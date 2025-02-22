@@ -1,0 +1,10 @@
+{
+    "theme": "Светлая",
+    "interface_language": "ru",
+    "autostart": false,
+    "selection_mode": "English",
+    "hotkeys": "Ctrl+D",
+    "translation_mode": "Word selection",
+    "notifications": true,
+    "history": true
+}
