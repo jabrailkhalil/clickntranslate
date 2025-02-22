@@ -1,9 +1,12 @@
+import getpass
+import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
 
+USER_NAME = getpass.getuser()
 SETTINGS_TEXT = {
     "en": {
         "autostart": "Start with Windows",
@@ -43,7 +46,26 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
         else:
             super().keyPressEvent(event)
 
+def add_to_startup(file_path=""):
+    if file_path == "":
+        file_path = os.path.realpath(__file__)
+    link_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % USER_NAME
+    os.symlink(file_path, link_path + "\\clickntranslate.lnk")
+
+def remove_startup():
+    link_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\clickntranslate.lnk' % USER_NAME
+    os.remove(link_path)
+
+
+
+
 class SettingsWindow(QWidget):
+    def switch_startup(self, int):
+        if self.autostart_checkbox.isChecked():
+            add_to_startup()
+        else:
+            remove_startup()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
@@ -81,6 +103,7 @@ class SettingsWindow(QWidget):
         # Первый чекбокс
         self.autostart_checkbox = QCheckBox(SETTINGS_TEXT[lang]["autostart"])
         self.autostart_checkbox.setChecked(self.parent.config.get("autostart", False))
+        self.autostart_checkbox.clicked.connect(self.switch_startup)
         self.main_layout.addWidget(self.autostart_checkbox)
         # Отступ в 1 px
         self.main_layout.addSpacing(1)

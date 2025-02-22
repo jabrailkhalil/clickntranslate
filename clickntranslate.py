@@ -1,4 +1,5 @@
 import json
+import getpass
 import os
 import sys
 import winreg
@@ -6,6 +7,8 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QCom
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from settings_window import SettingsWindow
+
+
 
 LANGUAGES = {
     "en": ["English", "Russian"],
