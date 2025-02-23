@@ -6,5 +6,6 @@
     "hotkeys": "Ctrl+H",
     "translation_mode": "Word selection",
     "notifications": true,
-    "history": true
+    "history": true,
+    "ocr_hotkeys": "Ctrl+D"
 }
