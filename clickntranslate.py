@@ -3,12 +3,12 @@ import getpass
 import os
 import sys
 import winreg
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox, QWidget, QPushButton
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
+import subprocess
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
+                             QWidget, QPushButton, QShortcut, QSystemTrayIcon, QMenu)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QIcon, QKeySequence
 from settings_window import SettingsWindow
-
-
 
 LANGUAGES = {
     "en": ["English", "Russian"],
@@ -19,18 +19,20 @@ INTERFACE_TEXT = {
     "en": {
         "title": "Click'n'Translate",
         "select_language": "Select languages for translation",
-        "start": "Start",
+        "start": "Start OCR",  # эта кнопка теперь не используется для запуска OCR
         "translation_selected": "Selected translation: {src} → {tgt}",
         "settings": "Settings",
-        "back": "Back to main"
+        "back": "Back to main",
+        "ocr": "OCR"
     },
     "ru": {
         "title": "Click'n'Translate",
         "select_language": "Выберите языки перевода",
-        "start": "Начать",
+        "start": "Запустить OCR",
         "translation_selected": "Выбран перевод: {src} → {tgt}",
         "settings": "Настройки",
-        "back": "Назад"
+        "back": "Назад",
+        "ocr": "OCR"
     }
 }
 
@@ -59,7 +61,6 @@ THEMES = {
     }
 }
 
-
 class DarkThemeApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -79,6 +80,10 @@ class DarkThemeApp(QMainWindow):
         self.settings_window = None
         self.init_ui()
 
+        # Создаем системную трей-иконку и сразу сворачиваем приложение
+        self.create_tray_icon()
+        self.hide()
+
     def load_config(self):
         if os.path.exists("config.json"):
             with open("config.json", "r", encoding="utf-8") as f:
@@ -96,7 +101,8 @@ class DarkThemeApp(QMainWindow):
                 "translation_mode": LANGUAGES["en"][0],
                 "hotkeys": "",
                 "notifications": False,
-                "history": False
+                "history": False,
+                "ocr_hotkeys": "Ctrl+D"
             }
             self.current_theme = self.config["theme"]
             self.current_interface_language = self.config["interface_language"]
@@ -108,9 +114,7 @@ class DarkThemeApp(QMainWindow):
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
-        self.config["translation_mode"] = getattr(
-            self, "translation_mode", LANGUAGES[self.current_interface_language][0]
-        )
+        self.config["translation_mode"] = getattr(self, "translation_mode", LANGUAGES[self.current_interface_language][0])
         self.config["hotkeys"] = getattr(self, "hotkeys", "")
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
@@ -138,7 +142,6 @@ class DarkThemeApp(QMainWindow):
         self.title_bar.setAlignment(Qt.AlignCenter)
 
         self.flag_button = QPushButton(self)
-        # Заменили пути на icons/American_flag.png и icons/Russian_flag.png
         self.flag_button.setIcon(
             QIcon("icons/American_flag.png") if self.current_interface_language == "en"
             else QIcon("icons/Russian_flag.png")
@@ -175,8 +178,50 @@ class DarkThemeApp(QMainWindow):
         self.close_button.setGeometry(self.width() - 40, 5, 30, 30)
         self.close_button.clicked.connect(QApplication.instance().quit)
 
+        # Здесь не добавляем кнопку "Старт OCR" – OCR запускается только через горячие клавиши или через трей
+        from PyQt5.QtWidgets import QShortcut
+        self.ocr_shortcut = QShortcut(QKeySequence(self.config.get("ocr_hotkeys", "Ctrl+D")), self)
+        self.ocr_shortcut.activated.connect(self.launch_ocr)
+
         self.show_main_screen()
         self.apply_theme()
+
+    def create_tray_icon(self):
+        self.tray_icon = QSystemTrayIcon(QIcon("icons/logo.png"), self)
+        tray_menu = QMenu()
+        launch_action = tray_menu.addAction("Запустить OCR")
+        launch_action.triggered.connect(self.launch_ocr)
+        open_action = tray_menu.addAction("Открыть приложение")
+        open_action.triggered.connect(self.show_window_from_tray)
+        exit_action = tray_menu.addAction("Выход")
+        exit_action.triggered.connect(QApplication.instance().quit)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.on_tray_icon_activated)
+        self.tray_icon.show()
+
+    def on_tray_icon_activated(self, reason):
+        from PyQt5.QtWidgets import QSystemTrayIcon
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self.show_window_from_tray()
+
+    def show_window_from_tray(self):
+        self.tray_icon.hide()
+        self.show()
+
+    def launch_ocr(self):
+        # Определяем язык для OCR по выбранному исходному языку (если окно открыто)
+        if hasattr(self, "source_lang"):
+            src_text = self.source_lang.currentText().lower()
+            if "english" in src_text or "английский" in src_text:
+                lang = "en"
+            else:
+                lang = "ru"
+        else:
+            lang = self.config.get("ocr_language", self.current_interface_language)
+        # Запускаем ocr.py как отдельный процесс с передачей языка
+        subprocess.Popen([sys.executable, "ocr.py", lang])
+        # Если окно открыто – скрываем его
+        self.hide()
 
     def apply_theme(self):
         theme = THEMES[self.current_theme]
@@ -193,7 +238,7 @@ class DarkThemeApp(QMainWindow):
                 color: {theme['text_color']};
                 border: none;
                 padding: 5px;
-                font-size: 18px; /* увеличили размер шрифта */
+                font-size: 18px;
             }}
             QComboBox QAbstractItemView {{
                 background-color: {theme['button_background']};
@@ -274,7 +319,6 @@ class DarkThemeApp(QMainWindow):
 
         self.update_theme_icon()
 
-        # В зависимости от того, открыто ли окно настроек или нет, иконка "шестерёнки" меняется:
         if hasattr(self, "settings_button"):
             if self.settings_window is None:
                 if self.current_theme == "Темная":
@@ -292,7 +336,6 @@ class DarkThemeApp(QMainWindow):
                     self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['back'])
 
     def update_theme_icon(self):
-        # Заменили пути на icons/sun.png и icons/moon.png
         icon_path = "icons/sun.png" if self.current_theme == "Темная" else "icons/moon.png"
         self.theme_button.setIcon(QIcon(icon_path))
 
@@ -301,7 +344,6 @@ class DarkThemeApp(QMainWindow):
         self.save_config()
         self.apply_theme()
         self.update_theme_icon()
-
         if self.settings_window is not None:
             self.settings_window.apply_theme()
 
@@ -312,13 +354,11 @@ class DarkThemeApp(QMainWindow):
         else:
             self.current_interface_language = "en"
             self.flag_button.setIcon(QIcon("icons/American_flag.png"))
-
         self.save_config()
         if self.settings_window is not None:
             self.settings_window.update_language()
         else:
             self.show_main_screen()
-
         self.apply_theme()
         self.update_theme_icon()
 
@@ -350,26 +390,23 @@ class DarkThemeApp(QMainWindow):
         self.clear_layout()
         self.settings_window = None
         self.set_settings_button_to_settings()
-
         self.label = QLabel(INTERFACE_TEXT[self.current_interface_language]["select_language"])
         self.label.setAlignment(Qt.AlignCenter)
         self.main_layout.addWidget(self.label)
-
         self.source_lang = QComboBox()
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
         self.source_lang.setCurrentIndex(0)
         self.source_lang.currentIndexChanged.connect(self.update_languages)
         self.main_layout.addWidget(self.source_lang)
-
         self.target_lang = QComboBox()
         self.target_lang.addItems(
             [lang for lang in LANGUAGES[self.current_interface_language] if lang != self.source_lang.currentText()]
         )
         self.target_lang.setCurrentIndex(0)
         self.main_layout.addWidget(self.target_lang)
-
         self.start_button = QPushButton(INTERFACE_TEXT[self.current_interface_language]["start"])
         self.main_layout.addWidget(self.start_button)
+        self.start_button.clicked.connect(self.launch_ocr)
         self.apply_theme()
 
     def show_settings(self):

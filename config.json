@@ -3,7 +3,7 @@
     "interface_language": "ru",
     "autostart": false,
     "selection_mode": "English",
-    "hotkeys": "Ctrl+H",
+    "hotkeys": "Ctrl+K",
     "translation_mode": "Word selection",
     "notifications": true,
     "history": true,
