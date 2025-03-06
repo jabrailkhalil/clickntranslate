@@ -3,9 +3,9 @@
     "interface_language": "ru",
     "autostart": false,
     "selection_mode": "English",
-    "hotkeys": "Ctrl+K",
+    "hotkeys": "Del",
     "translation_mode": "Word selection",
-    "notifications": true,
+    "notifications": false,
     "history": true,
-    "ocr_hotkeys": "Ctrl+D"
+    "copy_to_clipboard": true
 }

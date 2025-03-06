@@ -2,3 +2,4 @@ PyQt5~=5.15.11
 winrt
 Pillow
 pyperclip
+argostranslate

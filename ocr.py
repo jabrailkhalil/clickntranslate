@@ -4,6 +4,7 @@ import os
 import json
 import winrt
 import logging
+from datetime import datetime
 
 from PIL import Image
 from winrt.windows.graphics.imaging import BitmapDecoder, BitmapPixelFormat, SoftwareBitmap
@@ -13,6 +14,7 @@ import winrt.windows.storage.streams as streams
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
+import pyperclip
 
 # Настройка логгирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -28,12 +30,38 @@ def load_ocr_config():
         config = {}
     return config.get("ocr_language", "ru")
 
-# Если передан аргумент командной строки – используем его, иначе грузим из config.json
-if len(sys.argv) > 1:
-    default_ocr_lang = sys.argv[1]
-else:
-    default_ocr_lang = load_ocr_config()
-logging.info(f"Стартовый язык OCR: {default_ocr_lang}")
+# Функция сохранения истории переводов в файл JSON
+def save_translation_history(text, language):
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except Exception as e:
+        return
+    if not config.get("history", False):
+        return  # Сохранение истории отключено
+
+    history_file = "translation_history.json"
+    # Если файла нет – создаём его с пустым списком
+    if not os.path.exists(history_file):
+        with open(history_file, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=4)
+    try:
+        with open(history_file, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    except:
+        history = []
+
+    history.append({
+        "timestamp": datetime.now().isoformat(),
+        "language": language,
+        "text": text
+    })
+
+    try:
+        with open(history_file, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        logging.error(f"Ошибка сохранения истории переводов: {e}")
 
 # -------------------- Функции для OCR --------------------
 async def run_ocr_with_engine(bitmap, engine):
@@ -95,6 +123,7 @@ class ScreenCaptureOverlay(QWidget):
         self.start_point = None
         self.end_point = None
         self.last_rect = None
+        self.current_language = "ru"  # Значение по умолчанию
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.screen = QApplication.primaryScreen()
@@ -102,7 +131,7 @@ class ScreenCaptureOverlay(QWidget):
         logging.info("Запущен оверлей захвата экрана.")
 
         # Используем язык по умолчанию (из аргументов или config.json)
-        default_lang = default_ocr_lang
+        default_lang = load_ocr_config()
 
         self.lang_combo = QtWidgets.QComboBox(self)
         self.lang_combo.addItem(QtGui.QIcon("icons/Russian_flag.png"), "Русский", "ru")
@@ -170,6 +199,7 @@ class ScreenCaptureOverlay(QWidget):
 
         bitmap = load_image_from_pil(pil_image)
         language_code = self.lang_combo.currentData() or "ru"
+        self.current_language = language_code  # Сохраняем выбранный язык для истории
         logging.info(f"Используемый язык для OCR: {language_code}")
 
         self.ocr_worker = OCRWorker(bitmap, language_code)
@@ -177,14 +207,26 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.start()
 
     def handle_ocr_result(self, text):
-        import pyperclip
         if text:
             try:
-                pyperclip.copy(text)
-                logging.info(f"Распознанный текст скопирован в буфер обмена: {text}")
+                # Проверяем настройку "copy_to_clipboard" в config.json и копируем в буфер, если включено
+                copy_enabled = False
+                try:
+                    with open("config.json", "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                    copy_enabled = config.get("copy_to_clipboard", False)
+                except Exception as e:
+                    logging.error(f"Ошибка загрузки конфигурации: {e}")
+                if copy_enabled:
+                    pyperclip.copy(text)
+                    logging.info(f"Распознанный текст скопирован в буфер обмена: {text}")
+                else:
+                    logging.info("Копирование в буфер обмена отключено настройками.")
+                # Сохраняем перевод в историю, если включено в конфигурациях
+                save_translation_history(text, self.current_language)
                 self.close()
             except Exception as e:
-                logging.error(f"Ошибка копирования в буфер через pyperclip: {e}")
+                logging.error(f"Ошибка обработки OCR результата: {e}")
         else:
             logging.info("OCR не распознал текст.")
             msg = QMessageBox(self)

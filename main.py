@@ -4,12 +4,83 @@ import os
 import sys
 import winreg
 import subprocess
+import ctypes
+import threading
+from ctypes import wintypes
+
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                             QWidget, QPushButton, QShortcut, QSystemTrayIcon, QMenu)
+                             QWidget, QPushButton, QSystemTrayIcon, QMenu)
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QIcon, QKeySequence
+from PyQt5.QtGui import QIcon
 from settings_window import SettingsWindow
 
+# --- Константы для RegisterHotKey ---
+WM_HOTKEY = 0x0312
+MOD_ALT = 0x0001
+MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
+MOD_WIN = 0x0008
+
+
+# Класс для глобального перехвата горячей клавиши через RegisterHotKey
+class HotkeyListenerThread(threading.Thread):
+    def __init__(self, hotkey_str, callback, hotkey_id=1):
+        super().__init__()
+        self.hotkey_str = hotkey_str
+        self.callback = callback
+        self.hotkey_id = hotkey_id
+        self.daemon = True  # поток завершается вместе с основным приложением
+        # Разбираем строку горячей клавиши: определяем модификаторы и виртуальный код
+        self.modifiers, self.vk = self.parse_hotkey(self.hotkey_str)
+        if self.vk is None:
+            print("Неверный формат горячей клавиши.")
+
+    def parse_hotkey(self, hotkey_str):
+        modifiers = 0
+        vk = None
+        parts = hotkey_str.split("+")
+        for part in parts:
+            token = part.strip().lower()
+            if token in ("ctrl", "control"):
+                modifiers |= MOD_CONTROL
+            elif token == "alt":
+                modifiers |= MOD_ALT
+            elif token == "shift":
+                modifiers |= MOD_SHIFT
+            elif token == "win":
+                modifiers |= MOD_WIN
+            else:
+                # Если это один символ (например, "K")
+                if len(token) == 1:
+                    vk = ord(token.upper())
+                else:
+                    # Обработка функциональных клавиш, например, "F1"
+                    if token.startswith("f"):
+                        try:
+                            fnum = int(token[1:])
+                            vk = 0x70 + fnum - 1  # VK_F1 = 0x70
+                        except:
+                            pass
+        return modifiers, vk
+
+    def run(self):
+        if self.vk is None:
+            return
+        if not ctypes.windll.user32.RegisterHotKey(None, self.hotkey_id, self.modifiers, self.vk):
+            print("Не удалось установить перехват горячей клавиши.")
+            return
+        # Цикл обработки сообщений – ждем WM_HOTKEY
+        msg = wintypes.MSG()
+        while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+            if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
+                # Запускаем callback в основном потоке через QTimer.singleShot
+                QTimer.singleShot(0, self.callback)
+            ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
+            ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
+        ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id)
+
+
+# --- Основное приложение ---
 LANGUAGES = {
     "en": ["English", "Russian"],
     "ru": ["Английский", "Русский"]
@@ -19,7 +90,7 @@ INTERFACE_TEXT = {
     "en": {
         "title": "Click'n'Translate",
         "select_language": "Select languages for translation",
-        "start": "Start OCR",  # эта кнопка теперь не используется для запуска OCR
+        "start": "Start",
         "translation_selected": "Selected translation: {src} → {tgt}",
         "settings": "Settings",
         "back": "Back to main",
@@ -28,7 +99,7 @@ INTERFACE_TEXT = {
     "ru": {
         "title": "Click'n'Translate",
         "select_language": "Выберите языки перевода",
-        "start": "Запустить OCR",
+        "start": "Старт",
         "translation_selected": "Выбран перевод: {src} → {tgt}",
         "settings": "Настройки",
         "back": "Назад",
@@ -61,6 +132,7 @@ THEMES = {
     }
 }
 
+
 class DarkThemeApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -80,9 +152,13 @@ class DarkThemeApp(QMainWindow):
         self.settings_window = None
         self.init_ui()
 
-        # Создаем системную трей-иконку и сразу сворачиваем приложение
         self.create_tray_icon()
         self.hide()
+
+        # Регистрируем горячую клавишу (например, "Ctrl+K")
+        hotkey_str = self.config.get("hotkeys", "Ctrl+K")
+        self.hotkey_thread = HotkeyListenerThread(hotkey_str, self.launch_ocr)
+        self.hotkey_thread.start()
 
     def load_config(self):
         if os.path.exists("config.json"):
@@ -92,30 +168,28 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language = self.config.get("interface_language", "en")
             self.autostart = self.config.get("autostart", False)
             self.translation_mode = self.config.get("translation_mode", LANGUAGES[self.current_interface_language][0])
-            self.hotkeys = self.config.get("hotkeys", "")
         else:
             self.config = {
                 "theme": "Темная",
                 "interface_language": "en",
                 "autostart": False,
                 "translation_mode": LANGUAGES["en"][0],
-                "hotkeys": "",
+                "hotkeys": "Ctrl+K",
                 "notifications": False,
                 "history": False,
-                "ocr_hotkeys": "Ctrl+D"
+                "ocr_hotkeys": "Ctrl+K"
             }
             self.current_theme = self.config["theme"]
             self.current_interface_language = self.config["interface_language"]
             self.autostart = self.config["autostart"]
             self.translation_mode = self.config["translation_mode"]
-            self.hotkeys = self.config["hotkeys"]
 
     def save_config(self):
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
-        self.config["translation_mode"] = getattr(self, "translation_mode", LANGUAGES[self.current_interface_language][0])
-        self.config["hotkeys"] = getattr(self, "hotkeys", "")
+        self.config["translation_mode"] = getattr(self, "translation_mode",
+                                                  LANGUAGES[self.current_interface_language][0])
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
 
@@ -178,16 +252,14 @@ class DarkThemeApp(QMainWindow):
         self.close_button.setGeometry(self.width() - 40, 5, 30, 30)
         self.close_button.clicked.connect(QApplication.instance().quit)
 
-        # Здесь не добавляем кнопку "Старт OCR" – OCR запускается только через горячие клавиши или через трей
-        from PyQt5.QtWidgets import QShortcut
-        self.ocr_shortcut = QShortcut(QKeySequence(self.config.get("ocr_hotkeys", "Ctrl+D")), self)
-        self.ocr_shortcut.activated.connect(self.launch_ocr)
-
         self.show_main_screen()
         self.apply_theme()
 
     def create_tray_icon(self):
-        self.tray_icon = QSystemTrayIcon(QIcon("icons/logo.png"), self)
+        icon = QIcon("icons/logo.png")
+        if icon.isNull():
+            icon = QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon)
+        self.tray_icon = QSystemTrayIcon(icon, self)
         tray_menu = QMenu()
         launch_action = tray_menu.addAction("Запустить OCR")
         launch_action.triggered.connect(self.launch_ocr)
@@ -204,12 +276,12 @@ class DarkThemeApp(QMainWindow):
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             self.show_window_from_tray()
 
+    # Изменённый метод: окно просто показывается, а значок трея не скрывается.
     def show_window_from_tray(self):
-        self.tray_icon.hide()
         self.show()
+        self.raise_()
 
     def launch_ocr(self):
-        # Определяем язык для OCR по выбранному исходному языку (если окно открыто)
         if hasattr(self, "source_lang"):
             src_text = self.source_lang.currentText().lower()
             if "english" in src_text or "английский" in src_text:
@@ -218,10 +290,12 @@ class DarkThemeApp(QMainWindow):
                 lang = "ru"
         else:
             lang = self.config.get("ocr_language", self.current_interface_language)
-        # Запускаем ocr.py как отдельный процесс с передачей языка
         subprocess.Popen([sys.executable, "ocr.py", lang])
-        # Если окно открыто – скрываем его
         self.hide()
+
+    def restart_hotkey_listener(self):
+        self.hotkey_thread = HotkeyListenerThread(self.config.get("hotkeys", "Ctrl+K"), self.launch_ocr)
+        self.hotkey_thread.start()
 
     def apply_theme(self):
         theme = THEMES[self.current_theme]
@@ -256,9 +330,11 @@ class DarkThemeApp(QMainWindow):
             QPushButton {{
                 background-color: {theme['button_background']};
                 color: {theme['text_color']};
-                border: none;
+                border: 2px solid #C5B3E9;
                 padding: 10px;
                 font-size: 14px;
+        }}
+
             }}
         """
         self.setStyleSheet(style_sheet)
@@ -406,11 +482,12 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.target_lang)
         self.start_button = QPushButton(INTERFACE_TEXT[self.current_interface_language]["start"])
         self.main_layout.addWidget(self.start_button)
-        self.start_button.clicked.connect(self.launch_ocr)
+        self.start_button.clicked.connect(self.hide)
         self.apply_theme()
 
     def show_settings(self):
         self.clear_layout()
+        from settings_window import SettingsWindow
         self.settings_window = SettingsWindow(self)
         self.main_layout.addWidget(self.settings_window)
         self.set_settings_button_to_home()
@@ -458,6 +535,7 @@ class DarkThemeApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication([])
+    app.setQuitOnLastWindowClosed(False)
     window = DarkThemeApp()
     window.show()
     app.exec_()
