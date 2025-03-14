@@ -26,6 +26,7 @@ SETTINGS_TEXT = {
     "ru": {
         "autostart": "Запускать вместе с Windows",
         "translation_mode": "Режим перевода текста: {mode}",
+        # Обновлённый текст: теперь явно указывается мгновенный перевод выделенного текста
         "hotkeys": "Настроить горячие клавиши",
         "save_and_back": "Сохранить и вернуться",
         "copy_to_clipboard": "Копировать в буфер",
@@ -77,7 +78,6 @@ class SettingsWindow(QWidget):
 
     def on_history_checkbox_toggled(self, state):
         self.auto_save_setting("history", state)
-        # Кнопка просмотра истории остаётся активной всегда
         if hasattr(self, "history_view_button"):
             self.history_view_button.setEnabled(True)
 
@@ -149,7 +149,6 @@ class SettingsWindow(QWidget):
 
         self.history_view_button = QPushButton(SETTINGS_TEXT[lang]["history_view"])
         self.history_view_button.clicked.connect(self.show_history_view)
-        # Кнопка просмотра истории всегда будет активна
         self.history_view_button.setEnabled(True)
         self.main_layout.addWidget(self.history_view_button)
 
@@ -177,39 +176,57 @@ class SettingsWindow(QWidget):
         self.main_layout.setSpacing(9)
 
         lang = self.parent.current_interface_language
-        label = QLabel(SETTINGS_TEXT[lang]["hotkeys"])
-        self.main_layout.addWidget(label)
 
-        self.hotkey_input = ClearableKeySequenceEdit()
-        saved_hotkeys = self.parent.config.get("hotkeys", "")
-        self.hotkey_input.setKeySequence(QKeySequence(saved_hotkeys))
-        self.main_layout.addWidget(self.hotkey_input)
-        self.hotkey_input.keySequenceChanged.connect(self.save_hotkeys)
+        # Блок для настройки горячей клавиши "Copy Selected"
+        label_copy = QLabel("Copy Selected Hotkey:" if lang == "en" else "Горячая клавиша для копирования")
+        self.main_layout.addWidget(label_copy)
 
+        self.copy_hotkey_input = ClearableKeySequenceEdit()
+        saved_copy_hotkey = self.parent.config.get("copy_hotkey", "")
+        self.copy_hotkey_input.setKeySequence(QKeySequence(saved_copy_hotkey))
+        self.main_layout.addWidget(self.copy_hotkey_input)
+        self.copy_hotkey_input.keySequenceChanged.connect(self.save_copy_hotkey)
+
+        self.main_layout.addSpacing(10)
+
+        # Блок для настройки горячей клавиши "Translate Selected"
+        label_translate = QLabel("Translate Selected Hotkey:" if lang == "en" else "Горячая клавиша для мгновенного перевода выделенного текста")
+        self.main_layout.addWidget(label_translate)
+
+        self.translate_hotkey_input = ClearableKeySequenceEdit()
+        saved_translate_hotkey = self.parent.config.get("translate_hotkey", "")
+        self.translate_hotkey_input.setKeySequence(QKeySequence(saved_translate_hotkey))
+        self.main_layout.addWidget(self.translate_hotkey_input)
+        self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
+
+        # Инструктивная надпись для удаления комбинации
         remove_label = QLabel(SETTINGS_TEXT[lang]["remove_hotkey"])
         self.main_layout.addWidget(remove_label)
 
+        # Кнопка возврата
         back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
         back_button.clicked.connect(self.back_from_hotkeys)
         self.main_layout.addWidget(back_button)
 
         self.apply_theme()
 
+    def save_copy_hotkey(self):
+        hotkey_str = self.copy_hotkey_input.keySequence().toString()
+        self.parent.config["copy_hotkey"] = hotkey_str
+        self.parent.save_config()
+        # Здесь можно перезапустить слушатель горячих клавиш для копирования, если требуется
+
+    def save_translate_hotkey(self):
+        hotkey_str = self.translate_hotkey_input.keySequence().toString()
+        self.parent.config["translate_hotkey"] = hotkey_str
+        self.parent.save_config()
+        # Здесь можно перезапустить слушатель горячих клавиш для перевода, если требуется
+
     def back_from_hotkeys(self):
-        self.main_layout.setContentsMargins(5, 5, 5, 5)
-        self.main_layout.setSpacing(0)
         self.init_ui()
         self.apply_theme()
 
-    def save_hotkeys(self):
-        hotkey_seq = self.hotkey_input.keySequence().toString()
-        self.parent.config["hotkeys"] = hotkey_seq
-        self.parent.hotkeys = hotkey_seq
-        self.parent.save_config()
-        self.parent.restart_hotkey_listener()
-
     def show_history_view(self):
-        # Отображаем историю переводов прямо в окне настроек
         self.clear_main_layout()
         lang = self.parent.current_interface_language
 
@@ -218,7 +235,6 @@ class SettingsWindow(QWidget):
 
         self.history_text_edit = QTextEdit()
         self.history_text_edit.setReadOnly(True)
-        # Устанавливаем стиль для корректного отображения в зависимости от темы
         if self.parent.current_theme == "Темная":
             self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
         else:
@@ -243,7 +259,6 @@ class SettingsWindow(QWidget):
                 if history:
                     text = ""
                     for record in history:
-                        # Форматируем так, чтобы было видно дату, текст и разделитель
                         text += f"{record.get('timestamp')} ({record.get('language')}):\n"
                         text += f"{record.get('text')}\n"
                         text += "-" * 40 + "\n\n"
@@ -317,18 +332,26 @@ class SettingsWindow(QWidget):
         """
         self.setStyleSheet(style)
 
-        if self.hotkeys_mode and hasattr(self, 'hotkey_input'):
+        if self.hotkeys_mode:
             if self.parent.current_theme == "Темная":
-                self.hotkey_input.setStyleSheet(
+                self.copy_hotkey_input.setStyleSheet(
+                    "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
+                )
+                self.translate_hotkey_input.setStyleSheet(
                     "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
                 )
             else:
-                self.hotkey_input.setStyleSheet(
+                self.copy_hotkey_input.setStyleSheet(
                     "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
                 )
-        # Если окно истории открыто, обновляем его стиль
+                self.translate_hotkey_input.setStyleSheet(
+                    "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
+                )
         if hasattr(self, "history_text_edit"):
             if self.parent.current_theme == "Темная":
                 self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
             else:
                 self.history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+
+    def update_language(self):
+        self.init_ui()

@@ -6,13 +6,16 @@ import winreg
 import subprocess
 import ctypes
 import threading
+import time
+import pyperclip
 from ctypes import wintypes
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                             QWidget, QPushButton, QSystemTrayIcon, QMenu)
+                             QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from settings_window import SettingsWindow
+import translater  # Импорт модуля перевода
 
 # --- Константы для RegisterHotKey ---
 WM_HOTKEY = 0x0312
@@ -21,8 +24,18 @@ MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 
+def simulate_copy():
+    # Эмуляция нажатия Ctrl+C для копирования выделенного текста
+    VK_CONTROL = 0x11
+    VK_C = 0x43
+    KEYEVENTF_EXTENDEDKEY = 0x0001
+    KEYEVENTF_KEYUP = 0x0002
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(VK_C, 0, 0, 0)
+    time.sleep(0.05)
+    ctypes.windll.user32.keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
-# Класс для глобального перехвата горячей клавиши через RegisterHotKey
 class HotkeyListenerThread(threading.Thread):
     def __init__(self, hotkey_str, callback, hotkey_id=1):
         super().__init__()
@@ -30,7 +43,6 @@ class HotkeyListenerThread(threading.Thread):
         self.callback = callback
         self.hotkey_id = hotkey_id
         self.daemon = True  # поток завершается вместе с основным приложением
-        # Разбираем строку горячей клавиши: определяем модификаторы и виртуальный код
         self.modifiers, self.vk = self.parse_hotkey(self.hotkey_str)
         if self.vk is None:
             print("Неверный формат горячей клавиши.")
@@ -49,12 +61,12 @@ class HotkeyListenerThread(threading.Thread):
                 modifiers |= MOD_SHIFT
             elif token == "win":
                 modifiers |= MOD_WIN
+            elif token == "del":
+                vk = 0x2E
             else:
-                # Если это один символ (например, "K")
                 if len(token) == 1:
                     vk = ord(token.upper())
                 else:
-                    # Обработка функциональных клавиш, например, "F1"
                     if token.startswith("f"):
                         try:
                             fnum = int(token[1:])
@@ -69,18 +81,14 @@ class HotkeyListenerThread(threading.Thread):
         if not ctypes.windll.user32.RegisterHotKey(None, self.hotkey_id, self.modifiers, self.vk):
             print("Не удалось установить перехват горячей клавиши.")
             return
-        # Цикл обработки сообщений – ждем WM_HOTKEY
         msg = wintypes.MSG()
         while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
             if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
-                # Запускаем callback в основном потоке через QTimer.singleShot
                 QTimer.singleShot(0, self.callback)
             ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
             ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
         ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id)
 
-
-# --- Основное приложение ---
 LANGUAGES = {
     "en": ["English", "Russian"],
     "ru": ["Английский", "Русский"]
@@ -132,7 +140,6 @@ THEMES = {
     }
 }
 
-
 class DarkThemeApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -155,10 +162,19 @@ class DarkThemeApp(QMainWindow):
         self.create_tray_icon()
         self.hide()
 
-        # Регистрируем горячую клавишу (например, "Ctrl+K")
-        hotkey_str = self.config.get("hotkeys", "Ctrl+K")
-        self.hotkey_thread = HotkeyListenerThread(hotkey_str, self.launch_ocr)
+        # Используем параметр "ocr_hotkeys" для привязки горячей клавиши OCR (дефолт "Ctrl+O")
+        ocr_hotkey = self.config.get("ocr_hotkeys", "Ctrl+O")
+        self.hotkey_thread = HotkeyListenerThread(ocr_hotkey, self.launch_ocr)
         self.hotkey_thread.start()
+        # Слушатели для горячих клавиш копирования и перевода (значения берутся из настроек)
+        copy_hotkey = self.config.get("copy_hotkey", "")
+        if copy_hotkey:
+            self.copy_hotkey_thread = HotkeyListenerThread(copy_hotkey, self.launch_copy)
+            self.copy_hotkey_thread.start()
+        translate_hotkey = self.config.get("translate_hotkey", "")
+        if translate_hotkey:
+            self.translate_hotkey_thread = HotkeyListenerThread(translate_hotkey, self.launch_translate)
+            self.translate_hotkey_thread.start()
 
     def load_config(self):
         if os.path.exists("config.json"):
@@ -174,10 +190,11 @@ class DarkThemeApp(QMainWindow):
                 "interface_language": "en",
                 "autostart": False,
                 "translation_mode": LANGUAGES["en"][0],
-                "hotkeys": "Ctrl+K",
+                "ocr_hotkeys": "Ctrl+O",
+                "copy_hotkey": "Ctrl+K",
+                "translate_hotkey": "Ctrl+F",
                 "notifications": False,
-                "history": False,
-                "ocr_hotkeys": "Ctrl+K"
+                "history": False
             }
             self.current_theme = self.config["theme"]
             self.current_interface_language = self.config["interface_language"]
@@ -276,7 +293,6 @@ class DarkThemeApp(QMainWindow):
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             self.show_window_from_tray()
 
-    # Изменённый метод: окно просто показывается, а значок трея не скрывается.
     def show_window_from_tray(self):
         self.show()
         self.raise_()
@@ -293,8 +309,17 @@ class DarkThemeApp(QMainWindow):
         subprocess.Popen([sys.executable, "ocr.py", lang])
         self.hide()
 
+    def launch_copy(self):
+        subprocess.Popen([sys.executable, "ocr.py", "copy"])
+        self.hide()
+
+    def launch_translate(self):
+        # Запускаем OCR в режиме перевода через ocr.py с параметром "translate"
+        subprocess.Popen([sys.executable, "ocr.py", "translate"])
+        self.hide()
+
     def restart_hotkey_listener(self):
-        self.hotkey_thread = HotkeyListenerThread(self.config.get("hotkeys", "Ctrl+K"), self.launch_ocr)
+        self.hotkey_thread = HotkeyListenerThread(self.config.get("ocr_hotkeys", "Ctrl+O"), self.launch_ocr)
         self.hotkey_thread.start()
 
     def apply_theme(self):
@@ -333,18 +358,14 @@ class DarkThemeApp(QMainWindow):
                 border: 2px solid #C5B3E9;
                 padding: 10px;
                 font-size: 14px;
-        }}
-
             }}
         """
         self.setStyleSheet(style_sheet)
-
         if hasattr(self, "title_bar"):
             header_bg = "#c0c0c0" if self.current_theme == "Светлая" else theme['button_background']
             self.title_bar.setStyleSheet(
                 f"font-size: 18px; font-weight: bold; color: {theme['text_color']}; background-color: {header_bg};"
             )
-
         if hasattr(self, "minimize_button") and hasattr(self, "close_button"):
             if self.current_theme == "Светлая":
                 self.minimize_button.setStyleSheet("""
@@ -392,9 +413,7 @@ class DarkThemeApp(QMainWindow):
                         color: #ff3333;
                     }
                 """)
-
         self.update_theme_icon()
-
         if hasattr(self, "settings_button"):
             if self.settings_window is None:
                 if self.current_theme == "Темная":
@@ -482,7 +501,7 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.target_lang)
         self.start_button = QPushButton(INTERFACE_TEXT[self.current_interface_language]["start"])
         self.main_layout.addWidget(self.start_button)
-        self.start_button.clicked.connect(self.hide)
+        self.start_button.clicked.connect(self.showMinimized)
         self.apply_theme()
 
     def show_settings(self):
@@ -531,7 +550,6 @@ class DarkThemeApp(QMainWindow):
     def closeEvent(self, event):
         self.save_config()
         event.accept()
-
 
 if __name__ == "__main__":
     app = QApplication([])

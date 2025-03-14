@@ -51,8 +51,28 @@ def test_translation():
     print("Исходный текст (RU):", text_ru)
     print("Перевод (EN):", translated_text)
 
+def translate_text(text, source_code, target_code):
+    """
+    Переводит заданный текст с использованием установленных языковых моделей.
+    :param text: Исходный текст для перевода
+    :param source_code: Код исходного языка (например, "ru" или "en")
+    :param target_code: Код целевого языка
+    :return: Переведённый текст
+    """
+    installed_languages = argostranslate.translate.get_installed_languages()
+    source_language = None
+    target_language = None
+    for language in installed_languages:
+        if language.code == source_code:
+            source_language = language
+        elif language.code == target_code:
+            target_language = language
+    if source_language is None or target_language is None:
+        raise Exception("Модели перевода не установлены.")
+    translation_obj = source_language.get_translation(target_language)
+    return translation_obj.translate(text)
+
 if __name__ == '__main__':
     install_ru_en_model()
-    # При первом запуске может потребоваться перезапуск скрипта, чтобы модель загрузилась корректно.
     print("Попытка тестового перевода:")
     test_translation()

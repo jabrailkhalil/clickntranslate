@@ -1,11 +1,14 @@
 {
     "theme": "Темная",
-    "interface_language": "ru",
+    "interface_language": "en",
     "autostart": false,
     "selection_mode": "English",
-    "hotkeys": "Del",
-    "translation_mode": "Word selection",
+    "hotkeys": "",
+    "translation_mode": "Выбор слова",
     "notifications": false,
     "history": true,
-    "copy_to_clipboard": true
+    "copy_to_clipboard": true,
+    "safe_mode": true,
+    "copy_hotkey": "",
+    "translate_hotkey": ""
 }
