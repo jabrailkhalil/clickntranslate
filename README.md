@@ -1,4 +1,4 @@
-![Project Cover](cover.png)
+![Project Cover](cover.jpg)
 
 1. Click'n'Translate is a modern application for instant text translation using hotkeys and OCR technology.
 2. The project integrates Argos Translate and Windows OCR to handle both selected text and image-based text.
