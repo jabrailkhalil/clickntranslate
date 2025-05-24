@@ -9,9 +9,11 @@ import threading
 import time
 import pyperclip
 from ctypes import wintypes
+import psutil
+import datetime
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                             QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox)
+                             QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from settings_window import SettingsWindow
@@ -36,6 +38,27 @@ def simulate_copy():
     ctypes.windll.user32.keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0)
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
+def save_copy_history(text):
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+        if not config.get("copy_history", False):
+            return
+    except Exception:
+        return
+    record = {"timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "text": text}
+    history_file = "copy_history.json"
+    history = []
+    if os.path.exists(history_file):
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    history.append(record)
+    with open(history_file, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=4)
+
 class HotkeyListenerThread(threading.Thread):
     def __init__(self, hotkey_str, callback, hotkey_id=1):
         super().__init__()
@@ -50,6 +73,12 @@ class HotkeyListenerThread(threading.Thread):
     def parse_hotkey(self, hotkey_str):
         modifiers = 0
         vk = None
+        main_keys = []
+        # Маппинг спецсимволов на виртуальные коды Windows
+        special_vk = {
+            ";": 0xBA, "=": 0xBB, ",": 0xBC, "-": 0xBD, ".": 0xBE, "/": 0xBF, "`": 0xC0,
+            "[": 0xDB, "\\": 0xDC, "]": 0xDD, "'": 0xDE
+        }
         parts = hotkey_str.split("+")
         for part in parts:
             token = part.strip().lower()
@@ -62,17 +91,25 @@ class HotkeyListenerThread(threading.Thread):
             elif token == "win":
                 modifiers |= MOD_WIN
             elif token == "del":
-                vk = 0x2E
-            else:
-                if len(token) == 1:
-                    vk = ord(token.upper())
-                else:
-                    if token.startswith("f"):
-                        try:
-                            fnum = int(token[1:])
-                            vk = 0x70 + fnum - 1  # VK_F1 = 0x70
-                        except:
-                            pass
+                main_keys.append(0x2E)
+            elif token.startswith("f") and len(token) > 1 and token[1:].isdigit():
+                try:
+                    fnum = int(token[1:])
+                    main_keys.append(0x70 + fnum - 1)  # VK_F1 = 0x70
+                except:
+                    pass
+            elif token in special_vk:
+                main_keys.append(special_vk[token])
+            elif len(token) == 1:
+                main_keys.append(ord(token.upper()))
+            # иначе игнорируем
+        if len(main_keys) == 0:
+            print("Ошибка: не выбрана основная клавиша для хоткея.")
+            return modifiers, None
+        if len(main_keys) > 1:
+            print("Ошибка: Windows поддерживает только одну основную клавишу в хоткее! Выбрано: " + str(main_keys))
+            return modifiers, None
+        vk = main_keys[0]
         return modifiers, vk
 
     def run(self):
@@ -160,7 +197,6 @@ class DarkThemeApp(QMainWindow):
         self.init_ui()
 
         self.create_tray_icon()
-        self.hide()
 
         # Используем параметр "ocr_hotkeys" для привязки горячей клавиши OCR (дефолт "Ctrl+O")
         ocr_hotkey = self.config.get("ocr_hotkeys", "Ctrl+O")
@@ -176,6 +212,10 @@ class DarkThemeApp(QMainWindow):
             self.translate_hotkey_thread = HotkeyListenerThread(translate_hotkey, self.launch_translate)
             self.translate_hotkey_thread.start()
 
+        self.HotkeyListenerThread = HotkeyListenerThread
+
+        self.setWindowIcon(QIcon("icons/icon.png"))
+
     def load_config(self):
         if os.path.exists("config.json"):
             with open("config.json", "r", encoding="utf-8") as f:
@@ -184,6 +224,7 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language = self.config.get("interface_language", "en")
             self.autostart = self.config.get("autostart", False)
             self.translation_mode = self.config.get("translation_mode", LANGUAGES[self.current_interface_language][0])
+            self.start_minimized = self.config.get("start_minimized", False)
         else:
             self.config = {
                 "theme": "Темная",
@@ -194,12 +235,14 @@ class DarkThemeApp(QMainWindow):
                 "copy_hotkey": "Ctrl+K",
                 "translate_hotkey": "Ctrl+F",
                 "notifications": False,
-                "history": False
+                "history": False,
+                "start_minimized": False
             }
             self.current_theme = self.config["theme"]
             self.current_interface_language = self.config["interface_language"]
             self.autostart = self.config["autostart"]
             self.translation_mode = self.config["translation_mode"]
+            self.start_minimized = self.config["start_minimized"]
 
     def save_config(self):
         self.config["theme"] = self.current_theme
@@ -207,6 +250,7 @@ class DarkThemeApp(QMainWindow):
         self.config["autostart"] = getattr(self, "autostart", False)
         self.config["translation_mode"] = getattr(self, "translation_mode",
                                                   LANGUAGES[self.current_interface_language][0])
+        self.config["start_minimized"] = getattr(self, "start_minimized", False)
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
 
@@ -273,10 +317,7 @@ class DarkThemeApp(QMainWindow):
         self.apply_theme()
 
     def create_tray_icon(self):
-        icon = QIcon("icons/logo.png")
-        if icon.isNull():
-            icon = QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon)
-        self.tray_icon = QSystemTrayIcon(icon, self)
+        self.tray_icon = QSystemTrayIcon(QIcon("icons/icon.png"), self)
         tray_menu = QMenu()
         launch_action = tray_menu.addAction("Запустить OCR")
         launch_action.triggered.connect(self.launch_ocr)
@@ -294,8 +335,13 @@ class DarkThemeApp(QMainWindow):
             self.show_window_from_tray()
 
     def show_window_from_tray(self):
-        self.show()
-        self.raise_()
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
 
     def launch_ocr(self):
         if hasattr(self, "source_lang"):
@@ -310,12 +356,15 @@ class DarkThemeApp(QMainWindow):
         self.hide()
 
     def launch_copy(self):
-        subprocess.Popen([sys.executable, "ocr.py", "copy"])
+        copy_hotkey = self.config.get("copy_hotkey", "")
+        if copy_hotkey:
+            subprocess.Popen([sys.executable, "ocr.py", "copy"])
         self.hide()
 
     def launch_translate(self):
-        # Запускаем OCR в режиме перевода через ocr.py с параметром "translate"
-        subprocess.Popen([sys.executable, "ocr.py", "translate"])
+        translate_hotkey = self.config.get("translate_hotkey", "")
+        if translate_hotkey:
+            subprocess.Popen([sys.executable, "ocr.py", "translate"])
         self.hide()
 
     def restart_hotkey_listener(self):
@@ -324,6 +373,10 @@ class DarkThemeApp(QMainWindow):
 
     def apply_theme(self):
         theme = THEMES[self.current_theme]
+        # Настроим стиль скроллбара в зависимости от темы
+        scrollbar_bg = theme['button_background'] if self.current_theme != 'Темная' else '#232323'
+        scrollbar_handle = '#888' if self.current_theme != 'Темная' else '#444'
+        scrollbar_handle_hover = '#aaa' if self.current_theme != 'Темная' else '#666'
         style_sheet = f"""
             QMainWindow {{
                 background-color: {theme['background']};
@@ -358,6 +411,33 @@ class DarkThemeApp(QMainWindow):
                 border: 2px solid #C5B3E9;
                 padding: 10px;
                 font-size: 14px;
+            }}
+            QLineEdit, QTextEdit {{
+                background-color: {theme['button_background']};
+                color: {theme['text_color']};
+                border: 1px solid #550000;
+                padding: 5px;
+                font-size: 14px;
+            }}
+            QTextEdit QScrollBar:vertical {{
+                background: {scrollbar_bg};
+                width: 10px;
+                margin: 0px 0px 0px 0px;
+                border-radius: 5px;
+                border: none;
+            }}
+            QTextEdit QScrollBar::handle:vertical {{
+                background: {scrollbar_handle};
+                min-height: 20px;
+                border-radius: 5px;
+                border: none;
+            }}
+            QTextEdit QScrollBar::add-line:vertical, QTextEdit QScrollBar::sub-line:vertical {{
+                background: none;
+                height: 0px;
+            }}
+            QTextEdit QScrollBar::handle:vertical:hover {{
+                background: {scrollbar_handle_hover};
             }}
         """
         self.setStyleSheet(style_sheet)
@@ -485,9 +565,13 @@ class DarkThemeApp(QMainWindow):
         self.clear_layout()
         self.settings_window = None
         self.set_settings_button_to_settings()
-        self.label = QLabel(INTERFACE_TEXT[self.current_interface_language]["select_language"])
+        # Стильная надпись 'Офлайн перевод'/'Offline translation'
+        lang_label_text = "Offline translation" if self.current_interface_language == "en" else "Офлайн перевод"
+        self.label = QLabel(lang_label_text)
         self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("color: #7A5FA1; font-size: 18px; font-weight: bold; margin-top: 12px; margin-bottom: 8px;")
         self.main_layout.addWidget(self.label)
+        self.main_layout.addSpacing(2)
         self.source_lang = QComboBox()
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
         self.source_lang.setCurrentIndex(0)
@@ -499,9 +583,42 @@ class DarkThemeApp(QMainWindow):
         )
         self.target_lang.setCurrentIndex(0)
         self.main_layout.addWidget(self.target_lang)
-        self.start_button = QPushButton(INTERFACE_TEXT[self.current_interface_language]["start"])
+        self.text_input = QTextEdit()
+        self.text_input.setPlaceholderText("Enter text to translate" if self.current_interface_language == "en" else "Введите текст для перевода")
+        self.text_input.setMinimumHeight(45)
+        self.text_input.setMaximumHeight(70)
+        self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_layout.addWidget(self.text_input)
+
+        # Кнопка перевода сразу под полем ввода
+        self.translate_button = QPushButton("Translate" if self.current_interface_language == "en" else "Перевести")
+        self.translate_button.clicked.connect(self.translate_input_text)
+        self.translate_button.setStyleSheet("border: 2px solid #C5B3E9; border-radius: 8px; font-size: 16px; padding: 8px 0; background: none; color: #7A5FA1;")
+        self.main_layout.addWidget(self.translate_button)
+
+        # --- Блок хоткеев ---
+        hotkey_label_style = "font-size: 13px; color: #888; margin-bottom: 0px;"
+        hotkey_value_style = "font-size: 15px; color: #7A5FA1; font-weight: bold; margin-bottom: 2px;"
+        copy_hotkey = self.config.get("copy_hotkey", "")
+        translate_hotkey = self.config.get("translate_hotkey", "")
+        if copy_hotkey:
+            label = QLabel(("Copy hotkey:" if self.current_interface_language == "en" else "Горячая клавиша копирования:") + f" <span style='{hotkey_value_style}'>{copy_hotkey}</span>")
+            label.setStyleSheet(hotkey_label_style)
+            label.setTextFormat(Qt.RichText)
+            self.main_layout.addWidget(label)
+        if translate_hotkey:
+            label = QLabel(("Translate hotkey:" if self.current_interface_language == "en" else "Горячая клавиша перевода:") + f" <span style='{hotkey_value_style}'>{translate_hotkey}</span>")
+            label.setStyleSheet(hotkey_label_style)
+            label.setTextFormat(Qt.RichText)
+            self.main_layout.addWidget(label)
+
+        # Кнопка старт (shadow mode) в самом низу
+        start_text = "Shadow mode" if self.current_interface_language == "en" else "Режим тени"
+        self.start_button = QPushButton(start_text)
+        self.start_button.setStyleSheet("border: none; font-size: 16px; padding: 8px 0; background-color: #C5B3E9; color: #111; border-radius: 8px;")
         self.main_layout.addWidget(self.start_button)
-        self.start_button.clicked.connect(self.showMinimized)
+        self.start_button.clicked.connect(self.minimize_to_tray)
         self.apply_theme()
 
     def show_settings(self):
@@ -551,9 +668,68 @@ class DarkThemeApp(QMainWindow):
         self.save_config()
         event.accept()
 
+    def translate_input_text(self):
+        text = self.text_input.toPlainText()
+        if text:
+            # Сопоставление отображаемого языка с кодом
+            lang_map = {
+                "Русский": "ru",
+                "Английский": "en",
+                "English": "en",
+                "Russian": "ru"
+            }
+            source_code = lang_map.get(self.source_lang.currentText(), "ru")
+            target_code = lang_map.get(self.target_lang.currentText(), "en")
+            try:
+                translated_text = translater.translate_text(text, source_code, target_code)
+                msg = QMessageBox(self)
+                msg.setText(translated_text)
+                copy_button = msg.addButton("Копировать", QMessageBox.ActionRole)
+                msg.addButton(QMessageBox.Ok)
+                msg.setStyleSheet(
+                    "QMessageBox { background-color: #121212; color: #ffffff; } "
+                    "QLabel { color: #ffffff; font-size: 18px; } "
+                    "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 5px; min-width: 80px; } "
+                    "QPushButton:hover { background-color: #333333; }"
+                )
+                msg.exec_()
+                if msg.clickedButton() == copy_button:
+                    pyperclip.copy(translated_text)
+                    self.save_copy_history(translated_text)
+            except Exception as e:
+                QMessageBox.warning(self, "Ошибка перевода", str(e))
+
+    def minimize_to_tray(self):
+        self.hide()
+
 if __name__ == "__main__":
+    # Проверяем, есть ли уже процесс
+    def is_already_running():
+        this_pid = os.getpid()
+        exe = sys.executable.lower()
+        for p in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+            if p.info['pid'] == this_pid:
+                continue
+            try:
+                if p.info['exe'] and p.info['exe'].lower() == exe:
+                    return True
+            except Exception:
+                pass
+        return False
+    # Читаем конфиг
+    start_minimized = False
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            start_minimized = config.get("start_minimized", False)
+    except Exception:
+        pass
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
     window = DarkThemeApp()
-    window.show()
+    # Всегда используем window.start_minimized, который инициализирован из config.json
+    if window.start_minimized and not is_already_running():
+        window.minimize_to_tray()
+    else:
+        window.show()
     app.exec_()

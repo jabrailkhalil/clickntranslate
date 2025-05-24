@@ -1,6 +1,6 @@
 {
     "theme": "Темная",
-    "interface_language": "en",
+    "interface_language": "ru",
     "autostart": false,
     "selection_mode": "English",
     "hotkeys": "",
@@ -9,6 +9,9 @@
     "history": true,
     "copy_to_clipboard": true,
     "safe_mode": true,
-    "copy_hotkey": "",
-    "translate_hotkey": ""
+    "copy_hotkey": "Ctrl+Shift+C",
+    "translate_hotkey": "Ctrl+Shift+T",
+    "start_minimized": false,
+    "source_lang_text": "English",
+    "copy_history": true
 }

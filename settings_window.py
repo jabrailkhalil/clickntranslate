@@ -21,7 +21,16 @@ SETTINGS_TEXT = {
         "save": "Save",
         "back": "Back",
         "remove_hotkey": "Press ESC to remove hotkey",
-        "history_view": "View translation history"
+        "history_view": "View translation history",
+        "start_minimized": "Start in shadow mode",
+        "copy_history_view": "Show copy history",
+        "copy_history": "Save copy history",
+        "clear_copy_history": "Clear copy history",
+        "clear_translation_history": "Clear translation history",
+        "history_title": "Translation history",
+        "copy_history_title": "Copy history",
+        "history_empty": "History is empty.",
+        "history_error": "Error reading history."
     },
     "ru": {
         "autostart": "Запускать вместе с Windows",
@@ -35,13 +44,17 @@ SETTINGS_TEXT = {
         "save": "Сохранить",
         "back": "Назад",
         "remove_hotkey": "Нажмите ESC для удаления горячей клавиши",
-        "history_view": "Посмотреть историю переводов"
+        "history_view": "Посмотреть историю переводов",
+        "start_minimized": "Запускать в режиме тень",
+        "copy_history_view": "Показать историю копирований",
+        "copy_history": "Сохранять историю копирований",
+        "clear_copy_history": "Очистить историю копирований",
+        "clear_translation_history": "Очистить историю переводов",
+        "history_title": "История переводов",
+        "copy_history_title": "История копирований",
+        "history_empty": "История пуста.",
+        "history_error": "Ошибка чтения истории."
     }
-}
-
-TRANSLATION_MODES = {
-    "en": ["Area selection", "Full screen selection", "Word selection"],
-    "ru": ["Выделение области", "Выделение всего экрана", "Выбор слова"]
 }
 
 class ClearableKeySequenceEdit(QKeySequenceEdit):
@@ -51,29 +64,21 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
         else:
             super().keyPressEvent(event)
 
-def add_to_startup(file_path=""):
-    if file_path == "":
-        file_path = os.path.realpath(__file__)
-    link_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % USER_NAME
-    os.symlink(file_path, link_path + "\\clickntranslate.lnk")
-
-def remove_startup():
-    link_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\clickntranslate.lnk' % USER_NAME
-    os.remove(link_path)
-
 # Класс HistoryDialog удалён, т.к. история теперь отображается внутри настроек
 
 class SettingsWindow(QWidget):
     def switch_startup(self, state):
         self.parent.config["autostart"] = self.autostart_checkbox.isChecked()
         self.parent.save_config()
-        if self.autostart_checkbox.isChecked():
-            add_to_startup()
-        else:
-            remove_startup()
+        self.parent.set_autostart(self.autostart_checkbox.isChecked())
+        self.parent.autostart = self.autostart_checkbox.isChecked()
 
     def auto_save_setting(self, key, value):
         self.parent.config[key] = value
+        if key == "start_minimized":
+            self.parent.start_minimized = value
+        if key == "autostart":
+            self.parent.autostart = value
         self.parent.save_config()
 
     def on_history_checkbox_toggled(self, state):
@@ -115,13 +120,25 @@ class SettingsWindow(QWidget):
         self.autostart_checkbox.setChecked(self.parent.config.get("autostart", False))
         self.autostart_checkbox.clicked.connect(self.switch_startup)
         self.main_layout.addWidget(self.autostart_checkbox)
-        self.main_layout.addSpacing(1)
+        self.main_layout.addSpacing(8)
+
+        self.start_minimized_checkbox = QCheckBox(SETTINGS_TEXT[lang]["start_minimized"])
+        self.start_minimized_checkbox.setChecked(self.parent.config.get("start_minimized", False))
+        self.start_minimized_checkbox.toggled.connect(lambda state: self.auto_save_setting("start_minimized", state))
+        self.main_layout.addWidget(self.start_minimized_checkbox)
+        self.main_layout.addSpacing(8)
 
         self.copy_checkbox = QCheckBox(SETTINGS_TEXT[lang]["copy_to_clipboard"])
         self.copy_checkbox.setChecked(self.parent.config.get("copy_to_clipboard", False))
         self.copy_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_to_clipboard", state))
         self.main_layout.addWidget(self.copy_checkbox)
-        self.main_layout.addSpacing(1)
+        self.main_layout.addSpacing(8)
+
+        self.copy_history_checkbox = QCheckBox(SETTINGS_TEXT[lang]["copy_history"])
+        self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", False))
+        self.copy_history_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_history", state))
+        self.main_layout.addWidget(self.copy_history_checkbox)
+        self.main_layout.addSpacing(8)
 
         self.history_checkbox = QCheckBox(SETTINGS_TEXT[lang]["history"])
         self.history_checkbox.setChecked(self.parent.config.get("history", False))
@@ -131,43 +148,27 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(100)
 
         # --- ГРУППА КНОПОК ---
-        self.translation_mode_button = QPushButton(
-            SETTINGS_TEXT[lang]["translation_mode"].format(
-                mode=self.parent.config.get("translation_mode", TRANSLATION_MODES[lang][0])
-            )
-        )
-        self.translation_mode_button.clicked.connect(self.cycle_translation_mode)
-        self.main_layout.addWidget(self.translation_mode_button)
-
-        self.main_layout.addSpacing(1)
-
         hotkeys_button = QPushButton(SETTINGS_TEXT[lang]["hotkeys"])
         hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         self.main_layout.addWidget(hotkeys_button)
 
-        self.main_layout.addSpacing(1)
+        self.main_layout.addSpacing(20)
 
+        # Кнопка истории переводов
         self.history_view_button = QPushButton(SETTINGS_TEXT[lang]["history_view"])
         self.history_view_button.clicked.connect(self.show_history_view)
         self.history_view_button.setEnabled(True)
         self.main_layout.addWidget(self.history_view_button)
 
-        self.main_layout.addSpacing(5)
+        self.main_layout.addSpacing(12)
 
-    def cycle_translation_mode(self):
-        lang = self.parent.current_interface_language
-        modes = TRANSLATION_MODES[lang]
-        current_mode = self.parent.config.get("translation_mode", modes[0])
-        try:
-            index = modes.index(current_mode)
-        except ValueError:
-            index = 0
-        new_mode = modes[(index + 1) % len(modes)]
-        self.parent.config["translation_mode"] = new_mode
-        self.parent.save_config()
-        self.translation_mode_button.setText(
-            SETTINGS_TEXT[lang]["translation_mode"].format(mode=new_mode)
-        )
+        # Кнопка истории копирований
+        self.copy_history_view_button = QPushButton(SETTINGS_TEXT[lang]["copy_history_view"])
+        self.copy_history_view_button.clicked.connect(self.show_copy_history_view)
+        self.copy_history_view_button.setEnabled(True)
+        self.main_layout.addWidget(self.copy_history_view_button)
+
+        self.main_layout.addSpacing(5)
 
     def show_hotkeys_screen(self):
         self.clear_main_layout()
@@ -214,13 +215,24 @@ class SettingsWindow(QWidget):
         hotkey_str = self.copy_hotkey_input.keySequence().toString()
         self.parent.config["copy_hotkey"] = hotkey_str
         self.parent.save_config()
-        # Здесь можно перезапустить слушатель горячих клавиш для копирования, если требуется
+        # Перезапуск слушателя горячих клавиш для копирования
+        if hasattr(self.parent, "copy_hotkey_thread") and self.parent.copy_hotkey_thread is not None:
+            # Остановить старый поток невозможно, но мы просто не будем его использовать
+            self.parent.copy_hotkey_thread = None
+        if hotkey_str:
+            self.parent.copy_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_copy)
+            self.parent.copy_hotkey_thread.start()
 
     def save_translate_hotkey(self):
         hotkey_str = self.translate_hotkey_input.keySequence().toString()
         self.parent.config["translate_hotkey"] = hotkey_str
         self.parent.save_config()
-        # Здесь можно перезапустить слушатель горячих клавиш для перевода, если требуется
+        # Перезапуск слушателя горячих клавиш для перевода
+        if hasattr(self.parent, "translate_hotkey_thread") and self.parent.translate_hotkey_thread is not None:
+            self.parent.translate_hotkey_thread = None
+        if hotkey_str:
+            self.parent.translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate)
+            self.parent.translate_hotkey_thread.start()
 
     def back_from_hotkeys(self):
         self.init_ui()
@@ -230,7 +242,7 @@ class SettingsWindow(QWidget):
         self.clear_main_layout()
         lang = self.parent.current_interface_language
 
-        title_label = QLabel("История переводов")
+        title_label = QLabel(SETTINGS_TEXT[lang]["history_title"])
         self.main_layout.addWidget(title_label)
 
         self.history_text_edit = QTextEdit()
@@ -242,9 +254,13 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.history_text_edit)
         self.load_history_embedded()
 
-        clear_button = QPushButton("Очистить историю")
+        self.main_layout.addSpacing(10)
+
+        clear_button = QPushButton(SETTINGS_TEXT[lang]["clear_translation_history"])
         clear_button.clicked.connect(self.clear_history)
         self.main_layout.addWidget(clear_button)
+
+        self.main_layout.addSpacing(10)
 
         back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
         back_button.clicked.connect(self.back_from_history)
@@ -252,6 +268,7 @@ class SettingsWindow(QWidget):
 
     def load_history_embedded(self):
         history_file = "translation_history.json"
+        lang = self.parent.current_interface_language
         if os.path.exists(history_file):
             try:
                 with open(history_file, "r", encoding="utf-8") as f:
@@ -264,11 +281,11 @@ class SettingsWindow(QWidget):
                         text += "-" * 40 + "\n\n"
                     self.history_text_edit.setText(text)
                 else:
-                    self.history_text_edit.setText("История пуста.")
+                    self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
             except Exception as e:
-                self.history_text_edit.setText("Ошибка чтения истории.")
+                self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_error"])
         else:
-            self.history_text_edit.setText("История пуста.")
+            self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
 
     def clear_history(self):
         history_file = "translation_history.json"
@@ -283,12 +300,79 @@ class SettingsWindow(QWidget):
         self.init_ui()
         self.apply_theme()
 
+    def show_copy_history_view(self):
+        self.clear_main_layout()
+        lang = self.parent.current_interface_language
+
+        title_label = QLabel(SETTINGS_TEXT[lang]["copy_history_title"])
+        self.main_layout.addWidget(title_label)
+
+        self.copy_history_text_edit = QTextEdit()
+        self.copy_history_text_edit.setReadOnly(True)
+        if self.parent.current_theme == "Темная":
+            self.copy_history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
+        else:
+            self.copy_history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+        self.main_layout.addWidget(self.copy_history_text_edit)
+        self.load_copy_history_embedded()
+
+        self.main_layout.addSpacing(10)
+
+        clear_button = QPushButton(SETTINGS_TEXT[lang]["clear_copy_history"])
+        clear_button.clicked.connect(self.clear_copy_history)
+        self.main_layout.addWidget(clear_button)
+
+        self.main_layout.addSpacing(10)
+
+        back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
+        back_button.clicked.connect(self.back_from_copy_history)
+        self.main_layout.addWidget(back_button)
+
+    def load_copy_history_embedded(self):
+        history_file = "copy_history.json"
+        lang = self.parent.current_interface_language
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, "r", encoding="utf-8") as f:
+                    history = json.load(f)
+                if history:
+                    text = ""
+                    for record in history:
+                        text += f"{record.get('timestamp')}\n"
+                        text += f"{record.get('text')}\n"
+                        text += "-" * 40 + "\n\n"
+                    self.copy_history_text_edit.setText(text)
+                else:
+                    self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
+            except Exception as e:
+                self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_error"])
+        else:
+            self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
+
+    def clear_copy_history(self):
+        history_file = "copy_history.json"
+        try:
+            with open(history_file, "w", encoding="utf-8") as f:
+                json.dump([], f, ensure_ascii=False, indent=4)
+            self.load_copy_history_embedded()
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", "Не удалось очистить историю копирований.")
+
+    def back_from_copy_history(self):
+        self.init_ui()
+        self.apply_theme()
+
     def save_and_back(self):
         self.parent.config["autostart"] = self.autostart_checkbox.isChecked()
         self.parent.config["copy_to_clipboard"] = self.copy_checkbox.isChecked()
+        self.parent.config["copy_history"] = self.copy_history_checkbox.isChecked()
         self.parent.config["history"] = self.history_checkbox.isChecked()
+        self.parent.config["start_minimized"] = self.start_minimized_checkbox.isChecked()
+        self.parent.autostart = self.autostart_checkbox.isChecked()
+        self.parent.start_minimized = self.start_minimized_checkbox.isChecked()
         self.parent.save_config()
         self.parent.set_autostart(self.autostart_checkbox.isChecked())
+        self.init_ui()
         self.parent.show_main_screen()
 
     def apply_theme(self):
@@ -347,11 +431,22 @@ class SettingsWindow(QWidget):
                 self.translate_hotkey_input.setStyleSheet(
                     "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
                 )
-        if hasattr(self, "history_text_edit"):
-            if self.parent.current_theme == "Темная":
-                self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
-            else:
-                self.history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+        if hasattr(self, "history_text_edit") and self.history_text_edit is not None:
+            try:
+                if self.parent.current_theme == "Темная":
+                    self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
+                else:
+                    self.history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+            except RuntimeError:
+                self.history_text_edit = None
+        if hasattr(self, "copy_history_text_edit") and self.copy_history_text_edit is not None:
+            try:
+                if self.parent.current_theme == "Темная":
+                    self.copy_history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
+                else:
+                    self.copy_history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+            except RuntimeError:
+                self.copy_history_text_edit = None
 
     def update_language(self):
         self.init_ui()

@@ -5,6 +5,7 @@ import json
 import winrt
 import logging
 from datetime import datetime
+import webbrowser
 
 from PIL import Image
 from winrt.windows.graphics.imaging import BitmapDecoder, BitmapPixelFormat, SoftwareBitmap
@@ -15,6 +16,7 @@ import winrt.windows.storage.streams as streams
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
 import pyperclip
+from main import save_copy_history
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -197,21 +199,68 @@ class ScreenCaptureOverlay(QWidget):
                 from translater import translate_text
                 lang_code = self.lang_combo.currentData() or "ru"
                 if lang_code == "ru":
-                    source_code = "en"
-                    target_code = "ru"
-                else:
                     source_code = "ru"
                     target_code = "en"
+                else:
+                    source_code = "en"
+                    target_code = "ru"
                 try:
                     translated_text = translate_text(text, source_code, target_code)
                 except Exception as e:
                     QMessageBox.warning(self, "Ошибка перевода", str(e))
                     translated_text = ""
                 if translated_text:
+                    # Определяем тему и язык
+                    theme = "Темная"
+                    lang = "ru"
+                    try:
+                        with open("config.json", "r", encoding="utf-8") as f:
+                            config = json.load(f)
+                        theme = config.get("theme", "Темная")
+                        lang = config.get("interface_language", "ru")
+                    except Exception:
+                        pass
+                    if theme == "Темная":
+                        style = (
+                        "QMessageBox { background-color: #121212; color: #ffffff; } "
+                        "QLabel { color: #ffffff; font-size: 18px; } "
+                        "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 5px; min-width: 80px; } "
+                        "QPushButton:hover { background-color: #333333; }"
+                    )
+                    else:
+                        style = (
+                            "QMessageBox { background-color: #ffffff; color: #000000; } "
+                            "QLabel { color: #000000; font-size: 18px; } "
+                            "QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #cccccc; padding: 5px; min-width: 80px; } "
+                            "QPushButton:hover { background-color: #e0e0e0; }"
+                        )
+                    copy_text = "Copy" if lang == "en" else "Копировать"
+                    close_text = "Close" if lang == "en" else "Закрыть"
+                    google_text = "Google" if lang == "en" else "Гугл"
                     msg = QMessageBox(self)
-                    msg.setWindowTitle("Перевод" if lang_code == "ru" else "Translation")
+                    msg.setWindowTitle(" ")
                     msg.setText(translated_text)
-                    msg.exec_()
+                    copy_button = msg.addButton(copy_text, QMessageBox.ActionRole)
+                    google_button = msg.addButton(google_text, QMessageBox.ActionRole)
+                    close_button = msg.addButton(close_text, QMessageBox.RejectRole)
+                    msg.setStyleSheet(style)
+                    msg.setWindowFlags(QtCore.Qt.Dialog | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint)
+                    msg.setWindowIcon(QtGui.QIcon("icons/icon.png"))
+                    msg.setIcon(QMessageBox.NoIcon)
+                    import urllib.parse
+                    while True:
+                        clicked = msg.exec_()
+                        if msg.clickedButton() == copy_button:
+                            pyperclip.copy(translated_text)
+                            save_copy_history(translated_text)
+                        elif msg.clickedButton() == google_button:
+                            url = "https://www.google.com/search?q=" + urllib.parse.quote(translated_text)
+                            webbrowser.open(url)
+                            break  # Закрыть окно после открытия Google
+                        else:
+                            break
+                    # Сохраняем только переводы в историю переводов
+                    save_translation_history(translated_text, target_code)
                 self.close()
             else:
                 try:
@@ -224,10 +273,11 @@ class ScreenCaptureOverlay(QWidget):
                         logging.error(f"Ошибка загрузки конфигурации: {e}")
                     if copy_enabled:
                         pyperclip.copy(text)
+                        save_copy_history(text)
                         logging.info(f"Распознанный текст скопирован в буфер обмена: {text}")
                     else:
                         logging.info("Копирование в буфер обмена отключено настройками.")
-                    save_translation_history(text, self.current_language)
+                    # НЕ сохраняем обычный текст в историю переводов!
                     self.close()
                 except Exception as e:
                     logging.error(f"Ошибка обработки OCR результата: {e}")
