@@ -1,0 +1,16 @@
+{
+    "theme": "Светлая",
+    "interface_language": "en",
+    "autostart": false,
+    "translation_mode": "English",
+    "ocr_hotkeys": "Ctrl+O",
+    "copy_hotkey": "Ctrl+Shift+C",
+    "translate_hotkey": "Ctrl+Shift+T",
+    "notifications": false,
+    "history": false,
+    "start_minimized": false,
+    "show_update_info": false,
+    "ocr_engine": "Windows",
+    "copy_translated_text": false,
+    "copy_history": false
+}

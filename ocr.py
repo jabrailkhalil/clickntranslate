@@ -5,6 +5,10 @@ import json
 import winrt
 import logging
 from datetime import datetime
+import webbrowser
+import pytesseract  # Added for Tesseract OCR support
+import shutil
+import requests
 
 from PIL import Image
 from winrt.windows.graphics.imaging import BitmapDecoder, BitmapPixelFormat, SoftwareBitmap
@@ -12,14 +16,31 @@ from winrt.windows.media.ocr import OcrEngine
 from winrt.windows.storage import StorageFile, FileAccessMode
 import winrt.windows.storage.streams as streams
 
+# Import resource helper from main for PyInstaller compatibility
+from main import resource_path
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
 import pyperclip
+from main import save_copy_history, show_translation_dialog
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
+def get_data_file(filename):
+    import sys, os
+    def get_app_dir():
+        if hasattr(sys, '_MEIPASS'):
+            return sys._MEIPASS
+        return os.path.dirname(os.path.abspath(sys.argv[0]))
+    data_dir = os.path.join(get_app_dir(), "data")
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    return os.path.join(data_dir, filename)
+
 def load_ocr_config():
-    config_path = "config.json"
+    config_path = get_data_file("config.json")
+    if not os.path.exists(config_path):
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -29,15 +50,18 @@ def load_ocr_config():
     return config.get("ocr_language", "ru")
 
 def save_translation_history(text, language):
+    config_path = get_data_file("config.json")
+    if not os.path.exists(config_path):
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
     except Exception as e:
         return
     if not config.get("history", False):
         return
-
-    history_file = "translation_history.json"
+    history_file = get_data_file("translation_history.json")
     if not os.path.exists(history_file):
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=4)
@@ -81,6 +105,8 @@ class OCRWorker(QtCore.QThread):
             from winrt.windows.globalization import Language
             if self.language_code == "en":
                 lang_tag = "en-US"
+            elif self.language_code == "ru":
+                lang_tag = "ru-RU"
             else:
                 lang_tag = self.language_code
             logging.info(f"Выбран язык для OCR: {lang_tag}")
@@ -121,8 +147,9 @@ class ScreenCaptureOverlay(QWidget):
         logging.info("Запущен оверлей захвата экрана.")
         default_lang = load_ocr_config()
         self.lang_combo = QtWidgets.QComboBox(self)
-        self.lang_combo.addItem(QtGui.QIcon("icons/Russian_flag.png"), "Русский", "ru")
-        self.lang_combo.addItem(QtGui.QIcon("icons/American_flag.png"), "English", "en")
+        # Use resource_path to locate icons both in dev and frozen modes
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "Русский", "ru")
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "English", "en")
         default_index = 0 if default_lang == "ru" else 1
         self.lang_combo.setCurrentIndex(default_index)
         self.lang_combo.setIconSize(QtCore.QSize(64, 64))
@@ -174,6 +201,17 @@ class ScreenCaptureOverlay(QWidget):
             logging.info("Нажата клавиша ESC, завершаем OCR.")
             self.close()
 
+    @staticmethod
+    def get_ocr_engine():
+        """Return selected OCR engine from config.json ('Windows' or 'Tesseract')."""
+        config_path = get_data_file("config.json")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                return config.get("ocr_engine", "Windows")
+        except Exception:
+            return "Windows"
+
     def capture_and_copy(self, rect):
         screenshot = self.screen.grabWindow(0)
         selected_pixmap = screenshot.copy(rect)
@@ -183,9 +221,101 @@ class ScreenCaptureOverlay(QWidget):
         ptr = qimage.bits()
         ptr.setsize(qimage.byteCount())
         pil_image = Image.frombuffer("RGBA", (width, height), ptr, "raw", "RGBA", 0, 1)
-        bitmap = load_image_from_pil(pil_image)
         language_code = self.lang_combo.currentData() or "ru"
         self.current_language = language_code
+
+        # Determine which OCR engine to use
+        ocr_engine_type = self.get_ocr_engine().lower()
+        if ocr_engine_type == "tesseract":
+            # Determine path to tesseract
+            tess_cmd = shutil.which("tesseract")  # сначала пробуем системный PATH
+            
+            app_root = os.path.dirname(os.path.abspath(sys.argv[0]))
+            local_root = os.path.join(app_root, "ocr", "tesseract")
+
+            # 1) Попытка найти исполняемый файл по ожидаемому прямому пути (старый формат папки)
+            direct_cmd = os.path.join(local_root, "tesseract.exe")
+            if os.path.exists(direct_cmd):
+                tess_cmd = direct_cmd
+            else:
+                # 2) Рекурсивный поиск внутри ocr/tesseract на случай вложенной структуры,
+                #    например ocr/tesseract/tesseract-ocr-w64-5.3.3/bin/tesseract.exe
+                for root_dir, _dirs, files in os.walk(local_root):
+                    if "tesseract.exe" in files:
+                        tess_cmd = os.path.join(root_dir, "tesseract.exe")
+                        break
+
+            # 3) Если не нашли portable-версию, проверяем стандартные пути системной установки
+            if not tess_cmd:
+                standard_paths = [
+                    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+                    os.path.join(os.path.expanduser("~"), "AppData", "Local", "Tesseract-OCR", "tesseract.exe"),
+                ]
+                for path in standard_paths:
+                    if os.path.exists(path):
+                        tess_cmd = path
+                        break
+
+            if tess_cmd:
+                pytesseract.pytesseract.tesseract_cmd = tess_cmd
+                logging.info(f"Using Tesseract at: {tess_cmd}")
+
+                # Устанавливаем TESSDATA_PREFIX для корректного поиска моделей
+                tess_dir = os.path.dirname(tess_cmd)
+                candidate_dirs = [
+                    os.path.join(tess_dir, "tessdata"),  # стандартное расположение в portable-сборке
+                    os.path.join(os.path.dirname(tess_dir), "tessdata"),  # если exe лежит в bin/
+                ]
+                for td in candidate_dirs:
+                    if os.path.isdir(td):
+                        os.environ["TESSDATA_PREFIX"] = td
+                        break
+                else:
+                    # на всякий случай убираем переменную, чтобы Tesseract искал в своих стандартных местах
+                    os.environ.pop("TESSDATA_PREFIX", None)
+
+                # --- Проверяем наличие языковой модели и при необходимости скачиваем ---
+                def ensure_lang_model(lang_code, dest_dir):
+                    fname = f"{lang_code}.traineddata"
+                    target_path = os.path.join(dest_dir, fname)
+                    if os.path.exists(target_path):
+                        return
+                    try:
+                        url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
+                        logging.info(f"Downloading {fname} …")
+                        r = requests.get(url, timeout=30, stream=True)
+                        r.raise_for_status()
+                        with open(target_path + '.tmp', 'wb') as f:
+                            shutil.copyfileobj(r.raw, f)
+                        os.replace(target_path + '.tmp', target_path)
+                        logging.info(f"{fname} downloaded into {dest_dir}")
+                    except Exception as dl_err:
+                        logging.warning(f"Could not download language model {lang_code}: {dl_err}")
+
+                tessdata_dir = os.environ.get("TESSDATA_PREFIX")
+                if tessdata_dir and os.path.isdir(tessdata_dir):
+                    required = ["eng", "rus"]
+                    for lc in required:
+                        ensure_lang_model(lc, tessdata_dir)
+            else:
+                logging.error("Tesseract executable not found.")
+                return "Текст не распознан"
+            # Map language codes for Tesseract
+            tess_lang = "eng" if language_code == "en" else "rus"
+            try:
+                logging.info(f"Запуск Tesseract OCR для языка '{tess_lang}'...")
+                recognized_text = pytesseract.image_to_string(pil_image, lang=tess_lang)
+                logging.info("Tesseract OCR завершил распознавание.")
+            except Exception as e:
+                logging.error(f"Ошибка Tesseract OCR: {e}")
+                recognized_text = ""
+            # Обработать результат напрямую
+            self.handle_ocr_result(recognized_text)
+            return  # Не использовать Windows OCR ниже
+
+        # По умолчанию используем Windows OCR
+        bitmap = load_image_from_pil(pil_image)
         logging.info(f"Используемый язык для OCR: {language_code}")
         self.ocr_worker = OCRWorker(bitmap, language_code)
         self.ocr_worker.result_ready.connect(self.handle_ocr_result)
@@ -197,44 +327,54 @@ class ScreenCaptureOverlay(QWidget):
                 from translater import translate_text
                 lang_code = self.lang_combo.currentData() or "ru"
                 if lang_code == "ru":
-                    source_code = "en"
-                    target_code = "ru"
-                else:
                     source_code = "ru"
                     target_code = "en"
+                else:
+                    source_code = "en"
+                    target_code = "ru"
                 try:
                     translated_text = translate_text(text, source_code, target_code)
                 except Exception as e:
                     QMessageBox.warning(self, "Ошибка перевода", str(e))
                     translated_text = ""
                 if translated_text:
-                    msg = QMessageBox(self)
-                    msg.setWindowTitle("Перевод" if lang_code == "ru" else "Translation")
-                    msg.setText(translated_text)
-                    msg.exec_()
+                    # Определяем тему и язык
+                    theme = "Темная"
+                    lang = "ru"
+                    auto_copy = True
+                    try:
+                        config_path = get_data_file("config.json")
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            config = json.load(f)
+                        theme = config.get("theme", "Темная")
+                        lang = config.get("interface_language", "ru")
+                        auto_copy = config.get("copy_translated_text", True)
+                    except Exception:
+                        pass
+                    from main import show_translation_dialog
+                    show_translation_dialog(self, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
+                    if auto_copy:
+                        pyperclip.copy(translated_text)
+                        save_copy_history(translated_text)
+                    else:
+                        # Если пользователь скопировал вручную, обработка уже в диалоге
+                        pass
+                    # Сохраняем только переводы в историю переводов
+                    save_translation_history(translated_text, target_code)
                 self.close()
             else:
                 try:
-                    copy_enabled = False
-                    try:
-                        with open("config.json", "r", encoding="utf-8") as f:
-                            config = json.load(f)
-                        copy_enabled = config.get("copy_to_clipboard", False)
-                    except Exception as e:
-                        logging.error(f"Ошибка загрузки конфигурации: {e}")
-                    if copy_enabled:
-                        pyperclip.copy(text)
-                        logging.info(f"Распознанный текст скопирован в буфер обмена: {text}")
-                    else:
-                        logging.info("Копирование в буфер обмена отключено настройками.")
-                    save_translation_history(text, self.current_language)
+                    pyperclip.copy(text)
+                    save_copy_history(text)
+                    logging.info(f"Распознанный текст скопирован в буфер обмена: {text}")
+                    # НЕ сохраняем обычный текст в историю переводов!
                     self.close()
                 except Exception as e:
                     logging.error(f"Ошибка обработки OCR результата: {e}")
         else:
             logging.info("OCR не распознал текст.")
             msg = QMessageBox(self)
-            msg.setWindowIcon(QtGui.QIcon("icons/warning.png"))
+            msg.setWindowIcon(QtGui.QIcon(resource_path("icons/warning.png")))
             msg.setIcon(QMessageBox.NoIcon)
             msg.setWindowTitle("Ошибка распознавания")
             msg.setText("Распознавание не удалось. Возможно, текст слишком мелкий.\nПопробуйте увеличить область или улучшить качество.")

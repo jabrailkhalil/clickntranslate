@@ -3,3 +3,6 @@ winrt
 Pillow
 pyperclip
 argostranslate
+pytesseract
+requests
+setuptools<81
