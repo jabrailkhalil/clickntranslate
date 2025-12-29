@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Build scripts and specs
+build.py
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+.env
+
+# IDE / editor settings
+.idea/
+.vscode/
+.claude/
+
+# Temporary files
+temp/
+
+# Downloaded OCR engine
+ocr/tesseract/
+
+# Logs and debug files
+*.log
+launch_log.txt
+
+# PyInstaller artefacts
+*.pyz
+*.pkg
+*.toc
+
+# Windows binaries
+*.exe
+*.dll
+
+# Batch files (for testing)
+*.bat
+
+# JARs and data models
+*.jar
+*.traineddata
+
+# User data (runtime generated)
+data/config.json
+data/copy_history.json
+data/translation_history.json
+data/settings.json
