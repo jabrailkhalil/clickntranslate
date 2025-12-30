@@ -1000,7 +1000,8 @@ class DarkThemeApp(QMainWindow):
 <div class="section-title">👁 OCR движки</div>
 <div class="item"><span class="item-title">Windows</span> — встроенный в ОС, быстрый <span class="recommended">✓ Рекомендуется</span></div>
 <div class="item"><span class="item-title">RapidOCR</span> — сверхбыстрый на базе ONNX</div>
-<div class="item"><span class="item-title">Tesseract</span> — офлайн, высокая точность, требует установки</div>
+<div class="item"><span class="item-title">Tesseract</span> — офлайн, высокая точность, <b>требует отдельной установки</b></div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Для работы Tesseract скачайте установщик с <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> и установите нужные языковые пакеты</div>
 </div>
 
 <div class="section">
@@ -1056,7 +1057,8 @@ class DarkThemeApp(QMainWindow):
 <div class="section-title">👁 OCR Engines</div>
 <div class="item"><span class="item-title">Windows</span> — built-in, fast <span class="recommended">✓ Recommended</span></div>
 <div class="item"><span class="item-title">RapidOCR</span> — super-fast (ONNX), best for Latin text</div>
-<div class="item"><span class="item-title">Tesseract</span> — accurate, offline, many languages</div>
+<div class="item"><span class="item-title">Tesseract</span> — accurate, offline, <b>requires separate installation</b></div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ To use Tesseract, download the installer from <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> and install required language packs</div>
 </div>
 
 <div class="section">

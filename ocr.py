@@ -442,7 +442,9 @@ class ScreenCaptureOverlay(QWidget):
         self.start_point = None
         self.end_point = None
         self.last_rect = None
-        self.current_language = "ru"
+        # Загрузка последнего выбранного языка из конфигурации
+        config = get_cached_ocr_config()
+        self.current_language = config.get("last_ocr_language", "ru")
         # Removed Qt.Tool, added WindowStaysOnTopHint and FramelessWindowHint
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -454,22 +456,57 @@ class ScreenCaptureOverlay(QWidget):
             self.show_overlay()
             
         logging.info("Screen capture overlay initialized.")
-        default_lang = load_ocr_config()
+        
+        # Используем текущий язык (уже загружен из конфига в __init__)
         self.lang_combo = QtWidgets.QComboBox(self)
-        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "Русский", "ru")
-        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "English", "en")
-        default_index = 0 if default_lang == "ru" else 1
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU", "ru")
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN", "en")
+        
+        # Устанавливаем индекс на основе self.current_language
+        default_index = 0 if self.current_language == "ru" else 1
         self.lang_combo.setCurrentIndex(default_index)
-        self.lang_combo.setIconSize(QtCore.QSize(64, 64))
+        
+        # Современный компактный дизайн с круглыми флагами
+        self.lang_combo.setIconSize(QtCore.QSize(48, 48))
         self.lang_combo.setStyleSheet("""
-            background-color: rgba(255,255,255,200);
-            font-size: 12px;
-            min-height: 64px;
-            min-width: 200px;
-            QComboBox::down-arrow { image: none; }
-            QComboBox::drop-down { border: 0px; width: 0px; }
+            QComboBox {
+                background-color: rgba(18, 18, 18, 230);
+                color: #ffffff;
+                border: 2px solid rgba(122, 95, 161, 200);
+                border-radius: 28px;
+                padding: 8px 12px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 120px;
+            }
+            QComboBox:hover {
+                background-color: rgba(30, 30, 30, 250);
+                border: 2px solid rgba(154, 127, 193, 255);
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(18, 18, 18, 250);
+                color: #ffffff;
+                border: 2px solid rgba(122, 95, 161, 200);
+                border-radius: 12px;
+                padding: 4px;
+                selection-background-color: rgba(122, 95, 161, 180);
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px;
+                border-radius: 6px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: rgba(154, 127, 193, 120);
+            }
         """)
-        self.lang_combo.setFixedSize(200, 64)
+        self.lang_combo.setFixedSize(140, 56)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
         self.lang_combo.setVisible(True if not defer_show else False)
 
@@ -552,15 +589,51 @@ class ScreenCaptureOverlay(QWidget):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 150))
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        # Проверка настройки "не затемнять экран"
+        config = get_cached_ocr_config()
+        no_dimming = config.get("no_screen_dimming", False)
+        
+        # Если не требуется затемнение, рисуем минимальный невидимый фон для перехвата мыши
+        if not no_dimming:
+            painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 150))
+        else:
+            # Минимальное затемнение (практически невидимое) для перехвата событий мыши
+            # Без этого окно полностью прозрачно и клики проваливаются сквозь него
+            painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 5))
+        
         if self.start_point and self.end_point:
             rect = QtCore.QRect(self.start_point, self.end_point).normalized()
-            painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
-            painter.fillRect(rect, QtGui.QColor(0, 0, 0, 0))
-            painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
-            pen = QtGui.QPen(QtGui.QColor(255, 255, 255), 2)
+            
+            # Очищаем внутреннюю область (если было затемнение)
+            if not no_dimming:
+                painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
+                painter.fillRect(rect, QtGui.QColor(0, 0, 0, 0))
+                painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
+            else:
+                # В режиме без затемнения добавляем легкий полупрозрачный белый фон
+                # чтобы область выделения была видна
+                painter.fillRect(rect, QtGui.QColor(255, 255, 255, 30))
+            
+            # Красивая рамка с градиентом и закругленными углами
+            pen = QtGui.QPen(QtGui.QColor(122, 95, 161), 3)  # Фирменный фиолетовый цвет
+            pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(pen)
-            painter.drawRect(rect)
+            
+            # Рисуем прямоугольник с закругленными углами
+            path = QtGui.QPainterPath()
+            path.addRoundedRect(QtCore.QRectF(rect), 8, 8)
+            painter.drawPath(path)
+            
+            # Добавляем внутренний светящийся эффект
+            inner_pen = QtGui.QPen(QtGui.QColor(154, 127, 193, 100), 1)
+            painter.setPen(inner_pen)
+            inner_rect = rect.adjusted(2, 2, -2, -2)
+            inner_path = QtGui.QPainterPath()
+            inner_path.addRoundedRect(QtCore.QRectF(inner_rect), 6, 6)
+            painter.drawPath(inner_path)
+            
         painter.end()
 
     def mousePressEvent(self, event):
@@ -674,6 +747,19 @@ class ScreenCaptureOverlay(QWidget):
         qimage = screenshot.toImage()
         language_code = self.lang_combo.currentData() or "ru"
         self.current_language = language_code
+        
+        # Сохраняем выбранный язык в конфигурации
+        config = get_cached_ocr_config()
+        if config.get("last_ocr_language") != language_code:
+            config_path = get_data_file("config.json")
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    full_config = json.load(f)
+                full_config["last_ocr_language"] = language_code
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(full_config, f, ensure_ascii=False, indent=4)
+            except Exception:
+                pass
 
         # Determine which OCR engine to use
         ocr_engine_type = self.get_ocr_engine().lower()
@@ -966,13 +1052,18 @@ def prepare_overlay(mode="ocr"):
 _ACTIVE_OVERLAYS = {}
 
 def get_or_show_overlay(mode="ocr"):
-    # Close existing active overlay of the same mode if any
+    # Если оверлей уже активен для этого режима - закрываем его (toggle behavior)
     if _ACTIVE_OVERLAYS.get(mode):
         try:
-            _ACTIVE_OVERLAYS[mode].close()
+            existing = _ACTIVE_OVERLAYS[mode]
+            if existing and existing.isVisible():
+                existing.close()
+                _ACTIVE_OVERLAYS[mode] = None
+                return  # Закрыли, больше ничего не делаем
         except Exception:
             pass
-            
+    
+    # Создаем или показываем оверлей
     ov = _OVERLAY_POOL.get(mode)
     if ov is None:
         ov = ScreenCaptureOverlay(mode, defer_show=False)
