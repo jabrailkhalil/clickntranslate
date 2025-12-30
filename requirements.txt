@@ -1,0 +1,14 @@
+PyQt5~=5.15.11
+winrt-Windows.Media.Ocr
+winrt-Windows.Globalization
+winrt-Windows.Graphics.Imaging
+winrt-Windows.Storage.Streams
+winrt-Windows.Foundation
+Pillow
+pyperclip
+argostranslate
+pytesseract
+rapidocr-onnxruntime
+requests
+setuptools<81
+psutil
