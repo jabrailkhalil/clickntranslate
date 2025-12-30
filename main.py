@@ -1448,6 +1448,10 @@ class DarkThemeApp(QMainWindow):
         """Полный выход из приложения (вызывается из трея)."""
         self.force_quit = True
         self.close()
+        # Явно завершаем приложение Qt
+        QApplication.instance().quit()
+        # Принудительный выход из процесса Python
+        sys.exit(0)
 
     def translate_input_text(self):
         text = self.text_input.toPlainText()
