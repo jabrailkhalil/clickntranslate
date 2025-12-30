@@ -5,7 +5,6 @@ import json
 import logging
 from datetime import datetime
 import shutil
-import numpy as np
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
@@ -88,24 +87,11 @@ except Exception as e:
 
 debug_log(f"_WINRT_AVAILABLE = {_WINRT_AVAILABLE}")
 
-# Lazy import for RapidOCR (optional, super-fast)
-_rapidocr_engine = None
-
-def _get_rapidocr_engine():
-    """Возвращает переиспользуемый экземпляр RapidOCR."""
-    global _rapidocr_engine
-    if _rapidocr_engine is None:
-        try:
-            from rapidocr_onnxruntime import RapidOCR
-            _rapidocr_engine = RapidOCR()
-        except ImportError:
-            logging.warning("RapidOCR not installed. Install with: pip install rapidocr-onnxruntime")
-            return None
-    return _rapidocr_engine
 # Ленивый импорт для избежания циклического импорта
 # from main import save_copy_history, show_translation_dialog
 
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s [%(levelname)s] %(message)s')  # Уменьшен уровень логирования
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
@@ -249,17 +235,21 @@ async def run_ocr_with_engine(bitmap, engine):
         
         if result:
             debug_log(f"Result object: {result}")
-            # Check if lines exist
-            if hasattr(result, 'lines'):
-                line_count = len(result.lines) if result.lines else 0
+            # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
+            try:
+                lines = result.lines
+                line_count = len(lines) if lines else 0
                 debug_log(f"Lines count: {line_count}")
                 if line_count > 0:
-                    for i, line in enumerate(result.lines):
+                    for i, line in enumerate(lines):
                         debug_log(f"Line {i}: {line.text}")
                 return result
-            else:
+            except AttributeError:
                 debug_log("ERROR: Result has no 'lines' attribute")
                 return None
+            except Exception as e:
+                debug_log(f"ERROR accessing lines: {e}")
+                return result  # Возвращаем result даже если не можем получить lines
         else:
             debug_log("ERROR: recognize_async returned None")
             return None
@@ -417,11 +407,24 @@ class OCRWorker(QtCore.QThread):
             debug_log(f"recognized = {recognized}")
 
             recognized_text = ""
-            if recognized and hasattr(recognized, 'lines'):
-                recognized_text = "\n".join(line.text for line in recognized.lines)
-                debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
+            if recognized:
+                try:
+                    # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
+                    lines = recognized.lines
+                    if lines:
+                        recognized_text = "\n".join(line.text for line in lines)
+                        debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
+                        logging.info(f"✅ Windows OCR recognized {len(recognized_text)} chars successfully")
+                    else:
+                        debug_log("recognized.lines is empty")
+                        logging.warning("⚠️ Windows OCR returned empty result")
+                except AttributeError:
+                    debug_log("ERROR: recognized has no 'lines' attribute")
+                except Exception as e:
+                    debug_log(f"ERROR accessing recognized.lines: {e}")
             else:
-                debug_log("No recognized text (recognized is None or no lines)")
+                debug_log("No recognized text (recognized is None)")
+                logging.warning("⚠️ Windows OCR returned None")
 
         except Exception as e:
             debug_log(f"EXCEPTION in OCRWorker.run(): {e}")
@@ -509,6 +512,9 @@ class ScreenCaptureOverlay(QWidget):
         self.lang_combo.setFixedSize(140, 56)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
         self.lang_combo.setVisible(True if not defer_show else False)
+        
+        # Сохраняем язык при изменении
+        self.lang_combo.currentIndexChanged.connect(self.on_language_changed)
 
     def show_overlay(self):
         try:
@@ -616,23 +622,14 @@ class ScreenCaptureOverlay(QWidget):
                 # чтобы область выделения была видна
                 painter.fillRect(rect, QtGui.QColor(255, 255, 255, 30))
             
-            # Красивая рамка с градиентом и закругленными углами
-            pen = QtGui.QPen(QtGui.QColor(122, 95, 161), 3)  # Фирменный фиолетовый цвет
+            # Тонкая полупрозрачная рамка (как в TextGrab)
+            # ВАЖНО: тонкая рамка (1px) не попадает в захватываемую область!
+            pen = QtGui.QPen(QtGui.QColor(122, 95, 161, 180), 1)  # 1px полупрозрачная
             pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(pen)
             
-            # Рисуем прямоугольник с закругленными углами
-            path = QtGui.QPainterPath()
-            path.addRoundedRect(QtCore.QRectF(rect), 8, 8)
-            painter.drawPath(path)
-            
-            # Добавляем внутренний светящийся эффект
-            inner_pen = QtGui.QPen(QtGui.QColor(154, 127, 193, 100), 1)
-            painter.setPen(inner_pen)
-            inner_rect = rect.adjusted(2, 2, -2, -2)
-            inner_path = QtGui.QPainterPath()
-            inner_path.addRoundedRect(QtCore.QRectF(inner_rect), 6, 6)
-            painter.drawPath(inner_path)
+            # Рисуем простой прямоугольник без закруглений (точнее)
+            painter.drawRect(rect)
             
         painter.end()
 
@@ -666,6 +663,22 @@ class ScreenCaptureOverlay(QWidget):
             self.last_rect = rect
             logging.info(f"Завершено выделение области: {rect}")
             self.capture_and_copy(rect)
+
+    def on_language_changed(self, index):
+        """Сохраняет выбранный язык в конфиг при изменении"""
+        language_code = self.lang_combo.currentData()
+        if language_code:
+            self.current_language = language_code
+            config_path = get_data_file("config.json")
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                config["last_ocr_language"] = language_code
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=4)
+                logging.info(f"Saved OCR language: {language_code}")
+            except Exception as e:
+                logging.warning(f"Failed to save OCR language: {e}")
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
@@ -732,12 +745,10 @@ class ScreenCaptureOverlay(QWidget):
         logging.info(f"Selected local rect: {rect}")
         logging.info(f"Mapped global rect: {global_rect}")
         
-        # Grab the specific area from the screen using global coordinates
-        # QScreen.grabWindow(0) grabs the desktop. The x, y, w, h arguments are relative to the screen's origin?
-        # Actually, for multi-monitor, it's safer to grab the specific screen or use the primary screen with global coords if it supports it.
-        # But grabWindow(0) on primary screen usually captures the whole virtual desktop in Qt5 on Windows.
-        
-        screenshot = self.screen.grabWindow(0, global_rect.x(), global_rect.y(), global_rect.width(), global_rect.height())
+        # Захватываем ТОЧНО выделенную область без padding
+        # (padding может захватить соседний текст и испортить распознавание)
+        screenshot = self.screen.grabWindow(0, global_rect.x(), global_rect.y(), 
+                                           global_rect.width(), global_rect.height())
         
         # Check if screenshot is valid
         if screenshot.isNull():
@@ -745,6 +756,131 @@ class ScreenCaptureOverlay(QWidget):
             return
 
         qimage = screenshot.toImage()
+        
+        # ОТЛАДКА: Сохраняем исходное изображение
+        try:
+            debug_orig_path = os.path.join(get_app_dir(), "debug_ocr_original.png")
+            qimage.save(debug_orig_path)
+            logging.info(f"DEBUG: Saved original {qimage.width()}x{qimage.height()} to {debug_orig_path}")
+        except Exception as e:
+            logging.warning(f"Failed to save debug original: {e}")
+        
+       
+        # ===== PADIMAGE ИЗ TEXT-GRAB (критично для маленьких областей!) =====
+        # Если изображение меньше 64x64, добавляем padding
+        # Padding заполняется цветом фона (первый пиксель) для естественного вида
+        original_width = qimage.width()
+        original_height = qimage.height()
+        min_w, min_h = 64, 64
+        
+        if original_width < min_w or original_height < min_h:
+            # Вычисляем новый размер (минимум 64+16, или исходный+16)
+            new_width = max(original_width + 16, min_w + 16)
+            new_height = max(original_height + 16, min_h + 16)
+            
+            # Создаем новое изображение
+            padded_qimage = QtGui.QImage(new_width, new_height, QtGui.QImage.Format_RGBA8888)
+            
+            # Получаем цвет первого пикселя для заливки
+            bg_color = QtGui.QColor(qimage.pixel(0, 0))
+            padded_qimage.fill(bg_color)
+            
+            # Рисуем исходное изображение в центре со смещением 8px
+            painter = QtGui.QPainter(padded_qimage)
+            painter.drawImage(8, 8, qimage)
+            painter.end()
+            
+            qimage = padded_qimage
+            logging.info(f"PadImage: {original_width}x{original_height} → {qimage.width()}x{qimage.height()} (bg color: {bg_color.name()})")
+        
+        # ===== АГРЕССИВНОЕ МАСШТАБИРОВАНИЕ (упрощенный подход без winrt) =====
+        # Вместо двухпроходного OCR используем очень агрессивное масштабирование
+        # основанное на размере области
+        
+        original_width = qimage.width()
+        original_height = qimage.height()
+        min_dimension = min(original_width, original_height)
+        
+        # Целевая высота текста для идеального OCR - 40-50px
+        # Вычисляем агрессивный масштаб на основе размера
+        TARGET_HEIGHT = 45.0
+        
+        # Предполагаем среднюю высоту текста на основе размера выделения
+        if min_dimension < 25:
+            estimated_text_height = 8  # Очень маелнький текст
+        elif min_dimension < 50:
+            estimated_text_height = 12
+        elif min_dimension < 100:
+            estimated_text_height = 18
+        elif min_dimension < 150:
+            estimated_text_height = 25
+        else:
+            estimated_text_height = 30
+        
+        # Вычисляем масштаб для достижения целевой высоты
+        scale_factor = TARGET_HEIGHT / estimated_text_height
+        
+        # Ограничиваем максимальный масштаб
+        scale_factor = min(scale_factor, 10.0)  # Макс 10x
+        scale_factor = max(scale_factor, 1.0)   # Мин 1x
+        
+        logging.info(f"Aggressive scaling: estimated text height {estimated_text_height}px, scale {scale_factor:.1f}x")
+        
+        # Применяем масштабирование
+        if scale_factor > 1.0:
+            new_width = int(original_width * scale_factor)
+            new_height = int(original_height * scale_factor)
+            qimage = qimage.scaled(new_width, new_height, 
+                                  QtCore.Qt.KeepAspectRatio, 
+                                  QtCore.Qt.SmoothTransformation)
+            logging.info(f"Scaled: {original_width}x{original_height} → {qimage.width()}x{qimage.height()}")
+        
+        # ===== АГРЕССИВНАЯ ПРЕДОБРАБОТКА =====
+        from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+        
+        qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
+        ptr = qimg_rgba.constBits()
+        ptr.setsize(qimg_rgba.byteCount())
+        pil_image = Image.frombuffer("RGBA", (qimg_rgba.width(), qimg_rgba.height()), 
+                                     ptr, "raw", "RGBA", 0, 1)
+        
+        # Конвертация в grayscale
+        pil_image = pil_image.convert('L')
+        
+        # АГРЕССИВНОЕ увеличение контраста для маленького текста
+        enhancer = ImageEnhance.Contrast(pil_image)
+        pil_image = enhancer.enhance(2.5)
+        
+        # АГРЕССИВНОЕ увеличение резкости
+        enhancer = ImageEnhance.Sharpness(pil_image)
+        pil_image = enhancer.enhance(2.0)
+        
+        # Добавляем белые поля (помогает OCR определить границы)
+        border_size = 20
+        pil_image = ImageOps.expand(pil_image, border=border_size, fill='white')
+        
+        # Адаптивная бинаризация для идеальной четкости
+        if min_dimension < 100:
+            # Для маленького текста применяем бинаризацию
+            threshold = 128
+            pil_image = pil_image.point(lambda x: 0 if x < threshold else 255, '1')
+            pil_image = pil_image.convert('L')
+        
+        # Конвертируем обратно в QImage
+        img_bytes = pil_image.tobytes()
+        qimage = QtGui.QImage(img_bytes, pil_image.width, pil_image.height, 
+                             pil_image.width, QtGui.QImage.Format_Grayscale8)
+        
+        # ОТЛАДКА: Сохраняем финальное изображение для проверки
+        try:
+            debug_path = os.path.join(get_app_dir(), "debug_ocr_final.png")
+            qimage.save(debug_path)
+            logging.info(f"DEBUG: Saved final image to {debug_path}")
+        except Exception as e:
+            logging.warning(f"Failed to save debug image: {e}")
+        
+        logging.info(f"Final preprocessed size: {qimage.width()}x{qimage.height()}")
+        
         language_code = self.lang_combo.currentData() or "ru"
         self.current_language = language_code
         
@@ -763,32 +899,7 @@ class ScreenCaptureOverlay(QWidget):
 
         # Determine which OCR engine to use
         ocr_engine_type = self.get_ocr_engine().lower()
-
-        if ocr_engine_type == "rapidocr":
-            # Super-fast RapidOCR (ONNX-based)
-            from PIL import Image
-            qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
-            ptr = qimg_rgba.constBits(); ptr.setsize(qimg_rgba.byteCount())
-            pil_image = Image.frombuffer("RGBA", (qimg_rgba.width(), qimg_rgba.height()), ptr, "raw", "RGBA", 0, 1)
-
-            rapidocr = _get_rapidocr_engine()
-            if rapidocr is None:
-                logging.error("RapidOCR not available, falling back to Windows OCR")
-            else:
-                try:
-                    # Convert to RGB numpy array for RapidOCR
-                    img_array = np.array(pil_image.convert("RGB"))
-                    result, _ = rapidocr(img_array)
-                    if result:
-                        recognized_text = "\n".join([line[1] for line in result])
-                    else:
-                        recognized_text = ""
-                    logging.info(f"RapidOCR result: {len(recognized_text)} chars")
-                    self.handle_ocr_result(recognized_text)
-                    return
-                except Exception as e:
-                    logging.error(f"RapidOCR error: {e}")
-                    # Fall through to Windows OCR
+        logging.info(f"🔍 Using OCR engine: {ocr_engine_type.upper()}")
 
         if ocr_engine_type == "tesseract":
             # Determine path to tesseract
@@ -850,21 +961,24 @@ class ScreenCaptureOverlay(QWidget):
             # Map language codes for Tesseract
             tess_lang = "eng" if language_code == "en" else "rus"
             try:
-                logging.info(f"Запуск Tesseract OCR для языка '{tess_lang}'...")
+                logging.info(f"🔄 Running Tesseract OCR for language '{tess_lang}'...")
                 # Оптимизация скорости: --oem 3 (LSTM only), --psm 6 (single block)
                 tess_config = '--oem 3 --psm 6'
                 recognized_text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
-                logging.info("Tesseract OCR завершил распознавание.")
+                if recognized_text.strip():
+                    logging.info(f"✅ Tesseract recognized {len(recognized_text)} chars successfully")
+                else:
+                    logging.warning("⚠️ Tesseract returned empty result")
             except Exception as e:
-                logging.error(f"Ошибка Tesseract OCR: {e}")
+                logging.error(f"❌ Tesseract error: {e}")
                 recognized_text = ""
             # Обработать результат напрямую
             self.handle_ocr_result(recognized_text)
             return  # Не использовать Windows OCR ниже
 
         # По умолчанию используем Windows OCR (без PIL)
+        logging.info(f"🔄 Running Windows OCR for language: {language_code.upper()}")
         bitmap = qimage_to_softwarebitmap(qimage)
-        logging.info(f"Используемый язык для OCR: {language_code}")
         
         # Create worker with Tesseract fallback capability
         self.ocr_worker = OCRWorker(bitmap, language_code)
@@ -928,9 +1042,15 @@ class ScreenCaptureOverlay(QWidget):
                 else:
                     source_code = "en"
                     target_code = "ru"
+                logging.info(f"🔄 Translating from {source_code.upper()} to {target_code.upper()}...")
                 try:
                     translated_text = translate_text(text, source_code, target_code)
+                    if translated_text:
+                        logging.info(f"✅ Translation completed successfully ({len(translated_text)} chars)")
+                    else:
+                        logging.warning("⚠️ Translation returned empty result")
                 except Exception as e:
+                    logging.error(f"❌ Translation error: {e}")
                     QMessageBox.warning(self, "Ошибка перевода", str(e))
                     translated_text = ""
                 if translated_text:
@@ -1089,11 +1209,6 @@ def warm_up():
     try:
         _get_windows_ocr_engine("ru-RU")
         _get_windows_ocr_engine("en-US")
-    except Exception:
-        pass
-    # Pre-initialize RapidOCR (optional)
-    try:
-        _get_rapidocr_engine()
     except Exception:
         pass
 

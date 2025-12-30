@@ -45,7 +45,7 @@ DEFAULT_CONFIG = {
     "ocr_engine": "Windows",
     "translator_engine": "Google",
     "copy_history": False,
-    "copy_translated_text": False,
+    "copy_translated_text": True,  # По умолчанию копировать переведенный текст
     "keep_visible_on_ocr": False,
     "last_ocr_language": "ru",
     "no_screen_dimming": False
@@ -780,9 +780,10 @@ class DarkThemeApp(QMainWindow):
     def apply_theme(self):
         theme = THEMES[self.current_theme]
         # Настроим стиль скроллбара в зависимости от темы
-        scrollbar_bg = theme['button_background'] if self.current_theme != 'Темная' else '#232323'
-        scrollbar_handle = '#888' if self.current_theme != 'Темная' else '#444'
-        scrollbar_handle_hover = '#aaa' if self.current_theme != 'Темная' else '#666'
+        # Настроим стиль скроллбара в зависимости от темы (как в FAQ)
+        scrollbar_bg = theme['button_background']
+        scrollbar_handle = '#7A5FA1'  # Фиолетовый
+        scrollbar_handle_hover = '#9A7FC1'
         style_sheet = f"""
             QMainWindow {{
                 background-color: {theme['background']};
@@ -827,23 +828,24 @@ class DarkThemeApp(QMainWindow):
             }}
             QTextEdit QScrollBar:vertical {{
                 background: {scrollbar_bg};
-                width: 10px;
-                margin: 0px 0px 0px 0px;
-                border-radius: 5px;
-                border: none;
+                width: 12px;
+                margin: 4px 2px 4px 2px;
+                border-radius: 6px;
             }}
             QTextEdit QScrollBar::handle:vertical {{
                 background: {scrollbar_handle};
-                min-height: 20px;
+                min-height: 30px;
                 border-radius: 5px;
-                border: none;
-            }}
-            QTextEdit QScrollBar::add-line:vertical, QTextEdit QScrollBar::sub-line:vertical {{
-                background: none;
-                height: 0px;
             }}
             QTextEdit QScrollBar::handle:vertical:hover {{
                 background: {scrollbar_handle_hover};
+            }}
+            QTextEdit QScrollBar::add-line:vertical, QTextEdit QScrollBar::sub-line:vertical {{
+                height: 0;
+                background: none;
+            }}
+            QTextEdit QScrollBar::add-page:vertical, QTextEdit QScrollBar::sub-page:vertical {{
+                background: none;
             }}
         """
         self.setStyleSheet(style_sheet)
@@ -999,7 +1001,6 @@ class DarkThemeApp(QMainWindow):
 <div class="section">
 <div class="section-title">👁 OCR движки</div>
 <div class="item"><span class="item-title">Windows</span> — встроенный в ОС, быстрый <span class="recommended">✓ Рекомендуется</span></div>
-<div class="item"><span class="item-title">RapidOCR</span> — сверхбыстрый на базе ONNX</div>
 <div class="item"><span class="item-title">Tesseract</span> — офлайн, высокая точность, <b>требует отдельной установки</b></div>
 <div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Для работы Tesseract скачайте установщик с <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> и установите нужные языковые пакеты</div>
 </div>
@@ -1056,7 +1057,6 @@ class DarkThemeApp(QMainWindow):
 <div class="section">
 <div class="section-title">👁 OCR Engines</div>
 <div class="item"><span class="item-title">Windows</span> — built-in, fast <span class="recommended">✓ Recommended</span></div>
-<div class="item"><span class="item-title">RapidOCR</span> — super-fast (ONNX), best for Latin text</div>
 <div class="item"><span class="item-title">Tesseract</span> — accurate, offline, <b>requires separate installation</b></div>
 <div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ To use Tesseract, download the installer from <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> and install required language packs</div>
 </div>
@@ -1211,11 +1211,18 @@ class DarkThemeApp(QMainWindow):
         translator_engine = cached_config.get("translator_engine", "Argos").lower()
         ocr_engine = cached_config.get("ocr_engine", "Windows")
         
-        # Динамическая надпись: Offline для Argos, Online для остальных
-        if translator_engine == "argos":
-            lang_label_text = "Offline translation" if self.current_interface_language == "en" else "Офлайн перевод"
-        else:
-            lang_label_text = "Online translation" if self.current_interface_language == "en" else "Онлайн перевод"
+        # Отображаем конкретный переводчик
+        translator_names = {
+            "argos": {"en": "Argos Translate (Offline)", "ru": "Argos Translate (Офлайн)"},
+            "google": {"en": "Google Translate", "ru": "Google Translate"},
+            "mymemory": {"en": "MyMemory Translate", "ru": "MyMemory Translate"},
+            "lingva": {"en": "Lingva Translate", "ru": "Lingva Translate"},
+            "libretranslate": {"en": "LibreTranslate", "ru": "LibreTranslate"}
+        }
+        
+        translator_info = translator_names.get(translator_engine, {"en": "Translation", "ru": "Перевод"})
+        lang_label_text = translator_info.get(self.current_interface_language, translator_info["en"])
+        
         self.label = QLabel(lang_label_text)
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("color: #7A5FA1; font-size: 18px; font-weight: bold; margin-top: 12px; margin-bottom: 8px;")
@@ -1620,6 +1627,15 @@ if __name__ == "__main__":
     # Прогрев OCR, чтобы первый запуск оверлея был быстрее
     try:
         from ocr import warm_up, prepare_overlay
+        import logging
+        # Логируем настройки при старте
+        config = get_cached_config()
+        logging.info("=" * 50)
+        logging.info("🚀 ClicknTranslate Started")
+        logging.info(f"🔍 OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
+        logging.info(f"🌐 Translator: {config.get('translator_engine', 'Google').upper()}")
+        logging.info(f"🗣️  OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
+        logging.info("=" * 50)
         warm_up()
         # Подготовим заранее все режимы оверлея
         prepare_overlay("ocr")

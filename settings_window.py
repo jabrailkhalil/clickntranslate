@@ -200,8 +200,8 @@ class SettingsWindow(QWidget):
         ocr_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
         
         self.ocr_engine_combo = QComboBox()
-        # Порядок: Windows, RapidOCR, Tesseract
-        self.ocr_engine_combo.addItems(["Windows", "RapidOCR", "Tesseract"])
+        # Два OCR движка: Windows и Tesseract
+        self.ocr_engine_combo.addItems(["Windows", "Tesseract"])
         current_engine = self.parent.config.get("ocr_engine", "Windows")
         idx = self.ocr_engine_combo.findText(current_engine, Qt.MatchFixedString)
         if idx >= 0:
@@ -220,8 +220,8 @@ class SettingsWindow(QWidget):
         
         # Подсказки для OCR движков
         ocr_tooltips = {
-            "ru": "Windows — быстрый, встроенный, без интернета\nRapidOCR — сверхбыстрый (ONNX), лучше для латиницы\nTesseract — точный, офлайн, поддержка многих языков",
-            "en": "Windows — fast, built-in, no internet\nRapidOCR — super-fast (ONNX), best for Latin text\nTesseract — accurate, offline, many languages"
+            "ru": "Windows — быстрый, встроенный, без интернета\nTesseract — точный, офлайн, поддержка многих языков",
+            "en": "Windows — fast, built-in, no internet\nTesseract — accurate, offline, many languages"
         }
         self.ocr_engine_combo.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
         ocr_label.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
@@ -1278,16 +1278,7 @@ The program will continue using Windows OCR for now.""" if self.parent.current_i
         except Exception:
             pass
         
-        # 5. Очистка кэша RapidOCR
-        try:
-            import ocr
-            if ocr._rapidocr_engine is not None:
-                total_cleared += 100000  # ~100KB для модели
-            ocr._rapidocr_engine = None
-        except Exception:
-            pass
-        
-        # 6. Очистка временных файлов
+        # 5. Очистка временных файлов
         try:
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "temp")
             if os.path.exists(temp_dir):
