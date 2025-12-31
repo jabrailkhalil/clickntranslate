@@ -41,11 +41,11 @@ DEFAULT_CONFIG = {
     "notifications": False,
     "history": False,
     "start_minimized": False,
-    "show_update_info": False,
+    "show_update_info": True,  # Показывать Welcome окно при первом запуске
     "ocr_engine": "Windows",
     "translator_engine": "Google",
     "copy_history": False,
-    "copy_translated_text": True,  # По умолчанию копировать переведенный текст
+    "copy_translated_text": False,  # Все галочки отключены по умолчанию
     "keep_visible_on_ocr": False,
     "last_ocr_language": "ru",
     "no_screen_dimming": False
@@ -464,7 +464,7 @@ class WelcomeDialog(QDialog):
         if self.lang == 'ru':
             self.setWindowTitle("Новости")
             title = "<b>Добро пожаловать в Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.2.1</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "Советуем <b>подписаться</b> на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -474,7 +474,7 @@ class WelcomeDialog(QDialog):
         else:
             self.setWindowTitle("News")
             title = "<b>Welcome to Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.2.1</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "We recommend <b>subscribing</b> to the developer's Telegram channel to get updates and news about the program.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"

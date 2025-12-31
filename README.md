@@ -1,79 +1,109 @@
-# Click 'n Translate
+# Click'n'Translate
 
-![Click 'n Translate Logo](icons/icon.ico)
+![Click'n'Translate Logo](icons/icon.ico)
 
-**Click 'n Translate** is a powerful, lightweight desktop application designed to make screen translation and text extraction (OCR) seamless and effortless. With a modern, user-friendly interface and robust features, it bridges the gap between seeing text on your screen and understanding it.
+**Click'n'Translate** is a powerful, lightweight desktop application for instant screen translation and text extraction (OCR). Capture any text on your screen, translate it instantly, or copy it to clipboard — all with simple hotkeys.
+
+## 📥 Download
+
+**[Download Latest Release](https://github.com/jabrailkhalil/clickntranslate/releases)**
+
+> The application is **fully portable** — no registry entries, no system modifications. It cleans up its own cache (button available in Settings).
+
+## 🛠 Installation
+
+1. **Download** the latest release from [Releases](https://github.com/jabrailkhalil/clickntranslate/releases)
+2. **Extract** the archive to your preferred location (e.g., `C:\Programs\ClicknTranslate`)
+3. **Run** `ClicknTranslate.exe`
+4. **(Optional)** Enable "Start with Windows" in Settings for auto-start
+5. **(Optional)** Run `CreateShortcut.bat` to create a desktop shortcut
+
+> ⚠️ **Important**: Move the folder to its permanent location *before* enabling auto-start or creating shortcuts. Moving the folder later will break these features.
 
 ## 🚀 Features
 
 ### 📷 Advanced OCR (Optical Character Recognition)
-- **Instant Text Capture**: Select any area on your screen to extract text instantly.
-- **Multi-Engine Support**: Choose between **Windows OCR** (native, fast), **Tesseract**, or **RapidOCR** for optimal accuracy.
-- **Language Support**: Seamlessly switch between **Russian** (ru) and **English** (en) recognition.
+- **Instant Text Capture**: Select any area on your screen to extract text instantly
+- **Dual Engine Support**: Choose between **Windows OCR** (native, fast) or **Tesseract** (offline, accurate)
+- **Universal Mode (AUTO)**: Auto-detect language for numbers and Latin text
+- **Language Support**: Switch between **Russian** and **English** recognition
 
 ### 🌐 Instant Translation
-- **Automatic Translation**: Recognized text is immediately translated to your preferred language.
-- **Google Translate Integration**: Reliable and accurate translations powered by Google API.
-- **History Tracking**: Never lose a translation. The built-in history viewer saves your translation sessions locally.
+- **Multiple Translation Engines**:
+  - **Google Translate** — fast and accurate (recommended)
+  - **Argos Translate** — fully offline, private
+  - **MyMemory** — free API (5000 chars/day limit)
+  - **Lingva** — Google proxy via public servers
+  - **LibreTranslate** — open source
+- **Visual Direction**: Clear indication of translation direction (RU → EN, EN → RU)
+- **History Tracking**: Built-in history viewer saves all translations locally
 
 ### ⚡ Productivity & Workflow
 - **Global Hotkeys**:
-  - **`Ctrl + Alt + C`**: Quick Copy Mode (OCR & Copy to Clipboard).
-  - **`Ctrl + Alt + T`**: Quick Translate Mode (OCR & Translate).
-- **Overlay Mode**: A non-intrusive, stay-on-top overlay allows you to select text without leaving your current window.
-- **Clipboard Management**: Automatically copies recognized text to your clipboard.
-- **Copy History**: Maintains a separate history of all text copied via the tool.
+  - **`Ctrl + Alt + C`**: Quick Copy Mode — OCR & copy to clipboard
+  - **`Ctrl + Alt + T`**: Quick Translate Mode — OCR & translate
+- **Photoshop-style Overlay**: Professional selection interface with glow effects
+- **Smart Clipboard**: Automatically copies recognized/translated text
+- **Separate Histories**: Maintains copy history and translation history
 
 ### 🎨 Modern UI & Customization
-- **Dark & Light Themes**: Fully distinct themes to match your system preference or mood.
-- **System Tray Integration**: Minimized to tray to keep your taskbar clean.
-- **Smart Settings**: Configure behavior such as "Start Minimized", "Keep Visible on OCR", and more.
-- **Responsive Design**: Polished layout with rounded corners and smooth interactions.
-
-## 🛠 Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/jabrailkhalil/clickntranslate.git
-   cd clickntranslate
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(Ensure you have Python 3.8+ installed)*
-
-3. **Run the application**:
-   ```bash
-   python main.py
-   ```
-
-## 📦 Building form Source
-
-To create a standalone executable (`.exe`):
-
-```bash
-python build.py
-```
-This will generate a portable executable in the `dist` folder.
+- **Dark & Light Themes**: Fully distinct themes
+- **System Tray Integration**: Minimizes to tray for clean taskbar
+- **Bilingual Interface**: Russian and English UI
+- **Cache Management**: Clear cache button in Settings
+- **Responsive Design**: Polished layout with smooth interactions
 
 ## 🎮 How to Use
 
-1. **Launch the App**: The main window provides access to all settings.
-2. **Settings**:
-   - Select your OCR Engine (Windows recommended for Windows 10/11).
-   - Set your **Interface Language** and **Target Translation Language**.
-   - Customize Hotkeys if desired.
-3. **Capture**:
-   - Press **`Ctrl + Alt + T`**.
-   - Your screen will dim slightly (optional).
-   - Click and drag to select the text you want to translate.
-   - The result will appear in a popup dialog.
+1. **Launch the App**: Main window provides access to all settings
+2. **Configure Settings**:
+   - Select your OCR Engine (Windows recommended)
+   - Set your Interface Language and Target Translation Language
+   - Customize Hotkeys if desired
+3. **Copy Text** (`Ctrl + Alt + C`):
+   - Select **AUTO** for numbers/Latin, or specific language for better accuracy
+   - Click and drag to select text area
+   - Text is copied to clipboard
+4. **Translate Text** (`Ctrl + Alt + T`):
+   - Select source language (RU → EN or EN → RU)
+   - Click and drag to select text area
+   - Translation appears in popup and copies to clipboard
+
+## 💡 Tips
+
+- **AUTO mode** works best for numbers, dates, and Latin text
+- **RU mode** works best for Cyrillic text
+- **Right-click** during selection to exit the app
+- **ESC** to cancel current selection
+- Windows OCR requires language packs installed in Windows (Settings → Language)
+
+## 📦 Building from Source
+
+```bash
+# Clone repository
+git clone https://github.com/jabrailkhalil/clickntranslate.git
+cd clickntranslate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run application
+python main.py
+
+# Build executable
+python build.py
+```
+
+This generates a portable executable in the `dist` folder.
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📬 Contact
+
+- **Telegram**: [@jabrail_digital](https://t.me/jabrail_digital)
+- **GitHub**: [jabrailkhalil](https://github.com/jabrailkhalil)
 
 ---
 *Developed by Jabrail (jabrailkhalil)*

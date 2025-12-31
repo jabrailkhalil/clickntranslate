@@ -518,20 +518,31 @@ class ScreenCaptureOverlay(QWidget):
         # В режиме copy добавляем опцию "Универсальный" первой (эмодзи планеты)
         if self.mode == "copy":
             self.lang_combo.addItem("🌐  AUTO", "universal")
-        
-        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU", "ru")
-        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN", "en")
-        
-        # Устанавливаем индекс на основе self.current_language
-        if self.mode == "copy":
-            # Для копирования по умолчанию универсальный режим
-            default_index = 0  # AUTO
+            self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU", "ru")
+            self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN", "en")
         else:
+            # В режиме translate показываем направление перевода
+            self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU → EN", "ru")
+            self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN → RU", "en")
+        
+        # Устанавливаем индекс на основе self.current_language (сохраненного)
+        if self.mode == "copy":
+            # В режиме copy есть AUTO, RU, EN (индексы 0, 1, 2)
+            if self.current_language == "universal":
+                default_index = 0  # AUTO
+            elif self.current_language == "ru":
+                default_index = 1  # RU
+            elif self.current_language == "en":
+                default_index = 2  # EN
+            else:
+                default_index = 0  # По умолчанию AUTO
+        else:
+            # В режиме translate только RU, EN (индексы 0, 1)
             default_index = 0 if self.current_language == "ru" else 1
         self.lang_combo.setCurrentIndex(default_index)
         
         # Photoshop-style дизайн: темный, профессиональный, с эффектами
-        self.lang_combo.setIconSize(QtCore.QSize(32, 32))
+        self.lang_combo.setIconSize(QtCore.QSize(40, 40))
         self.lang_combo.setStyleSheet("""
             QComboBox {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -541,9 +552,9 @@ class ScreenCaptureOverlay(QWidget):
                 color: #e8e8e8;
                 border: 1px solid rgba(80, 80, 80, 200);
                 border-top: 1px solid rgba(100, 100, 100, 150);
-                border-radius: 6px;
+                border-radius: 8px;
                 padding: 10px 16px;
-                font-size: 15px;
+                font-size: 16px;
                 font-weight: 600;
                 font-family: 'Segoe UI', Arial, sans-serif;
                 min-width: 110px;
@@ -592,7 +603,9 @@ class ScreenCaptureOverlay(QWidget):
                 background-color: rgba(80, 130, 200, 180);
             }
         """)
-        self.lang_combo.setFixedSize(130, 48)
+        # Размер зависит от режима (translate имеет более длинный текст)
+        combo_width = 180 if self.mode == "translate" else 160
+        self.lang_combo.setFixedSize(combo_width, 56)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
         # Показываем комбобокс (в режиме copy есть опция AUTO)
         self.lang_combo.setVisible(True if not defer_show else False)

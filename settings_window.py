@@ -469,7 +469,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(10)
         
         # --- Версия программы ---
-        version_label = QLabel("V1.2")
+        version_label = QLabel("V1.2.1")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 2px; margin-top: 2px;")
         self.main_layout.addWidget(version_label)
