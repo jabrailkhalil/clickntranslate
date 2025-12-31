@@ -1001,6 +1001,8 @@ class DarkThemeApp(QMainWindow):
 <div class="section">
 <div class="section-title">👁 OCR движки</div>
 <div class="item"><span class="item-title">Windows</span> — встроенный в ОС, быстрый <span class="recommended">✓ Рекомендуется</span></div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📋 <b>AUTO</b> — цифры и латиница | <b>RU</b> — кириллица | <b>EN</b> — английский</div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Работает только с языками, установленными в Windows (Настройки → Язык)</div>
 <div class="item"><span class="item-title">Tesseract</span> — офлайн, высокая точность, <b>требует отдельной установки</b></div>
 <div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Для работы Tesseract скачайте установщик с <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> и установите нужные языковые пакеты</div>
 </div>
@@ -1057,6 +1059,8 @@ class DarkThemeApp(QMainWindow):
 <div class="section">
 <div class="section-title">👁 OCR Engines</div>
 <div class="item"><span class="item-title">Windows</span> — built-in, fast <span class="recommended">✓ Recommended</span></div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📋 <b>AUTO</b> — numbers & latin | <b>RU</b> — cyrillic | <b>EN</b> — english</div>
+<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Only works with languages installed in Windows (Settings → Language)</div>
 <div class="item"><span class="item-title">Tesseract</span> — accurate, offline, <b>requires separate installation</b></div>
 <div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ To use Tesseract, download the installer from <a href="https://github.com/UB-Mannheim/tesseract/wiki" style="color: #7A5FA1;">GitHub</a> and install required language packs</div>
 </div>

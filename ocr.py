@@ -13,25 +13,16 @@ import pyperclip
 # Настройка логирования в файл для диагностики
 def get_log_path():
     if hasattr(sys, '_MEIPASS'):
-        # В сборке - логируем рядом с exe
         return os.path.join(os.path.dirname(sys.executable), "ocr_debug.log")
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr_debug.log")
 
 _debug_log_path = get_log_path()
 
 def debug_log(msg):
-    """Записать сообщение в лог-файл."""
-    try:
-        with open(_debug_log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
-    except:
-        pass
+    """Debug logging disabled for production."""
+    pass  # Логирование отключено для production
 
-debug_log("=" * 50)
-debug_log("OCR module loading...")
-debug_log(f"sys.executable: {sys.executable}")
-debug_log(f"frozen: {getattr(sys, 'frozen', False)}")
-debug_log(f"_MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}")
+# Инициализация (логирование отключено)
 
 # Явные импорты winrt для PyInstaller (должны быть до использования)
 _WINRT_AVAILABLE = False
@@ -332,6 +323,60 @@ def _get_windows_ocr_engine(lang_tag: str):
         debug_log(traceback.format_exc())
         return None
 
+# Cache for universal OCR engine
+_UNIVERSAL_OCR_ENGINE = None
+
+def _get_universal_ocr_engine():
+    """Получить универсальный Windows OCR движок. Используем en-US как базовый (лучше всего с цифрами)."""
+    global _UNIVERSAL_OCR_ENGINE, _WINRT_AVAILABLE
+    
+    debug_log("_get_universal_ocr_engine called")
+    
+    if _UNIVERSAL_OCR_ENGINE is not None:
+        debug_log("Returning cached universal OCR engine")
+        return _UNIVERSAL_OCR_ENGINE
+    
+    if not _WINRT_AVAILABLE:
+        debug_log(f"FAILED: WinRT not available. Error was: {_WINRT_ERROR}")
+        logging.error("WinRT modules are not available")
+        return None
+    
+    try:
+        OcrEngine = winrt_ocr.OcrEngine
+        Language = winrt_glob.Language
+        
+        # Для универсального режима используем en-US (лучше всего с цифрами и латиницей)
+        debug_log("Using en-US for universal mode (best for numbers)...")
+        try:
+            if OcrEngine.is_language_supported(Language("en-US")):
+                engine = OcrEngine.try_create_from_language(Language("en-US"))
+                if engine:
+                    _UNIVERSAL_OCR_ENGINE = engine
+                    debug_log("SUCCESS: Using en-US as universal engine")
+                    return engine
+        except Exception as e:
+            debug_log(f"en-US failed: {e}")
+        
+        # Fallback: любой доступный язык
+        debug_log("Falling back to first available language...")
+        available_langs = OcrEngine.get_available_recognizer_languages()
+        if available_langs.size > 0:
+            first_lang = available_langs.get_at(0)
+            debug_log(f"Using fallback language: {first_lang.language_tag}")
+            engine = OcrEngine.try_create_from_language(first_lang)
+            if engine:
+                _UNIVERSAL_OCR_ENGINE = engine
+                return engine
+        
+        debug_log("ERROR: No OCR languages available")
+        return None
+    except Exception as e:
+        debug_log(f"EXCEPTION in _get_universal_ocr_engine: {e}")
+        import traceback
+        debug_log(traceback.format_exc())
+        return None
+
+
 def qimage_to_softwarebitmap(qimage):
     debug_log(f"qimage_to_softwarebitmap called")
     debug_log(f"qimage = {qimage}, isNull = {qimage.isNull() if qimage else 'N/A'}")
@@ -376,21 +421,28 @@ def _get_ocr_event_loop():
 
 class OCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
-    def __init__(self, bitmap, language_code, parent=None):
+    def __init__(self, bitmap, language_code, parent=None, use_universal=False):
         super().__init__(parent)
         self.bitmap = bitmap
         self.language_code = language_code
+        self.use_universal = use_universal
 
     def run(self):
         debug_log(f"OCRWorker.run() started")
         debug_log(f"self.bitmap = {self.bitmap}")
         debug_log(f"self.language_code = {self.language_code}")
+        debug_log(f"self.use_universal = {self.use_universal}")
         try:
-            # Определяем language tag
-            lang_tag = {"en": "en-US", "ru": "ru-RU"}.get(self.language_code, self.language_code)
-            debug_log(f"lang_tag = {lang_tag}")
+            # Выбираем engine в зависимости от режима
+            if self.use_universal:
+                debug_log("Using universal OCR engine (from user profile languages)")
+                engine = _get_universal_ocr_engine()
+            else:
+                # Определяем language tag
+                lang_tag = {"en": "en-US", "ru": "ru-RU"}.get(self.language_code, self.language_code)
+                debug_log(f"lang_tag = {lang_tag}")
+                engine = _get_windows_ocr_engine(lang_tag)
             
-            engine = _get_windows_ocr_engine(lang_tag)
             debug_log(f"engine = {engine}")
             
             if engine is None:
@@ -462,55 +514,87 @@ class ScreenCaptureOverlay(QWidget):
         
         # Используем текущий язык (уже загружен из конфига в __init__)
         self.lang_combo = QtWidgets.QComboBox(self)
+        
+        # В режиме copy добавляем опцию "Универсальный" первой (эмодзи планеты)
+        if self.mode == "copy":
+            self.lang_combo.addItem("🌐  AUTO", "universal")
+        
         self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU", "ru")
         self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN", "en")
         
         # Устанавливаем индекс на основе self.current_language
-        default_index = 0 if self.current_language == "ru" else 1
+        if self.mode == "copy":
+            # Для копирования по умолчанию универсальный режим
+            default_index = 0  # AUTO
+        else:
+            default_index = 0 if self.current_language == "ru" else 1
         self.lang_combo.setCurrentIndex(default_index)
         
-        # Современный компактный дизайн с круглыми флагами
-        self.lang_combo.setIconSize(QtCore.QSize(48, 48))
+        # Photoshop-style дизайн: темный, профессиональный, с эффектами
+        self.lang_combo.setIconSize(QtCore.QSize(32, 32))
         self.lang_combo.setStyleSheet("""
             QComboBox {
-                background-color: rgba(18, 18, 18, 230);
-                color: #ffffff;
-                border: 2px solid rgba(122, 95, 161, 200);
-                border-radius: 28px;
-                padding: 8px 12px;
-                font-size: 14px;
-                font-weight: bold;
-                min-width: 120px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(60, 60, 60, 240),
+                    stop:0.5 rgba(45, 45, 45, 245),
+                    stop:1 rgba(35, 35, 35, 250));
+                color: #e8e8e8;
+                border: 1px solid rgba(80, 80, 80, 200);
+                border-top: 1px solid rgba(100, 100, 100, 150);
+                border-radius: 6px;
+                padding: 10px 16px;
+                font-size: 15px;
+                font-weight: 600;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                min-width: 110px;
             }
             QComboBox:hover {
-                background-color: rgba(30, 30, 30, 250);
-                border: 2px solid rgba(154, 127, 193, 255);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(75, 75, 75, 245),
+                    stop:0.5 rgba(55, 55, 55, 250),
+                    stop:1 rgba(45, 45, 45, 255));
+                border: 1px solid rgba(100, 100, 100, 220);
+                border-top: 1px solid rgba(130, 130, 130, 180);
+            }
+            QComboBox:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(40, 40, 40, 250),
+                    stop:1 rgba(55, 55, 55, 255));
             }
             QComboBox::drop-down {
                 border: none;
-                width: 20px;
+                width: 24px;
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
             }
             QComboBox::down-arrow {
                 image: none;
+                width: 0;
             }
             QComboBox QAbstractItemView {
-                background-color: rgba(18, 18, 18, 250);
-                color: #ffffff;
-                border: 2px solid rgba(122, 95, 161, 200);
-                border-radius: 12px;
-                padding: 4px;
-                selection-background-color: rgba(122, 95, 161, 180);
+                background-color: rgba(40, 40, 40, 252);
+                color: #e8e8e8;
+                border: 1px solid rgba(80, 80, 80, 200);
+                border-radius: 6px;
+                padding: 6px;
+                selection-background-color: rgba(80, 130, 200, 180);
+                outline: none;
             }
             QComboBox QAbstractItemView::item {
-                padding: 8px;
-                border-radius: 6px;
+                padding: 10px 14px;
+                border-radius: 4px;
+                margin: 2px;
             }
             QComboBox QAbstractItemView::item:hover {
-                background-color: rgba(154, 127, 193, 120);
+                background-color: rgba(70, 70, 70, 200);
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: rgba(80, 130, 200, 180);
             }
         """)
-        self.lang_combo.setFixedSize(140, 56)
+        self.lang_combo.setFixedSize(130, 48)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
+        # Показываем комбобокс (в режиме copy есть опция AUTO)
         self.lang_combo.setVisible(True if not defer_show else False)
         
         # Сохраняем язык при изменении
@@ -622,14 +706,24 @@ class ScreenCaptureOverlay(QWidget):
                 # чтобы область выделения была видна
                 painter.fillRect(rect, QtGui.QColor(255, 255, 255, 30))
             
-            # Тонкая полупрозрачная рамка (как в TextGrab)
-            # ВАЖНО: тонкая рамка (1px) не попадает в захватываемую область!
-            pen = QtGui.QPen(QtGui.QColor(122, 95, 161, 180), 1)  # 1px полупрозрачная
-            pen.setStyle(QtCore.Qt.SolidLine)
-            painter.setPen(pen)
+            # Photoshop-style рамка: голубая с эффектом свечения
+            # Внешнее свечение (glow effect)
+            glow_pen = QtGui.QPen(QtGui.QColor(80, 160, 255, 60), 5)
+            glow_pen.setStyle(QtCore.Qt.SolidLine)
+            painter.setPen(glow_pen)
+            painter.drawRect(rect.adjusted(-2, -2, 2, 2))
             
-            # Рисуем простой прямоугольник без закруглений (точнее)
+            # Основная рамка (яркая голубая, как в Photoshop)
+            main_pen = QtGui.QPen(QtGui.QColor(80, 160, 255, 255), 1)
+            main_pen.setStyle(QtCore.Qt.SolidLine)
+            painter.setPen(main_pen)
             painter.drawRect(rect)
+            
+            # Внутренняя светлая рамка для контраста
+            inner_pen = QtGui.QPen(QtGui.QColor(200, 230, 255, 100), 1)
+            inner_pen.setStyle(QtCore.Qt.SolidLine)
+            painter.setPen(inner_pen)
+            painter.drawRect(rect.adjusted(1, 1, -1, -1))
             
         painter.end()
 
@@ -977,11 +1071,17 @@ class ScreenCaptureOverlay(QWidget):
             return  # Не использовать Windows OCR ниже
 
         # По умолчанию используем Windows OCR (без PIL)
-        logging.info(f"🔄 Running Windows OCR for language: {language_code.upper()}")
+        # Используем универсальный OCR если выбрано "universal" (AUTO)
+        use_universal = (language_code == "universal")
+        if use_universal:
+            logging.info("🔄 Running Windows OCR in UNIVERSAL mode (auto-detect language)")
+        else:
+            logging.info(f"🔄 Running Windows OCR for language: {language_code.upper()}")
+        
         bitmap = qimage_to_softwarebitmap(qimage)
         
         # Create worker with Tesseract fallback capability
-        self.ocr_worker = OCRWorker(bitmap, language_code)
+        self.ocr_worker = OCRWorker(bitmap, language_code, use_universal=use_universal)
         
         # Pass the QImage for Tesseract fallback if needed
         self.ocr_worker.qimage = qimage
