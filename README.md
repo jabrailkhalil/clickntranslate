@@ -103,7 +103,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📬 Contact
 
 - **Telegram**: [@jabrail_digital](https://t.me/jabrail_digital)
-- **GitHub**: [jabrailkhalil](https://github.com/jabrailkhalil)
-
----
-*Developed by Jabrail (jabrailkhalil)*
