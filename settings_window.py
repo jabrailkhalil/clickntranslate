@@ -469,7 +469,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(10)
         
         # --- Версия программы ---
-        version_label = QLabel("V1.2.1")
+        version_label = QLabel("V1.2.2")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 2px; margin-top: 2px;")
         self.main_layout.addWidget(version_label)
@@ -593,10 +593,27 @@ class SettingsWindow(QWidget):
                 history = json.load(f)
             if history:
                 text = ""
-                for record in history:
-                    text += f"{record.get('timestamp')} ({record.get('language')}):\n"
-                    text += f"{record.get('text')}\n"
-                    text += "-" * 40 + "\n\n"
+                for record in reversed(history):  # Новые сверху
+                    # Форматируем дату красиво
+                    try:
+                        from datetime import datetime
+                        ts = record.get('timestamp', '')
+                        dt = datetime.fromisoformat(ts)
+                        date_str = dt.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        date_str = record.get('timestamp', '')
+                    
+                    lang_code = record.get('language', '').upper()
+                    text += f"📅 {date_str}  •  {lang_code}\n"
+                    
+                    # Поддержка и старого формата (text), и нового (original + translated)
+                    if 'original' in record and 'translated' in record:
+                        text += f"📝 {record.get('original')}\n"
+                        text += f"🌐 {record.get('translated')}\n"
+                    else:
+                        # Старый формат
+                        text += f"📝 {record.get('text')}\n"
+                    text += "━" * 35 + "\n\n"
                 self.history_text_edit.setText(text)
             else:
                 self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
@@ -654,10 +671,19 @@ class SettingsWindow(QWidget):
                 history = json.load(f)
             if history:
                 text = ""
-                for record in history:
-                    text += f"{record.get('timestamp')}\n"
-                    text += f"{record.get('text')}\n"
-                    text += "-" * 40 + "\n\n"
+                for record in reversed(history):  # Новые сверху
+                    # Форматируем дату красиво
+                    try:
+                        from datetime import datetime
+                        ts = record.get('timestamp', '')
+                        dt = datetime.fromisoformat(ts)
+                        date_str = dt.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        date_str = record.get('timestamp', '')
+                    
+                    text += f"📅 {date_str}\n"
+                    text += f"📋 {record.get('text')}\n"
+                    text += "━" * 35 + "\n\n"
                 self.copy_history_text_edit.setText(text)
             else:
                 self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
@@ -1414,6 +1440,8 @@ The program will continue using Windows OCR for now.""" if self.parent.current_i
         self.parent.autostart = default_config["autostart"]
         self.parent.translation_mode = default_config["translation_mode"]
         self.parent.start_minimized = default_config["start_minimized"]
+        # Удаляем ярлык автозапуска (autostart = False)
+        self.parent.set_autostart(False)
         # Сохраняем конфиг
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения

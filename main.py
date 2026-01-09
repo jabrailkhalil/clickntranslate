@@ -464,7 +464,7 @@ class WelcomeDialog(QDialog):
         if self.lang == 'ru':
             self.setWindowTitle("Новости")
             title = "<b>Добро пожаловать в Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2.1</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.2.2</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "Советуем <b>подписаться</b> на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -474,7 +474,7 @@ class WelcomeDialog(QDialog):
         else:
             self.setWindowTitle("News")
             title = "<b>Welcome to Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2.1</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.2.2</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "We recommend <b>subscribing</b> to the developer's Telegram channel to get updates and news about the program.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -625,7 +625,7 @@ class DarkThemeApp(QMainWindow):
             QIcon(resource_path("icons/American_flag.png")) if self.current_interface_language == "en"
             else QIcon(resource_path("icons/Russian_flag.png"))
         )
-        self.flag_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['title'])
+        self.flag_button.setToolTip("Сменить язык" if self.current_interface_language == "ru" else "Change language")
         self.flag_button.setStyleSheet("background-color: transparent; border: none;")
         self.flag_button.setGeometry(10, 5, 30, 30)
         self.flag_button.clicked.connect(self.toggle_language)
@@ -681,6 +681,7 @@ class DarkThemeApp(QMainWindow):
             copy_text = "Копировать текст"
             translate_text = "Перевести"
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
+        self.tray_icon.setToolTip("Click'n'Translate")
         tray_menu = QMenu()
         open_action = tray_menu.addAction(open_text)
         open_action.triggered.connect(self.show_window_from_tray)
@@ -1590,26 +1591,45 @@ if __name__ == "__main__":
         run_screen_capture(mode="ocr" if mode_arg == "ocr" else mode_arg)
         sys.exit(0)
 
-    # Проверяем, есть ли уже процесс (только для скомпилированного exe)
+    # Single instance через Windows mutex
     def is_already_running():
-        """Проверить, запущен ли уже другой экземпляр программы."""
-        this_pid = os.getpid()
-        current_exe = sys.executable.lower()
+        """Проверить через mutex, запущен ли уже экземпляр программы."""
+        try:
+            # Создаем уникальный mutex
+            mutex_name = "ClicknTranslate_SingleInstance_Mutex"
+            kernel32 = ctypes.windll.kernel32
+            mutex = kernel32.CreateMutexW(None, False, mutex_name)
+            # ERROR_ALREADY_EXISTS = 183
+            if kernel32.GetLastError() == 183:
+                kernel32.CloseHandle(mutex)
+                return True
+            # Сохраняем handle чтобы mutex жил пока программа работает
+            global _single_instance_mutex
+            _single_instance_mutex = mutex
+            return False
+        except Exception:
+            return False
 
-        for p in psutil.process_iter(['pid', 'exe']):
-            try:
-                if p.info['exe'] and p.info['exe'].lower() == current_exe:
-                    if p.info['pid'] != this_pid:
-                        return True
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
+    def bring_existing_to_front():
+        """Найти и показать окно существующего экземпляра программы."""
+        try:
+            # Ищем окно по заголовку
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Click'n'Translate")
+            if hwnd:
+                # Показываем и активируем окно
+                SW_RESTORE = 9
+                ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                return True
+        except Exception:
+            pass
         return False
 
-    # Разрешаем множественный запуск (проверка удалена по запросу)
-    # def is_already_running(): ...
-    
-    # if getattr(sys, 'frozen', False):
-    #     bring_existing_to_front() ...
+    # Проверяем single instance (не разрешаем запуск нескольких копий)
+    if is_already_running():
+        # Пытаемся показать существующее окно
+        bring_existing_to_front()
+        sys.exit(0)
     
     # Читаем конфиг
     start_minimized = False

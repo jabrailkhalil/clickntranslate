@@ -122,7 +122,7 @@ def get_cached_ocr_config():
 def load_ocr_config():
     return get_cached_ocr_config().get("ocr_language", "ru")
 
-def _save_translation_history_sync(text, language):
+def _save_translation_history_sync(original_text, translated_text, language):
     """Синхронная запись в историю переводов (выполняется в отдельном потоке)."""
     try:
         config = get_cached_ocr_config()
@@ -156,7 +156,8 @@ def _save_translation_history_sync(text, language):
                 history.append({
                     "timestamp": datetime.now().isoformat(),
                     "language": language,
-                    "text": text
+                    "original": original_text,
+                    "translated": translated_text
                 })
                 f.seek(0)
                 f.truncate()
@@ -181,7 +182,8 @@ def _save_translation_history_sync(text, language):
                 history.append({
                     "timestamp": datetime.now().isoformat(),
                     "language": language,
-                    "text": text
+                    "original": original_text,
+                    "translated": translated_text
                 })
                 f.seek(0)
                 f.truncate()
@@ -197,7 +199,8 @@ def _save_translation_history_sync(text, language):
         history.append({
             "timestamp": datetime.now().isoformat(),
             "language": language,
-            "text": text
+            "original": original_text,
+            "translated": translated_text
         })
         try:
             with open(history_file, "w", encoding="utf-8") as f:
@@ -205,10 +208,10 @@ def _save_translation_history_sync(text, language):
         except Exception:
             pass
 
-def save_translation_history(text, language):
+def save_translation_history(original_text, translated_text, language):
     """Асинхронно сохранить перевод в историю (не блокирует UI)."""
     import threading
-    threading.Thread(target=_save_translation_history_sync, args=(text, language), daemon=True).start()
+    threading.Thread(target=_save_translation_history_sync, args=(original_text, translated_text, language), daemon=True).start()
 
 async def run_ocr_with_engine(bitmap, engine):
     debug_log(f"run_ocr_with_engine called")
@@ -464,7 +467,20 @@ class OCRWorker(QtCore.QThread):
                     # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
                     lines = recognized.lines
                     if lines:
-                        recognized_text = "\n".join(line.text for line in lines)
+                        # Собираем текст из слов с правильными пробелами
+                        lines_text = []
+                        for line in lines:
+                            try:
+                                # Используем words для правильных пробелов между словами
+                                words = list(line.words)
+                                if words:
+                                    line_text = " ".join(word.text for word in words)
+                                else:
+                                    line_text = line.text
+                            except:
+                                line_text = line.text
+                            lines_text.append(line_text)
+                        recognized_text = "\n".join(lines_text)
                         debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
                         logging.info(f"✅ Windows OCR recognized {len(recognized_text)} chars successfully")
                     else:
@@ -1181,8 +1197,8 @@ class ScreenCaptureOverlay(QWidget):
                     else:
                         # Если пользователь скопировал вручную, обработка уже в диалоге
                         pass
-                    # Сохраняем только переводы в историю переводов
-                    save_translation_history(translated_text, target_code)
+                    # Сохраняем переводы в историю (исходный текст и перевод)
+                    save_translation_history(text, translated_text, target_code)
                 self.close()
             else:
                 try:
