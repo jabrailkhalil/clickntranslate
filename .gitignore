@@ -58,3 +58,5 @@ data/settings.json
 *.cmd
 *.ps1
 *.sh
+
+!build_release.bat
