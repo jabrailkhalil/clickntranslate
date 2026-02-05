@@ -32,6 +32,14 @@ ocr/tesseract/
 *.log
 launch_log.txt
 
+# Debug images
+debug_*.png
+
+# Misc junk files
+git
+task.txt
+%VBS%
+
 # PyInstaller artefacts
 *.pyz
 *.pkg
