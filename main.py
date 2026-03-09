@@ -48,7 +48,8 @@ DEFAULT_CONFIG = {
     "copy_translated_text": False,  # Все галочки отключены по умолчанию
     "keep_visible_on_ocr": False,
     "last_ocr_language": "ru",
-    "no_screen_dimming": False
+    "no_screen_dimming": False,
+    "fullscreen_translate_hotkey": "Ctrl+Alt+F"
 }
 
 # --- Глобальный кэш конфигурации ---
@@ -554,6 +555,11 @@ class DarkThemeApp(QMainWindow):
             self.translate_hotkey_thread = HotkeyListenerThread(translate_hotkey, self.launch_translate, hotkey_id=2)
             self.translate_hotkey_thread.start()
 
+        fullscreen_translate_hotkey = self.config.get("fullscreen_translate_hotkey", "")
+        if fullscreen_translate_hotkey:
+            self.fullscreen_translate_hotkey_thread = HotkeyListenerThread(fullscreen_translate_hotkey, self.launch_fullscreen_translate, hotkey_id=3)
+            self.fullscreen_translate_hotkey_thread.start()
+
         self.HotkeyListenerThread = HotkeyListenerThread
 
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
@@ -675,11 +681,13 @@ class DarkThemeApp(QMainWindow):
             exit_text = "Exit"
             copy_text = "Copy Text"
             translate_text = "Translate"
+            fullscreen_text = "Translate Screen"
         else:
             open_text = "Открыть"
             exit_text = "Закрыть программу"
             copy_text = "Копировать текст"
             translate_text = "Перевести"
+            fullscreen_text = "Перевести экран"
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
         self.tray_icon.setToolTip("Click'n'Translate")
         tray_menu = QMenu()
@@ -689,6 +697,8 @@ class DarkThemeApp(QMainWindow):
         copy_action.triggered.connect(self.launch_copy)
         translate_action = tray_menu.addAction(translate_text)
         translate_action.triggered.connect(self.launch_translate)
+        fullscreen_action = tray_menu.addAction(fullscreen_text)
+        fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
         tray_menu.addSeparator()
         exit_action = tray_menu.addAction(exit_text)
         exit_action.triggered.connect(self.exit_app)
@@ -773,6 +783,28 @@ class DarkThemeApp(QMainWindow):
                 self._start_external("ocr.py", "translate")
             if not self.config.get("keep_visible_on_ocr", False):
                 self.hide()
+
+    def launch_fullscreen_translate(self):
+        print("launch_fullscreen_translate called")
+        try:
+            from ocr import run_fullscreen_translate
+            if not self.config.get("keep_visible_on_ocr", False):
+                self.hide()
+
+            def _do_translate():
+                try:
+                    run_fullscreen_translate()
+                except Exception as e:
+                    print(f"Error in fullscreen translate: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            # Small delay to ensure window is hidden before screenshot
+            QTimer.singleShot(150, _do_translate)
+        except Exception as e:
+            print(f"Error launching fullscreen translate: {e}")
+            import traceback
+            traceback.print_exc()
 
     def restart_hotkey_listener(self):
         self.hotkey_thread = HotkeyListenerThread(self.config.get("ocr_hotkeys", "Ctrl+O"), self.launch_ocr)
@@ -1452,6 +1484,12 @@ class DarkThemeApp(QMainWindow):
                 self.translate_hotkey_thread.join(timeout=0.5)
         except Exception as e:
             print(f"Error stopping translate hotkey thread: {e}")
+        try:
+            if hasattr(self, "fullscreen_translate_hotkey_thread") and self.fullscreen_translate_hotkey_thread is not None:
+                self.fullscreen_translate_hotkey_thread.stop()
+                self.fullscreen_translate_hotkey_thread.join(timeout=0.5)
+        except Exception as e:
+            print(f"Error stopping fullscreen translate hotkey thread: {e}")
         self.save_config()
         self.tray_icon.hide()  # Убираем иконку из трея
         event.accept()
@@ -1655,10 +1693,10 @@ if __name__ == "__main__":
         # Логируем настройки при старте
         config = get_cached_config()
         logging.info("=" * 50)
-        logging.info("🚀 ClicknTranslate Started")
-        logging.info(f"🔍 OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
-        logging.info(f"🌐 Translator: {config.get('translator_engine', 'Google').upper()}")
-        logging.info(f"🗣️  OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
+        logging.info("ClicknTranslate Started")
+        logging.info(f"OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
+        logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
+        logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
         logging.info("=" * 50)
         warm_up()
         # Подготовим заранее все режимы оверлея

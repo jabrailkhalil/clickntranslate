@@ -48,7 +48,10 @@ SETTINGS_TEXT = {
         "copy_history_title": "Copy history",
         "history_empty": "History is empty.",
         "history_error": "Error reading history.",
-        "copy_translated_text": "Copy translated text automatically"
+        "copy_translated_text": "Copy translated text automatically",
+        "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
+        "fullscreen_from": "From:",
+        "fullscreen_to": "To:"
     },
     "ru": {
         "autostart": "Запускать вместе с ОС",
@@ -72,7 +75,10 @@ SETTINGS_TEXT = {
         "copy_history_title": "История копирований",
         "history_empty": "История пуста.",
         "history_error": "Ошибка чтения истории.",
-        "copy_translated_text": "Копировать сразу переведённый текст"
+        "copy_translated_text": "Копировать сразу переведённый текст",
+        "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
+        "fullscreen_from": "С:",
+        "fullscreen_to": "На:"
     }
 }
 
@@ -505,6 +511,50 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.translate_hotkey_input)
         self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
 
+        self.main_layout.addSpacing(10)
+
+        # Блок для настройки горячей клавиши "Fullscreen Translate"
+        label_fullscreen = QLabel(SETTINGS_TEXT[lang]["fullscreen_translate_hotkey"])
+        self.main_layout.addWidget(label_fullscreen)
+
+        self.fullscreen_translate_hotkey_input = ClearableKeySequenceEdit()
+        saved_fs_hotkey = self.parent.config.get("fullscreen_translate_hotkey", "")
+        self.fullscreen_translate_hotkey_input.setKeySequence(QKeySequence(saved_fs_hotkey))
+        self.main_layout.addWidget(self.fullscreen_translate_hotkey_input)
+        self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
+
+        # Language direction for fullscreen translate
+        lang_row = QHBoxLayout()
+        lang_row.setSpacing(8)
+
+        from_label = QLabel(SETTINGS_TEXT[lang]["fullscreen_from"])
+        lang_row.addWidget(from_label)
+
+        self.fs_from_combo = QComboBox()
+        self.fs_from_combo.addItem("English", "en")
+        self.fs_from_combo.addItem("Russian", "ru")
+        saved_from = self.parent.config.get("fullscreen_translate_from", "en")
+        idx_from = self.fs_from_combo.findData(saved_from)
+        if idx_from >= 0:
+            self.fs_from_combo.setCurrentIndex(idx_from)
+        lang_row.addWidget(self.fs_from_combo)
+
+        to_label = QLabel(SETTINGS_TEXT[lang]["fullscreen_to"])
+        lang_row.addWidget(to_label)
+
+        self.fs_to_combo = QComboBox()
+        self.fs_to_combo.addItem("Russian", "ru")
+        self.fs_to_combo.addItem("English", "en")
+        saved_to = self.parent.config.get("fullscreen_translate_to", "ru")
+        idx_to = self.fs_to_combo.findData(saved_to)
+        if idx_to >= 0:
+            self.fs_to_combo.setCurrentIndex(idx_to)
+        lang_row.addWidget(self.fs_to_combo)
+
+        self.main_layout.addLayout(lang_row)
+        self.fs_from_combo.currentIndexChanged.connect(self.save_fullscreen_lang_direction)
+        self.fs_to_combo.currentIndexChanged.connect(self.save_fullscreen_lang_direction)
+
         # Инструктивная надпись для удаления комбинации
         remove_label = QLabel(SETTINGS_TEXT[lang]["remove_hotkey"])
         self.main_layout.addWidget(remove_label)
@@ -551,6 +601,27 @@ class SettingsWindow(QWidget):
         if hotkey_str:
             self.parent.translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate, hotkey_id=3)
             self.parent.translate_hotkey_thread.start()
+
+    def save_fullscreen_translate_hotkey(self):
+        hotkey_str = self.fullscreen_translate_hotkey_input.keySequence().toString()
+        self.parent.config["fullscreen_translate_hotkey"] = hotkey_str
+        self.parent.save_config()
+        # Перезапуск слушателя горячих клавиш для перевода экрана
+        if hasattr(self.parent, "fullscreen_translate_hotkey_thread") and self.parent.fullscreen_translate_hotkey_thread is not None:
+            try:
+                self.parent.fullscreen_translate_hotkey_thread.stop()
+                self.parent.fullscreen_translate_hotkey_thread.join(timeout=0.5)
+            except Exception as e:
+                print(f"Error stopping fullscreen translate hotkey thread: {e}")
+            self.parent.fullscreen_translate_hotkey_thread = None
+        if hotkey_str:
+            self.parent.fullscreen_translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_fullscreen_translate, hotkey_id=4)
+            self.parent.fullscreen_translate_hotkey_thread.start()
+
+    def save_fullscreen_lang_direction(self):
+        self.parent.config["fullscreen_translate_from"] = self.fs_from_combo.currentData()
+        self.parent.config["fullscreen_translate_to"] = self.fs_to_combo.currentData()
+        self.parent.save_config()
 
     def back_from_hotkeys(self):
         self.init_ui()
@@ -760,19 +831,14 @@ class SettingsWindow(QWidget):
 
         if self.hotkeys_mode:
             if self.parent.current_theme == "Темная":
-                self.copy_hotkey_input.setStyleSheet(
-                    "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
-                )
-                self.translate_hotkey_input.setStyleSheet(
-                    "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
-                )
+                hotkey_style = "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
             else:
-                self.copy_hotkey_input.setStyleSheet(
-                    "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
-                )
-                self.translate_hotkey_input.setStyleSheet(
-                    "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
-                )
+                hotkey_style = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
+            self.copy_hotkey_input.setStyleSheet(hotkey_style)
+            self.translate_hotkey_input.setStyleSheet(hotkey_style)
+            self.fullscreen_translate_hotkey_input.setStyleSheet(hotkey_style)
+            self.fs_from_combo.setStyleSheet(hotkey_style)
+            self.fs_to_combo.setStyleSheet(hotkey_style)
         if hasattr(self, "history_text_edit") and self.history_text_edit is not None:
             try:
                 if self.parent.current_theme == "Темная":

@@ -217,7 +217,7 @@ def test_translation():
 def translate_text(text, source_code, target_code, status_callback=None):
     """Перевод текста с выбранным движком и автоматическим фоллбеком."""
     engine = get_cached_translator_config().get("translator_engine", "Argos").lower()
-    print(f"🌐 Using translator: {engine.upper()}")  # Логирование переводчика
+    print(f"Using translator: {engine.upper()}")  # Логирование переводчика
 
     # Онлайн-переводчики (определяем локально для избежания проблем с порядком)
     online_engines = ['google', 'mymemory', 'lingva', 'libretranslate']

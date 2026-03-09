@@ -482,17 +482,17 @@ class OCRWorker(QtCore.QThread):
                             lines_text.append(line_text)
                         recognized_text = "\n".join(lines_text)
                         debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
-                        logging.info(f"✅ Windows OCR recognized {len(recognized_text)} chars successfully")
+                        logging.info(f"Windows OCR recognized {len(recognized_text)} chars successfully")
                     else:
                         debug_log("recognized.lines is empty")
-                        logging.warning("⚠️ Windows OCR returned empty result")
+                        logging.warning("Windows OCR returned empty result")
                 except AttributeError:
                     debug_log("ERROR: recognized has no 'lines' attribute")
                 except Exception as e:
                     debug_log(f"ERROR accessing recognized.lines: {e}")
             else:
                 debug_log("No recognized text (recognized is None)")
-                logging.warning("⚠️ Windows OCR returned None")
+                logging.warning("Windows OCR returned None")
 
         except Exception as e:
             debug_log(f"EXCEPTION in OCRWorker.run(): {e}")
@@ -1022,7 +1022,7 @@ class ScreenCaptureOverlay(QWidget):
 
         # Determine which OCR engine to use
         ocr_engine_type = self.get_ocr_engine().lower()
-        logging.info(f"🔍 Using OCR engine: {ocr_engine_type.upper()}")
+        logging.info(f"Using OCR engine: {ocr_engine_type.upper()}")
 
         if ocr_engine_type == "tesseract":
             # Determine path to tesseract
@@ -1091,7 +1091,7 @@ class ScreenCaptureOverlay(QWidget):
                 if recognized_text.strip():
                     logging.info(f"✅ Tesseract recognized {len(recognized_text)} chars successfully")
                 else:
-                    logging.warning("⚠️ Tesseract returned empty result")
+                    logging.warning("Tesseract returned empty result")
             except Exception as e:
                 logging.error(f"❌ Tesseract error: {e}")
                 recognized_text = ""
@@ -1177,7 +1177,7 @@ class ScreenCaptureOverlay(QWidget):
                     if translated_text:
                         logging.info(f"✅ Translation completed successfully ({len(translated_text)} chars)")
                     else:
-                        logging.warning("⚠️ Translation returned empty result")
+                        logging.warning("Translation returned empty result")
                 except Exception as e:
                     logging.error(f"❌ Translation error: {e}")
                     QMessageBox.warning(self, "Ошибка перевода", str(e))
@@ -1340,6 +1340,287 @@ def warm_up():
         _get_windows_ocr_engine("en-US")
     except Exception:
         pass
+
+
+# ============================================================
+# Fullscreen Translate — OCR all text on screen and overlay translations
+# ============================================================
+
+class FullScreenOCRWorker(QtCore.QThread):
+    """OCR worker that returns text lines with bounding box positions."""
+    result_ready = QtCore.pyqtSignal(list)  # list of (x, y, w, h, text)
+
+    def __init__(self, bitmap, language_code="ru", parent=None):
+        super().__init__(parent)
+        self.bitmap = bitmap
+        self.language_code = language_code
+
+    def run(self):
+        lines_data = []
+        try:
+            if not _WINRT_AVAILABLE:
+                logging.error("FullScreenOCR: WinRT not available")
+                self.result_ready.emit([])
+                return
+
+            lang_tag = {"en": "en-US", "ru": "ru-RU"}.get(self.language_code, "en-US")
+            logging.info(f"FullScreenOCR: using lang_tag={lang_tag}")
+            engine = _get_windows_ocr_engine(lang_tag)
+            if engine is None:
+                logging.error("FullScreenOCR: engine is None")
+                self.result_ready.emit([])
+                return
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                recognized = loop.run_until_complete(run_ocr_with_engine(self.bitmap, engine))
+            finally:
+                loop.close()
+
+            logging.info(f"FullScreenOCR: recognized={recognized}")
+            if recognized:
+                for line in recognized.lines:
+                    words = list(line.words)
+                    if not words:
+                        continue
+                    min_x = min(w.bounding_rect.x for w in words)
+                    min_y = min(w.bounding_rect.y for w in words)
+                    max_x = max(w.bounding_rect.x + w.bounding_rect.width for w in words)
+                    max_y = max(w.bounding_rect.y + w.bounding_rect.height for w in words)
+                    text = " ".join(w.text for w in words)
+                    if text.strip():
+                        lines_data.append((min_x, min_y, max_x - min_x, max_y - min_y, text))
+            logging.info(f"FullScreenOCR: found {len(lines_data)} text blocks")
+        except Exception as e:
+            logging.error(f"FullScreenOCRWorker error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        self.result_ready.emit(lines_data)
+
+
+class FullScreenTranslateOverlay(QWidget):
+    """Overlay that translates all visible text on screen and shows translations at original positions."""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowIcon(QtGui.QIcon(resource_path("icons/icon.ico")))
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setCursor(QtCore.Qt.ArrowCursor)
+
+        self.translated_blocks = []  # list of (QRectF, original, translated)
+        self.loading = True
+        self.error_message = None
+        self._lines_data = []
+        self.ocr_worker = None
+
+        # Read config
+        config = get_cached_ocr_config()
+
+        # Language direction from settings (with fallback to OCR language)
+        self.src_lang = config.get("fullscreen_translate_from", "en")
+        self.tgt_lang = config.get("fullscreen_translate_to", "ru")
+        # OCR language = source language for recognition
+        self.ocr_language = self.src_lang
+
+        # Capture screenshot from the screen where cursor is
+        cursor_pos = QtGui.QCursor.pos()
+        target_screen = QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
+        geo = target_screen.geometry()
+
+        self.screenshot = target_screen.grabWindow(0, geo.x(), geo.y(), geo.width(), geo.height())
+        self.setGeometry(geo)
+
+        logging.info(f"FullScreenOverlay: screen geo={geo}, screenshot size={self.screenshot.width()}x{self.screenshot.height()}")
+        logging.info(f"FullScreenOverlay: ocr_language={self.ocr_language}, translate {self.src_lang}->{self.tgt_lang}")
+
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+        self._start_ocr()
+
+    def _start_ocr(self):
+        qimage = self.screenshot.toImage()
+        bitmap = qimage_to_softwarebitmap(qimage)
+        if bitmap is None:
+            self.loading = False
+            self.error_message = "OCR initialization failed"
+            self.update()
+            return
+
+        self.ocr_worker = FullScreenOCRWorker(bitmap, self.ocr_language)
+        self.ocr_worker.result_ready.connect(self._on_ocr_complete)
+        self.ocr_worker.start()
+
+    def _on_ocr_complete(self, lines_data):
+        if not lines_data:
+            self.loading = False
+            config = get_cached_ocr_config()
+            lang = config.get("interface_language", "en")
+            self.error_message = "Текст на экране не распознан" if lang == "ru" else "No text recognized on screen"
+            self.update()
+            # Auto-close after 2 seconds
+            QTimer.singleShot(2000, self.close)
+            return
+
+        self._lines_data = lines_data
+        import threading
+        threading.Thread(target=self._translate_all, daemon=True).start()
+
+    def _translate_all(self):
+        try:
+            from translater import translate_text
+
+            src, tgt = self.src_lang, self.tgt_lang
+            logging.info(f"FullScreenOverlay: translating {len(self._lines_data)} blocks ({src}->{tgt})")
+
+            # Batch translate: join all lines, translate once, split back
+            all_texts = [item[4] for item in self._lines_data]
+            joined = "\n".join(all_texts)
+            translated = translate_text(joined, src, tgt)
+
+            if translated:
+                parts = translated.split("\n")
+                for i, (x, y, w, h, orig) in enumerate(self._lines_data):
+                    tr = parts[i].strip() if i < len(parts) else orig
+                    self.translated_blocks.append(
+                        (QtCore.QRectF(x, y, w, h), orig, tr)
+                    )
+            else:
+                config = get_cached_ocr_config()
+                lang = config.get("interface_language", "en")
+                self.error_message = "Ошибка перевода" if lang == "ru" else "Translation failed"
+        except Exception as e:
+            self.error_message = str(e)
+
+        self.loading = False
+        QtCore.QMetaObject.invokeMethod(self, "_refresh", QtCore.Qt.QueuedConnection)
+
+    @QtCore.pyqtSlot()
+    def _refresh(self):
+        self.update()
+
+    # ---- painting --------------------------------------------------
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
+
+        # Screenshot as background
+        painter.drawPixmap(0, 0, self.screenshot)
+        # Slight dimming
+        painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 100))
+
+        if self.loading:
+            self._paint_loading(painter)
+        elif self.error_message:
+            self._paint_center_msg(painter, self.error_message, QtGui.QColor(80, 20, 20, 230))
+        else:
+            for rect_f, _orig, translated in self.translated_blocks:
+                self._paint_block(painter, rect_f, translated)
+            self._paint_hint(painter)
+
+        painter.end()
+
+    def _paint_loading(self, painter):
+        config = get_cached_ocr_config()
+        lang = config.get("interface_language", "en")
+        text = "Перевод экрана..." if lang == "ru" else "Translating screen..."
+        self._paint_center_msg(painter, text, QtGui.QColor(30, 20, 60, 230))
+
+    def _paint_center_msg(self, painter, text, bg_color):
+        cx, cy = self.width() // 2, self.height() // 2
+        font = QtGui.QFont("Segoe UI", 15, QtGui.QFont.Bold)
+        painter.setFont(font)
+        fm = QtGui.QFontMetrics(font)
+        tw = fm.horizontalAdvance(text) + 40
+        box = QtCore.QRectF(cx - tw / 2, cy - 25, tw, 50)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(bg_color)
+        painter.drawRoundedRect(box, 12, 12)
+        painter.setPen(QtGui.QColor(220, 200, 255))
+        painter.drawText(box, QtCore.Qt.AlignCenter, text)
+
+    def _paint_block(self, painter, rect_f, text):
+        pad = 3
+        # Calculate font size proportional to line height
+        line_h = rect_f.height()
+        font_size = max(8, min(int(line_h * 0.72), 40))
+        font = QtGui.QFont("Segoe UI", font_size)
+        fm = QtGui.QFontMetrics(font)
+        text_width = fm.horizontalAdvance(text) + 8
+
+        # Background rect — stretches to fit translated text
+        bg_w = max(rect_f.width(), text_width) + pad * 2
+        bg_rect = QtCore.QRectF(rect_f.x() - pad, rect_f.y() - pad, bg_w, rect_f.height() + pad * 2)
+
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(20, 15, 45, 215))
+        painter.drawRoundedRect(bg_rect, 4, 4)
+
+        # Text
+        draw_rect = QtCore.QRectF(rect_f.x() + 2, rect_f.y(), bg_w - pad * 2, rect_f.height())
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(240, 230, 255))
+        painter.drawText(draw_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.TextSingleLine, text)
+
+    def _paint_hint(self, painter):
+        config = get_cached_ocr_config()
+        lang = config.get("interface_language", "en")
+        hint = "ESC \u2014 \u0437\u0430\u043a\u0440\u044b\u0442\u044c" if lang == "ru" else "ESC \u2014 close"
+        font = QtGui.QFont("Segoe UI", 11)
+        painter.setFont(font)
+        fm = QtGui.QFontMetrics(font)
+        tw = fm.horizontalAdvance(hint) + 24
+        box = QtCore.QRectF(self.width() - tw - 15, 15, tw, 28)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(0, 0, 0, 160))
+        painter.drawRoundedRect(box, 6, 6)
+        painter.setPen(QtGui.QColor(200, 200, 200, 200))
+        painter.drawText(box, QtCore.Qt.AlignCenter, hint)
+
+    # ---- input -----------------------------------------------------
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.RightButton:
+            self.close()
+
+    def closeEvent(self, event):
+        global _fullscreen_overlay_ref
+        _fullscreen_overlay_ref = None
+        super().closeEvent(event)
+        self.deleteLater()
+
+
+_fullscreen_overlay_ref = None
+_fullscreen_translate_busy = False
+
+
+def run_fullscreen_translate():
+    """Launch (or toggle) the fullscreen translate overlay."""
+    global _fullscreen_overlay_ref, _fullscreen_translate_busy
+    if _fullscreen_translate_busy:
+        return
+    if _fullscreen_overlay_ref is not None:
+        _fullscreen_overlay_ref.close()
+        _fullscreen_overlay_ref = None
+        return
+    app = QApplication.instance()
+    if app is None:
+        return
+    _fullscreen_translate_busy = True
+    try:
+        _fullscreen_overlay_ref = FullScreenTranslateOverlay()
+    finally:
+        _fullscreen_translate_busy = False
+
 
 if __name__ == "__main__":
     import sys
