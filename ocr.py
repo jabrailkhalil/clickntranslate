@@ -94,8 +94,14 @@ def get_app_dir():
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(sys.argv[0]))
 
+def get_portable_dir():
+    """Directory next to the exe for portable data."""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
 def get_data_file(filename):
-    data_dir = os.path.join(get_app_dir(), "data")
+    data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     return os.path.join(data_dir, filename)
@@ -159,6 +165,8 @@ def _save_translation_history_sync(original_text, translated_text, language):
                     "original": original_text,
                     "translated": translated_text
                 })
+                if len(history) > 500:
+                    history = history[-500:]
                 f.seek(0)
                 f.truncate()
                 json.dump(history, f, ensure_ascii=False, indent=4)
@@ -185,6 +193,8 @@ def _save_translation_history_sync(original_text, translated_text, language):
                     "original": original_text,
                     "translated": translated_text
                 })
+                if len(history) > 500:
+                    history = history[-500:]
                 f.seek(0)
                 f.truncate()
                 json.dump(history, f, ensure_ascii=False, indent=4)
@@ -202,6 +212,8 @@ def _save_translation_history_sync(original_text, translated_text, language):
             "original": original_text,
             "translated": translated_text
         })
+        if len(history) > 500:
+            history = history[-500:]
         try:
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, ensure_ascii=False, indent=4)
@@ -521,7 +533,9 @@ class ScreenCaptureOverlay(QWidget):
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setCursor(QtCore.Qt.CrossCursor)
+        # Используем primaryScreen для grabWindow(0) — WId=0 означает весь виртуальный десктоп
         self.screen = QApplication.primaryScreen()
+        self._grab_screen = self.screen  # сохраняем для capture
         
         if not defer_show:
             self.show_overlay()
@@ -700,11 +714,17 @@ class ScreenCaptureOverlay(QWidget):
             logging.info(f"Moved combo to {x}, {y} (Screen: {screen_geo})")
 
     def closeEvent(self, event):
+        # Сначала убираем себя из активных оверлеев
         try:
-            prepare_overlay(self.mode)
+            for active_mode, overlay in list(_ACTIVE_OVERLAYS.items()):
+                if overlay is self:
+                    _ACTIVE_OVERLAYS[active_mode] = None
         except Exception:
             pass
         super().closeEvent(event)
+        # Подготавливаем новый оверлей ПОСЛЕ закрытия текущего (отложенно)
+        mode = self.mode
+        QtCore.QTimer.singleShot(100, lambda: _safe_prepare_overlay(mode))
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -783,6 +803,13 @@ class ScreenCaptureOverlay(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton and self.start_point and self.end_point:
             rect = QtCore.QRect(self.start_point, self.end_point).normalized()
+            # Отклоняем слишком маленькие выделения (случайные клики)
+            if rect.width() < 5 or rect.height() < 5:
+                logging.info(f"Selection too small ({rect.width()}x{rect.height()}), ignoring")
+                self.start_point = None
+                self.end_point = None
+                self.update()
+                return
             self.last_rect = rect
             logging.info(f"Завершено выделение области: {rect}")
             self.capture_and_copy(rect)
@@ -853,156 +880,157 @@ class ScreenCaptureOverlay(QWidget):
         cls._tesseract_cmd_cache = tess_cmd
         return tess_cmd
 
+    # Сохраняем ссылку на данные изображения, чтобы QImage не потерял буфер
+    _ocr_image_data = None
+
     def capture_and_copy(self, rect):
-        # Convert overlay-local rect to global screen coordinates
-        # The overlay covers the virtual desktop, but its local (0,0) corresponds to its top-left position
-        # which might be negative in global coordinates if there's a monitor to the left/top.
-        
-        # rect is in local coordinates of the overlay widget
-        # Map top-left and bottom-right to global coordinates
+        # rect — в локальных координатах overlay-виджета
         global_top_left = self.mapToGlobal(rect.topLeft())
         global_bottom_right = self.mapToGlobal(rect.bottomRight())
-        
         global_rect = QtCore.QRect(global_top_left, global_bottom_right)
-        
+
         logging.info(f"Selected local rect: {rect}")
         logging.info(f"Mapped global rect: {global_rect}")
-        
-        # Захватываем ТОЧНО выделенную область без padding
-        # (padding может захватить соседний текст и испортить распознавание)
-        screenshot = self.screen.grabWindow(0, global_rect.x(), global_rect.y(), 
-                                           global_rect.width(), global_rect.height())
-        
-        # Check if screenshot is valid
+
+        # Находим экран, содержащий центр выделенной области
+        target_screen = self.screen
+        center = global_rect.center()
+        dpr = 1.0
+        for scr in QApplication.screens():
+            if scr.geometry().contains(center):
+                target_screen = scr
+                dpr = scr.devicePixelRatio()
+                break
+
+        # DPI-aware захват: grabWindow использует физические пиксели
+        screenshot = target_screen.grabWindow(
+            0, global_rect.x(), global_rect.y(),
+            global_rect.width(), global_rect.height()
+        )
+
         if screenshot.isNull():
             logging.error("Failed to grab screenshot (result is null)")
             return
 
         qimage = screenshot.toImage()
-        
-        # ОТЛАДКА: Сохраняем исходное изображение
-        try:
-            debug_orig_path = os.path.join(get_app_dir(), "debug_ocr_original.png")
-            qimage.save(debug_orig_path)
-            logging.info(f"DEBUG: Saved original {qimage.width()}x{qimage.height()} to {debug_orig_path}")
-        except Exception as e:
-            logging.warning(f"Failed to save debug original: {e}")
-        
-       
-        # ===== PADIMAGE ИЗ TEXT-GRAB (критично для маленьких областей!) =====
-        # Если изображение меньше 64x64, добавляем padding
-        # Padding заполняется цветом фона (первый пиксель) для естественного вида
-        original_width = qimage.width()
-        original_height = qimage.height()
-        min_w, min_h = 64, 64
-        
-        if original_width < min_w or original_height < min_h:
-            # Вычисляем новый размер (минимум 64+16, или исходный+16)
-            new_width = max(original_width + 16, min_w + 16)
-            new_height = max(original_height + 16, min_h + 16)
-            
-            # Создаем новое изображение
-            padded_qimage = QtGui.QImage(new_width, new_height, QtGui.QImage.Format_RGBA8888)
-            
-            # Получаем цвет первого пикселя для заливки
-            bg_color = QtGui.QColor(qimage.pixel(0, 0))
-            padded_qimage.fill(bg_color)
-            
-            # Рисуем исходное изображение в центре со смещением 8px
-            painter = QtGui.QPainter(padded_qimage)
-            painter.drawImage(8, 8, qimage)
-            painter.end()
-            
-            qimage = padded_qimage
-            logging.info(f"PadImage: {original_width}x{original_height} → {qimage.width()}x{qimage.height()} (bg color: {bg_color.name()})")
-        
-        # ===== АГРЕССИВНОЕ МАСШТАБИРОВАНИЕ (упрощенный подход без winrt) =====
-        # Вместо двухпроходного OCR используем очень агрессивное масштабирование
-        # основанное на размере области
-        
-        original_width = qimage.width()
-        original_height = qimage.height()
-        min_dimension = min(original_width, original_height)
-        
-        # Целевая высота текста для идеального OCR - 40-50px
-        # Вычисляем агрессивный масштаб на основе размера
-        TARGET_HEIGHT = 45.0
-        
-        # Предполагаем среднюю высоту текста на основе размера выделения
-        if min_dimension < 25:
-            estimated_text_height = 8  # Очень маелнький текст
-        elif min_dimension < 50:
-            estimated_text_height = 12
-        elif min_dimension < 100:
-            estimated_text_height = 18
-        elif min_dimension < 150:
-            estimated_text_height = 25
-        else:
-            estimated_text_height = 30
-        
-        # Вычисляем масштаб для достижения целевой высоты
-        scale_factor = TARGET_HEIGHT / estimated_text_height
-        
-        # Ограничиваем максимальный масштаб
-        scale_factor = min(scale_factor, 10.0)  # Макс 10x
-        scale_factor = max(scale_factor, 1.0)   # Мин 1x
-        
-        logging.info(f"Aggressive scaling: estimated text height {estimated_text_height}px, scale {scale_factor:.1f}x")
-        
-        # Применяем масштабирование
-        if scale_factor > 1.0:
-            new_width = int(original_width * scale_factor)
-            new_height = int(original_height * scale_factor)
-            qimage = qimage.scaled(new_width, new_height, 
-                                  QtCore.Qt.KeepAspectRatio, 
-                                  QtCore.Qt.SmoothTransformation)
-            logging.info(f"Scaled: {original_width}x{original_height} → {qimage.width()}x{qimage.height()}")
-        
-        # ===== АГРЕССИВНАЯ ПРЕДОБРАБОТКА =====
-        from PIL import Image, ImageEnhance, ImageOps, ImageFilter
-        
+        orig_w, orig_h = qimage.width(), qimage.height()
+        logging.info(f"Captured {orig_w}x{orig_h} (DPR={dpr})")
+
+        # ===== PIL-обработка для улучшения качества OCR =====
+        from PIL import Image, ImageEnhance, ImageOps, ImageFilter, ImageStat
+
+        # QImage → PIL (через копирование данных для безопасности)
         qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
         ptr = qimg_rgba.constBits()
         ptr.setsize(qimg_rgba.byteCount())
-        pil_image = Image.frombuffer("RGBA", (qimg_rgba.width(), qimg_rgba.height()), 
-                                     ptr, "raw", "RGBA", 0, 1)
-        
-        # Конвертация в grayscale
+        pil_image = Image.frombuffer(
+            "RGBA", (qimg_rgba.width(), qimg_rgba.height()),
+            bytes(ptr), "raw", "RGBA", 0, 1
+        )
+
+        # --- 1. Определяем тёмный/светлый фон ---
+        gray = pil_image.convert('L')
+        stat = ImageStat.Stat(gray)
+        mean_brightness = stat.mean[0]
+        is_dark_bg = mean_brightness < 128
+
+        # --- 2. Если тёмный фон — инвертируем для OCR (чёрный текст на белом) ---
+        if is_dark_bg:
+            pil_image = ImageOps.invert(pil_image.convert('RGB')).convert('RGBA')
+            logging.info(f"Dark background detected (mean={mean_brightness:.0f}), inverted")
+
+        # --- 3. Конвертация в grayscale ---
         pil_image = pil_image.convert('L')
-        
-        # АГРЕССИВНОЕ увеличение контраста для маленького текста
+
+        # --- 4. Умное масштабирование на основе высоты изображения ---
+        # Windows OCR лучше всего работает при высоте текста ~35-50px
+        # Используем высоту выделения как основной ориентир
+        height = pil_image.height
+        TARGET_TEXT_HEIGHT = 48.0
+
+        if height < 20:
+            scale_factor = 6.0
+        elif height < 40:
+            scale_factor = 4.0
+        elif height < 80:
+            scale_factor = 3.0
+        elif height < 150:
+            scale_factor = 2.0
+        elif height < 300:
+            scale_factor = 1.5
+        else:
+            scale_factor = 1.0
+
+        if scale_factor > 1.0:
+            new_w = int(pil_image.width * scale_factor)
+            new_h = int(pil_image.height * scale_factor)
+            pil_image = pil_image.resize((new_w, new_h), Image.LANCZOS)
+            logging.info(f"Scaled {scale_factor:.1f}x → {new_w}x{new_h}")
+
+        # --- 5. Умное улучшение контраста (адаптивное) ---
+        stat = ImageStat.Stat(pil_image)
+        stddev = stat.stddev[0]  # стандартное отклонение яркости
+
+        if stddev < 30:
+            # Низкоконтрастное изображение — нужно больше усиления
+            contrast_factor = 2.5
+        elif stddev < 60:
+            contrast_factor = 1.8
+        else:
+            contrast_factor = 1.3  # Уже контрастное — не портим
+
         enhancer = ImageEnhance.Contrast(pil_image)
-        pil_image = enhancer.enhance(2.5)
-        
-        # АГРЕССИВНОЕ увеличение резкости
+        pil_image = enhancer.enhance(contrast_factor)
+
+        # --- 6. Лёгкое повышение резкости (не агрессивное) ---
         enhancer = ImageEnhance.Sharpness(pil_image)
-        pil_image = enhancer.enhance(2.0)
-        
-        # Добавляем белые поля (помогает OCR определить границы)
-        border_size = 20
-        pil_image = ImageOps.expand(pil_image, border=border_size, fill='white')
-        
-        # Адаптивная бинаризация для идеальной четкости
-        if min_dimension < 100:
-            # Для маленького текста применяем бинаризацию
-            threshold = 128
-            pil_image = pil_image.point(lambda x: 0 if x < threshold else 255, '1')
-            pil_image = pil_image.convert('L')
-        
-        # Конвертируем обратно в QImage
-        img_bytes = pil_image.tobytes()
-        qimage = QtGui.QImage(img_bytes, pil_image.width, pil_image.height, 
-                             pil_image.width, QtGui.QImage.Format_Grayscale8)
-        
-        # ОТЛАДКА: Сохраняем финальное изображение для проверки
-        try:
-            debug_path = os.path.join(get_app_dir(), "debug_ocr_final.png")
-            qimage.save(debug_path)
-            logging.info(f"DEBUG: Saved final image to {debug_path}")
-        except Exception as e:
-            logging.warning(f"Failed to save debug image: {e}")
-        
-        logging.info(f"Final preprocessed size: {qimage.width()}x{qimage.height()}")
+        pil_image = enhancer.enhance(1.5)
+
+        # --- 7. Бинаризация Otsu для маленьких выделений ---
+        if height < 80:
+            try:
+                import numpy as np
+                arr = np.array(pil_image)
+                # Otsu's threshold
+                hist, _ = np.histogram(arr.ravel(), bins=256, range=(0, 256))
+                total = arr.size
+                sum_total = np.dot(np.arange(256), hist)
+                sum_bg, weight_bg, max_var, threshold = 0.0, 0, 0.0, 128
+                for t in range(256):
+                    weight_bg += hist[t]
+                    if weight_bg == 0:
+                        continue
+                    weight_fg = total - weight_bg
+                    if weight_fg == 0:
+                        break
+                    sum_bg += t * hist[t]
+                    mean_bg = sum_bg / weight_bg
+                    mean_fg = (sum_total - sum_bg) / weight_fg
+                    var_between = weight_bg * weight_fg * (mean_bg - mean_fg) ** 2
+                    if var_between > max_var:
+                        max_var = var_between
+                        threshold = t
+                pil_image = pil_image.point(lambda x: 255 if x > threshold else 0, 'L')
+                logging.info(f"Otsu binarization: threshold={threshold}")
+            except ImportError:
+                # numpy не доступен — простая бинаризация
+                pil_image = pil_image.point(lambda x: 255 if x > 128 else 0, 'L')
+
+        # --- 8. Добавляем поля вокруг текста (помогает OCR определить границы) ---
+        # Цвет полей совпадает с доминирующим фоном (после всех преобразований)
+        stat = ImageStat.Stat(pil_image)
+        border_fill = 255 if stat.mean[0] > 128 else 0
+        border_size = max(16, int(pil_image.height * 0.15))
+        pil_image = ImageOps.expand(pil_image, border=border_size, fill=border_fill)
+
+        # --- 9. Конвертируем обратно в QImage (БЕЗОПАСНО — копируем данные) ---
+        self._ocr_image_data = pil_image.tobytes()
+        qimage = QtGui.QImage(
+            self._ocr_image_data, pil_image.width, pil_image.height,
+            pil_image.width, QtGui.QImage.Format_Grayscale8
+        )
+
+        logging.info(f"Final preprocessed: {pil_image.width}x{pil_image.height} (border_fill={border_fill})")
         
         language_code = self.lang_combo.currentData() or "ru"
         self.current_language = language_code
@@ -1025,16 +1053,12 @@ class ScreenCaptureOverlay(QWidget):
         logging.info(f"Using OCR engine: {ocr_engine_type.upper()}")
 
         if ocr_engine_type == "tesseract":
-            # Determine path to tesseract
-            # Lazy import pytesseract and requests
             import pytesseract
             import requests
-            # For tesseract we need PIL image
-            from PIL import Image
-            qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
-            ptr = qimg_rgba.constBits(); ptr.setsize(qimg_rgba.byteCount())
-            pil_image = Image.frombuffer("RGBA", (qimg_rgba.width(), qimg_rgba.height()), ptr, "raw", "RGBA", 0, 1)
-            
+            # pil_image уже подготовлен выше (grayscale, масштабированный, с бордерами)
+            # Конвертируем в формат, понятный Tesseract
+            tess_pil = pil_image.convert('L') if pil_image.mode != 'L' else pil_image
+
             tess_cmd = self.get_tesseract_cmd()
             
             if tess_cmd:
@@ -1087,7 +1111,7 @@ class ScreenCaptureOverlay(QWidget):
                 logging.info(f"🔄 Running Tesseract OCR for language '{tess_lang}'...")
                 # Оптимизация скорости: --oem 3 (LSTM only), --psm 6 (single block)
                 tess_config = '--oem 3 --psm 6'
-                recognized_text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
+                recognized_text = pytesseract.image_to_string(tess_pil, lang=tess_lang, config=tess_config)
                 if recognized_text.strip():
                     logging.info(f"✅ Tesseract recognized {len(recognized_text)} chars successfully")
                 else:
@@ -1119,40 +1143,54 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.start()
 
     def handle_ocr_result(self, text):
+        try:
+            self._handle_ocr_result_inner(text)
+        except Exception as e:
+            logging.error(f"Critical error in handle_ocr_result: {e}")
+            # Гарантированно закрываем оверлей при любом краше
+            try:
+                self.close()
+            except Exception:
+                pass
+
+    def _handle_ocr_result_inner(self, text):
         if not text and hasattr(self, 'ocr_worker') and hasattr(self.ocr_worker, 'qimage'):
             # If Windows OCR failed, try Tesseract as fallback
             logging.info("Windows OCR returned empty result, attempting Tesseract fallback...")
             try:
                 import pytesseract
                 from PIL import Image
-                
+
+                # qimage уже предобработан (grayscale, масштаб, бордеры)
                 qimage = self.ocr_worker.qimage
-                qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
-                ptr = qimg_rgba.constBits()
-                ptr.setsize(qimg_rgba.byteCount())
-                pil_image = Image.frombuffer("RGBA", (qimg_rgba.width(), qimg_rgba.height()), ptr, "raw", "RGBA", 0, 1)
-                
-                # Determine Tesseract language
+                w, h = qimage.width(), qimage.height()
+                bpl = qimage.bytesPerLine()
+
+                # Безопасная конвертация QImage → PIL
+                if qimage.format() == QtGui.QImage.Format_Grayscale8:
+                    ptr = qimage.constBits()
+                    ptr.setsize(bpl * h)
+                    pil_image = Image.frombytes('L', (w, h), bytes(ptr), 'raw', 'L', bpl)
+                else:
+                    qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
+                    ptr = qimg_rgba.constBits()
+                    ptr.setsize(qimg_rgba.byteCount())
+                    pil_image = Image.frombuffer("RGBA", (w, h), bytes(ptr), "raw", "RGBA", 0, 1)
+                    pil_image = pil_image.convert('L')
+
                 lang_code = self.lang_combo.currentData() or "ru"
                 tess_lang = "eng" if lang_code == "en" else "rus"
-                
-                # Configure Tesseract path
+
                 tess_cmd = self.get_tesseract_cmd()
                 if tess_cmd:
                     pytesseract.pytesseract.tesseract_cmd = tess_cmd
-                    
-                    # Setup TESSDATA_PREFIX
                     tess_dir = os.path.dirname(tess_cmd)
-                    candidate_dirs = [
-                        os.path.join(tess_dir, "tessdata"),
-                        os.path.join(os.path.dirname(tess_dir), "tessdata"),
-                    ]
-                    for td in candidate_dirs:
+                    for td in [os.path.join(tess_dir, "tessdata"),
+                               os.path.join(os.path.dirname(tess_dir), "tessdata")]:
                         if os.path.isdir(td):
                             os.environ["TESSDATA_PREFIX"] = td
                             break
-                    
-                    # Simplified fallback attempt with speed optimizations
+
                     tess_config = '--oem 3 --psm 6'
                     text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
                     logging.info(f"Tesseract fallback result length: {len(text)}")
@@ -1180,7 +1218,8 @@ class ScreenCaptureOverlay(QWidget):
                         logging.warning("Translation returned empty result")
                 except Exception as e:
                     logging.error(f"❌ Translation error: {e}")
-                    QMessageBox.warning(self, "Ошибка перевода", str(e))
+                    self.hide()
+                    QMessageBox.warning(None, "Ошибка перевода", str(e))
                     translated_text = ""
                 if translated_text:
                     # Определяем тему и язык из кэша
@@ -1190,13 +1229,25 @@ class ScreenCaptureOverlay(QWidget):
                     auto_copy = config.get("copy_translated_text", True)
                     # Ленивый импорт для избежания циклического импорта
                     from main import show_translation_dialog, save_copy_history
-                    show_translation_dialog(self, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
+
+                    # Скрываем оверлей ПЕРЕД показом диалога, чтобы:
+                    # 1) Пользователь видел исходный контент за диалогом
+                    # 2) Не было z-order проблем (диалог поверх translucent overlay)
+                    self.hide()
+
+                    # Используем главное окно приложения как parent вместо overlay
+                    dialog_parent = None
+                    app = QApplication.instance()
+                    if app:
+                        for widget in app.topLevelWidgets():
+                            if hasattr(widget, 'show_window_from_tray') and widget.windowTitle() == "Click'n'Translate":
+                                dialog_parent = widget
+                                break
+
+                    show_translation_dialog(dialog_parent, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
                     if auto_copy:
                         pyperclip.copy(translated_text)
                         save_copy_history(translated_text)
-                    else:
-                        # Если пользователь скопировал вручную, обработка уже в диалоге
-                        pass
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
                 self.close()
@@ -1213,12 +1264,14 @@ class ScreenCaptureOverlay(QWidget):
                     logging.error(f"Ошибка обработки OCR результата: {e}")
         else:
             logging.info("OCR не распознал текст.")
+            # Скрываем оверлей перед показом диалога ошибки
+            self.hide()
             # Получаем тему из конфига
             config = get_cached_ocr_config()
             theme = config.get("theme", "Светлая")
             lang = config.get("interface_language", "en")
-            
-            msg = QMessageBox(self)
+
+            msg = QMessageBox()
             msg.setWindowIcon(QtGui.QIcon(resource_path("icons/icon.ico")))
             msg.setIcon(QMessageBox.NoIcon)
             
@@ -1298,9 +1351,34 @@ def prepare_overlay(mode="ocr"):
     except Exception:
         _OVERLAY_POOL[mode] = None
 
+def _safe_prepare_overlay(mode="ocr"):
+    """Безопасная подготовка оверлея — вызывается отложенно после closeEvent."""
+    try:
+        prepare_overlay(mode)
+    except Exception:
+        pass
+
 _ACTIVE_OVERLAYS = {}
 
+def _close_active_overlays(except_mode=None):
+    """Закрывает все активные оверлеи, кроме указанного режима."""
+    for active_mode, overlay in list(_ACTIVE_OVERLAYS.items()):
+        if active_mode == except_mode or not overlay:
+            continue
+        try:
+            if overlay.isVisible():
+                overlay.close()
+            else:
+                overlay.deleteLater()
+        except Exception:
+            pass
+        finally:
+            _ACTIVE_OVERLAYS[active_mode] = None
+
 def get_or_show_overlay(mode="ocr"):
+    # Не допускаем одновременное существование панелей разных режимов
+    _close_active_overlays(except_mode=mode)
+
     # Если оверлей уже активен для этого режима - закрываем его (toggle behavior)
     if _ACTIVE_OVERLAYS.get(mode):
         try:
@@ -1309,6 +1387,7 @@ def get_or_show_overlay(mode="ocr"):
                 existing.close()
                 _ACTIVE_OVERLAYS[mode] = None
                 return  # Закрыли, больше ничего не делаем
+            _ACTIVE_OVERLAYS[mode] = None
         except Exception:
             pass
     
@@ -1410,19 +1489,16 @@ class FullScreenTranslateOverlay(QWidget):
         self.setCursor(QtCore.Qt.ArrowCursor)
 
         self.translated_blocks = []  # list of (QRectF, original, translated)
-        self.loading = True
+        self.loading = False
         self.error_message = None
         self._lines_data = []
         self.ocr_worker = None
+        self._is_dragging = False
+        self._drag_offset = QtCore.QPoint()
 
         # Read config
         config = get_cached_ocr_config()
-
-        # Language direction from settings (with fallback to OCR language)
-        self.src_lang = config.get("fullscreen_translate_from", "en")
-        self.tgt_lang = config.get("fullscreen_translate_to", "ru")
-        # OCR language = source language for recognition
-        self.ocr_language = self.src_lang
+        saved_src = config.get("fullscreen_translate_from", "en")
 
         # Capture screenshot from the screen where cursor is
         cursor_pos = QtGui.QCursor.pos()
@@ -1432,13 +1508,122 @@ class FullScreenTranslateOverlay(QWidget):
         self.screenshot = target_screen.grabWindow(0, geo.x(), geo.y(), geo.width(), geo.height())
         self.setGeometry(geo)
 
+        # --- Комбо-бокс выбора направления перевода (как в обычном overlay) ---
+        self.lang_combo = QtWidgets.QComboBox(self)
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/American_flag.png")), "EN \u2192 RU", "en")
+        self.lang_combo.addItem(QtGui.QIcon(resource_path("icons/Russian_flag.png")), "RU \u2192 EN", "ru")
+        # Восстанавливаем последний выбор
+        default_idx = 0 if saved_src == "en" else 1
+        self.lang_combo.setCurrentIndex(default_idx)
+
+        self.lang_combo.setIconSize(QtCore.QSize(32, 32))
+        self.lang_combo.setStyleSheet("""
+            QComboBox {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(60, 60, 60, 240),
+                    stop:0.5 rgba(45, 45, 45, 245),
+                    stop:1 rgba(35, 35, 35, 250));
+                color: #e8e8e8;
+                border: 1px solid rgba(80, 80, 80, 200);
+                border-radius: 8px;
+                padding: 8px 14px;
+                font-size: 15px;
+                font-weight: 600;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QComboBox:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(75, 75, 75, 245),
+                    stop:1 rgba(45, 45, 45, 255));
+                border: 1px solid rgba(100, 100, 100, 220);
+            }
+            QComboBox::drop-down { border: none; width: 20px; }
+            QComboBox::down-arrow { image: none; width: 0; }
+            QComboBox QAbstractItemView {
+                background-color: rgba(40, 40, 40, 252);
+                color: #e8e8e8;
+                border: 1px solid rgba(80, 80, 80, 200);
+                border-radius: 6px;
+                padding: 4px;
+                selection-background-color: rgba(80, 130, 200, 180);
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item { padding: 8px 12px; border-radius: 4px; margin: 2px; }
+            QComboBox QAbstractItemView::item:hover { background-color: rgba(70, 70, 70, 200); }
+        """)
+        self.lang_combo.setFixedSize(170, 48)
+
+        # --- Кнопка запуска перевода ---
+        config_lang = config.get("interface_language", "en")
+        go_text = "Перевести" if config_lang == "ru" else "Translate"
+        self.go_button = QtWidgets.QPushButton(go_text, self)
+        self.go_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(90, 70, 160, 240),
+                    stop:1 rgba(60, 45, 120, 250));
+                color: #ffffff;
+                border: 1px solid rgba(120, 100, 180, 200);
+                border-radius: 8px;
+                padding: 8px 20px;
+                font-size: 15px;
+                font-weight: 700;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(110, 90, 180, 250),
+                    stop:1 rgba(80, 60, 140, 255));
+            }
+            QPushButton:pressed {
+                background: rgba(50, 35, 100, 250);
+            }
+        """)
+        self.go_button.setFixedSize(140, 48)
+        self.go_button.setCursor(QtCore.Qt.PointingHandCursor)
+        self.go_button.clicked.connect(self._on_go_clicked)
+
+        # Позиционируем элементы по центру сверху
+        total_w = self.lang_combo.width() + 12 + self.go_button.width()
+        start_x = (geo.width() - total_w) // 2
+        top_y = 30
+        self.lang_combo.move(start_x, top_y)
+        self.go_button.move(start_x + self.lang_combo.width() + 12, top_y)
+
         logging.info(f"FullScreenOverlay: screen geo={geo}, screenshot size={self.screenshot.width()}x{self.screenshot.height()}")
-        logging.info(f"FullScreenOverlay: ocr_language={self.ocr_language}, translate {self.src_lang}->{self.tgt_lang}")
 
         self.show()
         self.raise_()
         self.activateWindow()
 
+    def _on_go_clicked(self):
+        """Запуск OCR + перевода по нажатию кнопки."""
+        lang_data = self.lang_combo.currentData()  # "en" или "ru"
+        self.src_lang = lang_data
+        self.tgt_lang = "ru" if lang_data == "en" else "en"
+        self.ocr_language = self.src_lang
+
+        # Сохраняем выбор в конфиг
+        config_path = get_data_file("config.json")
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            cfg["fullscreen_translate_from"] = self.src_lang
+            cfg["fullscreen_translate_to"] = self.tgt_lang
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
+
+        # Скрываем UI, показываем загрузку
+        self.lang_combo.hide()
+        self.go_button.hide()
+        self.loading = True
+        self.translated_blocks.clear()
+        self.error_message = None
+        self.update()
+
+        logging.info(f"FullScreenOverlay: starting OCR ({self.src_lang}->{self.tgt_lang})")
         self._start_ocr()
 
     def _start_ocr(self):
@@ -1462,7 +1647,7 @@ class FullScreenTranslateOverlay(QWidget):
             self.error_message = "Текст на экране не распознан" if lang == "ru" else "No text recognized on screen"
             self.update()
             # Auto-close after 2 seconds
-            QTimer.singleShot(2000, self.close)
+            QtCore.QTimer.singleShot(2000, self.close)
             return
 
         self._lines_data = lines_data
@@ -1518,10 +1703,11 @@ class FullScreenTranslateOverlay(QWidget):
             self._paint_loading(painter)
         elif self.error_message:
             self._paint_center_msg(painter, self.error_message, QtGui.QColor(80, 20, 20, 230))
-        else:
+        elif self.translated_blocks:
             for rect_f, _orig, translated in self.translated_blocks:
                 self._paint_block(painter, rect_f, translated)
             self._paint_hint(painter)
+        # else: начальный экран — комбо-бокс и кнопка видны поверх скриншота
 
         painter.end()
 
@@ -1570,7 +1756,10 @@ class FullScreenTranslateOverlay(QWidget):
     def _paint_hint(self, painter):
         config = get_cached_ocr_config()
         lang = config.get("interface_language", "en")
-        hint = "ESC \u2014 \u0437\u0430\u043a\u0440\u044b\u0442\u044c" if lang == "ru" else "ESC \u2014 close"
+        if lang == "ru":
+            hint = "ESC \u2014 \u0437\u0430\u043a\u0440\u044b\u0442\u044c  |  \u041f\u041a\u041c \u2014 \u043f\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044c"
+        else:
+            hint = "ESC \u2014 close  |  RMB \u2014 drag"
         font = QtGui.QFont("Segoe UI", 11)
         painter.setFont(font)
         fm = QtGui.QFontMetrics(font)
@@ -1590,7 +1779,19 @@ class FullScreenTranslateOverlay(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.RightButton:
-            self.close()
+            # ПКМ — перетаскивание оверлея
+            self._is_dragging = True
+            self._drag_offset = event.pos()
+            self.setCursor(QtCore.Qt.ClosedHandCursor)
+
+    def mouseMoveEvent(self, event):
+        if self._is_dragging:
+            self.move(self.pos() + event.pos() - self._drag_offset)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.RightButton:
+            self._is_dragging = False
+            self.setCursor(QtCore.Qt.ArrowCursor)
 
     def closeEvent(self, event):
         global _fullscreen_overlay_ref

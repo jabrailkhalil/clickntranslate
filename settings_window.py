@@ -51,7 +51,8 @@ SETTINGS_TEXT = {
         "copy_translated_text": "Copy translated text automatically",
         "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
         "fullscreen_from": "From:",
-        "fullscreen_to": "To:"
+        "fullscreen_to": "To:",
+        "translate_selection_hotkey": "Translate Selection Hotkey:"
     },
     "ru": {
         "autostart": "Запускать вместе с ОС",
@@ -78,26 +79,51 @@ SETTINGS_TEXT = {
         "copy_translated_text": "Копировать сразу переведённый текст",
         "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
         "fullscreen_from": "С:",
-        "fullscreen_to": "На:"
+        "fullscreen_to": "На:",
+        "translate_selection_hotkey": "Перевод выделенного текста"
     }
 }
 
 class ClearableKeySequenceEdit(QKeySequenceEdit):
+    """QKeySequenceEdit that always stores English key names regardless of keyboard layout."""
+
+    _CYR_TO_LAT = {
+        'Й': 'Q', 'Ц': 'W', 'У': 'E', 'К': 'R', 'Е': 'T', 'Н': 'Y', 'Г': 'U', 'Ш': 'I', 'Щ': 'O', 'З': 'P',
+        'Ф': 'A', 'Ы': 'S', 'В': 'D', 'А': 'F', 'П': 'G', 'Р': 'H', 'О': 'J', 'Л': 'K', 'Д': 'L',
+        'Я': 'Z', 'Ч': 'X', 'С': 'C', 'М': 'V', 'И': 'B', 'Т': 'N', 'Ь': 'M',
+        'Х': '[', 'Ъ': ']', 'Ж': ';', 'Э': "'", 'Б': ',', 'Ю': '.',
+    }
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.clear()
         else:
             super().keyPressEvent(event)
+            seq_str = self.keySequence().toString()
+            normalized = self._normalize_hotkey(seq_str)
+            if normalized != seq_str:
+                self.setKeySequence(QKeySequence(normalized))
+
+    @classmethod
+    def _normalize_hotkey(cls, hotkey_str):
+        result = []
+        for ch in hotkey_str:
+            upper = ch.upper()
+            if upper in cls._CYR_TO_LAT:
+                result.append(cls._CYR_TO_LAT[upper])
+            else:
+                result.append(ch)
+        return ''.join(result)
 
 # Класс HistoryDialog удалён, т.к. история теперь отображается внутри настроек
 
 def get_data_file(filename):
     import sys, os
-    def get_app_dir():
+    def get_portable_dir():
         if hasattr(sys, '_MEIPASS'):
-            return sys._MEIPASS
+            return os.path.dirname(os.path.abspath(sys.executable))
         return os.path.dirname(os.path.abspath(sys.argv[0]))
-    data_dir = os.path.join(get_app_dir(), "data")
+    data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     return os.path.join(data_dir, filename)
@@ -327,7 +353,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.no_dimming_checkbox, alignment=Qt.AlignLeft)
 
         # --- конец блока чекбоксов ---
-        self.main_layout.addSpacing(12)
+        self.main_layout.addSpacing(4)
 
         # --- Группа кнопок: Clear cache | Reset | Update (горизонтальная, связанные стили) ---
         btn_group_layout = QHBoxLayout()
@@ -475,7 +501,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(10)
         
         # --- Версия программы ---
-        version_label = QLabel("V1.2.2")
+        version_label = QLabel("V1.3.0")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 2px; margin-top: 2px;")
         self.main_layout.addWidget(version_label)
@@ -484,8 +510,8 @@ class SettingsWindow(QWidget):
     def show_hotkeys_screen(self):
         self.setup_new_layout()
         self.hotkeys_mode = True
-        self.main_layout.setContentsMargins(9, 9, 9, 9)
-        self.main_layout.setSpacing(9)
+        self.main_layout.setContentsMargins(9, 5, 9, 5)
+        self.main_layout.setSpacing(3)
 
         lang = self.parent.current_interface_language
 
@@ -499,10 +525,10 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.copy_hotkey_input)
         self.copy_hotkey_input.keySequenceChanged.connect(self.save_copy_hotkey)
 
-        self.main_layout.addSpacing(10)
+        self.main_layout.addSpacing(2)
 
         # Блок для настройки горячей клавиши "Translate Selected"
-        label_translate = QLabel("Translate Selected Hotkey:" if lang == "en" else "Горячая клавиша для мгновенного перевода выделенного текста")
+        label_translate = QLabel("Translate Hotkey:" if lang == "en" else "Перевод выделенного (OCR)")
         self.main_layout.addWidget(label_translate)
 
         self.translate_hotkey_input = ClearableKeySequenceEdit()
@@ -511,10 +537,10 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.translate_hotkey_input)
         self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
 
-        self.main_layout.addSpacing(10)
+        self.main_layout.addSpacing(4)
 
         # Блок для настройки горячей клавиши "Fullscreen Translate"
-        label_fullscreen = QLabel(SETTINGS_TEXT[lang]["fullscreen_translate_hotkey"])
+        label_fullscreen = QLabel("Fullscreen Translate:" if lang == "en" else "Перевод всего экрана")
         self.main_layout.addWidget(label_fullscreen)
 
         self.fullscreen_translate_hotkey_input = ClearableKeySequenceEdit()
@@ -523,41 +549,23 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.fullscreen_translate_hotkey_input)
         self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
 
-        # Language direction for fullscreen translate
-        lang_row = QHBoxLayout()
-        lang_row.setSpacing(8)
+        self.main_layout.addSpacing(4)
 
-        from_label = QLabel(SETTINGS_TEXT[lang]["fullscreen_from"])
-        lang_row.addWidget(from_label)
+        # Блок для настройки горячей клавиши "Translate Selection" (перевод выделенного текста)
+        label_selection = QLabel("Selection Translate:" if lang == "en" else "Перевод выделенного текста")
+        self.main_layout.addWidget(label_selection)
 
-        self.fs_from_combo = QComboBox()
-        self.fs_from_combo.addItem("English", "en")
-        self.fs_from_combo.addItem("Russian", "ru")
-        saved_from = self.parent.config.get("fullscreen_translate_from", "en")
-        idx_from = self.fs_from_combo.findData(saved_from)
-        if idx_from >= 0:
-            self.fs_from_combo.setCurrentIndex(idx_from)
-        lang_row.addWidget(self.fs_from_combo)
-
-        to_label = QLabel(SETTINGS_TEXT[lang]["fullscreen_to"])
-        lang_row.addWidget(to_label)
-
-        self.fs_to_combo = QComboBox()
-        self.fs_to_combo.addItem("Russian", "ru")
-        self.fs_to_combo.addItem("English", "en")
-        saved_to = self.parent.config.get("fullscreen_translate_to", "ru")
-        idx_to = self.fs_to_combo.findData(saved_to)
-        if idx_to >= 0:
-            self.fs_to_combo.setCurrentIndex(idx_to)
-        lang_row.addWidget(self.fs_to_combo)
-
-        self.main_layout.addLayout(lang_row)
-        self.fs_from_combo.currentIndexChanged.connect(self.save_fullscreen_lang_direction)
-        self.fs_to_combo.currentIndexChanged.connect(self.save_fullscreen_lang_direction)
+        self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
+        saved_sel_hotkey = self.parent.config.get("translate_selection_hotkey", "")
+        self.translate_selection_hotkey_input.setKeySequence(QKeySequence(saved_sel_hotkey))
+        self.main_layout.addWidget(self.translate_selection_hotkey_input)
+        self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
 
         # Инструктивная надпись для удаления комбинации
         remove_label = QLabel(SETTINGS_TEXT[lang]["remove_hotkey"])
         self.main_layout.addWidget(remove_label)
+
+        self.main_layout.addStretch()
 
         # Кнопка возврата
         back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
@@ -581,32 +589,28 @@ class SettingsWindow(QWidget):
                 print(f"Error stopping copy hotkey thread: {e}")
             self.parent.copy_hotkey_thread = None
         if hotkey_str:
-            self.parent.copy_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_copy, hotkey_id=2)
+            self.parent.copy_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_copy, hotkey_id=1)
             self.parent.copy_hotkey_thread.start()
 
     def save_translate_hotkey(self):
         hotkey_str = self.translate_hotkey_input.keySequence().toString()
         self.parent.config["translate_hotkey"] = hotkey_str
         self.parent.save_config()
-        # Перезапуск слушателя горячих клавиш для перевода
         if hasattr(self.parent, "translate_hotkey_thread") and self.parent.translate_hotkey_thread is not None:
-            # Правильно останавливаем старый поток
             try:
                 self.parent.translate_hotkey_thread.stop()
-                # Даём потоку время на завершение
                 self.parent.translate_hotkey_thread.join(timeout=0.5)
             except Exception as e:
                 print(f"Error stopping translate hotkey thread: {e}")
             self.parent.translate_hotkey_thread = None
         if hotkey_str:
-            self.parent.translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate, hotkey_id=3)
+            self.parent.translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate, hotkey_id=2)
             self.parent.translate_hotkey_thread.start()
 
     def save_fullscreen_translate_hotkey(self):
         hotkey_str = self.fullscreen_translate_hotkey_input.keySequence().toString()
         self.parent.config["fullscreen_translate_hotkey"] = hotkey_str
         self.parent.save_config()
-        # Перезапуск слушателя горячих клавиш для перевода экрана
         if hasattr(self.parent, "fullscreen_translate_hotkey_thread") and self.parent.fullscreen_translate_hotkey_thread is not None:
             try:
                 self.parent.fullscreen_translate_hotkey_thread.stop()
@@ -615,13 +619,23 @@ class SettingsWindow(QWidget):
                 print(f"Error stopping fullscreen translate hotkey thread: {e}")
             self.parent.fullscreen_translate_hotkey_thread = None
         if hotkey_str:
-            self.parent.fullscreen_translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_fullscreen_translate, hotkey_id=4)
+            self.parent.fullscreen_translate_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_fullscreen_translate, hotkey_id=3)
             self.parent.fullscreen_translate_hotkey_thread.start()
 
-    def save_fullscreen_lang_direction(self):
-        self.parent.config["fullscreen_translate_from"] = self.fs_from_combo.currentData()
-        self.parent.config["fullscreen_translate_to"] = self.fs_to_combo.currentData()
+    def save_translate_selection_hotkey(self):
+        hotkey_str = self.translate_selection_hotkey_input.keySequence().toString()
+        self.parent.config["translate_selection_hotkey"] = hotkey_str
         self.parent.save_config()
+        if hasattr(self.parent, "translate_selection_hotkey_thread") and self.parent.translate_selection_hotkey_thread is not None:
+            try:
+                self.parent.translate_selection_hotkey_thread.stop()
+                self.parent.translate_selection_hotkey_thread.join(timeout=0.5)
+            except Exception as e:
+                print(f"Error stopping translate selection hotkey thread: {e}")
+            self.parent.translate_selection_hotkey_thread = None
+        if hotkey_str:
+            self.parent.translate_selection_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate_selection, hotkey_id=4)
+            self.parent.translate_selection_hotkey_thread.start()
 
     def back_from_hotkeys(self):
         self.init_ui()
@@ -837,8 +851,7 @@ class SettingsWindow(QWidget):
             self.copy_hotkey_input.setStyleSheet(hotkey_style)
             self.translate_hotkey_input.setStyleSheet(hotkey_style)
             self.fullscreen_translate_hotkey_input.setStyleSheet(hotkey_style)
-            self.fs_from_combo.setStyleSheet(hotkey_style)
-            self.fs_to_combo.setStyleSheet(hotkey_style)
+            self.translate_selection_hotkey_input.setStyleSheet(hotkey_style)
         if hasattr(self, "history_text_edit") and self.history_text_edit is not None:
             try:
                 if self.parent.current_theme == "Темная":
@@ -1062,7 +1075,7 @@ class SettingsWindow(QWidget):
 
                             if sys.platform.startswith('win'):
                                 # ждём завершения мастера установки
-                                subprocess.run([exe_temp_path, lang_param, dir_param], shell=True)
+                                subprocess.run([exe_temp_path, lang_param, dir_param])
                             else:
                                 subprocess.run([exe_temp_path, dir_param])
                         except Exception:
@@ -1302,98 +1315,100 @@ The program will continue using Windows OCR for now.""" if self.parent.current_i
         msg.exec_()
 
     def clear_all_cache(self):
-        """Очистить все кэши приложения для освобождения памяти и ускорения."""
+        """Очистить все кэши приложения: память, диск, история."""
         from PyQt5.QtCore import QTimer
         from PyQt5.QtWidgets import QApplication
-        
+        from cache_manager import clear_all_cache as cm_clear, get_cache_stats, format_size
+
         lang = self.parent.current_interface_language
         original_text = "Очистить кэш" if lang == 'ru' else "Clear cache"
         clearing_text = "Выполняется..." if lang == 'ru' else "Clearing..."
-        
-        # Показываем "Выполняется..."
+
         if hasattr(self, 'clear_cache_btn'):
             self.clear_cache_btn.setText(clearing_text)
             self.clear_cache_btn.setEnabled(False)
             QApplication.processEvents()
-        
-        total_cleared = 0  # Объём очищенного кэша в байтах
-        
-        # 1. Очистка кэша конфигурации main.py
+
+        # Get real stats before clearing
+        try:
+            from main import get_data_file
+            data_dir = os.path.dirname(get_data_file("config.json"))
+            stats_before = get_cache_stats(data_dir)
+            total_before = stats_before["total_bytes"]
+        except Exception:
+            data_dir = None
+            total_before = 0
+
+        total_cleared = 0
+
+        # 1. Clear disk cache (history, translation cache, pycache)
+        if data_dir:
+            try:
+                total_cleared += cm_clear(data_dir)
+            except Exception:
+                pass
+
+        # 2. Clear in-memory caches
         try:
             from main import invalidate_config_cache
             invalidate_config_cache()
-            total_cleared += 1024  # Примерный размер кэша конфига
         except Exception:
             pass
-        
-        # 2. Очистка кэша OCR движков
+
         try:
             from ocr import _OCR_ENGINE_CACHE, _OVERLAY_POOL
-            total_cleared += len(_OCR_ENGINE_CACHE) * 50000  # ~50KB на движок
             _OCR_ENGINE_CACHE.clear()
             for k in _OVERLAY_POOL:
-                if _OVERLAY_POOL[k] is not None:
-                    total_cleared += 10000
                 _OVERLAY_POOL[k] = None
         except Exception:
             pass
-        
-        # 3. Очистка кэша OCR конфигурации
+
         try:
             import ocr
-            if ocr._ocr_config_cache is not None:
-                total_cleared += 2048
             ocr._ocr_config_cache = None
             ocr._ocr_config_mtime = 0
         except Exception:
             pass
-        
-        # 4. Очистка кэша переводчика
+
         try:
             import translater
-            if translater._translator_config_cache is not None:
-                total_cleared += 2048
             translater._translator_config_cache = None
             translater._translator_config_mtime = 0
             translater._argos_languages_cache = None
-            cache_size = len(translater._argos_translations_cache)
-            total_cleared += cache_size * 5000  # ~5KB на перевод
             translater._argos_translations_cache.clear()
-            # Очистка HTTP сессии
             if translater._http_session is not None:
                 try:
                     translater._http_session.close()
                 except Exception:
                     pass
                 translater._http_session = None
-                total_cleared += 10000
         except Exception:
             pass
-        
-        # 5. Очистка временных файлов
+
+        try:
+            from cache_manager import invalidate_translation_cache
+            invalidate_translation_cache()
+        except Exception:
+            pass
+
+        # 3. Clear temp files
         try:
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "temp")
             if os.path.exists(temp_dir):
-                # Подсчитываем размер перед удалением
                 for root, dirs, files in os.walk(temp_dir):
                     for f in files:
                         try:
                             total_cleared += os.path.getsize(os.path.join(root, f))
-                        except:
+                        except Exception:
                             pass
                 shutil.rmtree(temp_dir, ignore_errors=True)
         except Exception:
             pass
-        
-        # Форматируем размер
-        def format_size(size_bytes):
-            if size_bytes < 1024:
-                return f"{size_bytes} B"
-            elif size_bytes < 1024 * 1024:
-                return f"{size_bytes / 1024:.1f} KB"
-            else:
-                return f"{size_bytes / (1024 * 1024):.1f} MB"
-        
+
+        # Use real total if cache_manager gave us 0
+        if total_cleared == 0:
+            total_cleared = total_before
+
         size_str = format_size(total_cleared)
         done_text = f"Очищено {size_str}" if lang == 'ru' else f"Cleared {size_str}"
         

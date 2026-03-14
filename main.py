@@ -49,7 +49,8 @@ DEFAULT_CONFIG = {
     "keep_visible_on_ocr": False,
     "last_ocr_language": "ru",
     "no_screen_dimming": False,
-    "fullscreen_translate_hotkey": "Ctrl+Alt+F"
+    "fullscreen_translate_hotkey": "Ctrl+Alt+F",
+    "translate_selection_hotkey": "Ctrl+Alt+Q"
 }
 
 # --- Глобальный кэш конфигурации ---
@@ -84,6 +85,58 @@ MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 
+APP_WINDOW_TITLE = "Click'n'Translate"
+SINGLE_INSTANCE_MUTEX_NAME = "ClicknTranslate_SingleInstance_Mutex"
+SINGLE_INSTANCE_SHOW_MESSAGE = "ClicknTranslate_ShowWindow_Message"
+HWND_BROADCAST = 0xFFFF
+ERROR_ALREADY_EXISTS = 183
+SW_SHOW = 5
+SW_RESTORE = 9
+
+_SHOW_WINDOW_MESSAGE_ID = 0
+if sys.platform == "win32":
+    try:
+        _SHOW_WINDOW_MESSAGE_ID = ctypes.windll.user32.RegisterWindowMessageW(SINGLE_INSTANCE_SHOW_MESSAGE)
+    except Exception:
+        _SHOW_WINDOW_MESSAGE_ID = 0
+
+_main_window_ref = None
+_single_instance_event_filter = None
+
+def _show_running_instance():
+    """Показать главное окно уже запущенного экземпляра."""
+    app = QApplication.instance()
+    if app is None:
+        return
+
+    target = _main_window_ref
+    if target is None:
+        for widget in app.topLevelWidgets():
+            if hasattr(widget, "show_window_from_tray") and widget.windowTitle() == APP_WINDOW_TITLE:
+                target = widget
+                break
+    if target is None:
+        return
+
+    try:
+        target.show_window_from_tray(force_show=True)
+    except Exception:
+        pass
+
+class _SingleInstanceMessageFilter(QtCore.QAbstractNativeEventFilter):
+    """Глобальный фильтр системного сообщения активации уже запущенного экземпляра."""
+    def nativeEventFilter(self, eventType, message):
+        event_name = eventType.decode("utf-8", "ignore") if isinstance(eventType, bytes) else str(eventType)
+        if _SHOW_WINDOW_MESSAGE_ID and event_name in ("windows_generic_MSG", "windows_dispatcher_MSG"):
+            try:
+                msg = wintypes.MSG.from_address(int(message))
+                if msg.message == _SHOW_WINDOW_MESSAGE_ID:
+                    QTimer.singleShot(0, _show_running_instance)
+                    return True, 0
+            except Exception:
+                pass
+        return False, 0
+
 # --- Диспетчер для безопасного вызова UI из потоков хоткеев ---
 class _HotkeyDispatcher(QtCore.QObject):
     triggered = QtCore.pyqtSignal(object)
@@ -102,8 +155,16 @@ def simulate_copy():
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 def get_app_dir():
+    """Directory with app resources (icons, etc). In PyInstaller — temp extraction dir."""
     if hasattr(sys, '_MEIPASS'):
         return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+def get_portable_dir():
+    """Directory next to the exe for portable data (config, history, cache).
+    Settings survive program updates — user just replaces exe/program files."""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.dirname(os.path.abspath(sys.executable))
     return os.path.dirname(os.path.abspath(sys.argv[0]))
 
 def ensure_json_file(filepath, default_content):
@@ -112,7 +173,7 @@ def ensure_json_file(filepath, default_content):
             json.dump(default_content, f, ensure_ascii=False, indent=4)
 
 def ensure_data_dir_and_files():
-    data_dir = os.path.join(get_app_dir(), "data")
+    data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, "config.json")
@@ -128,7 +189,7 @@ def ensure_data_dir_and_files():
     ensure_json_file(settings_path, {})
 
 def get_data_file(filename):
-    data_dir = os.path.join(get_app_dir(), "data")
+    data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     file_path = os.path.join(data_dir, filename)
@@ -173,7 +234,13 @@ def _save_copy_history_sync(text):
                         history = json.loads(content)
                 except (json.JSONDecodeError, ValueError):
                     history = []
-                history.append(record)
+                # Deduplicate consecutive + limit
+                if history and history[-1].get("text") == record["text"]:
+                    pass  # skip duplicate
+                else:
+                    history.append(record)
+                if len(history) > 500:
+                    history = history[-500:]
                 f.seek(0)
                 f.truncate()
                 json.dump(history, f, ensure_ascii=False, indent=4)
@@ -206,7 +273,10 @@ def _save_copy_history_sync(text):
                 history = json.load(f)
         except Exception:
             history = []
-        history.append(record)
+        if not (history and history[-1].get("text") == record["text"]):
+            history.append(record)
+        if len(history) > 500:
+            history = history[-500:]
         try:
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, ensure_ascii=False, indent=4)
@@ -465,7 +535,7 @@ class WelcomeDialog(QDialog):
         if self.lang == 'ru':
             self.setWindowTitle("Новости")
             title = "<b>Добро пожаловать в Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2.2</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.3.0</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "Советуем <b>подписаться</b> на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -475,7 +545,7 @@ class WelcomeDialog(QDialog):
         else:
             self.setWindowTitle("News")
             title = "<b>Welcome to Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.2.2</span><br><br>"
+            version = "<span style='color:#aaa; font-size:13px;'>V1.3.0</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "We recommend <b>subscribing</b> to the developer's Telegram channel to get updates and news about the program.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -504,12 +574,20 @@ class WelcomeDialog(QDialog):
         self.init_ui()
 
 class DarkThemeApp(QMainWindow):
+    # Signal to show translation dialog from background thread
+    _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str)
+
     def __init__(self):
         super().__init__()
+        self._show_selection_signal.connect(self._show_selection_translation)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setWindowTitle("Click'n'Translate")
+        self.setWindowTitle(APP_WINDOW_TITLE)
         self.setFixedSize(700, 400)
         self._is_dragging = False
+        # Важно для single-instance в режиме "start minimized":
+        # создаем native HWND заранее, чтобы окно могло получить Windows message.
+        self.winId()
+        self._init_status_tooltip()
 
         self.load_config()
 
@@ -559,6 +637,11 @@ class DarkThemeApp(QMainWindow):
         if fullscreen_translate_hotkey:
             self.fullscreen_translate_hotkey_thread = HotkeyListenerThread(fullscreen_translate_hotkey, self.launch_fullscreen_translate, hotkey_id=3)
             self.fullscreen_translate_hotkey_thread.start()
+
+        translate_selection_hotkey = self.config.get("translate_selection_hotkey", "")
+        if translate_selection_hotkey:
+            self.translate_selection_hotkey_thread = HotkeyListenerThread(translate_selection_hotkey, self.launch_translate_selection, hotkey_id=4)
+            self.translate_selection_hotkey_thread.start()
 
         self.HotkeyListenerThread = HotkeyListenerThread
 
@@ -692,7 +775,7 @@ class DarkThemeApp(QMainWindow):
         self.tray_icon.setToolTip("Click'n'Translate")
         tray_menu = QMenu()
         open_action = tray_menu.addAction(open_text)
-        open_action.triggered.connect(self.show_window_from_tray)
+        open_action.triggered.connect(lambda: self.show_window_from_tray(force_show=True))
         copy_action = tray_menu.addAction(copy_text)
         copy_action.triggered.connect(self.launch_copy)
         translate_action = tray_menu.addAction(translate_text)
@@ -710,14 +793,36 @@ class DarkThemeApp(QMainWindow):
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             self.show_window_from_tray()
 
-    def show_window_from_tray(self):
-        if self.isVisible():
+    def show_window_from_tray(self, force_show=False):
+        if self.isVisible() and not force_show:
             self.hide()
-        else:
-            self.show()
-            self.raise_()
-            self.activateWindow()
-            self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+            return
+        self.setWindowState(Qt.WindowNoState)
+        self.showNormal()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        if sys.platform == "win32":
+            try:
+                hwnd = int(self.winId())
+                ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
+                ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
+
+    def nativeEvent(self, eventType, message):
+        event_name = eventType.decode("utf-8", "ignore") if isinstance(eventType, bytes) else str(eventType)
+        if _SHOW_WINDOW_MESSAGE_ID and event_name in ("windows_generic_MSG", "windows_dispatcher_MSG"):
+            try:
+                msg = wintypes.MSG.from_address(int(message))
+                if msg.message == _SHOW_WINDOW_MESSAGE_ID:
+                    QTimer.singleShot(0, _show_running_instance)
+                    return True, 0
+            except Exception:
+                pass
+        return super().nativeEvent(eventType, message)
 
     def _start_external(self, script_or_exe, *args):
         """Launch helper that works both in dev (python script) and frozen (exe)."""
@@ -805,6 +910,103 @@ class DarkThemeApp(QMainWindow):
             print(f"Error launching fullscreen translate: {e}")
             import traceback
             traceback.print_exc()
+
+    # Signal to show/hide status tooltip
+    _show_status_signal = QtCore.pyqtSignal(str)
+    _hide_status_signal = QtCore.pyqtSignal()
+
+    def _init_status_tooltip(self):
+        """Initialize floating status tooltip."""
+        from PyQt5.QtWidgets import QLabel
+        self._status_label = QLabel()
+        self._status_label.setWindowFlags(Qt.ToolTip | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self._status_label.setStyleSheet(
+            "QLabel { background-color: #1a1a2e; color: #e0e0e0; padding: 8px 16px; "
+            "border: 1px solid #550000; border-radius: 6px; font-size: 14px; }"
+        )
+        self._status_label.hide()
+        self._show_status_signal.connect(self._on_show_status)
+        self._hide_status_signal.connect(self._on_hide_status)
+
+    def _on_show_status(self, text):
+        from PyQt5.QtGui import QCursor
+        self._status_label.setText(text)
+        self._status_label.adjustSize()
+        pos = QCursor.pos()
+        self._status_label.move(pos.x() + 15, pos.y() + 15)
+        self._status_label.show()
+
+    def _on_hide_status(self):
+        self._status_label.hide()
+
+    def launch_translate_selection(self):
+        """Translate currently selected text: simulate Ctrl+C, read clipboard, translate, show dialog."""
+        print("launch_translate_selection called")
+
+        def _do_copy_and_translate():
+            lang = self.config.get("interface_language", "ru")
+            try:
+                # Release all modifier keys first
+                KEYEVENTF_KEYUP = 0x0002
+                for vk in (0x11, 0x12, 0x10, 0x5B, 0x5C):
+                    ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+                time.sleep(0.35)
+                # Clear clipboard, then Ctrl+C to capture selection
+                pyperclip.copy("")
+                simulate_copy()
+                time.sleep(0.25)
+                text = pyperclip.paste()
+                if not text or not text.strip():
+                    time.sleep(0.3)
+                    text = pyperclip.paste()
+                if not text or not text.strip():
+                    lang = self.config.get("interface_language", "ru")
+                    no_text = "No text selected" if lang == "en" else "Текст не выделен"
+                    self._show_status_signal.emit(no_text)
+                    time.sleep(1.5)
+                    self._hide_status_signal.emit()
+                    return
+                text = text.strip()
+                # Show status
+                lang = self.config.get("interface_language", "ru")
+                status_msg = "Translating..." if lang == "en" else "Переводим..."
+                self._show_status_signal.emit(status_msg)
+                # Auto-detect language direction
+                cyrillic_count = sum(1 for c in text if '\u0400' <= c <= '\u04ff')
+                if cyrillic_count > len(text) * 0.3:
+                    source_code, target_code = "ru", "en"
+                else:
+                    source_code, target_code = "en", "ru"
+                print(f"[SEL] translating {source_code}->{target_code}, {len(text)} chars...")
+                from translater import translate_text
+                translated = translate_text(text, source_code, target_code)
+                self._hide_status_signal.emit()
+                print(f"[SEL] result: {len(translated) if translated else 0} chars")
+                if not translated:
+                    return
+                theme = self.config.get("theme", "Темная")
+                auto_copy = self.config.get("copy_translated_text", False)
+                self._show_selection_signal.emit(translated, auto_copy, lang, theme)
+            except Exception as e:
+                err_msg = "Translation error" if lang == "en" else "Ошибка перевода"
+                self._show_status_signal.emit(f"{err_msg}: {e}")
+                print(f"Error in translate_selection: {e}")
+                import traceback
+                traceback.print_exc()
+                time.sleep(3)
+                self._hide_status_signal.emit()
+
+        threading.Thread(target=_do_copy_and_translate, daemon=True).start()
+
+    def _show_selection_translation(self, translated, auto_copy, lang, theme):
+        """Show translation dialog from selection (called in UI thread)."""
+        try:
+            show_translation_dialog(self, translated, auto_copy=auto_copy, lang=lang, theme=theme)
+            if auto_copy:
+                pyperclip.copy(translated)
+                save_copy_history(translated)
+        except Exception as e:
+            print(f"Error showing translation dialog: {e}")
 
     def restart_hotkey_listener(self):
         self.hotkey_thread = HotkeyListenerThread(self.config.get("ocr_hotkeys", "Ctrl+O"), self.launch_ocr)
@@ -1291,55 +1493,46 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.translate_button)
 
         # --- Блок хоткеев (показываем всегда) ---
-        hotkey_label_style = "font-size: 13px; color: #888; margin-bottom: 0px;"
-        hotkey_value_style = "font-size: 15px; color: #7A5FA1; font-weight: bold; margin-bottom: 2px;"
-        copy_hotkey = self.config.get("copy_hotkey", "")
-        translate_hotkey = self.config.get("translate_hotkey", "")
-        
-        # Маппинг имён для отображения (короткие названия)
-        tr_names = {
-            "argos": "Argos",
-            "google": "Google",
-            "mymemory": "MyMemory",
-            "lingva": "Lingva",
-            "libretranslate": "LibreTranslate"
-        }
+        hk_style = "font-size: 13px; color: #888; padding: 0; margin: 0;"
+        hk_val = "color: #7A5FA1; font-weight: bold;"
+        not_set = "—"
+        is_en = self.current_interface_language == "en"
+
+        copy_hk = self.config.get("copy_hotkey", "") or not_set
+        translate_hk = self.config.get("translate_hotkey", "") or not_set
+        fs_hk = self.config.get("fullscreen_translate_hotkey", "") or not_set
+        sel_hk = self.config.get("translate_selection_hotkey", "") or not_set
+
+        tr_names = {"argos": "Argos", "google": "Google", "mymemory": "MyMemory", "lingva": "Lingva", "libretranslate": "LibreTranslate"}
         tr_name = tr_names.get(translator_engine, translator_engine.capitalize())
-        
-        # --- Строка 1: Хоткей копирования + OCR ---
-        copy_row = QHBoxLayout()
-        copy_row.setSpacing(0)
-        not_set_text = "Not set" if self.current_interface_language == "en" else "Не задан"
-        copy_hotkey_display = copy_hotkey if copy_hotkey else not_set_text
-        copy_label = QLabel(("Copy hotkey:" if self.current_interface_language == "en" else "Горячая клавиша копирования:") + f" <span style='{hotkey_value_style}'>{copy_hotkey_display}</span>")
-        copy_label.setStyleSheet(hotkey_label_style)
-        copy_label.setTextFormat(Qt.RichText)
-        copy_row.addWidget(copy_label, alignment=Qt.AlignLeft)
-        copy_row.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        ocr_label = QLabel(f"OCR: {ocr_engine}")
-        ocr_label.setAlignment(Qt.AlignRight)
-        ocr_label.setStyleSheet("color: #7A5FA1; font-size: 14px; font-weight: bold; margin-top: 2px; margin-bottom: 2px; margin-right: 8px;")
-        copy_row.addWidget(ocr_label, alignment=Qt.AlignRight)
-        self.main_layout.addLayout(copy_row)
-        
-        # --- Строка 2: Хоткей перевода + Переводчик ---
-        tr_row = QHBoxLayout()
-        tr_row.setSpacing(0)
-        translate_hotkey_display = translate_hotkey if translate_hotkey else not_set_text
-        tr_left = QLabel(("Translate hotkey:" if self.current_interface_language == "en" else "Горячая клавиша перевода:") + f" <span style='{hotkey_value_style}'>{translate_hotkey_display}</span>")
-        tr_left.setStyleSheet(hotkey_label_style)
-        tr_left.setTextFormat(Qt.RichText)
-        tr_row.addWidget(tr_left, alignment=Qt.AlignLeft)
-        tr_row.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        if self.current_interface_language == "en":
-            tr_text = f"Translator: {tr_name}"
-        else:
-            tr_text = f"Переводчик: {tr_name}"
-        tr_label = QLabel(tr_text)
-        tr_label.setAlignment(Qt.AlignRight)
-        tr_label.setStyleSheet("color: #7A5FA1; font-size: 14px; font-weight: bold; margin-top: 2px; margin-bottom: 2px; margin-right: 8px;")
-        tr_row.addWidget(tr_label, alignment=Qt.AlignRight)
-        self.main_layout.addLayout(tr_row)
+
+        # Row 1: Copy + OCR translate | OCR engine + Translator
+        row1 = QHBoxLayout()
+        row1.setSpacing(0)
+        r1_left = QLabel(f"{'Copy' if is_en else 'Копир.'}: <span style='{hk_val}'>{copy_hk}</span> &nbsp; {'OCR Translate' if is_en else 'OCR перевод'}: <span style='{hk_val}'>{translate_hk}</span>")
+        r1_left.setStyleSheet(hk_style)
+        r1_left.setTextFormat(Qt.RichText)
+        row1.addWidget(r1_left, alignment=Qt.AlignLeft)
+        row1.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        r1_right = QLabel(f"OCR: <b>{ocr_engine}</b>")
+        r1_right.setStyleSheet("font-size: 13px; color: #7A5FA1; margin-right: 8px;")
+        r1_right.setTextFormat(Qt.RichText)
+        row1.addWidget(r1_right, alignment=Qt.AlignRight)
+        self.main_layout.addLayout(row1)
+
+        # Row 2: Fullscreen + Selection | Translator
+        row2 = QHBoxLayout()
+        row2.setSpacing(0)
+        r2_left = QLabel(f"{'Fullscreen' if is_en else 'Экран'}: <span style='{hk_val}'>{fs_hk}</span> &nbsp; {'Selection' if is_en else 'Выделение'}: <span style='{hk_val}'>{sel_hk}</span>")
+        r2_left.setStyleSheet(hk_style)
+        r2_left.setTextFormat(Qt.RichText)
+        row2.addWidget(r2_left, alignment=Qt.AlignLeft)
+        row2.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        r2_right = QLabel(f"{'Translator' if is_en else 'Переводчик'}: <b>{tr_name}</b>")
+        r2_right.setStyleSheet("font-size: 13px; color: #7A5FA1; margin-right: 8px;")
+        r2_right.setTextFormat(Qt.RichText)
+        row2.addWidget(r2_right, alignment=Qt.AlignRight)
+        self.main_layout.addLayout(row2)
 
         # Кнопка старт (shadow mode) в самом низу
         start_text = "Shadow mode" if self.current_interface_language == "en" else "Режим тени"
@@ -1490,6 +1683,12 @@ class DarkThemeApp(QMainWindow):
                 self.fullscreen_translate_hotkey_thread.join(timeout=0.5)
         except Exception as e:
             print(f"Error stopping fullscreen translate hotkey thread: {e}")
+        try:
+            if hasattr(self, "translate_selection_hotkey_thread") and self.translate_selection_hotkey_thread is not None:
+                self.translate_selection_hotkey_thread.stop()
+                self.translate_selection_hotkey_thread.join(timeout=0.5)
+        except Exception as e:
+            print(f"Error stopping selection hotkey thread: {e}")
         self.save_config()
         self.tray_icon.hide()  # Убираем иконку из трея
         event.accept()
@@ -1559,7 +1758,7 @@ class DarkThemeApp(QMainWindow):
                     pyperclip.copy(translated_text)
                     try:
                         if config.get("copy_history", False):
-                            self.save_copy_history(translated_text)
+                            save_copy_history(translated_text)
                     except Exception:
                         pass
                 # Показываем универсальный диалог
@@ -1567,7 +1766,7 @@ class DarkThemeApp(QMainWindow):
                 if not auto_copy:
                     try:
                         if config.get("copy_history", False):
-                            self.save_copy_history(translated_text)
+                            save_copy_history(translated_text)
                     except Exception:
                         pass
             except Exception as e:
@@ -1578,50 +1777,80 @@ class DarkThemeApp(QMainWindow):
 
 # --- Универсальный диалог перевода ---
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная'):
-    if theme == "Темная":
-        style = (
-            "QMessageBox { background-color: #121212; color: #ffffff; } "
-            "QLabel { color: #ffffff; font-size: 18px; } "
-            "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 5px; min-width: 80px; } "
-            "QPushButton:hover { background-color: #333333; }"
-        )
-    else:
-        style = (
-            "QMessageBox { background-color: #ffffff; color: #000000; } "
-            "QLabel { color: #000000; font-size: 18px; } "
-            "QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #cccccc; padding: 5px; min-width: 80px; } "
-            "QPushButton:hover { background-color: #e0e0e0; }"
-        )
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
+    is_dark = theme == "Темная"
+    bg = "#121212" if is_dark else "#ffffff"
+    fg = "#ffffff" if is_dark else "#000000"
+    btn_bg = "#1e1e1e" if is_dark else "#f0f0f0"
+    btn_border = "#550000" if is_dark else "#cccccc"
+    btn_hover = "#333333" if is_dark else "#e0e0e0"
+
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Click'n'Translate")
+    dlg.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
+    dlg.setWindowIcon(QIcon(resource_path("icons/icon.png")))
+    dlg.setMinimumSize(350, 150)
+    dlg.setMaximumSize(800, 600)
+    dlg.setStyleSheet(f"QDialog {{ background-color: {bg}; }}")
+
+    layout = QVBoxLayout(dlg)
+    layout.setContentsMargins(12, 12, 12, 12)
+
+    text_edit = QTextEdit()
+    text_edit.setPlainText(translated_text)
+    text_edit.setReadOnly(True)
+    text_edit.setStyleSheet(
+        f"QTextEdit {{ background-color: {bg}; color: {fg}; border: none; font-size: 16px; }}"
+        f"QScrollBar:vertical {{ background: {bg}; width: 8px; }}"
+        f"QScrollBar::handle:vertical {{ background: #555; border-radius: 4px; }}"
+    )
+    layout.addWidget(text_edit)
+
+    btn_style = (
+        f"QPushButton {{ background-color: {btn_bg}; color: {fg}; border: 1px solid {btn_border}; "
+        f"padding: 6px 16px; min-width: 80px; font-size: 13px; }}"
+        f"QPushButton:hover {{ background-color: {btn_hover}; }}"
+    )
+
+    btn_layout = QHBoxLayout()
+    btn_layout.addStretch()
+
     copy_text = "Copy" if lang == "en" else "Копировать"
-    close_text = "Close" if lang == "en" else "Закрыть"
     google_text = "Google" if lang == "en" else "Гугл"
-    msg = QMessageBox(parent)
-    msg.setWindowTitle(" ")
-    msg.setText(translated_text)
+    close_text = "Close" if lang == "en" else "Закрыть"
+
     if not auto_copy:
-        copy_button = msg.addButton(copy_text, QMessageBox.ActionRole)
-    google_button = msg.addButton(google_text, QMessageBox.ActionRole)
-    close_button = msg.addButton(close_text, QMessageBox.RejectRole)
-    msg.setStyleSheet(style)
-    msg.setWindowFlags(msg.windowFlags() | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
-    msg.setWindowIcon(QIcon(resource_path("icons/icon.png")))
-    msg.setIcon(QMessageBox.NoIcon)
+        copy_btn = QPushButton(copy_text)
+        copy_btn.setStyleSheet(btn_style)
+        copy_btn.clicked.connect(lambda: pyperclip.copy(translated_text))
+        btn_layout.addWidget(copy_btn)
+
+    google_btn = QPushButton(google_text)
+    google_btn.setStyleSheet(btn_style)
+    google_btn.clicked.connect(lambda: (webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(translated_text)), dlg.accept()))
+    btn_layout.addWidget(google_btn)
+
+    close_btn = QPushButton(close_text)
+    close_btn.setStyleSheet(btn_style)
+    close_btn.clicked.connect(dlg.accept)
+    btn_layout.addWidget(close_btn)
+
+    layout.addLayout(btn_layout)
+
+    # Auto-size based on text length
+    lines = translated_text.count('\n') + 1
+    text_len = len(translated_text)
+    height = min(max(150, lines * 28 + 80, text_len // 2 + 100), 600)
+    width = min(max(350, min(text_len * 8, 700)), 800)
+    dlg.resize(width, height)
+
     if auto_copy:
         pyperclip.copy(translated_text)
-        # save_copy_history вызывается в вызывающем коде
-    while True:
-        clicked = msg.exec_()
-        if not auto_copy and msg.clickedButton() == copy_button:
-            pyperclip.copy(translated_text)
-            # save_copy_history вызывается в вызывающем коде
-        elif msg.clickedButton() == google_button:
-            url = "https://www.google.com/search?q=" + urllib.parse.quote(translated_text)
-            webbrowser.open(url)
-            break
-        else:
-            break
+
+    dlg.exec_()
 
 if __name__ == "__main__":
+
     # --- Обработка вызова как OCR подпроцесса -----------------
     if len(sys.argv) > 1 and sys.argv[1] in ("ocr", "copy", "translate"):
         from ocr import run_screen_capture
@@ -1634,11 +1863,9 @@ if __name__ == "__main__":
         """Проверить через mutex, запущен ли уже экземпляр программы."""
         try:
             # Создаем уникальный mutex
-            mutex_name = "ClicknTranslate_SingleInstance_Mutex"
             kernel32 = ctypes.windll.kernel32
-            mutex = kernel32.CreateMutexW(None, False, mutex_name)
-            # ERROR_ALREADY_EXISTS = 183
-            if kernel32.GetLastError() == 183:
+            mutex = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
+            if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
                 kernel32.CloseHandle(mutex)
                 return True
             # Сохраняем handle чтобы mutex жил пока программа работает
@@ -1649,19 +1876,13 @@ if __name__ == "__main__":
             return False
 
     def bring_existing_to_front():
-        """Найти и показать окно существующего экземпляра программы."""
+        """Отправить запущенному экземпляру команду раскрыть главное окно."""
+        if not _SHOW_WINDOW_MESSAGE_ID:
+            return False
         try:
-            # Ищем окно по заголовку
-            hwnd = ctypes.windll.user32.FindWindowW(None, "Click'n'Translate")
-            if hwnd:
-                # Показываем и активируем окно
-                SW_RESTORE = 9
-                ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
-                return True
+            return bool(ctypes.windll.user32.PostMessageW(HWND_BROADCAST, _SHOW_WINDOW_MESSAGE_ID, 0, 0))
         except Exception:
-            pass
-        return False
+            return False
 
     # Проверяем single instance (не разрешаем запуск нескольких копий)
     if is_already_running():
@@ -1680,6 +1901,12 @@ if __name__ == "__main__":
         pass
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
+    if _SHOW_WINDOW_MESSAGE_ID:
+        try:
+            _single_instance_event_filter = _SingleInstanceMessageFilter()
+            app.installNativeEventFilter(_single_instance_event_filter)
+        except Exception:
+            _single_instance_event_filter = None
     # Повышаем приоритет процесса для уменьшения задержек
     try:
         HIGH_PRIORITY_CLASS = 0x00000080
@@ -1706,6 +1933,7 @@ if __name__ == "__main__":
     except Exception:
         pass
     window = DarkThemeApp()
+    _main_window_ref = window
     # Всегда используем window.start_minimized, который инициализирован из config.json
     # Проверку на повторный запуск is_already_running() убрали
     if window.start_minimized:

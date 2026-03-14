@@ -16,8 +16,13 @@ def get_app_dir():
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(sys.argv[0]))
 
+def get_portable_dir():
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
 def get_data_file(filename):
-    data_dir = os.path.join(get_app_dir(), "data")
+    data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     return os.path.join(data_dir, filename)
@@ -216,8 +221,21 @@ def test_translation():
 
 def translate_text(text, source_code, target_code, status_callback=None):
     """Перевод текста с выбранным движком и автоматическим фоллбеком."""
+    # Check translation cache first
+    try:
+        from main import get_data_file
+        import os
+        data_dir = os.path.dirname(get_data_file("config.json"))
+        from cache_manager import get_cached_translation, save_cached_translation
+        cached = get_cached_translation(data_dir, text, source_code, target_code)
+        if cached:
+            print(f"Using cached translation ({len(text)} chars)")
+            return cached
+    except Exception:
+        data_dir = None
+
     engine = get_cached_translator_config().get("translator_engine", "Argos").lower()
-    print(f"Using translator: {engine.upper()}")  # Логирование переводчика
+    print(f"Using translator: {engine.upper()}")
 
     # Онлайн-переводчики (определяем локально для избежания проблем с порядком)
     online_engines = ['google', 'mymemory', 'lingva', 'libretranslate']
@@ -233,27 +251,32 @@ def translate_text(text, source_code, target_code, status_callback=None):
             return libretranslate(txt, src, tgt)
         raise ValueError(f"Unknown engine: {name}")
 
+    def _cache_and_return(result):
+        """Save translation to cache and return."""
+        if result and data_dir:
+            try:
+                save_cached_translation(data_dir, text, source_code, target_code, result)
+            except Exception:
+                pass
+        return result
+
     if engine in online_engines:
         try:
-            return _call_online(engine, text, source_code, target_code)
+            return _cache_and_return(_call_online(engine, text, source_code, target_code))
         except Exception as e:
-            # Фоллбек на другие онлайн-переводчики
             for name in online_engines:
                 if name != engine:
                     try:
-                        return _call_online(name, text, source_code, target_code)
+                        return _cache_and_return(_call_online(name, text, source_code, target_code))
                     except Exception:
                         continue
-            # Последний шанс — Argos офлайн
             if HAS_ARGOS:
-                pass  # продолжаем ниже
+                pass
             else:
                 raise e
 
-    # Offline (Argos), если доступен
     if not HAS_ARGOS:
-        # Нет Argos — используем Google как дефолт
-        return google_translate(text, source_code, target_code)
+        return _cache_and_return(google_translate(text, source_code, target_code))
 
     ensure_models(status_callback=status_callback)
 
@@ -262,7 +285,7 @@ def translate_text(text, source_code, target_code, status_callback=None):
     if translation_obj is None:
         raise Exception(f"Нет модели для перевода {source_code}->{target_code}. Проверьте, что установлены обе модели (RU->EN и EN->RU) через Argos Translate.")
 
-    return translation_obj.translate(text)
+    return _cache_and_return(translation_obj.translate(text))
 
 # Кэшированная сессия для HTTP запросов
 _http_session = None
@@ -276,8 +299,8 @@ def _get_http_session():
         _http_session.headers.update({'Connection': 'keep-alive'})
     return _http_session
 
-def google_translate(text, source_code, target_code):
-    """Google Translate через публичный endpoint."""
+def _google_translate_chunk(text, source_code, target_code):
+    """Translate a single chunk via Google API."""
     url = 'https://translate.googleapis.com/translate_a/single'
     params = {
         'client': 'gtx',
@@ -291,6 +314,46 @@ def google_translate(text, source_code, target_code):
     r.raise_for_status()
     data = r.json()
     return ''.join(seg[0] for seg in data[0] if seg and seg[0])
+
+
+def google_translate(text, source_code, target_code):
+    """Google Translate через публичный endpoint с разбивкой длинного текста."""
+    # Normalize line endings
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    # Cyrillic chars expand ~6x in URL encoding, latin ~1x
+    # Use conservative limit to avoid 400 errors
+    MAX_CHUNK = 1500
+    if len(text) <= MAX_CHUNK:
+        return _google_translate_chunk(text, source_code, target_code)
+    # Split by paragraphs, then sentences
+    parts = []
+    current = ""
+    for line in text.split('\n'):
+        if len(current) + len(line) + 1 > MAX_CHUNK:
+            if current:
+                parts.append(current)
+            if len(line) > MAX_CHUNK:
+                while len(line) > MAX_CHUNK:
+                    cut = line[:MAX_CHUNK].rfind('. ')
+                    if cut < MAX_CHUNK // 2:
+                        cut = line[:MAX_CHUNK].rfind(' ')
+                    if cut < MAX_CHUNK // 4:
+                        cut = MAX_CHUNK
+                    else:
+                        cut += 1
+                    parts.append(line[:cut])
+                    line = line[cut:]
+                current = line if line else ""
+            else:
+                current = line
+        else:
+            current = current + '\n' + line if current else line
+    if current:
+        parts.append(current)
+    translated_parts = []
+    for part in parts:
+        translated_parts.append(_google_translate_chunk(part, source_code, target_code))
+    return '\n'.join(translated_parts)
 
 def mymemory_translate(text, source_code, target_code):
     """MyMemory - бесплатный API (до 5000 символов/день без регистрации)."""
