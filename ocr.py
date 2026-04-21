@@ -525,8 +525,12 @@ class ScreenCaptureOverlay(QWidget):
         self.start_point = None
         self.end_point = None
         self.last_rect = None
+        self._active_screen = None
+        self._frozen_background = None
+        self._frozen_background_rect = QtCore.QRect()
         # Загрузка последнего выбранного языка из конфигурации
         config = get_cached_ocr_config()
+        self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
         self.current_language = config.get("last_ocr_language", "ru")
         # Removed Qt.Tool, added WindowStaysOnTopHint and FramelessWindowHint
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -643,19 +647,67 @@ class ScreenCaptureOverlay(QWidget):
         # Сохраняем язык при изменении
         self.lang_combo.currentIndexChanged.connect(self.on_language_changed)
 
+    @staticmethod
+    def _get_active_screen():
+        cursor_pos = QtGui.QCursor.pos()
+        return QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
+
+    def _capture_frozen_background(self, screen_rect):
+        if not self._freeze_screen_on_ocr or screen_rect.isNull():
+            self._frozen_background = None
+            self._frozen_background_rect = QtCore.QRect()
+            return
+
+        try:
+            frozen_bg = QtGui.QPixmap(screen_rect.size())
+            if frozen_bg.isNull():
+                self._frozen_background = None
+                self._frozen_background_rect = QtCore.QRect()
+                return
+            frozen_bg.fill(QtCore.Qt.transparent)
+            drawn_any = False
+            target_screen = self._active_screen or self._get_active_screen()
+            if target_screen is not None:
+                shot = target_screen.grabWindow(0)
+                if shot.isNull():
+                    shot = target_screen.grabWindow(0, 0, 0, screen_rect.width(), screen_rect.height())
+                if not shot.isNull():
+                    painter = QtGui.QPainter(frozen_bg)
+                    try:
+                        painter.drawPixmap(0, 0, shot)
+                    finally:
+                        painter.end()
+                    drawn_any = True
+
+            if drawn_any:
+                self._frozen_background = frozen_bg
+                self._frozen_background_rect = screen_rect
+            else:
+                self._frozen_background = None
+                self._frozen_background_rect = QtCore.QRect()
+        except Exception as e:
+            logging.warning(f"Failed to capture frozen OCR background: {e}")
+            self._frozen_background = None
+            self._frozen_background_rect = QtCore.QRect()
+
     def show_overlay(self):
         try:
             logging.info("Showing overlay...")
+            config = get_cached_ocr_config()
+            self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
             self.setWindowOpacity(1.0)
-            
-            # Calculate the total geometry of all screens
-            total_rect = QtCore.QRect()
-            for screen in QApplication.screens():
-                total_rect = total_rect.united(screen.geometry())
-            
-            # Set geometry to cover the entire virtual desktop
-            self.setGeometry(total_rect)
-            logging.info(f"Overlay geometry set to: {total_rect}")
+
+            # Активный монитор — тот, где находится курсор в момент запуска OCR.
+            # Оверлей и заморозка работают только на нем.
+            self._active_screen = self._get_active_screen()
+            if self._active_screen is not None:
+                overlay_rect = self._active_screen.geometry()
+            else:
+                overlay_rect = QtCore.QRect(0, 0, 1, 1)
+
+            self.setGeometry(overlay_rect)
+            logging.info(f"Overlay geometry set to active screen: {overlay_rect}")
+            self._capture_frozen_background(overlay_rect)
             
             self.show()
             self.raise_()
@@ -682,12 +734,9 @@ class ScreenCaptureOverlay(QWidget):
 
     def update_combo_position(self):
         if hasattr(self, 'lang_combo') and self.lang_combo:
-            # Center horizontally relative to the active screen or the entire virtual desktop
-            # For better UX, let's center it on the primary screen or the screen where the mouse is
-            
-            # Find the screen containing the cursor
-            cursor_pos = QtGui.QCursor.pos()
-            target_screen = QApplication.screenAt(cursor_pos)
+            # Держим позицию комбобокса на том же мониторе,
+            # где был запущен оверлей.
+            target_screen = self._active_screen or self._get_active_screen()
             if not target_screen:
                 target_screen = QApplication.primaryScreen()
             
@@ -721,6 +770,8 @@ class ScreenCaptureOverlay(QWidget):
                     _ACTIVE_OVERLAYS[active_mode] = None
         except Exception:
             pass
+        self._frozen_background = None
+        self._frozen_background_rect = QtCore.QRect()
         super().closeEvent(event)
         # Подготавливаем новый оверлей ПОСЛЕ закрытия текущего (отложенно)
         mode = self.mode
@@ -730,9 +781,14 @@ class ScreenCaptureOverlay(QWidget):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
-        # Проверка настройки "не затемнять экран"
-        config = get_cached_ocr_config()
-        no_dimming = config.get("no_screen_dimming", False)
+        # Затемнение отключено постоянно: выделение читается на живом/замороженном фоне.
+        no_dimming = True
+
+        # Если включена заморозка экрана — рисуем заготовленный кадр
+        if self._freeze_screen_on_ocr and (self._frozen_background is None or self._frozen_background.isNull()):
+            self._capture_frozen_background(self.geometry())
+        if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
+            painter.drawPixmap(0, 0, self._frozen_background)
         
         # Если не требуется затемнение, рисуем минимальный невидимый фон для перехвата мыши
         if not no_dimming:
@@ -749,6 +805,8 @@ class ScreenCaptureOverlay(QWidget):
             if not no_dimming:
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
                 painter.fillRect(rect, QtGui.QColor(0, 0, 0, 0))
+                if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
+                    painter.drawPixmap(rect, self._frozen_background, rect)
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
             else:
                 # В режиме без затемнения добавляем легкий полупрозрачный белый фон

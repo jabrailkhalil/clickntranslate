@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QCo
 from PyQt5.QtCore import Qt, QTimer, QSize
 from PyQt5.QtGui import QIcon
 from settings_window import SettingsWindow
+from app_version import APP_VERSION
 import translater  # Импорт модуля перевода
 
 # --- Единственная константа с дефолтной конфигурацией ---
@@ -47,6 +48,7 @@ DEFAULT_CONFIG = {
     "copy_history": False,
     "copy_translated_text": False,  # Все галочки отключены по умолчанию
     "keep_visible_on_ocr": False,
+    "freeze_screen_on_ocr": False,
     "last_ocr_language": "ru",
     "no_screen_dimming": False,
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
@@ -535,7 +537,7 @@ class WelcomeDialog(QDialog):
         if self.lang == 'ru':
             self.setWindowTitle("Новости")
             title = "<b>Добро пожаловать в Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.3.0</span><br><br>"
+            version = f"<span style='color:#aaa; font-size:13px;'>V{APP_VERSION}</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "Советуем <b>подписаться</b> на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
@@ -545,7 +547,7 @@ class WelcomeDialog(QDialog):
         else:
             self.setWindowTitle("News")
             title = "<b>Welcome to Click'n'Translate!</b><br>"
-            version = "<span style='color:#aaa; font-size:13px;'>V1.3.0</span><br><br>"
+            version = f"<span style='color:#aaa; font-size:13px;'>V{APP_VERSION}</span><br><br>"
             body = ("<span style='font-size:15px;'>"
                     "We recommend <b>subscribing</b> to the developer's Telegram channel to get updates and news about the program.<br><br>"
                     "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"

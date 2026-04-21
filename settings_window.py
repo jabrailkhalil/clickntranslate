@@ -5,13 +5,15 @@ import requests, zipfile, tempfile, shutil, threading
 import sys
 import subprocess
 import platform
+import re
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
-    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy
+    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon
 from PyQt5 import QtCore
+from app_version import APP_VERSION
 
 # Импортируем функцию инвалидации кэша (ленивый импорт для избежания циклического импорта)
 def _invalidate_main_config_cache():
@@ -25,6 +27,38 @@ def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
+
+
+GITHUB_OWNER = "jabrailkhalil"
+GITHUB_REPO = "clickntranslate"
+GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/"
+GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+
+
+def _normalize_version(version_text):
+    if not version_text:
+        return "0"
+    version = version_text.strip()
+    if version.lower().startswith("v"):
+        version = version[1:]
+    return version
+
+
+def _version_to_tuple(version_text):
+    normalized = _normalize_version(version_text)
+    parts = re.findall(r"\d+", normalized)
+    if not parts:
+        return (0,)
+    return tuple(int(p) for p in parts)
+
+
+def _is_newer_version(latest, current):
+    latest_tuple = _version_to_tuple(latest)
+    current_tuple = _version_to_tuple(current)
+    max_len = max(len(latest_tuple), len(current_tuple))
+    latest_tuple = latest_tuple + (0,) * (max_len - len(latest_tuple))
+    current_tuple = current_tuple + (0,) * (max_len - len(current_tuple))
+    return latest_tuple > current_tuple
 
 SETTINGS_TEXT = {
     "en": {
@@ -49,6 +83,7 @@ SETTINGS_TEXT = {
         "history_empty": "History is empty.",
         "history_error": "Error reading history.",
         "copy_translated_text": "Copy translated text automatically",
+        "freeze_screen_on_ocr": "Freeze screen during OCR",
         "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
         "fullscreen_from": "From:",
         "fullscreen_to": "To:",
@@ -77,6 +112,7 @@ SETTINGS_TEXT = {
         "history_empty": "История пуста.",
         "history_error": "Ошибка чтения истории.",
         "copy_translated_text": "Копировать сразу переведённый текст",
+        "freeze_screen_on_ocr": "Заморозить экран при OCR",
         "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
         "fullscreen_from": "С:",
         "fullscreen_to": "На:",
@@ -344,13 +380,13 @@ class SettingsWindow(QWidget):
         self.keep_visible_checkbox.setFixedHeight(fixed_height)
         self.main_layout.addWidget(self.keep_visible_checkbox, alignment=Qt.AlignLeft)
 
-        # Чекбокс "Не затемнять экран при OCR"
-        self.no_dimming_checkbox = QCheckBox("Не затемнять экран при OCR" if lang == 'ru' else "No screen dimming during OCR")
-        self.no_dimming_checkbox.setChecked(self.parent.config.get("no_screen_dimming", False))
-        self.no_dimming_checkbox.toggled.connect(lambda state: self.auto_save_setting("no_screen_dimming", state))
-        self.no_dimming_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
-        self.no_dimming_checkbox.setFixedHeight(fixed_height)
-        self.main_layout.addWidget(self.no_dimming_checkbox, alignment=Qt.AlignLeft)
+        # Последний чекбокс в фиксированном окне: заморозка экрана при OCR
+        self.freeze_screen_checkbox = QCheckBox(SETTINGS_TEXT[lang]["freeze_screen_on_ocr"])
+        self.freeze_screen_checkbox.setChecked(self.parent.config.get("freeze_screen_on_ocr", False))
+        self.freeze_screen_checkbox.toggled.connect(lambda state: self.auto_save_setting("freeze_screen_on_ocr", state))
+        self.freeze_screen_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.freeze_screen_checkbox.setFixedHeight(fixed_height)
+        self.main_layout.addWidget(self.freeze_screen_checkbox, alignment=Qt.AlignLeft)
 
         # --- конец блока чекбоксов ---
         self.main_layout.addSpacing(4)
@@ -428,7 +464,7 @@ class SettingsWindow(QWidget):
             QPushButton:hover { background-color: #8B70B2; }
         """)
         update_btn.setFixedHeight(38)
-        update_btn.clicked.connect(lambda: webbrowser.open('https://github.com/jabrailkhalil/clickntranslate/releases/'))
+        update_btn.clicked.connect(self.check_for_updates)
         btn_group_layout.addWidget(update_btn)
         
         self.main_layout.addLayout(btn_group_layout)
@@ -501,7 +537,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(10)
         
         # --- Версия программы ---
-        version_label = QLabel("V1.3.0")
+        version_label = QLabel(f"V{APP_VERSION}")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 2px; margin-top: 2px;")
         self.main_layout.addWidget(version_label)
@@ -801,6 +837,294 @@ class SettingsWindow(QWidget):
         self.parent.set_autostart(self.autostart_checkbox.isChecked())
         self.init_ui()
         self.parent.show_main_screen()
+
+    def check_for_updates(self):
+        lang = self.parent.current_interface_language
+        is_ru = lang == "ru"
+
+        if not getattr(sys, "frozen", False):
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Обновление" if is_ru else "Update")
+            msg.setText(
+                "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?"
+                if is_ru else
+                "Auto-update is available only in the packaged app.\nOpen releases page?"
+            )
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            yes_btn = msg.addButton("Открыть" if is_ru else "Open", QMessageBox.YesRole)
+            msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+            msg.exec_()
+            if msg.clickedButton() == yes_btn:
+                webbrowser.open(GITHUB_RELEASES_PAGE)
+            return
+
+        try:
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"ClicknTranslate/{APP_VERSION}",
+            }
+            response = requests.get(GITHUB_LATEST_RELEASE_API, headers=headers, timeout=20)
+            response.raise_for_status()
+            release = response.json()
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Ошибка обновления" if is_ru else "Update error",
+                ("Не удалось проверить обновления:\n" if is_ru else "Failed to check for updates:\n") + str(e)
+            )
+            return
+
+        latest_tag = release.get("tag_name") or release.get("name") or ""
+        latest_version = _normalize_version(latest_tag) or APP_VERSION
+
+        if not _is_newer_version(latest_version, APP_VERSION):
+            QMessageBox.information(
+                self,
+                "Обновление" if is_ru else "Update",
+                f"У вас уже актуальная версия: V{APP_VERSION}" if is_ru else f"You already have the latest version: V{APP_VERSION}"
+            )
+            return
+
+        assets = release.get("assets") or []
+        selected_asset = self._pick_update_asset(assets)
+        if not selected_asset:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Обновление" if is_ru else "Update")
+            msg.setText(
+                "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?"
+                if is_ru else
+                "No compatible auto-update asset found in the release. Open releases page?"
+            )
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            yes_btn = msg.addButton("Открыть" if is_ru else "Open", QMessageBox.YesRole)
+            msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+            msg.exec_()
+            if msg.clickedButton() == yes_btn:
+                webbrowser.open(GITHUB_RELEASES_PAGE)
+            return
+
+        asset_name = selected_asset.get("name") or "update.zip"
+        asset_url = selected_asset.get("browser_download_url")
+        if not asset_url:
+            QMessageBox.warning(
+                self,
+                "Ошибка обновления" if is_ru else "Update error",
+                "Некорректный URL файла обновления." if is_ru else "Invalid update asset URL."
+            )
+            return
+
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Доступно обновление" if is_ru else "Update available")
+        confirm.setIcon(QMessageBox.Question)
+        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setText(
+            f"Найдена новая версия: V{latest_version}\nТекущая версия: V{APP_VERSION}\n\nУстановить сейчас?"
+            if is_ru else
+            f"New version found: V{latest_version}\nCurrent version: V{APP_VERSION}\n\nInstall now?"
+        )
+        yes_btn = confirm.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
+        confirm.addButton("Позже" if is_ru else "Later", QMessageBox.NoRole)
+        confirm.exec_()
+        if confirm.clickedButton() != yes_btn:
+            return
+
+        self._update_progress = QProgressDialog(
+            "Загрузка обновления..." if is_ru else "Downloading update...",
+            None, 0, 0, self
+        )
+        self._update_progress.setCancelButton(None)
+        self._update_progress.setWindowModality(Qt.WindowModal)
+        self._update_progress.setAutoClose(False)
+        self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self._update_progress.show()
+
+        worker = threading.Thread(
+            target=self._download_and_prepare_update,
+            args=(asset_url, asset_name, latest_version),
+            daemon=True
+        )
+        worker.start()
+
+    def _pick_update_asset(self, assets):
+        zip_assets = []
+        for asset in assets:
+            name = (asset.get("name") or "").lower()
+            if name.endswith(".zip") and asset.get("browser_download_url"):
+                zip_assets.append(asset)
+        if not zip_assets:
+            return None
+
+        def _score(a):
+            name = (a.get("name") or "").lower()
+            score = 0
+            if "clickntranslate" in name:
+                score += 50
+            if "win" in name or "windows" in name:
+                score += 20
+            if "portable" in name:
+                score += 10
+            return score
+
+        return sorted(zip_assets, key=_score, reverse=True)[0]
+
+    def _download_and_prepare_update(self, asset_url, asset_name, latest_version):
+        temp_dir = None
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="clickntranslate_update_")
+            safe_name = asset_name or f"ClicknTranslate-v{latest_version}.zip"
+            zip_path = os.path.join(temp_dir, safe_name)
+
+            with requests.get(asset_url, stream=True, timeout=60) as r:
+                r.raise_for_status()
+                with open(zip_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+
+            ok, err = self._launch_zip_updater(zip_path)
+            if not ok:
+                raise RuntimeError(err or "Updater launch failed")
+
+            QMetaObject.invokeMethod(
+                self,
+                "_on_update_ready_to_restart",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, latest_version)
+            )
+        except Exception as e:
+            try:
+                if temp_dir and os.path.isdir(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+            QMetaObject.invokeMethod(
+                self,
+                "_on_update_failed",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, str(e))
+            )
+
+    def _launch_zip_updater(self, zip_path):
+        if not getattr(sys, "frozen", False):
+            return False, "Auto-update is available only in packaged app"
+
+        app_dir = os.path.dirname(os.path.abspath(sys.executable))
+        exe_name = os.path.basename(sys.executable)
+        current_pid = os.getpid()
+
+        fd, script_path = tempfile.mkstemp(prefix="clickntranslate_updater_", suffix=".ps1")
+        os.close(fd)
+
+        script = r"""param(
+    [string]$AppDir,
+    [string]$ZipPath,
+    [int]$Pid,
+    [string]$ExeName
+)
+$ErrorActionPreference = 'Stop'
+
+$deadline = (Get-Date).AddSeconds(120)
+while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
+    if ((Get-Date) -gt $deadline) { break }
+    Start-Sleep -Milliseconds 500
+}
+
+$extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
+Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
+
+$exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($exeMatch) {
+    $payloadRoot = $exeMatch.DirectoryName
+} else {
+    $dirs = Get-ChildItem -LiteralPath $extractDir -Directory -Force
+    if ($dirs.Count -eq 1) {
+        $payloadRoot = $dirs[0].FullName
+    } else {
+        $payloadRoot = $extractDir
+    }
+}
+
+Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
+    if ($_.Name -ieq "data") { return }
+    $dst = Join-Path $AppDir $_.Name
+    Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force
+}
+
+$targetExe = Join-Path $AppDir $ExeName
+if (Test-Path -LiteralPath $targetExe) {
+    Start-Process -FilePath $targetExe
+}
+
+Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+"""
+        try:
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(script)
+        except Exception as e:
+            return False, f"Failed to create updater script: {e}"
+
+        try:
+            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            subprocess.Popen(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", script_path,
+                    "-AppDir", app_dir,
+                    "-ZipPath", zip_path,
+                    "-Pid", str(current_pid),
+                    "-ExeName", exe_name,
+                ],
+                creationflags=create_no_window
+            )
+            return True, None
+        except Exception as e:
+            return False, f"Failed to launch updater: {e}"
+
+    @pyqtSlot(str)
+    def _on_update_failed(self, error_text):
+        if hasattr(self, "_update_progress") and self._update_progress is not None:
+            try:
+                self._update_progress.close()
+            except Exception:
+                pass
+            self._update_progress = None
+
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.warning(
+            self,
+            "Ошибка обновления" if is_ru else "Update error",
+            ("Не удалось установить обновление:\n" if is_ru else "Failed to install update:\n") + str(error_text)
+        )
+
+    @pyqtSlot(str)
+    def _on_update_ready_to_restart(self, latest_version):
+        if hasattr(self, "_update_progress") and self._update_progress is not None:
+            try:
+                self._update_progress.close()
+            except Exception:
+                pass
+            self._update_progress = None
+
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            "Обновление" if is_ru else "Update",
+            (
+                f"Обновление до V{latest_version} загружено.\nПриложение перезапустится автоматически."
+                if is_ru else
+                f"Update V{latest_version} is downloaded.\nThe app will restart automatically."
+            )
+        )
+        try:
+            self.parent.exit_app()
+        except Exception:
+            QApplication.instance().quit()
 
     def apply_theme(self):
         THEMES_LOCAL = {
@@ -1495,6 +1819,7 @@ The program will continue using Windows OCR for now.""" if self.parent.current_i
             "show_update_info": False,
             "ocr_engine": "Windows",
             "copy_translated_text": False,
+            "freeze_screen_on_ocr": False,
             "copy_history": False,
             "translator_engine": "Google",
             "keep_visible_on_ocr": False,
