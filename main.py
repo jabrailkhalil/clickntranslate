@@ -15,6 +15,19 @@ import subprocess
 import ctypes
 import threading
 import time
+
+
+def _show_dependency_error():
+    message = (
+        "Click'n'Translate не запускается: не найдена библиотека PyQt5.\n\n"
+        "Запустите в консоли:\n"
+        "  python -m pip install -r requirements.txt\n\n"
+        "Или только Qt:\n"
+        "  python -m pip install PyQt5"
+    )
+    print(message)
+    raise SystemExit(1)
+
 try:
     import pyperclip
 except Exception:
@@ -56,11 +69,14 @@ import datetime
 import urllib.parse
 import webbrowser
 
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                             QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog)
-from PyQt5.QtCore import Qt, QTimer, QSize
-from PyQt5.QtGui import QIcon
+try:
+    from PyQt5 import QtCore
+    from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog)
+    from PyQt5.QtCore import Qt, QTimer, QSize
+    from PyQt5.QtGui import QIcon
+except Exception:
+    _show_dependency_error()
 from settings_window import SettingsWindow
 from app_version import APP_VERSION
 import translater  # Импорт модуля перевода
