@@ -110,10 +110,12 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 self.fallback_called = False
                 self.download_calls = 0
 
-            def _download_file(self, _url, destination_path, timeout=120):
+            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None):
                 self.download_calls += 1
                 with zipfile.ZipFile(destination_path, "w") as zf:
                     zf.writestr("ClicknTranslate.exe", b"exe")
+                if progress_callback:
+                    progress_callback(1, 1)
 
             def _launch_zip_updater(self, _zip_path):
                 return True, None
@@ -143,9 +145,11 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
     def test_download_prepare_failure_reports_error(self):
         class DummyUpdater:
-            def _download_file(self, _url, destination_path, timeout=120):
+            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None):
                 with zipfile.ZipFile(destination_path, "w") as zf:
                     zf.writestr("ClicknTranslate.exe", b"exe")
+                if progress_callback:
+                    progress_callback(1, 1)
 
             def _launch_zip_updater(self, _zip_path):
                 return False, "Updater launch failed"

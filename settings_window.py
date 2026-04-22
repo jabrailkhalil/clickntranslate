@@ -880,21 +880,88 @@ class SettingsWindow(QWidget):
         if text is None:
             text = "Обновление" if self.parent.current_interface_language == "ru" else "Update"
         self.update_btn.setEnabled(enabled)
-        self.update_btn.setText(text if enabled else text)
+        self.update_btn.setText(text)
 
-    def _show_update_progress(self, text):
+    def _show_update_progress(self, text, determinate=False, value=0):
+        is_ru = self.parent.current_interface_language == "ru"
+        title = "Обновление" if is_ru else "Update"
         if not hasattr(self, "_update_progress") or self._update_progress is None:
-            self._update_progress = QProgressDialog(text, None, 0, 0, self)
+            self._update_progress = QProgressDialog("", None, 0, 100, self)
+            self._update_progress.setWindowTitle(title)
             self._update_progress.setCancelButton(None)
             self._update_progress.setWindowModality(Qt.WindowModal)
             self._update_progress.setAutoClose(False)
+            self._update_progress.setAutoReset(False)
+            self._update_progress.setMinimumDuration(0)
+            self._update_progress.setMinimumWidth(430)
             self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        else:
             try:
-                self._update_progress.setLabelText(text)
+                flags = self._update_progress.windowFlags()
+                flags |= Qt.CustomizeWindowHint | Qt.WindowTitleHint
+                flags &= ~Qt.WindowContextHelpButtonHint
+                flags &= ~Qt.WindowCloseButtonHint
+                self._update_progress.setWindowFlags(flags)
             except Exception:
                 pass
+            self._update_progress.setStyleSheet("""
+                QProgressDialog {
+                    background-color: #111111;
+                    color: #ffffff;
+                    border: 1px solid #6f5aa8;
+                    border-radius: 8px;
+                }
+                QProgressBar {
+                    border: 1px solid #555555;
+                    border-radius: 6px;
+                    text-align: center;
+                    background: #1d1d1d;
+                    color: #ffffff;
+                    min-height: 20px;
+                }
+                QProgressBar::chunk {
+                    background-color: #7a61b3;
+                    border-radius: 5px;
+                }
+            """)
+        else:
+            try:
+                self._update_progress.setWindowTitle(title)
+            except Exception:
+                pass
+        try:
+            self._update_progress.setLabelText(text)
+        except Exception:
+            pass
+        if determinate:
+            self._update_progress.setRange(0, 100)
+            self._update_progress.setValue(max(0, min(100, int(value))))
+        else:
+            self._update_progress.setRange(0, 0)
         self._update_progress.show()
+
+    @QtCore.pyqtSlot(str)
+    def _on_update_progress_text(self, text):
+        self._show_update_progress(text, determinate=False)
+
+    @QtCore.pyqtSlot(str, int, int)
+    def _on_update_download_progress(self, stage_text, downloaded_bytes, total_bytes):
+        is_ru = self.parent.current_interface_language == "ru"
+        downloaded_bytes = max(0, int(downloaded_bytes))
+        total_bytes = max(0, int(total_bytes))
+        downloaded_mb = downloaded_bytes / (1024 * 1024)
+
+        if total_bytes > 0:
+            percent = int((downloaded_bytes * 100) / total_bytes)
+            total_mb = total_bytes / (1024 * 1024)
+            label = f"{stage_text}\n{downloaded_mb:.1f}/{total_mb:.1f} MB ({percent}%)"
+            self._show_update_progress(label, determinate=True, value=percent)
+            prefix = "Скачивание" if is_ru else "Downloading"
+            self._set_update_controls_enabled(False, f"{prefix} {percent}%")
+            return
+
+        label = f"{stage_text}\n{downloaded_mb:.1f} MB"
+        self._show_update_progress(label, determinate=False)
+        self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
 
     def _hide_update_progress(self):
         if hasattr(self, "_update_progress") and self._update_progress is not None:
@@ -1052,8 +1119,9 @@ class SettingsWindow(QWidget):
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
         is_ru = self.parent.current_interface_language == "ru"
+        self._update_in_progress = True
         self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
-        self._show_update_progress("Загрузка обновления..." if is_ru else "Downloading update...")
+        self._show_update_progress("Подготовка загрузки..." if is_ru else "Preparing download...", determinate=False)
         worker = threading.Thread(
             target=self._download_and_prepare_update,
             args=(asset_url, asset_name, latest_version, checksum_url),
@@ -1149,27 +1217,80 @@ class SettingsWindow(QWidget):
             return ""
         return digest.hexdigest().lower()
 
-    def _download_file(self, url, destination_path, timeout=120):
+    def _download_file(self, url, destination_path, timeout=120, progress_callback=None):
         with requests.get(url, stream=True, timeout=timeout) as r:
             r.raise_for_status()
+            try:
+                total_bytes = int((r.headers.get("Content-Length") or "0").strip() or "0")
+            except Exception:
+                total_bytes = 0
+            downloaded_bytes = 0
+            if progress_callback:
+                try:
+                    progress_callback(downloaded_bytes, total_bytes)
+                except Exception:
+                    pass
             with open(destination_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):
                     if chunk:
                         f.write(chunk)
+                        downloaded_bytes += len(chunk)
+                        if progress_callback:
+                            try:
+                                progress_callback(downloaded_bytes, total_bytes)
+                            except Exception:
+                                pass
 
     def _download_and_prepare_update(self, asset_url, asset_name, latest_version, checksum_url=""):
         temp_dir = None
         try:
+            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            stage_download = "Загрузка файла обновления..." if is_ru else "Downloading update package..."
+            stage_checksum = "Загрузка контрольной суммы..." if is_ru else "Downloading checksum..."
+            stage_verify = "Проверка контрольной суммы..." if is_ru else "Verifying checksum..."
+            stage_prepare = "Подготовка обновления..." if is_ru else "Preparing update..."
+
+            def _emit_stage_text(stage_text):
+                QMetaObject.invokeMethod(
+                    self,
+                    "_on_update_progress_text",
+                    Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, stage_text)
+                )
+
+            def _emit_download_progress(stage_text, downloaded, total):
+                QMetaObject.invokeMethod(
+                    self,
+                    "_on_update_download_progress",
+                    Qt.QueuedConnection,
+                    QtCore.Q_ARG(str, stage_text),
+                    QtCore.Q_ARG(int, int(downloaded)),
+                    QtCore.Q_ARG(int, int(total))
+                )
+
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_update_")
             safe_name = asset_name or f"ClicknTranslate-v{latest_version}.zip"
             zip_path = os.path.join(temp_dir, safe_name)
             if not zip_path.lower().endswith(".zip"):
                 zip_path = zip_path + ".zip"
 
-            self._download_file(asset_url, zip_path, timeout=120)
+            _emit_stage_text(stage_download)
+            self._download_file(
+                asset_url,
+                zip_path,
+                timeout=120,
+                progress_callback=lambda done, total: _emit_download_progress(stage_download, done, total)
+            )
             if checksum_url:
                 checksum_path = os.path.join(temp_dir, f"{safe_name}.sha256")
-                self._download_file(checksum_url, checksum_path, timeout=120)
+                _emit_stage_text(stage_checksum)
+                self._download_file(
+                    checksum_url,
+                    checksum_path,
+                    timeout=120,
+                    progress_callback=lambda done, total: _emit_download_progress(stage_checksum, done, total)
+                )
+                _emit_stage_text(stage_verify)
                 expected = self._read_checksum(checksum_path, safe_name)
                 if expected:
                     actual = self._compute_sha256(zip_path)
@@ -1180,6 +1301,7 @@ class SettingsWindow(QWidget):
             if not zipfile.is_zipfile(zip_path):
                 raise RuntimeError("Скачанный файл не является zip архивом.")
 
+            _emit_stage_text(stage_prepare)
             ok, err = self._launch_zip_updater(zip_path)
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
@@ -1210,11 +1332,11 @@ class SettingsWindow(QWidget):
             except Exception:
                 pass
             QMetaObject.invokeMethod(
-            self,
-            "_on_update_failed",
-            Qt.QueuedConnection,
-            QtCore.Q_ARG(str, str(e))
-        )
+                self,
+                "_on_update_failed",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, str(e))
+            )
 
     def _schedule_update_restart_fallback(self, delay_seconds=4):
         try:
@@ -1344,11 +1466,14 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     @QtCore.pyqtSlot()
     def _restore_update_button_after_download(self):
+        self._update_in_progress = False
         self._set_update_controls_enabled(True)
         self._hide_update_progress()
 
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
+        self._update_in_progress = False
+        self._set_update_controls_enabled(True)
         if hasattr(self, "_update_progress") and self._update_progress is not None:
             try:
                 self._update_progress.close()
@@ -1365,6 +1490,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
     @pyqtSlot(str)
     def _on_update_ready_to_restart(self, latest_version):
+        self._update_in_progress = False
         if hasattr(self, "_update_progress") and self._update_progress is not None:
             try:
                 self._update_progress.close()
