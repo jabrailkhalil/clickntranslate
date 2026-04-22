@@ -1184,6 +1184,10 @@ class SettingsWindow(QWidget):
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
 
+            # Дополнительная страховка: если скрипт автозамены не перезапустил приложение
+            # (например, из-за ошибки запуска внешнего процесса), через паузу запускаем запасной запуск.
+            self._schedule_update_restart_fallback()
+
             QMetaObject.invokeMethod(
                 self,
                 "_on_update_ready_to_restart",
@@ -1206,11 +1210,28 @@ class SettingsWindow(QWidget):
             except Exception:
                 pass
             QMetaObject.invokeMethod(
-                self,
-                "_on_update_failed",
-                Qt.QueuedConnection,
-                QtCore.Q_ARG(str, str(e))
+            self,
+            "_on_update_failed",
+            Qt.QueuedConnection,
+            QtCore.Q_ARG(str, str(e))
+        )
+
+    def _schedule_update_restart_fallback(self, delay_seconds=4):
+        try:
+            exe_path = os.path.abspath(sys.executable)
+            if not exe_path or not os.path.isfile(exe_path):
+                return
+
+            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            # Через cmd запускаем новую копию немного позже, это позволит updater-скрипту выполнить замену файлов.
+            fallback_delay = max(1, int(delay_seconds))
+            fallback_command = f'ping -n {fallback_delay} 127.0.0.1 >nul && start "" "{exe_path}"'
+            subprocess.Popen(
+                ["cmd", "/c", fallback_command],
+                creationflags=create_no_window
             )
+        except Exception as e:
+            print(f"Could not schedule update restart fallback: {e}")
 
     def _launch_zip_updater(self, zip_path):
         if not getattr(sys, "frozen", False):
@@ -1229,22 +1250,33 @@ class SettingsWindow(QWidget):
     [int]$Pid,
     [string]$ExeName
 )
+$logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
 $ErrorActionPreference = 'Stop'
+$logHeader = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')] ClicknTranslate updater start: AppDir=$AppDir, ZipPath=$ZipPath, Exe=$ExeName, Pid=$Pid"
+Add-Content -Path $logPath -Value $logHeader -ErrorAction SilentlyContinue
+
+function Write-UpdateLog {
+    param([string]$Message)
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+    Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
+}
 
 $deadline = (Get-Date).AddSeconds(120)
-while ($true) {
-    if (-not (Get-Process -Id $Pid -ErrorAction SilentlyContinue)) {
+while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
+    if ((Get-Date) -gt $deadline) {
+        Write-UpdateLog "Application did not exit in time, force terminating process $Pid"
+        try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch {}
         break
     }
-    if ((Get-Date) -gt $deadline) {
-        throw "Original process did not exit in time."
-    }
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 300
 }
+
+Write-UpdateLog "Target app process is not running; start applying update"
 
 $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
 New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
 Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
+Write-UpdateLog "Archive unpacked to $extractDir"
 
 $exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($exeMatch) {
@@ -1259,17 +1291,27 @@ if ($exeMatch) {
 }
 
 Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
-    if ($_.Name -ieq "data") { return }
+    if ($_.Name -ieq "data") { continue }
     $dst = Join-Path $AppDir $_.Name
     Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force
 }
 
 $targetExe = Join-Path $AppDir $ExeName
 if (Test-Path -LiteralPath $targetExe) {
-    Start-Process -FilePath $targetExe
+    Write-UpdateLog "Starting updated executable: $targetExe"
+    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
 } else {
-    throw "Target executable not found: $ExeName"
+    Write-UpdateLog "Target executable not found by direct path, searching recursively"
+    $fallback = Get-ChildItem -LiteralPath $AppDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($fallback) {
+        Write-UpdateLog "Starting fallback found executable: $($fallback.FullName)"
+        Start-Process -FilePath $fallback.FullName -WorkingDirectory $AppDir
+    } else {
+        throw "Target executable not found: $ExeName"
+    }
 }
+
+Write-UpdateLog "Updated executable started"
 
 Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
