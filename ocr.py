@@ -8,7 +8,30 @@ import shutil
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
-import pyperclip
+
+try:
+    import pyperclip
+except Exception:
+    class _PyperclipFallback:
+        @staticmethod
+        def copy(text):
+            try:
+                app = QApplication.instance()
+                if app is not None:
+                    app.clipboard().setText(str(text))
+            except Exception:
+                return
+
+        @staticmethod
+        def paste():
+            try:
+                app = QApplication.instance()
+                if app is not None:
+                    return app.clipboard().text()
+            except Exception:
+                return ""
+
+    pyperclip = _PyperclipFallback
 
 # Настройка логирования в файл для диагностики
 def get_log_path():

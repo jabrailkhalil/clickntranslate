@@ -15,7 +15,41 @@ import subprocess
 import ctypes
 import threading
 import time
-import pyperclip
+try:
+    import pyperclip
+except Exception:
+    class _PyperclipFallback:
+        @staticmethod
+        def _clipboard():
+            try:
+                app = QApplication.instance()
+                if app is None:
+                    return None
+                return app.clipboard()
+            except Exception:
+                return None
+
+        @staticmethod
+        def copy(text):
+            clipboard = _PyperclipFallback._clipboard()
+            if clipboard is None:
+                return
+            try:
+                clipboard.setText(str(text))
+            except Exception:
+                pass
+
+        @staticmethod
+        def paste():
+            clipboard = _PyperclipFallback._clipboard()
+            if clipboard is None:
+                return ""
+            try:
+                return clipboard.text()
+            except Exception:
+                return ""
+
+    pyperclip = _PyperclipFallback
 from ctypes import wintypes
 import psutil
 import datetime

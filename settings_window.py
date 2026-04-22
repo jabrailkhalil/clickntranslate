@@ -1,7 +1,7 @@
 import os
 import json
 import webbrowser
-import requests, zipfile, tempfile, shutil, threading
+import requests, zipfile, tempfile, shutil, threading, hashlib
 import sys
 import subprocess
 import platform
@@ -197,6 +197,7 @@ class SettingsWindow(QWidget):
         self.parent = parent
         self.hotkeys_mode = False
         self.previous_ocr_engine = None  # Для отката OCR движка при отмене загрузки
+        self._update_in_progress = False
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.init_ui()
@@ -444,8 +445,8 @@ class SettingsWindow(QWidget):
         btn_group_layout.addWidget(reset_btn)
         
         # Правая кнопка - закругление справа (фиолетовая - обновление)
-        update_btn = QPushButton("Обновление" if lang == 'ru' else "Update")
-        update_btn.setStyleSheet("""
+        self.update_btn = QPushButton("Обновление" if lang == 'ru' else "Update")
+        self.update_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
                 color: #fff; 
@@ -463,9 +464,9 @@ class SettingsWindow(QWidget):
             }
             QPushButton:hover { background-color: #8B70B2; }
         """)
-        update_btn.setFixedHeight(38)
-        update_btn.clicked.connect(self.check_for_updates)
-        btn_group_layout.addWidget(update_btn)
+        self.update_btn.setFixedHeight(38)
+        self.update_btn.clicked.connect(self.check_for_updates)
+        btn_group_layout.addWidget(self.update_btn)
         
         self.main_layout.addLayout(btn_group_layout)
         # Убрали spacing 10, чтобы кнопки слиплись
@@ -859,6 +860,67 @@ class SettingsWindow(QWidget):
                 webbrowser.open(GITHUB_RELEASES_PAGE)
             return
 
+        if self._update_in_progress:
+            return
+
+        self._start_update_check()
+
+    def _start_update_check(self):
+        is_ru = self.parent.current_interface_language == "ru"
+        self._set_update_controls_enabled(False, "Проверка..." if is_ru else "Checking...")
+        self._show_update_progress("Проверка обновлений..." if is_ru else "Checking updates...")
+        self._update_in_progress = True
+
+        worker = threading.Thread(target=self._check_latest_release_worker, daemon=True)
+        worker.start()
+
+    def _set_update_controls_enabled(self, enabled, text=None):
+        if not hasattr(self, "update_btn"):
+            return
+        if text is None:
+            text = "Обновление" if self.parent.current_interface_language == "ru" else "Update"
+        self.update_btn.setEnabled(enabled)
+        self.update_btn.setText(text if enabled else text)
+
+    def _show_update_progress(self, text):
+        if not hasattr(self, "_update_progress") or self._update_progress is None:
+            self._update_progress = QProgressDialog(text, None, 0, 0, self)
+            self._update_progress.setCancelButton(None)
+            self._update_progress.setWindowModality(Qt.WindowModal)
+            self._update_progress.setAutoClose(False)
+            self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        else:
+            try:
+                self._update_progress.setLabelText(text)
+            except Exception:
+                pass
+        self._update_progress.show()
+
+    def _hide_update_progress(self):
+        if hasattr(self, "_update_progress") and self._update_progress is not None:
+            try:
+                self._update_progress.close()
+            except Exception:
+                pass
+            self._update_progress = None
+
+    def _post_update_check_result(self, payload):
+        try:
+            payload_text = json.dumps(payload, ensure_ascii=False)
+        except Exception as e:
+            payload_text = json.dumps({
+                "status": "error",
+                "error": f"Invalid update payload: {e}"
+            })
+        QMetaObject.invokeMethod(
+            self,
+            "_on_update_check_result",
+            Qt.QueuedConnection,
+            QtCore.Q_ARG(str, payload_text)
+        )
+
+    def _check_latest_release_worker(self):
+        is_ru = self.parent.current_interface_language == "ru"
         try:
             headers = {
                 "Accept": "application/vnd.github+json",
@@ -868,17 +930,73 @@ class SettingsWindow(QWidget):
             response.raise_for_status()
             release = response.json()
         except Exception as e:
-            QMessageBox.warning(
-                self,
-                "Ошибка обновления" if is_ru else "Update error",
-                ("Не удалось проверить обновления:\n" if is_ru else "Failed to check for updates:\n") + str(e)
-            )
+            self._post_update_check_result({
+                "status": "error",
+                "error": ("Не удалось проверить обновления:\n" if is_ru else "Failed to check for updates:\n") + str(e),
+            })
             return
 
         latest_tag = release.get("tag_name") or release.get("name") or ""
         latest_version = _normalize_version(latest_tag) or APP_VERSION
 
         if not _is_newer_version(latest_version, APP_VERSION):
+            self._post_update_check_result({
+                "status": "up_to_date",
+                "latest_version": latest_version,
+            })
+            return
+
+        assets = release.get("assets") or []
+        selected_asset = self._pick_update_asset(assets)
+        if not selected_asset:
+            self._post_update_check_result({
+                "status": "no_asset",
+                "latest_version": latest_version,
+            })
+            return
+
+        asset_name = selected_asset.get("name") or f"ClicknTranslate-v{latest_version}.zip"
+        asset_url = selected_asset.get("browser_download_url")
+        if not asset_url:
+            self._post_update_check_result({
+                "status": "invalid_asset",
+                "latest_version": latest_version,
+            })
+            return
+
+        checksum_url = self._pick_checksum_url(assets, asset_name)
+        self._post_update_check_result({
+            "status": "ready",
+            "latest_version": latest_version,
+            "asset_name": asset_name,
+            "asset_url": asset_url,
+            "checksum_url": checksum_url,
+        })
+
+    @QtCore.pyqtSlot(str)
+    def _on_update_check_result(self, payload_text):
+        is_ru = self.parent.current_interface_language == "ru"
+        self._update_in_progress = False
+        self._set_update_controls_enabled(True)
+        self._hide_update_progress()
+
+        try:
+            payload = json.loads(payload_text)
+        except Exception:
+            payload = {"status": "error", "error": "Не удалось обработать ответ от сервера обновлений." if is_ru else "Failed to parse update response."}
+
+        status = payload.get("status")
+        latest_version = payload.get("latest_version") or APP_VERSION
+
+        if status == "error":
+            QMessageBox.warning(
+                self,
+                "Ошибка обновления" if is_ru else "Update error",
+                payload.get("error", "Unknown update error.")
+            )
+            return
+
+        if status == "up_to_date":
             QMessageBox.information(
                 self,
                 "Обновление" if is_ru else "Update",
@@ -886,9 +1004,7 @@ class SettingsWindow(QWidget):
             )
             return
 
-        assets = release.get("assets") or []
-        selected_asset = self._pick_update_asset(assets)
-        if not selected_asset:
+        if status in ("no_asset", "invalid_asset"):
             msg = QMessageBox(self)
             msg.setWindowTitle("Обновление" if is_ru else "Update")
             msg.setText(
@@ -905,44 +1021,42 @@ class SettingsWindow(QWidget):
                 webbrowser.open(GITHUB_RELEASES_PAGE)
             return
 
-        asset_name = selected_asset.get("name") or "update.zip"
-        asset_url = selected_asset.get("browser_download_url")
-        if not asset_url:
-            QMessageBox.warning(
-                self,
-                "Ошибка обновления" if is_ru else "Update error",
-                "Некорректный URL файла обновления." if is_ru else "Invalid update asset URL."
+        if status == "ready":
+            asset_name = payload.get("asset_name") or f"ClicknTranslate-v{latest_version}.zip"
+            asset_url = payload.get("asset_url")
+            checksum_url = payload.get("checksum_url")
+            if not asset_url:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка обновления" if is_ru else "Update error",
+                    "Некорректный URL файла обновления." if is_ru else "Invalid update asset URL."
+                )
+                return
+
+            confirm = QMessageBox(self)
+            confirm.setWindowTitle("Доступно обновление" if is_ru else "Update available")
+            confirm.setIcon(QMessageBox.Question)
+            confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            confirm.setText(
+                f"Найдена новая версия: V{latest_version}\nТекущая версия: V{APP_VERSION}\n\nУстановить сейчас?"
+                if is_ru else
+                f"New version found: V{latest_version}\nCurrent version: V{APP_VERSION}\n\nInstall now?"
             )
-            return
+            yes_btn = confirm.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
+            confirm.addButton("Позже" if is_ru else "Later", QMessageBox.NoRole)
+            confirm.exec_()
+            if confirm.clickedButton() != yes_btn:
+                return
 
-        confirm = QMessageBox(self)
-        confirm.setWindowTitle("Доступно обновление" if is_ru else "Update available")
-        confirm.setIcon(QMessageBox.Question)
-        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        confirm.setText(
-            f"Найдена новая версия: V{latest_version}\nТекущая версия: V{APP_VERSION}\n\nУстановить сейчас?"
-            if is_ru else
-            f"New version found: V{latest_version}\nCurrent version: V{APP_VERSION}\n\nInstall now?"
-        )
-        yes_btn = confirm.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        confirm.addButton("Позже" if is_ru else "Later", QMessageBox.NoRole)
-        confirm.exec_()
-        if confirm.clickedButton() != yes_btn:
-            return
+            self._start_update_download(asset_url, asset_name, latest_version, checksum_url)
 
-        self._update_progress = QProgressDialog(
-            "Загрузка обновления..." if is_ru else "Downloading update...",
-            None, 0, 0, self
-        )
-        self._update_progress.setCancelButton(None)
-        self._update_progress.setWindowModality(Qt.WindowModal)
-        self._update_progress.setAutoClose(False)
-        self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self._update_progress.show()
-
+    def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
+        is_ru = self.parent.current_interface_language == "ru"
+        self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
+        self._show_update_progress("Загрузка обновления..." if is_ru else "Downloading update...")
         worker = threading.Thread(
             target=self._download_and_prepare_update,
-            args=(asset_url, asset_name, latest_version),
+            args=(asset_url, asset_name, latest_version, checksum_url),
             daemon=True
         )
         worker.start()
@@ -969,19 +1083,102 @@ class SettingsWindow(QWidget):
 
         return sorted(zip_assets, key=_score, reverse=True)[0]
 
-    def _download_and_prepare_update(self, asset_url, asset_name, latest_version):
+    def _pick_checksum_url(self, assets, asset_name):
+        if not asset_name:
+            return ""
+        base_name = re.sub(r"\.zip$", "", asset_name.lower())
+        direct_name = f"{asset_name.lower()}"
+        direct_txt_name = f"{direct_name}.txt"
+        candidates = set()
+        candidates.update({
+            f"{base_name}.sha256",
+            f"{base_name}.sha256.txt",
+            f"{asset_name.lower()}.sha256",
+            f"{asset_name.lower()}.sha256.txt",
+            f"{base_name}.sha256sum",
+            f"{base_name}.sha256sum.txt",
+            direct_txt_name,
+        })
+
+        for asset in assets:
+            name = (asset.get("name") or "").lower()
+            if "sha256" not in name:
+                continue
+            if name == direct_name + ".sha256" or name == direct_name + ".sha256.txt" or name == direct_txt_name:
+                return asset.get("browser_download_url", "")
+            if ("." + base_name + ".") in name:
+                return asset.get("browser_download_url", "")
+        for asset in assets:
+            name = (asset.get("name") or "").lower()
+            if name in candidates:
+                return asset.get("browser_download_url", "")
+        return ""
+
+    def _read_checksum(self, checksum_path, archive_name):
+        try:
+            with open(checksum_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            return ""
+        archive_name = archive_name.lower()
+        for line in content.splitlines():
+            parts = re.findall(r"[0-9a-fA-F]{64}", line)
+            if not parts:
+                continue
+            low_line = line.lower()
+            if archive_name in low_line:
+                return parts[0].lower()
+        for line in content.splitlines():
+            tokens = line.strip().split()
+            if len(tokens) >= 2 and re.fullmatch(r"[0-9a-fA-F]{64}", tokens[0]):
+                if tokens[1].strip("*") == archive_name:
+                    return tokens[0].lower()
+        for line in content.splitlines():
+            token = re.search(r"[0-9a-fA-F]{64}", line)
+            if token:
+                return token.group(0).lower()
+        return ""
+
+    def _compute_sha256(self, filepath):
+        digest = hashlib.sha256()
+        try:
+            with open(filepath, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except Exception:
+            return ""
+        return digest.hexdigest().lower()
+
+    def _download_file(self, url, destination_path, timeout=120):
+        with requests.get(url, stream=True, timeout=timeout) as r:
+            r.raise_for_status()
+            with open(destination_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        f.write(chunk)
+
+    def _download_and_prepare_update(self, asset_url, asset_name, latest_version, checksum_url=""):
         temp_dir = None
         try:
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_update_")
             safe_name = asset_name or f"ClicknTranslate-v{latest_version}.zip"
             zip_path = os.path.join(temp_dir, safe_name)
+            if not zip_path.lower().endswith(".zip"):
+                zip_path = zip_path + ".zip"
 
-            with requests.get(asset_url, stream=True, timeout=60) as r:
-                r.raise_for_status()
-                with open(zip_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        if chunk:
-                            f.write(chunk)
+            self._download_file(asset_url, zip_path, timeout=120)
+            if checksum_url:
+                checksum_path = os.path.join(temp_dir, f"{safe_name}.sha256")
+                self._download_file(checksum_url, checksum_path, timeout=120)
+                expected = self._read_checksum(checksum_path, safe_name)
+                if expected:
+                    actual = self._compute_sha256(zip_path)
+                    if not actual:
+                        raise RuntimeError("Не удалось вычислить SHA256 для загруженного архива.")
+                    if actual != expected:
+                        raise RuntimeError("Контрольная сумма обновления не совпала (checksum mismatch).")
+            if not zipfile.is_zipfile(zip_path):
+                raise RuntimeError("Скачанный файл не является zip архивом.")
 
             ok, err = self._launch_zip_updater(zip_path)
             if not ok:
@@ -997,6 +1194,15 @@ class SettingsWindow(QWidget):
             try:
                 if temp_dir and os.path.isdir(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "update_btn"):
+                    QMetaObject.invokeMethod(
+                        self,
+                        "_restore_update_button_after_download",
+                        Qt.QueuedConnection
+                    )
             except Exception:
                 pass
             QMetaObject.invokeMethod(
@@ -1026,12 +1232,18 @@ class SettingsWindow(QWidget):
 $ErrorActionPreference = 'Stop'
 
 $deadline = (Get-Date).AddSeconds(120)
-while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
-    if ((Get-Date) -gt $deadline) { break }
+while ($true) {
+    if (-not (Get-Process -Id $Pid -ErrorAction SilentlyContinue)) {
+        break
+    }
+    if ((Get-Date) -gt $deadline) {
+        throw "Original process did not exit in time."
+    }
     Start-Sleep -Milliseconds 500
 }
 
 $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
+New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
 Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
 
 $exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -1055,6 +1267,8 @@ Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
 $targetExe = Join-Path $AppDir $ExeName
 if (Test-Path -LiteralPath $targetExe) {
     Start-Process -FilePath $targetExe
+} else {
+    throw "Target executable not found: $ExeName"
 }
 
 Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -1085,6 +1299,11 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
             return True, None
         except Exception as e:
             return False, f"Failed to launch updater: {e}"
+
+    @QtCore.pyqtSlot()
+    def _restore_update_button_after_download(self):
+        self._set_update_controls_enabled(True)
+        self._hide_update_progress()
 
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
@@ -1366,8 +1585,17 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
                             dir_param = f'/DIR="{tesseract_dir}"'
 
                             # Показываем диалог с инструкцией и автокопированием пути
-                            import pyperclip
-                            pyperclip.copy(tesseract_dir)
+                            try:
+                                import pyperclip
+                                pyperclip.copy(tesseract_dir)
+                            except Exception:
+                                try:
+                                    from PyQt5.QtWidgets import QApplication
+                                    app = QApplication.instance()
+                                    if app is not None:
+                                        app.clipboard().setText(tesseract_dir)
+                                except Exception:
+                                    pass
                             info_box = QMessageBox(self)
                             info_box.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
                             if self.parent.current_theme == "Темная":
