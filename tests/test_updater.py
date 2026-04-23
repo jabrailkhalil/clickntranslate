@@ -51,29 +51,30 @@ class TestUpdateAssetSelection(unittest.TestCase):
 
 
 class TestUpdaterCommands(unittest.TestCase):
-    def test_schedule_update_restart_fallback_builds_expected_cmd_script(self):
+    def test_schedule_update_restart_fallback_builds_expected_powershell_script(self):
         dummy = types.SimpleNamespace()
         generated_script = None
         with mock.patch.object(sw.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
             with mock.patch.object(sw.os.path, "isfile", return_value=True):
                 with mock.patch.object(sw.os, "getpid", return_value=999):
-                    with mock.patch.object(sw.tempfile, "mkstemp", return_value=tempfile.mkstemp(prefix="restart_fallback_", suffix=".cmd")):
+                    with mock.patch.object(sw.tempfile, "mkstemp", return_value=tempfile.mkstemp(prefix="restart_fallback_", suffix=".ps1")):
                         with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
                             sw.SettingsWindow._schedule_update_restart_fallback(dummy, delay_seconds=6, attempts=5, interval_seconds=2)
 
         popen_mock.assert_called_once()
         args, kwargs = popen_mock.call_args
-        self.assertEqual(args[0][0:2], ["cmd", "/c"])
-        generated_script = args[0][2]
-        self.assertTrue(generated_script.lower().endswith(".cmd"))
+        self.assertIn("-File", args[0])
+        self.assertIn("-TargetPid", args[0])
+        generated_script = args[0][args[0].index("-File") + 1]
+        self.assertTrue(generated_script.lower().endswith(".ps1"))
 
         with open(generated_script, "r", encoding="utf-8") as f:
             script_text = f.read()
 
-        self.assertIn('set "EXE_PATH=C:\\Apps\\ClicknTranslate.exe"', script_text)
-        self.assertIn('set "PID=999"', script_text)
-        self.assertIn('if exist "%EXE_PATH%" start "" "%EXE_PATH%"', script_text)
-        self.assertIn('tasklist /FI "PID eq %PID%"', script_text)
+        self.assertIn("[string]$ExePath", script_text)
+        self.assertIn("[int]$TargetPid", script_text)
+        self.assertIn("Get-Process -Id $TargetPid", script_text)
+        self.assertIn("Start-Process -FilePath $ExePath -WorkingDirectory $ExeDir", script_text)
         self.assertIn("creationflags", kwargs)
         try:
             os.remove(generated_script)
@@ -109,9 +110,11 @@ class TestUpdaterCommands(unittest.TestCase):
                 script_text = f.read()
 
             self.assertIn("clickntranslate_update.log", script_text)
-            self.assertIn("Stop-Process -Id $Pid -Force", script_text)
+            self.assertIn("[int]$TargetPid", script_text)
+            self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
             self.assertIn("if ($_.Name -ieq \"data\") { continue }", script_text)
+            self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:
             try:
                 os.remove(script_path)

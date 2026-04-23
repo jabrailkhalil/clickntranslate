@@ -1338,7 +1338,43 @@ class SettingsWindow(QWidget):
                 QtCore.Q_ARG(str, str(e))
             )
 
-    def _schedule_update_restart_fallback(self, delay_seconds=6, attempts=70, interval_seconds=2):
+    def _powershell_launch_candidates(self):
+        system_root = os.environ.get("SystemRoot") or r"C:\Windows"
+        candidates = [
+            os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+            os.path.join(system_root, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+            "powershell.exe",
+            "powershell",
+        ]
+        unique = []
+        for candidate in candidates:
+            if candidate and candidate not in unique:
+                unique.append(candidate)
+        return unique
+
+    def _launch_hidden_powershell_script(self, script_path, extra_args):
+        create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        last_err = None
+        for candidate in SettingsWindow._powershell_launch_candidates(self):
+            try:
+                subprocess.Popen(
+                    [
+                        candidate,
+                        "-NoProfile",
+                        "-ExecutionPolicy", "Bypass",
+                        "-WindowStyle", "Hidden",
+                        "-File", script_path,
+                        *extra_args,
+                    ],
+                    creationflags=create_no_window
+                )
+                return True, None
+            except Exception as e:
+                last_err = e
+                continue
+        return False, last_err
+
+    def _schedule_update_restart_fallback(self, delay_seconds=14, attempts=45, interval_seconds=2):
         try:
             exe_path = os.path.abspath(sys.executable)
             if not exe_path or not os.path.isfile(exe_path):
@@ -1348,39 +1384,78 @@ class SettingsWindow(QWidget):
             delay_seconds = max(1, int(delay_seconds))
             attempts = max(1, int(attempts))
             interval_seconds = max(1, int(interval_seconds))
+            exe_dir = os.path.dirname(exe_path)
+            process_name = os.path.splitext(os.path.basename(exe_path))[0]
 
-            fd, cmd_path = tempfile.mkstemp(prefix="clickntranslate_restart_", suffix=".cmd")
+            fd, script_path = tempfile.mkstemp(prefix="clickntranslate_restart_", suffix=".ps1")
             os.close(fd)
-            script = "\n".join([
-                "@echo off",
-                "setlocal",
-                f'set "EXE_PATH={exe_path}"',
-                f'set "PID={current_pid}"',
-                f'set "TRIES={attempts}"',
-                f'set "WAIT_SEC={interval_seconds}"',
-                f'set "INITIAL_DELAY={delay_seconds}"',
-                "timeout /t %INITIAL_DELAY% /nobreak >nul",
-                "for /L %%I in (1,1,%TRIES%) do (",
-                '  tasklist /FI "PID eq %PID%" | find " %PID% " >nul',
-                "  if errorlevel 1 (",
-                '    if exist "%EXE_PATH%" start "" "%EXE_PATH%"',
-                "    goto :cleanup",
-                "  )",
-                "  timeout /t %WAIT_SEC% /nobreak >nul",
-                ")",
-                'if exist "%EXE_PATH%" start "" "%EXE_PATH%"',
-                ":cleanup",
-                'del "%~f0" >nul 2>&1',
-                "endlocal",
-            ])
-            with open(cmd_path, "w", encoding="utf-8", newline="\r\n") as f:
+            script = r"""param(
+    [string]$ExePath,
+    [string]$ExeDir,
+    [string]$ProcessName,
+    [int]$TargetPid,
+    [int]$InitialDelay,
+    [int]$Attempts,
+    [int]$WaitSeconds
+)
+$logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
+$ErrorActionPreference = 'Stop'
+
+function Write-UpdateLog {
+    param([string]$Message)
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+    Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
+}
+
+Write-UpdateLog "Fallback watcher start: ExePath=$ExePath; TargetPid=$TargetPid; Attempts=$Attempts"
+
+try {
+    Start-Sleep -Seconds $InitialDelay
+    for ($i = 0; $i -lt $Attempts; $i++) {
+        if (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
+            Start-Sleep -Seconds $WaitSeconds
+            continue
+        }
+        if (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue) {
+            Write-UpdateLog "Fallback skip: process $ProcessName is already running"
+            break
+        }
+        if (-not (Test-Path -LiteralPath $ExePath)) {
+            Write-UpdateLog "Fallback wait: executable is missing: $ExePath"
+            Start-Sleep -Seconds $WaitSeconds
+            continue
+        }
+        Write-UpdateLog "Fallback launching executable: $ExePath"
+        Start-Process -FilePath $ExePath -WorkingDirectory $ExeDir
+        Write-UpdateLog "Fallback launch requested"
+        break
+    }
+}
+catch {
+    Write-UpdateLog ("Fallback watcher failed: " + $_.Exception.Message)
+}
+finally {
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+"""
+            with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script)
 
-            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            subprocess.Popen(
-                ["cmd", "/c", cmd_path],
-                creationflags=create_no_window
+            ok, err = SettingsWindow._launch_hidden_powershell_script(
+                self,
+                script_path,
+                [
+                    "-ExePath", exe_path,
+                    "-ExeDir", exe_dir,
+                    "-ProcessName", process_name,
+                    "-TargetPid", str(current_pid),
+                    "-InitialDelay", str(delay_seconds),
+                    "-Attempts", str(attempts),
+                    "-WaitSeconds", str(interval_seconds),
+                ]
             )
+            if not ok:
+                print(f"Could not launch update restart fallback: {err}")
         except Exception as e:
             print(f"Could not schedule update restart fallback: {e}")
 
@@ -1398,7 +1473,7 @@ class SettingsWindow(QWidget):
         script = r"""param(
     [string]$AppDir,
     [string]$ZipPath,
-    [int]$Pid,
+    [int]$TargetPid,
     [string]$ExeName
 )
 $logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
@@ -1410,15 +1485,15 @@ function Write-UpdateLog {
     Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
 }
 
-Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; Pid=$Pid"
+Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; TargetPid=$TargetPid"
 
 $extractDir = $null
 try {
     $deadline = (Get-Date).AddSeconds(120)
-    while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
+    while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
         if ((Get-Date) -gt $deadline) {
-            Write-UpdateLog "Application did not exit in time, force terminating process $Pid"
-            try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch {}
+            Write-UpdateLog "Application did not exit in time, force terminating process $TargetPid"
+            try { Stop-Process -Id $TargetPid -Force -ErrorAction SilentlyContinue } catch {}
             break
         }
         Start-Sleep -Milliseconds 300
@@ -1491,34 +1566,19 @@ finally {
             return False, f"Failed to create updater script: {e}"
 
         try:
-            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            last_err = None
-            candidates = []
-            system_root = os.environ.get("SystemRoot") or r"C:\Windows"
-            candidates.append(os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"))
-            candidates.append("powershell.exe")
-            candidates.append("powershell")
-
-            for candidate in candidates:
-                try:
-                    subprocess.Popen(
-                        [
-                            candidate,
-                            "-NoProfile",
-                            "-ExecutionPolicy", "Bypass",
-                            "-File", script_path,
-                            "-AppDir", app_dir,
-                            "-ZipPath", zip_path,
-                            "-Pid", str(current_pid),
-                            "-ExeName", exe_name,
-                        ],
-                        creationflags=create_no_window
-                    )
-                    return True, None
-                except Exception as e:
-                    last_err = e
-                    continue
-            return False, f"Failed to launch updater: {last_err}"
+            ok, err = SettingsWindow._launch_hidden_powershell_script(
+                self,
+                script_path,
+                [
+                    "-AppDir", app_dir,
+                    "-ZipPath", zip_path,
+                    "-TargetPid", str(current_pid),
+                    "-ExeName", exe_name,
+                ]
+            )
+            if ok:
+                return True, None
+            return False, f"Failed to launch updater: {err}"
         except Exception as e:
             return False, f"Failed to launch updater: {e}"
 
