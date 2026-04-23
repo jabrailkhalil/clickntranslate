@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import threading
 import types
@@ -200,6 +201,39 @@ class TestUpdateCancellation(unittest.TestCase):
                 os.remove(temp_path)
             except OSError:
                 pass
+
+
+class TestTesseractInstallerHelpers(unittest.TestCase):
+    def test_get_tesseract_bundle_url_uses_release_asset(self):
+        dummy = types.SimpleNamespace()
+
+        url = sw.SettingsWindow._get_tesseract_bundle_url(dummy, is_x64=True)
+
+        self.assertIn("/releases/download/v1.3.2/", url)
+        self.assertTrue(url.endswith("ClicknTranslate-tesseract-win64.zip"))
+
+    def test_find_tesseract_exe_under_searches_recursively(self):
+        dummy = types.SimpleNamespace()
+        root = tempfile.mkdtemp(prefix="tess_find_")
+        try:
+            nested = os.path.join(root, "bin")
+            os.makedirs(nested, exist_ok=True)
+            exe_path = os.path.join(nested, "tesseract.exe")
+            with open(exe_path, "wb") as f:
+                f.write(b"exe")
+
+            found = sw.SettingsWindow._find_tesseract_exe_under(dummy, root)
+
+            self.assertEqual(found, exe_path)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_check_tesseract_cancel_requested_raises(self):
+        dummy = types.SimpleNamespace(_tesseract_cancel_requested=threading.Event())
+        dummy._tesseract_cancel_requested.set()
+
+        with self.assertRaises(sw.TesseractInstallCancelledError):
+            sw.SettingsWindow._check_tesseract_cancel_requested(dummy)
 
 
 class TestDownloadAndPrepareUpdate(unittest.TestCase):

@@ -6,6 +6,7 @@ import sys
 import subprocess
 import platform
 import re
+import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication
@@ -33,9 +34,19 @@ GITHUB_OWNER = "jabrailkhalil"
 GITHUB_REPO = "clickntranslate"
 GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/"
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
+TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
+TESSERACT_BUNDLE_URL_WIN64 = (
+    f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/"
+    f"{TESSERACT_BUNDLE_RELEASE_TAG}/{TESSERACT_BUNDLE_NAME_WIN64}"
+)
 
 
 class UpdateCancelledError(RuntimeError):
+    pass
+
+
+class TesseractInstallCancelledError(RuntimeError):
     pass
 
 
@@ -54,6 +65,25 @@ class UpdateProgressDialog(QProgressDialog):
     def reject(self):
         if self._owner and getattr(self._owner, "_update_in_progress", False):
             self._owner._handle_update_progress_close_attempt()
+            return
+        super().reject()
+
+
+class TesseractInstallProgressDialog(QProgressDialog):
+    def __init__(self, owner):
+        super().__init__("", None, 0, 100, owner)
+        self._owner = owner
+
+    def closeEvent(self, event):
+        if self._owner and getattr(self._owner, "_tesseract_install_in_progress", False):
+            self._owner._request_tesseract_install_cancel()
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def reject(self):
+        if self._owner and getattr(self._owner, "_tesseract_install_in_progress", False):
+            self._owner._request_tesseract_install_cancel()
             return
         super().reject()
 
@@ -224,6 +254,10 @@ class SettingsWindow(QWidget):
         self._update_phase = "idle"
         self._update_temp_dir = ""
         self._update_cancel_requested = threading.Event()
+        self._tesseract_install_in_progress = False
+        self._tesseract_install_phase = "idle"
+        self._tesseract_temp_dir = ""
+        self._tesseract_cancel_requested = threading.Event()
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.init_ui()
@@ -308,7 +342,7 @@ class SettingsWindow(QWidget):
         self.ocr_engine_combo.setStyleSheet("margin-left:6px;")
         self.ocr_engine_combo.setFixedWidth(130)
         self.ocr_engine_combo.setFixedHeight(32)
-        
+
         # Выравниваем: лейбл занимает всю высоту (38), комбобокс (32) выравнивается по центру высоты строки
         row1.addWidget(ocr_label) # Alignment внутри виджета
         row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignVCenter)
@@ -1865,61 +1899,142 @@ finally {
     def update_language(self):
         self.init_ui()
 
+    def _portable_app_dir(self):
+        if getattr(sys, "frozen", False):
+            return os.path.dirname(os.path.abspath(sys.executable))
+        return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+    def _local_tesseract_dir(self):
+        return os.path.join(self._portable_app_dir(), "ocr", "tesseract")
+
+    def _find_tesseract_exe_under(self, root_dir):
+        if not root_dir or not os.path.isdir(root_dir):
+            return ""
+        direct_path = os.path.join(root_dir, "tesseract.exe")
+        if os.path.isfile(direct_path):
+            return direct_path
+        for current_root, _dirs, files in os.walk(root_dir):
+            for name in files:
+                if name.lower() == "tesseract.exe":
+                    return os.path.join(current_root, name)
+        return ""
+
+    def _find_local_tesseract_exe(self):
+        return self._find_tesseract_exe_under(self._local_tesseract_dir())
+
+    def _find_available_tesseract_exe(self):
+        local_exe = self._find_local_tesseract_exe()
+        if local_exe:
+            return local_exe
+        path_exe = shutil.which("tesseract")
+        if path_exe:
+            return path_exe
+        for path in [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.join(os.path.expanduser("~"), "AppData", "Local", "Tesseract-OCR", "tesseract.exe"),
+        ]:
+            if os.path.isfile(path):
+                return path
+        return ""
+
+    def _reset_tesseract_runtime_cache(self):
+        try:
+            import ocr
+            if hasattr(ocr, "ScreenCaptureOverlay"):
+                ocr.ScreenCaptureOverlay._tesseract_cmd_cache = None
+            ocr._ocr_config_cache = None
+            ocr._ocr_config_mtime = 0
+        except Exception:
+            pass
+
+    def _set_ocr_combo_silently(self, engine_name):
+        if not hasattr(self, "ocr_engine_combo"):
+            return
+        self.ocr_engine_combo.blockSignals(True)
+        self.ocr_engine_combo.setCurrentText(engine_name)
+        self.ocr_engine_combo.blockSignals(False)
+
     def handle_ocr_engine_change(self, text):
-        import shutil
-        if text == "Tesseract":
-            # Сохраняем прошлый движок для отката
-            self.previous_ocr_engine = self.parent.config.get("ocr_engine", "Windows")
-            # Проверяем наличие tesseract (в PATH или в локальной папке)
-            tesseract_path = shutil.which("tesseract")
-            if not tesseract_path:
-                local_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "ocr", "tesseract", "tesseract.exe")
-                if not os.path.exists(local_path):
-                    # Предлагаем скачать автоматически
-                    msg = QMessageBox(self)
-                    if self.parent.current_interface_language == "ru":
-                        msg.setWindowTitle("Tesseract не найден")
-                        msg.setText("Tesseract-OCR не найден. Скачать и установить?")
-                    else:
-                        msg.setWindowTitle("Tesseract not found")
-                        msg.setText("Tesseract-OCR not found. Download and install?")
-                    msg.setIcon(QMessageBox.NoIcon)
-                    msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-                    # remove ? context help button from title bar
-                    msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-                    if self.parent.current_interface_language == "ru":
-                        yes_btn = msg.addButton("Да", QMessageBox.YesRole)
-                        no_btn = msg.addButton("Нет", QMessageBox.NoRole)
-                    else:
-                        yes_btn = msg.addButton("Yes", QMessageBox.YesRole)
-                        no_btn = msg.addButton("No", QMessageBox.NoRole)
+        if text != "Tesseract":
+            previous_engine = self.parent.config.get("ocr_engine", "Windows")
+            if previous_engine == "Tesseract" and self._find_local_tesseract_exe():
+                action = self._ask_remove_local_tesseract_after_switch()
+                if action == "cancel":
+                    self._set_ocr_combo_silently("Tesseract")
+                    self.save_ocr_engine("Tesseract")
+                    return
+                if action == "remove":
+                    removed, error = self._delete_local_tesseract_dir()
+                    if not removed:
+                        is_ru = self.parent.current_interface_language == "ru"
+                        QMessageBox.warning(
+                            self,
+                            "Ошибка Tesseract" if is_ru else "Tesseract error",
+                            ("Не удалось удалить локальный Tesseract:\n" if is_ru else "Failed to remove local Tesseract:\n") + error
+                        )
+            self.save_ocr_engine(text)
+            return
 
-                    # uniform theme styling
-                    if self.parent.current_theme == "Темная":
-                        msg.setStyleSheet(
-                            "QMessageBox { background-color: #121212; color: #ffffff; } "
-                            "QLabel { color: #ffffff; font-size: 16px; } "
-                            "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 5px; min-width: 80px; } "
-                            "QPushButton:hover { background-color: #333333; }")
-                    else:
-                        msg.setStyleSheet(
-                            "QMessageBox { background-color: #ffffff; color: #000000; } "
-                            "QLabel { color: #000000; font-size: 16px; } "
-                            "QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #550000; padding: 5px; min-width: 80px; } "
-                            "QPushButton:hover { background-color: #e0e0e0; }")
+        self.previous_ocr_engine = self.parent.config.get("ocr_engine", "Windows")
+        if self._find_available_tesseract_exe():
+            self.save_ocr_engine("Tesseract")
+            return
 
-                    msg.exec_()
-                    if msg.clickedButton() == yes_btn:
-                        self.start_download_thread()
-                        return  # не сохраняем пока не скачаем
-                    else:
-                        # Ставим первый доступный (Windows)
-                        self.ocr_engine_combo.blockSignals(True)
-                        self.ocr_engine_combo.setCurrentText("Windows")
-                        self.ocr_engine_combo.blockSignals(False)
-                        self.save_ocr_engine("Windows")
-                        return
-        self.save_ocr_engine(text)
+        is_ru = self.parent.current_interface_language == "ru"
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Tesseract не найден" if is_ru else "Tesseract not found")
+        msg.setText(
+            "Tesseract-OCR не найден. Скачать и установить локально?"
+            if is_ru else
+            "Tesseract-OCR was not found. Download and install it locally?"
+        )
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
+        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        msg.exec_()
+        if msg.clickedButton() == yes_btn:
+            self.start_tesseract_install()
+            return
+
+        self._set_ocr_combo_silently(self.previous_ocr_engine or "Windows")
+        self.save_ocr_engine(self.previous_ocr_engine or "Windows")
+
+    def _ask_remove_local_tesseract_after_switch(self):
+        is_ru = self.parent.current_interface_language == "ru"
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Локальный Tesseract" if is_ru else "Local Tesseract")
+        msg.setText(
+            "Вы переключаетесь на Windows OCR. Удалить локальный Tesseract из папки программы?"
+            if is_ru else
+            "You are switching to Windows OCR. Remove local Tesseract from the app folder?"
+        )
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        remove_btn = msg.addButton("Удалить" if is_ru else "Remove", QMessageBox.DestructiveRole)
+        keep_btn = msg.addButton("Оставить" if is_ru else "Keep", QMessageBox.AcceptRole)
+        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.RejectRole)
+        msg.exec_()
+        clicked = msg.clickedButton()
+        if clicked == remove_btn:
+            return "remove"
+        if clicked == keep_btn:
+            return "keep"
+        return "cancel"
+
+    def _delete_local_tesseract_dir(self):
+        tesseract_dir = self._local_tesseract_dir()
+        if not os.path.isdir(tesseract_dir):
+            return True, ""
+        try:
+            shutil.rmtree(tesseract_dir, ignore_errors=False)
+            self._reset_tesseract_runtime_cache()
+            return True, ""
+        except Exception as e:
+            return False, str(e)
 
     def save_ocr_engine(self, text):
         self.auto_save_setting("ocr_engine", text)
@@ -1933,388 +2048,312 @@ finally {
         self.auto_save_setting("translator_engine", value)
 
     def start_download_thread(self):
-        """Скачать portable-версию Tesseract и две языковые модели (eng, rus)."""
-        # Определяем архитектуру
-        machine = platform.machine().lower()
-        is_x64 = machine in ("amd64", "x86_64")
-        # Основной и резервный portable-zip
-        if is_x64:
-            portable_urls = [
-                "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.3.20231005/tesseract-ocr-w64-5.3.3.20231005-portable.zip",
-                "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-5.3.1.20230401-portable.zip"
+        self.start_tesseract_install()
+
+    def start_tesseract_install(self):
+        if self._tesseract_install_in_progress:
+            return
+        is_ru = self.parent.current_interface_language == "ru"
+        self._tesseract_install_in_progress = True
+        self._tesseract_install_phase = "starting"
+        self._tesseract_cancel_requested.clear()
+        self._tesseract_temp_dir = ""
+        self.ocr_engine_combo.setEnabled(False)
+        self._show_tesseract_progress("Подготовка установки Tesseract..." if is_ru else "Preparing Tesseract install...", 0)
+        threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
+
+    def _get_tesseract_bundle_url(self, is_x64=True):
+        if not is_x64:
+            raise RuntimeError("Автоматическая установка Tesseract поддерживает только Windows x64.")
+        return TESSERACT_BUNDLE_URL_WIN64
+
+    def _emit_tesseract_progress(self, text, percent=0, determinate=True):
+        QMetaObject.invokeMethod(
+            self,
+            "_on_tesseract_progress",
+            Qt.QueuedConnection,
+            QtCore.Q_ARG(str, str(text)),
+            QtCore.Q_ARG(int, int(max(0, min(100, percent)))),
+            QtCore.Q_ARG(bool, bool(determinate))
+        )
+
+    def _check_tesseract_cancel_requested(self):
+        if self._tesseract_cancel_requested.is_set():
+            raise TesseractInstallCancelledError("Tesseract installation canceled by user.")
+
+    def _install_tesseract_worker(self):
+        temp_dir = ""
+        backup_dir = ""
+        final_dir = self._local_tesseract_dir()
+        try:
+            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            machine = platform.machine().lower()
+            is_x64 = machine in ("amd64", "x86_64")
+            bundle_url = self._get_tesseract_bundle_url(is_x64)
+            temp_dir = tempfile.mkdtemp(prefix="clickntranslate_tesseract_")
+            self._tesseract_temp_dir = temp_dir
+            bundle_path = os.path.join(temp_dir, TESSERACT_BUNDLE_NAME_WIN64)
+            extract_dir = os.path.join(temp_dir, "extract")
+            os.makedirs(extract_dir, exist_ok=True)
+
+            download_text = "Загрузка Tesseract..." if is_ru else "Downloading Tesseract..."
+            self._tesseract_install_phase = "downloading"
+            self._emit_tesseract_progress(download_text, 1)
+
+            def download_progress(done, total):
+                if total > 0:
+                    percent = 1 + int((done * 72) / total)
+                else:
+                    percent = 6
+                self._emit_tesseract_progress(download_text, percent)
+
+            self._download_file(
+                bundle_url,
+                bundle_path,
+                timeout=180,
+                progress_callback=download_progress,
+                cancel_callback=lambda: self._tesseract_cancel_requested.is_set(),
+            )
+            self._check_tesseract_cancel_requested()
+            if not zipfile.is_zipfile(bundle_path):
+                raise RuntimeError("Downloaded Tesseract bundle is not a zip archive.")
+
+            extract_text = "Распаковка Tesseract..." if is_ru else "Extracting Tesseract..."
+            self._tesseract_install_phase = "extracting"
+            self._emit_tesseract_progress(extract_text, 74)
+            with zipfile.ZipFile(bundle_path, "r") as zip_ref:
+                zip_ref.extractall(extract_dir)
+            self._check_tesseract_cancel_requested()
+
+            tess_exe = self._find_tesseract_exe_under(extract_dir)
+            if not tess_exe:
+                raise RuntimeError("tesseract.exe not found in Tesseract bundle")
+
+            install_dir = os.path.dirname(tess_exe)
+
+            tessdata_dir = os.path.join(os.path.dirname(tess_exe), "tessdata")
+            os.makedirs(tessdata_dir, exist_ok=True)
+
+            models = [
+                ("eng", "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"),
+                ("rus", "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata"),
             ]
+            for index, (name, url) in enumerate(models):
+                model_path = os.path.join(tessdata_dir, f"{name}.traineddata")
+                if os.path.isfile(model_path) and os.path.getsize(model_path) > 1024:
+                    continue
+                self._check_tesseract_cancel_requested()
+                model_text = f"Загрузка языковой модели {name}..." if is_ru else f"Downloading language data {name}..."
+                start = 82 + index * 6
+
+                def model_progress(done, total, base=start, label=model_text):
+                    if total > 0:
+                        percent = base + int((done * 5) / total)
+                    else:
+                        percent = base
+                    self._emit_tesseract_progress(label, percent)
+
+                self._download_file(
+                    url,
+                    model_path,
+                    timeout=180,
+                    progress_callback=model_progress,
+                    cancel_callback=lambda: self._tesseract_cancel_requested.is_set(),
+                )
+
+            self._check_tesseract_cancel_requested()
+            self._tesseract_install_phase = "applying"
+            self._emit_tesseract_progress("Применение установки..." if is_ru else "Applying install...", 96)
+            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
+            if os.path.isdir(final_dir):
+                backup_dir = f"{final_dir}.backup-{int(time.time())}"
+                shutil.move(final_dir, backup_dir)
+            shutil.move(install_dir, final_dir)
+            if backup_dir and os.path.isdir(backup_dir):
+                shutil.rmtree(backup_dir, ignore_errors=True)
+                backup_dir = ""
+
+            final_exe = self._find_tesseract_exe_under(final_dir)
+            if not final_exe:
+                raise RuntimeError("tesseract.exe not found after applying install")
+
+            self._emit_tesseract_progress("Готово" if is_ru else "Done", 100)
+            QMetaObject.invokeMethod(
+                self,
+                "_on_tesseract_install_ready",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, final_exe)
+            )
+        except TesseractInstallCancelledError:
+            if backup_dir and os.path.isdir(backup_dir) and not os.path.isdir(final_dir):
+                try:
+                    shutil.move(backup_dir, final_dir)
+                except Exception:
+                    pass
+            QMetaObject.invokeMethod(self, "_on_tesseract_install_cancelled", Qt.QueuedConnection)
+        except Exception as e:
+            if backup_dir and os.path.isdir(backup_dir) and not os.path.isdir(final_dir):
+                try:
+                    shutil.move(backup_dir, final_dir)
+                except Exception:
+                    pass
+            QMetaObject.invokeMethod(
+                self,
+                "_on_tesseract_install_failed",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, str(e))
+            )
+        finally:
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            self._tesseract_temp_dir = ""
+
+    def _show_tesseract_progress(self, text, percent=0, determinate=True):
+        is_ru = self.parent.current_interface_language == "ru"
+        if not hasattr(self, "progress") or self.progress is None:
+            self.progress = TesseractInstallProgressDialog(self)
+            self.progress.setWindowTitle("Tesseract")
+            self.progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
+            self.progress.setWindowModality(Qt.WindowModal)
+            self.progress.setAutoClose(False)
+            self.progress.setAutoReset(False)
+            self.progress.setMinimumDuration(0)
+            self.progress.setMinimumWidth(430)
+            self.progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self.progress.canceled.connect(self._request_tesseract_install_cancel)
+            try:
+                self.progress.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+            except Exception:
+                pass
+            self.progress.setStyleSheet("""
+                QProgressDialog { background-color: #111111; color: #ffffff; border: 1px solid #6f5aa8; border-radius: 8px; }
+                QLabel { color: #ffffff; font-size: 15px; }
+                QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #6f5aa8; padding: 5px 12px; }
+                QPushButton:hover { background-color: #333333; }
+                QProgressBar { border: 1px solid #555555; border-radius: 6px; text-align: center; background: #1d1d1d; color: #ffffff; min-height: 20px; }
+                QProgressBar::chunk { background-color: #7a61b3; border-radius: 5px; }
+            """)
+        self.progress.setLabelText(text)
+        if determinate:
+            self.progress.setRange(0, 100)
+            self.progress.setValue(max(0, min(100, int(percent))))
         else:
-            portable_urls = [
-                "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.3.20231005/tesseract-ocr-w32-5.3.3.20231005-portable.zip",
-                "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w32-5.3.1.20230401-portable.zip"
-            ]
-        model_urls = {
-            "eng": "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata",
-            "rus": "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata",
-        }
-        total_files = 1 + len(model_urls)  # zip + models
-        progress_text = "Downloading Tesseract …" if self.parent.current_interface_language == "en" else "Загрузка Tesseract …"
-        self.progress = QProgressDialog(progress_text, "Cancel", 0, 100, self)
-        self.progress.setWindowModality(Qt.WindowModal)
-        self.progress.setAutoClose(False)
-        # remove ? button
-        self.progress.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+            self.progress.setRange(0, 0)
         self.progress.show()
 
-        # стилизуем прогресс-бар в соответствии с темой
-        if self.parent.current_theme == "Темная":
-            self.progress.setStyleSheet(
-                "QProgressDialog { background-color: #121212; color: #ffffff; } "
-                "QLabel { color: #ffffff; font-size: 16px; } "
-                "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 4px 12px; } "
-                "QProgressBar { border: 1px solid #555; border-radius: 5px; text-align: center; color: #ffffff; } "
-                "QProgressBar::chunk { background-color: #7A5FA1; width: 20px; }")
-        else:
-            self.progress.setStyleSheet(
-                "QProgressDialog { background-color: #ffffff; color: #000000; } "
-                "QLabel { color: #000000; font-size: 16px; } "
-                "QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #550000; padding: 4px 12px; } "
-                "QProgressBar { border: 1px solid #555; border-radius: 5px; text-align: center; color: #ffffff; } "
-                "QProgressBar::chunk { background-color: #7A5FA1; width: 20px; }")
+    @QtCore.pyqtSlot(str, int, bool)
+    def _on_tesseract_progress(self, text, percent, determinate):
+        self._show_tesseract_progress(text, percent, determinate)
 
-        def worker():
+    def _hide_tesseract_progress(self):
+        if hasattr(self, "progress") and self.progress is not None:
             try:
-                app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-                temp_dir = os.path.join(app_dir, "temp")
-                ocr_dir = os.path.join(app_dir, "ocr")
-                tesseract_dir = os.path.join(ocr_dir, "tesseract")
-                # очистка прошлых остатков
-                for p in (temp_dir, tesseract_dir):
-                    if os.path.exists(p):
-                        shutil.rmtree(p, ignore_errors=True)
-                os.makedirs(temp_dir, exist_ok=True)
-                os.makedirs(tesseract_dir, exist_ok=True)
-                current_index = 0
-                # --- Скачиваем portable zip (с fallback) ---
-                zip_temp_path = os.path.join(temp_dir, "tess_portable.zip")
-                zip_ok = False
-                for url in portable_urls:
-                    if self.progress.wasCanceled():
-                        raise Exception("cancelled")
-                    r = requests.get(url, stream=True, timeout=30)
-                    total_len = int(r.headers.get("content-length", 0))
-                    downloaded = 0
-                    with open(zip_temp_path, "wb") as f:
-                        for chunk in r.iter_content(8192):
-                            if self.progress.wasCanceled():
-                                raise Exception("cancelled")
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            base_progress = int(downloaded * 100 / total_len) if total_len else 0
-                            QtCore.QMetaObject.invokeMethod(self.progress, "setValue", Qt.QueuedConnection, QtCore.Q_ARG(int, int(base_progress / total_files)))
-                    # Проверяем, действительно ли это zip
-                    if zipfile.is_zipfile(zip_temp_path):
-                        zip_ok = True
-                        break
-                    else:
-                        os.unlink(zip_temp_path)
-                if not zip_ok:
-                    # --- Fallback: EXE-установщик, распаковка через 7z ---
-                    if is_x64:
-                        exe_url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
-                    else:
-                        exe_url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w32-setup-5.3.0.20221222.exe"
-                    exe_temp_path = os.path.join(temp_dir, "tess_setup.exe")
-                    r = requests.get(exe_url, stream=True, timeout=30)
-                    with open(exe_temp_path, "wb") as f:
-                        for chunk in r.iter_content(8192):
-                            if self.progress.wasCanceled():
-                                raise Exception("cancelled")
-                            f.write(chunk)
-                    try:
-                        # Пытаемся запустить интерактивный установщик поверх всех окон
-                        self.progress.close()
-                        self.parent.hide()
-                        try:
-                            lang_param = '/LANG=Russian' if self.parent.current_interface_language == 'ru' else '/LANG=English'
-                            dir_param = f'/DIR="{tesseract_dir}"'
+                self.progress.blockSignals(True)
+                self.progress.close()
+            except Exception:
+                pass
+            self.progress = None
 
-                            # Показываем диалог с инструкцией и автокопированием пути
-                            try:
-                                import pyperclip
-                                pyperclip.copy(tesseract_dir)
-                            except Exception:
-                                try:
-                                    from PyQt5.QtWidgets import QApplication
-                                    app = QApplication.instance()
-                                    if app is not None:
-                                        app.clipboard().setText(tesseract_dir)
-                                except Exception:
-                                    pass
-                            info_box = QMessageBox(self)
-                            info_box.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-                            if self.parent.current_theme == "Темная":
-                                info_box.setStyleSheet(
-                                    "QMessageBox { background-color: #121212; color: #ffffff; } "
-                                    "QLabel { color: #ffffff; font-size: 16px; } "
-                                    "QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #550000; padding: 5px 16px; } "
-                                    "QPushButton:hover { background-color: #333333; }")
-                            else:
-                                info_box.setStyleSheet(
-                                    "QMessageBox { background-color: #ffffff; color: #000000; } "
-                                    "QLabel { color: #000000; font-size: 16px; } "
-                                    "QPushButton { background-color: #f0f0f0; color: #000000; border: 1px solid #550000; padding: 5px 16px; } "
-                                    "QPushButton:hover { background-color: #e0e0e0; }")
+    def _request_tesseract_install_cancel(self):
+        if not self._tesseract_install_in_progress:
+            return
+        is_ru = self.parent.current_interface_language == "ru"
+        self._tesseract_cancel_requested.set()
+        self._show_tesseract_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
 
-                            if self.parent.current_interface_language == 'ru':
-                                info_box.setWindowTitle("Установка Tesseract")
-                                info_box.setText(
-                                    f"Мастер установки откроется сейчас.\n\nВыберите путь установки:\n<b>{tesseract_dir}</b>\n(путь уже скопирован в буфер обмена)\n\nДобавьте русский язык (rus) в списке языковых моделей и завершите установку.")
-                                ok_text = "Продолжить"
-                            else:
-                                info_box.setWindowTitle("Tesseract setup")
-                                info_box.setText(
-                                    f"Installer will open now.\n\nChoose install path:\n<b>{tesseract_dir}</b>\n(Path is already copied to clipboard)\n\nMake sure to include Russian (rus) language files then finish setup.")
-                                ok_text = "Continue"
-                            info_box.addButton(ok_text, QMessageBox.AcceptRole)
-                            info_box.setIcon(QMessageBox.NoIcon)
-                            info_box.exec_()
+    def _finish_tesseract_install_state(self):
+        self._tesseract_install_in_progress = False
+        self._tesseract_install_phase = "idle"
+        self._tesseract_cancel_requested.clear()
+        self.ocr_engine_combo.setEnabled(True)
 
-                            if sys.platform.startswith('win'):
-                                # ждём завершения мастера установки
-                                subprocess.run([exe_temp_path, lang_param, dir_param])
-                            else:
-                                subprocess.run([exe_temp_path, dir_param])
-                        except Exception:
-                            pass
-
-                        # После выхода мастера проверяем, появился ли tesseract.exe
-                        tess_exe = None
-                        for root, _dirs, files in os.walk(tesseract_dir):
-                            for f in files:
-                                if f.lower() == "tesseract.exe":
-                                    tess_exe = os.path.join(root, f)
-                                    break
-                            if tess_exe:
-                                break
-
-                        if not tess_exe:
-                            # ищем системную установку
-                            tess_exe = shutil.which("tesseract")
-                            if not tess_exe:
-                                for p in [r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-                                          r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-                                          os.path.join(os.path.expanduser("~"), "AppData", "Local", "Tesseract-OCR", "tesseract.exe")]:
-                                    if os.path.exists(p):
-                                        tess_exe = p
-                                        break
-
-                        if tess_exe and os.path.exists(tess_exe):
-                            QtCore.QMetaObject.invokeMethod(self, "_portable_ready", Qt.QueuedConnection, QtCore.Q_ARG(str, tess_exe))
-                        else:
-                            QtCore.QMetaObject.invokeMethod(self, "_download_failed", Qt.QueuedConnection, QtCore.Q_ARG(str, "tesseract.exe not found after installer finished"))
-                        return
-                    except Exception as install_err:
-                        QtCore.QMetaObject.invokeMethod(self, "_download_failed", Qt.QueuedConnection, QtCore.Q_ARG(str, f"Installer launch failed: {install_err}"))
-                        return
-                else:
-                    # Распаковываем portable zip
-                    with zipfile.ZipFile(zip_temp_path, 'r') as zip_ref:
-                        zip_ref.extractall(tesseract_dir)
-                    os.unlink(zip_temp_path)
-                current_index += 1
-                # --- tessdata dir ---
-                possible_tessdata = [os.path.join(tesseract_dir, "tessdata"),
-                                     os.path.join(tesseract_dir, "share", "tessdata")]
-                tessdata_dir = None
-                for td in possible_tessdata:
-                    if os.path.isdir(td):
-                        tessdata_dir = td
-                        break
-                if tessdata_dir is None:
-                    tessdata_dir = os.path.join(tesseract_dir, "tessdata")
-                    os.makedirs(tessdata_dir, exist_ok=True)
-                # --- Скачиваем языковые модели ---
-                for name, url in model_urls.items():
-                    if self.progress.wasCanceled():
-                        raise Exception("cancelled")
-                    model_path = os.path.join(tessdata_dir, f"{name}.traineddata")
-                    r = requests.get(url, stream=True, timeout=30)
-                    with open(model_path, "wb") as f:
-                        for chunk in r.iter_content(8192):
-                            if self.progress.wasCanceled():
-                                raise Exception("cancelled")
-                            f.write(chunk)
-                    current_index += 1
-                    QtCore.QMetaObject.invokeMethod(
-                        self.progress,
-                        "setValue",
-                        Qt.QueuedConnection,
-                        QtCore.Q_ARG(int, int(current_index * 100 / total_files))
-                    )
-                # Ищем tesseract.exe
-                tess_exe = None
-                for root, dirs, files in os.walk(tesseract_dir):
-                    if "tesseract.exe" in files:
-                        tess_exe = os.path.join(root, "tesseract.exe")
-                        break
-                if not tess_exe:
-                    raise Exception("tesseract.exe not found after extraction")
-                # успех
-                QtCore.QMetaObject.invokeMethod(self, "_portable_ready", Qt.QueuedConnection, QtCore.Q_ARG(str, tess_exe))
-            except Exception as e:
-                if str(e) == "cancelled":
-                    QtCore.QMetaObject.invokeMethod(self, "_handle_download_cancel", Qt.QueuedConnection)
-                else:
-                    QtCore.QMetaObject.invokeMethod(self, "_download_failed", Qt.QueuedConnection, QtCore.Q_ARG(str, str(e)))
-        threading.Thread(target=worker, daemon=True).start()
-        
     @QtCore.pyqtSlot(str)
-    def _portable_ready(self, tesseract_path):
-        self.progress.close()
-        from PyQt5.QtWidgets import QMessageBox
-        # Проверяем, что файл существует
-        if os.path.exists(tesseract_path):
-            # Устанавливаем TESSDATA_PREFIX для текущего процесса
-            tessdata_dir = os.path.join(os.path.dirname(tesseract_path), "tessdata")
-            if os.path.isdir(tessdata_dir):
-                os.environ["TESSDATA_PREFIX"] = tessdata_dir
-            msg_text = "Tesseract portable installed successfully! You can now use Tesseract OCR." if self.parent.current_interface_language == "en" else "Tesseract portable успешно установлен! Теперь можно использовать Tesseract OCR."
-            im = QMessageBox(self)
-            im.setWindowTitle("Success" if self.parent.current_interface_language == "en" else "Успех")
-            im.setText(msg_text)
-            im.setIcon(QMessageBox.Information)
-            im.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            im.exec_()
-            # Сохраняем выбор Tesseract
-            self.save_ocr_engine("Tesseract")
+    def _on_tesseract_install_ready(self, tesseract_path):
+        self._finish_tesseract_install_state()
+        self._hide_tesseract_progress()
+        tessdata_dir = os.path.join(os.path.dirname(tesseract_path), "tessdata")
+        if os.path.isdir(tessdata_dir):
+            os.environ["TESSDATA_PREFIX"] = tessdata_dir
+        self._reset_tesseract_runtime_cache()
+        self._set_ocr_combo_silently("Tesseract")
+        self.save_ocr_engine("Tesseract")
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            "Tesseract",
+            "Tesseract установлен и готов к работе." if is_ru else "Tesseract is installed and ready."
+        )
 
-            # Разворачиваем/показываем главное окно
-            try:
-                self.parent.show()  # на случай, если было скрыто
-                self.parent.raise_()
-                self.parent.activateWindow()
-            except Exception:
-                pass
-
-            # Обновляем главную метку OCR, если пользователь не в настройках
-            try:
-                if not (hasattr(self.parent, "settings_window") and self.parent.settings_window is not None):
-                    self.parent.show_main_screen()
-            except Exception:
-                pass
-        else:
-            warn = QMessageBox(self)
-            warn.setWindowTitle("Error")
-            warn.setText("Failed to setup Tesseract")
-            warn.setIcon(QMessageBox.Warning)
-            warn.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            warn.exec_()
-            # Возвращаем на Windows OCR
-            self.ocr_engine_combo.blockSignals(True)
-            self.ocr_engine_combo.setCurrentText("Windows")
-            self.ocr_engine_combo.blockSignals(False)
-            self.save_ocr_engine("Windows")
-
-    @pyqtSlot(str)
-    def _download_failed(self, error):
-        self.progress.close()
-        # Если ошибка связана с правами доступа, показываем подробную инструкцию
-        if 'Permission denied' in error or 'permission denied' in error.lower():
-            msg_text = (
-                "Не удалось установить Tesseract из-за ошибки доступа к файлам.\n\n"
-                "Возможные причины и решения:\n"
-                "- Запустите программу от имени администратора.\n"
-                "- Убедитесь, что папки 'ocr/tesseract' и 'temp' не заняты другими процессами.\n"
-                "- Удалите вручную папки 'ocr/tesseract' и 'temp', если они остались после неудачной попытки.\n"
-                "- Проверьте, не блокирует ли антивирус создание файлов.\n"
-            ) if self.parent.current_interface_language == 'ru' else (
-                "Failed to install Tesseract due to file access error.\n\n"
-                "Possible reasons and solutions:\n"
-                "- Run the program as administrator.\n"
-                "- Make sure the 'ocr/tesseract' and 'temp' folders are not used by other processes.\n"
-                "- Delete the 'ocr/tesseract' and 'temp' folders manually if they remain after a failed attempt.\n"
-                "- Check if your antivirus is blocking file creation.\n"
-            )
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Ошибка доступа" if self.parent.current_interface_language == 'ru' else "Permission Error")
-            msg_box.setText(msg_text)
-            msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            msg_box.exec_()
-        else:
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to install Tesseract: {error}")
-            msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            msg_box.exec_()
-        # revert selection
-        self.ocr_engine_combo.blockSignals(True)
-        self.ocr_engine_combo.setCurrentText("Windows")
-        self.ocr_engine_combo.blockSignals(False)
-        self.save_ocr_engine("Windows")
-
-    @QtCore.pyqtSlot()
-    def _show_manual_install_info(self):
-        self.progress.close()
-        from PyQt5.QtWidgets import QMessageBox
-        
-        msg_title = "Manual Installation Required" if self.parent.current_interface_language == "en" else "Требуется ручная установка"
-        msg_text = """Automatic Tesseract installation failed due to Windows compatibility issues.
-        
-Please install Tesseract manually:
-1. Download: https://github.com/UB-Mannheim/tesseract/wiki
-2. Install to default location
-3. Restart the program and select Tesseract again
-
-The program will continue using Windows OCR for now.""" if self.parent.current_interface_language == "en" else """Автоматическая установка Tesseract не удалась из-за проблем совместимости с Windows.
-
-Пожалуйста, установите Tesseract вручную:
-1. Скачайте: https://github.com/UB-Mannheim/tesseract/wiki
-2. Установите в стандартную папку
-3. Перезапустите программу и выберите Tesseract снова
-
-Пока программа будет использовать Windows OCR."""
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle(msg_title)
-        msg.setText(msg_text)
-        msg.setIcon(QMessageBox.Information)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        msg.exec_()
-        
-        # Возвращаем на Windows OCR
-        self.ocr_engine_combo.blockSignals(True)
-        self.ocr_engine_combo.setCurrentText("Windows")
-        self.ocr_engine_combo.blockSignals(False)
-        self.save_ocr_engine("Windows")
-
-    @QtCore.pyqtSlot()
-    def _handle_download_cancel(self):
-        self.progress.close()
-        # Удаляем временные папки
-        app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        temp_dir = os.path.join(app_dir, "temp")
-        tesseract_dir = os.path.join(app_dir, "ocr", "tesseract")
-        try:
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(tesseract_dir):
-                shutil.rmtree(tesseract_dir)
-        except Exception:
-            pass
-        # Возвращаем прошлый движок
+    @QtCore.pyqtSlot(str)
+    def _on_tesseract_install_failed(self, error):
+        self._finish_tesseract_install_state()
+        self._hide_tesseract_progress()
         prev_engine = self.previous_ocr_engine or "Windows"
-        self.ocr_engine_combo.blockSignals(True)
-        self.ocr_engine_combo.setCurrentText(prev_engine)
-        self.ocr_engine_combo.blockSignals(False)
+        self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        from PyQt5.QtWidgets import QMessageBox
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Отмена" if self.parent.current_interface_language == "ru" else "Cancelled")
-        msg.setText("Загрузка Tesseract отменена. Возвращён прошлый движок OCR." if self.parent.current_interface_language == "ru" else "Tesseract download cancelled. Previous OCR engine restored.")
-        msg.setIcon(QMessageBox.Information)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        msg.exec_()
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.warning(
+            self,
+            "Ошибка Tesseract" if is_ru else "Tesseract error",
+            ("Не удалось установить Tesseract:\n" if is_ru else "Failed to install Tesseract:\n") + str(error)
+        )
+
+    @QtCore.pyqtSlot()
+    def _on_tesseract_install_cancelled(self):
+        self._finish_tesseract_install_state()
+        self._hide_tesseract_progress()
+        prev_engine = self.previous_ocr_engine or "Windows"
+        self._set_ocr_combo_silently(prev_engine)
+        self.save_ocr_engine(prev_engine)
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            "Отмена" if is_ru else "Cancelled",
+            "Установка Tesseract отменена. Временные файлы удалены."
+            if is_ru else
+            "Tesseract installation canceled. Temporary files were removed."
+        )
+
+    def remove_tesseract_engine(self):
+        is_ru = self.parent.current_interface_language == "ru"
+        if self._tesseract_install_in_progress:
+            self._request_tesseract_install_cancel()
+            return
+        tesseract_dir = self._local_tesseract_dir()
+        if not os.path.isdir(tesseract_dir):
+            return
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Удалить Tesseract" if is_ru else "Remove Tesseract")
+        confirm.setText(
+            "Удалить локальный движок Tesseract из папки программы?"
+            if is_ru else
+            "Remove the local Tesseract engine from the app folder?"
+        )
+        confirm.setIcon(QMessageBox.Question)
+        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
+        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        confirm.exec_()
+        if confirm.clickedButton() != yes_btn:
+            return
+        removed, error = self._delete_local_tesseract_dir()
+        try:
+            if not removed:
+                raise RuntimeError(error)
+            if self.parent.config.get("ocr_engine") == "Tesseract":
+                self._set_ocr_combo_silently("Windows")
+                self.save_ocr_engine("Windows")
+            QMessageBox.information(
+                self,
+                "Tesseract",
+                "Локальный Tesseract удалён." if is_ru else "Local Tesseract was removed."
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Ошибка Tesseract" if is_ru else "Tesseract error",
+                ("Не удалось удалить Tesseract:\n" if is_ru else "Failed to remove Tesseract:\n") + str(e)
+            )
 
     def clear_all_cache(self):
         """Очистить все кэши приложения: память, диск, история."""

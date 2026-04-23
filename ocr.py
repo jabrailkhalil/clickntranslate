@@ -930,7 +930,7 @@ class ScreenCaptureOverlay(QWidget):
             return cls._tesseract_cmd_cache
 
         tess_cmd = shutil.which("tesseract")
-        app_root = get_app_dir()
+        app_root = get_portable_dir()
         local_root = os.path.join(app_root, "ocr", "tesseract")
 
         # 1) Check direct path
