@@ -1338,18 +1338,47 @@ class SettingsWindow(QWidget):
                 QtCore.Q_ARG(str, str(e))
             )
 
-    def _schedule_update_restart_fallback(self, delay_seconds=4):
+    def _schedule_update_restart_fallback(self, delay_seconds=6, attempts=70, interval_seconds=2):
         try:
             exe_path = os.path.abspath(sys.executable)
             if not exe_path or not os.path.isfile(exe_path):
                 return
 
+            current_pid = os.getpid()
+            delay_seconds = max(1, int(delay_seconds))
+            attempts = max(1, int(attempts))
+            interval_seconds = max(1, int(interval_seconds))
+
+            fd, cmd_path = tempfile.mkstemp(prefix="clickntranslate_restart_", suffix=".cmd")
+            os.close(fd)
+            script = "\n".join([
+                "@echo off",
+                "setlocal",
+                f'set "EXE_PATH={exe_path}"',
+                f'set "PID={current_pid}"',
+                f'set "TRIES={attempts}"',
+                f'set "WAIT_SEC={interval_seconds}"',
+                f'set "INITIAL_DELAY={delay_seconds}"',
+                "timeout /t %INITIAL_DELAY% /nobreak >nul",
+                "for /L %%I in (1,1,%TRIES%) do (",
+                '  tasklist /FI "PID eq %PID%" | find " %PID% " >nul',
+                "  if errorlevel 1 (",
+                '    if exist "%EXE_PATH%" start "" "%EXE_PATH%"',
+                "    goto :cleanup",
+                "  )",
+                "  timeout /t %WAIT_SEC% /nobreak >nul",
+                ")",
+                'if exist "%EXE_PATH%" start "" "%EXE_PATH%"',
+                ":cleanup",
+                'del "%~f0" >nul 2>&1',
+                "endlocal",
+            ])
+            with open(cmd_path, "w", encoding="utf-8", newline="\r\n") as f:
+                f.write(script)
+
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            # Через cmd запускаем новую копию немного позже, это позволит updater-скрипту выполнить замену файлов.
-            fallback_delay = max(1, int(delay_seconds))
-            fallback_command = f'ping -n {fallback_delay} 127.0.0.1 >nul && start "" "{exe_path}"'
             subprocess.Popen(
-                ["cmd", "/c", fallback_command],
+                ["cmd", "/c", cmd_path],
                 creationflags=create_no_window
             )
         except Exception as e:
@@ -1374,8 +1403,6 @@ class SettingsWindow(QWidget):
 )
 $logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
 $ErrorActionPreference = 'Stop'
-$logHeader = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')] ClicknTranslate updater start: AppDir=$AppDir, ZipPath=$ZipPath, Exe=$ExeName, Pid=$Pid"
-Add-Content -Path $logPath -Value $logHeader -ErrorAction SilentlyContinue
 
 function Write-UpdateLog {
     param([string]$Message)
@@ -1383,61 +1410,79 @@ function Write-UpdateLog {
     Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
 }
 
-$deadline = (Get-Date).AddSeconds(120)
-while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
-    if ((Get-Date) -gt $deadline) {
-        Write-UpdateLog "Application did not exit in time, force terminating process $Pid"
-        try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch {}
-        break
+Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; Pid=$Pid"
+
+$extractDir = $null
+try {
+    $deadline = (Get-Date).AddSeconds(120)
+    while (Get-Process -Id $Pid -ErrorAction SilentlyContinue) {
+        if ((Get-Date) -gt $deadline) {
+            Write-UpdateLog "Application did not exit in time, force terminating process $Pid"
+            try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch {}
+            break
+        }
+        Start-Sleep -Milliseconds 300
     }
-    Start-Sleep -Milliseconds 300
-}
 
-Write-UpdateLog "Target app process is not running; start applying update"
+    Write-UpdateLog "Target app process is not running; start applying update"
+    $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
+    Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
+    Write-UpdateLog "Archive unpacked to $extractDir"
 
-$extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
-New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
-Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
-Write-UpdateLog "Archive unpacked to $extractDir"
-
-$exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($exeMatch) {
-    $payloadRoot = $exeMatch.DirectoryName
-} else {
-    $dirs = Get-ChildItem -LiteralPath $extractDir -Directory -Force
-    if ($dirs.Count -eq 1) {
-        $payloadRoot = $dirs[0].FullName
+    $exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exeMatch) {
+        $payloadRoot = $exeMatch.DirectoryName
     } else {
-        $payloadRoot = $extractDir
+        $dirs = Get-ChildItem -LiteralPath $extractDir -Directory -Force
+        if ($dirs.Count -eq 1) {
+            $payloadRoot = $dirs[0].FullName
+        } else {
+            $payloadRoot = $extractDir
+        }
     }
-}
 
-Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
-    if ($_.Name -ieq "data") { continue }
-    $dst = Join-Path $AppDir $_.Name
-    Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force
-}
+    Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
+        if ($_.Name -ieq "data") { continue }
+        $dst = Join-Path $AppDir $_.Name
+        Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force
+    }
 
-$targetExe = Join-Path $AppDir $ExeName
-if (Test-Path -LiteralPath $targetExe) {
-    Write-UpdateLog "Starting updated executable: $targetExe"
-    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
-} else {
-    Write-UpdateLog "Target executable not found by direct path, searching recursively"
-    $fallback = Get-ChildItem -LiteralPath $AppDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($fallback) {
-        Write-UpdateLog "Starting fallback found executable: $($fallback.FullName)"
-        Start-Process -FilePath $fallback.FullName -WorkingDirectory $AppDir
-    } else {
+    $targetExe = Join-Path $AppDir $ExeName
+    if (-not (Test-Path -LiteralPath $targetExe)) {
+        Write-UpdateLog "Target executable not found by direct path, searching recursively"
+        $fallback = Get-ChildItem -LiteralPath $AppDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($fallback) {
+            $targetExe = $fallback.FullName
+        }
+    }
+    if (-not (Test-Path -LiteralPath $targetExe)) {
         throw "Target executable not found: $ExeName"
     }
+
+    Write-UpdateLog "Starting updated executable: $targetExe"
+    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
+    Write-UpdateLog "Updated executable started"
 }
-
-Write-UpdateLog "Updated executable started"
-
-Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+catch {
+    Write-UpdateLog ("Updater failed: " + $_.Exception.Message)
+    try {
+        $fallbackExe = Join-Path $AppDir $ExeName
+        if (Test-Path -LiteralPath $fallbackExe) {
+            Write-UpdateLog "Launching fallback executable after updater failure: $fallbackExe"
+            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir
+        }
+    } catch {}
+}
+finally {
+    if ($extractDir -and (Test-Path -LiteralPath $extractDir)) {
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $ZipPath) {
+        Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
 """
         try:
             with open(script_path, "w", encoding="utf-8") as f:
@@ -1447,20 +1492,33 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 
         try:
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            subprocess.Popen(
-                [
-                    "powershell",
-                    "-NoProfile",
-                    "-ExecutionPolicy", "Bypass",
-                    "-File", script_path,
-                    "-AppDir", app_dir,
-                    "-ZipPath", zip_path,
-                    "-Pid", str(current_pid),
-                    "-ExeName", exe_name,
-                ],
-                creationflags=create_no_window
-            )
-            return True, None
+            last_err = None
+            candidates = []
+            system_root = os.environ.get("SystemRoot") or r"C:\Windows"
+            candidates.append(os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"))
+            candidates.append("powershell.exe")
+            candidates.append("powershell")
+
+            for candidate in candidates:
+                try:
+                    subprocess.Popen(
+                        [
+                            candidate,
+                            "-NoProfile",
+                            "-ExecutionPolicy", "Bypass",
+                            "-File", script_path,
+                            "-AppDir", app_dir,
+                            "-ZipPath", zip_path,
+                            "-Pid", str(current_pid),
+                            "-ExeName", exe_name,
+                        ],
+                        creationflags=create_no_window
+                    )
+                    return True, None
+                except Exception as e:
+                    last_err = e
+                    continue
+            return False, f"Failed to launch updater: {last_err}"
         except Exception as e:
             return False, f"Failed to launch updater: {e}"
 

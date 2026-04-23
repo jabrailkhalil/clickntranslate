@@ -51,19 +51,42 @@ class TestUpdateAssetSelection(unittest.TestCase):
 
 
 class TestUpdaterCommands(unittest.TestCase):
-    def test_schedule_update_restart_fallback_builds_expected_cmd(self):
+    def test_schedule_update_restart_fallback_builds_expected_cmd_script(self):
         dummy = types.SimpleNamespace()
+        generated_script = None
         with mock.patch.object(sw.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
             with mock.patch.object(sw.os.path, "isfile", return_value=True):
-                with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
-                    sw.SettingsWindow._schedule_update_restart_fallback(dummy, delay_seconds=4)
+                with mock.patch.object(sw.os, "getpid", return_value=999):
+                    with mock.patch.object(sw.tempfile, "mkstemp", return_value=tempfile.mkstemp(prefix="restart_fallback_", suffix=".cmd")):
+                        with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
+                            sw.SettingsWindow._schedule_update_restart_fallback(dummy, delay_seconds=6, attempts=5, interval_seconds=2)
 
         popen_mock.assert_called_once()
         args, kwargs = popen_mock.call_args
         self.assertEqual(args[0][0:2], ["cmd", "/c"])
-        self.assertIn('start "" "C:\\Apps\\ClicknTranslate.exe"', args[0][2])
-        self.assertIn("ping -n 4", args[0][2])
+        generated_script = args[0][2]
+        self.assertTrue(generated_script.lower().endswith(".cmd"))
+
+        with open(generated_script, "r", encoding="utf-8") as f:
+            script_text = f.read()
+
+        self.assertIn('set "EXE_PATH=C:\\Apps\\ClicknTranslate.exe"', script_text)
+        self.assertIn('set "PID=999"', script_text)
+        self.assertIn('if exist "%EXE_PATH%" start "" "%EXE_PATH%"', script_text)
+        self.assertIn('tasklist /FI "PID eq %PID%"', script_text)
         self.assertIn("creationflags", kwargs)
+        try:
+            os.remove(generated_script)
+        except OSError:
+            pass
+
+    def test_schedule_update_restart_fallback_skips_missing_exe(self):
+        dummy = types.SimpleNamespace()
+        with mock.patch.object(sw.sys, "executable", r"C:\Apps\Missing.exe"):
+            with mock.patch.object(sw.os.path, "isfile", return_value=False):
+                with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
+                    sw.SettingsWindow._schedule_update_restart_fallback(dummy)
+        popen_mock.assert_not_called()
 
     def test_launch_zip_updater_generates_expected_script(self):
         dummy = types.SimpleNamespace()
