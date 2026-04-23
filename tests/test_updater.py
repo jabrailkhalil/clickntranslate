@@ -1,5 +1,6 @@
 import os
 import tempfile
+import threading
 import types
 import unittest
 from unittest import mock
@@ -129,25 +130,107 @@ class TestUpdaterCommands(unittest.TestCase):
         self.assertIn("packaged app", err)
 
 
+class TestUpdateCancellation(unittest.TestCase):
+    def test_handle_update_progress_close_attempt_requests_cancel_before_apply(self):
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="ru"),
+            _update_in_progress=True,
+            _update_phase="downloading",
+            _update_cancel_requested=threading.Event(),
+        )
+        dummy._show_update_progress = mock.Mock()
+        dummy._set_update_controls_enabled = mock.Mock()
+        dummy._is_update_apply_stage = lambda: False
+
+        sw.SettingsWindow._handle_update_progress_close_attempt(dummy)
+
+        self.assertTrue(dummy._update_cancel_requested.is_set())
+        dummy._set_update_controls_enabled.assert_called_once_with(False, "Отмена...")
+        dummy._show_update_progress.assert_called_once()
+
+    def test_handle_update_progress_close_attempt_blocks_during_apply(self):
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_in_progress=True,
+            _update_phase="applying",
+            _update_cancel_requested=threading.Event(),
+        )
+        dummy._show_update_progress = mock.Mock()
+        dummy._set_update_controls_enabled = mock.Mock()
+        dummy._is_update_apply_stage = lambda: True
+
+        with mock.patch.object(sw.QMessageBox, "information") as info_mock:
+            sw.SettingsWindow._handle_update_progress_close_attempt(dummy)
+
+        self.assertFalse(dummy._update_cancel_requested.is_set())
+        dummy._set_update_controls_enabled.assert_not_called()
+        dummy._show_update_progress.assert_called_once()
+        info_mock.assert_called_once()
+
+    def test_download_file_cancellation_raises(self):
+        class FakeResponse:
+            headers = {"Content-Length": "4"}
+
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size=1024 * 1024):
+                yield b"test"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        dummy = types.SimpleNamespace()
+        fd, temp_path = tempfile.mkstemp(prefix="cancel_update_", suffix=".bin")
+        os.close(fd)
+        try:
+            with mock.patch.object(sw.requests, "get", return_value=FakeResponse()):
+                with self.assertRaises(sw.UpdateCancelledError):
+                    sw.SettingsWindow._download_file(
+                        dummy,
+                        "https://example.com/update.zip",
+                        temp_path,
+                        cancel_callback=lambda: True,
+                    )
+        finally:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+
 class TestDownloadAndPrepareUpdate(unittest.TestCase):
     def test_download_prepare_success_invokes_restart_flow(self):
         class DummyUpdater:
             def __init__(self):
+                self.parent = types.SimpleNamespace(current_interface_language="en")
                 self.fallback_called = False
                 self.download_calls = 0
+                self._update_cancel_requested = threading.Event()
+                self._update_phase = "idle"
+                self._update_temp_dir = ""
 
-            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None):
+            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
                 self.download_calls += 1
                 with zipfile.ZipFile(destination_path, "w") as zf:
                     zf.writestr("ClicknTranslate.exe", b"exe")
                 if progress_callback:
                     progress_callback(1, 1)
 
+            def _check_update_cancel_requested(self):
+                return None
+
             def _launch_zip_updater(self, _zip_path):
                 return True, None
 
             def _schedule_update_restart_fallback(self):
                 self.fallback_called = True
+
+            def _cleanup_update_temp_dir(self):
+                return None
 
         dummy = DummyUpdater()
         invoke_calls = []
@@ -171,17 +254,29 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
     def test_download_prepare_failure_reports_error(self):
         class DummyUpdater:
-            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None):
+            def __init__(self):
+                self.parent = types.SimpleNamespace(current_interface_language="en")
+                self._update_cancel_requested = threading.Event()
+                self._update_phase = "idle"
+                self._update_temp_dir = ""
+
+            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
                 with zipfile.ZipFile(destination_path, "w") as zf:
                     zf.writestr("ClicknTranslate.exe", b"exe")
                 if progress_callback:
                     progress_callback(1, 1)
+
+            def _check_update_cancel_requested(self):
+                return None
 
             def _launch_zip_updater(self, _zip_path):
                 return False, "Updater launch failed"
 
             def _schedule_update_restart_fallback(self):
                 raise AssertionError("Fallback should not run when updater launch fails")
+
+            def _cleanup_update_temp_dir(self):
+                return None
 
         dummy = DummyUpdater()
         invoke_calls = []

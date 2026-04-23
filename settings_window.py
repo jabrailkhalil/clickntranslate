@@ -35,6 +35,29 @@ GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/release
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 
 
+class UpdateCancelledError(RuntimeError):
+    pass
+
+
+class UpdateProgressDialog(QProgressDialog):
+    def __init__(self, owner):
+        super().__init__("", None, 0, 100, owner)
+        self._owner = owner
+
+    def closeEvent(self, event):
+        if self._owner and getattr(self._owner, "_update_in_progress", False):
+            self._owner._handle_update_progress_close_attempt()
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def reject(self):
+        if self._owner and getattr(self._owner, "_update_in_progress", False):
+            self._owner._handle_update_progress_close_attempt()
+            return
+        super().reject()
+
+
 def _normalize_version(version_text):
     if not version_text:
         return "0"
@@ -198,6 +221,9 @@ class SettingsWindow(QWidget):
         self.hotkeys_mode = False
         self.previous_ocr_engine = None  # Для отката OCR движка при отмене загрузки
         self._update_in_progress = False
+        self._update_phase = "idle"
+        self._update_temp_dir = ""
+        self._update_cancel_requested = threading.Event()
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.init_ui()
@@ -867,6 +893,9 @@ class SettingsWindow(QWidget):
 
     def _start_update_check(self):
         is_ru = self.parent.current_interface_language == "ru"
+        self._update_cancel_requested.clear()
+        self._update_phase = "checking"
+        self._update_temp_dir = ""
         self._set_update_controls_enabled(False, "Проверка..." if is_ru else "Checking...")
         self._show_update_progress("Проверка обновлений..." if is_ru else "Checking updates...")
         self._update_in_progress = True
@@ -886,7 +915,7 @@ class SettingsWindow(QWidget):
         is_ru = self.parent.current_interface_language == "ru"
         title = "Обновление" if is_ru else "Update"
         if not hasattr(self, "_update_progress") or self._update_progress is None:
-            self._update_progress = QProgressDialog("", None, 0, 100, self)
+            self._update_progress = UpdateProgressDialog(self)
             self._update_progress.setWindowTitle(title)
             self._update_progress.setCancelButton(None)
             self._update_progress.setWindowModality(Qt.WindowModal)
@@ -899,7 +928,7 @@ class SettingsWindow(QWidget):
                 flags = self._update_progress.windowFlags()
                 flags |= Qt.CustomizeWindowHint | Qt.WindowTitleHint
                 flags &= ~Qt.WindowContextHelpButtonHint
-                flags &= ~Qt.WindowCloseButtonHint
+                flags |= Qt.WindowCloseButtonHint
                 self._update_progress.setWindowFlags(flags)
             except Exception:
                 pass
@@ -928,6 +957,10 @@ class SettingsWindow(QWidget):
                 self._update_progress.setWindowTitle(title)
             except Exception:
                 pass
+        try:
+            self._update_progress.setWindowModality(Qt.WindowModal)
+        except Exception:
+            pass
         try:
             self._update_progress.setLabelText(text)
         except Exception:
@@ -966,10 +999,71 @@ class SettingsWindow(QWidget):
     def _hide_update_progress(self):
         if hasattr(self, "_update_progress") and self._update_progress is not None:
             try:
+                self._update_progress.blockSignals(True)
                 self._update_progress.close()
             except Exception:
                 pass
             self._update_progress = None
+
+    def _cleanup_update_temp_dir(self):
+        temp_dir = getattr(self, "_update_temp_dir", "") or ""
+        self._update_temp_dir = ""
+        if not temp_dir:
+            return
+        try:
+            if os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    def _is_update_apply_stage(self):
+        return getattr(self, "_update_phase", "") == "applying"
+
+    def _is_update_cancelable(self):
+        return self._update_in_progress and not self._is_update_apply_stage()
+
+    def _handle_update_progress_close_attempt(self):
+        if not self._update_in_progress:
+            return
+
+        is_ru = self.parent.current_interface_language == "ru"
+        if self._is_update_apply_stage():
+            self._show_update_progress(
+                "Обновление уже применяется.\nПожалуйста, подождите..." if is_ru else
+                "The update is being applied.\nPlease wait...",
+                determinate=False
+            )
+            QMessageBox.information(
+                self,
+                "Обновление" if is_ru else "Update",
+                "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите."
+                if is_ru else
+                "The update is already being applied. Closing is disabled right now.\nPlease wait."
+            )
+            return
+
+        if not self._update_cancel_requested.is_set():
+            self._update_cancel_requested.set()
+            self._update_phase = "canceling"
+            self._set_update_controls_enabled(False, "Отмена..." if is_ru else "Canceling...")
+            self._show_update_progress(
+                "Отмена обновления...\nУдаляем временные файлы, пожалуйста, подождите."
+                if is_ru else
+                "Canceling the update...\nCleaning temporary files, please wait.",
+                determinate=False
+            )
+            return
+
+        self._show_update_progress(
+            "Отмена обновления...\nПожалуйста, подождите."
+            if is_ru else
+            "Canceling the update...\nPlease wait.",
+            determinate=False
+        )
+
+    def _check_update_cancel_requested(self):
+        if self._update_cancel_requested.is_set():
+            raise UpdateCancelledError("Обновление отменено пользователем.")
 
     def _post_update_check_result(self, payload):
         try:
@@ -997,10 +1091,17 @@ class SettingsWindow(QWidget):
             response.raise_for_status()
             release = response.json()
         except Exception as e:
+            if self._update_cancel_requested.is_set():
+                self._post_update_check_result({"status": "cancelled"})
+                return
             self._post_update_check_result({
                 "status": "error",
                 "error": ("Не удалось проверить обновления:\n" if is_ru else "Failed to check for updates:\n") + str(e),
             })
+            return
+
+        if self._update_cancel_requested.is_set():
+            self._post_update_check_result({"status": "cancelled"})
             return
 
         latest_tag = release.get("tag_name") or release.get("name") or ""
@@ -1044,6 +1145,7 @@ class SettingsWindow(QWidget):
     def _on_update_check_result(self, payload_text):
         is_ru = self.parent.current_interface_language == "ru"
         self._update_in_progress = False
+        self._update_phase = "idle"
         self._set_update_controls_enabled(True)
         self._hide_update_progress()
 
@@ -1054,6 +1156,16 @@ class SettingsWindow(QWidget):
 
         status = payload.get("status")
         latest_version = payload.get("latest_version") or APP_VERSION
+
+        if status == "cancelled" or self._update_cancel_requested.is_set():
+            self._update_cancel_requested.clear()
+            self._cleanup_update_temp_dir()
+            QMessageBox.information(
+                self,
+                "Обновление" if is_ru else "Update",
+                "Проверка обновлений отменена." if is_ru else "Update check was canceled."
+            )
+            return
 
         if status == "error":
             QMessageBox.warning(
@@ -1120,6 +1232,9 @@ class SettingsWindow(QWidget):
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
         is_ru = self.parent.current_interface_language == "ru"
         self._update_in_progress = True
+        self._update_phase = "preparing_download"
+        self._update_temp_dir = ""
+        self._update_cancel_requested.clear()
         self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
         self._show_update_progress("Подготовка загрузки..." if is_ru else "Preparing download...", determinate=False)
         worker = threading.Thread(
@@ -1217,7 +1332,7 @@ class SettingsWindow(QWidget):
             return ""
         return digest.hexdigest().lower()
 
-    def _download_file(self, url, destination_path, timeout=120, progress_callback=None):
+    def _download_file(self, url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
         with requests.get(url, stream=True, timeout=timeout) as r:
             r.raise_for_status()
             try:
@@ -1225,6 +1340,8 @@ class SettingsWindow(QWidget):
             except Exception:
                 total_bytes = 0
             downloaded_bytes = 0
+            if cancel_callback and cancel_callback():
+                raise UpdateCancelledError("Обновление отменено пользователем.")
             if progress_callback:
                 try:
                     progress_callback(downloaded_bytes, total_bytes)
@@ -1232,6 +1349,8 @@ class SettingsWindow(QWidget):
                     pass
             with open(destination_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if cancel_callback and cancel_callback():
+                        raise UpdateCancelledError("Обновление отменено пользователем.")
                     if chunk:
                         f.write(chunk)
                         downloaded_bytes += len(chunk)
@@ -1269,27 +1388,36 @@ class SettingsWindow(QWidget):
                 )
 
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_update_")
+            self._update_temp_dir = temp_dir
             safe_name = asset_name or f"ClicknTranslate-v{latest_version}.zip"
             zip_path = os.path.join(temp_dir, safe_name)
             if not zip_path.lower().endswith(".zip"):
                 zip_path = zip_path + ".zip"
 
+            self._check_update_cancel_requested()
+            self._update_phase = "downloading"
             _emit_stage_text(stage_download)
             self._download_file(
                 asset_url,
                 zip_path,
                 timeout=120,
-                progress_callback=lambda done, total: _emit_download_progress(stage_download, done, total)
+                progress_callback=lambda done, total: _emit_download_progress(stage_download, done, total),
+                cancel_callback=lambda: self._update_cancel_requested.is_set()
             )
+            self._check_update_cancel_requested()
             if checksum_url:
                 checksum_path = os.path.join(temp_dir, f"{safe_name}.sha256")
+                self._update_phase = "checksum"
                 _emit_stage_text(stage_checksum)
                 self._download_file(
                     checksum_url,
                     checksum_path,
                     timeout=120,
-                    progress_callback=lambda done, total: _emit_download_progress(stage_checksum, done, total)
+                    progress_callback=lambda done, total: _emit_download_progress(stage_checksum, done, total),
+                    cancel_callback=lambda: self._update_cancel_requested.is_set()
                 )
+                self._check_update_cancel_requested()
+                self._update_phase = "verifying"
                 _emit_stage_text(stage_verify)
                 expected = self._read_checksum(checksum_path, safe_name)
                 if expected:
@@ -1301,7 +1429,10 @@ class SettingsWindow(QWidget):
             if not zipfile.is_zipfile(zip_path):
                 raise RuntimeError("Скачанный файл не является zip архивом.")
 
+            self._check_update_cancel_requested()
+            self._update_phase = "preparing"
             _emit_stage_text(stage_prepare)
+            self._update_phase = "applying"
             ok, err = self._launch_zip_updater(zip_path)
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
@@ -1316,10 +1447,16 @@ class SettingsWindow(QWidget):
                 Qt.QueuedConnection,
                 QtCore.Q_ARG(str, latest_version)
             )
+        except UpdateCancelledError:
+            self._cleanup_update_temp_dir()
+            QMetaObject.invokeMethod(
+                self,
+                "_on_update_cancelled",
+                Qt.QueuedConnection
+            )
         except Exception as e:
             try:
-                if temp_dir and os.path.isdir(temp_dir):
-                    shutil.rmtree(temp_dir, ignore_errors=True)
+                self._cleanup_update_temp_dir()
             except Exception:
                 pass
             try:
@@ -1585,12 +1722,36 @@ finally {
     @QtCore.pyqtSlot()
     def _restore_update_button_after_download(self):
         self._update_in_progress = False
+        self._update_phase = "idle"
+        self._update_cancel_requested.clear()
+        self._cleanup_update_temp_dir()
         self._set_update_controls_enabled(True)
         self._hide_update_progress()
+
+    @QtCore.pyqtSlot()
+    def _on_update_cancelled(self):
+        self._update_in_progress = False
+        self._update_phase = "idle"
+        self._cleanup_update_temp_dir()
+        self._update_cancel_requested.clear()
+        self._set_update_controls_enabled(True)
+        self._hide_update_progress()
+
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            "Обновление" if is_ru else "Update",
+            "Обновление отменено. Временные файлы удалены."
+            if is_ru else
+            "Update canceled. Temporary files were removed."
+        )
 
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
         self._update_in_progress = False
+        self._update_phase = "idle"
+        self._cleanup_update_temp_dir()
+        self._update_cancel_requested.clear()
         self._set_update_controls_enabled(True)
         if hasattr(self, "_update_progress") and self._update_progress is not None:
             try:
@@ -1609,6 +1770,9 @@ finally {
     @pyqtSlot(str)
     def _on_update_ready_to_restart(self, latest_version):
         self._update_in_progress = False
+        self._update_phase = "idle"
+        self._update_temp_dir = ""
+        self._update_cancel_requested.clear()
         if hasattr(self, "_update_progress") and self._update_progress is not None:
             try:
                 self._update_progress.close()
