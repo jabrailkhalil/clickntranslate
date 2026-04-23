@@ -9,7 +9,7 @@ import re
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
-    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication
+    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication, QToolButton
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon
@@ -339,9 +339,36 @@ class SettingsWindow(QWidget):
              self.ocr_engine_combo.setCurrentIndex(0)
 
         self.ocr_engine_combo.currentTextChanged.connect(self.handle_ocr_engine_change)
-        self.ocr_engine_combo.setStyleSheet("margin-left:6px;")
+        self.ocr_engine_combo.currentTextChanged.connect(lambda _text: self._sync_ocr_engine_delete_button())
+        self.ocr_engine_combo.setStyleSheet("margin-left:6px; padding-right:18px;")
         self.ocr_engine_combo.setFixedWidth(130)
         self.ocr_engine_combo.setFixedHeight(32)
+        self.ocr_engine_combo.installEventFilter(self)
+        self.ocr_engine_delete_btn = QToolButton(self.ocr_engine_combo)
+        self.ocr_engine_delete_btn.setObjectName("ocrEngineDeleteButton")
+        self.ocr_engine_delete_btn.setText("x")
+        self.ocr_engine_delete_btn.setCursor(Qt.PointingHandCursor)
+        self.ocr_engine_delete_btn.setToolTip(
+            "Удалить локальный Tesseract" if lang == "ru" else "Remove local Tesseract"
+        )
+        self.ocr_engine_delete_btn.clicked.connect(self.remove_tesseract_engine)
+        self.ocr_engine_delete_btn.setStyleSheet("""
+            QToolButton#ocrEngineDeleteButton {
+                background-color: rgba(212, 68, 68, 0.85);
+                color: #ffffff;
+                border: none;
+                border-radius: 7px;
+                font-size: 10px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+            }
+            QToolButton#ocrEngineDeleteButton:hover {
+                background-color: #d44444;
+            }
+        """)
+        self._sync_ocr_engine_delete_button()
+        QtCore.QTimer.singleShot(0, self._sync_ocr_engine_delete_button)
 
         # Выравниваем: лейбл занимает всю высоту (38), комбобокс (32) выравнивается по центру высоты строки
         row1.addWidget(ocr_label) # Alignment внутри виджета
@@ -1899,6 +1926,53 @@ finally {
     def update_language(self):
         self.init_ui()
 
+    def eventFilter(self, obj, event):
+        if obj is getattr(self, "ocr_engine_combo", None) and event.type() in (
+            QtCore.QEvent.Resize,
+            QtCore.QEvent.Show,
+            QtCore.QEvent.EnabledChange,
+        ):
+            self._sync_ocr_engine_delete_button()
+        return super().eventFilter(obj, event)
+
+    def _position_ocr_engine_delete_button(self):
+        combo = getattr(self, "ocr_engine_combo", None)
+        button = getattr(self, "ocr_engine_delete_btn", None)
+        if combo is None or button is None:
+            return
+        button_size = 14
+        button.setFixedSize(button_size, button_size)
+        x_pos = max(0, combo.width() - 38)
+        y_pos = max(0, (combo.height() - button_size) // 2)
+        button.move(x_pos, y_pos)
+        button.raise_()
+
+    def _sync_ocr_engine_delete_button(self):
+        button = getattr(self, "ocr_engine_delete_btn", None)
+        combo = getattr(self, "ocr_engine_combo", None)
+        if button is None or combo is None:
+            return
+        self._position_ocr_engine_delete_button()
+        show_button = (
+            combo.currentText() == "Tesseract"
+            and bool(self._find_local_tesseract_exe())
+            and not self._tesseract_install_in_progress
+        )
+        button.setVisible(show_button)
+        button.setEnabled(show_button)
+
+    def _restore_settings_view(self):
+        try:
+            if self.parent is not None:
+                self.parent.show()
+                self.parent.raise_()
+                self.parent.activateWindow()
+            self.show()
+            self.raise_()
+            self.activateWindow()
+        except Exception:
+            pass
+
     def _portable_app_dir(self):
         if getattr(sys, "frozen", False):
             return os.path.dirname(os.path.abspath(sys.executable))
@@ -1954,25 +2028,10 @@ finally {
         self.ocr_engine_combo.blockSignals(True)
         self.ocr_engine_combo.setCurrentText(engine_name)
         self.ocr_engine_combo.blockSignals(False)
+        self._sync_ocr_engine_delete_button()
 
     def handle_ocr_engine_change(self, text):
         if text != "Tesseract":
-            previous_engine = self.parent.config.get("ocr_engine", "Windows")
-            if previous_engine == "Tesseract" and self._find_local_tesseract_exe():
-                action = self._ask_remove_local_tesseract_after_switch()
-                if action == "cancel":
-                    self._set_ocr_combo_silently("Tesseract")
-                    self.save_ocr_engine("Tesseract")
-                    return
-                if action == "remove":
-                    removed, error = self._delete_local_tesseract_dir()
-                    if not removed:
-                        is_ru = self.parent.current_interface_language == "ru"
-                        QMessageBox.warning(
-                            self,
-                            "Ошибка Tesseract" if is_ru else "Tesseract error",
-                            ("Не удалось удалить локальный Tesseract:\n" if is_ru else "Failed to remove local Tesseract:\n") + error
-                        )
             self.save_ocr_engine(text)
             return
 
@@ -2001,29 +2060,6 @@ finally {
 
         self._set_ocr_combo_silently(self.previous_ocr_engine or "Windows")
         self.save_ocr_engine(self.previous_ocr_engine or "Windows")
-
-    def _ask_remove_local_tesseract_after_switch(self):
-        is_ru = self.parent.current_interface_language == "ru"
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Локальный Tesseract" if is_ru else "Local Tesseract")
-        msg.setText(
-            "Вы переключаетесь на Windows OCR. Удалить локальный Tesseract из папки программы?"
-            if is_ru else
-            "You are switching to Windows OCR. Remove local Tesseract from the app folder?"
-        )
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        remove_btn = msg.addButton("Удалить" if is_ru else "Remove", QMessageBox.DestructiveRole)
-        keep_btn = msg.addButton("Оставить" if is_ru else "Keep", QMessageBox.AcceptRole)
-        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.RejectRole)
-        msg.exec_()
-        clicked = msg.clickedButton()
-        if clicked == remove_btn:
-            return "remove"
-        if clicked == keep_btn:
-            return "keep"
-        return "cancel"
 
     def _delete_local_tesseract_dir(self):
         tesseract_dir = self._local_tesseract_dir()
@@ -2059,6 +2095,7 @@ finally {
         self._tesseract_cancel_requested.clear()
         self._tesseract_temp_dir = ""
         self.ocr_engine_combo.setEnabled(False)
+        self._sync_ocr_engine_delete_button()
         self._show_tesseract_progress("Подготовка установки Tesseract..." if is_ru else "Preparing Tesseract install...", 0)
         threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
 
@@ -2266,17 +2303,20 @@ finally {
         self._tesseract_install_phase = "idle"
         self._tesseract_cancel_requested.clear()
         self.ocr_engine_combo.setEnabled(True)
+        self._sync_ocr_engine_delete_button()
 
     @QtCore.pyqtSlot(str)
     def _on_tesseract_install_ready(self, tesseract_path):
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
+        self._restore_settings_view()
         tessdata_dir = os.path.join(os.path.dirname(tesseract_path), "tessdata")
         if os.path.isdir(tessdata_dir):
             os.environ["TESSDATA_PREFIX"] = tessdata_dir
         self._reset_tesseract_runtime_cache()
         self._set_ocr_combo_silently("Tesseract")
         self.save_ocr_engine("Tesseract")
+        self._sync_ocr_engine_delete_button()
         is_ru = self.parent.current_interface_language == "ru"
         QMessageBox.information(
             self,
@@ -2288,6 +2328,7 @@ finally {
     def _on_tesseract_install_failed(self, error):
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
+        self._restore_settings_view()
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
@@ -2302,6 +2343,7 @@ finally {
     def _on_tesseract_install_cancelled(self):
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
+        self._restore_settings_view()
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
@@ -2321,6 +2363,7 @@ finally {
             return
         tesseract_dir = self._local_tesseract_dir()
         if not os.path.isdir(tesseract_dir):
+            self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle("Удалить Tesseract" if is_ru else "Remove Tesseract")
@@ -2343,12 +2386,14 @@ finally {
             if self.parent.config.get("ocr_engine") == "Tesseract":
                 self._set_ocr_combo_silently("Windows")
                 self.save_ocr_engine("Windows")
+            self._sync_ocr_engine_delete_button()
             QMessageBox.information(
                 self,
                 "Tesseract",
                 "Локальный Tesseract удалён." if is_ru else "Local Tesseract was removed."
             )
         except Exception as e:
+            self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
                 "Ошибка Tesseract" if is_ru else "Tesseract error",
