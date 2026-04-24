@@ -23,6 +23,25 @@ class TestVersionHelpers(unittest.TestCase):
         self.assertFalse(sw._is_newer_version("1.3.2", "1.3.3"))
 
 
+class TestConfigCacheInvalidation(unittest.TestCase):
+    def test_uses_already_loaded_main_module(self):
+        called = []
+        fake_main = types.ModuleType("main")
+        fake_main.invalidate_config_cache = lambda: called.append(True)
+        sentinel = object()
+        old_main = sw.sys.modules.get("main", sentinel)
+        sw.sys.modules["main"] = fake_main
+        try:
+            sw._invalidate_main_config_cache()
+        finally:
+            if old_main is sentinel:
+                sw.sys.modules.pop("main", None)
+            else:
+                sw.sys.modules["main"] = old_main
+
+        self.assertEqual(called, [True])
+
+
 class TestUpdateAssetSelection(unittest.TestCase):
     def test_pick_update_asset_prefers_windows_clickntranslate_zip(self):
         dummy = types.SimpleNamespace()

@@ -18,11 +18,15 @@ from app_version import APP_VERSION
 
 # Импортируем функцию инвалидации кэша (ленивый импорт для избежания циклического импорта)
 def _invalidate_main_config_cache():
-    try:
-        from main import invalidate_config_cache
-        invalidate_config_cache()
-    except ImportError:
-        pass
+    for module_name in ("main", "__main__"):
+        module = sys.modules.get(module_name)
+        invalidate_config_cache = getattr(module, "invalidate_config_cache", None)
+        if callable(invalidate_config_cache):
+            try:
+                invalidate_config_cache()
+            except Exception:
+                pass
+            return
 
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
@@ -2221,7 +2225,7 @@ finally {
                 Qt.QueuedConnection,
                 QtCore.Q_ARG(str, final_exe)
             )
-        except TesseractInstallCancelledError:
+        except (TesseractInstallCancelledError, UpdateCancelledError):
             if backup_dir and os.path.isdir(backup_dir) and not os.path.isdir(final_dir):
                 try:
                     shutil.move(backup_dir, final_dir)
