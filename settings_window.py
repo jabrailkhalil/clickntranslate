@@ -1043,10 +1043,10 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(0)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
-        hotkeys_button = QPushButton(settings_text(lang, "hotkeys"))
-        hotkeys_button.clicked.connect(self.show_hotkeys_screen)
+        self.hotkeys_button = QPushButton(settings_text(lang, "hotkeys"))
+        self.hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
-        hotkeys_button.setStyleSheet("""
+        self.hotkeys_button.setStyleSheet("""
             padding-top: 2px;
             padding-bottom: 12px;
             padding-left: 16px;
@@ -1056,10 +1056,10 @@ class SettingsWindow(QWidget):
             border-radius: 0px;
             border-bottom: 1px solid rgba(255,255,255,0.05);
         """)
-        hotkeys_button.setMinimumWidth(320)
-        hotkeys_button.setMinimumHeight(40)
-        hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.main_layout.addWidget(hotkeys_button)
+        self.hotkeys_button.setMinimumWidth(320)
+        self.hotkeys_button.setMinimumHeight(40)
+        self.hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.main_layout.addWidget(self.hotkeys_button)
         self.main_layout.addSpacing(0)
         
         # --- Две кнопки истории объединены (без зазора) ---
@@ -1180,6 +1180,8 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(back_button)
 
         self.apply_theme()
+        if hasattr(self.parent, "_complete_guide_step"):
+            self.parent._complete_guide_step("hotkeys")
 
     def save_copy_hotkey(self):
         hotkey_str = self.copy_hotkey_input.keySequence().toString()
@@ -3633,6 +3635,8 @@ finally {
             "history": False,
             "start_minimized": False,
             "show_update_info": False,
+            "first_run_guide_completed": False,
+            "first_run_guide_pending": False,
             "ocr_engine": "Windows",
             "copy_translated_text": False,
             "freeze_screen_on_ocr": False,

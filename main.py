@@ -72,9 +72,9 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame, QGraphicsDropShadowEffect)
     from PyQt5.QtCore import Qt, QTimer, QSize
-    from PyQt5.QtGui import QIcon
+    from PyQt5.QtGui import QIcon, QColor
 except Exception:
     _show_dependency_error()
 from settings_window import SettingsWindow
@@ -112,6 +112,8 @@ DEFAULT_CONFIG = {
     "history": False,
     "start_minimized": False,
     "show_update_info": True,  # Показывать Welcome окно при первом запуске
+    "first_run_guide_completed": False,
+    "first_run_guide_pending": False,
     "ocr_engine": "Windows",
     "translator_engine": "Google",
     "allow_online_provider_fallback": False,
@@ -854,6 +856,8 @@ WELCOME_TEXT = {
         "feature_updates": "One-click updates",
         "telegram": "Open Telegram",
         "checkbox": "Don't show this window again",
+        "guide": "Show me around",
+        "skip": "Skip",
         "close": "Start",
     },
     "ru": {
@@ -866,6 +870,8 @@ WELCOME_TEXT = {
         "feature_updates": "Обновление в один клик",
         "telegram": "Открыть Telegram",
         "checkbox": "Больше не показывать это окно",
+        "guide": "Пройти обучение",
+        "skip": "Пропустить",
         "close": "Начать",
     },
     "es": {
@@ -878,6 +884,8 @@ WELCOME_TEXT = {
         "feature_updates": "Un clic",
         "telegram": "Abrir Telegram",
         "checkbox": "No volver a mostrar esta ventana",
+        "guide": "Ver guía",
+        "skip": "Omitir",
         "close": "Empezar",
     },
     "de": {
@@ -890,6 +898,8 @@ WELCOME_TEXT = {
         "feature_updates": "1-Klick-Update",
         "telegram": "Telegram öffnen",
         "checkbox": "Dieses Fenster nicht mehr anzeigen",
+        "guide": "Tour starten",
+        "skip": "Überspringen",
         "close": "Starten",
     },
     "fr": {
@@ -902,6 +912,8 @@ WELCOME_TEXT = {
         "feature_updates": "Un clic",
         "telegram": "Ouvrir Telegram",
         "checkbox": "Ne plus afficher cette fenêtre",
+        "guide": "Voir le guide",
+        "skip": "Passer",
         "close": "Commencer",
     },
     "zh": {
@@ -914,6 +926,8 @@ WELCOME_TEXT = {
         "feature_updates": "一键更新",
         "telegram": "打开 Telegram",
         "checkbox": "不再显示此窗口",
+        "guide": "开始引导",
+        "skip": "跳过",
         "close": "开始",
     },
 }
@@ -923,14 +937,167 @@ def welcome_text(lang):
     return WELCOME_TEXT.get(lang, WELCOME_TEXT["en"])
 
 
+GUIDE_TEXT = {
+    "en": {
+        "progress": "{current}/{total}",
+        "click_hint": "Click glow",
+        "skip": "Next",
+        "done_title": "Ready",
+        "done_body": "You know the main controls now. The full FAQ stays under the info button.",
+        "steps": [
+            ("language", "Interface language", "Flag changes app, settings, tray and help language."),
+            ("theme", "Theme", "Sun/moon switches dark and light themes."),
+            ("help", "Help", "Info opens OCR, hotkeys and translator help."),
+            ("settings", "Settings", "Gear opens engines, history, updates and hotkeys."),
+            ("ocr_engine", "OCR engine", "OCR: Windows is fast; Tesseract works offline."),
+            ("translator", "Translator", "Translator: Google online; Argos and Hy-MT offline."),
+            ("hotkeys", "Hotkeys", "Hotkeys configure screen copy and OCR translation."),
+            ("back_home", "Back home", "Home returns to the main translator screen."),
+        ],
+    },
+    "ru": {
+        "progress": "{current}/{total}",
+        "click_hint": "Нажми элемент",
+        "skip": "Пропустить",
+        "done_title": "Готово",
+        "done_body": "Готово. Полная справка - под кнопкой информации.",
+        "steps": [
+            ("language", "Язык интерфейса", "Флаг меняет язык окна, настроек, трея и справки."),
+            ("theme", "Тема", "Солнце/луна переключает темную и светлую тему."),
+            ("help", "Помощь", "Информация: OCR, хоткеи и переводчики."),
+            ("settings", "Настройки", "Шестеренка: движки, история, обновления и хоткеи."),
+            ("ocr_engine", "OCR-движок", "OCR: Windows быстрый, Tesseract работает офлайн."),
+            ("translator", "Переводчик", "Переводчик: Google онлайн, Argos и Hy-MT офлайн."),
+            ("hotkeys", "Горячие клавиши", "Хоткеи: копирование экрана и OCR-перевод."),
+            ("back_home", "Назад домой", "Домик возвращает на главный экран."),
+        ],
+    },
+    "es": {
+        "progress": "{current}/{total}",
+        "click_hint": "Pulsa luz",
+        "skip": "Siguiente",
+        "done_title": "Listo",
+        "done_body": "Ya conoces los controles principales. La guía completa está en el botón de información.",
+        "steps": [
+            ("language", "Idioma", "Bandera: ventana, ajustes, bandeja y ayuda."),
+            ("theme", "Tema", "Sol/luna cambia entre tema oscuro y claro."),
+            ("help", "Ayuda", "Info: OCR, atajos y traductores."),
+            ("settings", "Ajustes", "Engranaje: motores, historial, updates y atajos."),
+            ("ocr_engine", "Motor OCR", "OCR: Windows rápido; Tesseract offline."),
+            ("translator", "Traductor", "Traductor: Google online; Argos y Hy-MT offline."),
+            ("hotkeys", "Atajos", "Atajos: copia de pantalla y traducción OCR."),
+            ("back_home", "Volver", "Casa: vuelve a la pantalla principal."),
+        ],
+    },
+    "de": {
+        "progress": "{current}/{total}",
+        "click_hint": "Klick Licht",
+        "skip": "Weiter",
+        "done_title": "Fertig",
+        "done_body": "Die wichtigsten Bedienelemente sind bekannt. Die komplette Hilfe bleibt im Info-Button.",
+        "steps": [
+            ("language", "Sprache", "Flagge: Sprache für App, Tray und Hilfe."),
+            ("theme", "Design", "Sonne/Mond wechselt dunkel und hell."),
+            ("help", "Hilfe", "Info: OCR, Hotkeys und Übersetzer."),
+            ("settings", "Einstellungen", "Zahnrad: Engines, Verlauf, Updates und Hotkeys."),
+            ("ocr_engine", "OCR-Engine", "OCR: Windows schnell; Tesseract offline."),
+            ("translator", "Übersetzer", "Übersetzer: Google online; Argos/Hy-MT offline."),
+            ("hotkeys", "Hotkeys", "Hotkeys: Bildschirmkopie und OCR."),
+            ("back_home", "Zurück", "Haus: zurück zum Hauptbildschirm."),
+        ],
+    },
+    "fr": {
+        "progress": "{current}/{total}",
+        "click_hint": "Clique ici",
+        "skip": "Suivant",
+        "done_title": "Prêt",
+        "done_body": "Les contrôles principaux sont vus. L'aide complète reste dans le bouton info.",
+        "steps": [
+            ("language", "Langue", "Drapeau: langue de l'app, réglages et aide."),
+            ("theme", "Thème", "Soleil/lune alterne sombre et clair."),
+            ("help", "Aide", "Info: OCR, raccourcis et traducteurs."),
+            ("settings", "Réglages", "Engrenage: moteurs, historique, mises à jour."),
+            ("ocr_engine", "Moteur OCR", "OCR: Windows rapide; Tesseract offline."),
+            ("translator", "Traducteur", "Traducteur: Google online; Argos/Hy-MT offline."),
+            ("hotkeys", "Raccourcis", "Raccourcis: copie écran et OCR."),
+            ("back_home", "Retour", "Maison: retour à l'écran principal."),
+        ],
+    },
+    "zh": {
+        "progress": "{current}/{total}",
+        "click_hint": "点击高亮处",
+        "skip": "下一步",
+        "done_title": "完成",
+        "done_body": "你已经看过主要控件。完整帮助在信息按钮里。",
+        "steps": [
+            ("language", "界面语言", "点击旗帜。它会切换窗口、设置、托盘和帮助的语言。"),
+            ("theme", "主题", "点击太阳/月亮。这里切换深色和浅色主题。"),
+            ("help", "帮助", "点击信息按钮。这里有 OCR、快捷键和翻译器说明。"),
+            ("settings", "设置", "点击齿轮。引擎、历史、更新和快捷键都在这里。"),
+            ("ocr_engine", "OCR 引擎", "打开 OCR。Windows 快且内置；Tesseract 可离线下载。"),
+            ("translator", "翻译器", "打开翻译器。Google 在线；Argos 和 Hy-MT 可离线使用。"),
+            ("hotkeys", "快捷键", "点击快捷键。这里设置屏幕复制和 OCR 翻译快捷键。"),
+            ("back_home", "返回主页", "点击主页图标。它会回到主翻译界面。"),
+        ],
+    },
+}
+
+
+def guide_text(lang):
+    return GUIDE_TEXT.get(lang, GUIDE_TEXT["en"])
+
+
+
 _HELP_STYLE = """
 <style>
-    .section { margin-bottom: 18px; }
-    .section-title { color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #7A5FA1; padding-bottom: 4px; }
-    .item { margin: 6px 0; padding-left: 8px; font-size: 14px; }
-    .item-title { color: #9A7FC1; font-weight: bold; }
-    .recommended { color: #4CAF50; font-size: 12px; }
-    .step { background-color: rgba(122, 95, 161, 0.1); padding: 8px; border-radius: 6px; margin: 4px 0; font-size: 14px; }
+    body { color: #e8e0f7; font-family: "Segoe UI"; }
+    .hero {
+        background-color: rgba(197, 179, 233, 0.12);
+        border: 1px solid rgba(197, 179, 233, 0.45);
+        border-radius: 14px;
+        padding: 13px;
+        margin-bottom: 14px;
+    }
+    .hero-title { color: #ffffff; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+    .hero-subtitle { color: #cfc4e8; font-size: 13px; line-height: 1.45; }
+    .section {
+        background-color: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(197, 179, 233, 0.22);
+        border-radius: 13px;
+        margin-bottom: 12px;
+        padding: 12px;
+    }
+    .section-title {
+        color: #c5b3e9;
+        font-size: 16px;
+        font-weight: 900;
+        margin-bottom: 8px;
+    }
+    .item { margin: 7px 0; font-size: 13px; line-height: 1.42; }
+    .item-title { color: #dfd4ff; font-weight: 900; }
+    .recommended { color: #7ee787; font-size: 12px; font-weight: 800; }
+    .step {
+        background-color: rgba(197, 179, 233, 0.10);
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin: 6px 0;
+        font-size: 13px;
+    }
+    .kbd {
+        color: #111827;
+        background-color: #c5b3e9;
+        border-radius: 7px;
+        padding: 2px 6px;
+        font-weight: 900;
+    }
+    .note {
+        color: #cfc4e8;
+        background-color: rgba(42, 171, 238, 0.10);
+        border: 1px solid rgba(42, 171, 238, 0.25);
+        border-radius: 10px;
+        padding: 9px;
+        margin-top: 8px;
+    }
 </style>
 """
 
@@ -1253,9 +1420,181 @@ HELP_CONTENT = {
 }
 
 
+HELP_INTRO = {
+    "en": (
+        "Click'n'Translate is a portable assistant for screen OCR, quick translation, hotkeys and optional offline engines. "
+        "Use this FAQ as a map; the interactive guide can be launched again from the button below."
+    ),
+    "ru": (
+        "Click'n'Translate - портативный помощник для OCR с экрана, быстрого перевода, горячих клавиш и офлайн-движков. "
+        "Этот FAQ работает как карта программы; интерактивное обучение можно снова запустить кнопкой ниже."
+    ),
+    "es": (
+        "Click'n'Translate es un asistente portátil para OCR de pantalla, traducción rápida, atajos y motores offline opcionales. "
+        "Este FAQ sirve como mapa; la guía interactiva se puede abrir de nuevo con el botón inferior."
+    ),
+    "de": (
+        "Click'n'Translate ist ein portabler Assistent für Bildschirm-OCR, schnelle Übersetzung, Hotkeys und optionale Offline-Engines. "
+        "Diese FAQ ist die Karte; die interaktive Tour kann unten erneut gestartet werden."
+    ),
+    "fr": (
+        "Click'n'Translate est un assistant portable pour OCR d'écran, traduction rapide, raccourcis et moteurs offline optionnels. "
+        "Cette FAQ sert de carte; le guide interactif peut être relancé avec le bouton en bas."
+    ),
+    "zh": (
+        "Click'n'Translate 是便携式屏幕 OCR、快速翻译、快捷键和可选离线引擎助手。"
+        "这份 FAQ 是功能地图；底部按钮可以重新启动交互式引导。"
+    ),
+}
+
+HELP_EXTRA_CONTENT = {
+    "en": [
+        ("Best OCR results", [
+            "Select only the text area, not the whole window. Smaller captures are faster and cleaner.",
+            "Use <span class='item-title'>Freeze screen during OCR</span> when the source moves, fades, or disappears.",
+            "If Windows OCR misses a language, try Tesseract or install the needed Windows language pack.",
+        ]),
+        ("Offline packages", [
+            "<span class='item-title'>Tesseract</span> adds offline OCR and many recognition languages.",
+            "<span class='item-title'>Argos</span> is offline translation with small language packages.",
+            "<span class='item-title'>Hy-MT</span> is a larger local model; install it only when you need offline quality and have disk space.",
+        ]),
+        ("Updates and portable mode", [
+            "The update button downloads the release archive and replaces the portable folder automatically.",
+            "Keep the app in a stable folder before enabling autostart, otherwise Windows may point to the old path.",
+            "Config, cache, history and local engines live in the program data folder so the app can move as one package.",
+        ]),
+        ("Privacy", [
+            "Online providers send text to their service. Use Argos, Hy-MT and Tesseract when you need local-only work.",
+            "History and copy history are optional; turn them off if you do not want text stored locally.",
+        ]),
+    ],
+    "ru": [
+        ("Как получить точный OCR", [
+            "Выделяй только область с текстом, а не всё окно. Маленький захват быстрее и чище.",
+            "Включай <span class='item-title'>Заморозку экрана при OCR</span>, если текст движется, пропадает или меняется.",
+            "Если Windows OCR не видит язык, попробуй Tesseract или установи нужный языковой пакет Windows.",
+        ]),
+        ("Офлайн-пакеты", [
+            "<span class='item-title'>Tesseract</span> добавляет офлайн OCR и много языков распознавания.",
+            "<span class='item-title'>Argos</span> даёт офлайн-перевод через небольшие языковые пакеты.",
+            "<span class='item-title'>Hy-MT</span> - крупная локальная модель; ставь её, когда нужна офлайн-точность и есть место на диске.",
+        ]),
+        ("Обновления и portable-режим", [
+            "Кнопка обновления скачивает архив релиза и автоматически заменяет portable-папку.",
+            "Перед автозапуском положи программу в постоянную папку, иначе Windows может помнить старый путь.",
+            "Конфиг, кэш, история и локальные движки лежат в папке данных программы, поэтому её можно переносить целиком.",
+        ]),
+        ("Приватность", [
+            "Онлайн-провайдеры отправляют текст в свой сервис. Для локальной работы используй Argos, Hy-MT и Tesseract.",
+            "История переводов и копирования необязательны; отключи их, если не хочешь хранить текст локально.",
+        ]),
+    ],
+    "es": [
+        ("Mejor OCR", [
+            "Selecciona solo el área con texto, no toda la ventana.",
+            "Usa <span class='item-title'>Congelar pantalla durante OCR</span> si el texto se mueve o desaparece.",
+            "Si Windows OCR no reconoce un idioma, prueba Tesseract o instala el paquete de idioma de Windows.",
+        ]),
+        ("Paquetes offline", [
+            "<span class='item-title'>Tesseract</span> agrega OCR offline y muchos idiomas.",
+            "<span class='item-title'>Argos</span> traduce offline con paquetes pequeños.",
+            "<span class='item-title'>Hy-MT</span> es un modelo local más grande para mejor calidad offline.",
+        ]),
+        ("Actualizaciones y modo portátil", [
+            "El botón de actualización descarga el release y reemplaza la carpeta portable.",
+            "Coloca la app en una carpeta fija antes de activar inicio automático.",
+            "Config, caché, historial y motores locales viven junto a la app.",
+        ]),
+        ("Privacidad", [
+            "Los proveedores online reciben el texto. Para trabajo local usa Argos, Hy-MT y Tesseract.",
+            "El historial es opcional; desactívalo si no quieres guardar texto localmente.",
+        ]),
+    ],
+    "de": [
+        ("Bessere OCR-Ergebnisse", [
+            "Markiere nur den Textbereich, nicht das ganze Fenster.",
+            "Nutze <span class='item-title'>Bildschirm einfrieren</span>, wenn Text sich bewegt oder verschwindet.",
+            "Wenn Windows OCR eine Sprache nicht erkennt, nutze Tesseract oder installiere das Windows-Sprachpaket.",
+        ]),
+        ("Offline-Pakete", [
+            "<span class='item-title'>Tesseract</span> ergänzt Offline-OCR und viele Sprachen.",
+            "<span class='item-title'>Argos</span> übersetzt offline mit kleinen Sprachpaketen.",
+            "<span class='item-title'>Hy-MT</span> ist ein größeres lokales Modell für bessere Offline-Qualität.",
+        ]),
+        ("Updates und Portable-Modus", [
+            "Der Update-Button lädt das Release und ersetzt den portablen Ordner.",
+            "Lege die App vor Autostart in einen festen Ordner.",
+            "Konfig, Cache, Verlauf und lokale Engines liegen neben der App.",
+        ]),
+        ("Datenschutz", [
+            "Online-Anbieter erhalten den Text. Für lokale Arbeit nutze Argos, Hy-MT und Tesseract.",
+            "Verlauf ist optional; ausschalten, wenn lokal nichts gespeichert werden soll.",
+        ]),
+    ],
+    "fr": [
+        ("Meilleur OCR", [
+            "Sélectionne seulement la zone de texte, pas toute la fenêtre.",
+            "Utilise <span class='item-title'>Figer l'écran pendant l'OCR</span> si le texte bouge ou disparaît.",
+            "Si Windows OCR ne reconnaît pas une langue, essaie Tesseract ou installe le module Windows.",
+        ]),
+        ("Modules offline", [
+            "<span class='item-title'>Tesseract</span> ajoute OCR offline et beaucoup de langues.",
+            "<span class='item-title'>Argos</span> traduit offline avec de petits modules.",
+            "<span class='item-title'>Hy-MT</span> est un modèle local plus grand pour meilleure qualité offline.",
+        ]),
+        ("Mises à jour et mode portable", [
+            "Le bouton de mise à jour télécharge le release et remplace le dossier portable.",
+            "Place l'app dans un dossier stable avant d'activer le démarrage automatique.",
+            "Config, cache, historique et moteurs locaux restent à côté de l'app.",
+        ]),
+        ("Confidentialité", [
+            "Les fournisseurs en ligne reçoivent le texte. Pour rester local, utilise Argos, Hy-MT et Tesseract.",
+            "L'historique est optionnel; désactive-le si tu ne veux rien stocker localement.",
+        ]),
+    ],
+    "zh": [
+        ("提升 OCR 准确率", [
+            "只选择文字区域，不要截取整个窗口。",
+            "如果文字会移动或消失，请使用 <span class='item-title'>OCR 时冻结屏幕</span>。",
+            "如果 Windows OCR 缺少语言，请尝试 Tesseract 或安装 Windows 语言包。",
+        ]),
+        ("离线包", [
+            "<span class='item-title'>Tesseract</span> 提供离线 OCR 和多语言识别。",
+            "<span class='item-title'>Argos</span> 使用小型语言包进行离线翻译。",
+            "<span class='item-title'>Hy-MT</span> 是更大的本地模型，适合需要离线质量时使用。",
+        ]),
+        ("更新和便携模式", [
+            "更新按钮会下载 release 压缩包并替换便携文件夹。",
+            "启用自启动前，请把程序放到固定位置。",
+            "配置、缓存、历史和本地引擎都保存在程序数据目录中。",
+        ]),
+        ("隐私", [
+            "在线提供商会接收文本。需要本地处理时请使用 Argos、Hy-MT 和 Tesseract。",
+            "历史记录是可选的；如果不想本地保存文本，可以关闭。",
+        ]),
+    ],
+}
+
+HELP_ACTION_TEXT = {
+    "en": {"title": "FAQ", "guide": "Start interactive guide", "close": "Got it"},
+    "ru": {"title": "Справка", "guide": "Пройти обучение", "close": "Понятно"},
+    "es": {"title": "Ayuda", "guide": "Iniciar guía", "close": "Entendido"},
+    "de": {"title": "Hilfe", "guide": "Tour starten", "close": "Verstanden"},
+    "fr": {"title": "Aide", "guide": "Lancer le guide", "close": "Compris"},
+    "zh": {"title": "帮助", "guide": "开始引导", "close": "知道了"},
+}
+
+
+def help_action_text(lang, key):
+    text = HELP_ACTION_TEXT.get(lang, HELP_ACTION_TEXT["en"])
+    return text.get(key, HELP_ACTION_TEXT["en"].get(key, key))
+
+
 def help_text(lang):
-    sections = HELP_CONTENT.get(lang, HELP_CONTENT["en"])
-    blocks = [_HELP_STYLE]
+    sections = HELP_CONTENT.get(lang, HELP_CONTENT["en"]) + HELP_EXTRA_CONTENT.get(lang, HELP_EXTRA_CONTENT["en"])
+    intro = HELP_INTRO.get(lang, HELP_INTRO["en"])
+    blocks = [_HELP_STYLE, f'<div class="hero"><div class="hero-title">Click&apos;n&apos;Translate</div><div class="hero-subtitle">{intro}</div></div>']
     for title, items in sections:
         blocks.append(f'<div class="section"><div class="section-title">{title}</div>')
         for item in items:
@@ -1299,17 +1638,21 @@ class WelcomeDialog(QDialog):
         super().__init__(parent)
         self.parent = parent
         self._drag_position = None
+        self._animations = []
+        self.start_guide_requested = False
         self.lang = normalize_interface_language(
             parent.current_interface_language if hasattr(parent, 'current_interface_language') else 'ru'
         )
         self.setWindowTitle(welcome_text(self.lang)["window"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self.setFixedSize(580, 430)
+        self.setFixedSize(560, 390)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.init_ui()
 
     def init_ui(self):
+        previous_checked = bool(getattr(getattr(self, "checkbox", None), "isChecked", lambda: False)())
+        self._stop_animations()
         self._clear_layout()
         text = welcome_text(self.lang)
         self.setWindowTitle(text["window"])
@@ -1344,12 +1687,12 @@ class WelcomeDialog(QDialog):
             }
             QLabel#welcomeTitle {
                 color: #ffffff;
-                font-size: 28px;
+                font-size: 27px;
                 font-weight: 900;
             }
             QLabel#welcomeBody {
                 color: #d8d2e8;
-                font-size: 15px;
+                font-size: 14px;
                 line-height: 1.45;
             }
             QLabel#welcomeVersion {
@@ -1375,7 +1718,8 @@ class WelcomeDialog(QDialog):
             }
             QPushButton#welcomeLang:hover,
             QPushButton#welcomeClose:hover {
-                background: rgba(197, 179, 233, 55);
+                background: rgba(197, 179, 233, 60);
+                border: 1px solid rgba(223, 212, 255, 150);
             }
             QPushButton#welcomeTelegram {
                 background: rgba(42, 171, 238, 26);
@@ -1402,6 +1746,19 @@ class WelcomeDialog(QDialog):
             QPushButton#welcomeStart:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #dfd4ff, stop:1 #a681eb);
+            }
+            QPushButton#welcomeSkip {
+                background: rgba(255, 255, 255, 12);
+                color: #d8d2e8;
+                border: 1px solid rgba(197, 179, 233, 72);
+                border-radius: 13px;
+                padding: 10px 18px;
+                font-size: 14px;
+                font-weight: 800;
+            }
+            QPushButton#welcomeSkip:hover {
+                background: rgba(197, 179, 233, 34);
+                color: #ffffff;
             }
             QCheckBox {
                 color: #bdb4d1;
@@ -1468,7 +1825,7 @@ class WelcomeDialog(QDialog):
         close_x.setObjectName("welcomeClose")
         close_x.setFixedSize(38, 38)
         close_x.setStyleSheet("font-size: 22px; font-weight: 700;")
-        close_x.clicked.connect(self.accept)
+        close_x.clicked.connect(self.skip_guide)
         top_row.addWidget(close_x)
         card_layout.addLayout(top_row)
 
@@ -1500,6 +1857,7 @@ class WelcomeDialog(QDialog):
         card_layout.addStretch()
 
         self.checkbox = QCheckBox(text["checkbox"])
+        self.checkbox.setChecked(previous_checked)
         card_layout.addWidget(self.checkbox)
 
         actions = QHBoxLayout()
@@ -1510,31 +1868,71 @@ class WelcomeDialog(QDialog):
         actions.addWidget(self.telegram_btn)
         actions.addStretch()
 
-        self.close_btn = QPushButton(text["close"])
-        self.close_btn.setObjectName("welcomeStart")
-        self.close_btn.clicked.connect(self.accept)
-        actions.addWidget(self.close_btn)
+        self.skip_btn = QPushButton(text["skip"])
+        self.skip_btn.setObjectName("welcomeSkip")
+        self.skip_btn.clicked.connect(self.skip_guide)
+        actions.addWidget(self.skip_btn)
+
+        self.guide_btn = QPushButton(text["guide"])
+        self.guide_btn.setObjectName("welcomeStart")
+        self.guide_btn.clicked.connect(self.start_guide)
+        actions.addWidget(self.guide_btn)
         card_layout.addLayout(actions)
+
+        QTimer.singleShot(120, self._pulse_flag_button)
+
+    def _pulse_flag_button(self):
+        if not getattr(self, "flag_button", None):
+            return
+        glow = QGraphicsDropShadowEffect(self.flag_button)
+        glow.setOffset(0, 0)
+        glow.setColor(QColor(197, 179, 233, 210))
+        glow.setBlurRadius(16)
+        self.flag_button.setGraphicsEffect(glow)
+
+        animation = QtCore.QPropertyAnimation(glow, b"blurRadius", self)
+        animation.setStartValue(10)
+        animation.setEndValue(30)
+        animation.setDuration(1050)
+        animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
+        animation.setLoopCount(-1)
+        animation.start()
+        self._animations.append(animation)
+
+    def _stop_animations(self):
+        for animation in getattr(self, "_animations", []):
+            try:
+                animation.stop()
+            except Exception:
+                pass
+        self._animations = []
 
     def _clear_layout(self):
         layout = self.layout()
         if layout is None:
             return
         while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            child_layout = item.layout()
-            if child_layout is not None:
-                while child_layout.count():
-                    child_item = child_layout.takeAt(0)
-                    child_widget = child_item.widget()
-                    if child_widget is not None:
-                        child_widget.deleteLater()
+            self._delete_layout_item(layout.takeAt(0))
+
+    def _delete_layout_item(self, item):
+        widget = item.widget()
+        if widget is not None:
+            widget.deleteLater()
+        child_layout = item.layout()
+        if child_layout is not None:
+            while child_layout.count():
+                self._delete_layout_item(child_layout.takeAt(0))
 
     def open_telegram(self):
         webbrowser.open("https://t.me/jabrail_digital")
+
+    def start_guide(self):
+        self.start_guide_requested = True
+        self.accept()
+
+    def skip_guide(self):
+        self.start_guide_requested = False
+        self.accept()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -1563,18 +1961,19 @@ class WelcomeDialog(QDialog):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background-color: #11151d;
+                background-color: #0f131c;
                 color: #ffffff;
-                border: 1px solid #54617a;
-                border-radius: 8px;
+                border: 1px solid #6f5a99;
+                border-radius: 10px;
                 padding: 6px;
             }
             QMenu::item {
-                padding: 7px 20px 7px 10px;
-                border-radius: 6px;
+                padding: 8px 22px 8px 10px;
+                border-radius: 8px;
+                font-weight: 700;
             }
             QMenu::item:selected {
-                background-color: #314968;
+                background-color: rgba(197, 179, 233, 64);
             }
             QMenu::indicator {
                 width: 0px;
@@ -1588,9 +1987,21 @@ class WelcomeDialog(QDialog):
 
     def set_language(self, language_code):
         self.lang = normalize_interface_language(language_code)
-        self.parent.current_interface_language = self.lang
-        self.parent.save_config()
+        if self.parent is not None:
+            self.parent.current_interface_language = self.lang
+            if hasattr(self.parent, "config"):
+                self.parent.config["interface_language"] = self.lang
+            if hasattr(self.parent, "save_config"):
+                self.parent.save_config()
         self.init_ui()
+
+    def accept(self):
+        self._stop_animations()
+        super().accept()
+
+    def closeEvent(self, event):
+        self._stop_animations()
+        super().closeEvent(event)
 
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
@@ -1616,7 +2027,13 @@ class DarkThemeApp(QMainWindow):
             if dlg.exec_() == QDialog.Accepted:
                 if dlg.checkbox.isChecked():
                     self.config["show_update_info"] = False
-                    self.save_config()
+                if dlg.start_guide_requested:
+                    self.config["first_run_guide_completed"] = False
+                    self.config["first_run_guide_pending"] = True
+                else:
+                    self.config["first_run_guide_completed"] = True
+                    self.config["first_run_guide_pending"] = False
+                self.save_config()
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -1626,9 +2043,19 @@ class DarkThemeApp(QMainWindow):
 
         self.hotkeys_mode = False
         self.force_quit = False
+        self._guide_active = False
+        self._guide_step_index = 0
+        self._guide_effect_widget = None
+        self._guide_bubble = None
+        self._guide_waiting_action = None
+        self._guide_target_animation = None
+        self._guide_step_timer = QTimer(self)
+        self._guide_step_timer.setSingleShot(True)
+        self._guide_step_timer.timeout.connect(self._show_guide_step)
         self.init_ui()
 
         self.create_tray_icon()
+        QTimer.singleShot(700, self._maybe_start_first_run_guide)
 
         # Подписка на события хоткеев из потоков
         try:
@@ -1828,6 +2255,332 @@ class DarkThemeApp(QMainWindow):
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
             except Exception:
                 pass
+        QTimer.singleShot(250, self._maybe_start_first_run_guide)
+
+    def _maybe_start_first_run_guide(self):
+        if not self.config.get("first_run_guide_pending", DEFAULT_CONFIG["first_run_guide_pending"]):
+            return
+        if self.config.get("first_run_guide_completed", DEFAULT_CONFIG["first_run_guide_completed"]):
+            return
+        if self._guide_active:
+            return
+        if not self.isVisible():
+            return
+        self._guide_active = True
+        self._guide_step_index = 0
+        self._schedule_guide_step(0)
+
+    def _schedule_guide_step(self, delay_ms=0):
+        if not self._guide_active:
+            return
+        self._guide_step_timer.stop()
+        self._guide_step_timer.start(max(0, int(delay_ms)))
+
+    def _guide_steps(self):
+        return guide_text(self.current_interface_language)["steps"]
+
+    def _guide_current_action(self):
+        steps = self._guide_steps()
+        if not steps or self._guide_step_index >= len(steps):
+            return None
+        return steps[self._guide_step_index][0]
+
+    def _guide_target_widget(self, action):
+        if action == "language":
+            return getattr(self, "flag_button", None)
+        if action == "theme":
+            return getattr(self, "theme_button", None)
+        if action == "help":
+            return getattr(self, "help_button", None)
+        if action in ("settings", "back_home"):
+            return getattr(self, "settings_button", None)
+
+        settings_window = getattr(self, "settings_window", None)
+        if settings_window is None:
+            return None
+        if action == "ocr_engine":
+            return getattr(settings_window, "ocr_engine_combo", None)
+        if action == "translator":
+            return getattr(settings_window, "translator_combo", None)
+        if action == "hotkeys":
+            return getattr(settings_window, "hotkeys_button", None)
+        return None
+
+    def _show_guide_step(self):
+        if not self._guide_active:
+            return
+        steps = self._guide_steps()
+        if self._guide_step_index >= len(steps):
+            self._finish_first_run_guide()
+            return
+
+        action, title, body = steps[self._guide_step_index]
+        target = self._guide_target_widget(action)
+        if target is None or not target.isVisible():
+            self._schedule_guide_step(250)
+            return
+
+        self._highlight_guide_target(target, action)
+        self._ensure_guide_bubble()
+        text = guide_text(self.current_interface_language)
+        self._guide_progress.setText(text["progress"].format(
+            current=self._guide_step_index + 1,
+            total=len(steps),
+        ))
+        self._guide_title.setText(title)
+        self._guide_body.setText(body)
+        self._guide_hint.setText(text["click_hint"])
+        if hasattr(self, "_guide_skip_btn"):
+            self._guide_skip_btn.setText(text["skip"])
+        self._position_guide_bubble(target)
+        self._guide_bubble.show()
+        self._guide_bubble.raise_()
+
+    def _ensure_guide_bubble(self):
+        if self._guide_bubble is not None:
+            return
+        self._guide_bubble = QFrame(self)
+        self._guide_bubble.setObjectName("firstRunGuideBubble")
+        self._guide_bubble.setFixedSize(390, 168)
+        self._guide_bubble.setStyleSheet("""
+            QFrame#firstRunGuideBubble {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #151927, stop:1 #26183a);
+                border: 1px solid rgba(197, 179, 233, 185);
+                border-radius: 16px;
+            }
+            QLabel#firstRunGuideProgress {
+                color: #c5b3e9;
+                font-size: 12px;
+                font-weight: 900;
+            }
+            QLabel#firstRunGuideTitle {
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: 900;
+            }
+            QLabel#firstRunGuideBody {
+                color: #d8d2e8;
+                font-size: 15px;
+                line-height: 1.35;
+            }
+            QLabel#firstRunGuideHint {
+                color: #c5b3e9;
+                background: transparent;
+                border: none;
+                padding: 5px 0px;
+                font-size: 13px;
+                font-weight: 900;
+            }
+            QPushButton#firstRunGuideSkip {
+                background: rgba(255, 255, 255, 14);
+                color: #d8d2e8;
+                border: 1px solid rgba(197, 179, 233, 70);
+                border-radius: 9px;
+                padding: 5px 12px;
+                font-size: 13px;
+                font-weight: 900;
+            }
+            QPushButton#firstRunGuideSkip:hover {
+                background: rgba(197, 179, 233, 42);
+                color: #ffffff;
+            }
+        """)
+        layout = QVBoxLayout(self._guide_bubble)
+        layout.setContentsMargins(15, 11, 15, 11)
+        layout.setSpacing(5)
+
+        top_row = QHBoxLayout()
+        self._guide_title = QLabel()
+        self._guide_title.setObjectName("firstRunGuideTitle")
+        self._guide_title.setWordWrap(False)
+        top_row.addWidget(self._guide_title)
+        top_row.addStretch()
+        self._guide_progress = QLabel()
+        self._guide_progress.setObjectName("firstRunGuideProgress")
+        top_row.addWidget(self._guide_progress)
+        layout.addLayout(top_row)
+
+        self._guide_body = QLabel()
+        self._guide_body.setObjectName("firstRunGuideBody")
+        self._guide_body.setWordWrap(True)
+        self._guide_body.setMinimumHeight(66)
+        layout.addWidget(self._guide_body)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(8)
+
+        self._guide_hint = QLabel()
+        self._guide_hint.setObjectName("firstRunGuideHint")
+        self._guide_hint.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._guide_hint.setMinimumWidth(150)
+        self._guide_hint.setMaximumWidth(215)
+        bottom_row.addWidget(self._guide_hint)
+        bottom_row.addStretch()
+
+        self._guide_skip_btn = QPushButton()
+        self._guide_skip_btn.setObjectName("firstRunGuideSkip")
+        self._guide_skip_btn.setMinimumWidth(118)
+        self._guide_skip_btn.setMaximumWidth(165)
+        self._guide_skip_btn.clicked.connect(self.skip_current_guide_step)
+        bottom_row.addWidget(self._guide_skip_btn)
+        layout.addLayout(bottom_row)
+
+    def _position_guide_bubble(self, target):
+        if self._guide_bubble is None:
+            return
+        target_pos = target.mapTo(self, QtCore.QPoint(0, 0))
+        bubble_w = self._guide_bubble.width()
+        bubble_h = self._guide_bubble.height()
+        margin = 12
+
+        if target_pos.y() < 55:
+            x = target_pos.x() + target.width() + 10
+            y = 48
+        elif target_pos.x() > self.width() // 2:
+            x = target_pos.x() - bubble_w - 12
+            y = target_pos.y() - 8
+        else:
+            x = target_pos.x() + target.width() + 12
+            y = target_pos.y() - 8
+
+        x = max(margin, min(x, self.width() - bubble_w - margin))
+        y = max(48, min(y, self.height() - bubble_h - margin))
+        self._guide_bubble.move(x, y)
+
+    def _highlight_guide_target(self, target, action):
+        if self._guide_target_animation is not None:
+            try:
+                self._guide_target_animation.stop()
+            except Exception:
+                pass
+            self._guide_target_animation = None
+        if self._guide_effect_widget is not None and self._guide_effect_widget is not target:
+            try:
+                self._guide_effect_widget.removeEventFilter(self)
+                self._guide_effect_widget.setGraphicsEffect(None)
+            except Exception:
+                pass
+        self._guide_effect_widget = target
+        self._guide_waiting_action = action
+
+        try:
+            target.removeEventFilter(self)
+        except Exception:
+            pass
+        if action in ("ocr_engine", "translator"):
+            target.installEventFilter(self)
+
+        glow = QGraphicsDropShadowEffect(target)
+        glow.setOffset(0, 0)
+        glow.setColor(QColor(197, 179, 233, 230))
+        glow.setBlurRadius(20)
+        target.setGraphicsEffect(glow)
+
+        animation = QtCore.QPropertyAnimation(glow, b"blurRadius", self)
+        animation.setStartValue(12)
+        animation.setEndValue(34)
+        animation.setDuration(900)
+        animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
+        animation.setLoopCount(-1)
+        animation.start()
+        self._guide_target_animation = animation
+
+    def _complete_guide_step(self, action):
+        if not self._guide_active:
+            return
+        if action != self._guide_current_action():
+            return
+        self._guide_step_index += 1
+        self._schedule_guide_step(120)
+
+    def skip_current_guide_step(self):
+        if not self._guide_active:
+            return
+        action = self._guide_current_action()
+        self._guide_step_index += 1
+        if action == "settings" and getattr(self, "settings_window", None) is None:
+            self.show_settings()
+        self._schedule_guide_step(80)
+
+    def skip_first_run_guide(self):
+        self.config["first_run_guide_completed"] = True
+        self.config["first_run_guide_pending"] = False
+        self.save_config()
+        self._guide_active = False
+        self._guide_waiting_action = None
+        self._guide_step_timer.stop()
+
+        if self._guide_effect_widget is not None:
+            try:
+                self._guide_effect_widget.removeEventFilter(self)
+                self._guide_effect_widget.setGraphicsEffect(None)
+            except Exception:
+                pass
+        self._guide_effect_widget = None
+
+        if self._guide_target_animation is not None:
+            try:
+                self._guide_target_animation.stop()
+            except Exception:
+                pass
+            self._guide_target_animation = None
+
+        if self._guide_bubble is not None:
+            self._guide_bubble.hide()
+
+    def _finish_first_run_guide(self):
+        if not self._guide_active:
+            return
+        self.config["first_run_guide_completed"] = True
+        self.config["first_run_guide_pending"] = False
+        self.save_config()
+        self._guide_active = False
+        self._guide_waiting_action = None
+        self._guide_step_timer.stop()
+
+        if self._guide_effect_widget is not None:
+            try:
+                self._guide_effect_widget.removeEventFilter(self)
+                self._guide_effect_widget.setGraphicsEffect(None)
+            except Exception:
+                pass
+        self._guide_effect_widget = None
+        if self._guide_target_animation is not None:
+            try:
+                self._guide_target_animation.stop()
+            except Exception:
+                pass
+            self._guide_target_animation = None
+
+        self._ensure_guide_bubble()
+        text = guide_text(self.current_interface_language)
+        self._guide_progress.setText("")
+        self._guide_title.setText(text["done_title"])
+        self._guide_body.setText(text["done_body"])
+        self._guide_hint.setText("")
+        self._guide_bubble.move(
+            max(12, (self.width() - self._guide_bubble.width()) // 2),
+            max(48, (self.height() - self._guide_bubble.height()) // 2),
+        )
+        self._guide_bubble.show()
+        self._guide_bubble.raise_()
+        QTimer.singleShot(1800, self._hide_guide_bubble)
+
+    def _hide_guide_bubble(self):
+        if self._guide_bubble is not None:
+            self._guide_bubble.hide()
+
+    def eventFilter(self, watched, event):
+        if (
+            self._guide_active
+            and watched is self._guide_effect_widget
+            and event.type() == QtCore.QEvent.MouseButtonPress
+            and self._guide_waiting_action in ("ocr_engine", "translator")
+        ):
+            action = self._guide_waiting_action
+            QTimer.singleShot(180, lambda: self._complete_guide_step(action))
+        return super().eventFilter(watched, event)
 
     def nativeEvent(self, eventType, message):
         event_name = eventType.decode("utf-8", "ignore") if isinstance(eventType, bytes) else str(eventType)
@@ -2187,6 +2940,7 @@ class DarkThemeApp(QMainWindow):
         self.update_theme_icon()
         if self.settings_window is not None:
             self.settings_window.apply_theme()
+        self._complete_guide_step("theme")
 
     def toggle_language(self):
         codes = [option["code"] for option in INTERFACE_LANGUAGE_OPTIONS]
@@ -2245,6 +2999,7 @@ class DarkThemeApp(QMainWindow):
             action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
         menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+        self._complete_guide_step("language")
 
     def set_interface_language(self, language_code):
         language_code = normalize_interface_language(language_code)
@@ -2268,13 +3023,43 @@ class DarkThemeApp(QMainWindow):
         theme = self.current_theme
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("FAQ" if lang == "ru" else "FAQ")
-        dialog.setFixedSize(550, 550) # Вернули фиксированный размер
+        dialog.setWindowTitle(help_action_text(lang, "title"))
+        dialog.setFixedSize(610, 620)
         dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        dialog.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(10)
+        icon = QLabel("?")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(38, 38)
+        icon.setStyleSheet("""
+            QLabel {
+                color: #111827;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #dfd4ff, stop:1 #8f6fd1);
+                border-radius: 14px;
+                font-size: 19px;
+                font-weight: 900;
+            }
+        """)
+        title_row.addWidget(icon)
+
+        title_stack = QVBoxLayout()
+        title_stack.setSpacing(0)
+        title_label = QLabel(help_action_text(lang, "title"))
+        title_label.setStyleSheet("font-size: 21px; font-weight: 900; color: #ffffff;")
+        subtitle_label = QLabel("Click'n'Translate")
+        subtitle_label.setStyleSheet("font-size: 12px; font-weight: 800; color: #a994d2;")
+        title_stack.addWidget(title_label)
+        title_stack.addWidget(subtitle_label)
+        title_row.addLayout(title_stack)
+        title_row.addStretch()
+        layout.addLayout(title_row)
 
         # Текст FAQ всегда строится из актуального языка интерфейса.
         help_html = help_text(lang)
@@ -2285,30 +3070,34 @@ class DarkThemeApp(QMainWindow):
 
         # Стилизация под тему
         if theme == "Темная":
-            dialog.setStyleSheet("QDialog { background-color: #121212; }")
+            dialog.setStyleSheet("""
+                QDialog {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
+                }
+            """)
             text_edit.setStyleSheet("""
                 QTextEdit {
-                    background-color: #1a1a2e;
+                    background-color: rgba(9, 12, 20, 165);
                     color: #e0e0e0;
-                    border: none;
-                    border-radius: 12px;
+                    border: 1px solid rgba(197, 179, 233, 70);
+                    border-radius: 16px;
                     padding: 15px;
                     font-size: 13px;
                     line-height: 1.5;
                 }
                 QScrollBar:vertical {
-                    background: #1a1a2e;
-                    width: 12px;
+                    background: transparent;
+                    width: 10px;
                     margin: 4px 2px 4px 2px;
-                    border-radius: 6px;
                 }
                 QScrollBar::handle:vertical {
-                    background: #7A5FA1;
+                    background: #8f6fd1;
                     min-height: 30px;
                     border-radius: 5px;
                 }
                 QScrollBar::handle:vertical:hover {
-                    background: #9A7FC1;
+                    background: #c5b3e9;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                     height: 0;
@@ -2319,30 +3108,34 @@ class DarkThemeApp(QMainWindow):
                 }
             """)
         else:
-            dialog.setStyleSheet("QDialog { background-color: #f8f8f8; }")
+            dialog.setStyleSheet("""
+                QDialog {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
+                }
+            """)
             text_edit.setStyleSheet("""
                 QTextEdit {
-                    background-color: #ffffff;
-                    color: #333333;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 12px;
+                    background-color: rgba(9, 12, 20, 165);
+                    color: #e0e0e0;
+                    border: 1px solid rgba(197, 179, 233, 70);
+                    border-radius: 16px;
                     padding: 15px;
                     font-size: 13px;
                     line-height: 1.5;
                 }
                 QScrollBar:vertical {
-                    background: #f0f0f0;
-                    width: 12px;
+                    background: transparent;
+                    width: 10px;
                     margin: 4px 2px 4px 2px;
-                    border-radius: 6px;
                 }
                 QScrollBar::handle:vertical {
-                    background: #7A5FA1;
+                    background: #8f6fd1;
                     min-height: 30px;
                     border-radius: 5px;
                 }
                 QScrollBar::handle:vertical:hover {
-                    background: #9A7FC1;
+                    background: #7a5fa1;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                     height: 0;
@@ -2352,26 +3145,76 @@ class DarkThemeApp(QMainWindow):
 
         layout.addWidget(text_edit)
 
-        # Кнопка закрытия
-        close_btn = QPushButton(ui_text(lang, "got_it"))
-        close_btn.setStyleSheet("""
+        button_row = QHBoxLayout()
+        button_row.setSpacing(10)
+
+        guide_btn = QPushButton(help_action_text(lang, "guide"))
+        guide_btn.setStyleSheet("""
             QPushButton {
-                background-color: #7A5FA1;
-                color: white;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #c5b3e9, stop:1 #8f6fd1);
+                color: #111827;
                 border: none;
-                border-radius: 8px;
-                padding: 10px 32px;
+                border-radius: 12px;
+                padding: 10px 22px;
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 900;
             }
             QPushButton:hover {
-                background-color: #8B70B2;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #dfd4ff, stop:1 #a681eb);
+            }
+        """)
+        guide_btn.clicked.connect(lambda: self._close_help_and_start_guide(dialog))
+        button_row.addWidget(guide_btn)
+        button_row.addStretch()
+
+        # Кнопка закрытия
+        close_btn = QPushButton(help_action_text(lang, "close"))
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 18);
+                color: #efe8ff;
+                border: 1px solid rgba(197, 179, 233, 92);
+                border-radius: 12px;
+                padding: 10px 26px;
+                font-size: 14px;
+                font-weight: 900;
+            }
+            QPushButton:hover {
+                background-color: rgba(197, 179, 233, 48);
             }
         """)
         close_btn.clicked.connect(dialog.close)
-        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        button_row.addWidget(close_btn)
+        layout.addLayout(button_row)
 
         dialog.exec_()
+        self._complete_guide_step("help")
+
+    def _close_help_and_start_guide(self, dialog):
+        dialog.accept()
+        QTimer.singleShot(120, self.start_first_run_guide)
+
+    def start_first_run_guide(self):
+        self.config["first_run_guide_completed"] = False
+        self.config["first_run_guide_pending"] = True
+        self.save_config()
+        self._guide_active = False
+        self._guide_step_index = 0
+        self._guide_waiting_action = None
+        if self._guide_effect_widget is not None:
+            try:
+                self._guide_effect_widget.removeEventFilter(self)
+                self._guide_effect_widget.setGraphicsEffect(None)
+            except Exception:
+                pass
+        self._guide_effect_widget = None
+        if self._guide_bubble is not None:
+            self._guide_bubble.hide()
+        self.show_main_screen()
+        self.show_window_from_tray(force_show=True)
+        QTimer.singleShot(250, self._maybe_start_first_run_guide)
 
     def set_settings_button_to_home(self):
         if self.current_theme == "Темная":
@@ -2499,6 +3342,7 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.start_button)
         self.start_button.clicked.connect(self.minimize_to_tray)
         self.apply_theme()
+        self._complete_guide_step("back_home")
 
     def show_settings(self):
         self.clear_layout()
@@ -2507,6 +3351,7 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.settings_window)
         self.set_settings_button_to_home()
         self.apply_theme()
+        self._complete_guide_step("settings")
 
     def update_languages(self):
         src = self.source_lang.currentText()
