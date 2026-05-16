@@ -6,6 +6,7 @@ __pycache__/
 # Distribution / packaging
 build/
 dist/
+releases/
 *.egg-info/
 
 # Build scripts and specs
@@ -27,6 +28,10 @@ temp/
 
 # Downloaded OCR engine
 ocr/tesseract/
+
+# Downloaded local translator engines/models
+translators/
+*.gguf
 
 # Logs and debug files
 *.log
@@ -61,6 +66,10 @@ data/config.json
 data/copy_history.json
 data/translation_history.json
 data/settings.json
+data/cache/
+data/logs/
+data/**/*.png
+data/**/*.log
 
 # Shell scripts
 *.cmd

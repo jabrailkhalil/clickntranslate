@@ -9,7 +9,8 @@ import re
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
-    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication, QToolButton
+    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication, QToolButton,
+    QDialog, QProgressBar
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon
@@ -44,6 +45,27 @@ TESSERACT_BUNDLE_URL_WIN64 = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/"
     f"{TESSERACT_BUNDLE_RELEASE_TAG}/{TESSERACT_BUNDLE_NAME_WIN64}"
 )
+HYMT_MODEL_FILE = "HY-MT1.5-1.8B-Q4_K_M.gguf"
+HYMT_MODEL_URL = (
+    "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/"
+    f"{HYMT_MODEL_FILE}?download=true"
+)
+HYMT_MODEL_SHA256 = "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7"
+HYMT_RUNTIME_ARCHIVE_NAME_WIN64 = "llama-b9048-bin-win-cpu-x64.zip"
+HYMT_RUNTIME_URL_WIN64 = (
+    "https://github.com/ggml-org/llama.cpp/releases/download/b9048/"
+    f"{HYMT_RUNTIME_ARCHIVE_NAME_WIN64}"
+)
+HYMT_RUNTIME_SHA256 = "7412d3b73de94b9d29d3a7f9f971c68f35bac3cc47c1a45fc60b01b962663938"
+HYMT_LICENSE_URL = "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/License.txt?download=true"
+HYMT_README_URL = "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/README.md?download=true"
+HYMT_NOTICE_TEXT = (
+    "Tencent HY is licensed under the Tencent HY Community License Agreement, "
+    "Copyright (c) 2025 Tencent. All Rights Reserved. The trademark rights of "
+    "\"Tencent HY\" are owned by Tencent or its affiliate."
+)
+HYMT_ENGINE_KEY = "hymt"
+HYMT_ENGINE_DISPLAY = "Hy-MT"
 
 
 class UpdateCancelledError(RuntimeError):
@@ -51,6 +73,10 @@ class UpdateCancelledError(RuntimeError):
 
 
 class TesseractInstallCancelledError(RuntimeError):
+    pass
+
+
+class HyMTInstallCancelledError(RuntimeError):
     pass
 
 
@@ -73,23 +99,174 @@ class UpdateProgressDialog(QProgressDialog):
         super().reject()
 
 
-class TesseractInstallProgressDialog(QProgressDialog):
-    def __init__(self, owner):
-        super().__init__("", None, 0, 100, owner)
+class TesseractInstallProgressDialog(QDialog):
+    canceled = QtCore.pyqtSignal()
+
+    def __init__(self, owner, title="Tesseract", in_progress_attr="_tesseract_install_in_progress", cancel_callback=None):
+        super().__init__(None)
         self._owner = owner
+        self._title = title
+        self._in_progress_attr = in_progress_attr
+        self._cancel_callback = cancel_callback
+        self._drag_position = None
+        self._user_minimized = False
+        owner_parent = getattr(owner, "parent", None)
+        self._lang = getattr(owner_parent, "current_interface_language", "en")
+        self.setWindowTitle(title)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setWindowModality(Qt.NonModal)
+        self.setMinimumWidth(430)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #111111;
+                color: #ffffff;
+                border: 1px solid #7a61b3;
+                border-radius: 10px;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 15px;
+            }
+            QPushButton {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border: 1px solid #6f5aa8;
+                padding: 5px 12px;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+            }
+            QProgressBar {
+                border: 1px solid #555555;
+                border-radius: 6px;
+                text-align: center;
+                background: #1d1d1d;
+                color: #ffffff;
+                min-height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #7a61b3;
+                border-radius: 5px;
+            }
+            QToolButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 15px;
+                font-weight: bold;
+            }
+            QToolButton:hover {
+                background-color: #2b2440;
+            }
+        """)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(1, 1, 1, 1)
+        outer.setSpacing(0)
+
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(12, 8, 8, 5)
+        title_row.setSpacing(6)
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c5b3e9;")
+        title_row.addWidget(self.title_label)
+        title_row.addStretch()
+        self.minimize_button = QToolButton(self)
+        self.minimize_button.setText("–")
+        self.minimize_button.setToolTip("Свернуть" if self._lang == "ru" else "Minimize")
+        self.minimize_button.setFixedSize(28, 24)
+        self.minimize_button.clicked.connect(self._minimize_to_taskbar)
+        title_row.addWidget(self.minimize_button)
+        self.close_button = QToolButton(self)
+        self.close_button.setText("×")
+        self.close_button.setToolTip("Отменить" if self._lang == "ru" else "Cancel")
+        self.close_button.setFixedSize(28, 24)
+        self.close_button.clicked.connect(self.reject)
+        title_row.addWidget(self.close_button)
+        outer.addLayout(title_row)
+
+        body = QVBoxLayout()
+        body.setContentsMargins(16, 8, 16, 16)
+        body.setSpacing(10)
+        self.message_label = QLabel("")
+        self.message_label.setAlignment(Qt.AlignCenter)
+        body.addWidget(self.message_label)
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        body.addWidget(self.progress_bar)
+        self.cancel_button = QPushButton("Отменить" if self._lang == "ru" else "Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
+        outer.addLayout(body)
+
+    def _minimize_to_taskbar(self):
+        self._user_minimized = True
+        self.showMinimized()
+
+    def setCancelButtonText(self, text):
+        self.cancel_button.setText(text)
+        self.close_button.setToolTip(text)
+
+    def setLabelText(self, text):
+        self.message_label.setText(text)
+
+    def setRange(self, minimum, maximum):
+        self.progress_bar.setRange(minimum, maximum)
+
+    def setValue(self, value):
+        self.progress_bar.setValue(value)
+
+    def setAutoClose(self, _value):
+        pass
+
+    def setAutoReset(self, _value):
+        pass
+
+    def setMinimumDuration(self, _value):
+        pass
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.pos().y() <= 38:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.WindowStateChange:
+            self._user_minimized = self.isMinimized()
+        super().changeEvent(event)
 
     def closeEvent(self, event):
-        if self._owner and getattr(self._owner, "_tesseract_install_in_progress", False):
-            self._owner._request_tesseract_install_cancel()
+        if self._owner and getattr(self._owner, self._in_progress_attr, False):
+            self._request_cancel()
             event.ignore()
             return
         super().closeEvent(event)
 
     def reject(self):
-        if self._owner and getattr(self._owner, "_tesseract_install_in_progress", False):
-            self._owner._request_tesseract_install_cancel()
+        if self._owner and getattr(self._owner, self._in_progress_attr, False):
+            self._request_cancel()
             return
         super().reject()
+
+    def _request_cancel(self):
+        if callable(self._cancel_callback):
+            self._cancel_callback()
+            return
+        if self._owner and hasattr(self._owner, "_request_tesseract_install_cancel"):
+            self._owner._request_tesseract_install_cancel()
 
 
 def _normalize_version(version_text):
@@ -254,6 +431,7 @@ class SettingsWindow(QWidget):
         self.parent = parent
         self.hotkeys_mode = False
         self.previous_ocr_engine = None  # Для отката OCR движка при отмене загрузки
+        self.previous_translator_engine = None
         self._update_in_progress = False
         self._update_phase = "idle"
         self._update_temp_dir = ""
@@ -262,6 +440,12 @@ class SettingsWindow(QWidget):
         self._tesseract_install_phase = "idle"
         self._tesseract_temp_dir = ""
         self._tesseract_cancel_requested = threading.Event()
+        self._hymt_install_in_progress = False
+        self._hymt_install_phase = "idle"
+        self._hymt_temp_dir = ""
+        self._hymt_cancel_requested = threading.Event()
+        self.hymt_progress = None
+        self._parent_was_topmost_before_tesseract = None
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.init_ui()
@@ -408,10 +592,10 @@ class SettingsWindow(QWidget):
         tr_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
 
         self.translator_combo = QComboBox()
-        # Порядок: Google первый
-        self.translator_combo.addItems(["Google", "Argos", "MyMemory", "Lingva", "LibreTranslate"])
+        # Порядок: Google первый, офлайн-движки рядом.
+        self.translator_combo.addItems(["Google", "Argos", HYMT_ENGINE_DISPLAY, "MyMemory", "Lingva", "LibreTranslate"])
         # Маппинг индексов на имена движков (соответствует порядку в addItems)
-        self._translator_engines = ["google", "argos", "mymemory", "lingva", "libretranslate"]
+        self._translator_engines = ["google", "argos", HYMT_ENGINE_KEY, "mymemory", "lingva", "libretranslate"]
         
         current_tr = self.parent.config.get("translator_engine", "Google").lower()
         try:
@@ -420,9 +604,36 @@ class SettingsWindow(QWidget):
             idx = 0 # Google по умолчанию
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.currentIndexChanged.connect(self._on_translator_changed)
-        self.translator_combo.setStyleSheet("margin-left:6px;")
+        self.translator_combo.currentIndexChanged.connect(lambda _idx: self._sync_translator_engine_delete_button())
+        self.translator_combo.setStyleSheet("margin-left:6px; padding-right:18px;")
         self.translator_combo.setFixedWidth(130)
         self.translator_combo.setFixedHeight(32)
+        self.translator_combo.installEventFilter(self)
+        self.translator_engine_delete_btn = QToolButton(self.translator_combo)
+        self.translator_engine_delete_btn.setObjectName("translatorEngineDeleteButton")
+        self.translator_engine_delete_btn.setText("x")
+        self.translator_engine_delete_btn.setCursor(Qt.PointingHandCursor)
+        self.translator_engine_delete_btn.setToolTip(
+            "Удалить локальный Hy-MT" if lang == "ru" else "Remove local Hy-MT"
+        )
+        self.translator_engine_delete_btn.clicked.connect(self.remove_hymt_engine)
+        self.translator_engine_delete_btn.setStyleSheet("""
+            QToolButton#translatorEngineDeleteButton {
+                background-color: rgba(212, 68, 68, 0.85);
+                color: #ffffff;
+                border: none;
+                border-radius: 7px;
+                font-size: 10px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+            }
+            QToolButton#translatorEngineDeleteButton:hover {
+                background-color: #d44444;
+            }
+        """)
+        self._sync_translator_engine_delete_button()
+        QtCore.QTimer.singleShot(0, self._sync_translator_engine_delete_button)
         
         # Выравниваем
         row2.addWidget(tr_label) # Alignment внутри виджета
@@ -430,8 +641,8 @@ class SettingsWindow(QWidget):
         
         # Подсказки для переводчиков
         tr_tooltips = {
-            "ru": "Google — быстрый, точный, нужен интернет\nArgos — офлайн, без интернета, приватный\nMyMemory — бесплатный API, лимит 5000 симв/день\nLingva — прокси Google, более стабильный\nLibreTranslate — открытый, бесплатный",
-            "en": "Google — fast, accurate, needs internet\nArgos — offline, no internet, private\nMyMemory — free API, 5000 chars/day limit\nLingva — Google proxy, more stable\nLibreTranslate — open source, free"
+            "ru": "Google — быстрый, точный, нужен интернет\nArgos — офлайн, без интернета, приватный\nHy-MT — локальная LLM-модель, ставится отдельным пакетом\nMyMemory — бесплатный API, лимит 5000 симв/день\nLingva — прокси Google, более стабильный\nLibreTranslate — открытый, бесплатный",
+            "en": "Google — fast, accurate, needs internet\nArgos — offline, no internet, private\nHy-MT — local LLM model, installed as a separate package\nMyMemory — free API, 5000 chars/day limit\nLingva — Google proxy, more stable\nLibreTranslate — open source, free"
         }
         self.translator_combo.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
         tr_label.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
@@ -1320,16 +1531,25 @@ class SettingsWindow(QWidget):
 
         def _score(a):
             name = (a.get("name") or "").lower()
+            if any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime")):
+                return -1
             score = 0
             if "clickntranslate" in name:
                 score += 50
+            if re.search(r"clickntranslate-v?\d", name):
+                score += 30
             if "win" in name or "windows" in name:
                 score += 20
+            if "x64" in name or "win64" in name:
+                score += 10
             if "portable" in name:
                 score += 10
             return score
 
-        return sorted(zip_assets, key=_score, reverse=True)[0]
+        candidates = [asset for asset in zip_assets if _score(asset) >= 0]
+        if not candidates:
+            return None
+        return sorted(candidates, key=_score, reverse=True)[0]
 
     def _pick_checksum_url(self, assets, asset_name):
         if not asset_name:
@@ -1711,12 +1931,7 @@ try {
     if ($exeMatch) {
         $payloadRoot = $exeMatch.DirectoryName
     } else {
-        $dirs = Get-ChildItem -LiteralPath $extractDir -Directory -Force
-        if ($dirs.Count -eq 1) {
-            $payloadRoot = $dirs[0].FullName
-        } else {
-            $payloadRoot = $extractDir
-        }
+        throw "Update archive does not contain $ExeName"
     }
 
     Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
@@ -1937,6 +2152,12 @@ finally {
             QtCore.QEvent.EnabledChange,
         ):
             self._sync_ocr_engine_delete_button()
+        if obj is getattr(self, "translator_combo", None) and event.type() in (
+            QtCore.QEvent.Resize,
+            QtCore.QEvent.Show,
+            QtCore.QEvent.EnabledChange,
+        ):
+            self._sync_translator_engine_delete_button()
         return super().eventFilter(obj, event)
 
     def _position_ocr_engine_delete_button(self):
@@ -1965,17 +2186,66 @@ finally {
         button.setVisible(show_button)
         button.setEnabled(show_button)
 
+    def _position_translator_engine_delete_button(self):
+        combo = getattr(self, "translator_combo", None)
+        button = getattr(self, "translator_engine_delete_btn", None)
+        if combo is None or button is None:
+            return
+        button_size = 14
+        button.setFixedSize(button_size, button_size)
+        x_pos = max(0, combo.width() - 38)
+        y_pos = max(0, (combo.height() - button_size) // 2)
+        button.move(x_pos, y_pos)
+        button.raise_()
+
+    def _sync_translator_engine_delete_button(self):
+        button = getattr(self, "translator_engine_delete_btn", None)
+        combo = getattr(self, "translator_combo", None)
+        if button is None or combo is None:
+            return
+        self._position_translator_engine_delete_button()
+        show_button = (
+            self._current_translator_engine_from_combo() == HYMT_ENGINE_KEY
+            and self._hymt_installed()
+            and not self._hymt_install_in_progress
+        )
+        button.setVisible(show_button)
+        button.setEnabled(show_button)
+
     def _restore_settings_view(self):
         try:
+            app = QApplication.instance()
+            if app is not None:
+                app.setQuitOnLastWindowClosed(False)
             if self.parent is not None:
-                self.parent.show()
-                self.parent.raise_()
-                self.parent.activateWindow()
-            self.show()
-            self.raise_()
-            self.activateWindow()
+                if not self.parent.isVisible():
+                    self.parent.show()
+            if not self.isVisible():
+                self.show()
         except Exception:
             pass
+
+    def _set_parent_topmost_for_tesseract_install(self, enabled):
+        parent = getattr(self, "parent", None)
+        if parent is None:
+            return
+        try:
+            is_topmost = bool(parent.windowFlags() & Qt.WindowStaysOnTopHint)
+            if not enabled and self._parent_was_topmost_before_tesseract is None:
+                self._parent_was_topmost_before_tesseract = is_topmost
+            should_be_topmost = enabled and bool(self._parent_was_topmost_before_tesseract)
+            if is_topmost == should_be_topmost:
+                return
+            was_visible = parent.isVisible()
+            parent.setWindowFlag(Qt.WindowStaysOnTopHint, should_be_topmost)
+            if was_visible:
+                parent.show()
+        except Exception:
+            pass
+
+    def _restore_parent_topmost_after_tesseract_install(self):
+        self._set_parent_topmost_for_tesseract_install(True)
+        self._parent_was_topmost_before_tesseract = None
 
     def _portable_app_dir(self):
         if getattr(sys, "frozen", False):
@@ -2079,13 +2349,123 @@ finally {
     def save_ocr_engine(self, text):
         self.auto_save_setting("ocr_engine", text)
 
+    def _local_hymt_dir(self):
+        return os.path.join(self._portable_app_dir(), "translators", "hymt")
+
+    def _delete_local_hymt_dir(self):
+        hymt_dir = self._local_hymt_dir()
+        if not os.path.isdir(hymt_dir):
+            return True, ""
+        try:
+            shutil.rmtree(hymt_dir, ignore_errors=False)
+            self._reset_hymt_runtime_cache()
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+    def _find_hymt_model_under(self, root_dir):
+        if not root_dir or not os.path.isdir(root_dir):
+            return ""
+        direct_path = os.path.join(root_dir, HYMT_MODEL_FILE)
+        if os.path.isfile(direct_path):
+            return direct_path
+        for current_root, _dirs, files in os.walk(root_dir):
+            for name in files:
+                lower = name.lower()
+                if lower == HYMT_MODEL_FILE.lower() or (lower.endswith(".gguf") and "hy-mt" in lower):
+                    return os.path.join(current_root, name)
+        return ""
+
+    def _find_hymt_runner_under(self, root_dir):
+        if not root_dir or not os.path.isdir(root_dir):
+            return ""
+        candidates = ("hymt.exe", "llama-cli.exe", "llama-run.exe", "main.exe")
+        for name in candidates:
+            direct_path = os.path.join(root_dir, name)
+            if os.path.isfile(direct_path):
+                return direct_path
+        for current_root, _dirs, files in os.walk(root_dir):
+            lower_files = {name.lower(): name for name in files}
+            for candidate in candidates:
+                if candidate in lower_files:
+                    return os.path.join(current_root, lower_files[candidate])
+        return ""
+
+    def _hymt_installed(self):
+        root_dir = self._local_hymt_dir()
+        return bool(self._find_hymt_model_under(root_dir) and self._find_hymt_runner_under(root_dir))
+
+    def _reset_hymt_runtime_cache(self):
+        try:
+            import translater
+            if hasattr(translater, "_hymt_runtime_cache"):
+                translater._hymt_runtime_cache = None
+            translater._translator_config_cache = None
+            translater._translator_config_mtime = 0
+        except Exception:
+            pass
+
+    def _set_translator_combo_silently(self, engine_name):
+        if not hasattr(self, "translator_combo"):
+            return
+        idx = 0
+        if hasattr(self, "_translator_engines"):
+            try:
+                idx = self._translator_engines.index(str(engine_name).lower())
+            except ValueError:
+                idx = 0
+        self.translator_combo.blockSignals(True)
+        self.translator_combo.setCurrentIndex(idx)
+        self.translator_combo.blockSignals(False)
+        self._sync_translator_engine_delete_button()
+
+    def _current_translator_engine_from_combo(self):
+        combo = getattr(self, "translator_combo", None)
+        if combo is None:
+            return "google"
+        idx = combo.currentIndex()
+        if hasattr(self, "_translator_engines") and 0 <= idx < len(self._translator_engines):
+            return self._translator_engines[idx]
+        return "google"
+
     def _on_translator_changed(self, idx):
         # Сохраняем имя движка из списка
         if hasattr(self, '_translator_engines') and 0 <= idx < len(self._translator_engines):
             value = self._translator_engines[idx]
         else:
-            value = "argos"
-        self.auto_save_setting("translator_engine", value)
+            value = "google"
+        if value != HYMT_ENGINE_KEY:
+            self.auto_save_setting("translator_engine", value)
+            return
+
+        self.previous_translator_engine = self.parent.config.get("translator_engine", "Google").lower()
+        if self._hymt_installed():
+            self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
+            return
+
+        is_ru = self.parent.current_interface_language == "ru"
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Hy-MT не найден" if is_ru else "Hy-MT not found")
+        msg.setText(
+            "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\n"
+            "Будет скачано около 1.2 ГБ: модель Hy-MT и локальный llama.cpp runtime."
+            if is_ru else
+            "The local Hy-MT model is not installed. Download and install the offline translation package?\n\n"
+            "About 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime."
+        )
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
+        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        msg.exec_()
+        if msg.clickedButton() == yes_btn:
+            self.start_hymt_install()
+            return
+
+        fallback = self.previous_translator_engine or "google"
+        self._set_translator_combo_silently(fallback)
+        self.auto_save_setting("translator_engine", fallback)
 
     def start_download_thread(self):
         self.start_tesseract_install()
@@ -2100,6 +2480,7 @@ finally {
         self._tesseract_temp_dir = ""
         self.ocr_engine_combo.setEnabled(False)
         self._sync_ocr_engine_delete_button()
+        self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress("Подготовка установки Tesseract..." if is_ru else "Preparing Tesseract install...", 0)
         threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
 
@@ -2255,7 +2636,7 @@ finally {
             self.progress = TesseractInstallProgressDialog(self)
             self.progress.setWindowTitle("Tesseract")
             self.progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
-            self.progress.setWindowModality(Qt.WindowModal)
+            self.progress.setWindowModality(Qt.NonModal)
             self.progress.setAutoClose(False)
             self.progress.setAutoReset(False)
             self.progress.setMinimumDuration(0)
@@ -2263,24 +2644,21 @@ finally {
             self.progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             self.progress.canceled.connect(self._request_tesseract_install_cancel)
             try:
-                self.progress.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+                owner_window = self.window()
+                owner_center = owner_window.frameGeometry().center()
+                progress_frame = self.progress.frameGeometry()
+                progress_frame.moveCenter(owner_center)
+                self.progress.move(progress_frame.topLeft())
             except Exception:
                 pass
-            self.progress.setStyleSheet("""
-                QProgressDialog { background-color: #111111; color: #ffffff; border: 1px solid #6f5aa8; border-radius: 8px; }
-                QLabel { color: #ffffff; font-size: 15px; }
-                QPushButton { background-color: #1e1e1e; color: #ffffff; border: 1px solid #6f5aa8; padding: 5px 12px; }
-                QPushButton:hover { background-color: #333333; }
-                QProgressBar { border: 1px solid #555555; border-radius: 6px; text-align: center; background: #1d1d1d; color: #ffffff; min-height: 20px; }
-                QProgressBar::chunk { background-color: #7a61b3; border-radius: 5px; }
-            """)
         self.progress.setLabelText(text)
         if determinate:
             self.progress.setRange(0, 100)
             self.progress.setValue(max(0, min(100, int(percent))))
         else:
             self.progress.setRange(0, 0)
-        self.progress.show()
+        if not self.progress.isVisible() and not getattr(self.progress, "_user_minimized", False):
+            self.progress.show()
 
     @QtCore.pyqtSlot(str, int, bool)
     def _on_tesseract_progress(self, text, percent, determinate):
@@ -2290,10 +2668,12 @@ finally {
         if hasattr(self, "progress") and self.progress is not None:
             try:
                 self.progress.blockSignals(True)
-                self.progress.close()
+                try:
+                    self.progress.hide()
+                finally:
+                    self.progress.blockSignals(False)
             except Exception:
                 pass
-            self.progress = None
 
     def _request_tesseract_install_cancel(self):
         if not self._tesseract_install_in_progress:
@@ -2308,6 +2688,7 @@ finally {
         self._tesseract_cancel_requested.clear()
         self.ocr_engine_combo.setEnabled(True)
         self._sync_ocr_engine_delete_button()
+        self._restore_parent_topmost_after_tesseract_install()
 
     @QtCore.pyqtSlot(str)
     def _on_tesseract_install_ready(self, tesseract_path):
@@ -2359,6 +2740,405 @@ finally {
             if is_ru else
             "Tesseract installation canceled. Temporary files were removed."
         )
+
+    def start_hymt_install(self):
+        if self._hymt_install_in_progress or self._tesseract_install_in_progress:
+            return
+        is_ru = self.parent.current_interface_language == "ru"
+        self._hymt_install_in_progress = True
+        self._hymt_install_phase = "starting"
+        self._hymt_cancel_requested.clear()
+        self._hymt_temp_dir = ""
+        self.translator_combo.setEnabled(False)
+        self._sync_translator_engine_delete_button()
+        self._set_parent_topmost_for_tesseract_install(False)
+        self._show_hymt_progress(
+            "Подготовка установки Hy-MT..." if is_ru else "Preparing Hy-MT install...",
+            0
+        )
+        threading.Thread(target=self._install_hymt_worker, daemon=True).start()
+
+    def _get_hymt_download_plan(self, is_x64=True):
+        if not is_x64:
+            raise RuntimeError("Автоматическая установка Hy-MT поддерживает только Windows x64.")
+        return {
+            "runtime": {
+                "name": HYMT_RUNTIME_ARCHIVE_NAME_WIN64,
+                "url": HYMT_RUNTIME_URL_WIN64,
+                "sha256": HYMT_RUNTIME_SHA256,
+            },
+            "model": {
+                "name": HYMT_MODEL_FILE,
+                "url": HYMT_MODEL_URL,
+                "sha256": HYMT_MODEL_SHA256,
+            },
+            "docs": [
+                {
+                    "name": "License.txt",
+                    "url": HYMT_LICENSE_URL,
+                },
+                {
+                    "name": "README.md",
+                    "url": HYMT_README_URL,
+                },
+            ],
+        }
+
+    def _verify_file_sha256(self, filepath, expected_sha256, label):
+        expected = (expected_sha256 or "").strip().lower()
+        if not expected:
+            return
+        actual = self._compute_sha256(filepath)
+        if actual != expected:
+            raise RuntimeError(
+                f"{label} checksum mismatch. Expected {expected}, got {actual or 'unreadable file'}."
+            )
+
+    def _emit_hymt_progress(self, text, percent=0, determinate=True):
+        QMetaObject.invokeMethod(
+            self,
+            "_on_hymt_progress",
+            Qt.QueuedConnection,
+            QtCore.Q_ARG(str, str(text)),
+            QtCore.Q_ARG(int, int(max(0, min(100, percent)))),
+            QtCore.Q_ARG(bool, bool(determinate))
+        )
+
+    def _check_hymt_cancel_requested(self):
+        if self._hymt_cancel_requested.is_set():
+            raise HyMTInstallCancelledError("Hy-MT installation canceled by user.")
+
+    def _restore_hymt_backup(self, final_dir, backup_dir):
+        if not backup_dir or not os.path.isdir(backup_dir):
+            return
+        try:
+            if os.path.isdir(final_dir):
+                shutil.rmtree(final_dir, ignore_errors=True)
+            shutil.move(backup_dir, final_dir)
+        except Exception:
+            pass
+
+    def _install_hymt_worker(self):
+        temp_dir = ""
+        backup_dir = ""
+        final_dir = self._local_hymt_dir()
+        try:
+            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            machine = platform.machine().lower()
+            is_x64 = machine in ("amd64", "x86_64")
+            plan = self._get_hymt_download_plan(is_x64)
+            temp_dir = tempfile.mkdtemp(prefix="clickntranslate_hymt_")
+            self._hymt_temp_dir = temp_dir
+            package_root = os.path.join(temp_dir, "package")
+            runtime_dir = os.path.join(package_root, "runtime")
+            os.makedirs(runtime_dir, exist_ok=True)
+
+            runtime_text = "Загрузка runtime Hy-MT..." if is_ru else "Downloading Hy-MT runtime..."
+            self._hymt_install_phase = "downloading"
+            self._emit_hymt_progress(runtime_text, 1)
+
+            runtime_zip_path = os.path.join(temp_dir, plan["runtime"]["name"])
+
+            def runtime_progress(done, total):
+                if total > 0:
+                    percent = 1 + int((done * 10) / total)
+                else:
+                    percent = 4
+                self._emit_hymt_progress(runtime_text, percent)
+
+            self._download_file(
+                plan["runtime"]["url"],
+                runtime_zip_path,
+                timeout=600,
+                progress_callback=runtime_progress,
+                cancel_callback=lambda: self._hymt_cancel_requested.is_set(),
+            )
+            self._check_hymt_cancel_requested()
+            self._verify_file_sha256(runtime_zip_path, plan["runtime"]["sha256"], plan["runtime"]["name"])
+            if not zipfile.is_zipfile(runtime_zip_path):
+                raise RuntimeError("Downloaded Hy-MT runtime is not a zip archive.")
+
+            extract_text = "Распаковка runtime Hy-MT..." if is_ru else "Extracting Hy-MT runtime..."
+            self._hymt_install_phase = "extracting"
+            self._emit_hymt_progress(extract_text, 13)
+            with zipfile.ZipFile(runtime_zip_path, "r") as zip_ref:
+                zip_ref.extractall(runtime_dir)
+            self._check_hymt_cancel_requested()
+
+            runner_path = self._find_hymt_runner_under(package_root)
+            if not runner_path:
+                raise RuntimeError("Hy-MT runtime must contain llama-cli.exe, llama-run.exe, or hymt.exe.")
+
+            model_text = "Загрузка модели Hy-MT..." if is_ru else "Downloading Hy-MT model..."
+            model_path = os.path.join(package_root, plan["model"]["name"])
+            self._emit_hymt_progress(model_text, 15)
+
+            def model_progress(done, total):
+                if total > 0:
+                    percent = 15 + int((done * 75) / total)
+                else:
+                    percent = 20
+                self._emit_hymt_progress(model_text, percent)
+
+            self._download_file(
+                plan["model"]["url"],
+                model_path,
+                timeout=1800,
+                progress_callback=model_progress,
+                cancel_callback=lambda: self._hymt_cancel_requested.is_set(),
+            )
+            self._check_hymt_cancel_requested()
+            self._verify_file_sha256(model_path, plan["model"]["sha256"], plan["model"]["name"])
+
+            docs_text = "Сохранение лицензии Hy-MT..." if is_ru else "Saving Hy-MT license..."
+            self._emit_hymt_progress(docs_text, 92)
+            for index, doc in enumerate(plan["docs"]):
+                self._check_hymt_cancel_requested()
+                doc_path = os.path.join(package_root, doc["name"])
+                try:
+                    self._download_file(
+                        doc["url"],
+                        doc_path,
+                        timeout=120,
+                        progress_callback=None,
+                        cancel_callback=lambda: self._hymt_cancel_requested.is_set(),
+                    )
+                except (HyMTInstallCancelledError, UpdateCancelledError):
+                    raise
+                except Exception:
+                    with open(doc_path, "w", encoding="utf-8") as f:
+                        f.write(f"{doc['name']} could not be downloaded automatically.\nSource: {doc['url']}\n")
+                self._emit_hymt_progress(docs_text, 92 + index)
+
+            notice_path = os.path.join(package_root, "NOTICE.txt")
+            with open(notice_path, "w", encoding="utf-8") as f:
+                f.write(
+                    HYMT_NOTICE_TEXT
+                    + "\n\nModel source: "
+                    + HYMT_MODEL_URL
+                    + "\nRuntime source: "
+                    + HYMT_RUNTIME_URL_WIN64
+                    + "\n"
+                )
+
+            manifest_path = os.path.join(package_root, "install_manifest.json")
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "engine": HYMT_ENGINE_KEY,
+                        "model": plan["model"]["name"],
+                        "model_sha256": plan["model"]["sha256"],
+                        "runtime": plan["runtime"]["name"],
+                        "runtime_sha256": plan["runtime"]["sha256"],
+                        "model_url": plan["model"]["url"],
+                        "runtime_url": plan["runtime"]["url"],
+                    },
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+
+            model_path = self._find_hymt_model_under(package_root)
+            runner_path = self._find_hymt_runner_under(package_root)
+            if not model_path:
+                raise RuntimeError(f"{HYMT_MODEL_FILE} not found after download.")
+            if not runner_path:
+                raise RuntimeError("Hy-MT runtime not found after download.")
+
+            self._hymt_install_phase = "applying"
+            self._emit_hymt_progress("Применение установки..." if is_ru else "Applying install...", 96)
+            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
+            if os.path.isdir(final_dir):
+                backup_dir = f"{final_dir}.backup-{int(time.time())}"
+                shutil.move(final_dir, backup_dir)
+            shutil.move(package_root, final_dir)
+
+            final_model = self._find_hymt_model_under(final_dir)
+            final_runner = self._find_hymt_runner_under(final_dir)
+            if not final_model or not final_runner:
+                raise RuntimeError("Hy-MT model or runner not found after applying install.")
+            if backup_dir and os.path.isdir(backup_dir):
+                shutil.rmtree(backup_dir, ignore_errors=True)
+                backup_dir = ""
+
+            self._emit_hymt_progress("Готово" if is_ru else "Done", 100)
+            QMetaObject.invokeMethod(
+                self,
+                "_on_hymt_install_ready",
+                Qt.QueuedConnection
+            )
+        except (HyMTInstallCancelledError, UpdateCancelledError):
+            self._restore_hymt_backup(final_dir, backup_dir)
+            QMetaObject.invokeMethod(self, "_on_hymt_install_cancelled", Qt.QueuedConnection)
+        except Exception as e:
+            self._restore_hymt_backup(final_dir, backup_dir)
+            QMetaObject.invokeMethod(
+                self,
+                "_on_hymt_install_failed",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, str(e))
+            )
+        finally:
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            self._hymt_temp_dir = ""
+
+    def _show_hymt_progress(self, text, percent=0, determinate=True):
+        is_ru = self.parent.current_interface_language == "ru"
+        if self.hymt_progress is None:
+            self.hymt_progress = TesseractInstallProgressDialog(
+                self,
+                title=HYMT_ENGINE_DISPLAY,
+                in_progress_attr="_hymt_install_in_progress",
+                cancel_callback=self._request_hymt_install_cancel
+            )
+            self.hymt_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
+            self.hymt_progress.setWindowModality(Qt.NonModal)
+            self.hymt_progress.setAutoClose(False)
+            self.hymt_progress.setAutoReset(False)
+            self.hymt_progress.setMinimumDuration(0)
+            self.hymt_progress.setMinimumWidth(430)
+            self.hymt_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            try:
+                owner_window = self.window()
+                owner_center = owner_window.frameGeometry().center()
+                progress_frame = self.hymt_progress.frameGeometry()
+                progress_frame.moveCenter(owner_center)
+                self.hymt_progress.move(progress_frame.topLeft())
+            except Exception:
+                pass
+        self.hymt_progress.setLabelText(text)
+        if determinate:
+            self.hymt_progress.setRange(0, 100)
+            self.hymt_progress.setValue(max(0, min(100, int(percent))))
+        else:
+            self.hymt_progress.setRange(0, 0)
+        if not self.hymt_progress.isVisible() and not getattr(self.hymt_progress, "_user_minimized", False):
+            self.hymt_progress.show()
+
+    @QtCore.pyqtSlot(str, int, bool)
+    def _on_hymt_progress(self, text, percent, determinate):
+        self._show_hymt_progress(text, percent, determinate)
+
+    def _hide_hymt_progress(self):
+        if self.hymt_progress is not None:
+            try:
+                self.hymt_progress.blockSignals(True)
+                try:
+                    self.hymt_progress.hide()
+                finally:
+                    self.hymt_progress.blockSignals(False)
+            except Exception:
+                pass
+
+    def _request_hymt_install_cancel(self):
+        if not self._hymt_install_in_progress:
+            return
+        is_ru = self.parent.current_interface_language == "ru"
+        self._hymt_cancel_requested.set()
+        self._show_hymt_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
+
+    def _finish_hymt_install_state(self):
+        self._hymt_install_in_progress = False
+        self._hymt_install_phase = "idle"
+        self._hymt_cancel_requested.clear()
+        if hasattr(self, "translator_combo"):
+            self.translator_combo.setEnabled(True)
+        self._sync_translator_engine_delete_button()
+        self._restore_parent_topmost_after_tesseract_install()
+
+    @QtCore.pyqtSlot()
+    def _on_hymt_install_ready(self):
+        self._finish_hymt_install_state()
+        self._hide_hymt_progress()
+        self._restore_settings_view()
+        self._reset_hymt_runtime_cache()
+        self._set_translator_combo_silently(HYMT_ENGINE_KEY)
+        self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
+        self._sync_translator_engine_delete_button()
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            HYMT_ENGINE_DISPLAY,
+            "Hy-MT установлен и готов к офлайн-переводу." if is_ru else "Hy-MT is installed and ready for offline translation."
+        )
+
+    @QtCore.pyqtSlot(str)
+    def _on_hymt_install_failed(self, error):
+        self._finish_hymt_install_state()
+        self._hide_hymt_progress()
+        self._restore_settings_view()
+        prev_engine = self.previous_translator_engine or "google"
+        self._set_translator_combo_silently(prev_engine)
+        self.auto_save_setting("translator_engine", prev_engine)
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.warning(
+            self,
+            "Ошибка Hy-MT" if is_ru else "Hy-MT error",
+            ("Не удалось установить Hy-MT:\n" if is_ru else "Failed to install Hy-MT:\n") + str(error)
+        )
+
+    @QtCore.pyqtSlot()
+    def _on_hymt_install_cancelled(self):
+        self._finish_hymt_install_state()
+        self._hide_hymt_progress()
+        self._restore_settings_view()
+        prev_engine = self.previous_translator_engine or "google"
+        self._set_translator_combo_silently(prev_engine)
+        self.auto_save_setting("translator_engine", prev_engine)
+        is_ru = self.parent.current_interface_language == "ru"
+        QMessageBox.information(
+            self,
+            "Отмена" if is_ru else "Cancelled",
+            "Установка Hy-MT отменена. Временные файлы удалены."
+            if is_ru else
+            "Hy-MT installation canceled. Temporary files were removed."
+        )
+
+    def remove_hymt_engine(self):
+        is_ru = self.parent.current_interface_language == "ru"
+        if self._hymt_install_in_progress:
+            self._request_hymt_install_cancel()
+            return
+        hymt_dir = self._local_hymt_dir()
+        if not os.path.isdir(hymt_dir):
+            self._sync_translator_engine_delete_button()
+            return
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Удалить Hy-MT" if is_ru else "Remove Hy-MT")
+        confirm.setText(
+            "Удалить локальную модель Hy-MT и runtime из папки программы?"
+            if is_ru else
+            "Remove the local Hy-MT model and runtime from the app folder?"
+        )
+        confirm.setIcon(QMessageBox.Question)
+        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
+        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        confirm.exec_()
+        if confirm.clickedButton() != yes_btn:
+            return
+        removed, error = self._delete_local_hymt_dir()
+        try:
+            if not removed:
+                raise RuntimeError(error)
+            if self.parent.config.get("translator_engine", "").lower() == HYMT_ENGINE_KEY:
+                self._set_translator_combo_silently("google")
+                self.auto_save_setting("translator_engine", "google")
+            self._sync_translator_engine_delete_button()
+            QMessageBox.information(
+                self,
+                HYMT_ENGINE_DISPLAY,
+                "Локальный Hy-MT удалён." if is_ru else "Local Hy-MT was removed."
+            )
+        except Exception as e:
+            self._sync_translator_engine_delete_button()
+            QMessageBox.warning(
+                self,
+                "Ошибка Hy-MT" if is_ru else "Hy-MT error",
+                ("Не удалось удалить Hy-MT:\n" if is_ru else "Failed to remove Hy-MT:\n") + str(e)
+            )
 
     def remove_tesseract_engine(self):
         is_ru = self.parent.current_interface_language == "ru"
@@ -2466,6 +3246,8 @@ finally {
             translater._translator_config_mtime = 0
             translater._argos_languages_cache = None
             translater._argos_translations_cache.clear()
+            if hasattr(translater, "_hymt_runtime_cache"):
+                translater._hymt_runtime_cache = None
             if translater._http_session is not None:
                 try:
                     translater._http_session.close()
@@ -2586,10 +3368,14 @@ finally {
             "ocr_engine": "Windows",
             "copy_translated_text": False,
             "freeze_screen_on_ocr": False,
+            "debug_ocr_artifacts": False,
             "copy_history": False,
             "translator_engine": "Google",
+            "allow_online_provider_fallback": False,
             "keep_visible_on_ocr": False,
             "last_ocr_language": "ru",
+            "ocr_translate_source_language": "en",
+            "ocr_translate_target_language": "ru",
             "no_screen_dimming": False
         }
         # Save to disk

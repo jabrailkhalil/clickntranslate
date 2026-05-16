@@ -54,6 +54,24 @@ class TestUpdateAssetSelection(unittest.TestCase):
         self.assertIsNotNone(selected)
         self.assertEqual(selected["name"], "ClicknTranslate-v1.3.3-win64.zip")
 
+    def test_pick_update_asset_ignores_engine_bundles(self):
+        dummy = types.SimpleNamespace()
+        assets = [
+            {
+                "name": "ClicknTranslate-tesseract-win64.zip",
+                "browser_download_url": "https://example.com/tesseract.zip",
+            },
+            {
+                "name": "ClicknTranslate-v1.3.3-win64.zip",
+                "browser_download_url": "https://example.com/app.zip",
+            },
+        ]
+
+        selected = sw.SettingsWindow._pick_update_asset(dummy, assets)
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["name"], "ClicknTranslate-v1.3.3-win64.zip")
+
     def test_pick_checksum_url_matches_expected_name(self):
         dummy = types.SimpleNamespace()
         assets = [
@@ -135,6 +153,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
             self.assertIn("if ($_.Name -ieq \"data\") { continue }", script_text)
+            self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:
             try:
@@ -253,6 +272,31 @@ class TestTesseractInstallerHelpers(unittest.TestCase):
 
         with self.assertRaises(sw.TesseractInstallCancelledError):
             sw.SettingsWindow._check_tesseract_cancel_requested(dummy)
+
+    def test_hide_tesseract_progress_hides_without_closing(self):
+        class DummyProgress:
+            def __init__(self):
+                self.hidden = False
+                self.closed = False
+                self.blocked = []
+
+            def blockSignals(self, value):
+                self.blocked.append(value)
+
+            def hide(self):
+                self.hidden = True
+
+            def close(self):
+                self.closed = True
+
+        progress = DummyProgress()
+        dummy = types.SimpleNamespace(progress=progress)
+
+        sw.SettingsWindow._hide_tesseract_progress(dummy)
+
+        self.assertTrue(progress.hidden)
+        self.assertFalse(progress.closed)
+        self.assertEqual(progress.blocked, [True, False])
 
 
 class TestDownloadAndPrepareUpdate(unittest.TestCase):

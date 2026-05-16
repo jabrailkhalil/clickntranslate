@@ -2,6 +2,9 @@ import requests
 import json
 import os
 import sys
+import subprocess
+import re
+from languages import language_english_name, translator_api_code
 
 # Optional Argos Translate (offline). If missing, we will use Google online.
 HAS_ARGOS = True
@@ -30,6 +33,11 @@ def get_data_file(filename):
 # --- Кэширование конфигурации ---
 _translator_config_cache = None
 _translator_config_mtime = 0
+
+HYMT_MODEL_FILE = "HY-MT1.5-1.8B-Q4_K_M.gguf"
+HYMT_ENGINE_KEY = "hymt"
+HYMT_DISPLAY_NAME = "Hy-MT"
+_hymt_runtime_cache = None
 
 def get_cached_translator_config():
     """Возвращает закэшированную конфигурацию переводчика."""
@@ -75,6 +83,207 @@ def _get_translation_object(source_code, target_code):
         else:
             _argos_translations_cache[key] = None
     return _argos_translations_cache[key]
+
+
+def _local_hymt_dir():
+    return os.path.join(get_portable_dir(), "translators", "hymt")
+
+
+def _find_hymt_model_under(root_dir):
+    if not root_dir or not os.path.isdir(root_dir):
+        return ""
+    direct_path = os.path.join(root_dir, HYMT_MODEL_FILE)
+    if os.path.isfile(direct_path):
+        return direct_path
+    for current_root, _dirs, files in os.walk(root_dir):
+        for name in files:
+            lower = name.lower()
+            if lower == HYMT_MODEL_FILE.lower() or (lower.endswith(".gguf") and "hy-mt" in lower):
+                return os.path.join(current_root, name)
+    return ""
+
+
+def _find_hymt_runner_under(root_dir):
+    if not root_dir or not os.path.isdir(root_dir):
+        return ""
+    candidates = ("hymt.exe", "llama-cli.exe", "llama-run.exe", "main.exe")
+    for name in candidates:
+        direct_path = os.path.join(root_dir, name)
+        if os.path.isfile(direct_path):
+            return direct_path
+    for current_root, _dirs, files in os.walk(root_dir):
+        lower_files = {name.lower(): name for name in files}
+        for candidate in candidates:
+            if candidate in lower_files:
+                return os.path.join(current_root, lower_files[candidate])
+    return ""
+
+
+def _get_hymt_runtime():
+    global _hymt_runtime_cache
+    if _hymt_runtime_cache is not None:
+        return _hymt_runtime_cache
+    root_dir = _local_hymt_dir()
+    runtime = {
+        "root": root_dir,
+        "model": _find_hymt_model_under(root_dir),
+        "runner": _find_hymt_runner_under(root_dir),
+    }
+    _hymt_runtime_cache = runtime
+    return runtime
+
+
+def hymt_installed():
+    runtime = _get_hymt_runtime()
+    return bool(runtime.get("model") and runtime.get("runner"))
+
+
+def _build_hymt_prompt(text, source_code, target_code):
+    source_name = language_english_name(source_code)
+    target_name = language_english_name(target_code)
+    user_text = (
+        f"Translate the following text from {source_name} to {target_name}. "
+        f"Return only the translation, without explanations.\n\n{text}"
+    )
+    return f"<｜hy_begin▁of▁sentence｜><｜hy_User｜>{user_text}<｜hy_Assistant｜>"
+
+
+def _clean_hymt_output(output, prompt):
+    text = (output or "").strip()
+    if not text:
+        return ""
+    if prompt and prompt in text:
+        text = text.rsplit(prompt, 1)[-1].strip()
+    markers = [
+        "<｜hy_Assistant｜>",
+        "<|assistant|>",
+        "Assistant:",
+    ]
+    for marker in markers:
+        if marker in text:
+            text = text.split(marker)[-1].strip()
+    text = re.sub(r"^\s*>\s*", "", text).strip()
+    stop_markers = [
+        "<｜hy_place▁holder▁no▁2｜>",
+        "<｜hy_place▁holder▁no▁8｜>",
+        "<｜hy_User｜>",
+        "<|end|>",
+        "</s>",
+        "Exiting...",
+        "llama_perf_",
+    ]
+    for marker in stop_markers:
+        if marker in text:
+            text = text.split(marker)[0].strip()
+    service_lines = (
+        "Loading model...",
+        "available commands:",
+        "/exit",
+        "/regen",
+        "/clear",
+        "/read",
+        "/glob",
+        "build      :",
+        "model      :",
+        "modalities :",
+    )
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if lines:
+                lines.append("")
+            continue
+        if any(stripped.startswith(prefix) for prefix in service_lines):
+            continue
+        if set(stripped) <= {"▄", "▀", "█", " ", "\t"}:
+            continue
+        lines.append(line)
+    text = "\n".join(lines).strip()
+    text = re.sub(r"^translation\s*:\s*", "", text, flags=re.IGNORECASE).strip()
+    return text.strip("\"' \r\n")
+
+
+def hymt_translate(text, source_code, target_code, status_callback=None):
+    runtime = _get_hymt_runtime()
+    model_path = runtime.get("model")
+    runner_path = runtime.get("runner")
+    if not model_path or not runner_path:
+        raise RuntimeError(
+            "Hy-MT не установлен. Установите пакет Hy-MT в настройках переводчика."
+        )
+
+    if status_callback:
+        try:
+            status_callback("Запуск Hy-MT…")
+        except Exception:
+            pass
+
+    prompt = _build_hymt_prompt(text, source_code, target_code)
+    max_tokens = max(96, min(2048, int(len(text) * 1.6) + 64))
+    runner_dir = os.path.dirname(runner_path)
+    env = os.environ.copy()
+    env["PATH"] = runner_dir + os.pathsep + env.get("PATH", "")
+    startupinfo = None
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    base_cmd = [
+        runner_path,
+        "-m", model_path,
+        "-p", prompt,
+        "-n", str(max_tokens),
+        "--temp", "0",
+        "--top-p", "1",
+        "--no-display-prompt",
+        "--single-turn",
+        "--no-warmup",
+        "--no-perf",
+        "--no-show-timings",
+        "--log-disable",
+        "--simple-io",
+    ]
+
+    def _run(cmd):
+        return subprocess.run(
+            cmd,
+            cwd=runner_dir,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
+        )
+
+    result = _run(base_cmd)
+    if result.returncode != 0:
+        err_text = (result.stderr or result.stdout or "").lower()
+        if "unknown argument" in err_text or "invalid argument" in err_text:
+            result = _run([
+                runner_path,
+                "-m", model_path,
+                "-p", prompt,
+                "-n", str(max_tokens),
+                "--temp", "0",
+                "--top-p", "1",
+                "--no-display-prompt",
+                "--single-turn",
+            ])
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"Hy-MT failed: {err[:1200]}")
+
+    translated = _clean_hymt_output(result.stdout, prompt)
+    if not translated:
+        err = (result.stderr or "").strip()
+        raise RuntimeError(f"Hy-MT returned empty translation. {err[:500]}")
+    return translated
 
 # --- helper to auto-install ru<->en models on first run ---
 
@@ -188,6 +397,17 @@ def install_models(status_callback=None):
     # Сбрасываем кэш после установки
     _invalidate_argos_cache()
 
+
+def _try_argos_translate(text, source_code, target_code, status_callback=None, allow_ru_en_install=True):
+    if not HAS_ARGOS:
+        return None
+    if allow_ru_en_install and {source_code, target_code} == {"ru", "en"}:
+        ensure_models(status_callback=status_callback)
+    translation_obj = _get_translation_object(source_code, target_code)
+    if translation_obj is None:
+        return None
+    return translation_obj.translate(text)
+
 def test_translation():
     if not HAS_ARGOS:
         print("Argos недоступен в этой сборке.")
@@ -221,24 +441,25 @@ def test_translation():
 
 def translate_text(text, source_code, target_code, status_callback=None):
     """Перевод текста с выбранным движком и автоматическим фоллбеком."""
+    config = get_cached_translator_config()
+    engine = config.get("translator_engine", "Google").lower()
+    allow_provider_fallback = bool(config.get("allow_online_provider_fallback", False))
+    print(f"Using translator: {engine.upper()}")
+
     # Check translation cache first
     try:
         from main import get_data_file
         import os
         data_dir = os.path.dirname(get_data_file("config.json"))
         from cache_manager import get_cached_translation, save_cached_translation
-        cached = get_cached_translation(data_dir, text, source_code, target_code)
+        cached = get_cached_translation(data_dir, text, source_code, target_code, engine=engine)
         if cached:
             print(f"Using cached translation ({len(text)} chars)")
             return cached
     except Exception:
         data_dir = None
 
-    engine = get_cached_translator_config().get("translator_engine", "Argos").lower()
-    print(f"Using translator: {engine.upper()}")
-
-    # Онлайн-переводчики (определяем локально для избежания проблем с порядком)
-    online_engines = ['google', 'mymemory', 'lingva', 'libretranslate']
+    online_engines = ['google', 'lingva', 'mymemory', 'libretranslate']
 
     def _call_online(name, txt, src, tgt):
         if name == 'google':
@@ -255,37 +476,61 @@ def translate_text(text, source_code, target_code, status_callback=None):
         """Save translation to cache and return."""
         if result and data_dir:
             try:
-                save_cached_translation(data_dir, text, source_code, target_code, result)
+                save_cached_translation(data_dir, text, source_code, target_code, result, engine=engine)
             except Exception:
                 pass
         return result
 
+    if engine == HYMT_ENGINE_KEY:
+        return _cache_and_return(hymt_translate(text, source_code, target_code, status_callback=status_callback))
+
+    def _online_order(preferred):
+        ordered = []
+        if preferred in online_engines:
+            ordered.append(preferred)
+        for name in online_engines:
+            if name not in ordered:
+                ordered.append(name)
+        return ordered
+
+    def _try_online(preferred, allow_fallback=False):
+        last_error = None
+        engines_to_try = _online_order(preferred) if allow_fallback else [preferred]
+        for name in engines_to_try:
+            try:
+                result = _call_online(name, text, source_code, target_code)
+                if result:
+                    return result
+            except Exception as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        return None
+
     if engine in online_engines:
         try:
-            return _cache_and_return(_call_online(engine, text, source_code, target_code))
-        except Exception as e:
-            for name in online_engines:
-                if name != engine:
-                    try:
-                        return _cache_and_return(_call_online(name, text, source_code, target_code))
-                    except Exception:
-                        continue
+            return _cache_and_return(_try_online(engine, allow_fallback=allow_provider_fallback))
+        except Exception as online_error:
             if HAS_ARGOS:
-                pass
+                argos_result = _try_argos_translate(
+                    text, source_code, target_code, status_callback=status_callback, allow_ru_en_install=False
+                )
+                if argos_result:
+                    return _cache_and_return(argos_result)
             else:
-                raise e
+                raise online_error
 
-    if not HAS_ARGOS:
-        return _cache_and_return(google_translate(text, source_code, target_code))
+    if HAS_ARGOS:
+        argos_result = _try_argos_translate(text, source_code, target_code, status_callback=status_callback)
+        if argos_result:
+            return _cache_and_return(argos_result)
+        if engine == "argos":
+            raise Exception(
+                f"Argos offline translation package is not installed for {source_code}->{target_code}."
+            )
 
-    ensure_models(status_callback=status_callback)
-
-    # Используем кэшированный объект перевода
-    translation_obj = _get_translation_object(source_code, target_code)
-    if translation_obj is None:
-        raise Exception(f"Нет модели для перевода {source_code}->{target_code}. Проверьте, что установлены обе модели (RU->EN и EN->RU) через Argos Translate.")
-
-    return _cache_and_return(translation_obj.translate(text))
+    return _cache_and_return(_try_online("google", allow_fallback=allow_provider_fallback))
 
 # Кэшированная сессия для HTTP запросов
 _http_session = None
@@ -302,10 +547,12 @@ def _get_http_session():
 def _google_translate_chunk(text, source_code, target_code):
     """Translate a single chunk via Google API."""
     url = 'https://translate.googleapis.com/translate_a/single'
+    source_api = translator_api_code(source_code, "google")
+    target_api = translator_api_code(target_code, "google")
     params = {
         'client': 'gtx',
-        'sl': source_code,
-        'tl': target_code,
+        'sl': source_api,
+        'tl': target_api,
         'dt': 't',
         'q': text,
     }
@@ -358,9 +605,11 @@ def google_translate(text, source_code, target_code):
 def mymemory_translate(text, source_code, target_code):
     """MyMemory - бесплатный API (до 5000 символов/день без регистрации)."""
     url = 'https://api.mymemory.translated.net/get'
+    source_api = translator_api_code(source_code, "mymemory")
+    target_api = translator_api_code(target_code, "mymemory")
     params = {
         'q': text,
-        'langpair': f'{source_code}|{target_code}',
+        'langpair': f'{source_api}|{target_api}',
     }
     session = _get_http_session()
     r = session.get(url, params=params, timeout=10)
@@ -380,9 +629,11 @@ def lingva_translate(text, source_code, target_code):
     ]
     session = _get_http_session()
     last_error = None
+    source_api = translator_api_code(source_code, "lingva")
+    target_api = translator_api_code(target_code, "lingva")
     for base_url in instances:
         try:
-            url = f'{base_url}/api/v1/{source_code}/{target_code}/{requests.utils.quote(text)}'
+            url = f'{base_url}/api/v1/{source_api}/{target_api}/{requests.utils.quote(text)}'
             r = session.get(url, timeout=8)
             if r.status_code == 200:
                 data = r.json()
@@ -401,13 +652,15 @@ def libretranslate(text, source_code, target_code):
     ]
     session = _get_http_session()
     last_error = None
+    source_api = translator_api_code(source_code, "libretranslate")
+    target_api = translator_api_code(target_code, "libretranslate")
     for base_url in instances:
         try:
             url = f'{base_url}/translate'
             payload = {
                 'q': text,
-                'source': source_code,
-                'target': target_code,
+                'source': source_api,
+                'target': target_api,
                 'format': 'text'
             }
             r = session.post(url, json=payload, timeout=10)

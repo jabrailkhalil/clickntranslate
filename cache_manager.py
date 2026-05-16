@@ -10,6 +10,7 @@ import time
 import shutil
 import datetime
 import threading
+import hashlib
 
 # Default limits
 MAX_COPY_HISTORY = 500          # max records in copy history
@@ -224,7 +225,7 @@ def clear_all_cache(data_dir):
 
 # --- Translation Cache (avoid re-translating same text) ---
 
-_translation_cache = None  # lazy loaded
+_translation_caches = {}  # lazy loaded per data_dir
 
 
 def _get_cache_path(data_dir):
@@ -233,26 +234,48 @@ def _get_cache_path(data_dir):
 
 
 def _load_translation_cache(data_dir):
-    global _translation_cache
-    if _translation_cache is not None:
-        return _translation_cache
+    cache_id = os.path.abspath(data_dir)
+    if cache_id in _translation_caches:
+        return _translation_caches[cache_id]
     path = _get_cache_path(data_dir)
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                _translation_cache = json.load(f)
+                _translation_caches[cache_id] = json.load(f)
         except Exception:
-            _translation_cache = {}
+            _translation_caches[cache_id] = {}
     else:
-        _translation_cache = {}
-    return _translation_cache
+        _translation_caches[cache_id] = {}
+    return _translation_caches[cache_id]
 
 
-def get_cached_translation(data_dir, text, source_code, target_code):
+def _translation_cache_key(text, source_code, target_code, engine=None):
+    text_digest = hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
+    if engine:
+        return f"{engine}:{source_code}:{target_code}:{text_digest}"
+    return f"{source_code}:{target_code}:{text_digest}"
+
+
+def _legacy_translation_cache_key(text, source_code, target_code, engine=None):
+    if engine:
+        return f"{engine}:{source_code}:{target_code}:{text}"
+    return f"{source_code}:{target_code}:{text}"
+
+
+def get_cached_translation(data_dir, text, source_code, target_code, engine=None):
     """Look up a cached translation. Returns translated text or None."""
     cache = _load_translation_cache(data_dir)
-    key = f"{source_code}:{target_code}:{text}"
-    entry = cache.get(key)
+    keys = [_translation_cache_key(text, source_code, target_code, engine)]
+    if engine and engine != "hymt":
+        keys.append(_translation_cache_key(text, source_code, target_code))
+    keys.append(_legacy_translation_cache_key(text, source_code, target_code, engine))
+    if engine and engine != "hymt":
+        keys.append(_legacy_translation_cache_key(text, source_code, target_code))
+    entry = None
+    for key in keys:
+        entry = cache.get(key)
+        if entry:
+            break
     if entry:
         # Update access time
         entry["accessed"] = time.time()
@@ -260,12 +283,12 @@ def get_cached_translation(data_dir, text, source_code, target_code):
     return None
 
 
-def save_cached_translation(data_dir, text, source_code, target_code, translated):
+def save_cached_translation(data_dir, text, source_code, target_code, translated, engine=None):
     """Save a translation to cache. Trims cache if over limit."""
     if not translated or len(text) > MAX_TEXT_LENGTH:
         return
     cache = _load_translation_cache(data_dir)
-    key = f"{source_code}:{target_code}:{text}"
+    key = _translation_cache_key(text, source_code, target_code, engine)
     cache[key] = {
         "translated": translated,
         "created": time.time(),
@@ -295,5 +318,4 @@ def _save_translation_cache(data_dir, cache):
 
 def invalidate_translation_cache():
     """Force reload of translation cache on next access."""
-    global _translation_cache
-    _translation_cache = None
+    _translation_caches.clear()

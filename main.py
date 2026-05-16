@@ -80,6 +80,12 @@ except Exception:
 from settings_window import SettingsWindow
 from app_version import APP_VERSION
 import translater  # Импорт модуля перевода
+from languages import (
+    default_target_for_source,
+    detect_language_code,
+    language_code_from_name,
+    language_names,
+)
 
 # --- Единственная константа с дефолтной конфигурацией ---
 DEFAULT_CONFIG = {
@@ -95,11 +101,15 @@ DEFAULT_CONFIG = {
     "show_update_info": True,  # Показывать Welcome окно при первом запуске
     "ocr_engine": "Windows",
     "translator_engine": "Google",
+    "allow_online_provider_fallback": False,
     "copy_history": False,
     "copy_translated_text": False,  # Все галочки отключены по умолчанию
     "keep_visible_on_ocr": False,
     "freeze_screen_on_ocr": False,
+    "debug_ocr_artifacts": False,
     "last_ocr_language": "ru",
+    "ocr_translate_source_language": "en",
+    "ocr_translate_target_language": "ru",
     "no_screen_dimming": False,
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": "Ctrl+Alt+Q"
@@ -491,8 +501,8 @@ class HotkeyListenerThread(threading.Thread):
                 pass
 
 LANGUAGES = {
-    "en": ["English", "Russian"],
-    "ru": ["Английский", "Русский"]
+    "en": language_names("en"),
+    "ru": language_names("ru")
 }
 
 INTERFACE_TEXT = {
@@ -1023,12 +1033,8 @@ class DarkThemeApp(QMainWindow):
                 lang = self.config.get("interface_language", "ru")
                 status_msg = "Translating..." if lang == "en" else "Переводим..."
                 self._show_status_signal.emit(status_msg)
-                # Auto-detect language direction
-                cyrillic_count = sum(1 for c in text if '\u0400' <= c <= '\u04ff')
-                if cyrillic_count > len(text) * 0.3:
-                    source_code, target_code = "ru", "en"
-                else:
-                    source_code, target_code = "en", "ru"
+                source_code = detect_language_code(text)
+                target_code = default_target_for_source(source_code)
                 print(f"[SEL] translating {source_code}->{target_code}, {len(text)} chars...")
                 from translater import translate_text
                 translated = translate_text(text, source_code, target_code)
@@ -1280,6 +1286,7 @@ class DarkThemeApp(QMainWindow):
 <div class="section-title">🌐 Переводчики</div>
 <div class="item"><span class="item-title">Google</span> — быстрый и точный <span class="recommended">✓ Рекомендуется</span></div>
 <div class="item"><span class="item-title">Argos</span> — офлайн, работает без интернета, полностью приватный</div>
+<div class="item"><span class="item-title">Hy-MT</span> — офлайн LLM-модель, ставится отдельным пакетом</div>
 <div class="item"><span class="item-title">MyMemory</span> — бесплатный API, лимит ~5000 символов/день</div>
 <div class="item"><span class="item-title">Lingva</span> — прокси к Google через публичные серверы</div>
 <div class="item"><span class="item-title">LibreTranslate</span> — открытый переводчик</div>
@@ -1338,6 +1345,7 @@ class DarkThemeApp(QMainWindow):
 <div class="section-title">🌐 Translators</div>
 <div class="item"><span class="item-title">Google</span> — fast and accurate <span class="recommended">✓ Recommended</span></div>
 <div class="item"><span class="item-title">Argos</span> — offline, no internet, private</div>
+<div class="item"><span class="item-title">Hy-MT</span> — offline LLM model, installed as a separate package</div>
 <div class="item"><span class="item-title">MyMemory</span> — free API, 5000 chars/day limit</div>
 <div class="item"><span class="item-title">Lingva</span> — Google proxy, more stable</div>
 <div class="item"><span class="item-title">LibreTranslate</span> — open source, free</div>
@@ -1505,6 +1513,7 @@ class DarkThemeApp(QMainWindow):
         # Отображаем конкретный переводчик
         translator_names = {
             "argos": {"en": "Argos Translate (Offline)", "ru": "Argos Translate (Офлайн)"},
+            "hymt": {"en": "Hy-MT Translate (Offline)", "ru": "Hy-MT Translate (Офлайн)"},
             "google": {"en": "Google Translate", "ru": "Google Translate"},
             "mymemory": {"en": "MyMemory Translate", "ru": "MyMemory Translate"},
             "lingva": {"en": "Lingva Translate", "ru": "Lingva Translate"},
@@ -1555,7 +1564,7 @@ class DarkThemeApp(QMainWindow):
         fs_hk = self.config.get("fullscreen_translate_hotkey", "") or not_set
         sel_hk = self.config.get("translate_selection_hotkey", "") or not_set
 
-        tr_names = {"argos": "Argos", "google": "Google", "mymemory": "MyMemory", "lingva": "Lingva", "libretranslate": "LibreTranslate"}
+        tr_names = {"argos": "Argos", "hymt": "Hy-MT", "google": "Google", "mymemory": "MyMemory", "lingva": "Lingva", "libretranslate": "LibreTranslate"}
         tr_name = tr_names.get(translator_engine, translator_engine.capitalize())
 
         # Row 1: Copy + OCR translate | OCR engine + Translator
@@ -1757,15 +1766,8 @@ class DarkThemeApp(QMainWindow):
     def translate_input_text(self):
         text = self.text_input.toPlainText()
         if text:
-            # Сопоставление отображаемого языка с кодом
-            lang_map = {
-                "Русский": "ru",
-                "Английский": "en",
-                "English": "en",
-                "Russian": "ru"
-            }
-            source_code = lang_map.get(self.source_lang.currentText(), "ru")
-            target_code = lang_map.get(self.target_lang.currentText(), "en")
+            source_code = language_code_from_name(self.source_lang.currentText(), self.current_interface_language)
+            target_code = language_code_from_name(self.target_lang.currentText(), self.current_interface_language)
             try:
                 # Показать прогресс, если потребуется установка моделей Argos
                 progress = None
