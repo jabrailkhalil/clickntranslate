@@ -179,7 +179,7 @@ class TesseractInstallProgressDialog(QDialog):
         title_row.addWidget(self.minimize_button)
         self.close_button = QToolButton(self)
         self.close_button.setText("×")
-        self.close_button.setToolTip("Отменить" if self._lang == "ru" else "Cancel")
+        self.close_button.setToolTip(settings_text(self._lang, "cancel"))
         self.close_button.setFixedSize(28, 24)
         self.close_button.clicked.connect(self.reject)
         title_row.addWidget(self.close_button)
@@ -194,7 +194,7 @@ class TesseractInstallProgressDialog(QDialog):
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setRange(0, 100)
         body.addWidget(self.progress_bar)
-        self.cancel_button = QPushButton("Отменить" if self._lang == "ru" else "Cancel")
+        self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
         self.cancel_button.clicked.connect(self.reject)
         body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
         outer.addLayout(body)
@@ -321,7 +321,33 @@ SETTINGS_TEXT = {
         "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
         "fullscreen_from": "From:",
         "fullscreen_to": "To:",
-        "translate_selection_hotkey": "Translate Selection Hotkey:"
+        "translate_selection_hotkey": "Translate Selection Hotkey:",
+        "translator_label": "Translate:",
+        "keep_visible_on_ocr": "Keep window visible during OCR",
+        "clear_cache": "Clear cache",
+        "reset": "Reset",
+        "update": "Update",
+        "translation_history_button": "Translation history",
+        "copy_history_button": "Copy history",
+        "fullscreen_translate_label": "Fullscreen Translate:",
+        "selection_translate_label": "Selection Translate:",
+        "copy_hotkey_label": "Copy Selected Hotkey:",
+        "translate_hotkey_label": "Translate Hotkey:",
+        "remove_local_tesseract": "Remove local Tesseract",
+        "remove_local_hymt": "Remove local Hy-MT",
+        "clearing": "Clearing...",
+        "cleared": "Cleared {size}",
+        "yes": "Yes",
+        "no": "No",
+        "cancel": "Cancel",
+        "open": "Open",
+        "install": "Install",
+        "later": "Later",
+        "remove": "Remove",
+        "reset_question": "Are you sure you want to reset all settings?",
+        "clear_histories_title": "Clear histories?",
+        "clear_histories_question": "Clear translation history and copy history?",
+        "settings_reset_done": "Settings were reset"
     },
     "ru": {
         "autostart": "Запускать вместе с ОС",
@@ -350,9 +376,255 @@ SETTINGS_TEXT = {
         "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
         "fullscreen_from": "С:",
         "fullscreen_to": "На:",
-        "translate_selection_hotkey": "Перевод выделенного текста"
+        "translate_selection_hotkey": "Перевод выделенного текста",
+        "translator_label": "Перевод:",
+        "keep_visible_on_ocr": "Не сворачивать при OCR",
+        "clear_cache": "Очистить кэш",
+        "reset": "Сброс",
+        "update": "Обновление",
+        "translation_history_button": "История переводов",
+        "copy_history_button": "История копирований",
+        "fullscreen_translate_label": "Перевод всего экрана",
+        "selection_translate_label": "Перевод выделенного текста",
+        "copy_hotkey_label": "Горячая клавиша для копирования",
+        "translate_hotkey_label": "Перевод выделенного (OCR)",
+        "remove_local_tesseract": "Удалить локальный Tesseract",
+        "remove_local_hymt": "Удалить локальный Hy-MT",
+        "clearing": "Выполняется...",
+        "cleared": "Очищено {size}",
+        "yes": "Да",
+        "no": "Нет",
+        "cancel": "Отмена",
+        "open": "Открыть",
+        "install": "Установить",
+        "later": "Позже",
+        "remove": "Удалить",
+        "reset_question": "Вы уверены, что хотите сбросить все настройки?",
+        "clear_histories_title": "Очистить истории?",
+        "clear_histories_question": "Очистить историю переводов и историю копирований?",
+        "settings_reset_done": "Настройки сброшены"
+    },
+    "es": {
+        "autostart": "Iniciar con el sistema",
+        "translation_mode": "Modo de traduccion: {mode}",
+        "hotkeys": "Configurar atajos",
+        "save_and_back": "Guardar y volver",
+        "copy_to_clipboard": "Copiar al portapapeles",
+        "history": "Guardar historial de traducciones",
+        "test_ocr": "Probar OCR",
+        "save": "Guardar",
+        "back": "Volver",
+        "remove_hotkey": "Pulsa ESC para quitar el atajo",
+        "history_view": "Ver historial de traducciones",
+        "start_minimized": "Iniciar en modo sombra",
+        "copy_history_view": "Mostrar historial de copias",
+        "copy_history": "Guardar historial de copias",
+        "clear_copy_history": "Borrar historial de copias",
+        "clear_translation_history": "Borrar historial de traducciones",
+        "history_title": "Historial de traducciones",
+        "copy_history_title": "Historial de copias",
+        "history_empty": "El historial esta vacio.",
+        "history_error": "Error al leer el historial.",
+        "copy_translated_text": "Copiar automaticamente el texto traducido",
+        "freeze_screen_on_ocr": "Congelar pantalla durante OCR",
+        "fullscreen_translate_hotkey": "Atajo de traduccion de pantalla:",
+        "fullscreen_from": "De:",
+        "fullscreen_to": "A:",
+        "translate_selection_hotkey": "Atajo para traducir seleccion:",
+        "translator_label": "Traducir:",
+        "keep_visible_on_ocr": "Mantener ventana visible durante OCR",
+        "clear_cache": "Borrar cache",
+        "reset": "Restablecer",
+        "update": "Actualizar",
+        "translation_history_button": "Historial de traducciones",
+        "copy_history_button": "Historial de copias",
+        "fullscreen_translate_label": "Traduccion de pantalla:",
+        "selection_translate_label": "Traduccion de seleccion:",
+        "copy_hotkey_label": "Atajo para copiar seleccion:",
+        "translate_hotkey_label": "Atajo de traduccion:",
+        "remove_local_tesseract": "Eliminar Tesseract local",
+        "remove_local_hymt": "Eliminar Hy-MT local",
+        "clearing": "Borrando...",
+        "cleared": "Borrado {size}",
+        "yes": "Si",
+        "no": "No",
+        "cancel": "Cancelar",
+        "open": "Abrir",
+        "install": "Instalar",
+        "later": "Mas tarde",
+        "remove": "Eliminar",
+        "reset_question": "Seguro que quieres restablecer todos los ajustes?",
+        "clear_histories_title": "Borrar historiales?",
+        "clear_histories_question": "Borrar el historial de traducciones y de copias?",
+        "settings_reset_done": "Ajustes restablecidos"
+    },
+    "de": {
+        "autostart": "Mit dem System starten",
+        "translation_mode": "Ubersetzungsmodus: {mode}",
+        "hotkeys": "Tastenkurzel konfigurieren",
+        "save_and_back": "Speichern und zuruck",
+        "copy_to_clipboard": "In Zwischenablage kopieren",
+        "history": "Ubersetzungsverlauf speichern",
+        "test_ocr": "OCR testen",
+        "save": "Speichern",
+        "back": "Zuruck",
+        "remove_hotkey": "ESC drucken, um das Tastenkurzel zu entfernen",
+        "history_view": "Ubersetzungsverlauf anzeigen",
+        "start_minimized": "Im Schattenmodus starten",
+        "copy_history_view": "Kopierverlauf anzeigen",
+        "copy_history": "Kopierverlauf speichern",
+        "clear_copy_history": "Kopierverlauf leeren",
+        "clear_translation_history": "Ubersetzungsverlauf leeren",
+        "history_title": "Ubersetzungsverlauf",
+        "copy_history_title": "Kopierverlauf",
+        "history_empty": "Der Verlauf ist leer.",
+        "history_error": "Fehler beim Lesen des Verlaufs.",
+        "copy_translated_text": "Ubersetzten Text automatisch kopieren",
+        "freeze_screen_on_ocr": "Bildschirm wahrend OCR einfrieren",
+        "fullscreen_translate_hotkey": "Tastenkurzel fur Bildschirmubersetzung:",
+        "fullscreen_from": "Von:",
+        "fullscreen_to": "Nach:",
+        "translate_selection_hotkey": "Tastenkurzel fur Auswahlubersetzung:",
+        "translator_label": "Ubersetzen:",
+        "keep_visible_on_ocr": "Fenster wahrend OCR sichtbar halten",
+        "clear_cache": "Cache leeren",
+        "reset": "Zurucksetzen",
+        "update": "Aktualisieren",
+        "translation_history_button": "Ubersetzungsverlauf",
+        "copy_history_button": "Kopierverlauf",
+        "fullscreen_translate_label": "Bildschirmubersetzung:",
+        "selection_translate_label": "Auswahlubersetzung:",
+        "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
+        "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
+        "remove_local_tesseract": "Lokales Tesseract entfernen",
+        "remove_local_hymt": "Lokales Hy-MT entfernen",
+        "clearing": "Wird geleert...",
+        "cleared": "{size} geleert",
+        "yes": "Ja",
+        "no": "Nein",
+        "cancel": "Abbrechen",
+        "open": "Offnen",
+        "install": "Installieren",
+        "later": "Spater",
+        "remove": "Entfernen",
+        "reset_question": "Mochtest du wirklich alle Einstellungen zurucksetzen?",
+        "clear_histories_title": "Verlaufe leeren?",
+        "clear_histories_question": "Ubersetzungs- und Kopierverlauf leeren?",
+        "settings_reset_done": "Einstellungen wurden zuruckgesetzt"
+    },
+    "fr": {
+        "autostart": "Demarrer avec le systeme",
+        "translation_mode": "Mode de traduction : {mode}",
+        "hotkeys": "Configurer les raccourcis",
+        "save_and_back": "Enregistrer et revenir",
+        "copy_to_clipboard": "Copier dans le presse-papiers",
+        "history": "Enregistrer l'historique des traductions",
+        "test_ocr": "Tester l'OCR",
+        "save": "Enregistrer",
+        "back": "Retour",
+        "remove_hotkey": "Appuyez sur ESC pour supprimer le raccourci",
+        "history_view": "Voir l'historique des traductions",
+        "start_minimized": "Demarrer en mode ombre",
+        "copy_history_view": "Afficher l'historique des copies",
+        "copy_history": "Enregistrer l'historique des copies",
+        "clear_copy_history": "Effacer l'historique des copies",
+        "clear_translation_history": "Effacer l'historique des traductions",
+        "history_title": "Historique des traductions",
+        "copy_history_title": "Historique des copies",
+        "history_empty": "L'historique est vide.",
+        "history_error": "Erreur de lecture de l'historique.",
+        "copy_translated_text": "Copier automatiquement le texte traduit",
+        "freeze_screen_on_ocr": "Figer l'ecran pendant l'OCR",
+        "fullscreen_translate_hotkey": "Raccourci traduction plein ecran :",
+        "fullscreen_from": "De :",
+        "fullscreen_to": "Vers :",
+        "translate_selection_hotkey": "Raccourci traduction de selection :",
+        "translator_label": "Traduire :",
+        "keep_visible_on_ocr": "Garder la fenetre visible pendant l'OCR",
+        "clear_cache": "Vider le cache",
+        "reset": "Reinitialiser",
+        "update": "Mettre a jour",
+        "translation_history_button": "Historique des traductions",
+        "copy_history_button": "Historique des copies",
+        "fullscreen_translate_label": "Traduction plein ecran :",
+        "selection_translate_label": "Traduction de selection :",
+        "copy_hotkey_label": "Raccourci de copie :",
+        "translate_hotkey_label": "Raccourci de traduction :",
+        "remove_local_tesseract": "Supprimer Tesseract local",
+        "remove_local_hymt": "Supprimer Hy-MT local",
+        "clearing": "Nettoyage...",
+        "cleared": "{size} nettoye",
+        "yes": "Oui",
+        "no": "Non",
+        "cancel": "Annuler",
+        "open": "Ouvrir",
+        "install": "Installer",
+        "later": "Plus tard",
+        "remove": "Supprimer",
+        "reset_question": "Voulez-vous vraiment reinitialiser tous les reglages ?",
+        "clear_histories_title": "Effacer les historiques ?",
+        "clear_histories_question": "Effacer l'historique des traductions et des copies ?",
+        "settings_reset_done": "Reglages reinitialises"
+    },
+    "zh": {
+        "autostart": "随系统启动",
+        "translation_mode": "文本翻译模式：{mode}",
+        "hotkeys": "配置快捷键",
+        "save_and_back": "保存并返回",
+        "copy_to_clipboard": "复制到剪贴板",
+        "history": "保存翻译历史",
+        "test_ocr": "测试 OCR",
+        "save": "保存",
+        "back": "返回",
+        "remove_hotkey": "按 ESC 删除快捷键",
+        "history_view": "查看翻译历史",
+        "start_minimized": "以阴影模式启动",
+        "copy_history_view": "显示复制历史",
+        "copy_history": "保存复制历史",
+        "clear_copy_history": "清除复制历史",
+        "clear_translation_history": "清除翻译历史",
+        "history_title": "翻译历史",
+        "copy_history_title": "复制历史",
+        "history_empty": "历史为空。",
+        "history_error": "读取历史时出错。",
+        "copy_translated_text": "自动复制翻译文本",
+        "freeze_screen_on_ocr": "OCR 时冻结屏幕",
+        "fullscreen_translate_hotkey": "全屏翻译快捷键：",
+        "fullscreen_from": "从：",
+        "fullscreen_to": "到：",
+        "translate_selection_hotkey": "翻译选中文本快捷键：",
+        "translator_label": "翻译：",
+        "keep_visible_on_ocr": "OCR 时保持窗口可见",
+        "clear_cache": "清除缓存",
+        "reset": "重置",
+        "update": "更新",
+        "translation_history_button": "翻译历史",
+        "copy_history_button": "复制历史",
+        "fullscreen_translate_label": "全屏翻译：",
+        "selection_translate_label": "选中文本翻译：",
+        "copy_hotkey_label": "复制选区快捷键：",
+        "translate_hotkey_label": "翻译快捷键：",
+        "remove_local_tesseract": "删除本地 Tesseract",
+        "remove_local_hymt": "删除本地 Hy-MT",
+        "clearing": "正在清除...",
+        "cleared": "已清除 {size}",
+        "yes": "是",
+        "no": "否",
+        "cancel": "取消",
+        "open": "打开",
+        "install": "安装",
+        "later": "稍后",
+        "remove": "删除",
+        "reset_question": "确定要重置所有设置吗？",
+        "clear_histories_title": "清除历史？",
+        "clear_histories_question": "清除翻译历史和复制历史吗？",
+        "settings_reset_done": "设置已重置"
     }
 }
+
+def settings_text(lang, key):
+    texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
+    return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
 
 class ClearableKeySequenceEdit(QKeySequenceEdit):
     """QKeySequenceEdit that always stores English key names regardless of keyboard layout."""
@@ -494,7 +766,7 @@ class SettingsWindow(QWidget):
         row1 = QHBoxLayout()
         row1.setContentsMargins(0, 0, 0, 0)
         row1.setSpacing(8)
-        self.autostart_checkbox = QCheckBox(SETTINGS_TEXT[lang]["autostart"])
+        self.autostart_checkbox = QCheckBox(settings_text(lang, "autostart"))
         self.autostart_checkbox.setChecked(self.parent.config.get("autostart", False))
         self.autostart_checkbox.clicked.connect(self.switch_startup)
         self.autostart_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:300px;")
@@ -536,9 +808,7 @@ class SettingsWindow(QWidget):
         self.ocr_engine_delete_btn.setObjectName("ocrEngineDeleteButton")
         self.ocr_engine_delete_btn.setText("x")
         self.ocr_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.ocr_engine_delete_btn.setToolTip(
-            "Удалить локальный Tesseract" if lang == "ru" else "Remove local Tesseract"
-        )
+        self.ocr_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_tesseract"))
         self.ocr_engine_delete_btn.clicked.connect(self.remove_tesseract_engine)
         self.ocr_engine_delete_btn.setStyleSheet("""
             QToolButton#ocrEngineDeleteButton {
@@ -575,7 +845,7 @@ class SettingsWindow(QWidget):
         row2 = QHBoxLayout()
         row2.setContentsMargins(0, 0, 0, 0)
         row2.setSpacing(8)
-        self.start_minimized_checkbox = QCheckBox(SETTINGS_TEXT[lang]["start_minimized"])
+        self.start_minimized_checkbox = QCheckBox(settings_text(lang, "start_minimized"))
         self.start_minimized_checkbox.setChecked(self.parent.config.get("start_minimized", False))
         self.start_minimized_checkbox.toggled.connect(lambda state: self.auto_save_setting("start_minimized", state))
         self.start_minimized_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:300px;")
@@ -585,7 +855,7 @@ class SettingsWindow(QWidget):
         
         # Переводчик блок
         # [ИНСТРУКЦИЯ] См. выше про выравнивание (AlignTop + padding 2px)
-        tr_label = QLabel("Перевод:" if lang == "ru" else "Translate:")
+        tr_label = QLabel(settings_text(lang, "translator_label"))
         tr_label.setStyleSheet("margin:0; padding:0; padding-top: 2px;")
         tr_label.setFixedWidth(90)
         tr_label.setFixedHeight(38)
@@ -613,9 +883,7 @@ class SettingsWindow(QWidget):
         self.translator_engine_delete_btn.setObjectName("translatorEngineDeleteButton")
         self.translator_engine_delete_btn.setText("x")
         self.translator_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.translator_engine_delete_btn.setToolTip(
-            "Удалить локальный Hy-MT" if lang == "ru" else "Remove local Hy-MT"
-        )
+        self.translator_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_hymt"))
         self.translator_engine_delete_btn.clicked.connect(self.remove_hymt_engine)
         self.translator_engine_delete_btn.setStyleSheet("""
             QToolButton#translatorEngineDeleteButton {
@@ -654,21 +922,21 @@ class SettingsWindow(QWidget):
         # --- Остальные чекбоксы (start_minimized уже добавлен выше) ---
 
         # Остальные чекбоксы
-        self.copy_translated_checkbox = QCheckBox(SETTINGS_TEXT[lang]["copy_translated_text"])
+        self.copy_translated_checkbox = QCheckBox(settings_text(lang, "copy_translated_text"))
         self.copy_translated_checkbox.setChecked(self.parent.config.get("copy_translated_text", False))
         self.copy_translated_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_translated_text", state))
         self.copy_translated_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
         self.copy_translated_checkbox.setFixedHeight(fixed_height)
         self.main_layout.addWidget(self.copy_translated_checkbox, alignment=Qt.AlignLeft)
 
-        self.copy_history_checkbox = QCheckBox(SETTINGS_TEXT[lang]["copy_history"])
+        self.copy_history_checkbox = QCheckBox(settings_text(lang, "copy_history"))
         self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", False))
         self.copy_history_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_history", state))
         self.copy_history_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
         self.copy_history_checkbox.setFixedHeight(fixed_height)
         self.main_layout.addWidget(self.copy_history_checkbox, alignment=Qt.AlignLeft)
 
-        self.history_checkbox = QCheckBox(SETTINGS_TEXT[lang]["history"])
+        self.history_checkbox = QCheckBox(settings_text(lang, "history"))
         self.history_checkbox.setChecked(self.parent.config.get("history", False))
         self.history_checkbox.toggled.connect(self.on_history_checkbox_toggled)
         self.history_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
@@ -676,7 +944,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.history_checkbox, alignment=Qt.AlignLeft)
 
         # Чекбокс "Не сворачивать при OCR"
-        self.keep_visible_checkbox = QCheckBox("Не сворачивать при OCR" if lang == 'ru' else "Keep window visible during OCR")
+        self.keep_visible_checkbox = QCheckBox(settings_text(lang, "keep_visible_on_ocr"))
         self.keep_visible_checkbox.setChecked(self.parent.config.get("keep_visible_on_ocr", False))
         self.keep_visible_checkbox.toggled.connect(lambda state: self.auto_save_setting("keep_visible_on_ocr", state))
         self.keep_visible_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
@@ -684,7 +952,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.keep_visible_checkbox, alignment=Qt.AlignLeft)
 
         # Последний чекбокс в фиксированном окне: заморозка экрана при OCR
-        self.freeze_screen_checkbox = QCheckBox(SETTINGS_TEXT[lang]["freeze_screen_on_ocr"])
+        self.freeze_screen_checkbox = QCheckBox(settings_text(lang, "freeze_screen_on_ocr"))
         self.freeze_screen_checkbox.setChecked(self.parent.config.get("freeze_screen_on_ocr", False))
         self.freeze_screen_checkbox.toggled.connect(lambda state: self.auto_save_setting("freeze_screen_on_ocr", state))
         self.freeze_screen_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
@@ -700,7 +968,7 @@ class SettingsWindow(QWidget):
         btn_group_layout.setSpacing(0)  # Без зазора между кнопками
         
         # Левая кнопка - закругление слева (фиолетовая)
-        self.clear_cache_btn = QPushButton("Очистить кэш" if lang == 'ru' else "Clear cache")
+        self.clear_cache_btn = QPushButton(settings_text(lang, "clear_cache"))
         self.clear_cache_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -724,7 +992,7 @@ class SettingsWindow(QWidget):
         btn_group_layout.addWidget(self.clear_cache_btn)
         
         # Средняя кнопка - без закругления (красная - сброс)
-        reset_btn = QPushButton("Сброс" if lang == 'ru' else "Reset")
+        reset_btn = QPushButton(settings_text(lang, "reset"))
         reset_btn.setStyleSheet("""
             QPushButton {
                 background-color: #D44444; 
@@ -747,7 +1015,7 @@ class SettingsWindow(QWidget):
         btn_group_layout.addWidget(reset_btn)
         
         # Правая кнопка - закругление справа (фиолетовая - обновление)
-        self.update_btn = QPushButton("Обновление" if lang == 'ru' else "Update")
+        self.update_btn = QPushButton(settings_text(lang, "update"))
         self.update_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -775,7 +1043,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(0)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
-        hotkeys_button = QPushButton(SETTINGS_TEXT[lang]["hotkeys"])
+        hotkeys_button = QPushButton(settings_text(lang, "hotkeys"))
         hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
         hotkeys_button.setStyleSheet("""
@@ -799,7 +1067,7 @@ class SettingsWindow(QWidget):
         btn_row.setSpacing(0)  # Без зазора
         btn_row.setContentsMargins(0, 0, 0, 0)
         
-        history_btn = QPushButton("История переводов" if lang == 'ru' else "Translation history")
+        history_btn = QPushButton(settings_text(lang, "translation_history_button"))
         history_btn.clicked.connect(self.show_history_view)
         # History (левая): Верх прямой, низ-лево круглый
         history_btn.setStyleSheet("""
@@ -816,7 +1084,7 @@ class SettingsWindow(QWidget):
         history_btn.setMinimumHeight(38)
         history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
-        copy_history_btn = QPushButton("История копирований" if lang == 'ru' else "Copy history")
+        copy_history_btn = QPushButton(settings_text(lang, "copy_history_button"))
         copy_history_btn.clicked.connect(self.show_copy_history_view)
         # Copy History (правая): Верх прямой, низ-право круглый
         copy_history_btn.setStyleSheet("""
@@ -855,7 +1123,7 @@ class SettingsWindow(QWidget):
         lang = self.parent.current_interface_language
 
         # Блок для настройки горячей клавиши "Copy Selected"
-        label_copy = QLabel("Copy Selected Hotkey:" if lang == "en" else "Горячая клавиша для копирования")
+        label_copy = QLabel(settings_text(lang, "copy_hotkey_label"))
         self.main_layout.addWidget(label_copy)
 
         self.copy_hotkey_input = ClearableKeySequenceEdit()
@@ -867,7 +1135,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(2)
 
         # Блок для настройки горячей клавиши "Translate Selected"
-        label_translate = QLabel("Translate Hotkey:" if lang == "en" else "Перевод выделенного (OCR)")
+        label_translate = QLabel(settings_text(lang, "translate_hotkey_label"))
         self.main_layout.addWidget(label_translate)
 
         self.translate_hotkey_input = ClearableKeySequenceEdit()
@@ -879,7 +1147,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(4)
 
         # Блок для настройки горячей клавиши "Fullscreen Translate"
-        label_fullscreen = QLabel("Fullscreen Translate:" if lang == "en" else "Перевод всего экрана")
+        label_fullscreen = QLabel(settings_text(lang, "fullscreen_translate_label"))
         self.main_layout.addWidget(label_fullscreen)
 
         self.fullscreen_translate_hotkey_input = ClearableKeySequenceEdit()
@@ -891,7 +1159,7 @@ class SettingsWindow(QWidget):
         self.main_layout.addSpacing(4)
 
         # Блок для настройки горячей клавиши "Translate Selection" (перевод выделенного текста)
-        label_selection = QLabel("Selection Translate:" if lang == "en" else "Перевод выделенного текста")
+        label_selection = QLabel(settings_text(lang, "selection_translate_label"))
         self.main_layout.addWidget(label_selection)
 
         self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
@@ -901,13 +1169,13 @@ class SettingsWindow(QWidget):
         self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
 
         # Инструктивная надпись для удаления комбинации
-        remove_label = QLabel(SETTINGS_TEXT[lang]["remove_hotkey"])
+        remove_label = QLabel(settings_text(lang, "remove_hotkey"))
         self.main_layout.addWidget(remove_label)
 
         self.main_layout.addStretch()
 
         # Кнопка возврата
-        back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
+        back_button = QPushButton(settings_text(lang, "back"))
         back_button.clicked.connect(self.back_from_hotkeys)
         self.main_layout.addWidget(back_button)
 
@@ -984,7 +1252,7 @@ class SettingsWindow(QWidget):
         self.clear_main_layout()
         lang = self.parent.current_interface_language
 
-        title_label = QLabel(SETTINGS_TEXT[lang]["history_title"])
+        title_label = QLabel(settings_text(lang, "history_title"))
         self.main_layout.addWidget(title_label)
 
         self.history_text_edit = QTextEdit()
@@ -998,13 +1266,13 @@ class SettingsWindow(QWidget):
 
         self.main_layout.addSpacing(10)
 
-        clear_button = QPushButton(SETTINGS_TEXT[lang]["clear_translation_history"])
+        clear_button = QPushButton(settings_text(lang, "clear_translation_history"))
         clear_button.clicked.connect(self.clear_history)
         self.main_layout.addWidget(clear_button)
 
         self.main_layout.addSpacing(10)
 
-        back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
+        back_button = QPushButton(settings_text(lang, "back"))
         back_button.clicked.connect(self.back_from_history)
         self.main_layout.addWidget(back_button)
 
@@ -1040,9 +1308,9 @@ class SettingsWindow(QWidget):
                     text += "━" * 35 + "\n\n"
                 self.history_text_edit.setText(text)
             else:
-                self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
+                self.history_text_edit.setText(settings_text(lang, "history_empty"))
         except Exception as e:
-            self.history_text_edit.setText(SETTINGS_TEXT[lang]["history_error"])
+            self.history_text_edit.setText(settings_text(lang, "history_error"))
 
     def clear_history(self):
         history_file = get_data_file("translation_history.json")
@@ -1062,7 +1330,7 @@ class SettingsWindow(QWidget):
         self.clear_main_layout()
         lang = self.parent.current_interface_language
 
-        title_label = QLabel(SETTINGS_TEXT[lang]["copy_history_title"])
+        title_label = QLabel(settings_text(lang, "copy_history_title"))
         self.main_layout.addWidget(title_label)
 
         self.copy_history_text_edit = QTextEdit()
@@ -1076,13 +1344,13 @@ class SettingsWindow(QWidget):
 
         self.main_layout.addSpacing(10)
 
-        clear_button = QPushButton(SETTINGS_TEXT[lang]["clear_copy_history"])
+        clear_button = QPushButton(settings_text(lang, "clear_copy_history"))
         clear_button.clicked.connect(self.clear_copy_history)
         self.main_layout.addWidget(clear_button)
 
         self.main_layout.addSpacing(10)
 
-        back_button = QPushButton(SETTINGS_TEXT[lang]["back"])
+        back_button = QPushButton(settings_text(lang, "back"))
         back_button.clicked.connect(self.back_from_copy_history)
         self.main_layout.addWidget(back_button)
 
@@ -1110,9 +1378,9 @@ class SettingsWindow(QWidget):
                     text += "━" * 35 + "\n\n"
                 self.copy_history_text_edit.setText(text)
             else:
-                self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_empty"])
+                self.copy_history_text_edit.setText(settings_text(lang, "history_empty"))
         except Exception as e:
-            self.copy_history_text_edit.setText(SETTINGS_TEXT[lang]["history_error"])
+            self.copy_history_text_edit.setText(settings_text(lang, "history_error"))
 
     def clear_copy_history(self):
         history_file = get_data_file("copy_history.json")
@@ -1147,7 +1415,7 @@ class SettingsWindow(QWidget):
 
         if not getattr(sys, "frozen", False):
             msg = QMessageBox(self)
-            msg.setWindowTitle("Обновление" if is_ru else "Update")
+            msg.setWindowTitle(settings_text(lang, "update"))
             msg.setText(
                 "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?"
                 if is_ru else
@@ -1155,8 +1423,8 @@ class SettingsWindow(QWidget):
             )
             msg.setIcon(QMessageBox.Information)
             msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton("Открыть" if is_ru else "Open", QMessageBox.YesRole)
-            msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
+            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
             msg.exec_()
             if msg.clickedButton() == yes_btn:
                 webbrowser.open(GITHUB_RELEASES_PAGE)
@@ -1183,13 +1451,13 @@ class SettingsWindow(QWidget):
         if not hasattr(self, "update_btn"):
             return
         if text is None:
-            text = "Обновление" if self.parent.current_interface_language == "ru" else "Update"
+            text = settings_text(self.parent.current_interface_language, "update")
         self.update_btn.setEnabled(enabled)
         self.update_btn.setText(text)
 
     def _show_update_progress(self, text, determinate=False, value=0):
         is_ru = self.parent.current_interface_language == "ru"
-        title = "Обновление" if is_ru else "Update"
+        title = settings_text(self.parent.current_interface_language, "update")
         if not hasattr(self, "_update_progress") or self._update_progress is None:
             self._update_progress = UpdateProgressDialog(self)
             self._update_progress.setWindowTitle(title)
@@ -1311,7 +1579,7 @@ class SettingsWindow(QWidget):
             )
             QMessageBox.information(
                 self,
-                "Обновление" if is_ru else "Update",
+                settings_text(self.parent.current_interface_language, "update"),
                 "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите."
                 if is_ru else
                 "The update is already being applied. Closing is disabled right now.\nPlease wait."
@@ -1438,7 +1706,7 @@ class SettingsWindow(QWidget):
             self._cleanup_update_temp_dir()
             QMessageBox.information(
                 self,
-                "Обновление" if is_ru else "Update",
+                settings_text(self.parent.current_interface_language, "update"),
                 "Проверка обновлений отменена." if is_ru else "Update check was canceled."
             )
             return
@@ -1461,7 +1729,7 @@ class SettingsWindow(QWidget):
 
         if status in ("no_asset", "invalid_asset"):
             msg = QMessageBox(self)
-            msg.setWindowTitle("Обновление" if is_ru else "Update")
+            msg.setWindowTitle(settings_text(self.parent.current_interface_language, "update"))
             msg.setText(
                 "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?"
                 if is_ru else
@@ -1469,8 +1737,8 @@ class SettingsWindow(QWidget):
             )
             msg.setIcon(QMessageBox.Information)
             msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton("Открыть" if is_ru else "Open", QMessageBox.YesRole)
-            msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+            yes_btn = msg.addButton(settings_text(self.parent.current_interface_language, "open"), QMessageBox.YesRole)
+            msg.addButton(settings_text(self.parent.current_interface_language, "cancel"), QMessageBox.NoRole)
             msg.exec_()
             if msg.clickedButton() == yes_btn:
                 webbrowser.open(GITHUB_RELEASES_PAGE)
@@ -1497,8 +1765,8 @@ class SettingsWindow(QWidget):
                 if is_ru else
                 f"New version found: V{latest_version}\nCurrent version: V{APP_VERSION}\n\nInstall now?"
             )
-            yes_btn = confirm.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-            confirm.addButton("Позже" if is_ru else "Later", QMessageBox.NoRole)
+            yes_btn = confirm.addButton(settings_text(self.parent.current_interface_language, "install"), QMessageBox.YesRole)
+            confirm.addButton(settings_text(self.parent.current_interface_language, "later"), QMessageBox.NoRole)
             confirm.exec_()
             if confirm.clickedButton() != yes_btn:
                 return
@@ -2086,7 +2354,7 @@ finally {
                 "text_color": "#000000",
             }
         }
-        theme = THEMES_LOCAL[self.parent.current_theme]
+        theme = THEMES_LOCAL.get(self.parent.current_theme) or next(iter(THEMES_LOCAL.values()))
         style = f"""
             QWidget {{
                 background-color: {theme['background']};
@@ -3191,8 +3459,8 @@ finally {
         from cache_manager import clear_all_cache as cm_clear, get_cache_stats, format_size
 
         lang = self.parent.current_interface_language
-        original_text = "Очистить кэш" if lang == 'ru' else "Clear cache"
-        clearing_text = "Выполняется..." if lang == 'ru' else "Clearing..."
+        original_text = settings_text(lang, "clear_cache")
+        clearing_text = settings_text(lang, "clearing")
 
         if hasattr(self, 'clear_cache_btn'):
             self.clear_cache_btn.setText(clearing_text)
@@ -3282,7 +3550,7 @@ finally {
             total_cleared = total_before
 
         size_str = format_size(total_cleared)
-        done_text = f"Очищено {size_str}" if lang == 'ru' else f"Cleared {size_str}"
+        done_text = settings_text(lang, "cleared").format(size=size_str)
         
         # Показываем результат и возвращаем текст через 2 сек
         if hasattr(self, 'clear_cache_btn'):
@@ -3338,15 +3606,15 @@ finally {
     def reset_settings(self):
         """Reset all program settings to default values (white theme, English, etc.)."""
         lang = self.parent.current_interface_language
-        title = "Сброс" if lang == 'ru' else "Reset"
-        question = "Вы уверены, что хотите сбросить все настройки?" if lang == 'ru' else "Are you sure you want to reset all settings?"
+        title = settings_text(lang, "reset")
+        question = settings_text(lang, "reset_question")
         box = QMessageBox(self)
         box.setWindowTitle(title)
         box.setText(question)
         box.setIcon(QMessageBox.Question)
         box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        yes_btn = box.addButton("Да" if lang == 'ru' else "Yes", QMessageBox.YesRole)
-        no_btn = box.addButton("Нет" if lang == 'ru' else "No", QMessageBox.NoRole)
+        yes_btn = box.addButton(settings_text(lang, "yes"), QMessageBox.YesRole)
+        no_btn = box.addButton(settings_text(lang, "no"), QMessageBox.NoRole)
         box.exec_()
         reply = QMessageBox.Yes if box.clickedButton() == yes_btn else QMessageBox.No
         if reply != QMessageBox.Yes:
@@ -3411,14 +3679,9 @@ finally {
 
         # Предложить очистить истории
         msg_clear = QMessageBox(self)
-        if lang == 'ru':
-            msg_clear.setWindowTitle('Очистить истории?')
-            msg_clear.setText('Очистить историю переводов и историю копирований?')
-            yes_text, no_text = 'Да', 'Нет'
-        else:
-            msg_clear.setWindowTitle('Clear histories?')
-            msg_clear.setText('Clear translation history and copy history?')
-            yes_text, no_text = 'Yes', 'No'
+        msg_clear.setWindowTitle(settings_text(lang, "clear_histories_title"))
+        msg_clear.setText(settings_text(lang, "clear_histories_question"))
+        yes_text, no_text = settings_text(lang, "yes"), settings_text(lang, "no")
         yes_btn = msg_clear.addButton(yes_text, QMessageBox.YesRole)
         no_btn = msg_clear.addButton(no_text, QMessageBox.NoRole)
         msg_clear.setIcon(QMessageBox.Question)
@@ -3433,7 +3696,7 @@ finally {
                 except Exception:
                     pass
 
-        done_text = "Настройки сброшены" if lang == 'ru' else "Settings were reset"
+        done_text = settings_text(lang, "settings_reset_done")
         info = QMessageBox(self)
         info.setWindowTitle(title)
         info.setText(done_text)

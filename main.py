@@ -72,7 +72,7 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame)
     from PyQt5.QtCore import Qt, QTimer, QSize
     from PyQt5.QtGui import QIcon
 except Exception:
@@ -86,6 +86,19 @@ from languages import (
     language_code_from_name,
     language_names,
 )
+
+APP_RUN_VALUE_NAME = "ClicknTranslate"
+APP_RUN_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+INTERFACE_LANGUAGE_OPTIONS = [
+    {"code": "en", "name": "English", "icon": "icons/American_flag.png"},
+    {"code": "ru", "name": "Русский", "icon": "icons/Russian_flag.png"},
+    {"code": "es", "name": "Español", "icon": "icons/Spanish_flag.png"},
+    {"code": "de", "name": "Deutsch", "icon": "icons/German_flag.png"},
+    {"code": "fr", "name": "Français", "icon": "icons/French_flag.png"},
+    {"code": "zh", "name": "中文", "icon": "icons/Chinese_flag.png"},
+]
+INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
 # --- Единственная константа с дефолтной конфигурацией ---
 DEFAULT_CONFIG = {
@@ -114,6 +127,119 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": "Ctrl+Alt+Q"
 }
+
+
+def normalize_interface_language(language_code):
+    code = str(language_code or "").lower()
+    if code in INTERFACE_LANGUAGE_BY_CODE:
+        return code
+    return DEFAULT_CONFIG["interface_language"]
+
+
+def get_interface_language_option(language_code):
+    return INTERFACE_LANGUAGE_BY_CODE.get(
+        normalize_interface_language(language_code),
+        INTERFACE_LANGUAGE_BY_CODE[DEFAULT_CONFIG["interface_language"]],
+    )
+
+
+def _build_autostart_command():
+    """Return the exact command that should be stored in HKCU Run."""
+    if getattr(sys, "frozen", False):
+        return subprocess.list2cmdline([os.path.abspath(sys.executable)])
+
+    python_exe = os.path.abspath(sys.executable)
+    pythonw = python_exe
+    if os.path.basename(python_exe).lower() == "python.exe":
+        candidate = os.path.join(os.path.dirname(python_exe), "pythonw.exe")
+        pythonw = candidate if os.path.exists(candidate) else python_exe
+
+    script_path = os.path.abspath(sys.argv[0])
+    return subprocess.list2cmdline([pythonw, script_path])
+
+
+def _parse_windows_command_line(command):
+    command = str(command or "").strip()
+    if not command:
+        return []
+    try:
+        argc = ctypes.c_int(0)
+        command_line_to_argv = ctypes.windll.shell32.CommandLineToArgvW
+        command_line_to_argv.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_int)]
+        command_line_to_argv.restype = ctypes.POINTER(ctypes.c_wchar_p)
+        argv = command_line_to_argv(command, ctypes.byref(argc))
+        if not argv:
+            return []
+        try:
+            return [argv[i] for i in range(argc.value)]
+        finally:
+            local_free = ctypes.windll.kernel32.LocalFree
+            local_free.argtypes = [wintypes.HLOCAL]
+            local_free.restype = wintypes.HLOCAL
+            local_free(argv)
+    except Exception:
+        return [command.strip('"')]
+
+
+def _normalize_autostart_arg(arg):
+    value = os.path.expandvars(str(arg or "").strip().strip('"'))
+    if not value:
+        return ""
+    value = value.replace("/", "\\")
+    if os.path.isabs(value):
+        return os.path.normcase(os.path.abspath(value))
+    return value.lower()
+
+
+def _normalize_autostart_command(command):
+    return tuple(
+        _normalize_autostart_arg(arg)
+        for arg in _parse_windows_command_line(command)
+        if str(arg or "").strip()
+    )
+
+
+def _autostart_commands_equivalent(left, right):
+    left_norm = _normalize_autostart_command(left)
+    right_norm = _normalize_autostart_command(right)
+    return bool(left_norm and right_norm and left_norm == right_norm)
+
+
+def _read_autostart_command():
+    try:
+        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_READ)
+        try:
+            value, _value_type = winreg.QueryValueEx(reg_key, APP_RUN_VALUE_NAME)
+            return str(value or "")
+        finally:
+            winreg.CloseKey(reg_key)
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return ""
+
+
+def _write_autostart_command(enable):
+    if enable:
+        reg_key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_SET_VALUE)
+        try:
+            winreg.SetValueEx(reg_key, APP_RUN_VALUE_NAME, 0, winreg.REG_SZ, _build_autostart_command())
+        finally:
+            winreg.CloseKey(reg_key)
+        return
+
+    try:
+        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_SET_VALUE)
+        try:
+            winreg.DeleteValue(reg_key, APP_RUN_VALUE_NAME)
+        except FileNotFoundError:
+            pass
+        finally:
+            winreg.CloseKey(reg_key)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 # --- Глобальный кэш конфигурации ---
 _config_cache = None
@@ -501,8 +627,8 @@ class HotkeyListenerThread(threading.Thread):
                 pass
 
 LANGUAGES = {
-    "en": language_names("en"),
-    "ru": language_names("ru")
+    code: language_names(code)
+    for code in INTERFACE_LANGUAGE_BY_CODE
 }
 
 INTERFACE_TEXT = {
@@ -513,7 +639,32 @@ INTERFACE_TEXT = {
         "translation_selected": "Selected translation: {src} → {tgt}",
         "settings": "Settings",
         "back": "Back to main",
-        "ocr": "OCR"
+        "ocr": "OCR",
+        "help": "Help",
+        "choose_interface_language": "Choose interface language",
+        "theme": "Change theme",
+        "minimize": "Minimize",
+        "tray_open": "Open",
+        "tray_exit": "Exit",
+        "tray_copy": "Copy Text",
+        "tray_translate": "Translate",
+        "tray_translate_screen": "Translate Screen",
+        "input_placeholder": "Enter text to translate",
+        "translate_button": "Translate",
+        "hotkey_copy": "Copy",
+        "hotkey_ocr_translate": "OCR Translate",
+        "hotkey_fullscreen": "Fullscreen",
+        "hotkey_selection": "Selection",
+        "translator": "Translator",
+        "shadow_mode": "Shadow mode",
+        "copy": "Copy",
+        "google": "Google",
+        "close": "Close",
+        "got_it": "Got it",
+        "no_text_selected": "No text selected",
+        "translating": "Translating...",
+        "translation_error": "Translation error",
+        "installing_language_packages": "Installing language packages…"
     },
     "ru": {
         "title": "Click'n'Translate",
@@ -522,9 +673,595 @@ INTERFACE_TEXT = {
         "translation_selected": "Выбран перевод: {src} → {tgt}",
         "settings": "Настройки",
         "back": "Назад",
-        "ocr": "OCR"
+        "ocr": "OCR",
+        "help": "Помощь",
+        "choose_interface_language": "Выбрать язык интерфейса",
+        "theme": "Сменить тему",
+        "minimize": "Свернуть",
+        "tray_open": "Открыть",
+        "tray_exit": "Закрыть программу",
+        "tray_copy": "Копировать текст",
+        "tray_translate": "Перевести",
+        "tray_translate_screen": "Перевести экран",
+        "input_placeholder": "Введите текст для перевода",
+        "translate_button": "Перевести",
+        "hotkey_copy": "Копир.",
+        "hotkey_ocr_translate": "OCR перевод",
+        "hotkey_fullscreen": "Экран",
+        "hotkey_selection": "Выделение",
+        "translator": "Переводчик",
+        "shadow_mode": "Режим тени",
+        "copy": "Копировать",
+        "google": "Гугл",
+        "close": "Закрыть",
+        "got_it": "Понятно",
+        "no_text_selected": "Текст не выделен",
+        "translating": "Переводим...",
+        "translation_error": "Ошибка перевода",
+        "installing_language_packages": "Установка языковых пакетов…"
+    },
+    "es": {
+        "title": "Click'n'Translate",
+        "select_language": "Selecciona idiomas",
+        "start": "Iniciar",
+        "translation_selected": "Traducción: {src} → {tgt}",
+        "settings": "Ajustes",
+        "back": "Volver",
+        "ocr": "OCR",
+        "help": "Ayuda",
+        "choose_interface_language": "Elegir idioma de la interfaz",
+        "theme": "Cambiar tema",
+        "minimize": "Minimizar",
+        "tray_open": "Abrir",
+        "tray_exit": "Salir",
+        "tray_copy": "Copiar texto",
+        "tray_translate": "Traducir",
+        "tray_translate_screen": "Traducir pantalla",
+        "input_placeholder": "Escribe texto para traducir",
+        "translate_button": "Traducir",
+        "hotkey_copy": "Copiar",
+        "hotkey_ocr_translate": "OCR traducir",
+        "hotkey_fullscreen": "Pantalla",
+        "hotkey_selection": "Selección",
+        "translator": "Traductor",
+        "shadow_mode": "Modo sombra",
+        "copy": "Copiar",
+        "google": "Google",
+        "close": "Cerrar",
+        "got_it": "Entendido",
+        "no_text_selected": "No hay texto seleccionado",
+        "translating": "Traduciendo...",
+        "translation_error": "Error de traducción",
+        "installing_language_packages": "Instalando paquetes de idioma…"
+    },
+    "de": {
+        "title": "Click'n'Translate",
+        "select_language": "Sprachen wählen",
+        "start": "Start",
+        "translation_selected": "Übersetzung: {src} → {tgt}",
+        "settings": "Einstellungen",
+        "back": "Zurück",
+        "ocr": "OCR",
+        "help": "Hilfe",
+        "choose_interface_language": "Sprache der Oberfläche wählen",
+        "theme": "Design ändern",
+        "minimize": "Minimieren",
+        "tray_open": "Öffnen",
+        "tray_exit": "Beenden",
+        "tray_copy": "Text kopieren",
+        "tray_translate": "Übersetzen",
+        "tray_translate_screen": "Bildschirm übersetzen",
+        "input_placeholder": "Text zum Übersetzen eingeben",
+        "translate_button": "Übersetzen",
+        "hotkey_copy": "Kopie",
+        "hotkey_ocr_translate": "OCR Übers.",
+        "hotkey_fullscreen": "Bildschirm",
+        "hotkey_selection": "Auswahl",
+        "translator": "Übersetzer",
+        "shadow_mode": "Schattenmodus",
+        "copy": "Kopieren",
+        "google": "Google",
+        "close": "Schließen",
+        "got_it": "Verstanden",
+        "no_text_selected": "Kein Text ausgewählt",
+        "translating": "Übersetze...",
+        "translation_error": "Übersetzungsfehler",
+        "installing_language_packages": "Sprachpakete werden installiert…"
+    },
+    "fr": {
+        "title": "Click'n'Translate",
+        "select_language": "Choisir les langues",
+        "start": "Démarrer",
+        "translation_selected": "Traduction : {src} → {tgt}",
+        "settings": "Réglages",
+        "back": "Retour",
+        "ocr": "OCR",
+        "help": "Aide",
+        "choose_interface_language": "Choisir la langue de l'interface",
+        "theme": "Changer de thème",
+        "minimize": "Réduire",
+        "tray_open": "Ouvrir",
+        "tray_exit": "Quitter",
+        "tray_copy": "Copier le texte",
+        "tray_translate": "Traduire",
+        "tray_translate_screen": "Traduire l'écran",
+        "input_placeholder": "Saisir le texte à traduire",
+        "translate_button": "Traduire",
+        "hotkey_copy": "Copier",
+        "hotkey_ocr_translate": "OCR traduire",
+        "hotkey_fullscreen": "Écran",
+        "hotkey_selection": "Sélection",
+        "translator": "Traducteur",
+        "shadow_mode": "Mode ombre",
+        "copy": "Copier",
+        "google": "Google",
+        "close": "Fermer",
+        "got_it": "Compris",
+        "no_text_selected": "Aucun texte sélectionné",
+        "translating": "Traduction...",
+        "translation_error": "Erreur de traduction",
+        "installing_language_packages": "Installation des modules de langue…"
+    },
+    "zh": {
+        "title": "Click'n'Translate",
+        "select_language": "选择翻译语言",
+        "start": "开始",
+        "translation_selected": "已选翻译：{src} → {tgt}",
+        "settings": "设置",
+        "back": "返回",
+        "ocr": "OCR",
+        "help": "帮助",
+        "choose_interface_language": "选择界面语言",
+        "theme": "切换主题",
+        "minimize": "最小化",
+        "tray_open": "打开",
+        "tray_exit": "退出",
+        "tray_copy": "复制文本",
+        "tray_translate": "翻译",
+        "tray_translate_screen": "翻译屏幕",
+        "input_placeholder": "输入要翻译的文本",
+        "translate_button": "翻译",
+        "hotkey_copy": "复制",
+        "hotkey_ocr_translate": "OCR 翻译",
+        "hotkey_fullscreen": "全屏",
+        "hotkey_selection": "选区",
+        "translator": "翻译器",
+        "shadow_mode": "阴影模式",
+        "copy": "复制",
+        "google": "Google",
+        "close": "关闭",
+        "got_it": "知道了",
+        "no_text_selected": "未选择文本",
+        "translating": "正在翻译...",
+        "translation_error": "翻译错误",
+        "installing_language_packages": "正在安装语言包…"
     }
 }
+
+
+def ui_text(lang, key):
+    return INTERFACE_TEXT.get(lang, INTERFACE_TEXT["en"]).get(key, INTERFACE_TEXT["en"].get(key, key))
+
+
+WELCOME_TEXT = {
+    "en": {
+        "window": "News",
+        "eyebrow": "Portable screen translator",
+        "title": "Welcome to Click'n'Translate!",
+        "body": "We recommend subscribing to the developer's Telegram channel to get updates and news about the program.",
+        "feature_ocr": "Screen OCR",
+        "feature_translate": "Online + offline",
+        "feature_updates": "One-click updates",
+        "telegram": "Open Telegram",
+        "checkbox": "Don't show this window again",
+        "close": "Start",
+    },
+    "ru": {
+        "window": "Новости",
+        "eyebrow": "Портативный экранный переводчик",
+        "title": "Добро пожаловать в Click'n'Translate!",
+        "body": "Советуем подписаться на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.",
+        "feature_ocr": "OCR с экрана",
+        "feature_translate": "Онлайн + офлайн",
+        "feature_updates": "Обновление в один клик",
+        "telegram": "Открыть Telegram",
+        "checkbox": "Больше не показывать это окно",
+        "close": "Начать",
+    },
+    "es": {
+        "window": "Noticias",
+        "eyebrow": "Traductor de pantalla portátil",
+        "title": "¡Bienvenido a Click'n'Translate!",
+        "body": "Te recomendamos suscribirte al canal de Telegram del desarrollador para recibir novedades y actualizaciones.",
+        "feature_ocr": "OCR de pantalla",
+        "feature_translate": "Online + offline",
+        "feature_updates": "Un clic",
+        "telegram": "Abrir Telegram",
+        "checkbox": "No volver a mostrar esta ventana",
+        "close": "Empezar",
+    },
+    "de": {
+        "window": "Neuigkeiten",
+        "eyebrow": "Portabler Bildschirmübersetzer",
+        "title": "Willkommen bei Click'n'Translate!",
+        "body": "Wir empfehlen, den Telegram-Kanal des Entwicklers zu abonnieren, um Updates und Neuigkeiten zu erhalten.",
+        "feature_ocr": "Bildschirm-OCR",
+        "feature_translate": "Online + offline",
+        "feature_updates": "1-Klick-Update",
+        "telegram": "Telegram öffnen",
+        "checkbox": "Dieses Fenster nicht mehr anzeigen",
+        "close": "Starten",
+    },
+    "fr": {
+        "window": "Actualités",
+        "eyebrow": "Traducteur d'écran portable",
+        "title": "Bienvenue dans Click'n'Translate !",
+        "body": "Nous vous conseillons de suivre le canal Telegram du développeur pour recevoir les nouveautés et mises à jour.",
+        "feature_ocr": "OCR d'écran",
+        "feature_translate": "En ligne + hors ligne",
+        "feature_updates": "Un clic",
+        "telegram": "Ouvrir Telegram",
+        "checkbox": "Ne plus afficher cette fenêtre",
+        "close": "Commencer",
+    },
+    "zh": {
+        "window": "更新",
+        "eyebrow": "便携式屏幕翻译器",
+        "title": "欢迎使用 Click'n'Translate！",
+        "body": "建议订阅开发者的 Telegram 频道，以获取程序更新和最新消息。",
+        "feature_ocr": "屏幕 OCR",
+        "feature_translate": "在线 + 离线翻译",
+        "feature_updates": "一键更新",
+        "telegram": "打开 Telegram",
+        "checkbox": "不再显示此窗口",
+        "close": "开始",
+    },
+}
+
+
+def welcome_text(lang):
+    return WELCOME_TEXT.get(lang, WELCOME_TEXT["en"])
+
+
+_HELP_STYLE = """
+<style>
+    .section { margin-bottom: 18px; }
+    .section-title { color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #7A5FA1; padding-bottom: 4px; }
+    .item { margin: 6px 0; padding-left: 8px; font-size: 14px; }
+    .item-title { color: #9A7FC1; font-weight: bold; }
+    .recommended { color: #4CAF50; font-size: 12px; }
+    .step { background-color: rgba(122, 95, 161, 0.1); padding: 8px; border-radius: 6px; margin: 4px 0; font-size: 14px; }
+</style>
+"""
+
+ADDITIONAL_HELP_TEXT = {
+    "es": _HELP_STYLE + """
+<div class="section"><div class="section-title">🚀 Inicio rápido</div>
+<div class="step"><b>1.</b> Pulsa el atajo para copiar o traducir</div>
+<div class="step"><b>2.</b> Selecciona el área de la pantalla con texto</div>
+<div class="step"><b>3.</b> Elige el idioma del texto en el selector</div>
+<div class="step"><b>4.</b> Listo: el texto se copiará o traducirá</div></div>
+<div class="section"><div class="section-title">🌐 Traductores</div>
+<div class="item"><span class="item-title">Google</span> — rápido y preciso <span class="recommended">✓ Recomendado</span></div>
+<div class="item"><span class="item-title">Argos</span> — sin conexión y privado</div>
+<div class="item"><span class="item-title">Hy-MT</span> — modelo LLM sin conexión, se instala aparte</div>
+<div class="item"><span class="item-title">MyMemory / Lingva / LibreTranslate</span> — proveedores en línea alternativos</div></div>
+<div class="section"><div class="section-title">👁 Motores OCR</div>
+<div class="item"><span class="item-title">Windows</span> — integrado y rápido <span class="recommended">✓ Recomendado</span></div>
+<div class="item"><span class="item-title">Tesseract</span> — sin conexión, preciso, se instala desde ajustes</div></div>
+<div class="section"><div class="section-title">⚙️ Ajustes</div>
+<div class="item">Configura inicio automático, historial, caché, motores OCR, traductores y atajos.</div>
+<div class="item">Si un atajo no funciona, puede estar ocupado por otra aplicación.</div></div>
+""",
+    "de": _HELP_STYLE + """
+<div class="section"><div class="section-title">🚀 Schnellstart</div>
+<div class="step"><b>1.</b> Hotkey zum Kopieren oder Übersetzen drücken</div>
+<div class="step"><b>2.</b> Bildschirmbereich mit Text markieren</div>
+<div class="step"><b>3.</b> Textsprache im Auswahlfeld wählen</div>
+<div class="step"><b>4.</b> Fertig: Text wird kopiert oder übersetzt</div></div>
+<div class="section"><div class="section-title">🌐 Übersetzer</div>
+<div class="item"><span class="item-title">Google</span> — schnell und präzise <span class="recommended">✓ Empfohlen</span></div>
+<div class="item"><span class="item-title">Argos</span> — offline und privat</div>
+<div class="item"><span class="item-title">Hy-MT</span> — Offline-LLM-Modell, separat installierbar</div>
+<div class="item"><span class="item-title">MyMemory / Lingva / LibreTranslate</span> — alternative Online-Anbieter</div></div>
+<div class="section"><div class="section-title">👁 OCR-Engines</div>
+<div class="item"><span class="item-title">Windows</span> — integriert und schnell <span class="recommended">✓ Empfohlen</span></div>
+<div class="item"><span class="item-title">Tesseract</span> — offline, präzise, über Einstellungen installierbar</div></div>
+<div class="section"><div class="section-title">⚙️ Einstellungen</div>
+<div class="item">Autostart, Verlauf, Cache, OCR-Engines, Übersetzer und Hotkeys werden hier verwaltet.</div>
+<div class="item">Wenn ein Hotkey nicht funktioniert, wird er vermutlich von einer anderen App genutzt.</div></div>
+""",
+    "fr": _HELP_STYLE + """
+<div class="section"><div class="section-title">🚀 Démarrage rapide</div>
+<div class="step"><b>1.</b> Appuyez sur le raccourci pour copier ou traduire</div>
+<div class="step"><b>2.</b> Sélectionnez la zone de l'écran contenant du texte</div>
+<div class="step"><b>3.</b> Choisissez la langue du texte dans le sélecteur</div>
+<div class="step"><b>4.</b> Terminé : le texte est copié ou traduit</div></div>
+<div class="section"><div class="section-title">🌐 Traducteurs</div>
+<div class="item"><span class="item-title">Google</span> — rapide et précis <span class="recommended">✓ Recommandé</span></div>
+<div class="item"><span class="item-title">Argos</span> — hors ligne et privé</div>
+<div class="item"><span class="item-title">Hy-MT</span> — modèle LLM hors ligne, installé séparément</div>
+<div class="item"><span class="item-title">MyMemory / Lingva / LibreTranslate</span> — fournisseurs en ligne alternatifs</div></div>
+<div class="section"><div class="section-title">👁 Moteurs OCR</div>
+<div class="item"><span class="item-title">Windows</span> — intégré et rapide <span class="recommended">✓ Recommandé</span></div>
+<div class="item"><span class="item-title">Tesseract</span> — hors ligne, précis, installable depuis les réglages</div></div>
+<div class="section"><div class="section-title">⚙️ Réglages</div>
+<div class="item">Gérez le démarrage automatique, l'historique, le cache, les moteurs OCR, les traducteurs et les raccourcis.</div>
+<div class="item">Si un raccourci ne fonctionne pas, il est peut-être utilisé par une autre application.</div></div>
+""",
+    "zh": _HELP_STYLE + """
+<div class="section"><div class="section-title">🚀 快速开始</div>
+<div class="step"><b>1.</b> 按复制或翻译快捷键</div>
+<div class="step"><b>2.</b> 用鼠标选择屏幕上的文本区域</div>
+<div class="step"><b>3.</b> 在选择器中选择文本语言</div>
+<div class="step"><b>4.</b> 完成：文本会被复制或翻译</div></div>
+<div class="section"><div class="section-title">🌐 翻译器</div>
+<div class="item"><span class="item-title">Google</span> — 快速且准确 <span class="recommended">✓ 推荐</span></div>
+<div class="item"><span class="item-title">Argos</span> — 离线、私密</div>
+<div class="item"><span class="item-title">Hy-MT</span> — 离线 LLM 模型，需要单独安装</div>
+<div class="item"><span class="item-title">MyMemory / Lingva / LibreTranslate</span> — 其他在线提供商</div></div>
+<div class="section"><div class="section-title">👁 OCR 引擎</div>
+<div class="item"><span class="item-title">Windows</span> — 系统内置，速度快 <span class="recommended">✓ 推荐</span></div>
+<div class="item"><span class="item-title">Tesseract</span> — 离线、准确，可在设置中安装</div></div>
+<div class="section"><div class="section-title">⚙️ 设置</div>
+<div class="item">这里可以管理自动启动、历史记录、缓存、OCR 引擎、翻译器和快捷键。</div>
+<div class="item">如果快捷键不起作用，可能已被其他应用占用。</div></div>
+""",
+}
+
+HELP_CONTENT = {
+    "en": [
+        ("Quick Start", [
+            "<b>1.</b> Press the copy or translate hotkey.",
+            "<b>2.</b> Select the screen area that contains text.",
+            "<b>3.</b> Choose the OCR/source language from the flag selector when needed.",
+            "<b>4.</b> The app copies recognized text or shows the translation.",
+        ]),
+        ("Interface Language", [
+            "Use the flag button in the title bar to switch the interface language.",
+            "The main window, settings, hotkeys, history screens, tray menu and this FAQ follow the selected language.",
+            "OCR and translation language selection is separate from the interface language.",
+        ]),
+        ("Translators", [
+            "<span class='item-title'>Google</span> - fast online translation, recommended by default.",
+            "<span class='item-title'>Argos</span> - offline and private, requires local language packages.",
+            "<span class='item-title'>Hy-MT</span> - local LLM translation package, installed separately from Settings.",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - alternative online providers.",
+        ]),
+        ("OCR Engines", [
+            "<span class='item-title'>Windows</span> - built into Windows, fast, depends on installed Windows language packs.",
+            "<span class='item-title'>Tesseract</span> - offline OCR engine; Settings can download a local portable package.",
+            "<span class='item-title'>AUTO</span> works best for numbers and Latin text; choose a specific language for better accuracy.",
+        ]),
+        ("Settings", [
+            "Shadow mode starts the app hidden in the system tray.",
+            "Keep window visible prevents the main window from hiding during OCR capture.",
+            "Freeze screen makes selecting moving text easier.",
+            "History and cache can be enabled, viewed, and cleared from Settings.",
+        ]),
+        ("Hotkeys", [
+            "<span class='item-title'>Copy</span> recognizes the selected area and copies text.",
+            "<span class='item-title'>OCR Translate</span> recognizes the selected area and translates it.",
+            "<span class='item-title'>Fullscreen</span> translates visible text blocks on the screen.",
+            "<span class='item-title'>Selection</span> translates the currently selected text from another app.",
+        ]),
+        ("Portable App", [
+            "The app stores config, history, cache and optional local engines next to the program folder.",
+            "Move the folder to its final location before enabling autostart or creating shortcuts.",
+        ]),
+    ],
+    "ru": [
+        ("Быстрый старт", [
+            "<b>1.</b> Нажмите горячую клавишу копирования или перевода.",
+            "<b>2.</b> Выделите область экрана с текстом.",
+            "<b>3.</b> При необходимости выберите язык OCR/исходного текста через флаг.",
+            "<b>4.</b> Программа скопирует распознанный текст или покажет перевод.",
+        ]),
+        ("Язык интерфейса", [
+            "Кнопка с флагом в заголовке переключает язык интерфейса.",
+            "Главное окно, настройки, горячие клавиши, история, меню трея и этот FAQ следуют выбранному языку.",
+            "Язык интерфейса не меняет язык OCR и направление перевода: они настраиваются отдельно.",
+        ]),
+        ("Переводчики", [
+            "<span class='item-title'>Google</span> - быстрый онлайн-перевод, выбран по умолчанию.",
+            "<span class='item-title'>Argos</span> - офлайн и приватно, нужны локальные языковые пакеты.",
+            "<span class='item-title'>Hy-MT</span> - локальный LLM-пакет перевода, устанавливается отдельно из настроек.",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - альтернативные онлайн-провайдеры.",
+        ]),
+        ("OCR-движки", [
+            "<span class='item-title'>Windows</span> - встроен в Windows, быстрый, зависит от установленных языковых пакетов Windows.",
+            "<span class='item-title'>Tesseract</span> - офлайн OCR; настройки умеют скачать локальный portable-пакет.",
+            "<span class='item-title'>AUTO</span> лучше подходит для цифр и латиницы; для точности выбирайте конкретный язык.",
+        ]),
+        ("Настройки", [
+            "Режим тени запускает программу скрытой в системном трее.",
+            "Не сворачивать при OCR оставляет главное окно видимым во время захвата.",
+            "Заморозка экрана помогает выделять движущийся текст.",
+            "Историю и кэш можно включать, просматривать и очищать в настройках.",
+        ]),
+        ("Горячие клавиши", [
+            "<span class='item-title'>Копирование</span> распознает выделенную область и копирует текст.",
+            "<span class='item-title'>OCR-перевод</span> распознает выделенную область и переводит ее.",
+            "<span class='item-title'>Экран</span> переводит видимые текстовые блоки на экране.",
+            "<span class='item-title'>Выделение</span> переводит уже выделенный текст из другого приложения.",
+        ]),
+        ("Портативность", [
+            "Конфиг, история, кэш и локальные движки хранятся рядом с папкой программы.",
+            "Переместите папку в постоянное место до включения автозапуска или создания ярлыков.",
+        ]),
+    ],
+    "es": [
+        ("Inicio rapido", [
+            "<b>1.</b> Pulsa el atajo de copiar o traducir.",
+            "<b>2.</b> Selecciona el area de la pantalla con texto.",
+            "<b>3.</b> Elige el idioma OCR/origen con la bandera cuando haga falta.",
+            "<b>4.</b> La app copia el texto reconocido o muestra la traduccion.",
+        ]),
+        ("Idioma de la interfaz", [
+            "El boton de bandera en la barra superior cambia el idioma de la interfaz.",
+            "Ventana principal, ajustes, atajos, historiales, menu de bandeja y este FAQ usan el idioma elegido.",
+            "El idioma de interfaz no cambia el idioma OCR ni la direccion de traduccion.",
+        ]),
+        ("Traductores", [
+            "<span class='item-title'>Google</span> - traduccion online rapida, recomendada por defecto.",
+            "<span class='item-title'>Argos</span> - sin conexion y privado; requiere paquetes locales.",
+            "<span class='item-title'>Hy-MT</span> - paquete LLM local, se instala aparte desde Ajustes.",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - proveedores online alternativos.",
+        ]),
+        ("Motores OCR", [
+            "<span class='item-title'>Windows</span> - integrado en Windows, rapido, depende de paquetes de idioma instalados.",
+            "<span class='item-title'>Tesseract</span> - OCR sin conexion; Ajustes puede descargar un paquete portable.",
+            "<span class='item-title'>AUTO</span> funciona mejor con numeros y texto latino; para precision elige un idioma concreto.",
+        ]),
+        ("Ajustes", [
+            "Modo sombra inicia la app oculta en la bandeja del sistema.",
+            "Mantener ventana visible evita ocultar la ventana principal durante OCR.",
+            "Congelar pantalla ayuda a seleccionar texto en movimiento.",
+            "El historial y la cache se pueden activar, ver y limpiar desde Ajustes.",
+        ]),
+        ("Atajos", [
+            "<span class='item-title'>Copiar</span> reconoce el area seleccionada y copia el texto.",
+            "<span class='item-title'>OCR traducir</span> reconoce el area seleccionada y la traduce.",
+            "<span class='item-title'>Pantalla</span> traduce bloques de texto visibles en pantalla.",
+            "<span class='item-title'>Seleccion</span> traduce texto ya seleccionado en otra app.",
+        ]),
+        ("Portabilidad", [
+            "Config, historial, cache y motores locales se guardan junto a la carpeta del programa.",
+            "Mueve la carpeta a su ubicacion final antes de activar inicio automatico o crear accesos directos.",
+        ]),
+    ],
+    "de": [
+        ("Schnellstart", [
+            "<b>1.</b> Drucken Sie das Kopieren- oder Ubersetzen-Tastenkurzel.",
+            "<b>2.</b> Markieren Sie den Bildschirmbereich mit Text.",
+            "<b>3.</b> Wahlen Sie bei Bedarf die OCR-/Quellsprache uber die Flagge.",
+            "<b>4.</b> Die App kopiert erkannten Text oder zeigt die Ubersetzung.",
+        ]),
+        ("Sprache der Oberflache", [
+            "Die Flagge in der Titelleiste wechselt die Sprache der Oberflache.",
+            "Hauptfenster, Einstellungen, Tastenkurzel, Verlauf, Tray-Menu und dieses FAQ folgen der gewahlten Sprache.",
+            "Die Oberflachensprache andert OCR-Sprache und Ubersetzungsrichtung nicht.",
+        ]),
+        ("Ubersetzer", [
+            "<span class='item-title'>Google</span> - schnelle Online-Ubersetzung, standardmassig empfohlen.",
+            "<span class='item-title'>Argos</span> - offline und privat; lokale Sprachpakete erforderlich.",
+            "<span class='item-title'>Hy-MT</span> - lokales LLM-Paket, separat in den Einstellungen installierbar.",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - alternative Online-Anbieter.",
+        ]),
+        ("OCR-Engines", [
+            "<span class='item-title'>Windows</span> - in Windows integriert, schnell, hangt von installierten Sprachpaketen ab.",
+            "<span class='item-title'>Tesseract</span> - Offline-OCR; Einstellungen konnen ein portables Paket laden.",
+            "<span class='item-title'>AUTO</span> passt am besten fur Zahlen und lateinischen Text; fur Genauigkeit eine konkrete Sprache wahlen.",
+        ]),
+        ("Einstellungen", [
+            "Schattenmodus startet die App ausgeblendet im System-Tray.",
+            "Fenster sichtbar halten verhindert, dass das Hauptfenster beim OCR ausgeblendet wird.",
+            "Bildschirm einfrieren hilft beim Markieren bewegter Texte.",
+            "Verlauf und Cache konnen in den Einstellungen aktiviert, angezeigt und geleert werden.",
+        ]),
+        ("Tastenkurzel", [
+            "<span class='item-title'>Kopieren</span> erkennt den markierten Bereich und kopiert Text.",
+            "<span class='item-title'>OCR-Ubersetzen</span> erkennt den markierten Bereich und ubersetzt ihn.",
+            "<span class='item-title'>Bildschirm</span> ubersetzt sichtbare Textblocke auf dem Bildschirm.",
+            "<span class='item-title'>Auswahl</span> ubersetzt bereits markierten Text aus einer anderen App.",
+        ]),
+        ("Portabilitat", [
+            "Konfig, Verlauf, Cache und lokale Engines liegen neben dem Programmordner.",
+            "Verschieben Sie den Ordner an seinen endgultigen Ort, bevor Autostart oder Verknupfungen erstellt werden.",
+        ]),
+    ],
+    "fr": [
+        ("Demarrage rapide", [
+            "<b>1.</b> Appuyez sur le raccourci de copie ou de traduction.",
+            "<b>2.</b> Selectionnez la zone de l'ecran contenant du texte.",
+            "<b>3.</b> Choisissez la langue OCR/source avec le drapeau si besoin.",
+            "<b>4.</b> L'app copie le texte reconnu ou affiche la traduction.",
+        ]),
+        ("Langue de l'interface", [
+            "Le bouton drapeau dans la barre de titre change la langue de l'interface.",
+            "Fenetre principale, reglages, raccourcis, historiques, menu de zone de notification et ce FAQ suivent la langue choisie.",
+            "La langue de l'interface ne change pas la langue OCR ni le sens de traduction.",
+        ]),
+        ("Traducteurs", [
+            "<span class='item-title'>Google</span> - traduction en ligne rapide, recommandee par defaut.",
+            "<span class='item-title'>Argos</span> - hors ligne et prive; modules locaux requis.",
+            "<span class='item-title'>Hy-MT</span> - paquet LLM local, installe separement depuis les reglages.",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - fournisseurs en ligne alternatifs.",
+        ]),
+        ("Moteurs OCR", [
+            "<span class='item-title'>Windows</span> - integre a Windows, rapide, depend des modules de langue installes.",
+            "<span class='item-title'>Tesseract</span> - OCR hors ligne; les reglages peuvent telecharger un paquet portable.",
+            "<span class='item-title'>AUTO</span> convient aux nombres et au texte latin; choisir une langue precise pour plus de fiabilite.",
+        ]),
+        ("Reglages", [
+            "Mode ombre lance l'app cachee dans la zone de notification.",
+            "Garder la fenetre visible empeche de masquer la fenetre principale pendant l'OCR.",
+            "Figer l'ecran facilite la selection de texte en mouvement.",
+            "Historique et cache peuvent etre actives, consultes et nettoyes dans les reglages.",
+        ]),
+        ("Raccourcis", [
+            "<span class='item-title'>Copier</span> reconnait la zone selectionnee et copie le texte.",
+            "<span class='item-title'>OCR traduire</span> reconnait la zone selectionnee et la traduit.",
+            "<span class='item-title'>Plein ecran</span> traduit les blocs de texte visibles a l'ecran.",
+            "<span class='item-title'>Selection</span> traduit le texte deja selectionne dans une autre app.",
+        ]),
+        ("Portabilite", [
+            "Config, historique, cache et moteurs locaux sont stockes a cote du dossier du programme.",
+            "Deplacez le dossier a son emplacement final avant d'activer le demarrage automatique ou de creer des raccourcis.",
+        ]),
+    ],
+    "zh": [
+        ("快速开始", [
+            "<b>1.</b> 按复制或翻译快捷键。",
+            "<b>2.</b> 选择屏幕上包含文字的区域。",
+            "<b>3.</b> 需要时通过旗帜选择 OCR/源语言。",
+            "<b>4.</b> 应用会复制识别文本或显示翻译。",
+        ]),
+        ("界面语言", [
+            "标题栏的旗帜按钮用于切换界面语言。",
+            "主窗口、设置、快捷键、历史记录、托盘菜单和本 FAQ 都会跟随所选语言。",
+            "界面语言不会改变 OCR 语言或翻译方向，这些需要单独设置。",
+        ]),
+        ("翻译器", [
+            "<span class='item-title'>Google</span> - 快速在线翻译，默认推荐。",
+            "<span class='item-title'>Argos</span> - 离线且私密，需要本地语言包。",
+            "<span class='item-title'>Hy-MT</span> - 本地 LLM 翻译包，可在设置中单独安装。",
+            "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - 其他在线翻译服务。",
+        ]),
+        ("OCR 引擎", [
+            "<span class='item-title'>Windows</span> - Windows 内置，速度快，依赖已安装的 Windows 语言包。",
+            "<span class='item-title'>Tesseract</span> - 离线 OCR；设置中可以下载本地便携包。",
+            "<span class='item-title'>AUTO</span> 更适合数字和拉丁文本；需要更高准确率时请选择具体语言。",
+        ]),
+        ("设置", [
+            "阴影模式会让应用启动后隐藏在系统托盘。",
+            "OCR 时保持窗口可见会防止主窗口在截图时隐藏。",
+            "冻结屏幕有助于选择正在变化的文字。",
+            "历史记录和缓存可以在设置中启用、查看和清除。",
+        ]),
+        ("快捷键", [
+            "<span class='item-title'>复制</span> 识别所选区域并复制文本。",
+            "<span class='item-title'>OCR 翻译</span> 识别所选区域并翻译。",
+            "<span class='item-title'>全屏</span> 翻译屏幕上可见的文本块。",
+            "<span class='item-title'>选区</span> 翻译其他应用中已选中的文本。",
+        ]),
+        ("便携应用", [
+            "配置、历史、缓存和本地引擎都保存在程序文件夹旁边。",
+            "启用自启动或创建快捷方式前，请先把程序文件夹移动到最终位置。",
+        ]),
+    ],
+}
+
+
+def help_text(lang):
+    sections = HELP_CONTENT.get(lang, HELP_CONTENT["en"])
+    blocks = [_HELP_STYLE]
+    for title, items in sections:
+        blocks.append(f'<div class="section"><div class="section-title">{title}</div>')
+        for item in items:
+            blocks.append(f'<div class="item">{item}</div>')
+        blocks.append("</div>")
+    return "\n".join(blocks)
 
 THEMES = {
     "Темная": {
@@ -561,76 +1298,296 @@ class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
-        self.lang = parent.current_interface_language if hasattr(parent, 'current_interface_language') else 'ru'
-        self.setWindowTitle(self.tr("Новости") if self.lang == 'ru' else "News")
+        self._drag_position = None
+        self.lang = normalize_interface_language(
+            parent.current_interface_language if hasattr(parent, 'current_interface_language') else 'ru'
+        )
+        self.setWindowTitle(welcome_text(self.lang)["window"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self.setFixedSize(500, 370)
-        self.setStyleSheet("background-color: #121212; color: #fff; font-size: 16px;")
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setFixedSize(580, 430)
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.init_ui()
 
     def init_ui(self):
-        # Очищаем layout, если он уже есть
-        layout = getattr(self, 'main_layout', None)
-        if layout:
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget:
-                    widget.deleteLater()
+        self._clear_layout()
+        text = welcome_text(self.lang)
+        self.setWindowTitle(text["window"])
+        self.setStyleSheet("""
+            QDialog {
+                background: transparent;
+            }
+            QFrame#welcomeCard {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #111827, stop:0.48 #15101f, stop:1 #241735);
+                border: 1px solid rgba(197, 179, 233, 120);
+                border-radius: 20px;
+            }
+            QLabel {
+                color: #f7f2ff;
+                background: transparent;
+            }
+            QLabel#welcomeLogo {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #c5b3e9, stop:1 #7a5fa1);
+                color: #111827;
+                border-radius: 15px;
+                font-size: 17px;
+                font-weight: 900;
+            }
+            QLabel#welcomeEyebrow {
+                color: #c5b3e9;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+            }
+            QLabel#welcomeTitle {
+                color: #ffffff;
+                font-size: 28px;
+                font-weight: 900;
+            }
+            QLabel#welcomeBody {
+                color: #d8d2e8;
+                font-size: 15px;
+                line-height: 1.45;
+            }
+            QLabel#welcomeVersion {
+                color: #a994d2;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QLabel#welcomeChip {
+                color: #efe8ff;
+                background: rgba(197, 179, 233, 30);
+                border: 1px solid rgba(197, 179, 233, 80);
+                border-radius: 12px;
+                padding: 7px 10px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QPushButton#welcomeLang,
+            QPushButton#welcomeClose {
+                background: rgba(255, 255, 255, 16);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 42);
+                border-radius: 12px;
+            }
+            QPushButton#welcomeLang:hover,
+            QPushButton#welcomeClose:hover {
+                background: rgba(197, 179, 233, 55);
+            }
+            QPushButton#welcomeTelegram {
+                background: rgba(42, 171, 238, 26);
+                color: #d9f2ff;
+                border: 1px solid rgba(42, 171, 238, 110);
+                border-radius: 13px;
+                padding: 10px 16px;
+                font-size: 14px;
+                font-weight: 800;
+            }
+            QPushButton#welcomeTelegram:hover {
+                background: rgba(42, 171, 238, 48);
+            }
+            QPushButton#welcomeStart {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #c5b3e9, stop:1 #8f6fd1);
+                color: #111827;
+                border: none;
+                border-radius: 13px;
+                padding: 10px 22px;
+                font-size: 15px;
+                font-weight: 900;
+            }
+            QPushButton#welcomeStart:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #dfd4ff, stop:1 #a681eb);
+            }
+            QCheckBox {
+                color: #bdb4d1;
+                font-size: 13px;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 17px;
+                height: 17px;
+                border-radius: 5px;
+                border: 1px solid #7a5fa1;
+                background: rgba(255,255,255,18);
+            }
+            QCheckBox::indicator:checked {
+                background: #c5b3e9;
+                border: 1px solid #c5b3e9;
+            }
+        """)
+
+        if self.layout() is None:
+            self.main_layout = QVBoxLayout(self)
         else:
-            layout = QVBoxLayout()
-            self.main_layout = layout
-            self.setLayout(layout)
+            self.main_layout = self.layout()
+        self.main_layout.setContentsMargins(12, 12, 12, 12)
         self.main_layout.setSpacing(0)
-        # --- Флаги ---
-        flag_layout = QHBoxLayout()
+
+        card = QFrame(self)
+        card.setObjectName("welcomeCard")
+        self.main_layout.addWidget(card)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 20, 24, 22)
+        card_layout.setSpacing(14)
+
+        top_row = QHBoxLayout()
+        top_row.setSpacing(10)
+
+        logo = QLabel("CT")
+        logo.setObjectName("welcomeLogo")
+        logo.setFixedSize(42, 42)
+        logo.setAlignment(Qt.AlignCenter)
+        top_row.addWidget(logo)
+
+        title_stack = QVBoxLayout()
+        title_stack.setSpacing(0)
+        app_name = QLabel("Click'n'Translate")
+        app_name.setStyleSheet("font-size: 17px; font-weight: 900; color: #ffffff;")
+        version = QLabel(f"v{APP_VERSION}")
+        version.setObjectName("welcomeVersion")
+        title_stack.addWidget(app_name)
+        title_stack.addWidget(version)
+        top_row.addLayout(title_stack)
+        top_row.addStretch()
+
         self.flag_button = QPushButton()
-        self.flag_button.setIcon(QIcon(resource_path("icons/Russian_flag.png")) if self.lang == 'ru' else QIcon(resource_path("icons/American_flag.png")))
-        self.flag_button.setIconSize(QSize(32, 32))
-        self.flag_button.setStyleSheet("background: transparent; border: none;")
-        self.flag_button.clicked.connect(self.toggle_language)
-        flag_layout.addWidget(self.flag_button)
-        flag_layout.addStretch()
-        self.main_layout.addLayout(flag_layout)
-        # --- Текст ---
-        if self.lang == 'ru':
-            self.setWindowTitle("Новости")
-            title = "<b>Добро пожаловать в Click'n'Translate!</b><br>"
-            version = f"<span style='color:#aaa; font-size:13px;'>V{APP_VERSION}</span><br><br>"
-            body = ("<span style='font-size:15px;'>"
-                    "Советуем <b>подписаться</b> на Telegram-канал разработчика, чтобы не пропустить обновления программы и получать свежие новости.<br><br>"
-                    "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
-                    "</span>")
-            checkbox_text = "Больше не показывать это окно"
-            close_text = "Закрыть"
-        else:
-            self.setWindowTitle("News")
-            title = "<b>Welcome to Click'n'Translate!</b><br>"
-            version = f"<span style='color:#aaa; font-size:13px;'>V{APP_VERSION}</span><br><br>"
-            body = ("<span style='font-size:15px;'>"
-                    "We recommend <b>subscribing</b> to the developer's Telegram channel to get updates and news about the program.<br><br>"
-                    "<a href='https://t.me/jabrail_digital' style='color:#7A5FA1; font-size:17px;'>https://t.me/jabrail_digital</a>"
-                    "</span>")
-            checkbox_text = "Don't show this window again"
-            close_text = "Close"
-        self.label = QLabel(title + version + body)
-        self.label.setOpenExternalLinks(True)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.label.setWordWrap(True)
-        self.main_layout.addWidget(self.label)
-        self.checkbox = QCheckBox(checkbox_text)
-        self.checkbox.setStyleSheet("color: #aaa; font-size: 14px; margin-left:0px; margin-bottom:10px;")
-        self.main_layout.addWidget(self.checkbox, alignment=Qt.AlignCenter)
-        btn_layout = QHBoxLayout()
-        self.close_btn = QPushButton(close_text)
-        self.close_btn.setStyleSheet("background-color: #7A5FA1; color: #fff; border-radius: 8px; padding: 8px 24px; font-size: 16px;")
+        self.flag_button.setObjectName("welcomeLang")
+        self.flag_button.setIcon(QIcon(resource_path(get_interface_language_option(self.lang)["icon"])))
+        self.flag_button.setIconSize(QSize(24, 24))
+        self.flag_button.setFixedSize(46, 38)
+        self.flag_button.clicked.connect(self.show_language_menu)
+        top_row.addWidget(self.flag_button)
+
+        close_x = QPushButton("×")
+        close_x.setObjectName("welcomeClose")
+        close_x.setFixedSize(38, 38)
+        close_x.setStyleSheet("font-size: 22px; font-weight: 700;")
+        close_x.clicked.connect(self.accept)
+        top_row.addWidget(close_x)
+        card_layout.addLayout(top_row)
+
+        hero = QVBoxLayout()
+        hero.setSpacing(8)
+        eyebrow = QLabel(text["eyebrow"])
+        eyebrow.setObjectName("welcomeEyebrow")
+        hero.addWidget(eyebrow)
+
+        title = QLabel(text["title"])
+        title.setObjectName("welcomeTitle")
+        title.setWordWrap(True)
+        hero.addWidget(title)
+
+        body = QLabel(text["body"])
+        body.setObjectName("welcomeBody")
+        body.setWordWrap(True)
+        hero.addWidget(body)
+        card_layout.addLayout(hero)
+
+        chips = QHBoxLayout()
+        chips.setSpacing(8)
+        for key in ("feature_ocr", "feature_translate", "feature_updates"):
+            chip = QLabel(text[key])
+            chip.setObjectName("welcomeChip")
+            chip.setAlignment(Qt.AlignCenter)
+            chips.addWidget(chip)
+        card_layout.addLayout(chips)
+        card_layout.addStretch()
+
+        self.checkbox = QCheckBox(text["checkbox"])
+        card_layout.addWidget(self.checkbox)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        self.telegram_btn = QPushButton(text["telegram"])
+        self.telegram_btn.setObjectName("welcomeTelegram")
+        self.telegram_btn.clicked.connect(self.open_telegram)
+        actions.addWidget(self.telegram_btn)
+        actions.addStretch()
+
+        self.close_btn = QPushButton(text["close"])
+        self.close_btn.setObjectName("welcomeStart")
         self.close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(self.close_btn)
-        self.main_layout.addLayout(btn_layout)
+        actions.addWidget(self.close_btn)
+        card_layout.addLayout(actions)
+
+    def _clear_layout(self):
+        layout = self.layout()
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            child_layout = item.layout()
+            if child_layout is not None:
+                while child_layout.count():
+                    child_item = child_layout.takeAt(0)
+                    child_widget = child_item.widget()
+                    if child_widget is not None:
+                        child_widget.deleteLater()
+
+    def open_telegram(self):
+        webbrowser.open("https://t.me/jabrail_digital")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
 
     def toggle_language(self):
-        self.lang = 'en' if self.lang == 'ru' else 'ru'
+        codes = [option["code"] for option in INTERFACE_LANGUAGE_OPTIONS]
+        index = codes.index(self.lang) if self.lang in codes else 0
+        self.set_language(codes[(index + 1) % len(codes)])
+
+    def show_language_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #11151d;
+                color: #ffffff;
+                border: 1px solid #54617a;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QMenu::item {
+                padding: 7px 20px 7px 10px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background-color: #314968;
+            }
+            QMenu::indicator {
+                width: 0px;
+            }
+        """)
+        for option in INTERFACE_LANGUAGE_OPTIONS:
+            selected = option["code"] == self.lang
+            action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
+            action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
+        menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+
+    def set_language(self, language_code):
+        self.lang = normalize_interface_language(language_code)
         self.parent.current_interface_language = self.lang
         self.parent.save_config()
         self.init_ui()
@@ -716,13 +1673,22 @@ class DarkThemeApp(QMainWindow):
                 self.config = json.load(f)
         else:
             self.config = DEFAULT_CONFIG.copy()
-            self.save_config()
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=4)
+            invalidate_config_cache()
         # Извлекаем значения с дефолтами из DEFAULT_CONFIG
         self.current_theme = self.config.get("theme", DEFAULT_CONFIG["theme"])
-        self.current_interface_language = self.config.get("interface_language", DEFAULT_CONFIG["interface_language"])
-        self.autostart = self.config.get("autostart", DEFAULT_CONFIG["autostart"])
+        raw_interface_language = self.config.get("interface_language", DEFAULT_CONFIG["interface_language"])
+        self.current_interface_language = normalize_interface_language(
+            raw_interface_language
+        )
+        self.config["interface_language"] = self.current_interface_language
+        stored_autostart = self.config.get("autostart", DEFAULT_CONFIG["autostart"])
+        self.autostart = self.sync_autostart_state(repair_stale=True)
         self.translation_mode = self.config.get("translation_mode", LANGUAGES[self.current_interface_language][0])
         self.start_minimized = self.config.get("start_minimized", DEFAULT_CONFIG["start_minimized"])
+        if raw_interface_language != self.current_interface_language or stored_autostart != self.autostart:
+            self.save_config()
 
     def save_config(self):
         self.config["theme"] = self.current_theme
@@ -736,34 +1702,36 @@ class DarkThemeApp(QMainWindow):
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
 
+    def sync_autostart_state(self, repair_stale=False):
+        """Sync config with the real HKCU Run entry; registry is the source of truth."""
+        command = _read_autostart_command()
+        enabled = False
+        if command:
+            if _autostart_commands_equivalent(command, _build_autostart_command()):
+                enabled = True
+            elif repair_stale and getattr(sys, "frozen", False):
+                # A stale ClicknTranslate Run entry means the user wanted autostart,
+                # but the path changed after moving/updating the portable app.
+                enabled = self.set_autostart(True)
+            else:
+                enabled = False
+        self.autostart = enabled
+        self.config["autostart"] = enabled
+        return enabled
+
     def set_autostart(self, enable: bool):
         try:
-            reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
-            
-            # Определяем путь к исполняемому файлу
-            if getattr(sys, 'frozen', False):
-                # PyInstaller: используем sys.executable (путь к exe)
-                exe_path = os.path.abspath(sys.executable)
-            else:
-                # Обычный Python: используем pythonw для запуска без консоли
-                pythonw = sys.executable.replace('python.exe', 'pythonw.exe')
-                script_path = os.path.abspath(sys.argv[0])
-                exe_path = f'"{pythonw}" "{script_path}"'
-            
-            if enable:
-                # Путь в кавычках на случай пробелов
-                if not exe_path.startswith('"'):
-                    exe_path = f'"{exe_path}"'
-                winreg.SetValueEx(reg_key, "ClicknTranslate", 0, winreg.REG_SZ, exe_path)
-            else:
-                try:
-                    winreg.DeleteValue(reg_key, "ClicknTranslate")
-                except FileNotFoundError:
-                    pass
-            winreg.CloseKey(reg_key)
+            _write_autostart_command(bool(enable))
+            command = _read_autostart_command()
+            actual = _autostart_commands_equivalent(command, _build_autostart_command())
+            self.autostart = bool(actual)
+            self.config["autostart"] = self.autostart
+            return self.autostart
         except Exception as e:
             print("Error setting autostart:", e)
+            self.autostart = False
+            self.config["autostart"] = False
+            return False
 
     def init_ui(self):
         self.title_bar = QLabel(self)
@@ -772,32 +1740,28 @@ class DarkThemeApp(QMainWindow):
         self.title_bar.setAlignment(Qt.AlignCenter)
 
         self.flag_button = QPushButton(self)
-        self.flag_button.setIcon(
-            QIcon(resource_path("icons/American_flag.png")) if self.current_interface_language == "en"
-            else QIcon(resource_path("icons/Russian_flag.png"))
-        )
-        self.flag_button.setToolTip("Сменить язык" if self.current_interface_language == "ru" else "Change language")
         self.flag_button.setStyleSheet("background-color: transparent; border: none;")
         self.flag_button.setGeometry(10, 5, 30, 30)
-        self.flag_button.clicked.connect(self.toggle_language)
+        self.flag_button.clicked.connect(self.show_interface_language_menu)
+        self.update_interface_language_button()
 
         self.theme_button = QPushButton(self)
         self.update_theme_icon()
-        self.theme_button.setToolTip("Change theme")
+        self.theme_button.setToolTip(ui_text(self.current_interface_language, "theme"))
         self.theme_button.setStyleSheet("background-color: transparent; border: none;")
         self.theme_button.setGeometry(50, 5, 30, 30)
         self.theme_button.clicked.connect(self.toggle_theme)
 
         self.minimize_button = QPushButton(self)
         self.minimize_button.setText("‒")
-        self.minimize_button.setToolTip("Minimize")
+        self.minimize_button.setToolTip(ui_text(self.current_interface_language, "minimize"))
         self.minimize_button.setStyleSheet("background-color: transparent; border: none;")
         self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
         self.minimize_button.clicked.connect(self.showMinimized)
 
         # Кнопка помощи (FAQ)
         self.help_button = QPushButton(self)
-        self.help_button.setToolTip("Помощь" if self.current_interface_language == "ru" else "Help")
+        self.help_button.setToolTip(ui_text(self.current_interface_language, "help"))
         self.help_button.setStyleSheet("background-color: transparent; border: none;")
         self.help_button.setGeometry(self.width() - 155, 5, 30, 30)
         self.help_button.clicked.connect(self.show_help_dialog)
@@ -820,36 +1784,27 @@ class DarkThemeApp(QMainWindow):
         self.apply_theme()
 
     def create_tray_icon(self):
-        lang = self.current_interface_language
-        if lang == "en":
-            open_text = "Open"
-            exit_text = "Exit"
-            copy_text = "Copy Text"
-            translate_text = "Translate"
-            fullscreen_text = "Translate Screen"
-        else:
-            open_text = "Открыть"
-            exit_text = "Закрыть программу"
-            copy_text = "Копировать текст"
-            translate_text = "Перевести"
-            fullscreen_text = "Перевести экран"
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
         self.tray_icon.setToolTip("Click'n'Translate")
-        tray_menu = QMenu()
-        open_action = tray_menu.addAction(open_text)
-        open_action.triggered.connect(lambda: self.show_window_from_tray(force_show=True))
-        copy_action = tray_menu.addAction(copy_text)
-        copy_action.triggered.connect(self.launch_copy)
-        translate_action = tray_menu.addAction(translate_text)
-        translate_action.triggered.connect(self.launch_translate)
-        fullscreen_action = tray_menu.addAction(fullscreen_text)
-        fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
-        tray_menu.addSeparator()
-        exit_action = tray_menu.addAction(exit_text)
-        exit_action.triggered.connect(self.exit_app)
-        self.tray_icon.setContextMenu(tray_menu)
+        self.update_tray_menu()
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
         self.tray_icon.show()
+
+    def update_tray_menu(self):
+        lang = self.current_interface_language
+        tray_menu = QMenu()
+        open_action = tray_menu.addAction(ui_text(lang, "tray_open"))
+        open_action.triggered.connect(lambda: self.show_window_from_tray(force_show=True))
+        copy_action = tray_menu.addAction(ui_text(lang, "tray_copy"))
+        copy_action.triggered.connect(self.launch_copy)
+        translate_action = tray_menu.addAction(ui_text(lang, "tray_translate"))
+        translate_action.triggered.connect(self.launch_translate)
+        fullscreen_action = tray_menu.addAction(ui_text(lang, "tray_translate_screen"))
+        fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
+        tray_menu.addSeparator()
+        exit_action = tray_menu.addAction(ui_text(lang, "tray_exit"))
+        exit_action.triggered.connect(self.exit_app)
+        self.tray_icon.setContextMenu(tray_menu)
 
     def on_tray_icon_activated(self, reason):
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
@@ -1023,7 +1978,7 @@ class DarkThemeApp(QMainWindow):
                     text = pyperclip.paste()
                 if not text or not text.strip():
                     lang = self.config.get("interface_language", "ru")
-                    no_text = "No text selected" if lang == "en" else "Текст не выделен"
+                    no_text = ui_text(lang, "no_text_selected")
                     self._show_status_signal.emit(no_text)
                     time.sleep(1.5)
                     self._hide_status_signal.emit()
@@ -1031,7 +1986,7 @@ class DarkThemeApp(QMainWindow):
                 text = text.strip()
                 # Show status
                 lang = self.config.get("interface_language", "ru")
-                status_msg = "Translating..." if lang == "en" else "Переводим..."
+                status_msg = ui_text(lang, "translating")
                 self._show_status_signal.emit(status_msg)
                 source_code = detect_language_code(text)
                 target_code = default_target_for_source(source_code)
@@ -1046,7 +2001,7 @@ class DarkThemeApp(QMainWindow):
                 auto_copy = self.config.get("copy_translated_text", False)
                 self._show_selection_signal.emit(translated, auto_copy, lang, theme)
             except Exception as e:
-                err_msg = "Translation error" if lang == "en" else "Ошибка перевода"
+                err_msg = ui_text(lang, "translation_error")
                 self._show_status_signal.emit(f"{err_msg}: {e}")
                 print(f"Error in translate_selection: {e}")
                 import traceback
@@ -1234,13 +2189,72 @@ class DarkThemeApp(QMainWindow):
             self.settings_window.apply_theme()
 
     def toggle_language(self):
-        if self.current_interface_language == "en":
-            self.current_interface_language = "ru"
-            self.flag_button.setIcon(QIcon(resource_path("icons/Russian_flag.png")))
-        else:
-            self.current_interface_language = "en"
-            self.flag_button.setIcon(QIcon(resource_path("icons/American_flag.png")))
+        codes = [option["code"] for option in INTERFACE_LANGUAGE_OPTIONS]
+        index = codes.index(self.current_interface_language) if self.current_interface_language in codes else 0
+        self.set_interface_language(codes[(index + 1) % len(codes)])
+
+    def update_interface_language_button(self):
+        option = get_interface_language_option(self.current_interface_language)
+        self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
+        self.flag_button.setIconSize(QSize(24, 24))
+        self.flag_button.setToolTip(ui_text(self.current_interface_language, "choose_interface_language"))
+
+    def refresh_interface_language_ui(self):
+        lang = self.current_interface_language
+        if hasattr(self, "title_bar"):
+            self.title_bar.setText(INTERFACE_TEXT[lang]["title"])
+        if hasattr(self, "flag_button"):
+            self.update_interface_language_button()
+        if hasattr(self, "theme_button"):
+            self.theme_button.setToolTip(ui_text(lang, "theme"))
+        if hasattr(self, "minimize_button"):
+            self.minimize_button.setToolTip(ui_text(lang, "minimize"))
+        if hasattr(self, "help_button"):
+            self.help_button.setToolTip(ui_text(lang, "help"))
+        if hasattr(self, "settings_button"):
+            key = "back" if getattr(self, "settings_window", None) is not None else "settings"
+            self.settings_button.setToolTip(INTERFACE_TEXT[lang][key])
+        if hasattr(self, "close_button"):
+            self.close_button.setToolTip(INTERFACE_TEXT[lang]["back"])
+        if hasattr(self, "tray_icon"):
+            self.update_tray_menu()
+
+    def show_interface_language_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #11151d;
+                color: #ffffff;
+                border: 1px solid #54617a;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QMenu::item {
+                padding: 7px 20px 7px 10px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background-color: #314968;
+            }
+            QMenu::indicator {
+                width: 0px;
+            }
+        """)
+        for option in INTERFACE_LANGUAGE_OPTIONS:
+            selected = option["code"] == self.current_interface_language
+            action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
+            action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
+        menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+
+    def set_interface_language(self, language_code):
+        language_code = normalize_interface_language(language_code)
+        if language_code == self.current_interface_language:
+            self.refresh_interface_language_ui()
+            return
+        self.current_interface_language = language_code
+        self.config["interface_language"] = language_code
         self.save_config()
+        self.refresh_interface_language_ui()
         if self.settings_window is not None:
             self.settings_window.update_language()
         else:
@@ -1262,129 +2276,12 @@ class DarkThemeApp(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        # Текст помощи
-        if lang == "ru":
-            help_text = """
-<style>
-    .section { margin-bottom: 18px; }
-    .section-title { color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #7A5FA1; padding-bottom: 4px; }
-    .item { margin: 6px 0; padding-left: 8px; font-size: 14px; }
-    .item-title { color: #9A7FC1; font-weight: bold; }
-    .recommended { color: #4CAF50; font-size: 12px; }
-    .step { background-color: rgba(122, 95, 161, 0.1); padding: 8px; border-radius: 6px; margin: 4px 0; font-size: 14px; }
-</style>
-
-<div class="section">
-<div class="section-title">🚀 Быстрый старт</div>
-<div class="step"><b>1.</b> Нажмите горячую клавишу для копирования или перевода</div>
-<div class="step"><b>2.</b> Выделите область экрана с текстом мышкой</div>
-<div class="step"><b>3.</b> Выберите язык текста (флаг в углу экрана)</div>
-<div class="step"><b>4.</b> Готово! Текст скопирован или переведён</div>
-</div>
-
-<div class="section">
-<div class="section-title">🌐 Переводчики</div>
-<div class="item"><span class="item-title">Google</span> — быстрый и точный <span class="recommended">✓ Рекомендуется</span></div>
-<div class="item"><span class="item-title">Argos</span> — офлайн, работает без интернета, полностью приватный</div>
-<div class="item"><span class="item-title">Hy-MT</span> — офлайн LLM-модель, ставится отдельным пакетом</div>
-<div class="item"><span class="item-title">MyMemory</span> — бесплатный API, лимит ~5000 символов/день</div>
-<div class="item"><span class="item-title">Lingva</span> — прокси к Google через публичные серверы</div>
-<div class="item"><span class="item-title">LibreTranslate</span> — открытый переводчик</div>
-</div>
-
-<div class="section">
-<div class="section-title">👁 OCR движки</div>
-<div class="item"><span class="item-title">Windows</span> — встроенный в ОС, быстрый <span class="recommended">✓ Рекомендуется</span></div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📋 <b>AUTO</b> — цифры и латиница | <b>RU</b> — кириллица | <b>EN</b> — английский</div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Работает только с языками, установленными в Windows (Настройки → Язык)</div>
-<div class="item"><span class="item-title">Tesseract</span> — офлайн, высокая точность, можно установить из настроек</div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📦 Установка скачивает локальный движок и модели RU/EN в папку программы; при возврате на Windows OCR можно удалить локальный движок</div>
-</div>
-
-<div class="section">
-<div class="section-title">⚙️ Настройки</div>
-<div class="item"><span class="item-title">Запускать в режиме тень</span> — программа запускается свёрнутой в трей</div>
-<div class="item"><span class="item-title">Копировать переведённый текст</span> — автоматически копировать перевод в буфер</div>
-<div class="item"><span class="item-title">Сохранять историю</span> — сохранять историю переводов и копирований</div>
-<div class="item"><span class="item-title">Не сворачивать при OCR</span> — окно остаётся видимым при захвате экрана</div>
-<div class="item"><span class="item-title">Не затемнять экран</span> — только рамка выделения без затемнения</div>
-</div>
-
-<div class="section">
-<div class="section-title">⌨️ Горячие клавиши</div>
-<div class="item">Настройте свои комбинации в разделе «Настроить горячие клавиши»</div>
-<div class="item">Если хоткей не работает — возможно он занят другой программой</div>
-</div>
-
-<div class="section">
-<div class="section-title">📦 Портативность</div>
-<div class="item">Программа полностью портативна — не требует установки</div>
-<div class="item"><span class="item-title">Автозапуск:</span> если отключить через Диспетчер задач — включите там же</div>
-</div>
-"""
-        else:
-            help_text = """
-<style>
-    .section { margin-bottom: 18px; }
-    .section-title { color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 8px; border-bottom: 2px solid #7A5FA1; padding-bottom: 4px; }
-    .item { margin: 6px 0; padding-left: 8px; font-size: 14px; }
-    .item-title { color: #9A7FC1; font-weight: bold; }
-    .recommended { color: #4CAF50; font-size: 12px; }
-    .step { background-color: rgba(122, 95, 161, 0.1); padding: 8px; border-radius: 6px; margin: 4px 0; font-size: 14px; }
-</style>
-
-<div class="section">
-<div class="section-title">🚀 Quick Start</div>
-<div class="step"><b>1.</b> Press your configured hotkey for copy or translate</div>
-<div class="step"><b>2.</b> Select an area on screen with text</div>
-<div class="step"><b>3.</b> Choose the text language (flag in the corner)</div>
-<div class="step"><b>4.</b> Done! Text is copied or translated</div>
-</div>
-
-<div class="section">
-<div class="section-title">🌐 Translators</div>
-<div class="item"><span class="item-title">Google</span> — fast and accurate <span class="recommended">✓ Recommended</span></div>
-<div class="item"><span class="item-title">Argos</span> — offline, no internet, private</div>
-<div class="item"><span class="item-title">Hy-MT</span> — offline LLM model, installed as a separate package</div>
-<div class="item"><span class="item-title">MyMemory</span> — free API, 5000 chars/day limit</div>
-<div class="item"><span class="item-title">Lingva</span> — Google proxy, more stable</div>
-<div class="item"><span class="item-title">LibreTranslate</span> — open source, free</div>
-</div>
-
-<div class="section">
-<div class="section-title">👁 OCR Engines</div>
-<div class="item"><span class="item-title">Windows</span> — built-in, fast <span class="recommended">✓ Recommended</span></div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📋 <b>AUTO</b> — numbers & latin | <b>RU</b> — cyrillic | <b>EN</b> — english</div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">⚠️ Only works with languages installed in Windows (Settings → Language)</div>
-<div class="item"><span class="item-title">Tesseract</span> — accurate, offline, can be installed from settings</div>
-<div class="item" style="padding-left: 24px; font-size: 13px; color: #888;">📦 Installation downloads the local engine and RU/EN data into the app folder; when switching back to Windows OCR, you can remove the local engine</div>
-</div>
-
-<div class="section">
-<div class="section-title">⚙️ Settings</div>
-<div class="item"><span class="item-title">Start minimized</span> — app starts hidden in system tray</div>
-<div class="item"><span class="item-title">Copy translated text</span> — auto-copy translation to clipboard</div>
-<div class="item"><span class="item-title">Save history</span> — keep history of translations and copies</div>
-<div class="item"><span class="item-title">Keep window visible</span> — don't hide app during screen capture</div>
-<div class="item"><span class="item-title">No screen dimming</span> — only selection frame, no overlay</div>
-</div>
-
-<div class="section">
-<div class="section-title">⌨️ Hotkeys</div>
-<div class="item">Configure your shortcuts in "Configure hotkeys" section</div>
-<div class="item">If a hotkey doesn't work — it may be used by another app</div>
-</div>
-
-<div class="section">
-<div class="section-title">📦 Portable App</div>
-<div class="item">This app is fully portable — no installation required</div>
-<div class="item"><span class="item-title">Autostart:</span> if disabled via Task Manager — re-enable it there</div>
-</div>
-"""
+        # Текст FAQ всегда строится из актуального языка интерфейса.
+        help_html = help_text(lang)
 
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        text_edit.setHtml(help_text)
+        text_edit.setHtml(help_html)
 
         # Стилизация под тему
         if theme == "Темная":
@@ -1456,7 +2353,7 @@ class DarkThemeApp(QMainWindow):
         layout.addWidget(text_edit)
 
         # Кнопка закрытия
-        close_btn = QPushButton("Понятно" if lang == "ru" else "Got it")
+        close_btn = QPushButton(ui_text(lang, "got_it"))
         close_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1;
@@ -1512,15 +2409,15 @@ class DarkThemeApp(QMainWindow):
         
         # Отображаем конкретный переводчик
         translator_names = {
-            "argos": {"en": "Argos Translate (Offline)", "ru": "Argos Translate (Офлайн)"},
-            "hymt": {"en": "Hy-MT Translate (Offline)", "ru": "Hy-MT Translate (Офлайн)"},
-            "google": {"en": "Google Translate", "ru": "Google Translate"},
-            "mymemory": {"en": "MyMemory Translate", "ru": "MyMemory Translate"},
-            "lingva": {"en": "Lingva Translate", "ru": "Lingva Translate"},
-            "libretranslate": {"en": "LibreTranslate", "ru": "LibreTranslate"}
+            "argos": {"en": "Argos Translate (Offline)", "ru": "Argos Translate (Офлайн)", "es": "Argos Translate (sin conexión)", "de": "Argos Translate (offline)", "fr": "Argos Translate (hors ligne)", "zh": "Argos Translate（离线）"},
+            "hymt": {"en": "Hy-MT Translate (Offline)", "ru": "Hy-MT Translate (Офлайн)", "es": "Hy-MT Translate (sin conexión)", "de": "Hy-MT Translate (offline)", "fr": "Hy-MT Translate (hors ligne)", "zh": "Hy-MT Translate（离线）"},
+            "google": {"en": "Google Translate", "ru": "Google Translate", "es": "Google Translate", "de": "Google Translate", "fr": "Google Translate", "zh": "Google 翻译"},
+            "mymemory": {"en": "MyMemory Translate", "ru": "MyMemory Translate", "es": "MyMemory Translate", "de": "MyMemory Translate", "fr": "MyMemory Translate", "zh": "MyMemory 翻译"},
+            "lingva": {"en": "Lingva Translate", "ru": "Lingva Translate", "es": "Lingva Translate", "de": "Lingva Translate", "fr": "Lingva Translate", "zh": "Lingva 翻译"},
+            "libretranslate": {"en": "LibreTranslate", "ru": "LibreTranslate", "es": "LibreTranslate", "de": "LibreTranslate", "fr": "LibreTranslate", "zh": "LibreTranslate"}
         }
         
-        translator_info = translator_names.get(translator_engine, {"en": "Translation", "ru": "Перевод"})
+        translator_info = translator_names.get(translator_engine, {"en": "Translation", "ru": "Перевод", "es": "Traducción", "de": "Übersetzung", "fr": "Traduction", "zh": "翻译"})
         lang_label_text = translator_info.get(self.current_interface_language, translator_info["en"])
         
         self.label = QLabel(lang_label_text)
@@ -1540,7 +2437,7 @@ class DarkThemeApp(QMainWindow):
         self.target_lang.setCurrentIndex(0)
         self.main_layout.addWidget(self.target_lang)
         self.text_input = QTextEdit()
-        self.text_input.setPlaceholderText("Enter text to translate" if self.current_interface_language == "en" else "Введите текст для перевода")
+        self.text_input.setPlaceholderText(ui_text(self.current_interface_language, "input_placeholder"))
         self.text_input.setMinimumHeight(45)
         self.text_input.setMaximumHeight(70)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -1548,7 +2445,7 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addWidget(self.text_input)
 
         # Кнопка перевода сразу под полем ввода
-        self.translate_button = QPushButton("Translate" if self.current_interface_language == "en" else "Перевести")
+        self.translate_button = QPushButton(ui_text(self.current_interface_language, "translate_button"))
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setStyleSheet("border: 2px solid #C5B3E9; border-radius: 8px; font-size: 16px; padding: 8px 0; background: none; color: #7A5FA1;")
         self.main_layout.addWidget(self.translate_button)
@@ -1557,7 +2454,7 @@ class DarkThemeApp(QMainWindow):
         hk_style = "font-size: 13px; color: #888; padding: 0; margin: 0;"
         hk_val = "color: #7A5FA1; font-weight: bold;"
         not_set = "—"
-        is_en = self.current_interface_language == "en"
+        lang = self.current_interface_language
 
         copy_hk = self.config.get("copy_hotkey", "") or not_set
         translate_hk = self.config.get("translate_hotkey", "") or not_set
@@ -1570,7 +2467,7 @@ class DarkThemeApp(QMainWindow):
         # Row 1: Copy + OCR translate | OCR engine + Translator
         row1 = QHBoxLayout()
         row1.setSpacing(0)
-        r1_left = QLabel(f"{'Copy' if is_en else 'Копир.'}: <span style='{hk_val}'>{copy_hk}</span> &nbsp; {'OCR Translate' if is_en else 'OCR перевод'}: <span style='{hk_val}'>{translate_hk}</span>")
+        r1_left = QLabel(f"{ui_text(lang, 'hotkey_copy')}: <span style='{hk_val}'>{copy_hk}</span> &nbsp; {ui_text(lang, 'hotkey_ocr_translate')}: <span style='{hk_val}'>{translate_hk}</span>")
         r1_left.setStyleSheet(hk_style)
         r1_left.setTextFormat(Qt.RichText)
         row1.addWidget(r1_left, alignment=Qt.AlignLeft)
@@ -1584,19 +2481,19 @@ class DarkThemeApp(QMainWindow):
         # Row 2: Fullscreen + Selection | Translator
         row2 = QHBoxLayout()
         row2.setSpacing(0)
-        r2_left = QLabel(f"{'Fullscreen' if is_en else 'Экран'}: <span style='{hk_val}'>{fs_hk}</span> &nbsp; {'Selection' if is_en else 'Выделение'}: <span style='{hk_val}'>{sel_hk}</span>")
+        r2_left = QLabel(f"{ui_text(lang, 'hotkey_fullscreen')}: <span style='{hk_val}'>{fs_hk}</span> &nbsp; {ui_text(lang, 'hotkey_selection')}: <span style='{hk_val}'>{sel_hk}</span>")
         r2_left.setStyleSheet(hk_style)
         r2_left.setTextFormat(Qt.RichText)
         row2.addWidget(r2_left, alignment=Qt.AlignLeft)
         row2.addItem(QSpacerItem(10, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        r2_right = QLabel(f"{'Translator' if is_en else 'Переводчик'}: <b>{tr_name}</b>")
+        r2_right = QLabel(f"{ui_text(lang, 'translator')}: <b>{tr_name}</b>")
         r2_right.setStyleSheet("font-size: 13px; color: #7A5FA1; margin-right: 8px;")
         r2_right.setTextFormat(Qt.RichText)
         row2.addWidget(r2_right, alignment=Qt.AlignRight)
         self.main_layout.addLayout(row2)
 
         # Кнопка старт (shadow mode) в самом низу
-        start_text = "Shadow mode" if self.current_interface_language == "en" else "Режим тени"
+        start_text = ui_text(self.current_interface_language, "shadow_mode")
         self.start_button = QPushButton(start_text)
         self.start_button.setStyleSheet("border: none; font-size: 16px; padding: 8px 0; background-color: #C5B3E9; color: #111; border-radius: 8px;")
         self.main_layout.addWidget(self.start_button)
@@ -1775,7 +2672,7 @@ class DarkThemeApp(QMainWindow):
                 def _status(msg):
                     nonlocal progress
                     if progress is None:
-                        title = "Installing language packages…" if self.current_interface_language == "en" else "Установка языковых пакетов…"
+                        title = ui_text(self.current_interface_language, "installing_language_packages")
                         progress = QProgressDialog(title, None, 0, 0, self)
                         progress.setCancelButton(None)
                         progress.setWindowModality(Qt.WindowModal)
@@ -1869,9 +2766,9 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
 
-    copy_text = "Copy" if lang == "en" else "Копировать"
-    google_text = "Google" if lang == "en" else "Гугл"
-    close_text = "Close" if lang == "en" else "Закрыть"
+    copy_text = ui_text(lang, "copy")
+    google_text = ui_text(lang, "google")
+    close_text = ui_text(lang, "close")
 
     if not auto_copy:
         copy_btn = QPushButton(copy_text)

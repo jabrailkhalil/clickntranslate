@@ -12,6 +12,7 @@ releases/
 # Build scripts and specs
 build.py
 *.spec
+!ClicknTranslate.spec
 
 # Virtual environments
 venv/
