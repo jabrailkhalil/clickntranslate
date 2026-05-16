@@ -678,11 +678,12 @@ def ensure_json_file(filepath, default_content):
 
 class SettingsWindow(QWidget):
     def switch_startup(self, state):
-        self.parent.config["autostart"] = self.autostart_checkbox.isChecked()
+        enabled = self.parent.set_autostart(self.autostart_checkbox.isChecked())
+        self.autostart_checkbox.setChecked(enabled)
+        self.parent.autostart = enabled
+        self.parent.config["autostart"] = enabled
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
-        self.parent.set_autostart(self.autostart_checkbox.isChecked())
-        self.parent.autostart = self.autostart_checkbox.isChecked()
 
     def auto_save_setting(self, key, value):
         self.parent.config[key] = value
@@ -1399,15 +1400,16 @@ class SettingsWindow(QWidget):
         self.apply_theme()
 
     def save_and_back(self):
-        self.parent.config["autostart"] = self.autostart_checkbox.isChecked()
+        autostart_enabled = self.parent.set_autostart(self.autostart_checkbox.isChecked())
+        self.autostart_checkbox.setChecked(autostart_enabled)
+        self.parent.config["autostart"] = autostart_enabled
         self.parent.config["copy_translated_text"] = self.copy_translated_checkbox.isChecked()
         self.parent.config["copy_history"] = self.copy_history_checkbox.isChecked()
         self.parent.config["history"] = self.history_checkbox.isChecked()
         self.parent.config["start_minimized"] = self.start_minimized_checkbox.isChecked()
-        self.parent.autostart = self.autostart_checkbox.isChecked()
+        self.parent.autostart = autostart_enabled
         self.parent.start_minimized = self.start_minimized_checkbox.isChecked()
         self.parent.save_config()
-        self.parent.set_autostart(self.autostart_checkbox.isChecked())
         self.init_ui()
         self.parent.show_main_screen()
 
@@ -3627,6 +3629,7 @@ finally {
             "interface_language": "en",
             "ocr_language": "ru",
             "autostart": False,
+            "autostart_backend": "startup_shortcut",
             "translation_mode": "English",
             "ocr_hotkeys": "Ctrl+O",
             "copy_hotkey": "Ctrl+Alt+C",

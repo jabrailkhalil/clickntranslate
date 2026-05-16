@@ -10,7 +10,6 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 warnings.filterwarnings("ignore", category=UserWarning, module=r"pkg_resources")
-import winreg
 import subprocess
 import ctypes
 import threading
@@ -87,8 +86,8 @@ from languages import (
     language_names,
 )
 
-APP_RUN_VALUE_NAME = "ClicknTranslate"
-APP_RUN_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
+AUTOSTART_BACKEND = "startup_shortcut"
 
 INTERFACE_LANGUAGE_OPTIONS = [
     {"code": "en", "name": "English", "icon": "icons/American_flag.png"},
@@ -105,6 +104,7 @@ DEFAULT_CONFIG = {
     "theme": "Темная",
     "interface_language": "en",
     "autostart": False,
+    "autostart_backend": AUTOSTART_BACKEND,
     "translation_mode": "English",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
@@ -145,10 +145,43 @@ def get_interface_language_option(language_code):
     )
 
 
-def _build_autostart_command():
-    """Return the exact command that should be stored in HKCU Run."""
+def _autostart_startup_dir():
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return os.path.join(
+            appdata,
+            "Microsoft",
+            "Windows",
+            "Start Menu",
+            "Programs",
+            "Startup",
+        )
+    return os.path.join(
+        os.path.expanduser("~"),
+        "AppData",
+        "Roaming",
+        "Microsoft",
+        "Windows",
+        "Start Menu",
+        "Programs",
+        "Startup",
+    )
+
+
+def _autostart_shortcut_path():
+    return os.path.join(_autostart_startup_dir(), AUTOSTART_SHORTCUT_NAME)
+
+
+def _current_autostart_shortcut_info():
+    """Return target/arguments for the Startup folder shortcut."""
     if getattr(sys, "frozen", False):
-        return subprocess.list2cmdline([os.path.abspath(sys.executable)])
+        target = os.path.abspath(sys.executable)
+        return {
+            "target": target,
+            "arguments": "--autostart",
+            "working_dir": os.path.dirname(target),
+            "icon": f"{target},0",
+        }
 
     python_exe = os.path.abspath(sys.executable)
     pythonw = python_exe
@@ -157,7 +190,20 @@ def _build_autostart_command():
         pythonw = candidate if os.path.exists(candidate) else python_exe
 
     script_path = os.path.abspath(sys.argv[0])
-    return subprocess.list2cmdline([pythonw, script_path])
+    return {
+        "target": pythonw,
+        "arguments": subprocess.list2cmdline([script_path, "--autostart"]),
+        "working_dir": os.path.dirname(script_path),
+        "icon": os.path.abspath(os.path.join(get_app_dir(), "icons", "icon.ico")),
+    }
+
+
+def _build_autostart_command():
+    info = _current_autostart_shortcut_info()
+    parts = [info["target"]]
+    if info["arguments"]:
+        parts.extend(_parse_windows_command_line(info["arguments"]))
+    return subprocess.list2cmdline(parts)
 
 
 def _parse_windows_command_line(command):
@@ -207,41 +253,124 @@ def _autostart_commands_equivalent(left, right):
     return bool(left_norm and right_norm and left_norm == right_norm)
 
 
-def _read_autostart_command():
+def _ps_single_quote(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _run_hidden_powershell(script):
+    startupinfo = None
+    creationflags = 0
+    if os.name == "nt":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
+        capture_output=True,
+        text=True,
+        startupinfo=startupinfo,
+        creationflags=creationflags,
+        timeout=15,
+    )
+
+
+def _write_autostart_shortcut():
+    info = _current_autostart_shortcut_info()
+    shortcut_path = _autostart_shortcut_path()
+    os.makedirs(os.path.dirname(shortcut_path), exist_ok=True)
+    script = "\n".join(
+        [
+            "$ErrorActionPreference = 'Stop'",
+            "$ws = New-Object -ComObject WScript.Shell",
+            f"$shortcut = $ws.CreateShortcut({_ps_single_quote(shortcut_path)})",
+            f"$shortcut.TargetPath = {_ps_single_quote(info['target'])}",
+            f"$shortcut.Arguments = {_ps_single_quote(info['arguments'])}",
+            f"$shortcut.WorkingDirectory = {_ps_single_quote(info['working_dir'])}",
+            f"$shortcut.IconLocation = {_ps_single_quote(info['icon'])}",
+            "$shortcut.WindowStyle = 7",
+            "$shortcut.Save()",
+        ]
+    )
+    result = _run_hidden_powershell(script)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Failed to create Startup shortcut").strip())
+
+
+def _read_autostart_shortcut():
+    shortcut_path = _autostart_shortcut_path()
+    if not os.path.exists(shortcut_path):
+        return None
+    script = "\n".join(
+        [
+            "$ErrorActionPreference = 'Stop'",
+            "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
+            "$ws = New-Object -ComObject WScript.Shell",
+            f"$shortcut = $ws.CreateShortcut({_ps_single_quote(shortcut_path)})",
+            "@{",
+            "  TargetPath = $shortcut.TargetPath",
+            "  Arguments = $shortcut.Arguments",
+            "  WorkingDirectory = $shortcut.WorkingDirectory",
+            "} | ConvertTo-Json -Compress",
+        ]
+    )
+    result = _run_hidden_powershell(script)
+    if result.returncode != 0:
+        return {"target": "", "arguments": "", "working_dir": ""}
     try:
-        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_READ)
-        try:
-            value, _value_type = winreg.QueryValueEx(reg_key, APP_RUN_VALUE_NAME)
-            return str(value or "")
-        finally:
-            winreg.CloseKey(reg_key)
-    except FileNotFoundError:
-        return ""
-    except OSError:
-        return ""
+        data = json.loads(result.stdout or "{}")
+    except Exception:
+        data = {}
+    return {
+        "target": str(data.get("TargetPath") or ""),
+        "arguments": str(data.get("Arguments") or ""),
+        "working_dir": str(data.get("WorkingDirectory") or ""),
+    }
+
+
+def _autostart_shortcut_matches_current(shortcut_info):
+    if not shortcut_info:
+        return False
+    expected = _current_autostart_shortcut_info()
+    left = [shortcut_info.get("target", "")]
+    left.extend(_parse_windows_command_line(shortcut_info.get("arguments", "")))
+    right = [expected["target"]]
+    right.extend(_parse_windows_command_line(expected.get("arguments", "")))
+    return _autostart_commands_equivalent(
+        subprocess.list2cmdline(left),
+        subprocess.list2cmdline(right),
+    )
 
 
 def _write_autostart_command(enable):
+    shortcut_path = _autostart_shortcut_path()
     if enable:
-        reg_key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_SET_VALUE)
-        try:
-            winreg.SetValueEx(reg_key, APP_RUN_VALUE_NAME, 0, winreg.REG_SZ, _build_autostart_command())
-        finally:
-            winreg.CloseKey(reg_key)
+        _write_autostart_shortcut()
         return
 
     try:
-        reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, APP_RUN_REG_PATH, 0, winreg.KEY_SET_VALUE)
-        try:
-            winreg.DeleteValue(reg_key, APP_RUN_VALUE_NAME)
-        except FileNotFoundError:
-            pass
-        finally:
-            winreg.CloseKey(reg_key)
+        os.remove(shortcut_path)
     except FileNotFoundError:
         pass
     except OSError:
         pass
+
+
+def _read_autostart_command():
+    shortcut_info = _read_autostart_shortcut()
+    if not shortcut_info:
+        return ""
+    parts = [shortcut_info.get("target", "")]
+    parts.extend(_parse_windows_command_line(shortcut_info.get("arguments", "")))
+    return subprocess.list2cmdline([part for part in parts if str(part or "").strip()])
 
 # --- Глобальный кэш конфигурации ---
 _config_cache = None
@@ -292,6 +421,97 @@ if sys.platform == "win32":
 
 _main_window_ref = None
 _single_instance_event_filter = None
+
+def _normalize_process_path(path):
+    if not path:
+        return ""
+    try:
+        return os.path.normcase(os.path.abspath(path))
+    except Exception:
+        return os.path.normcase(str(path))
+
+
+def _current_process_path():
+    if getattr(sys, "frozen", False):
+        return os.path.abspath(sys.executable)
+    return os.path.abspath(sys.argv[0])
+
+
+def _is_clickntranslate_process(process_info):
+    exe = process_info.get("exe") or ""
+    name = (process_info.get("name") or "").lower()
+    if os.path.basename(exe).lower() == "clickntranslate.exe" or name == "clickntranslate.exe":
+        return True
+    cmdline = process_info.get("cmdline") or []
+    return any(os.path.basename(str(arg)).lower() == "main.py" for arg in cmdline)
+
+
+def _running_clickntranslate_instances():
+    current_pid = os.getpid()
+    current_path = _normalize_process_path(_current_process_path())
+    instances = []
+    for proc in psutil.process_iter(["pid", "name", "exe", "cmdline"]):
+        try:
+            info = proc.info
+            pid = int(info.get("pid") or 0)
+            if pid == current_pid or not _is_clickntranslate_process(info):
+                continue
+            exe_path = info.get("exe") or ""
+            if not exe_path:
+                cmdline = info.get("cmdline") or []
+                exe_path = next((str(arg) for arg in cmdline if str(arg).lower().endswith(".exe")), "")
+            instances.append(
+                {
+                    "pid": pid,
+                    "path": exe_path,
+                    "same_path": bool(exe_path and _normalize_process_path(exe_path) == current_path),
+                }
+            )
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
+            continue
+    return instances
+
+
+def _other_install_instances():
+    return [item for item in _running_clickntranslate_instances() if not item["same_path"]]
+
+
+def _started_from_autostart():
+    return "--autostart" in sys.argv
+
+
+def _confirm_close_other_install(instances):
+    if _started_from_autostart():
+        return True
+    paths = "\n".join(f"- {item.get('path') or 'unknown path'}" for item in instances[:5])
+    text = (
+        "Click'n'Translate is already running from another folder:\n\n"
+        f"{paths}\n\n"
+        "Close the old running copy and start this one?"
+    )
+    try:
+        result = ctypes.windll.user32.MessageBoxW(None, text, APP_WINDOW_TITLE, 0x00000004 | 0x00000030)
+        return result == 6
+    except Exception:
+        return False
+
+
+def _terminate_instances(instances):
+    processes = []
+    for item in instances:
+        try:
+            proc = psutil.Process(item["pid"])
+            proc.terminate()
+            processes.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            continue
+    gone, alive = psutil.wait_procs(processes, timeout=5)
+    for proc in alive:
+        try:
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            pass
+
 
 def _show_running_instance():
     """Показать главное окно уже запущенного экземпляра."""
@@ -2111,16 +2331,22 @@ class DarkThemeApp(QMainWindow):
         )
         self.config["interface_language"] = self.current_interface_language
         stored_autostart = self.config.get("autostart", DEFAULT_CONFIG["autostart"])
+        stored_autostart_backend = self.config.get("autostart_backend")
         self.autostart = self.sync_autostart_state(repair_stale=True)
         self.translation_mode = self.config.get("translation_mode", LANGUAGES[self.current_interface_language][0])
         self.start_minimized = self.config.get("start_minimized", DEFAULT_CONFIG["start_minimized"])
-        if raw_interface_language != self.current_interface_language or stored_autostart != self.autostart:
+        if (
+            raw_interface_language != self.current_interface_language
+            or stored_autostart != self.autostart
+            or stored_autostart_backend != AUTOSTART_BACKEND
+        ):
             self.save_config()
 
     def save_config(self):
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
+        self.config["autostart_backend"] = AUTOSTART_BACKEND
         self.config["translation_mode"] = getattr(self, "translation_mode",
                                                   LANGUAGES[self.current_interface_language][0])
         self.config["start_minimized"] = getattr(self, "start_minimized", False)
@@ -2130,34 +2356,40 @@ class DarkThemeApp(QMainWindow):
         invalidate_config_cache()  # Сбрасываем кэш после записи
 
     def sync_autostart_state(self, repair_stale=False):
-        """Sync config with the real HKCU Run entry; registry is the source of truth."""
-        command = _read_autostart_command()
+        """Sync config with the real Startup folder shortcut."""
+        shortcut_info = _read_autostart_shortcut()
+        stored_autostart = bool(self.config.get("autostart", DEFAULT_CONFIG["autostart"]))
+        stored_backend = self.config.get("autostart_backend")
         enabled = False
-        if command:
-            if _autostart_commands_equivalent(command, _build_autostart_command()):
+        if shortcut_info:
+            if _autostart_shortcut_matches_current(shortcut_info):
                 enabled = True
             elif repair_stale and getattr(sys, "frozen", False):
-                # A stale ClicknTranslate Run entry means the user wanted autostart,
+                # A stale ClicknTranslate shortcut means the user wanted autostart,
                 # but the path changed after moving/updating the portable app.
                 enabled = self.set_autostart(True)
             else:
                 enabled = False
+        elif repair_stale and stored_autostart and stored_backend != AUTOSTART_BACKEND:
+            enabled = self.set_autostart(True)
         self.autostart = enabled
         self.config["autostart"] = enabled
+        self.config["autostart_backend"] = AUTOSTART_BACKEND
         return enabled
 
     def set_autostart(self, enable: bool):
         try:
             _write_autostart_command(bool(enable))
-            command = _read_autostart_command()
-            actual = _autostart_commands_equivalent(command, _build_autostart_command())
+            actual = _autostart_shortcut_matches_current(_read_autostart_shortcut())
             self.autostart = bool(actual)
             self.config["autostart"] = self.autostart
+            self.config["autostart_backend"] = AUTOSTART_BACKEND
             return self.autostart
         except Exception as e:
             print("Error setting autostart:", e)
             self.autostart = False
             self.config["autostart"] = False
+            self.config["autostart_backend"] = AUTOSTART_BACKEND
             return False
 
     def init_ui(self):
@@ -3683,8 +3915,15 @@ if __name__ == "__main__":
     # Проверяем single instance (не разрешаем запуск нескольких копий)
     if is_already_running():
         # Пытаемся показать существующее окно
-        bring_existing_to_front()
-        sys.exit(0)
+        other_install = _other_install_instances()
+        if other_install and _confirm_close_other_install(other_install):
+            _terminate_instances(other_install)
+            if is_already_running():
+                bring_existing_to_front()
+                sys.exit(0)
+        else:
+            bring_existing_to_front()
+            sys.exit(0)
     
     # Читаем конфиг
     start_minimized = False
