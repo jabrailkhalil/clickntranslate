@@ -126,7 +126,7 @@ def get_cached_config():
     try:
         mtime = os.path.getmtime(config_path)
         if _config_cache is None or mtime > _config_mtime:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r", encoding="utf-8-sig") as f:
                 _config_cache = json.load(f)
             _config_mtime = mtime
     except Exception:
@@ -712,7 +712,7 @@ class DarkThemeApp(QMainWindow):
     def load_config(self):
         config_path = get_data_file("config.json")
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r", encoding="utf-8-sig") as f:
                 self.config = json.load(f)
         else:
             self.config = DEFAULT_CONFIG.copy()
