@@ -9,13 +9,14 @@ import re
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
-    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QProgressDialog, QSpacerItem, QSizePolicy, QApplication, QToolButton,
+    QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon
 from PyQt5 import QtCore
 from app_version import APP_VERSION
+import portable_paths
 
 # Импортируем функцию инвалидации кэша (ленивый импорт для избежания циклического импорта)
 def _invalidate_main_config_cache():
@@ -36,29 +37,15 @@ def resource_path(relative_path):
 
 
 def _frozen_executable_dir():
-    return os.path.dirname(os.path.abspath(sys.executable))
+    return portable_paths.frozen_executable_dir()
 
 
 def _portable_base_dir():
-    if getattr(sys, "frozen", False):
-        exe_dir = _frozen_executable_dir()
-        parent_dir = os.path.dirname(exe_dir)
-        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
-        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
-            return parent_dir
-        return exe_dir
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return portable_paths.portable_base_dir()
 
 
 def _public_executable_path():
-    if getattr(sys, "frozen", False):
-        exe_dir = _frozen_executable_dir()
-        parent_dir = os.path.dirname(exe_dir)
-        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
-        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
-            return os.path.abspath(launcher_path)
-        return os.path.abspath(sys.executable)
-    return os.path.abspath(sys.argv[0])
+    return portable_paths.public_executable_path()
 
 
 GITHUB_OWNER = "jabrailkhalil"
@@ -163,19 +150,20 @@ class HyMTInstallCancelledError(RuntimeError):
     pass
 
 
-class UpdateProgressDialog(QProgressDialog):
+class UpdateProgressDialog(QDialog):
     def __init__(self, owner):
-        super().__init__("", None, 0, 100, None)
+        super().__init__(None)
         self._owner = owner
         self._drag_position = None
         self._user_minimized = False
         owner_parent = getattr(owner, "parent", None)
         self._lang = getattr(owner_parent, "current_interface_language", "en")
+        self.setWindowTitle(settings_text(self._lang, "update"))
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.setWindowModality(Qt.NonModal)
         self.setMinimumWidth(430)
         self.setStyleSheet("""
-            QProgressDialog {
+            QDialog {
                 background-color: #111111;
                 color: #ffffff;
                 border: 1px solid #7a61b3;
@@ -218,45 +206,45 @@ class UpdateProgressDialog(QProgressDialog):
             }
         """)
 
-        self.setLabel(QLabel(""))
-        self.label().setAlignment(Qt.AlignCenter)
-        self.label().setWordWrap(True)
-        self.setBar(QProgressBar(self))
-        self.setCancelButton(QPushButton(settings_text(self._lang, "cancel"), self))
-        self.canceled.connect(self._request_cancel)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(1, 1, 1, 1)
+        outer.setSpacing(0)
 
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(12, 8, 8, 5)
+        title_row.setSpacing(6)
         self._title_label = QLabel(settings_text(self._lang, "update"), self)
         self._title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c5b3e9;")
+        title_row.addWidget(self._title_label)
+        title_row.addStretch()
         self._minimize_button = QToolButton(self)
         self._minimize_button.setText("-")
         self._minimize_button.setToolTip("Minimize")
         self._minimize_button.setFixedSize(28, 24)
         self._minimize_button.clicked.connect(self._minimize_to_taskbar)
+        title_row.addWidget(self._minimize_button)
         self._close_button = QToolButton(self)
         self._close_button.setText("x")
         self._close_button.setToolTip(settings_text(self._lang, "cancel"))
         self._close_button.setFixedSize(28, 24)
         self._close_button.clicked.connect(self.reject)
+        title_row.addWidget(self._close_button)
+        outer.addLayout(title_row)
 
-        layout = self.layout()
-        if layout is not None:
-            layout.setContentsMargins(16, 44, 16, 16)
-            layout.setSpacing(10)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._layout_title_row()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._layout_title_row()
-
-    def _layout_title_row(self):
-        margin_top = 8
-        self._title_label.move(16, margin_top + 3)
-        self._title_label.resize(max(120, self.width() - 104), 24)
-        self._minimize_button.move(max(16, self.width() - 72), margin_top)
-        self._close_button.move(max(16, self.width() - 40), margin_top)
+        body = QVBoxLayout()
+        body.setContentsMargins(16, 8, 16, 16)
+        body.setSpacing(10)
+        self.message_label = QLabel("")
+        self.message_label.setAlignment(Qt.AlignCenter)
+        self.message_label.setWordWrap(True)
+        body.addWidget(self.message_label)
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        body.addWidget(self.progress_bar)
+        self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
+        self.cancel_button.clicked.connect(self.reject)
+        body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
+        outer.addLayout(body)
 
     def _minimize_to_taskbar(self):
         self._user_minimized = True
@@ -268,11 +256,27 @@ class UpdateProgressDialog(QProgressDialog):
             self._title_label.setText(title)
 
     def setCancelButtonText(self, text):
-        button = self.cancelButton()
-        if button is not None:
-            button.setText(text)
+        self.cancel_button.setText(text)
         if hasattr(self, "_close_button"):
             self._close_button.setToolTip(text)
+
+    def setLabelText(self, text):
+        self.message_label.setText(text)
+
+    def setRange(self, minimum, maximum):
+        self.progress_bar.setRange(minimum, maximum)
+
+    def setValue(self, value):
+        self.progress_bar.setValue(value)
+
+    def setAutoClose(self, _value):
+        pass
+
+    def setAutoReset(self, _value):
+        pass
+
+    def setMinimumDuration(self, _value):
+        pass
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and event.pos().y() <= 38:
@@ -1747,11 +1751,18 @@ class SettingsWindow(QWidget):
 
     def _hide_update_progress(self):
         if hasattr(self, "_update_progress") and self._update_progress is not None:
+            progress = self._update_progress
             try:
-                self._update_progress.blockSignals(True)
-                self._update_progress.close()
+                progress.blockSignals(True)
+                progress.hide()
+                progress.deleteLater()
             except Exception:
                 pass
+            finally:
+                try:
+                    progress.blockSignals(False)
+                except Exception:
+                    pass
             self._update_progress = None
 
     def _cleanup_update_temp_dir(self):
@@ -2281,6 +2292,7 @@ class SettingsWindow(QWidget):
             interval_seconds = max(1, int(interval_seconds))
             exe_dir = os.path.dirname(exe_path)
             process_name = os.path.splitext(os.path.basename(exe_path))[0]
+            app_process_name = os.path.splitext(os.path.basename(os.path.abspath(sys.executable)))[0]
 
             fd, script_path = tempfile.mkstemp(prefix="clickntranslate_restart_", suffix=".ps1")
             os.close(fd)
@@ -2288,6 +2300,7 @@ class SettingsWindow(QWidget):
     [string]$ExePath,
     [string]$ExeDir,
     [string]$ProcessName,
+    [string]$AppProcessName,
     [int]$TargetPid,
     [int]$InitialDelay,
     [int]$Attempts,
@@ -2313,6 +2326,10 @@ try {
         }
         if (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue) {
             Write-UpdateLog "Fallback skip: process $ProcessName is already running"
+            break
+        }
+        if ($AppProcessName -and $AppProcessName -ne $ProcessName -and (Get-Process -Name $AppProcessName -ErrorAction SilentlyContinue)) {
+            Write-UpdateLog "Fallback skip: process $AppProcessName is already running"
             break
         }
         if (-not (Test-Path -LiteralPath $ExePath)) {
@@ -2343,6 +2360,7 @@ finally {
                     "-ExePath", exe_path,
                     "-ExeDir", exe_dir,
                     "-ProcessName", process_name,
+                    "-AppProcessName", app_process_name,
                     "-TargetPid", str(current_pid),
                     "-InitialDelay", str(delay_seconds),
                     "-Attempts", str(attempts),
@@ -2418,13 +2436,13 @@ try {
 
     $payloadHasInternal = Test-Path -LiteralPath (Join-Path $payloadRoot "_internal")
     Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
-        if ($_.Name -ieq "data") { continue }
+        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { continue }
         Write-UpdateLog "Removing existing program item: $($_.FullName)"
         Remove-Item -LiteralPath $_.FullName -Recurse -Force
     }
 
     Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
-        if ($_.Name -ieq "data") { continue }
+        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { continue }
         Write-UpdateLog "Copying update item: $($_.FullName)"
         Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force
     }

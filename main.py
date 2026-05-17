@@ -78,6 +78,7 @@ except Exception:
     _show_dependency_error()
 from settings_window import SettingsWindow
 from app_version import APP_VERSION
+import portable_paths
 import translater  # Импорт модуля перевода
 from document_parser import DocumentParseError, format_file_size, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
@@ -190,29 +191,15 @@ def apply_windows_dark_frame(widget, enabled=True):
 
 
 def _frozen_executable_dir():
-    return os.path.dirname(os.path.abspath(sys.executable))
+    return portable_paths.frozen_executable_dir()
 
 
 def _portable_base_dir():
-    if getattr(sys, "frozen", False):
-        exe_dir = _frozen_executable_dir()
-        parent_dir = os.path.dirname(exe_dir)
-        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
-        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
-            return parent_dir
-        return exe_dir
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return portable_paths.portable_base_dir()
 
 
 def _public_executable_path():
-    if getattr(sys, "frozen", False):
-        exe_dir = _frozen_executable_dir()
-        parent_dir = os.path.dirname(exe_dir)
-        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
-        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
-            return os.path.abspath(launcher_path)
-        return os.path.abspath(sys.executable)
-    return os.path.abspath(sys.argv[0])
+    return portable_paths.public_executable_path()
 
 
 def _autostart_startup_dir():

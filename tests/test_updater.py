@@ -7,7 +7,14 @@ import unittest
 from unittest import mock
 import zipfile
 
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt5.QtWidgets import QApplication
+
+import ocr
+import portable_paths
 import settings_window as sw
+import translater
 
 
 class TestVersionHelpers(unittest.TestCase):
@@ -55,7 +62,10 @@ class TestPortableLayoutHelpers(unittest.TestCase):
 
             with mock.patch.object(sw.sys, "frozen", True, create=True):
                 with mock.patch.object(sw.sys, "executable", app_exe):
+                    self.assertEqual(portable_paths.portable_base_dir(), temp_dir)
                     self.assertEqual(sw._portable_base_dir(), temp_dir)
+                    self.assertEqual(ocr.get_portable_dir(), temp_dir)
+                    self.assertEqual(translater.get_portable_dir(), temp_dir)
                     self.assertEqual(sw._public_executable_path(), launcher_exe)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -72,6 +82,30 @@ class TestPortableLayoutHelpers(unittest.TestCase):
                     self.assertEqual(sw._public_executable_path(), app_exe)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+class TestUpdateProgressDialog(unittest.TestCase):
+    def test_update_progress_dialog_supports_update_flow_methods(self):
+        app = QApplication.instance() or QApplication([])
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_in_progress=False,
+            _handle_update_progress_close_attempt=mock.Mock(),
+        )
+
+        dialog = sw.UpdateProgressDialog(dummy)
+        dialog.setWindowTitle("Update")
+        dialog.setCancelButtonText("Cancel")
+        dialog.setLabelText("Checking updates...")
+        dialog.setRange(0, 100)
+        dialog.setValue(42)
+        dialog.show()
+        app.processEvents()
+
+        self.assertEqual(dialog.windowTitle(), "Update")
+        self.assertIn("Checking", dialog.message_label.text())
+        self.assertEqual(dialog.progress_bar.value(), 42)
+        dialog.close()
 
 
 class TestUpdateAssetSelection(unittest.TestCase):
@@ -143,8 +177,10 @@ class TestUpdaterCommands(unittest.TestCase):
             script_text = f.read()
 
         self.assertIn("[string]$ExePath", script_text)
+        self.assertIn("[string]$AppProcessName", script_text)
         self.assertIn("[int]$TargetPid", script_text)
         self.assertIn("Get-Process -Id $TargetPid", script_text)
+        self.assertIn("Get-Process -Name $AppProcessName", script_text)
         self.assertIn("Start-Process -FilePath $ExePath -WorkingDirectory $ExeDir", script_text)
         self.assertIn("creationflags", kwargs)
         try:
@@ -184,7 +220,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("[int]$TargetPid", script_text)
             self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
-            self.assertIn("if ($_.Name -ieq \"data\") { continue }", script_text)
+            self.assertIn("if ($_.Name -ieq \"data\" -or $_.Name -ieq \"ocr\" -or $_.Name -ieq \"translators\") { continue }", script_text)
             self.assertIn("Removing existing program item", script_text)
             self.assertIn("Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force", script_text)
             self.assertIn("Update payload copy failed: _internal directory is missing", script_text)

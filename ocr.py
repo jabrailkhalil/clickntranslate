@@ -21,6 +21,7 @@ from languages import (
     tesseract_language_code,
     windows_ocr_tag,
 )
+import portable_paths
 
 APP_LANGUAGE_CODES = {language.code for language in APP_LANGUAGES}
 
@@ -168,9 +169,7 @@ def get_app_dir():
 
 def get_portable_dir():
     """Directory next to the exe for portable data."""
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return portable_paths.portable_base_dir()
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")

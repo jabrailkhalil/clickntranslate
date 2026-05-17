@@ -5,6 +5,7 @@ import sys
 import subprocess
 import re
 from languages import language_english_name, translator_api_code
+import portable_paths
 
 # Optional Argos Translate (offline). Loaded lazily to keep app startup and tests
 # away from ctranslate2/torch DLLs unless offline translation is actually used.
@@ -37,9 +38,7 @@ def get_app_dir():
     return os.path.dirname(os.path.abspath(sys.argv[0]))
 
 def get_portable_dir():
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return portable_paths.portable_base_dir()
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")
