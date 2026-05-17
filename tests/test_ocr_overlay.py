@@ -30,6 +30,10 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             ("de", "fr"),
         )
         self.assertEqual(
+            ocr._combo_data_to_translate_pair(("auto", "ru"), {"ocr_translate_target_language": "en"}),
+            ("auto", "ru"),
+        )
+        self.assertEqual(
             ocr._combo_data_to_translate_pair("de", {"ocr_translate_target_language": "es"}),
             ("de", "es"),
         )
@@ -38,6 +42,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         overlay = ocr.ScreenCaptureOverlay("translate", defer_show=True)
         try:
             self.assertIsNotNone(overlay.target_lang_combo)
+            self.assertEqual(overlay.lang_combo.itemData(0), "auto")
             source, target = overlay._current_translate_pair()
 
             self.assertEqual(source, overlay.lang_combo.currentData())
@@ -77,6 +82,16 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         self.assertGreater(
             ocr.ScreenCaptureOverlay._score_tesseract_text("STRANGER THINGS"),
             ocr.ScreenCaptureOverlay._score_tesseract_text("witone~ ~~"),
+        )
+
+    def test_ocr_language_score_prefers_matching_script(self):
+        self.assertGreater(
+            ocr._score_ocr_text_for_language("Привет мир", "ru"),
+            ocr._score_ocr_text_for_language("Привет мир", "en"),
+        )
+        self.assertGreater(
+            ocr._score_ocr_text_for_language("Hello world", "en"),
+            ocr._score_ocr_text_for_language("Hello world", "ru"),
         )
 
 

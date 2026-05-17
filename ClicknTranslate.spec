@@ -11,6 +11,7 @@ hiddenimports = [
     'winrt.windows.foundation',
     'winrt.windows.foundation.collections',
     'winrt._winrt',
+    'pypdf',
 ]
 hiddenimports += collect_submodules('winrt')
 

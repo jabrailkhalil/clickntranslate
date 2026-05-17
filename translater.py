@@ -6,13 +6,30 @@ import subprocess
 import re
 from languages import language_english_name, translator_api_code
 
-# Optional Argos Translate (offline). If missing, we will use Google online.
+# Optional Argos Translate (offline). Loaded lazily to keep app startup and tests
+# away from ctranslate2/torch DLLs unless offline translation is actually used.
 HAS_ARGOS = True
-try:
-    import argostranslate.package as arg_pkg
-    import argostranslate.translate as arg_tr
-except Exception:
-    HAS_ARGOS = False
+arg_pkg = None
+arg_tr = None
+_argos_import_error = None
+
+
+def _ensure_argos_available():
+    global HAS_ARGOS, arg_pkg, arg_tr, _argos_import_error
+    if not HAS_ARGOS:
+        return False
+    if arg_pkg is not None and arg_tr is not None:
+        return True
+    try:
+        import argostranslate.package as loaded_pkg
+        import argostranslate.translate as loaded_tr
+    except Exception as exc:
+        HAS_ARGOS = False
+        _argos_import_error = exc
+        return False
+    arg_pkg = loaded_pkg
+    arg_tr = loaded_tr
+    return True
 
 def get_app_dir():
     if hasattr(sys, '_MEIPASS'):
@@ -61,7 +78,7 @@ _argos_translations_cache = {}
 def _get_argos_languages():
     """Возвращает закэшированные языки Argos."""
     global _argos_languages_cache
-    if _argos_languages_cache is None and HAS_ARGOS:
+    if _argos_languages_cache is None and _ensure_argos_available():
         _argos_languages_cache = {lang.code: lang for lang in arg_tr.get_installed_languages()}
     return _argos_languages_cache or {}
 
@@ -289,7 +306,7 @@ def hymt_translate(text, source_code, target_code, status_callback=None):
 
 def models_installed_ru_en():
     """Return True if both RU and EN language models are installed in Argos."""
-    if not HAS_ARGOS:
+    if not _ensure_argos_available():
         return False
     try:
         langs = _get_argos_languages()
@@ -298,7 +315,7 @@ def models_installed_ru_en():
         return False
 
 def ensure_models(status_callback=None):
-    if not HAS_ARGOS:
+    if not _ensure_argos_available():
         return
     langs = _get_argos_languages()
     if {'ru', 'en'}.issubset(langs.keys()):
@@ -315,7 +332,7 @@ def ensure_models(status_callback=None):
         print(f"Не удалось автоматически установить модели Argos Translate: {e}")
 
 def install_models(status_callback=None):
-    if not HAS_ARGOS:
+    if not _ensure_argos_available():
         return
     if status_callback:
         try:
@@ -399,7 +416,7 @@ def install_models(status_callback=None):
 
 
 def _try_argos_translate(text, source_code, target_code, status_callback=None, allow_ru_en_install=True):
-    if not HAS_ARGOS:
+    if not _ensure_argos_available():
         return None
     if allow_ru_en_install and {source_code, target_code} == {"ru", "en"}:
         ensure_models(status_callback=status_callback)
@@ -409,7 +426,7 @@ def _try_argos_translate(text, source_code, target_code, status_callback=None, a
     return translation_obj.translate(text)
 
 def test_translation():
-    if not HAS_ARGOS:
+    if not _ensure_argos_available():
         print("Argos недоступен в этой сборке.")
         return
     installed_languages = arg_tr.get_installed_languages()
@@ -439,10 +456,10 @@ def test_translation():
     else:
         print("Нет модели для EN->RU")
 
-def translate_text(text, source_code, target_code, status_callback=None):
+def translate_text(text, source_code, target_code, status_callback=None, engine=None):
     """Перевод текста с выбранным движком и автоматическим фоллбеком."""
     config = get_cached_translator_config()
-    engine = config.get("translator_engine", "Google").lower()
+    engine = (engine or config.get("translator_engine", "Google")).lower()
     allow_provider_fallback = bool(config.get("allow_online_provider_fallback", False))
     print(f"Using translator: {engine.upper()}")
 
@@ -512,7 +529,7 @@ def translate_text(text, source_code, target_code, status_callback=None):
         try:
             return _cache_and_return(_try_online(engine, allow_fallback=allow_provider_fallback))
         except Exception as online_error:
-            if HAS_ARGOS:
+            if _ensure_argos_available():
                 argos_result = _try_argos_translate(
                     text, source_code, target_code, status_callback=status_callback, allow_ru_en_install=False
                 )
@@ -521,7 +538,7 @@ def translate_text(text, source_code, target_code, status_callback=None):
             else:
                 raise online_error
 
-    if HAS_ARGOS:
+    if engine == "argos" or HAS_ARGOS:
         argos_result = _try_argos_translate(text, source_code, target_code, status_callback=status_callback)
         if argos_result:
             return _cache_and_return(argos_result)
@@ -673,7 +690,7 @@ def libretranslate(text, source_code, target_code):
     raise Exception(f"LibreTranslate failed: {last_error}")
 
 if __name__ == '__main__':
-    if HAS_ARGOS:
+    if _ensure_argos_available():
         install_models()
         _invalidate_argos_cache()  # Сбрасываем кэш после установки
         print("Попытка тестового перевода:")

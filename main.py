@@ -71,14 +71,18 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame, QGraphicsDropShadowEffect)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter)
     from PyQt5.QtCore import Qt, QTimer, QSize
-    from PyQt5.QtGui import QIcon, QColor
+    from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
     _show_dependency_error()
 from settings_window import SettingsWindow
 from app_version import APP_VERSION
 import translater  # Импорт модуля перевода
+from document_parser import DocumentParseError, format_file_size, parse_document
+from document_parser import SUPPORTED_EXTENSIONS
+from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
+from document_translation import translate_document_text
 from languages import (
     default_target_for_source,
     detect_language_code,
@@ -143,6 +147,46 @@ def get_interface_language_option(language_code):
         normalize_interface_language(language_code),
         INTERFACE_LANGUAGE_BY_CODE[DEFAULT_CONFIG["interface_language"]],
     )
+
+
+def apply_windows_dark_frame(widget, enabled=True):
+    if sys.platform != "win32" or widget is None:
+        return
+    try:
+        hwnd = int(widget.winId())
+        dwmapi = ctypes.windll.dwmapi
+        dark_value = ctypes.c_int(1 if enabled else 0)
+        for attribute in (20, 19):
+            try:
+                dwmapi.DwmSetWindowAttribute(
+                    wintypes.HWND(hwnd),
+                    ctypes.c_uint(attribute),
+                    ctypes.byref(dark_value),
+                    ctypes.sizeof(dark_value),
+                )
+            except Exception:
+                pass
+
+        if enabled:
+            border_color = ctypes.c_uint(0x000000)
+            caption_color = ctypes.c_uint(0x000000)
+            text_color = ctypes.c_uint(0xFFFFFF)
+        else:
+            default_color = ctypes.c_uint(0xFFFFFFFF)
+            border_color = caption_color = text_color = default_color
+
+        for attribute, value in ((34, border_color), (35, caption_color), (36, text_color)):
+            try:
+                dwmapi.DwmSetWindowAttribute(
+                    wintypes.HWND(hwnd),
+                    ctypes.c_uint(attribute),
+                    ctypes.byref(value),
+                    ctypes.sizeof(value),
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 def _autostart_startup_dir():
@@ -1065,6 +1109,352 @@ def ui_text(lang, key):
     return INTERFACE_TEXT.get(lang, INTERFACE_TEXT["en"]).get(key, INTERFACE_TEXT["en"].get(key, key))
 
 
+DOCUMENT_TEXT = {
+    "en": {
+        "title": "Document translation",
+        "main_file_tooltip": "Drop .txt, .md, .docx, .pdf, .html or .rtf here, press Ctrl+O, or right-click the main window.",
+        "main_file_hint": "Drop a document here or right-click",
+        "attach_file": "Attach file",
+        "remove_file": "Remove file",
+        "translate_file": "Translate text",
+        "translate_selected": "Translate selected",
+        "save_translation": "Save translation",
+        "open_session": "Open session",
+        "context_translate_file": "Choose file to translate",
+        "context_choose_folder": "Choose folder with file",
+        "source": "Source",
+        "target": "Target",
+        "auto_detect": "Auto-detect",
+        "original": "Original",
+        "translated": "Translated",
+        "drop_hint": "Type or paste text here, or drop a document.",
+        "no_file": "Enter text or attach a file.",
+        "loading": "Loading file...",
+        "loaded": "Loaded",
+        "translating": "Translating",
+        "done": "Translation complete",
+        "error": "Document translation error",
+        "file": "File",
+        "size": "Size",
+        "detected": "Detected",
+        "provider": "Provider",
+        "status": "Status",
+        "chunks": "Chunks",
+        "no_selection": "Select text in the original document first.",
+        "no_translation": "There is no translated text to save.",
+        "saved": "Saved",
+        "session_loaded": "Session loaded",
+        "translate_failed": "Translation finished with failed chunks",
+        "provider_unavailable_title": "Selected provider is not ready",
+        "provider_unavailable_argos": "Argos works offline, but the required local language package is not installed for this language pair. Open Settings, choose Argos and install the needed language package, or choose another provider here.",
+        "provider_unavailable_hymt": "Hy-MT works offline, but the local Hy-MT package is not installed. Open Settings, choose Hy-MT and download the offline package, or choose another provider here.",
+        "provider_unavailable_online": "This online provider did not return a translation. Check your internet connection or choose another provider here.",
+        "provider_unavailable_generic": "Choose another provider here, or open Settings and install the required local package for the selected provider.",
+        "technical_error": "Technical error",
+    },
+    "ru": {
+        "title": "Перевод документов",
+        "main_file_tooltip": "Перетащите сюда .txt, .md, .docx, .pdf, .html или .rtf, нажмите Ctrl+O или кликните правой кнопкой мыши в главном окне.",
+        "main_file_hint": "Перетащите документ сюда или кликните правой кнопкой мыши",
+        "attach_file": "Прикрепить файл",
+        "remove_file": "Убрать файл",
+        "translate_file": "Перевести текст",
+        "translate_selected": "Перевести выделение",
+        "save_translation": "Сохранить перевод",
+        "open_session": "Открыть сессию",
+        "context_translate_file": "Выбрать файл для перевода",
+        "context_choose_folder": "Выбрать папку с файлом",
+        "source": "Исходный",
+        "target": "Целевой",
+        "auto_detect": "Автоопределение",
+        "original": "Оригинал",
+        "translated": "Перевод",
+        "drop_hint": "Введите или вставьте текст сюда, либо перетащите документ.",
+        "no_file": "Введите текст или прикрепите файл.",
+        "loading": "Загрузка файла...",
+        "loaded": "Загружено",
+        "translating": "Перевод",
+        "done": "Перевод завершен",
+        "error": "Ошибка перевода документа",
+        "file": "Файл",
+        "size": "Размер",
+        "detected": "Определен",
+        "provider": "Провайдер",
+        "status": "Статус",
+        "chunks": "Части",
+        "no_selection": "Сначала выделите текст в оригинале.",
+        "no_translation": "Нет переведенного текста для сохранения.",
+        "saved": "Сохранено",
+        "session_loaded": "Сессия загружена",
+        "translate_failed": "Перевод завершен с ошибками в частях",
+        "provider_unavailable_title": "Выбранный провайдер не готов",
+        "provider_unavailable_argos": "Argos работает офлайн, но для этой пары языков не установлен локальный языковой пакет. Откройте настройки, выберите Argos и установите нужный пакет, либо выберите другой провайдер здесь.",
+        "provider_unavailable_hymt": "Hy-MT работает офлайн, но локальный пакет Hy-MT не установлен. Откройте настройки, выберите Hy-MT и скачайте офлайн-пакет, либо выберите другой провайдер здесь.",
+        "provider_unavailable_online": "Онлайн-провайдер не вернул перевод. Проверьте интернет или выберите другой провайдер здесь.",
+        "provider_unavailable_generic": "Выберите другой провайдер здесь, либо откройте настройки и установите нужный локальный пакет для выбранного провайдера.",
+        "technical_error": "Техническая ошибка",
+    },
+    "es": {
+        "title": "Traduccion de documentos",
+        "main_file_tooltip": "Arrastra aqui .txt, .md, .docx, .pdf, .html o .rtf, pulsa Ctrl+O o haz clic derecho en la ventana principal.",
+        "main_file_hint": "Arrastra un documento aqui o haz clic derecho",
+        "attach_file": "Adjuntar archivo",
+        "remove_file": "Quitar archivo",
+        "translate_file": "Traducir texto",
+        "translate_selected": "Traducir seleccion",
+        "save_translation": "Guardar traduccion",
+        "open_session": "Abrir sesion",
+        "context_translate_file": "Elegir archivo para traducir",
+        "context_choose_folder": "Elegir carpeta con archivo",
+        "source": "Origen",
+        "target": "Destino",
+        "auto_detect": "Detectar auto",
+        "original": "Original",
+        "translated": "Traducido",
+        "drop_hint": "Escribe o pega texto aqui, o arrastra un documento.",
+        "no_file": "Introduce texto o adjunta un archivo.",
+        "loading": "Cargando archivo...",
+        "loaded": "Cargado",
+        "translating": "Traduciendo",
+        "done": "Traduccion completada",
+        "error": "Error de traduccion de documento",
+        "file": "Archivo",
+        "size": "Tamano",
+        "detected": "Detectado",
+        "provider": "Proveedor",
+        "status": "Estado",
+        "chunks": "Partes",
+        "no_selection": "Selecciona texto en el documento original.",
+        "no_translation": "No hay texto traducido para guardar.",
+        "saved": "Guardado",
+        "session_loaded": "Sesion cargada",
+        "translate_failed": "Traduccion completada con partes fallidas",
+        "provider_unavailable_title": "El proveedor elegido no esta listo",
+        "provider_unavailable_argos": "Argos funciona offline, pero falta el paquete local para este par de idiomas. Abre Ajustes, elige Argos e instala el paquete necesario, o elige otro proveedor aqui.",
+        "provider_unavailable_hymt": "Hy-MT funciona offline, pero el paquete local no esta instalado. Abre Ajustes, elige Hy-MT y descarga el paquete offline, o elige otro proveedor aqui.",
+        "provider_unavailable_online": "Este proveedor online no devolvio traduccion. Revisa internet o elige otro proveedor aqui.",
+        "provider_unavailable_generic": "Elige otro proveedor aqui, o abre Ajustes e instala el paquete local requerido.",
+        "technical_error": "Error tecnico",
+    },
+    "de": {
+        "title": "Dokumentubersetzung",
+        "main_file_tooltip": ".txt, .md, .docx, .pdf, .html oder .rtf hier ablegen, Ctrl+O drucken oder im Hauptfenster rechtsklicken.",
+        "main_file_hint": "Dokument hier ablegen oder rechtsklicken",
+        "attach_file": "Datei anheften",
+        "remove_file": "Datei entfernen",
+        "translate_file": "Text ubersetzen",
+        "translate_selected": "Auswahl ubersetzen",
+        "save_translation": "Ubersetzung speichern",
+        "open_session": "Sitzung offnen",
+        "context_translate_file": "Datei zum Ubersetzen wahlen",
+        "context_choose_folder": "Ordner mit Datei wahlen",
+        "source": "Quelle",
+        "target": "Ziel",
+        "auto_detect": "Automatisch",
+        "original": "Original",
+        "translated": "Ubersetzung",
+        "drop_hint": "Text hier eingeben/einfugen oder Dokument ablegen.",
+        "no_file": "Text eingeben oder Datei anheften.",
+        "loading": "Datei wird geladen...",
+        "loaded": "Geladen",
+        "translating": "Ubersetze",
+        "done": "Ubersetzung abgeschlossen",
+        "error": "Fehler bei Dokumentubersetzung",
+        "file": "Datei",
+        "size": "Grosse",
+        "detected": "Erkannt",
+        "provider": "Anbieter",
+        "status": "Status",
+        "chunks": "Teile",
+        "no_selection": "Markiere zuerst Text im Original.",
+        "no_translation": "Kein ubersetzter Text zum Speichern.",
+        "saved": "Gespeichert",
+        "session_loaded": "Sitzung geladen",
+        "translate_failed": "Ubersetzung mit fehlerhaften Teilen abgeschlossen",
+        "provider_unavailable_title": "Der gewahlte Anbieter ist nicht bereit",
+        "provider_unavailable_argos": "Argos arbeitet offline, aber das lokale Sprachpaket fur dieses Sprachpaar fehlt. Offne Einstellungen, wahle Argos und installiere das Paket, oder wahle hier einen anderen Anbieter.",
+        "provider_unavailable_hymt": "Hy-MT arbeitet offline, aber das lokale Hy-MT-Paket fehlt. Offne Einstellungen, wahle Hy-MT und lade das Offline-Paket, oder wahle hier einen anderen Anbieter.",
+        "provider_unavailable_online": "Dieser Online-Anbieter hat keine Ubersetzung geliefert. Prufe die Internetverbindung oder wahle hier einen anderen Anbieter.",
+        "provider_unavailable_generic": "Wahle hier einen anderen Anbieter, oder offne Einstellungen und installiere das erforderliche lokale Paket.",
+        "technical_error": "Technischer Fehler",
+    },
+    "fr": {
+        "title": "Traduction de documents",
+        "main_file_tooltip": "Deposez ici .txt, .md, .docx, .pdf, .html ou .rtf, appuyez sur Ctrl+O ou faites un clic droit dans la fenetre principale.",
+        "main_file_hint": "Deposez un document ici ou clic droit",
+        "attach_file": "Joindre un fichier",
+        "remove_file": "Retirer le fichier",
+        "translate_file": "Traduire le texte",
+        "translate_selected": "Traduire la selection",
+        "save_translation": "Enregistrer",
+        "open_session": "Ouvrir session",
+        "context_translate_file": "Choisir le fichier a traduire",
+        "context_choose_folder": "Choisir le dossier du fichier",
+        "source": "Source",
+        "target": "Cible",
+        "auto_detect": "Detection auto",
+        "original": "Original",
+        "translated": "Traduction",
+        "drop_hint": "Saisissez ou collez du texte ici, ou deposez un document.",
+        "no_file": "Saisissez du texte ou joignez un fichier.",
+        "loading": "Chargement du fichier...",
+        "loaded": "Charge",
+        "translating": "Traduction",
+        "done": "Traduction terminee",
+        "error": "Erreur de traduction du document",
+        "file": "Fichier",
+        "size": "Taille",
+        "detected": "Detecte",
+        "provider": "Fournisseur",
+        "status": "Etat",
+        "chunks": "Parties",
+        "no_selection": "Selectionnez d'abord du texte dans l'original.",
+        "no_translation": "Aucun texte traduit a enregistrer.",
+        "saved": "Enregistre",
+        "session_loaded": "Session chargee",
+        "translate_failed": "Traduction terminee avec des parties en erreur",
+        "provider_unavailable_title": "Le fournisseur choisi n'est pas pret",
+        "provider_unavailable_argos": "Argos fonctionne hors ligne, mais le module local manque pour cette paire de langues. Ouvrez les reglages, choisissez Argos et installez le module, ou choisissez un autre fournisseur ici.",
+        "provider_unavailable_hymt": "Hy-MT fonctionne hors ligne, mais le paquet local Hy-MT n'est pas installe. Ouvrez les reglages, choisissez Hy-MT et telechargez le paquet offline, ou choisissez un autre fournisseur ici.",
+        "provider_unavailable_online": "Ce fournisseur en ligne n'a pas renvoye de traduction. Verifiez internet ou choisissez un autre fournisseur ici.",
+        "provider_unavailable_generic": "Choisissez un autre fournisseur ici, ou ouvrez les reglages et installez le paquet local requis.",
+        "technical_error": "Erreur technique",
+    },
+    "zh": {
+        "title": "文档翻译",
+        "main_file_tooltip": "将 .txt、.md、.docx、.pdf、.html 或 .rtf 拖到这里，按 Ctrl+O，或在主窗口中右键单击。",
+        "main_file_hint": "将文档拖到这里或右键单击",
+        "attach_file": "附加文件",
+        "remove_file": "移除文件",
+        "translate_file": "翻译文本",
+        "translate_selected": "翻译选中内容",
+        "save_translation": "保存翻译",
+        "open_session": "打开会话",
+        "context_translate_file": "选择要翻译的文件",
+        "context_choose_folder": "选择文件所在文件夹",
+        "source": "源语言",
+        "target": "目标语言",
+        "auto_detect": "自动检测",
+        "original": "原文",
+        "translated": "译文",
+        "drop_hint": "在此输入或粘贴文本，或拖入文档。",
+        "no_file": "请输入文本或附加文件。",
+        "loading": "正在加载文件...",
+        "loaded": "已加载",
+        "translating": "正在翻译",
+        "done": "翻译完成",
+        "error": "文档翻译错误",
+        "file": "文件",
+        "size": "大小",
+        "detected": "检测到",
+        "provider": "提供商",
+        "status": "状态",
+        "chunks": "分块",
+        "no_selection": "请先在原文中选择文本。",
+        "no_translation": "没有可保存的译文。",
+        "saved": "已保存",
+        "session_loaded": "会话已加载",
+        "translate_failed": "翻译完成，但部分分块失败",
+        "provider_unavailable_title": "所选提供商尚未就绪",
+        "provider_unavailable_argos": "Argos 可离线工作，但当前语言方向缺少本地语言包。请打开设置，选择 Argos 并安装所需语言包，或在这里选择其他提供商。",
+        "provider_unavailable_hymt": "Hy-MT 可离线工作，但本地 Hy-MT 包尚未安装。请打开设置，选择 Hy-MT 并下载离线包，或在这里选择其他提供商。",
+        "provider_unavailable_online": "该在线提供商没有返回翻译。请检查网络，或在这里选择其他提供商。",
+        "provider_unavailable_generic": "请在这里选择其他提供商，或打开设置并安装所选提供商所需的本地包。",
+        "technical_error": "技术错误",
+    },
+}
+
+
+def doc_text(lang, key):
+    text = DOCUMENT_TEXT.get(lang, DOCUMENT_TEXT["en"])
+    return text.get(key, DOCUMENT_TEXT["en"].get(key, key))
+
+
+def document_file_filter():
+    extensions = " ".join(f"*{extension}" for extension in sorted(SUPPORTED_EXTENSIONS))
+    return f"Documents ({extensions});;All files (*.*)"
+
+
+TRANSLATION_PROVIDER_OPTIONS = (
+    ("google", "Google", "online"),
+    ("argos", "Argos", "offline"),
+    ("hymt", "Hy-MT", "offline"),
+    ("mymemory", "MyMemory", "online"),
+    ("lingva", "Lingva", "online"),
+    ("libretranslate", "LibreTranslate", "online"),
+)
+
+
+def provider_kind_text(kind, lang):
+    if kind == "offline":
+        return {
+            "ru": "офлайн",
+            "es": "offline",
+            "de": "offline",
+            "fr": "offline",
+            "zh": "离线",
+        }.get(lang, "offline")
+    return {
+        "ru": "онлайн",
+        "es": "online",
+        "de": "online",
+        "fr": "online",
+        "zh": "在线",
+    }.get(lang, "online")
+
+
+def provider_display_name(engine, lang, include_kind=False):
+    engine = str(engine or "google").lower()
+    for key, name, kind in TRANSLATION_PROVIDER_OPTIONS:
+        if key == engine:
+            if include_kind:
+                return f"{name} · {provider_kind_text(kind, lang)}"
+            return name
+    return str(engine or "Google")
+
+
+def document_translation_icon(theme_name):
+    dark = theme_name == "Темная"
+    line = QColor("#f7f3ff" if dark else "#1f2937")
+    accent = QColor("#c5b3e9" if dark else "#7a5fa1")
+    paper_fill = QColor(255, 255, 255, 22) if dark else QColor(122, 95, 161, 16)
+
+    pixmap = QPixmap(30, 30)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(accent, 1.8))
+    painter.setBrush(QBrush(paper_fill))
+    painter.drawRoundedRect(QtCore.QRectF(6, 4, 16, 22), 3, 3)
+
+    fold = [
+        QtCore.QPointF(17, 4),
+        QtCore.QPointF(22, 9),
+        QtCore.QPointF(17, 9),
+    ]
+    painter.setBrush(QBrush(QColor(accent.red(), accent.green(), accent.blue(), 62)))
+    painter.drawPolygon(QPolygonF(fold))
+
+    painter.setPen(QPen(line, 1.2))
+    painter.drawLine(QtCore.QPointF(9.5, 13), QtCore.QPointF(18.5, 13))
+    painter.drawLine(QtCore.QPointF(9.5, 16.5), QtCore.QPointF(17, 16.5))
+    painter.drawLine(QtCore.QPointF(9.5, 20), QtCore.QPointF(14.5, 20))
+
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(QBrush(accent))
+    painter.drawRoundedRect(QtCore.QRectF(14, 16, 12, 10), 4, 4)
+
+    painter.setPen(QPen(QColor("#111827" if dark else "#ffffff"), 1))
+    font = painter.font()
+    font.setPointSize(7)
+    font.setBold(True)
+    painter.setFont(font)
+    painter.drawText(QtCore.QRectF(14, 16, 12, 10), Qt.AlignCenter, "A")
+    painter.end()
+    return QIcon(pixmap)
+
+
 WELCOME_TEXT = {
     "en": {
         "window": "News",
@@ -1418,7 +1808,8 @@ HELP_CONTENT = {
         ("OCR Engines", [
             "<span class='item-title'>Windows</span> - built into Windows, fast, depends on installed Windows language packs.",
             "<span class='item-title'>Tesseract</span> - offline OCR engine; Settings can download a local portable package.",
-            "<span class='item-title'>AUTO</span> works best for numbers and Latin text; choose a specific language for better accuracy.",
+            "<span class='item-title'>AUTO</span> cannot know the language before OCR. With Windows OCR it tries installed OCR languages and selects the most readable result.",
+            "If the needed language is not installed in Windows OCR, install its Windows language pack, choose a specific language, or use Tesseract.",
         ]),
         ("Settings", [
             "Shadow mode starts the app hidden in the system tray.",
@@ -1458,7 +1849,8 @@ HELP_CONTENT = {
         ("OCR-движки", [
             "<span class='item-title'>Windows</span> - встроен в Windows, быстрый, зависит от установленных языковых пакетов Windows.",
             "<span class='item-title'>Tesseract</span> - офлайн OCR; настройки умеют скачать локальный portable-пакет.",
-            "<span class='item-title'>AUTO</span> лучше подходит для цифр и латиницы; для точности выбирайте конкретный язык.",
+            "<span class='item-title'>AUTO</span> не может узнать язык до OCR, потому что текста еще нет. В Windows OCR он пробует установленные OCR-языки и выбирает самый читаемый результат.",
+            "Если нужный язык не установлен в Windows OCR, установите языковой пакет Windows, выберите язык вручную или используйте Tesseract.",
         ]),
         ("Настройки", [
             "Режим тени запускает программу скрытой в системном трее.",
@@ -1498,7 +1890,8 @@ HELP_CONTENT = {
         ("Motores OCR", [
             "<span class='item-title'>Windows</span> - integrado en Windows, rapido, depende de paquetes de idioma instalados.",
             "<span class='item-title'>Tesseract</span> - OCR sin conexion; Ajustes puede descargar un paquete portable.",
-            "<span class='item-title'>AUTO</span> funciona mejor con numeros y texto latino; para precision elige un idioma concreto.",
+            "<span class='item-title'>AUTO</span> no puede saber el idioma antes del OCR. Con Windows OCR prueba los idiomas OCR instalados y elige el resultado mas legible.",
+            "Si el idioma necesario no esta instalado en Windows OCR, instala su paquete de idioma de Windows, elige un idioma concreto o usa Tesseract.",
         ]),
         ("Ajustes", [
             "Modo sombra inicia la app oculta en la bandeja del sistema.",
@@ -1538,7 +1931,8 @@ HELP_CONTENT = {
         ("OCR-Engines", [
             "<span class='item-title'>Windows</span> - in Windows integriert, schnell, hangt von installierten Sprachpaketen ab.",
             "<span class='item-title'>Tesseract</span> - Offline-OCR; Einstellungen konnen ein portables Paket laden.",
-            "<span class='item-title'>AUTO</span> passt am besten fur Zahlen und lateinischen Text; fur Genauigkeit eine konkrete Sprache wahlen.",
+            "<span class='item-title'>AUTO</span> kann die Sprache nicht vor der OCR kennen. Mit Windows OCR werden installierte OCR-Sprachen getestet und das lesbarste Ergebnis gewahlt.",
+            "Wenn die benotigte Sprache in Windows OCR fehlt, installiere das Windows-Sprachpaket, wahle eine konkrete Sprache oder nutze Tesseract.",
         ]),
         ("Einstellungen", [
             "Schattenmodus startet die App ausgeblendet im System-Tray.",
@@ -1578,7 +1972,8 @@ HELP_CONTENT = {
         ("Moteurs OCR", [
             "<span class='item-title'>Windows</span> - integre a Windows, rapide, depend des modules de langue installes.",
             "<span class='item-title'>Tesseract</span> - OCR hors ligne; les reglages peuvent telecharger un paquet portable.",
-            "<span class='item-title'>AUTO</span> convient aux nombres et au texte latin; choisir une langue precise pour plus de fiabilite.",
+            "<span class='item-title'>AUTO</span> ne peut pas connaitre la langue avant l'OCR. Avec Windows OCR, il teste les langues OCR installees et choisit le resultat le plus lisible.",
+            "Si la langue requise manque dans Windows OCR, installe le module de langue Windows, choisis une langue precise ou utilise Tesseract.",
         ]),
         ("Reglages", [
             "Mode ombre lance l'app cachee dans la zone de notification.",
@@ -1618,7 +2013,8 @@ HELP_CONTENT = {
         ("OCR 引擎", [
             "<span class='item-title'>Windows</span> - Windows 内置，速度快，依赖已安装的 Windows 语言包。",
             "<span class='item-title'>Tesseract</span> - 离线 OCR；设置中可以下载本地便携包。",
-            "<span class='item-title'>AUTO</span> 更适合数字和拉丁文本；需要更高准确率时请选择具体语言。",
+            "<span class='item-title'>AUTO</span> 无法在 OCR 前知道语言，因为文字还没有被识别。使用 Windows OCR 时，它会尝试已安装的 OCR 语言并选择最可读的结果。",
+            "如果 Windows OCR 没有所需语言，请安装对应 Windows 语言包、手动选择语言，或使用 Tesseract。",
         ]),
         ("设置", [
             "阴影模式会让应用启动后隐藏在系统托盘。",
@@ -1796,6 +2192,58 @@ HELP_EXTRA_CONTENT = {
     ],
 }
 
+DOCUMENT_HELP_CONTENT = {
+    "en": [
+        ("Document translation", [
+            "Drop a .txt, .md, .docx, .pdf, .html or .rtf file onto the main window, or press Ctrl+O.",
+            "The document reader can translate the whole file or only selected text.",
+            "Long files are split into ordered chunks; failed chunks stay visible in the result.",
+            "Translations can be saved locally as .txt, .md or a reopenable session in the program data folder.",
+        ]),
+    ],
+    "ru": [
+        ("Перевод документов", [
+            "Перетащите .txt, .md, .docx, .pdf, .html или .rtf в главное окно, либо нажмите Ctrl+O.",
+            "Окно документа умеет переводить весь файл или только выделенный текст.",
+            "Длинные файлы режутся на части по порядку; ошибки отдельных частей остаются видимыми в результате.",
+            "Перевод можно сохранить локально как .txt, .md или сессию для повторного открытия.",
+        ]),
+    ],
+    "es": [
+        ("Traduccion de documentos", [
+            "Arrastra .txt, .md, .docx, .pdf, .html o .rtf a la ventana principal, o pulsa Ctrl+O.",
+            "El lector puede traducir todo el archivo o solo el texto seleccionado.",
+            "Los archivos largos se dividen en partes ordenadas; las partes fallidas quedan visibles.",
+            "La traduccion se guarda localmente como .txt, .md o sesion reutilizable.",
+        ]),
+    ],
+    "de": [
+        ("Dokumentubersetzung", [
+            ".txt, .md, .docx, .pdf, .html oder .rtf ins Hauptfenster ziehen oder Ctrl+O drucken.",
+            "Der Dokumentreader ubersetzt die ganze Datei oder nur markierten Text.",
+            "Lange Dateien werden in geordnete Teile geteilt; fehlgeschlagene Teile bleiben sichtbar.",
+            "Ubersetzungen werden lokal als .txt, .md oder wieder offnbare Sitzung gespeichert.",
+        ]),
+    ],
+    "fr": [
+        ("Traduction de documents", [
+            "Deposez .txt, .md, .docx, .pdf, .html ou .rtf dans la fenetre principale, ou appuyez sur Ctrl+O.",
+            "Le lecteur peut traduire tout le fichier ou seulement le texte selectionne.",
+            "Les longs fichiers sont decoupes en parties ordonnees; les erreurs restent visibles.",
+            "La traduction se sauvegarde localement en .txt, .md ou session reutilisable.",
+        ]),
+    ],
+    "zh": [
+        ("文档翻译", [
+            "将 .txt、.md、.docx、.pdf、.html 或 .rtf 拖到主窗口，或按 Ctrl+O。",
+            "文档阅读器可以翻译整个文件，也可以只翻译选中的文本。",
+            "长文件会按顺序分块翻译；失败的分块会保留在结果中。",
+            "译文可本地保存为 .txt、.md 或可重新打开的会话。",
+        ]),
+    ],
+}
+
+
 HELP_ACTION_TEXT = {
     "en": {"title": "FAQ", "guide": "Start interactive guide", "close": "Got it"},
     "ru": {"title": "Справка", "guide": "Пройти обучение", "close": "Понятно"},
@@ -1812,7 +2260,11 @@ def help_action_text(lang, key):
 
 
 def help_text(lang):
-    sections = HELP_CONTENT.get(lang, HELP_CONTENT["en"]) + HELP_EXTRA_CONTENT.get(lang, HELP_EXTRA_CONTENT["en"])
+    sections = (
+        HELP_CONTENT.get(lang, HELP_CONTENT["en"])
+        + DOCUMENT_HELP_CONTENT.get(lang, DOCUMENT_HELP_CONTENT["en"])
+        + HELP_EXTRA_CONTENT.get(lang, HELP_EXTRA_CONTENT["en"])
+    )
     intro = HELP_INTRO.get(lang, HELP_INTRO["en"])
     blocks = [_HELP_STYLE, f'<div class="hero"><div class="hero-title">Click&apos;n&apos;Translate</div><div class="hero-subtitle">{intro}</div></div>']
     for title, items in sections:
@@ -2223,6 +2675,886 @@ class WelcomeDialog(QDialog):
         self._stop_animations()
         super().closeEvent(event)
 
+class DocumentTranslationDialog(QDialog):
+    _document_loaded_signal = QtCore.pyqtSignal(object)
+    _document_error_signal = QtCore.pyqtSignal(str)
+    _document_progress_signal = QtCore.pyqtSignal(int, int, str)
+    _document_done_signal = QtCore.pyqtSignal(str, object)
+
+    def __init__(self, parent_app, initial_path=None):
+        super().__init__(parent_app)
+        self.parent_app = parent_app
+        self.lang = getattr(parent_app, "current_interface_language", "en")
+        self.theme_name = getattr(parent_app, "current_theme", DEFAULT_CONFIG["theme"])
+        self.current_document = None
+        self.session_payload = None
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.translation_running = False
+
+        self._document_loaded_signal.connect(self._on_document_loaded)
+        self._document_error_signal.connect(self._on_document_error)
+        self._document_progress_signal.connect(self._on_translation_progress)
+        self._document_done_signal.connect(self._on_translation_done)
+
+        self.setWindowTitle(doc_text(self.lang, "title"))
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
+        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setMinimumSize(980, 680)
+        self.resize(1080, 700)
+        self.setAcceptDrops(True)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._build_ui()
+        self._apply_dialog_theme()
+        self._apply_native_frame_theme()
+        self._set_status(doc_text(self.lang, "no_file"))
+        self._set_busy(False)
+        if initial_path:
+            QTimer.singleShot(0, lambda: self.load_file(initial_path))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._apply_native_frame_theme()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName("docTopBar")
+        header.setAttribute(Qt.WA_StyledBackground, True)
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(18, 14, 18, 12)
+        header_layout.setSpacing(12)
+
+        header_top = QHBoxLayout()
+        header_top.setSpacing(12)
+        self.doc_icon_label = QLabel()
+        self.doc_icon_label.setObjectName("docHeaderIcon")
+        self.doc_icon_label.setFixedSize(38, 38)
+        self.doc_icon_label.setAlignment(Qt.AlignCenter)
+        header_top.addWidget(self.doc_icon_label)
+
+        title_stack = QVBoxLayout()
+        title_stack.setSpacing(2)
+        self.header_title = QLabel(doc_text(self.lang, "title"))
+        self.header_title.setObjectName("docTitle")
+        self.header_subtitle = QLabel(doc_text(self.lang, "drop_hint"))
+        self.header_subtitle.setObjectName("docSubtitle")
+        title_stack.addWidget(self.header_title)
+        title_stack.addWidget(self.header_subtitle)
+        self.metadata_label = QLabel("")
+        self.metadata_label.setObjectName("docMetadata")
+        self.metadata_label.setWordWrap(False)
+        self.metadata_label.setTextFormat(Qt.PlainText)
+        title_stack.addWidget(self.metadata_label)
+        header_top.addLayout(title_stack, 1)
+
+        self.status_pill = QLabel(doc_text(self.lang, "no_file"))
+        self.status_pill.setObjectName("docStatusPill")
+        self.status_pill.setAlignment(Qt.AlignCenter)
+        self.status_pill.setMinimumWidth(128)
+        header_top.addWidget(self.status_pill)
+        header_layout.addLayout(header_top)
+
+        control_row = QHBoxLayout()
+        control_row.setSpacing(10)
+        self.source_field_label = QLabel(doc_text(self.lang, "source") + ":")
+        self.source_field_label.setObjectName("docFieldLabel")
+        control_row.addWidget(self.source_field_label)
+        self.source_combo = QComboBox()
+        self.source_combo.addItem(doc_text(self.lang, "auto_detect"))
+        self.source_combo.addItems(LANGUAGES[self.lang])
+        self.source_combo.setMinimumWidth(150)
+        control_row.addWidget(self.source_combo)
+
+        self.language_arrow = QLabel("→")
+        self.language_arrow.setObjectName("docArrow")
+        self.language_arrow.setAlignment(Qt.AlignCenter)
+        control_row.addWidget(self.language_arrow)
+
+        self.target_field_label = QLabel(doc_text(self.lang, "target") + ":")
+        self.target_field_label.setObjectName("docFieldLabel")
+        control_row.addWidget(self.target_field_label)
+        self.target_combo = QComboBox()
+        self.target_combo.addItems(LANGUAGES[self.lang])
+        target_widget = getattr(self.parent_app, "target_lang", None)
+        if target_widget is not None:
+            try:
+                target_text = target_widget.currentText()
+                target_index = self.target_combo.findText(target_text)
+                if target_index >= 0:
+                    self.target_combo.setCurrentIndex(target_index)
+            except RuntimeError:
+                pass
+        self.target_combo.currentIndexChanged.connect(self._update_metadata)
+        self.target_combo.setMinimumWidth(150)
+        control_row.addWidget(self.target_combo)
+
+        self.provider_field_label = QLabel(doc_text(self.lang, "provider") + ":")
+        self.provider_field_label.setObjectName("docFieldLabel")
+        control_row.addWidget(self.provider_field_label)
+        self.provider_combo = QComboBox()
+        self.provider_combo.setMinimumWidth(170)
+        self._populate_provider_combo()
+        self.provider_combo.currentIndexChanged.connect(self._update_metadata)
+        control_row.addWidget(self.provider_combo)
+        control_row.addStretch(1)
+        header_layout.addLayout(control_row)
+        layout.addWidget(header)
+
+        actions_frame = QFrame()
+        actions_frame.setObjectName("docToolBar")
+        actions_frame.setAttribute(Qt.WA_StyledBackground, True)
+        toolbar = QHBoxLayout()
+        toolbar.setContentsMargins(18, 10, 18, 10)
+        toolbar.setSpacing(8)
+        self.attach_button = QPushButton(doc_text(self.lang, "attach_file"))
+        self.attach_button.setObjectName("docButton")
+        self.attach_button.clicked.connect(self.attach_file)
+        toolbar.addWidget(self.attach_button)
+
+        self.open_button = QPushButton(doc_text(self.lang, "open_session"))
+        self.open_button.setObjectName("docButton")
+        self.open_button.clicked.connect(self.open_session)
+        toolbar.addWidget(self.open_button)
+
+        self.remove_button = QPushButton(doc_text(self.lang, "remove_file"))
+        self.remove_button.setObjectName("docDangerButton")
+        self.remove_button.clicked.connect(self.remove_file)
+        toolbar.addWidget(self.remove_button)
+
+        toolbar.addStretch(1)
+
+        self.translate_selected_button = QPushButton(doc_text(self.lang, "translate_selected"))
+        self.translate_selected_button.setObjectName("docButton")
+        self.translate_selected_button.clicked.connect(self.translate_selected_text)
+        toolbar.addWidget(self.translate_selected_button)
+
+        self.translate_file_button = QPushButton(doc_text(self.lang, "translate_file"))
+        self.translate_file_button.setObjectName("docPrimaryButton")
+        self.translate_file_button.clicked.connect(self.translate_file)
+        toolbar.addWidget(self.translate_file_button)
+
+        self.save_button = QPushButton(doc_text(self.lang, "save_translation"))
+        self.save_button.setObjectName("docButton")
+        self.save_button.clicked.connect(self.save_translation)
+        toolbar.addWidget(self.save_button)
+        actions_frame.setLayout(toolbar)
+        layout.addWidget(actions_frame)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setObjectName("docProgress")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setMaximumHeight(5)
+        layout.addWidget(self.progress_bar)
+
+        content_frame = QFrame()
+        content_frame.setObjectName("docContent")
+        content_frame.setAttribute(Qt.WA_StyledBackground, True)
+        content_layout = QVBoxLayout(content_frame)
+        content_layout.setContentsMargins(14, 14, 14, 14)
+        content_layout.setSpacing(0)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setObjectName("docSplitter")
+        splitter.addWidget(self._reader_column(doc_text(self.lang, "original"), True))
+        splitter.addWidget(self._reader_column(doc_text(self.lang, "translated"), False))
+        splitter.setSizes([490, 490])
+        content_layout.addWidget(splitter, 1)
+        layout.addWidget(content_frame, 1)
+
+    def _reader_column(self, title, original):
+        frame = QFrame()
+        frame.setObjectName("docPane")
+        frame.setAttribute(Qt.WA_StyledBackground, True)
+        column = QVBoxLayout(frame)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName("docPaneHeader")
+        header.setAttribute(Qt.WA_StyledBackground, True)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(14, 10, 14, 8)
+        header_layout.setSpacing(8)
+        label = QLabel(title)
+        label.setObjectName("docPaneTitle")
+        header_layout.addWidget(label)
+        header_layout.addStretch(1)
+        column.addWidget(header)
+
+        editor = QTextEdit()
+        editor.setObjectName("docEditor")
+        editor.setReadOnly(not original)
+        editor.setLineWrapMode(QTextEdit.WidgetWidth)
+        editor.setAcceptDrops(False)
+        editor.setFrameShape(QFrame.NoFrame)
+        if original:
+            self.original_label = label
+            self.original_view = editor
+            editor.setPlaceholderText(doc_text(self.lang, "drop_hint"))
+            editor.textChanged.connect(self._on_original_text_changed)
+        else:
+            self.translated_label = label
+            self.translated_view = editor
+        column.addWidget(editor, 1)
+        return frame
+
+    def _apply_dialog_theme(self):
+        is_dark = self.theme_name == DEFAULT_CONFIG["theme"]
+        bg = "#0E1116" if is_dark else "#F3F5F8"
+        top = "#151A22" if is_dark else "#FFFFFF"
+        toolbar = "#10151D" if is_dark else "#F8FAFC"
+        pane = "#111821" if is_dark else "#FFFFFF"
+        editor = "#0B0F15" if is_dark else "#FBFCFE"
+        control = "#1D2430" if is_dark else "#EEF2F7"
+        control_hover = "#26303F" if is_dark else "#E3E8F0"
+        border = "#2D3746" if is_dark else "#D8DEE8"
+        soft_border = "#222B38" if is_dark else "#E8ECF2"
+        fg = "#F3F6FA" if is_dark else "#141922"
+        muted = "#9CA8B8" if is_dark else "#697587"
+        faint = "#6F7B8B" if is_dark else "#8792A2"
+        accent = "#8F6FD1" if is_dark else "#6D55BE"
+        accent_hover = "#A98BE7" if is_dark else "#5D47A6"
+        accent_text = "#0E1116" if is_dark else "#FFFFFF"
+        danger = "#EB6D72" if is_dark else "#B84D57"
+        if hasattr(self, "doc_icon_label"):
+            self.doc_icon_label.setPixmap(document_translation_icon(self.theme_name).pixmap(30, 30))
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {bg};
+                color: {fg};
+            }}
+            QLabel {{
+                color: {fg};
+                font-size: 13px;
+            }}
+            QFrame#docTopBar {{
+                background-color: {top};
+                border-bottom: 1px solid {soft_border};
+            }}
+            QFrame#docToolBar {{
+                background-color: {toolbar};
+                border-bottom: 1px solid {soft_border};
+            }}
+            QFrame#docContent {{
+                background-color: {bg};
+            }}
+            QFrame#docPane {{
+                background-color: {pane};
+                border: 1px solid {border};
+                border-radius: 7px;
+            }}
+            QFrame#docPaneHeader {{
+                background-color: transparent;
+                border-bottom: 1px solid {soft_border};
+                border-top-left-radius: 7px;
+                border-top-right-radius: 7px;
+            }}
+            QLabel#docHeaderIcon {{
+                background-color: {control};
+                border: 1px solid {border};
+                border-radius: 10px;
+            }}
+            QLabel#docTitle {{
+                color: {fg};
+                font-size: 18px;
+                font-weight: 900;
+            }}
+            QLabel#docSubtitle,
+            QLabel#docMetadata,
+            QLabel#docProvider {{
+                color: {muted};
+                font-size: 12px;
+                font-weight: 600;
+            }}
+            QLabel#docMetadata {{
+                color: {faint};
+            }}
+            QLabel#docStatusPill {{
+                color: {fg};
+                background-color: {control};
+                border: 1px solid {border};
+                border-radius: 11px;
+                padding: 5px 10px;
+                font-size: 12px;
+                font-weight: 800;
+            }}
+            QLabel#docArrow {{
+                color: {muted};
+                font-size: 16px;
+                font-weight: 900;
+            }}
+            QLabel#docFieldLabel {{
+                color: {muted};
+                font-size: 12px;
+                font-weight: 800;
+            }}
+            QLabel#docPaneTitle {{
+                color: {fg};
+                font-size: 13px;
+                font-weight: 900;
+            }}
+            QPushButton {{
+                min-height: 28px;
+            }}
+            QPushButton#docButton {{
+                background-color: {control};
+                color: {fg};
+                border: 1px solid {border};
+                border-radius: 5px;
+                padding: 6px 11px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+            QPushButton#docButton:hover {{
+                background-color: {control_hover};
+                border-color: {accent};
+            }}
+            QPushButton#docPrimaryButton {{
+                background-color: {accent};
+                color: {accent_text};
+                border: 1px solid {accent};
+                border-radius: 5px;
+                padding: 6px 14px;
+                font-size: 12px;
+                font-weight: 900;
+            }}
+            QPushButton#docPrimaryButton:hover {{
+                background-color: {accent_hover};
+                border-color: {accent_hover};
+            }}
+            QPushButton#docDangerButton {{
+                background-color: transparent;
+                color: {danger};
+                border: 1px solid {border};
+                border-radius: 5px;
+                padding: 6px 11px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+            QPushButton#docDangerButton:hover {{
+                background-color: {control_hover};
+                border-color: {danger};
+            }}
+            QPushButton:disabled {{
+                color: #777777;
+                background-color: {control};
+                border-color: {soft_border};
+            }}
+            QComboBox {{
+                background-color: {control};
+                color: {fg};
+                border: 1px solid {border};
+                border-radius: 5px;
+                padding: 5px 8px;
+                font-size: 13px;
+            }}
+            QComboBox:hover {{
+                border-color: {accent};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {pane};
+                color: {fg};
+                border: 1px solid {border};
+                selection-background-color: {control_hover};
+            }}
+            QTextEdit#docEditor {{
+                background-color: {editor};
+                color: {fg};
+                border: none;
+                border-bottom-left-radius: 7px;
+                border-bottom-right-radius: 7px;
+                padding: 14px;
+                font-size: 14px;
+                line-height: 1.4;
+                selection-background-color: {accent};
+                selection-color: {accent_text};
+            }}
+            QTextEdit#docEditor:focus {{
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 10px;
+                margin: 5px 2px 5px 2px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {border};
+                min-height: 34px;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {accent};
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0;
+                background: none;
+            }}
+            QProgressBar#docProgress {{
+                background-color: {control};
+                border: none;
+                border-radius: 0;
+                max-height: 5px;
+                text-align: center;
+            }}
+            QProgressBar#docProgress::chunk {{
+                background-color: {accent};
+                border-radius: 0;
+            }}
+            QSplitter#docSplitter::handle {{
+                background-color: transparent;
+                width: 10px;
+            }}
+        """)
+
+    def _apply_native_frame_theme(self):
+        apply_windows_dark_frame(self, self.theme_name == DEFAULT_CONFIG["theme"])
+
+    def refresh_theme(self, theme_name):
+        self.theme_name = theme_name
+        self._apply_dialog_theme()
+        self._apply_native_frame_theme()
+
+    def refresh_language(self, language_code):
+        old_lang = self.lang
+        source_code = self._source_code()
+        target_code = language_code_from_name(self.target_combo.currentText(), old_lang)
+        self.lang = normalize_interface_language(language_code)
+
+        self.setWindowTitle(doc_text(self.lang, "title"))
+        self.header_title.setText(doc_text(self.lang, "title"))
+        self.header_subtitle.setText(doc_text(self.lang, "drop_hint"))
+        self.attach_button.setText(doc_text(self.lang, "attach_file"))
+        self.remove_button.setText(doc_text(self.lang, "remove_file"))
+        self.translate_file_button.setText(doc_text(self.lang, "translate_file"))
+        self.translate_selected_button.setText(doc_text(self.lang, "translate_selected"))
+        self.save_button.setText(doc_text(self.lang, "save_translation"))
+        self.open_button.setText(doc_text(self.lang, "open_session"))
+        self.source_field_label.setText(doc_text(self.lang, "source") + ":")
+        self.target_field_label.setText(doc_text(self.lang, "target") + ":")
+        self.original_label.setText(doc_text(self.lang, "original"))
+        self.translated_label.setText(doc_text(self.lang, "translated"))
+        self.original_view.setPlaceholderText(doc_text(self.lang, "drop_hint"))
+
+        self.source_combo.blockSignals(True)
+        self.source_combo.clear()
+        self.source_combo.addItem(doc_text(self.lang, "auto_detect"))
+        self.source_combo.addItems(LANGUAGES[self.lang])
+        self.source_combo.setCurrentIndex(0)
+        if source_code != "auto":
+            self._set_combo_to_language_code(self.source_combo, source_code)
+        self.source_combo.blockSignals(False)
+
+        self.target_combo.blockSignals(True)
+        self.target_combo.clear()
+        self.target_combo.addItems(LANGUAGES[self.lang])
+        self._set_combo_to_language_code(self.target_combo, target_code)
+        self.target_combo.blockSignals(False)
+
+        self.provider_field_label.setText(doc_text(self.lang, "provider") + ":")
+        provider_engine = self._provider_engine()
+        self._populate_provider_combo(provider_engine)
+        if self.translation_running:
+            self.current_status = doc_text(self.lang, "translating")
+        elif self.current_document:
+            self.current_status = doc_text(self.lang, "loaded")
+        elif self.session_payload:
+            self.current_status = doc_text(self.lang, "session_loaded")
+        else:
+            self.current_status = doc_text(self.lang, "no_file")
+        self.status_pill.setText(self.current_status)
+        self._update_metadata()
+
+    def _set_combo_to_language_code(self, combo, language_code):
+        for index in range(combo.count()):
+            if language_code_from_name(combo.itemText(index), self.lang) == language_code:
+                combo.setCurrentIndex(index)
+                return
+
+    def _on_original_text_changed(self):
+        if self.current_document or self.session_payload or self.translation_running:
+            return
+        if self.original_view.toPlainText().strip():
+            self._set_status(doc_text(self.lang, "loaded"))
+        else:
+            self.translated_text = ""
+            self.translation_results = []
+            self.translation_error_message_visible = False
+            self.translated_view.clear()
+            self.progress_bar.setValue(0)
+            self._set_status(doc_text(self.lang, "no_file"))
+        self._set_busy(False)
+
+    def attach_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            doc_text(self.lang, "attach_file"),
+            "",
+            "Documents (*.txt *.md *.docx *.pdf *.html *.htm *.rtf);;All files (*.*)",
+        )
+        if path:
+            self.load_file(path)
+
+    def load_file(self, path):
+        if self.translation_running:
+            return
+        self.current_document = None
+        self.session_payload = None
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.original_view.blockSignals(True)
+        self.original_view.clear()
+        self.original_view.blockSignals(False)
+        self.translated_view.clear()
+        self.progress_bar.setRange(0, 0)
+        self._set_status(doc_text(self.lang, "loading"))
+        self._set_busy(True, loading=True)
+
+        def worker():
+            try:
+                document = parse_document(path)
+                self._document_loaded_signal.emit(document)
+            except DocumentParseError as exc:
+                self._document_error_signal.emit(str(exc))
+            except Exception as exc:
+                self._document_error_signal.emit(str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_document_loaded(self, document):
+        self.current_document = document
+        self.session_payload = None
+        self.original_view.blockSignals(True)
+        self.original_view.setPlainText(document.text)
+        self.original_view.blockSignals(False)
+        self.translated_view.clear()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self._set_busy(False)
+        self._set_status(doc_text(self.lang, "loaded"))
+
+    def _on_document_error(self, message):
+        self.translation_running = False
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self._set_busy(False)
+        self._set_status(str(message))
+        QMessageBox.warning(self, doc_text(self.lang, "error"), str(message))
+
+    def remove_file(self):
+        if self.translation_running:
+            return
+        self.current_document = None
+        self.session_payload = None
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.original_view.blockSignals(True)
+        self.original_view.clear()
+        self.original_view.blockSignals(False)
+        self.translated_view.clear()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self._set_status(doc_text(self.lang, "no_file"))
+        self._set_busy(False)
+
+    def translate_file(self):
+        if not self.current_document and not self.original_view.toPlainText().strip():
+            QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_file"))
+            return
+        self._start_translation(self.original_view.toPlainText())
+
+    def translate_selected_text(self):
+        selected = self.original_view.textCursor().selectedText().replace("\u2029", "\n").strip()
+        if not selected:
+            QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_selection"))
+            return
+        self._start_translation(selected)
+
+    def _start_translation(self, text):
+        text = str(text or "").strip()
+        if not text or self.translation_running:
+            return
+        self.translation_running = True
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.translated_view.clear()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self._set_busy(True)
+        self._set_status(doc_text(self.lang, "translating"))
+
+        source_code = self._source_code()
+        target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
+
+        def progress(done, total, message):
+            self._document_progress_signal.emit(int(done), int(total), str(message))
+
+        def worker():
+            try:
+                translated, results = translate_document_text(
+                    text,
+                    source_code,
+                    target_code,
+                    provider_engine=self._provider_engine(),
+                    progress_callback=progress,
+                )
+                self._document_done_signal.emit(translated, results)
+            except Exception as exc:
+                self._document_error_signal.emit(str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_translation_progress(self, done, total, message):
+        if total:
+            self.progress_bar.setValue(max(0, min(100, int(done * 100 / total))))
+            self._set_status(f"{doc_text(self.lang, 'translating')}: {done}/{total}")
+        else:
+            self.progress_bar.setValue(0)
+            self._set_status(message)
+
+    def _on_translation_done(self, translated, results):
+        self.translation_running = False
+        self.translation_results = list(results or [])
+        friendly_failure = self._friendly_provider_failure_text(self.translation_results)
+        self.translation_error_message_visible = bool(friendly_failure)
+        self.translated_text = friendly_failure or (translated or "")
+        self.translated_view.setPlainText(self.translated_text)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self._set_busy(False)
+        failed = sum(1 for result in self.translation_results if getattr(result, "error", ""))
+        if friendly_failure:
+            self._set_status(doc_text(self.lang, "provider_unavailable_title"))
+        elif failed:
+            self._set_status(f"{doc_text(self.lang, 'translate_failed')}: {failed}")
+        else:
+            self._set_status(doc_text(self.lang, "done"))
+
+    def _friendly_provider_failure_text(self, results):
+        results = list(results or [])
+        if not results:
+            return ""
+        failed_results = [result for result in results if getattr(result, "error", "")]
+        if not failed_results or len(failed_results) != len(results):
+            return ""
+
+        engine = self._provider_engine()
+        provider_name = self._provider_name()
+        first_error = str(getattr(failed_results[0], "error", "") or "").strip()
+        error_lower = first_error.lower()
+
+        if engine == "argos" or "argos offline translation package" in error_lower:
+            advice_key = "provider_unavailable_argos"
+        elif engine == "hymt" or "hy-mt" in error_lower or "hymt" in error_lower:
+            advice_key = "provider_unavailable_hymt"
+        elif engine in {"google", "mymemory", "lingva", "libretranslate"}:
+            advice_key = "provider_unavailable_online"
+        else:
+            advice_key = "provider_unavailable_generic"
+
+        return (
+            f"{doc_text(self.lang, 'provider_unavailable_title')}: {provider_name}\n\n"
+            f"{doc_text(self.lang, advice_key)}\n\n"
+            f"{doc_text(self.lang, 'technical_error')}:\n{first_error}"
+        ).strip()
+
+    def save_translation(self):
+        if self.translation_error_message_visible:
+            QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "provider_unavailable_title"))
+            return
+        if not self.translated_text.strip():
+            QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_translation"))
+            return
+        paths = default_output_paths(self._data_dir(), self._source_file_name())
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            doc_text(self.lang, "save_translation"),
+            paths["txt"],
+            "Text file (*.txt);;Markdown file (*.md);;Session file (*.json)",
+        )
+        if not path:
+            return
+
+        selected_filter = selected_filter or ""
+        root, ext = os.path.splitext(path)
+        if "Markdown" in selected_filter and not ext:
+            path = root + ".md"
+        elif "Session" in selected_filter and not ext:
+            path = root + ".json"
+        elif not ext:
+            path = root + ".txt"
+
+        if path.lower().endswith(".json"):
+            save_session(path, self._session_payload())
+        else:
+            save_text(path, self.translated_text)
+            save_session(paths["session"], self._session_payload())
+        self._set_status(f"{doc_text(self.lang, 'saved')}: {path}")
+
+    def open_session(self):
+        root = translations_dir(self._data_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            doc_text(self.lang, "open_session"),
+            root,
+            "Translation sessions (*.json);;All files (*.*)",
+        )
+        if not path:
+            return
+        try:
+            payload = load_session(path)
+        except Exception as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
+        self.current_document = None
+        self.session_payload = payload
+        self.translated_text = payload.get("translated_text", "")
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.original_view.blockSignals(True)
+        self.original_view.setPlainText(payload.get("original_text", ""))
+        self.original_view.blockSignals(False)
+        self.translated_view.setPlainText(self.translated_text)
+        if payload.get("provider_engine"):
+            self._populate_provider_combo(payload.get("provider_engine"))
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100 if self.translated_text else 0)
+        self._set_status(doc_text(self.lang, "session_loaded"))
+        self._set_busy(False)
+
+    def _source_code(self):
+        if self.source_combo.currentIndex() == 0:
+            return "auto"
+        return language_code_from_name(self.source_combo.currentText(), self.lang)
+
+    def _populate_provider_combo(self, selected_engine=None):
+        selected_engine = str(selected_engine or get_cached_config().get("translator_engine", "Google")).lower()
+        if selected_engine == "hy-mt":
+            selected_engine = "hymt"
+        self.provider_combo.blockSignals(True)
+        self.provider_combo.clear()
+        selected_index = 0
+        for index, (engine, _name, _kind) in enumerate(TRANSLATION_PROVIDER_OPTIONS):
+            self.provider_combo.addItem(provider_display_name(engine, self.lang, include_kind=True), engine)
+            if engine == selected_engine:
+                selected_index = index
+        self.provider_combo.setCurrentIndex(selected_index)
+        self.provider_combo.blockSignals(False)
+
+    def _provider_engine(self):
+        if hasattr(self, "provider_combo"):
+            engine = self.provider_combo.currentData()
+            if engine:
+                return str(engine).lower()
+        return str(get_cached_config().get("translator_engine", "Google")).lower()
+
+    def _provider_name(self):
+        return provider_display_name(self._provider_engine(), self.lang)
+
+    def _data_dir(self):
+        return os.path.dirname(get_data_file("config.json"))
+
+    def _source_file_name(self):
+        if self.current_document:
+            return self.current_document.file_name
+        if self.session_payload:
+            return self.session_payload.get("source_file_name") or "translation"
+        return "translation"
+
+    def _session_payload(self):
+        source_code = self._source_code()
+        target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
+        document = self.current_document
+        return {
+            "source_file_name": self._source_file_name(),
+            "source_path": document.path if document else self.session_payload.get("source_path", "") if self.session_payload else "",
+            "source_size": document.size_bytes if document else self.session_payload.get("source_size", 0) if self.session_payload else 0,
+            "detected_language": document.detected_language if document else self.session_payload.get("detected_language", "") if self.session_payload else "",
+            "source_language": source_code,
+            "target_language": target_code,
+            "provider": self._provider_name(),
+            "provider_engine": self._provider_engine(),
+            "original_text": self.original_view.toPlainText(),
+            "translated_text": self.translated_text,
+            "chunks": [
+                {
+                    "index": result.index,
+                    "source_text": result.source_text,
+                    "translated_text": result.translated_text,
+                    "error": result.error,
+                }
+                for result in self.translation_results
+            ],
+        }
+
+    def _set_status(self, status):
+        self.current_status = str(status)
+        if hasattr(self, "status_pill"):
+            self.status_pill.setText(self.current_status)
+        self._update_metadata()
+
+    def _update_metadata(self):
+        target = self.target_combo.currentText() if hasattr(self, "target_combo") else ""
+        if self.current_document:
+            parts = [
+                f"{doc_text(self.lang, 'file')}: {self.current_document.file_name}",
+                f"{doc_text(self.lang, 'size')}: {format_file_size(self.current_document.size_bytes)}",
+                f"{doc_text(self.lang, 'detected')}: {self.current_document.detected_language.upper()}",
+                f"{doc_text(self.lang, 'target')}: {target}",
+                f"{doc_text(self.lang, 'provider')}: {self._provider_name()}",
+            ]
+        elif self.session_payload:
+            size = self.session_payload.get("source_size", 0)
+            parts = [
+                f"{doc_text(self.lang, 'file')}: {self._source_file_name()}",
+                f"{doc_text(self.lang, 'size')}: {format_file_size(size)}",
+                f"{doc_text(self.lang, 'target')}: {target}",
+                f"{doc_text(self.lang, 'provider')}: {self.session_payload.get('provider', self._provider_name())}",
+            ]
+        else:
+            parts = [
+                doc_text(self.lang, "loaded") if self.original_view.toPlainText().strip() else doc_text(self.lang, "drop_hint"),
+                f"{doc_text(self.lang, 'provider')}: {self._provider_name()}",
+            ]
+        self.metadata_label.setText("  •  ".join(parts))
+
+    def _set_busy(self, busy, loading=False):
+        has_translation = bool(str(self.translated_text or "").strip())
+        self.attach_button.setEnabled(not busy)
+        self.open_button.setEnabled(not busy)
+        self.remove_button.setEnabled(not busy)
+        self.translate_file_button.setEnabled(not busy)
+        self.translate_selected_button.setEnabled(not busy)
+        self.save_button.setEnabled(not busy and has_translation and not self.translation_error_message_visible)
+        self.source_combo.setEnabled(not busy)
+        self.target_combo.setEnabled(not busy)
+        self.provider_combo.setEnabled(not busy)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls() and event.mimeData().urls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path:
+                self.load_file(path)
+                event.acceptProposedAction()
+                return
+        super().dropEvent(event)
+
+
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str)
@@ -2234,6 +3566,8 @@ class DarkThemeApp(QMainWindow):
         self.setWindowTitle(APP_WINDOW_TITLE)
         self.setFixedSize(700, 400)
         self._is_dragging = False
+        self.setAcceptDrops(True)
+        self.document_dialog = None
         # Важно для single-instance в режиме "start minimized":
         # создаем native HWND заранее, чтобы окно могло получить Windows message.
         self.winId()
@@ -2257,6 +3591,10 @@ class DarkThemeApp(QMainWindow):
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
+        self.central_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.central_widget.customContextMenuRequested.connect(
+            lambda pos: self.show_main_context_menu(self.central_widget.mapToGlobal(pos))
+        )
         self.main_layout = QVBoxLayout()
         self.main_layout.setContentsMargins(5, 45, 5, 5)
         self.central_widget.setLayout(self.main_layout)
@@ -2417,6 +3755,23 @@ class DarkThemeApp(QMainWindow):
         self.minimize_button.setStyleSheet("background-color: transparent; border: none;")
         self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
         self.minimize_button.clicked.connect(self.showMinimized)
+
+        self.document_button = QPushButton(self)
+        self.document_button.setToolTip(doc_text(self.current_interface_language, "title"))
+        self.document_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(197, 179, 233, 42);
+            }
+        """)
+        self.document_button.setGeometry(self.width() - 190, 5, 30, 30)
+        self.document_button.setIconSize(QSize(26, 26))
+        self.document_button.clicked.connect(lambda _checked=False: self.open_document_translation())
+        self.update_document_icon()
 
         # Кнопка помощи (FAQ)
         self.help_button = QPushButton(self)
@@ -3137,6 +4492,7 @@ class DarkThemeApp(QMainWindow):
         # Обновить иконку кнопки помощи
         self.update_help_icon()
         self.update_theme_icon()
+        self.update_document_icon()
         if hasattr(self, "settings_button"):
             if self.settings_window is None:
                 if self.current_theme == "Темная":
@@ -3165,6 +4521,10 @@ class DarkThemeApp(QMainWindow):
             else:
                 self.help_button.setIcon(QIcon(resource_path("icons/faq_white_theme.png")))
 
+    def update_document_icon(self):
+        if hasattr(self, "document_button"):
+            self.document_button.setIcon(document_translation_icon(self.current_theme))
+
     def toggle_theme(self):
         self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
         self.save_config()
@@ -3172,6 +4532,8 @@ class DarkThemeApp(QMainWindow):
         self.update_theme_icon()
         if self.settings_window is not None:
             self.settings_window.apply_theme()
+        if self.document_dialog is not None and self.document_dialog.isVisible():
+            self.document_dialog.refresh_theme(self.current_theme)
         self._complete_guide_step("theme")
 
     def toggle_language(self):
@@ -3197,6 +4559,8 @@ class DarkThemeApp(QMainWindow):
             self.minimize_button.setToolTip(ui_text(lang, "minimize"))
         if hasattr(self, "help_button"):
             self.help_button.setToolTip(ui_text(lang, "help"))
+        if hasattr(self, "document_button"):
+            self.document_button.setToolTip(doc_text(lang, "title"))
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
             self.settings_button.setToolTip(INTERFACE_TEXT[lang][key])
@@ -3246,6 +4610,8 @@ class DarkThemeApp(QMainWindow):
             self.settings_window.update_language()
         else:
             self.show_main_screen()
+        if self.document_dialog is not None and self.document_dialog.isVisible():
+            self.document_dialog.refresh_language(language_code)
         self.apply_theme()
         self.update_theme_icon()
 
@@ -3512,11 +4878,17 @@ class DarkThemeApp(QMainWindow):
         self.target_lang.setCurrentIndex(0)
         self.main_layout.addWidget(self.target_lang)
         self.text_input = QTextEdit()
-        self.text_input.setPlaceholderText(ui_text(self.current_interface_language, "input_placeholder"))
+        self.text_input.setPlaceholderText(
+            f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
+        )
+        self.text_input.setToolTip(doc_text(self.current_interface_language, "main_file_tooltip"))
         self.text_input.setMinimumHeight(45)
         self.text_input.setMaximumHeight(70)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.text_input.setAcceptDrops(False)
         self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.text_input.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.main_layout.addWidget(self.text_input)
 
         # Кнопка перевода сразу под полем ввода
@@ -3617,11 +4989,131 @@ class DarkThemeApp(QMainWindow):
             elif item.layout():
                 self._clear_nested_layout(item.layout())
 
+    def open_document_translation(self, path=None):
+        if self.document_dialog is None or not self.document_dialog.isVisible():
+            self.document_dialog = DocumentTranslationDialog(self, initial_path=path)
+        elif path:
+            self.document_dialog.load_file(path)
+        self.document_dialog.show()
+        self.document_dialog.raise_()
+        self.document_dialog.activateWindow()
+
+    def _apply_main_context_menu_style(self, menu):
+        if self.current_theme == "Темная":
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #11151d;
+                    color: #ffffff;
+                    border: 1px solid #54617a;
+                    border-radius: 8px;
+                    padding: 6px;
+                }
+                QMenu::item {
+                    padding: 7px 20px 7px 10px;
+                    border-radius: 6px;
+                }
+                QMenu::item:selected {
+                    background-color: #314968;
+                }
+            """)
+        else:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #ffffff;
+                    color: #1f2937;
+                    border: 1px solid #c5b3e9;
+                    border-radius: 8px;
+                    padding: 6px;
+                }
+                QMenu::item {
+                    padding: 7px 20px 7px 10px;
+                    border-radius: 6px;
+                }
+                QMenu::item:selected {
+                    background-color: #e9ddff;
+                }
+            """)
+
+    def _add_document_context_actions(self, menu):
+        lang = self.current_interface_language
+        file_action = menu.addAction(doc_text(lang, "context_translate_file"))
+        file_action.triggered.connect(self._choose_document_from_main)
+        folder_action = menu.addAction(doc_text(lang, "context_choose_folder"))
+        folder_action.triggered.connect(self._choose_document_directory_from_main)
+
+    def show_main_context_menu(self, global_pos):
+        menu = QMenu(self)
+        self._apply_main_context_menu_style(menu)
+        self._add_document_context_actions(menu)
+        menu.exec_(global_pos)
+
+    def _show_text_input_context_menu(self, pos):
+        menu = self.text_input.createStandardContextMenu()
+        menu.addSeparator()
+        self._add_document_context_actions(menu)
+        self._apply_main_context_menu_style(menu)
+        menu.exec_(self.text_input.mapToGlobal(pos))
+
+    def _choose_document_from_main(self, initial_dir=""):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            doc_text(self.current_interface_language, "attach_file"),
+            initial_dir or "",
+            document_file_filter(),
+        )
+        if path:
+            self.open_document_translation(path)
+
+    def _choose_document_directory_from_main(self):
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            doc_text(self.current_interface_language, "context_choose_folder"),
+            "",
+        )
+        if directory:
+            self._choose_document_from_main(directory)
+
+    def _first_dropped_file(self, event):
+        if not event.mimeData().hasUrls():
+            return ""
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path:
+                return path
+        return ""
+
+    def dragEnterEvent(self, event):
+        if self._first_dropped_file(event):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        path = self._first_dropped_file(event)
+        if path:
+            self.open_document_translation(path)
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_O and event.modifiers() & Qt.ControlModifier:
+            self._choose_document_from_main()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
     def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            self.show_main_context_menu(event.globalPos())
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and event.y() <= 40:
             self._is_dragging = True
             self._drag_start_position = event.globalPos() - self.frameGeometry().topLeft()
             event.accept()
+            return
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._is_dragging:

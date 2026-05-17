@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
 from languages import (
     LANGUAGES as APP_LANGUAGES,
     default_target_for_source,
+    detect_language_code,
     language_display_name,
     language_icon_path,
     language_short_label,
@@ -271,9 +272,11 @@ def _save_pil_debug(image, session_id, label):
         logging.warning(f"[OCR:{session_id}] failed to save PIL artifact {label}: {e}")
     return ""
 
-def _normalize_app_language_code(code, fallback="en", allow_universal=False):
+def _normalize_app_language_code(code, fallback="en", allow_universal=False, allow_auto=False):
     code = str(code or "").lower()
     if allow_universal and code == "universal":
+        return code
+    if allow_auto and code == "auto":
         return code
     return code if code in APP_LANGUAGE_CODES else fallback
 
@@ -282,6 +285,7 @@ def _configured_ocr_translate_pair(config=None, source_code=None):
     source = _normalize_app_language_code(
         source_code or config.get("ocr_translate_source_language") or config.get("last_ocr_language"),
         "en",
+        allow_auto=True,
     )
     target = default_target_for_source(source, config.get("ocr_translate_target_language"))
     return source, target
@@ -289,12 +293,12 @@ def _configured_ocr_translate_pair(config=None, source_code=None):
 def _combo_data_to_ocr_language(data, fallback="ru"):
     if isinstance(data, (tuple, list)) and data:
         data = data[0]
-    return _normalize_app_language_code(data, fallback, allow_universal=True)
+    return _normalize_app_language_code(data, fallback, allow_universal=True, allow_auto=True)
 
 def _combo_data_to_translate_pair(data, config=None):
     config = config or get_cached_ocr_config()
     if isinstance(data, (tuple, list)) and len(data) >= 2:
-        source = _normalize_app_language_code(data[0], "en")
+        source = _normalize_app_language_code(data[0], "en", allow_auto=True)
         target = _normalize_app_language_code(data[1], default_target_for_source(source))
         if source == target:
             target = default_target_for_source(source)
@@ -681,6 +685,257 @@ def _get_ocr_event_loop():
         _ocr_event_loop = asyncio.new_event_loop()
     return _ocr_event_loop
 
+
+def _windows_ocr_result_to_text(recognized):
+    if not recognized:
+        return ""
+    try:
+        lines = recognized.lines
+    except AttributeError:
+        debug_log("ERROR: recognized has no 'lines' attribute")
+        return ""
+    except Exception as e:
+        debug_log(f"ERROR accessing recognized.lines: {e}")
+        return ""
+
+    if not lines:
+        debug_log("recognized.lines is empty")
+        return ""
+
+    lines_text = []
+    for line in lines:
+        try:
+            words = list(line.words)
+            line_text = " ".join(str(word.text) for word in words if str(word.text).strip())
+            if not line_text:
+                line_text = str(line.text or "")
+        except Exception:
+            line_text = str(getattr(line, "text", "") or "")
+        line_text = line_text.strip()
+        if line_text:
+            lines_text.append(line_text)
+    return "\n".join(lines_text).strip()
+
+
+def _auto_ocr_language_codes(config=None):
+    config = config or get_cached_ocr_config()
+    preferred = [
+        config.get("ocr_translate_source_language"),
+        config.get("last_ocr_language"),
+        "ru",
+        "en",
+    ]
+    preferred.extend(language.code for language in APP_LANGUAGES)
+
+    codes = []
+    seen = set()
+    for raw_code in preferred:
+        code = _normalize_app_language_code(raw_code, "", allow_universal=False, allow_auto=False)
+        if code and code not in seen:
+            codes.append(code)
+            seen.add(code)
+    return codes
+
+
+def _language_script_group(language_code):
+    code = (language_code or "").lower()
+    if code in {"ru", "uk"}:
+        return "cyrillic"
+    if code == "zh":
+        return "cjk"
+    if code == "ja":
+        return "japanese"
+    if code == "ko":
+        return "korean"
+    if code == "ar":
+        return "arabic"
+    if code == "hi":
+        return "devanagari"
+    return "latin"
+
+
+def _ocr_script_counts(text):
+    counts = {
+        "latin": 0,
+        "cyrillic": 0,
+        "cjk": 0,
+        "kana": 0,
+        "hangul": 0,
+        "arabic": 0,
+        "devanagari": 0,
+        "other": 0,
+    }
+    for ch in str(text or ""):
+        if "\u0400" <= ch <= "\u04ff":
+            counts["cyrillic"] += 1
+        elif "\u4e00" <= ch <= "\u9fff":
+            counts["cjk"] += 1
+        elif "\u3040" <= ch <= "\u30ff":
+            counts["kana"] += 1
+        elif "\uac00" <= ch <= "\ud7af":
+            counts["hangul"] += 1
+        elif "\u0600" <= ch <= "\u06ff":
+            counts["arabic"] += 1
+        elif "\u0900" <= ch <= "\u097f":
+            counts["devanagari"] += 1
+        elif ("a" <= ch.lower() <= "z") or ("\u00c0" <= ch <= "\u024f") or ("\u1e00" <= ch <= "\u1eff"):
+            counts["latin"] += 1
+        elif ch.isalpha():
+            counts["other"] += 1
+    return counts
+
+
+def _script_match_score(text, language_code):
+    counts = _ocr_script_counts(text)
+    total_letters = sum(counts.values())
+    if total_letters <= 0:
+        return 0.0
+
+    group = _language_script_group(language_code)
+    if group == "cyrillic":
+        matched = counts["cyrillic"]
+    elif group == "cjk":
+        matched = counts["cjk"]
+    elif group == "japanese":
+        matched = counts["kana"] + (counts["cjk"] * 0.7)
+    elif group == "korean":
+        matched = counts["hangul"]
+    elif group == "arabic":
+        matched = counts["arabic"]
+    elif group == "devanagari":
+        matched = counts["devanagari"]
+    else:
+        matched = counts["latin"]
+
+    ratio = matched / max(total_letters, 1)
+    score = ratio * 45.0
+    if total_letters >= 4 and matched <= 0:
+        score -= 35.0
+    elif total_letters >= 8 and ratio < 0.35:
+        score -= 18.0
+    return score
+
+
+def _score_ocr_text_for_language(text, language_code):
+    text = str(text or "").strip()
+    if not text:
+        return float("-inf")
+
+    alnum = sum(1 for ch in text if ch.isalnum())
+    alpha = sum(1 for ch in text if ch.isalpha())
+    digits = sum(1 for ch in text if ch.isdigit())
+    spaces = sum(1 for ch in text if ch.isspace())
+    common_punctuation = set(".,:;!?-\u2013\u2014()[]{}\"'`/\\%+\u2116#@&")
+    noise = sum(1 for ch in text if not ch.isalnum() and not ch.isspace() and ch not in common_punctuation)
+    replacement_chars = text.count("\ufffd")
+    tokens = [
+        token.strip(".,:;!?-\u2013\u2014()[]{}\"'`/\\%+\u2116#@&")
+        for token in text.replace("\n", " ").split()
+    ]
+    word_tokens = [token for token in tokens if any(ch.isalpha() for ch in token)]
+
+    score = 0.0
+    score += alpha * 2.2
+    score += digits * 0.5
+    score += min(spaces, max(alpha, 1)) * 0.15
+    score += min(len(word_tokens), 40) * 1.4
+    score -= noise * 1.8
+    score -= replacement_chars * 20.0
+    score += _script_match_score(text, language_code)
+
+    detected = detect_language_code(text)
+    if detected == language_code:
+        score += 35.0
+    elif _language_script_group(detected) == _language_script_group(language_code):
+        score += 8.0
+    elif alpha >= 4:
+        score -= 14.0
+
+    if alnum <= 1:
+        score -= 10.0
+    if alpha <= 0:
+        score -= 8.0
+    return score
+
+
+def _match_available_windows_ocr_tag(expected_tag, available_by_tag):
+    expected_key = str(expected_tag or "").lower()
+    if expected_key in available_by_tag:
+        return available_by_tag[expected_key]
+
+    language_prefix = expected_key.split("-", 1)[0]
+    if not language_prefix:
+        return ""
+    for available_key, available_tag in available_by_tag.items():
+        if available_key == language_prefix or available_key.startswith(language_prefix + "-"):
+            return available_tag
+    return ""
+
+
+def _windows_auto_ocr_candidates(config=None):
+    available_tags = _get_available_windows_ocr_language_tags()
+    available_by_tag = {str(tag).lower(): str(tag) for tag in available_tags if str(tag).strip()}
+    if not available_by_tag:
+        return []
+
+    candidates = []
+    seen_tags = set()
+    for code in _auto_ocr_language_codes(config):
+        tag = _match_available_windows_ocr_tag(windows_ocr_tag(code), available_by_tag)
+        tag_key = tag.lower()
+        if tag and tag_key not in seen_tags:
+            candidates.append((code, tag))
+            seen_tags.add(tag_key)
+    return candidates
+
+
+def _recognize_with_windows_auto(bitmap):
+    candidates = _windows_auto_ocr_candidates()
+    if not candidates:
+        logging.warning("Windows OCR AUTO has no installed candidate languages; falling back to universal engine.")
+        engine = _get_universal_ocr_engine()
+        if engine is None:
+            return ""
+        loop = _get_ocr_event_loop()
+        asyncio.set_event_loop(loop)
+        recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, engine))
+        return _windows_ocr_result_to_text(recognized)
+
+    loop = _get_ocr_event_loop()
+    asyncio.set_event_loop(loop)
+
+    best_text = ""
+    best_score = float("-inf")
+    best_code = ""
+    best_tag = ""
+    for code, tag in candidates:
+        engine = _get_windows_ocr_engine(tag)
+        if engine is None:
+            continue
+        recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, engine))
+        text = _windows_ocr_result_to_text(recognized)
+        score = _score_ocr_text_for_language(text, code)
+        detected = detect_language_code(text) if text else ""
+        logging.info(
+            f"Windows OCR AUTO candidate; lang={code}, tag={tag}, score={score:.1f}, "
+            f"detected={detected or '-'}, len={len(text)}, preview={_text_preview(text)}"
+        )
+        if text and score > best_score:
+            best_text = text
+            best_score = score
+            best_code = code
+            best_tag = tag
+
+    if best_text:
+        logging.info(
+            f"Windows OCR AUTO selected; lang={best_code}, tag={best_tag}, "
+            f"score={best_score:.1f}, preview={_text_preview(best_text)}"
+        )
+    else:
+        logging.warning("Windows OCR AUTO did not recognize text with any candidate language.")
+    return best_text
+
+
 class OCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
     def __init__(self, bitmap, language_code, parent=None, use_universal=False):
@@ -697,8 +952,11 @@ class OCRWorker(QtCore.QThread):
         try:
             # Выбираем engine в зависимости от режима
             if self.use_universal:
-                debug_log("Using universal OCR engine (from user profile languages)")
-                engine = _get_universal_ocr_engine()
+                debug_log("Using Windows OCR AUTO language selection")
+                recognized_text = _recognize_with_windows_auto(self.bitmap)
+                debug_log(f"Emitting AUTO result: '{recognized_text[:50]}...' (len={len(recognized_text)})")
+                self.result_ready.emit(recognized_text)
+                return
             else:
                 lang_tag = windows_ocr_tag(self.language_code)
                 debug_log(f"lang_tag = {lang_tag}")
@@ -719,36 +977,13 @@ class OCRWorker(QtCore.QThread):
             recognized = loop.run_until_complete(run_ocr_with_engine(self.bitmap, engine))
             debug_log(f"recognized = {recognized}")
 
-            recognized_text = ""
-            if recognized:
-                try:
-                    # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
-                    lines = recognized.lines
-                    if lines:
-                        # Собираем текст из слов с правильными пробелами
-                        lines_text = []
-                        for line in lines:
-                            try:
-                                # Используем words для правильных пробелов между словами
-                                words = list(line.words)
-                                if words:
-                                    line_text = " ".join(word.text for word in words)
-                                else:
-                                    line_text = line.text
-                            except:
-                                line_text = line.text
-                            lines_text.append(line_text)
-                        recognized_text = "\n".join(lines_text)
-                        debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
-                        logging.info(f"Windows OCR recognized {len(recognized_text)} chars successfully")
-                    else:
-                        debug_log("recognized.lines is empty")
-                        logging.warning("Windows OCR returned empty result")
-                except AttributeError:
-                    debug_log("ERROR: recognized has no 'lines' attribute")
-                except Exception as e:
-                    debug_log(f"ERROR accessing recognized.lines: {e}")
-            else:
+            recognized_text = _windows_ocr_result_to_text(recognized)
+            if recognized_text:
+                debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
+                logging.info(f"Windows OCR recognized {len(recognized_text)} chars successfully")
+            elif not recognized_text and recognized:
+                logging.warning("Windows OCR returned empty result")
+            elif not recognized:
                 debug_log("No recognized text (recognized is None)")
                 logging.warning("Windows OCR returned None")
 
@@ -816,6 +1051,7 @@ class ScreenCaptureOverlay(QWidget):
                     language.code,
                 )
         else:
+            self.lang_combo.addItem("AUTO", "auto")
             # В режиме translate источник и цель выбираются отдельно прямо в OCR-оверлее.
             for language in APP_LANGUAGES:
                 self.lang_combo.addItem(
@@ -1367,7 +1603,7 @@ class ScreenCaptureOverlay(QWidget):
                 source_code, target_code = self._current_translate_pair()
                 self.current_language = source_code
                 self.current_target_language = target_code
-                updates["last_ocr_language"] = source_code
+                updates["last_ocr_language"] = "universal" if source_code == "auto" else source_code
                 updates["ocr_translate_source_language"] = source_code
                 updates["ocr_translate_target_language"] = target_code
             if _write_ocr_config_updates(updates):
@@ -1922,8 +2158,8 @@ class ScreenCaptureOverlay(QWidget):
             source_code, target_code = self._current_translate_pair()
             self.current_language = source_code
             self.current_target_language = target_code
-            language_code = source_code
-            updates["last_ocr_language"] = source_code
+            language_code = "universal" if source_code == "auto" else source_code
+            updates["last_ocr_language"] = language_code
             updates["ocr_translate_source_language"] = source_code
             updates["ocr_translate_target_language"] = target_code
         if updates:
@@ -2036,6 +2272,8 @@ class ScreenCaptureOverlay(QWidget):
                     pil_image = pil_image.convert('L')
 
                 lang_code = _combo_data_to_ocr_language(self.lang_combo.currentData(), "ru")
+                if lang_code == "auto":
+                    lang_code = "universal"
                 tess_lang = tesseract_language_code(lang_code)
 
                 tess_cmd = self.get_tesseract_cmd()
@@ -2053,6 +2291,12 @@ class ScreenCaptureOverlay(QWidget):
             if self.mode == "translate":
                 from translater import translate_text
                 source_code, target_code = self._current_translate_pair()
+                if source_code == "auto":
+                    detected_source = detect_language_code(text)
+                    if detected_source:
+                        source_code = detected_source
+                    if source_code == target_code:
+                        target_code = default_target_for_source(source_code)
                 logging.info(
                     f"[OCR:{session_id}] Translating from {source_code.upper()} to {target_code.upper()}; "
                     f"source_len={len(text)}"

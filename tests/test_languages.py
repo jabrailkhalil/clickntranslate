@@ -36,6 +36,19 @@ class TestLanguages(unittest.TestCase):
         self.assertEqual(languages.detect_language_code("Мир"), "ru")
         self.assertEqual(languages.detect_language_code("Привіт"), "uk")
 
+    def test_detection_handles_latin_languages_better_than_diacritics_only(self):
+        self.assertEqual(languages.detect_language_code("The settings file is open and ready to translate."), "en")
+        self.assertEqual(languages.detect_language_code("Die Datei ist offen und bereit zum Übersetzen."), "de")
+        self.assertEqual(languages.detect_language_code("Le fichier est ouvert pour la traduction."), "fr")
+        self.assertEqual(languages.detect_language_code("El archivo está abierto para la traducción."), "es")
+        self.assertEqual(languages.detect_language_code("O arquivo está aberto para tradução."), "pt")
+        self.assertEqual(languages.detect_language_code("Plik jest gotowy do tłumaczenia."), "pl")
+        self.assertEqual(languages.detect_language_code("Dosya çeviri için hazır."), "tr")
+
+    def test_default_translation_target_for_auto_detection(self):
+        self.assertEqual(languages.default_target_for_source("auto"), "ru")
+        self.assertEqual(languages.default_target_for_source("auto", "en"), "en")
+
     def test_online_code_mapping_for_chinese(self):
         self.assertEqual(languages.translator_api_code("zh", "google"), "zh-CN")
         self.assertEqual(languages.translator_api_code("zh", "lingva"), "zh-CN")

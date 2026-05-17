@@ -12,3 +12,4 @@ rapidocr-onnxruntime
 requests
 setuptools<81
 psutil
+pypdf

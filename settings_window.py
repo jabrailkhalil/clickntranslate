@@ -67,6 +67,63 @@ HYMT_NOTICE_TEXT = (
 HYMT_ENGINE_KEY = "hymt"
 HYMT_ENGINE_DISPLAY = "Hy-MT"
 
+TRANSLATOR_ENGINE_OPTIONS = (
+    ("google", "Google", "online"),
+    ("argos", "Argos", "offline"),
+    (HYMT_ENGINE_KEY, HYMT_ENGINE_DISPLAY, "offline"),
+    ("mymemory", "MyMemory", "online"),
+    ("lingva", "Lingva", "online"),
+    ("libretranslate", "LibreTranslate", "online"),
+)
+
+
+def _provider_kind_text(kind, lang):
+    if kind == "offline":
+        return {
+            "ru": "офлайн",
+            "es": "offline",
+            "de": "offline",
+            "fr": "offline",
+            "zh": "离线",
+        }.get(lang, "offline")
+    return {
+        "ru": "онлайн",
+        "es": "online",
+        "de": "online",
+        "fr": "online",
+        "zh": "在线",
+    }.get(lang, "online")
+
+
+def _translator_combo_labels(lang):
+    return [
+        name
+        for _key, name, kind in TRANSLATOR_ENGINE_OPTIONS
+    ]
+
+
+def _translator_combo_tooltip(engine, name, kind, lang):
+    kind_text = _provider_kind_text(kind, lang)
+    if lang == "ru":
+        details = {
+            "google": "быстрый, точный, нужен интернет",
+            "argos": "локальный перевод, нужен установленный языковой пакет",
+            HYMT_ENGINE_KEY: "локальная LLM-модель, ставится отдельным пакетом",
+            "mymemory": "онлайн API, есть дневной лимит",
+            "lingva": "онлайн прокси Google",
+            "libretranslate": "онлайн сервер LibreTranslate",
+        }
+    else:
+        details = {
+            "google": "fast, accurate, needs internet",
+            "argos": "local translation, requires installed language packages",
+            HYMT_ENGINE_KEY: "local LLM model, installed separately",
+            "mymemory": "online API with daily limit",
+            "lingva": "online Google proxy",
+            "libretranslate": "online LibreTranslate server",
+        }
+    return f"{name}: {kind_text}. {details.get(engine, '')}".strip()
+
 
 class UpdateCancelledError(RuntimeError):
     pass
@@ -864,9 +921,15 @@ class SettingsWindow(QWidget):
 
         self.translator_combo = QComboBox()
         # Порядок: Google первый, офлайн-движки рядом.
-        self.translator_combo.addItems(["Google", "Argos", HYMT_ENGINE_DISPLAY, "MyMemory", "Lingva", "LibreTranslate"])
+        self.translator_combo.addItems(_translator_combo_labels(lang))
+        for option_index, (engine, name, kind) in enumerate(TRANSLATOR_ENGINE_OPTIONS):
+            self.translator_combo.setItemData(
+                option_index,
+                _translator_combo_tooltip(engine, name, kind, lang),
+                Qt.ToolTipRole,
+            )
         # Маппинг индексов на имена движков (соответствует порядку в addItems)
-        self._translator_engines = ["google", "argos", HYMT_ENGINE_KEY, "mymemory", "lingva", "libretranslate"]
+        self._translator_engines = [engine for engine, _name, _kind in TRANSLATOR_ENGINE_OPTIONS]
         
         current_tr = self.parent.config.get("translator_engine", "Google").lower()
         try:
