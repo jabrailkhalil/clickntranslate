@@ -153,6 +153,9 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
             self.assertIn("if ($_.Name -ieq \"data\") { continue }", script_text)
+            self.assertIn("Removing existing program item", script_text)
+            self.assertIn("Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force", script_text)
+            self.assertIn("Update payload copy failed: _internal directory is missing", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:

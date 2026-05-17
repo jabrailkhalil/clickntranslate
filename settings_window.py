@@ -2268,11 +2268,23 @@ try {
     } else {
         throw "Update archive does not contain $ExeName"
     }
+    Write-UpdateLog "Payload root: $payloadRoot"
+
+    $payloadHasInternal = Test-Path -LiteralPath (Join-Path $payloadRoot "_internal")
+    Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
+        if ($_.Name -ieq "data") { continue }
+        Write-UpdateLog "Removing existing program item: $($_.FullName)"
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    }
 
     Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
         if ($_.Name -ieq "data") { continue }
-        $dst = Join-Path $AppDir $_.Name
-        Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force
+        Write-UpdateLog "Copying update item: $($_.FullName)"
+        Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force
+    }
+
+    if ($payloadHasInternal -and -not (Test-Path -LiteralPath (Join-Path $AppDir "_internal"))) {
+        throw "Update payload copy failed: _internal directory is missing"
     }
 
     $targetExe = Join-Path $AppDir $ExeName
