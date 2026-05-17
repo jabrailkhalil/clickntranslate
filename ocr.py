@@ -212,6 +212,162 @@ def _text_preview(text, limit=180):
         return text[:limit] + "..."
     return text
 
+def _score_recognized_text(text):
+    text = str(text or "").strip()
+    if not text:
+        return float("-inf")
+    useful_punctuation = set(".,:;!?/\\-_()[]{}@#%&+=<>$€£¥'\"|")
+    alnum = sum(1 for ch in text if ch.isalnum())
+    alpha = sum(1 for ch in text if ch.isalpha())
+    spaces = sum(1 for ch in text if ch.isspace())
+    useful = sum(1 for ch in text if ch in useful_punctuation)
+    noise = sum(1 for ch in text if not ch.isalnum() and not ch.isspace() and ch not in useful_punctuation)
+    lines = text.count("\n")
+    text_len = max(len(text), 1)
+    signal_density = (alnum + useful * 0.65 + spaces * 0.25) / text_len
+    repeated_noise = sum(1 for left, right in zip(text, text[1:]) if left == right and not left.isalnum())
+    return (
+        signal_density * 45.0
+        + min(alnum, 90) * 1.15
+        + alpha * 0.15
+        + spaces * 0.12
+        + useful * 0.45
+        + lines * 0.4
+        - noise * 4.0
+        - repeated_noise * 1.6
+    )
+
+def _prepare_tesseract_data(tess_cmd, tess_lang):
+    tess_dir = os.path.dirname(tess_cmd)
+    candidate_dirs = [
+        os.path.join(tess_dir, "tessdata"),
+        os.path.join(os.path.dirname(tess_dir), "tessdata"),
+    ]
+    tessdata_dir = ""
+    for td in candidate_dirs:
+        if os.path.isdir(td):
+            tessdata_dir = td
+            os.environ["TESSDATA_PREFIX"] = td
+            break
+    if not tessdata_dir:
+        os.environ.pop("TESSDATA_PREFIX", None)
+        return
+
+    try:
+        import requests
+        for lang_code in [code for code in tess_lang.split("+") if code]:
+            fname = f"{lang_code}.traineddata"
+            target_path = os.path.join(tessdata_dir, fname)
+            if os.path.exists(target_path):
+                continue
+            url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
+            logging.info(f"Downloading {fname} ...")
+            r = requests.get(url, timeout=30, stream=True)
+            r.raise_for_status()
+            with open(target_path + ".tmp", "wb") as f:
+                shutil.copyfileobj(r.raw, f)
+            os.replace(target_path + ".tmp", target_path)
+            logging.info(f"{fname} downloaded into {tessdata_dir}")
+    except Exception as dl_err:
+        logging.warning(f"Could not prepare Tesseract language data {tess_lang}: {dl_err}")
+
+def _tesseract_psm_order(width, height):
+    psm_order = [6]
+    if height < 110:
+        psm_order = [7, 8, 13, 6, 11]
+    elif width < 260 or height < 180:
+        psm_order = [6, 7, 8, 13, 11]
+    return psm_order
+
+def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None):
+    import pytesseract
+
+    if pil_image is None:
+        return ""
+    height = getattr(pil_image, "height", 0)
+    width = getattr(pil_image, "width", 0)
+    if height <= 0 or width <= 0:
+        logging.warning(f"[OCR:{session_id}] Tesseract skipped for empty image in {context}")
+        return ""
+
+    pytesseract.pytesseract.tesseract_cmd = tess_cmd
+    best_text = ""
+    best_score = float("-inf")
+    for psm in _tesseract_psm_order(width, height):
+        if cancel_check and cancel_check():
+            logging.info(f"[OCR:{session_id}] Tesseract interrupted before psm={psm}; context={context}")
+            break
+        tess_config = f"--oem 3 --psm {psm}"
+        try:
+            started = time.perf_counter()
+            text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            stripped = text.strip()
+            score = _score_recognized_text(stripped)
+            logging.info(
+                f"[OCR:{session_id}] Tesseract {context}; lang={tess_lang}, psm={psm}, "
+                f"elapsed_ms={elapsed_ms:.1f}, raw_len={len(text)}, stripped_len={len(stripped)}, "
+                f"score={score:.1f}, preview={_text_preview(stripped)}"
+            )
+            if stripped and score > best_score:
+                best_text = text
+                best_score = score
+        except Exception as e:
+            logging.exception(f"[OCR:{session_id}] Tesseract {context} failed with psm={psm}: {e}")
+    if best_text:
+        logging.info(
+            f"[OCR:{session_id}] Tesseract {context} selected best result; "
+            f"score={best_score:.1f}, preview={_text_preview(best_text.strip())}"
+        )
+    return best_text
+
+def _recognize_tesseract_variants_with_cmd(
+    pil_variants,
+    tess_cmd,
+    tess_lang,
+    context,
+    session_id,
+    cancel_check=None,
+):
+    if not tess_cmd:
+        logging.error(f"[OCR:{session_id}] Tesseract executable not found for {context}.")
+        return None
+
+    logging.info(f"[OCR:{session_id}] Using Tesseract at: {tess_cmd}; context={context}, lang={tess_lang}")
+    _prepare_tesseract_data(tess_cmd, tess_lang)
+
+    best_text = ""
+    best_score = float("-inf")
+    best_label = ""
+    for label, pil_image in pil_variants or []:
+        if cancel_check and cancel_check():
+            logging.info(f"[OCR:{session_id}] Tesseract interrupted before variant={label}; context={context}")
+            break
+        text = _run_tesseract_ocr_image_with_cmd(
+            pil_image,
+            tess_cmd,
+            tess_lang,
+            f"{context}-{label}",
+            session_id,
+            cancel_check=cancel_check,
+        )
+        score = _score_recognized_text(text)
+        logging.info(
+            f"[OCR:{session_id}] Tesseract variant={label}; context={context}, "
+            f"score={score:.1f}, len={len(text or '')}, preview={_text_preview(text)}"
+        )
+        if text and score > best_score:
+            best_text = text
+            best_score = score
+            best_label = label
+
+    if best_text:
+        logging.info(
+            f"[OCR:{session_id}] Tesseract selected variant={best_label}; "
+            f"score={best_score:.1f}, preview={_text_preview(best_text)}"
+        )
+    return best_text
+
 def _ocr_debug_artifacts_enabled():
     try:
         return bool(get_cached_ocr_config().get("debug_ocr_artifacts", False))
@@ -240,9 +396,9 @@ def _cleanup_old_debug_artifacts(max_files=80):
 def _safe_artifact_label(label):
     return "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in str(label or "artifact"))
 
-def _save_pixmap_debug(pixmap, session_id, label):
+def _save_pixmap_debug(pixmap, session_id, label, force=False):
     try:
-        if not _ocr_debug_artifacts_enabled():
+        if not force and not _ocr_debug_artifacts_enabled():
             return ""
         if pixmap is None or pixmap.isNull():
             return ""
@@ -256,9 +412,9 @@ def _save_pixmap_debug(pixmap, session_id, label):
         logging.warning(f"[OCR:{session_id}] failed to save pixmap artifact {label}: {e}")
     return ""
 
-def _save_pil_debug(image, session_id, label):
+def _save_pil_debug(image, session_id, label, force=False):
     try:
-        if not _ocr_debug_artifacts_enabled():
+        if not force and not _ocr_debug_artifacts_enabled():
             return ""
         if image is None:
             return ""
@@ -540,6 +696,23 @@ def _get_windows_ocr_engine(lang_tag: str):
         debug_log(f"is_language_supported = {is_supported}")
         
         if not is_supported:
+            primary_subtag = str(lang_tag).split("-", 1)[0].lower()
+            for available_tag in _get_available_windows_ocr_language_tags():
+                if str(available_tag).split("-", 1)[0].lower() != primary_subtag:
+                    continue
+                try:
+                    if OcrEngine.is_language_supported(Language(available_tag)):
+                        logging.info(
+                            f"Windows OCR language {lang_tag} is not installed; "
+                            f"using installed regional variant {available_tag}"
+                        )
+                        lang_tag = available_tag
+                        is_supported = True
+                        break
+                except Exception:
+                    continue
+
+        if not is_supported:
             debug_log(f"Language {lang_tag} not supported by Windows OCR")
             logging.warning(f"Windows OCR language {lang_tag} is not installed")
             return None
@@ -589,7 +762,7 @@ def _get_available_windows_ocr_language_tags():
 _UNIVERSAL_OCR_ENGINE = None
 
 def _get_universal_ocr_engine():
-    """Получить универсальный Windows OCR движок. Используем en-US как базовый (лучше всего с цифрами)."""
+    """Получить OCR движок по языкам профиля Windows, затем fallback на en-US/первый доступный."""
     global _UNIVERSAL_OCR_ENGINE, _WINRT_AVAILABLE
     
     debug_log("_get_universal_ocr_engine called")
@@ -606,8 +779,20 @@ def _get_universal_ocr_engine():
     try:
         OcrEngine = winrt_ocr.OcrEngine
         Language = winrt_glob.Language
+
+        profile_getter = getattr(OcrEngine, "try_create_from_user_profile_languages", None)
+        if callable(profile_getter):
+            debug_log("Trying OCR engine from user profile languages...")
+            try:
+                engine = profile_getter()
+                if engine:
+                    _UNIVERSAL_OCR_ENGINE = engine
+                    debug_log("SUCCESS: Using user profile OCR engine")
+                    return engine
+            except Exception as e:
+                debug_log(f"User profile OCR engine failed: {e}")
         
-        # Для универсального режима используем en-US (лучше всего с цифрами и латиницей)
+        # Fallback: en-US хорошо работает с цифрами и латиницей.
         debug_log("Using en-US for universal mode (best for numbers)...")
         try:
             if OcrEngine.is_language_supported(Language("en-US")):
@@ -676,14 +861,31 @@ def qimage_to_softwarebitmap(qimage):
         debug_log(traceback.format_exc())
         return None
 
-# Глобальный event loop для OCR (переиспользование)
-_ocr_event_loop = None
+def _windows_ocr_max_image_dimension():
+    try:
+        return int(getattr(winrt_ocr.OcrEngine, "max_image_dimension", 0) or 0)
+    except Exception:
+        return 0
 
-def _get_ocr_event_loop():
-    global _ocr_event_loop
-    if _ocr_event_loop is None or _ocr_event_loop.is_closed():
-        _ocr_event_loop = asyncio.new_event_loop()
-    return _ocr_event_loop
+def _limit_qimage_for_windows_ocr(qimage, session_id, label):
+    max_dim = _windows_ocr_max_image_dimension()
+    if not qimage or qimage.isNull() or max_dim <= 0:
+        return qimage
+    largest = max(qimage.width(), qimage.height())
+    if largest <= max_dim:
+        return qimage
+    scaled = qimage.scaled(
+        max_dim,
+        max_dim,
+        QtCore.Qt.KeepAspectRatio,
+        QtCore.Qt.SmoothTransformation,
+    )
+    logging.warning(
+        f"[OCR:{session_id}] Windows OCR attempt={label} exceeded max image dimension; "
+        f"scaled {qimage.width()}x{qimage.height()} -> {scaled.width()}x{scaled.height()} "
+        f"(max={max_dim})"
+    )
+    return scaled
 
 
 def _windows_ocr_result_to_text(recognized):
@@ -938,17 +1140,65 @@ def _recognize_with_windows_auto(bitmap):
 
 class OCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
-    def __init__(self, bitmap, language_code, parent=None, use_universal=False):
+    def __init__(self, bitmap, language_code, parent=None, use_universal=False, attempts=None, session_id="unknown"):
         super().__init__(parent)
         self.bitmap = bitmap
         self.language_code = language_code
         self.use_universal = use_universal
+        self.session_id = session_id
+        self.cancel_requested = False
+        self.fallback_pil_variants = []
+        self.tesseract_fallback_enabled = False
+        self.tesseract_cmd = None
+        self.tesseract_fallback_attempted = False
+        if attempts is None:
+            attempts = [("primary", bitmap)]
+        self.attempts = [(str(label), attempt_bitmap) for label, attempt_bitmap in attempts if attempt_bitmap is not None]
+
+    def cancel(self):
+        self.cancel_requested = True
+        self.requestInterruption()
+
+    def _is_cancelled(self):
+        return self.cancel_requested or self.isInterruptionRequested()
+
+    @staticmethod
+    def _extract_result_text(recognized):
+        recognized_text = ""
+        if not recognized:
+            return recognized_text
+        try:
+            # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
+            lines = recognized.lines
+            if lines:
+                lines_text = []
+                for line in lines:
+                    try:
+                        words = list(line.words)
+                        if words:
+                            line_text = " ".join(word.text for word in words)
+                        else:
+                            line_text = line.text
+                    except Exception:
+                        line_text = line.text
+                    lines_text.append(line_text)
+                recognized_text = "\n".join(lines_text)
+            else:
+                debug_log("recognized.lines is empty")
+                logging.warning("Windows OCR returned empty result")
+        except AttributeError:
+            debug_log("ERROR: recognized has no 'lines' attribute")
+        except Exception as e:
+            debug_log(f"ERROR accessing recognized.lines: {e}")
+        return recognized_text
 
     def run(self):
         debug_log(f"OCRWorker.run() started")
         debug_log(f"self.bitmap = {self.bitmap}")
         debug_log(f"self.language_code = {self.language_code}")
         debug_log(f"self.use_universal = {self.use_universal}")
+        debug_log(f"self.attempts = {[label for label, _bitmap in self.attempts]}")
+        loop = None
         try:
             # Выбираем engine в зависимости от режима
             if self.use_universal:
@@ -965,36 +1215,223 @@ class OCRWorker(QtCore.QThread):
             debug_log(f"engine = {engine}")
             
             if engine is None:
-                debug_log("ERROR: engine is None, emitting empty result")
+                debug_log("ERROR: engine is None")
+                recognized_text = ""
+                if self.tesseract_fallback_enabled and self.fallback_pil_variants and self.tesseract_cmd:
+                    self.tesseract_fallback_attempted = True
+                    tess_lang = tesseract_language_code(self.language_code)
+                    logging.info(
+                        f"[OCR:{self.session_id}] Windows OCR engine unavailable; "
+                        f"running Tesseract fallback in OCR worker; lang={tess_lang}"
+                    )
+                    recognized_text = _recognize_tesseract_variants_with_cmd(
+                        self.fallback_pil_variants,
+                        self.tesseract_cmd,
+                        tess_lang,
+                        "windows-engine-missing-fallback",
+                        self.session_id,
+                        cancel_check=self._is_cancelled,
+                    ) or ""
+                if not self._is_cancelled():
+                    self.result_ready.emit(recognized_text)
+                return
+            if not self.attempts:
+                debug_log("ERROR: no OCR bitmap attempts, emitting empty result")
                 self.result_ready.emit("")
                 return
 
-            # Переиспользуем event loop
-            loop = _get_ocr_event_loop()
+            # WinRT async calls run inside this worker only; sharing one global loop
+            # across QThreads can crash when two OCR sessions overlap.
+            loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-            debug_log("Calling run_ocr_with_engine...")
-            recognized = loop.run_until_complete(run_ocr_with_engine(self.bitmap, engine))
-            debug_log(f"recognized = {recognized}")
+            best_text = ""
+            best_score = float("-inf")
+            best_label = ""
+            for attempt_label, attempt_bitmap in self.attempts:
+                if self._is_cancelled():
+                    logging.info(f"[OCR:{self.session_id}] OCR worker interrupted before attempt={attempt_label}")
+                    break
+                try:
+                    debug_log(f"Calling run_ocr_with_engine for attempt={attempt_label}...")
+                    started = time.perf_counter()
+                    recognized = loop.run_until_complete(run_ocr_with_engine(attempt_bitmap, engine))
+                    elapsed_ms = (time.perf_counter() - started) * 1000.0
+                    if self._is_cancelled():
+                        logging.info(f"[OCR:{self.session_id}] OCR worker interrupted after attempt={attempt_label}")
+                        break
+                    debug_log(f"recognized[{attempt_label}] = {recognized}")
+                    if not recognized:
+                        logging.warning(
+                            f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label} returned None; "
+                            f"elapsed_ms={elapsed_ms:.1f}"
+                        )
+                        continue
+                    attempt_text = self._extract_result_text(recognized)
+                    attempt_score = _score_recognized_text(attempt_text)
+                    logging.info(
+                        f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label}; "
+                        f"elapsed_ms={elapsed_ms:.1f}, text_len={len(attempt_text)}, "
+                        f"score={attempt_score:.1f}, preview={_text_preview(attempt_text)}"
+                    )
+                    if attempt_text and attempt_score > best_score:
+                        best_text = attempt_text
+                        best_score = attempt_score
+                        best_label = attempt_label
+                except Exception as e:
+                    logging.exception(f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label} failed: {e}")
 
-            recognized_text = _windows_ocr_result_to_text(recognized)
+            recognized_text = best_text
             if recognized_text:
                 debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
-                logging.info(f"Windows OCR recognized {len(recognized_text)} chars successfully")
-            elif not recognized_text and recognized:
-                logging.warning("Windows OCR returned empty result")
-            elif not recognized:
-                debug_log("No recognized text (recognized is None)")
-                logging.warning("Windows OCR returned None")
+                logging.info(
+                    f"[OCR:{self.session_id}] Windows OCR selected attempt={best_label}; "
+                    f"chars={len(recognized_text)}, score={best_score:.1f}"
+                )
+            else:
+                logging.warning(f"[OCR:{self.session_id}] Windows OCR returned empty result for all attempts")
+
+            if not recognized_text and not self.use_universal and not self._is_cancelled():
+                try:
+                    universal_engine = _get_universal_ocr_engine()
+                    if universal_engine is not None:
+                        logging.info(
+                            f"[OCR:{self.session_id}] Primary Windows OCR was empty; "
+                            "retrying with universal/user-profile OCR engine"
+                        )
+                        universal_best_text = ""
+                        universal_best_score = float("-inf")
+                        universal_best_label = ""
+                        for attempt_label, attempt_bitmap in self.attempts:
+                            if self._is_cancelled():
+                                logging.info(
+                                    f"[OCR:{self.session_id}] Universal OCR retry interrupted before attempt={attempt_label}"
+                                )
+                                break
+                            try:
+                                started = time.perf_counter()
+                                recognized = loop.run_until_complete(run_ocr_with_engine(attempt_bitmap, universal_engine))
+                                elapsed_ms = (time.perf_counter() - started) * 1000.0
+                                if self._is_cancelled():
+                                    logging.info(
+                                        f"[OCR:{self.session_id}] Universal OCR retry interrupted after attempt={attempt_label}"
+                                    )
+                                    break
+                                attempt_text = self._extract_result_text(recognized)
+                                attempt_score = _score_recognized_text(attempt_text)
+                                logging.info(
+                                    f"[OCR:{self.session_id}] Universal Windows OCR attempt={attempt_label}; "
+                                    f"elapsed_ms={elapsed_ms:.1f}, text_len={len(attempt_text)}, "
+                                    f"score={attempt_score:.1f}, preview={_text_preview(attempt_text)}"
+                                )
+                                if attempt_text and attempt_score > universal_best_score:
+                                    universal_best_text = attempt_text
+                                    universal_best_score = attempt_score
+                                    universal_best_label = attempt_label
+                            except Exception as e:
+                                logging.exception(
+                                    f"[OCR:{self.session_id}] Universal Windows OCR attempt={attempt_label} failed: {e}"
+                                )
+                        if universal_best_text:
+                            recognized_text = universal_best_text
+                            logging.info(
+                                f"[OCR:{self.session_id}] Universal Windows OCR selected attempt={universal_best_label}; "
+                                f"chars={len(recognized_text)}, score={universal_best_score:.1f}"
+                            )
+                except Exception as e:
+                    logging.exception(f"[OCR:{self.session_id}] Universal Windows OCR retry failed: {e}")
+
+            if (
+                not recognized_text
+                and self.tesseract_fallback_enabled
+                and self.fallback_pil_variants
+                and self.tesseract_cmd
+                and not self._is_cancelled()
+            ):
+                self.tesseract_fallback_attempted = True
+                tess_lang = tesseract_language_code(self.language_code)
+                logging.info(
+                    f"[OCR:{self.session_id}] Windows OCR empty; running Tesseract fallback in OCR worker; "
+                    f"lang={tess_lang}, variants={[label for label, _image in self.fallback_pil_variants]}"
+                )
+                recognized_text = _recognize_tesseract_variants_with_cmd(
+                    self.fallback_pil_variants,
+                    self.tesseract_cmd,
+                    tess_lang,
+                    "windows-empty-fallback",
+                    self.session_id,
+                    cancel_check=self._is_cancelled,
+                ) or ""
 
         except Exception as e:
             debug_log(f"EXCEPTION in OCRWorker.run(): {e}")
             import traceback
             debug_log(traceback.format_exc())
             recognized_text = ""
+        finally:
+            try:
+                if loop is not None:
+                    loop.close()
+            except Exception:
+                pass
         
+        if self._is_cancelled():
+            logging.info(f"[OCR:{self.session_id}] OCR worker result suppressed after interruption")
+            return
         debug_log(f"Emitting result: '{recognized_text[:50]}...' (len={len(recognized_text)})")
         self.result_ready.emit(recognized_text)
+
+class TesseractOCRWorker(QtCore.QThread):
+    result_ready = QtCore.pyqtSignal(str)
+
+    def __init__(self, pil_variants, language_code, tess_cmd, context, session_id, parent=None):
+        super().__init__(parent)
+        self.pil_variants = list(pil_variants or [])
+        self.language_code = language_code
+        self.tess_cmd = tess_cmd
+        self.context = context
+        self.session_id = session_id
+        self.cancel_requested = False
+
+    def cancel(self):
+        self.cancel_requested = True
+        self.requestInterruption()
+
+    def _is_cancelled(self):
+        return self.cancel_requested or self.isInterruptionRequested()
+
+    def run(self):
+        logging.info(
+            f"[OCR:{self.session_id}] TesseractOCRWorker started; context={self.context}, "
+            f"language={self.language_code}, variants={[label for label, _image in self.pil_variants]}"
+        )
+        text = ""
+        try:
+            if not self.tess_cmd:
+                logging.error(f"[OCR:{self.session_id}] Tesseract worker has no executable path")
+            elif not self.pil_variants:
+                logging.error(f"[OCR:{self.session_id}] Tesseract worker has no image variants")
+            else:
+                tess_lang = tesseract_language_code(self.language_code)
+                text = _recognize_tesseract_variants_with_cmd(
+                    self.pil_variants,
+                    self.tess_cmd,
+                    tess_lang,
+                    self.context,
+                    self.session_id,
+                    cancel_check=self._is_cancelled,
+                ) or ""
+        except Exception as e:
+            logging.exception(f"[OCR:{self.session_id}] TesseractOCRWorker failed: {e}")
+
+        if self._is_cancelled():
+            logging.info(f"[OCR:{self.session_id}] Tesseract worker result suppressed after interruption")
+            return
+        logging.info(
+            f"[OCR:{self.session_id}] TesseractOCRWorker finished; "
+            f"text_len={len(text or '')}, preview={_text_preview(text)}"
+        )
+        self.result_ready.emit(text)
 
 class ScreenCaptureOverlay(QWidget):
     def __init__(self, mode="ocr", defer_show=False):
@@ -1010,6 +1447,13 @@ class ScreenCaptureOverlay(QWidget):
         self._frozen_background = None
         self._frozen_background_rect = QtCore.QRect()
         self._updating_language_controls = False
+        self._ocr_in_progress = False
+        self._ignore_ocr_results = False
+        self._handling_ocr_result = False
+        self._ocr_worker_session_id = None
+        self._last_ocr_raw_capture = None
+        self._last_ocr_pil_variants = []
+        self._last_ocr_capture_meta = {}
         # Загрузка последнего выбранного языка из конфигурации
         config = get_cached_ocr_config()
         self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
@@ -1050,7 +1494,7 @@ class ScreenCaptureOverlay(QWidget):
                     language.short_label,
                     language.code,
                 )
-        else:
+        elif self.mode == "translate":
             self.lang_combo.addItem("AUTO", "auto")
             # В режиме translate источник и цель выбираются отдельно прямо в OCR-оверлее.
             for language in APP_LANGUAGES:
@@ -1072,6 +1516,13 @@ class ScreenCaptureOverlay(QWidget):
                 }
             """)
             self.target_lang_combo = QtWidgets.QComboBox(self)
+        else:
+            for language in APP_LANGUAGES:
+                self.lang_combo.addItem(
+                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    language.short_label,
+                    language.code,
+                )
         
         # Устанавливаем индекс на основе self.current_language (сохраненного)
         if self.mode == "copy":
@@ -1326,6 +1777,13 @@ class ScreenCaptureOverlay(QWidget):
             self._selection_started_at = None
             self._move_event_count = 0
             self._last_move_log_ts = 0.0
+            self._ocr_in_progress = False
+            self._ignore_ocr_results = False
+            self._handling_ocr_result = False
+            self._ocr_worker_session_id = None
+            self._last_ocr_raw_capture = None
+            self._last_ocr_pil_variants = []
+            self._last_ocr_capture_meta = {}
             logging.info(f"[OCR:{self._session_id}] Showing overlay; mode={self.mode}")
             config = get_cached_ocr_config()
             self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
@@ -1443,6 +1901,22 @@ class ScreenCaptureOverlay(QWidget):
                 current_x += widget.width() + spacing
             logging.info(f"Moved combo to {x}, {y} (Screen: {screen_geo})")
 
+    def _flush_selection_paint_before_capture(self):
+        session_id = getattr(self, "_session_id", "unknown")
+        try:
+            started = time.perf_counter()
+            self.repaint()
+            QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            # On Windows the compositor can lag one frame behind the widget state.
+            # A tiny wait prevents capturing our own selection rectangle on small snippets.
+            if not self._freeze_screen_on_ocr:
+                QtCore.QThread.msleep(16)
+                QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            logging.info(f"[OCR:{session_id}] Selection overlay paint flushed before capture; elapsed_ms={elapsed_ms:.1f}")
+        except Exception as e:
+            logging.warning(f"[OCR:{session_id}] Failed to flush overlay paint before capture: {e}")
+
     def closeEvent(self, event):
         # Сначала убираем себя из активных оверлеев
         try:
@@ -1451,6 +1925,23 @@ class ScreenCaptureOverlay(QWidget):
                     _ACTIVE_OVERLAYS[active_mode] = None
         except Exception:
             pass
+        if not self._handling_ocr_result:
+            self._ignore_ocr_results = True
+            self._ocr_worker_session_id = None
+            self._ocr_in_progress = False
+            worker = getattr(self, "ocr_worker", None)
+            if worker is not None:
+                try:
+                    if hasattr(worker, "cancel"):
+                        worker.cancel()
+                    else:
+                        worker.requestInterruption()
+                except Exception:
+                    pass
+                try:
+                    worker.result_ready.disconnect()
+                except Exception:
+                    pass
         self._frozen_background = None
         self._frozen_background_rect = QtCore.QRect()
         super().closeEvent(event)
@@ -1517,6 +2008,9 @@ class ScreenCaptureOverlay(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
+            if self._ocr_in_progress:
+                logging.info(f"[OCR:{self._session_id}] Mouse press ignored while OCR is already running")
+                return
             self.start_point = event.pos()
             self.end_point = self.start_point
             self._selection_started_at = time.monotonic()
@@ -1566,15 +2060,36 @@ class ScreenCaptureOverlay(QWidget):
                 f"local=({_point_to_text(event.pos())}), global=({_point_to_text(event.globalPos())}), "
                 f"rect=({_rect_to_text(rect)}), moves={self._move_event_count}, elapsed_ms={elapsed_ms}"
             )
-            # Отклоняем слишком маленькие выделения (случайные клики)
-            if rect.width() < 4 or rect.height() < 4:
-                logging.info(f"[OCR:{self._session_id}] Selection too small ({rect.width()}x{rect.height()}), ignoring")
+            # Отклоняем случайные релизы/микроклики: они часто дают 10-15 px и гарантированно ломают OCR.
+            if self._selection_started_at is None:
+                logging.warning(
+                    f"[OCR:{self._session_id}] Selection ignored: release without tracked mouse press; "
+                    f"rect=({_rect_to_text(rect)})"
+                )
                 self.start_point = None
                 self.end_point = None
+                self._selection_started_at = None
+                self.update()
+                return
+            min_area = 180
+            if rect.width() < 8 or rect.height() < 8 or (rect.width() * rect.height()) < min_area:
+                logging.info(
+                    f"[OCR:{self._session_id}] Selection too small/noisy "
+                    f"({rect.width()}x{rect.height()}, area={rect.width() * rect.height()}), ignoring"
+                )
+                self.start_point = None
+                self.end_point = None
+                self._selection_started_at = None
                 self.update()
                 return
             self.last_rect = rect
             logging.info(f"[OCR:{self._session_id}] Selection accepted; rect=({_rect_to_text(rect)})")
+            self._ocr_in_progress = True
+            self.start_point = None
+            self.end_point = None
+            self._selection_started_at = None
+            self.update()
+            self._flush_selection_paint_before_capture()
             self.capture_and_copy(rect)
         elif event.button() == QtCore.Qt.LeftButton:
             logging.warning(
@@ -1805,38 +2320,7 @@ class ScreenCaptureOverlay(QWidget):
 
     @staticmethod
     def _configure_tesseract_data(tess_cmd, tess_lang):
-        tess_dir = os.path.dirname(tess_cmd)
-        candidate_dirs = [
-            os.path.join(tess_dir, "tessdata"),
-            os.path.join(os.path.dirname(tess_dir), "tessdata"),
-        ]
-        tessdata_dir = ""
-        for td in candidate_dirs:
-            if os.path.isdir(td):
-                tessdata_dir = td
-                os.environ["TESSDATA_PREFIX"] = td
-                break
-        if not tessdata_dir:
-            os.environ.pop("TESSDATA_PREFIX", None)
-            return
-
-        try:
-            import requests
-            for lang_code in [code for code in tess_lang.split("+") if code]:
-                fname = f"{lang_code}.traineddata"
-                target_path = os.path.join(tessdata_dir, fname)
-                if os.path.exists(target_path):
-                    continue
-                url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
-                logging.info(f"Downloading {fname} …")
-                r = requests.get(url, timeout=30, stream=True)
-                r.raise_for_status()
-                with open(target_path + ".tmp", "wb") as f:
-                    shutil.copyfileobj(r.raw, f)
-                os.replace(target_path + ".tmp", target_path)
-                logging.info(f"{fname} downloaded into {tessdata_dir}")
-        except Exception as dl_err:
-            logging.warning(f"Could not prepare Tesseract language data {tess_lang}: {dl_err}")
+        _prepare_tesseract_data(tess_cmd, tess_lang)
 
     # Сохраняем ссылку на данные изображения, чтобы QImage не потерял буфер
     _ocr_image_data = None
@@ -1903,72 +2387,73 @@ class ScreenCaptureOverlay(QWidget):
         return QtGui.QPixmap(), "", clipped_global_rect
 
     def _run_tesseract_ocr_image(self, pil_image, tess_lang, context):
-        import pytesseract
-
-        if pil_image is None:
-            return ""
-        height = getattr(pil_image, "height", 0)
-        width = getattr(pil_image, "width", 0)
-        if height <= 0 or width <= 0:
-            logging.warning(f"[OCR:{self._session_id}] Tesseract skipped for empty image in {context}")
-            return ""
-
-        psm_order = [6]
-        if height < 110:
-            psm_order = [7, 8, 13, 6, 11]
-        elif width < 260 or height < 180:
-            psm_order = [6, 7, 8, 13, 11]
-
-        best_text = ""
-        best_score = float("-inf")
-        for psm in psm_order:
-            tess_config = f"--oem 3 --psm {psm}"
-            try:
-                started = time.perf_counter()
-                text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
-                elapsed_ms = (time.perf_counter() - started) * 1000.0
-                stripped = text.strip()
-                score = self._score_tesseract_text(stripped)
-                logging.info(
-                    f"[OCR:{self._session_id}] Tesseract {context}; lang={tess_lang}, psm={psm}, "
-                    f"elapsed_ms={elapsed_ms:.1f}, raw_len={len(text)}, stripped_len={len(stripped)}, "
-                    f"score={score:.1f}, preview={_text_preview(stripped)}"
-                )
-                if stripped and score > best_score:
-                    best_text = text
-                    best_score = score
-            except Exception as e:
-                logging.exception(f"[OCR:{self._session_id}] Tesseract {context} failed with psm={psm}: {e}")
-        if best_text:
-            logging.info(
-                f"[OCR:{self._session_id}] Tesseract {context} selected best result; "
-                f"score={best_score:.1f}, preview={_text_preview(best_text.strip())}"
-            )
-        return best_text
-
-    @staticmethod
-    def _score_tesseract_text(text):
-        text = str(text or "").strip()
-        if not text:
-            return float("-inf")
-        alnum = sum(1 for ch in text if ch.isalnum())
-        alpha = sum(1 for ch in text if ch.isalpha())
-        spaces = sum(1 for ch in text if ch.isspace())
-        noise = sum(1 for ch in text if not ch.isalnum() and not ch.isspace())
-        return (alnum * 2.0) + (alpha * 0.5) + (spaces * 0.2) - (noise * 1.7)
-
-    def _recognize_preprocessed_with_tesseract(self, pil_image, language_code, context):
-        import pytesseract
-
         tess_cmd = self.get_tesseract_cmd()
-        tess_lang = tesseract_language_code(language_code)
         if not tess_cmd:
             logging.error(f"[OCR:{self._session_id}] Tesseract executable not found for {context}.")
             return None
-        pytesseract.pytesseract.tesseract_cmd = tess_cmd
-        logging.info(f"[OCR:{self._session_id}] Using Tesseract at: {tess_cmd}; context={context}, lang={tess_lang}")
-        self._configure_tesseract_data(tess_cmd, tess_lang)
-        return self._run_tesseract_ocr_image(pil_image, tess_lang, context)
+        return _run_tesseract_ocr_image_with_cmd(
+            pil_image,
+            tess_cmd,
+            tess_lang,
+            context,
+            getattr(self, "_session_id", "unknown"),
+        )
+
+    @staticmethod
+    def _score_tesseract_text(text):
+        return _score_recognized_text(text)
+
+    def _recognize_preprocessed_with_tesseract(self, pil_image, language_code, context):
+        return self._recognize_tesseract_variants([("primary", pil_image)], language_code, context)
+
+    def _recognize_tesseract_variants(self, pil_variants, language_code, context):
+        tess_cmd = self.get_tesseract_cmd()
+        tess_lang = tesseract_language_code(language_code)
+        return _recognize_tesseract_variants_with_cmd(
+            pil_variants,
+            tess_cmd,
+            tess_lang,
+            context,
+            getattr(self, "_session_id", "unknown"),
+        )
+
+    def _start_tesseract_worker(self, pil_variants, language_code, context, session_id):
+        tess_cmd = self.get_tesseract_cmd()
+        if not tess_cmd:
+            logging.error(f"[OCR:{session_id}] Tesseract executable not found for async context={context}.")
+            self.handle_ocr_result("", session_id)
+            return
+
+        self.ocr_worker = TesseractOCRWorker(
+            pil_variants,
+            language_code,
+            tess_cmd,
+            context,
+            session_id,
+        )
+        self._ocr_worker_session_id = session_id
+        self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
+        self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.start()
+
+    def _persist_failed_ocr_artifacts(self, reason):
+        session_id = getattr(self, "_session_id", "unknown")
+        saved = []
+        try:
+            raw_capture = getattr(self, "_last_ocr_raw_capture", None)
+            raw_path = _save_pixmap_debug(raw_capture, session_id, f"failed_{reason}_raw_capture", force=True)
+            if raw_path:
+                saved.append(raw_path)
+            for label, image in getattr(self, "_last_ocr_pil_variants", []) or []:
+                path = _save_pil_debug(image, session_id, f"failed_{reason}_{label}", force=True)
+                if path:
+                    saved.append(path)
+            logging.warning(
+                f"[OCR:{session_id}] OCR failure artifacts saved; reason={reason}, "
+                f"count={len(saved)}, meta={getattr(self, '_last_ocr_capture_meta', {})}, files={saved}"
+            )
+        except Exception as e:
+            logging.warning(f"[OCR:{session_id}] Could not persist failed OCR artifacts: {e}")
 
     def capture_and_copy(self, rect):
         session_id = getattr(self, "_session_id", "unknown")
@@ -1990,15 +2475,49 @@ class ScreenCaptureOverlay(QWidget):
             f"[OCR:{session_id}] target screen selected by {screen_reason}; "
             f"center=({_point_to_text(global_rect.center())}), screen={_screen_to_text(target_screen)}"
         )
-        screenshot, grab_attempt, captured_global_rect = self._grab_screenshot_region(target_screen, global_rect)
+        screenshot = QtGui.QPixmap()
+        grab_attempt = ""
+        captured_global_rect = global_rect
+        if (
+            self._freeze_screen_on_ocr
+            and self._frozen_background is not None
+            and not self._frozen_background.isNull()
+        ):
+            frozen_rect = rect.intersected(self._frozen_background.rect())
+            if not frozen_rect.isNull() and frozen_rect.width() > 0 and frozen_rect.height() > 0:
+                screenshot = self._frozen_background.copy(frozen_rect)
+                grab_attempt = "frozen-background"
+                logging.info(
+                    f"[OCR:{session_id}] Captured from frozen background; "
+                    f"request=({_rect_to_text(rect)}), clipped=({_rect_to_text(frozen_rect)}), "
+                    f"pixmap={screenshot.width()}x{screenshot.height()}"
+                )
+            else:
+                logging.warning(
+                    f"[OCR:{session_id}] Frozen background capture skipped; "
+                    f"selection outside frozen pixmap: rect=({_rect_to_text(rect)}), "
+                    f"frozen_rect=({_rect_to_text(self._frozen_background.rect())})"
+                )
+        if screenshot.isNull():
+            screenshot, grab_attempt, captured_global_rect = self._grab_screenshot_region(target_screen, global_rect)
 
         if screenshot.isNull():
             logging.error(f"[OCR:{session_id}] Failed to grab screenshot (result is null)")
+            self._ocr_in_progress = False
             return
 
+        self._last_ocr_raw_capture = screenshot.copy()
+        self._last_ocr_capture_meta = {
+            "local_rect": _rect_to_text(rect),
+            "global_rect": _rect_to_text(global_rect),
+            "grab_attempt": grab_attempt,
+            "target_screen": _screen_to_text(target_screen),
+            "frozen": bool(self._freeze_screen_on_ocr),
+        }
         _save_pixmap_debug(screenshot, session_id, "raw_capture")
 
         qimage = screenshot.toImage()
+        raw_qimage = qimage.copy()
         orig_w, orig_h = qimage.width(), qimage.height()
         logging.info(
             f"[OCR:{session_id}] Captured qimage={orig_w}x{orig_h}; screen_dpr={dpr:.3f}; "
@@ -2017,6 +2536,7 @@ class ScreenCaptureOverlay(QWidget):
             "RGBA", (qimg_rgba.width(), qimg_rgba.height()),
             bytes(ptr), "raw", "RGBA", 0, 1
         )
+        raw_pil_for_ocr = pil_image.convert('L')
 
         # --- 1. Определяем тёмный/светлый фон ---
         gray = pil_image.convert('L')
@@ -2085,12 +2605,63 @@ class ScreenCaptureOverlay(QWidget):
         enhancer = ImageEnhance.Sharpness(pil_image)
         pil_image = enhancer.enhance(1.5)
 
-        # --- 7. Бинаризация Otsu для маленьких выделений ---
-        if height < 80:
+        def edge_mean_luminance(image):
+            probe = image.convert('L')
+            w, h = probe.size
+            band = max(1, min(w, h, max(2, min(w, h) // 18)))
+            crops = [
+                probe.crop((0, 0, w, band)),
+                probe.crop((0, max(0, h - band), w, h)),
+                probe.crop((0, 0, band, h)),
+                probe.crop((max(0, w - band), 0, w, h)),
+            ]
+            values = [ImageStat.Stat(crop).mean[0] for crop in crops if crop.size[0] > 0 and crop.size[1] > 0]
+            return sum(values) / len(values) if values else ImageStat.Stat(probe).mean[0]
+
+        def add_ocr_border_and_normalize(image, label):
+            # OCR стабильнее, когда фон по краям светлый, а текст темный.
+            normalized = image.convert('L')
+            edge_mean = edge_mean_luminance(normalized)
+            overall_mean = ImageStat.Stat(normalized).mean[0]
+            if edge_mean < 128:
+                normalized = ImageOps.invert(normalized)
+                logging.info(
+                    f"[OCR:{session_id}] Polarity normalized for {label}: inverted "
+                    f"(edge_mean={edge_mean:.1f}, overall_mean={overall_mean:.1f})"
+                )
+                edge_mean = edge_mean_luminance(normalized)
+            else:
+                logging.info(
+                    f"[OCR:{session_id}] Polarity kept for {label}: "
+                    f"edge_mean={edge_mean:.1f}, overall_mean={overall_mean:.1f}"
+                )
+            border_fill = 255 if edge_mean >= 128 else 0
+            border_size = min(32, max(10, int(normalized.height * 0.08)))
+            normalized = ImageOps.expand(normalized, border=border_size, fill=border_fill)
+            logging.info(
+                f"[OCR:{session_id}] Preprocessed variant {label}: {normalized.width}x{normalized.height}; "
+                f"border_fill={border_fill}, border_size={border_size}, "
+                f"extrema={ImageStat.Stat(normalized).extrema[0]}"
+            )
+            _save_pil_debug(normalized, session_id, f"preprocessed_{label}")
+            return normalized
+
+        def pil_l_to_qimage(image):
+            image = image.convert('L')
+            data = image.tobytes()
+            qimg = QtGui.QImage(data, image.width, image.height, image.width, QtGui.QImage.Format_Grayscale8)
+            return qimg.copy()
+
+        # --- 7. Создаем несколько OCR-вариантов вместо одной рискованной обработки ---
+        raw_soft_pil = add_ocr_border_and_normalize(raw_pil_for_ocr, "raw")
+        enhanced_pil = add_ocr_border_and_normalize(pil_image.copy(), "enhanced")
+        ocr_pil_variants = [("raw", raw_soft_pil), ("enhanced", enhanced_pil)]
+
+        if height < 120:
+            binary_pil = pil_image.copy()
             try:
                 import numpy as np
-                arr = np.array(pil_image)
-                # Otsu's threshold
+                arr = np.array(binary_pil)
                 hist, _ = np.histogram(arr.ravel(), bins=256, range=(0, 256))
                 total = arr.size
                 sum_total = np.dot(np.arange(256), hist)
@@ -2109,40 +2680,21 @@ class ScreenCaptureOverlay(QWidget):
                     if var_between > max_var:
                         max_var = var_between
                         threshold = t
-                pil_image = pil_image.point(lambda x: 255 if x > threshold else 0, 'L')
-                logging.info(f"[OCR:{session_id}] Otsu binarization: threshold={threshold}")
+                binary_pil = binary_pil.point(lambda x: 255 if x > threshold else 0, 'L')
+                logging.info(f"[OCR:{session_id}] Otsu binarization for binary variant: threshold={threshold}")
             except ImportError:
-                # numpy не доступен — простая бинаризация
-                pil_image = pil_image.point(lambda x: 255 if x > 128 else 0, 'L')
-                logging.info(f"[OCR:{session_id}] Numpy unavailable; simple binarization threshold=128")
+                binary_pil = binary_pil.point(lambda x: 255 if x > 128 else 0, 'L')
+                logging.info(f"[OCR:{session_id}] Numpy unavailable; binary variant threshold=128")
+            binary_pil = add_ocr_border_and_normalize(binary_pil, "binary")
+            ocr_pil_variants.append(("binary", binary_pil))
+        self._last_ocr_pil_variants = list(ocr_pil_variants)
 
-        # OCR engines are more stable on black text over a light background.
-        binary_mean = ImageStat.Stat(pil_image).mean[0]
-        if binary_mean < 128:
-            pil_image = ImageOps.invert(pil_image)
-            logging.info(
-                f"[OCR:{session_id}] OCR polarity normalized: inverted binary/light text image "
-                f"(mean={binary_mean:.1f})"
-            )
-
-        # --- 8. Добавляем поля вокруг текста (помогает OCR определить границы) ---
-        # Цвет полей совпадает с доминирующим фоном (после всех преобразований)
-        stat = ImageStat.Stat(pil_image)
-        border_fill = 255 if stat.mean[0] > 128 else 0
-        border_size = min(32, max(10, int(pil_image.height * 0.08)))
-        pil_image = ImageOps.expand(pil_image, border=border_size, fill=border_fill)
-        _save_pil_debug(pil_image, session_id, "preprocessed")
-
-        # --- 9. Конвертируем обратно в QImage (БЕЗОПАСНО — копируем данные) ---
-        self._ocr_image_data = pil_image.tobytes()
-        qimage = QtGui.QImage(
-            self._ocr_image_data, pil_image.width, pil_image.height,
-            pil_image.width, QtGui.QImage.Format_Grayscale8
-        )
-
+        # Основной вариант для Tesseract fallback: бинарный для мелкого текста, мягкий для крупного.
+        primary_label, pil_image = ocr_pil_variants[-1] if height < 120 else ocr_pil_variants[0]
+        qimage = pil_l_to_qimage(pil_image)
         logging.info(
-            f"[OCR:{session_id}] Final preprocessed: {pil_image.width}x{pil_image.height}; "
-            f"border_fill={border_fill}, border_size={border_size}, final_extrema={ImageStat.Stat(pil_image).extrema[0]}"
+            f"[OCR:{session_id}] Primary preprocessed variant={primary_label}; "
+            f"final={pil_image.width}x{pil_image.height}"
         )
         
         combo_data = self.lang_combo.currentData()
@@ -2174,12 +2726,9 @@ class ScreenCaptureOverlay(QWidget):
         )
 
         if ocr_engine_type == "tesseract":
-            # pil_image уже подготовлен выше (grayscale, масштабированный, с бордерами)
-            # Конвертируем в формат, понятный Tesseract
-            tess_pil = pil_image.convert('L') if pil_image.mode != 'L' else pil_image
-            recognized_text = self._recognize_preprocessed_with_tesseract(tess_pil, language_code, "primary")
-            # Обработать результат напрямую
-            self.handle_ocr_result(recognized_text or "")
+            # Пробуем несколько подготовленных вариантов: один фильтр часто спасает один кейс и ломает другой.
+            tess_variants = [(label, image.convert('L') if image.mode != 'L' else image) for label, image in ocr_pil_variants]
+            self._start_tesseract_worker(tess_variants, language_code, "primary", session_id)
             return  # Не использовать Windows OCR ниже
 
         # По умолчанию используем Windows OCR (без PIL)
@@ -2209,29 +2758,76 @@ class ScreenCaptureOverlay(QWidget):
                     f"[OCR:{session_id}] Windows OCR does not support {win_lang_tag} on this machine; "
                     "using Tesseract directly."
                 )
-                tess_pil = pil_image.convert('L') if pil_image.mode != 'L' else pil_image
-                recognized_text = self._recognize_preprocessed_with_tesseract(
-                    tess_pil,
+                tess_variants = [(label, image.convert('L') if image.mode != 'L' else image) for label, image in ocr_pil_variants]
+                self._start_tesseract_worker(
+                    tess_variants,
                     language_code,
                     "windows-unsupported-direct",
+                    session_id,
                 )
-                self.handle_ocr_result(recognized_text or "")
                 return
         
-        bitmap = qimage_to_softwarebitmap(qimage)
-        logging.debug(f"[OCR:{session_id}] SoftwareBitmap created: {bitmap}")
+        windows_qimage_attempts = [("raw", raw_qimage)]
+        for variant_label, variant_pil in ocr_pil_variants:
+            windows_qimage_attempts.append((variant_label, pil_l_to_qimage(variant_pil)))
+
+        bitmap_attempts = []
+        for attempt_label, attempt_qimage in windows_qimage_attempts:
+            attempt_qimage = _limit_qimage_for_windows_ocr(attempt_qimage, session_id, attempt_label)
+            bitmap = qimage_to_softwarebitmap(attempt_qimage)
+            logging.debug(f"[OCR:{session_id}] SoftwareBitmap created for {attempt_label}: {bitmap}")
+            if bitmap is not None:
+                bitmap_attempts.append((attempt_label, bitmap))
+
+        if not bitmap_attempts:
+            logging.error(f"[OCR:{session_id}] Failed to create SoftwareBitmap for every OCR attempt")
+            if self.get_tesseract_cmd():
+                logging.info(f"[OCR:{session_id}] Falling back to Tesseract after SoftwareBitmap conversion failure")
+                tess_variants = [(label, image.convert('L') if image.mode != 'L' else image) for label, image in ocr_pil_variants]
+                self._start_tesseract_worker(tess_variants, language_code, "windows-bitmap-fallback", session_id)
+            else:
+                self.handle_ocr_result("", session_id)
+            return
         
         # Create worker with Tesseract fallback capability
-        self.ocr_worker = OCRWorker(bitmap, language_code, use_universal=use_universal)
+        self.ocr_worker = OCRWorker(
+            bitmap_attempts[0][1],
+            language_code,
+            use_universal=use_universal,
+            attempts=bitmap_attempts,
+            session_id=session_id,
+        )
         
         # Pass the QImage for Tesseract fallback if needed
-        self.ocr_worker.qimage = qimage
+        self.ocr_worker.fallback_pil_variants = [
+            (label, image.convert('L') if image.mode != 'L' else image)
+            for label, image in ocr_pil_variants
+        ]
+        self.ocr_worker.tesseract_cmd = self.get_tesseract_cmd()
+        self.ocr_worker.tesseract_fallback_enabled = bool(self.ocr_worker.tesseract_cmd)
         
-        self.ocr_worker.result_ready.connect(self.handle_ocr_result)
+        self._ocr_worker_session_id = session_id
+        self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
+        self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
         self.ocr_worker.start()
 
-    def handle_ocr_result(self, text):
+    def handle_ocr_result(self, text, session_id=None):
         try:
+            current_session = getattr(self, "_session_id", "unknown")
+            expected_session = getattr(self, "_ocr_worker_session_id", None)
+            if self._ignore_ocr_results or (session_id is not None and session_id != current_session):
+                logging.info(
+                    f"[OCR:{current_session}] Ignoring stale OCR result; "
+                    f"result_session={session_id}, expected={expected_session}, ignore={self._ignore_ocr_results}"
+                )
+                return
+            if expected_session is not None and session_id is not None and session_id != expected_session:
+                logging.info(
+                    f"[OCR:{current_session}] Ignoring OCR result for inactive worker session; "
+                    f"result_session={session_id}, expected={expected_session}"
+                )
+                return
+            self._handling_ocr_result = True
             logging.info(
                 f"[OCR:{getattr(self, '_session_id', 'unknown')}] handle_ocr_result; "
                 f"text_len={len(text or '')}, preview={_text_preview(text)}"
@@ -2244,6 +2840,10 @@ class ScreenCaptureOverlay(QWidget):
                 self.close()
             except Exception:
                 pass
+        finally:
+            self._handling_ocr_result = False
+            self._ocr_in_progress = False
+            self._ocr_worker_session_id = None
 
     def _handle_ocr_result_inner(self, text):
         session_id = getattr(self, "_session_id", "unknown")
@@ -2251,37 +2851,36 @@ class ScreenCaptureOverlay(QWidget):
             # If Windows OCR failed, try Tesseract as fallback
             logging.info(f"[OCR:{session_id}] Windows OCR returned empty result, attempting Tesseract fallback...")
             try:
-                import pytesseract
                 from PIL import Image
 
-                # qimage уже предобработан (grayscale, масштаб, бордеры)
-                qimage = self.ocr_worker.qimage
-                w, h = qimage.width(), qimage.height()
-                bpl = qimage.bytesPerLine()
+                pil_variants = getattr(self.ocr_worker, "fallback_pil_variants", None)
+                if not pil_variants:
+                    # qimage уже предобработан (grayscale, масштаб, бордеры)
+                    qimage = self.ocr_worker.qimage
+                    w, h = qimage.width(), qimage.height()
+                    bpl = qimage.bytesPerLine()
 
-                # Безопасная конвертация QImage → PIL
-                if qimage.format() == QtGui.QImage.Format_Grayscale8:
-                    ptr = qimage.constBits()
-                    ptr.setsize(bpl * h)
-                    pil_image = Image.frombytes('L', (w, h), bytes(ptr), 'raw', 'L', bpl)
-                else:
-                    qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
-                    ptr = qimg_rgba.constBits()
-                    ptr.setsize(qimg_rgba.byteCount())
-                    pil_image = Image.frombuffer("RGBA", (w, h), bytes(ptr), "raw", "RGBA", 0, 1)
-                    pil_image = pil_image.convert('L')
+                    # Безопасная конвертация QImage → PIL
+                    if qimage.format() == QtGui.QImage.Format_Grayscale8:
+                        ptr = qimage.constBits()
+                        ptr.setsize(bpl * h)
+                        pil_image = Image.frombytes('L', (w, h), bytes(ptr), 'raw', 'L', bpl)
+                    else:
+                        qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
+                        ptr = qimg_rgba.constBits()
+                        ptr.setsize(qimg_rgba.byteCount())
+                        pil_image = Image.frombuffer("RGBA", (w, h), bytes(ptr), "raw", "RGBA", 0, 1)
+                        pil_image = pil_image.convert('L')
+                    pil_variants = [("qimage", pil_image)]
 
-                lang_code = _combo_data_to_ocr_language(self.lang_combo.currentData(), "ru")
-                if lang_code == "auto":
-                    lang_code = "universal"
-                tess_lang = tesseract_language_code(lang_code)
+                lang_code = getattr(self.ocr_worker, "language_code", None) or _combo_data_to_ocr_language(
+                    self.lang_combo.currentData(),
+                    "ru",
+                )
 
                 tess_cmd = self.get_tesseract_cmd()
                 if tess_cmd:
-                    pytesseract.pytesseract.tesseract_cmd = tess_cmd
-                    self._configure_tesseract_data(tess_cmd, tess_lang)
-
-                    text = self._run_tesseract_ocr_image(pil_image, tess_lang, "windows-empty-fallback")
+                    text = self._recognize_tesseract_variants(pil_variants, lang_code, "windows-empty-fallback")
                 else:
                     logging.warning(f"[OCR:{session_id}] Tesseract not found for fallback.")
             except Exception as e:
@@ -2361,6 +2960,7 @@ class ScreenCaptureOverlay(QWidget):
                     logging.exception(f"[OCR:{session_id}] OCR result handling error: {e}")
         else:
             logging.info(f"[OCR:{session_id}] OCR did not recognize text.")
+            self._persist_failed_ocr_artifacts("empty_result")
             # Скрываем оверлей перед показом диалога ошибки
             self.hide()
             # Получаем тему из конфига
