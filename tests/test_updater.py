@@ -65,6 +65,7 @@ class TestPortableLayoutHelpers(unittest.TestCase):
                     self.assertEqual(portable_paths.portable_base_dir(), temp_dir)
                     self.assertEqual(sw._portable_base_dir(), temp_dir)
                     self.assertEqual(ocr.get_portable_dir(), temp_dir)
+                    self.assertEqual(ocr.get_log_dir(), os.path.join(temp_dir, "data", "logs"))
                     self.assertEqual(translater.get_portable_dir(), temp_dir)
                     self.assertEqual(sw._public_executable_path(), launcher_exe)
         finally:

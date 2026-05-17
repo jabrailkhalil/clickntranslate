@@ -7,9 +7,13 @@ hiddenimports = [
     'winrt.windows.media.ocr',
     'winrt.windows.globalization',
     'winrt.windows.graphics.imaging',
+    'winrt.windows.graphics.directx',
+    'winrt.windows.graphics.directx.direct3d11',
     'winrt.windows.storage.streams',
+    'winrt.windows.storage',
     'winrt.windows.foundation',
     'winrt.windows.foundation.collections',
+    'winrt.windows.system',
     'winrt._winrt',
     'pypdf',
 ]

@@ -55,7 +55,7 @@ except Exception:
 # Настройка логирования в файл для диагностики
 def get_log_dir():
     if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(os.path.abspath(sys.executable))
+        base_dir = portable_paths.portable_base_dir()
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(base_dir, "data", "logs")
@@ -660,7 +660,7 @@ def load_image_from_pil(pil_image):
     pil_image = pil_image.convert("RGBA")
     data_writer = winrt_streams.DataWriter()
     byte_data = pil_image.tobytes()
-    data_writer.write_bytes(list(byte_data))
+    _write_data_writer_bytes(data_writer, byte_data)
     bitmap = winrt_imaging.SoftwareBitmap(winrt_imaging.BitmapPixelFormat.RGBA8, pil_image.width, pil_image.height)
     bitmap.copy_from_buffer(data_writer.detach_buffer())
     return bitmap
@@ -669,6 +669,14 @@ def load_image_from_pil(pil_image):
 _OCR_ENGINE_CACHE = {}
 _OVERLAY_POOL = {"ocr": None, "copy": None, "translate": None}
 _WINDOWS_OCR_MISSING_NOTICE_SHOWN = set()
+
+
+def _write_data_writer_bytes(data_writer, byte_data):
+    try:
+        data_writer.write_bytes(byte_data)
+    except TypeError:
+        data_writer.write_bytes(list(byte_data))
+
 
 def _get_windows_ocr_engine(lang_tag: str):
     """Получить Windows OCR движок для указанного языка."""
@@ -847,7 +855,7 @@ def qimage_to_softwarebitmap(qimage):
         debug_log(f"Byte count: {qimg.byteCount()}")
 
         data_writer = winrt_streams.DataWriter()
-        data_writer.write_bytes(bytes(ptr))
+        _write_data_writer_bytes(data_writer, bytes(ptr))
 
         bitmap = winrt_imaging.SoftwareBitmap(winrt_imaging.BitmapPixelFormat.RGBA8, width, height)
         bitmap.copy_from_buffer(data_writer.detach_buffer())
