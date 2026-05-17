@@ -35,6 +35,32 @@ def resource_path(relative_path):
     return os.path.join(os.path.abspath("."), relative_path)
 
 
+def _frozen_executable_dir():
+    return os.path.dirname(os.path.abspath(sys.executable))
+
+
+def _portable_base_dir():
+    if getattr(sys, "frozen", False):
+        exe_dir = _frozen_executable_dir()
+        parent_dir = os.path.dirname(exe_dir)
+        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
+        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
+            return parent_dir
+        return exe_dir
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
+def _public_executable_path():
+    if getattr(sys, "frozen", False):
+        exe_dir = _frozen_executable_dir()
+        parent_dir = os.path.dirname(exe_dir)
+        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
+        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
+            return os.path.abspath(launcher_path)
+        return os.path.abspath(sys.executable)
+    return os.path.abspath(sys.argv[0])
+
+
 GITHUB_OWNER = "jabrailkhalil"
 GITHUB_REPO = "clickntranslate"
 GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/"
@@ -139,8 +165,137 @@ class HyMTInstallCancelledError(RuntimeError):
 
 class UpdateProgressDialog(QProgressDialog):
     def __init__(self, owner):
-        super().__init__("", None, 0, 100, owner)
+        super().__init__("", None, 0, 100, None)
         self._owner = owner
+        self._drag_position = None
+        self._user_minimized = False
+        owner_parent = getattr(owner, "parent", None)
+        self._lang = getattr(owner_parent, "current_interface_language", "en")
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setWindowModality(Qt.NonModal)
+        self.setMinimumWidth(430)
+        self.setStyleSheet("""
+            QProgressDialog {
+                background-color: #111111;
+                color: #ffffff;
+                border: 1px solid #7a61b3;
+                border-radius: 10px;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 15px;
+            }
+            QPushButton {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border: 1px solid #6f5aa8;
+                padding: 5px 12px;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+            }
+            QProgressBar {
+                border: 1px solid #555555;
+                border-radius: 6px;
+                text-align: center;
+                background: #1d1d1d;
+                color: #ffffff;
+                min-height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #7a61b3;
+                border-radius: 5px;
+            }
+            QToolButton {
+                background-color: transparent;
+                color: #ffffff;
+                border: none;
+                font-size: 15px;
+                font-weight: bold;
+            }
+            QToolButton:hover {
+                background-color: #2b2440;
+            }
+        """)
+
+        self.setLabel(QLabel(""))
+        self.label().setAlignment(Qt.AlignCenter)
+        self.label().setWordWrap(True)
+        self.setBar(QProgressBar(self))
+        self.setCancelButton(QPushButton(settings_text(self._lang, "cancel"), self))
+        self.canceled.connect(self._request_cancel)
+
+        self._title_label = QLabel(settings_text(self._lang, "update"), self)
+        self._title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c5b3e9;")
+        self._minimize_button = QToolButton(self)
+        self._minimize_button.setText("-")
+        self._minimize_button.setToolTip("Minimize")
+        self._minimize_button.setFixedSize(28, 24)
+        self._minimize_button.clicked.connect(self._minimize_to_taskbar)
+        self._close_button = QToolButton(self)
+        self._close_button.setText("x")
+        self._close_button.setToolTip(settings_text(self._lang, "cancel"))
+        self._close_button.setFixedSize(28, 24)
+        self._close_button.clicked.connect(self.reject)
+
+        layout = self.layout()
+        if layout is not None:
+            layout.setContentsMargins(16, 44, 16, 16)
+            layout.setSpacing(10)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._layout_title_row()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._layout_title_row()
+
+    def _layout_title_row(self):
+        margin_top = 8
+        self._title_label.move(16, margin_top + 3)
+        self._title_label.resize(max(120, self.width() - 104), 24)
+        self._minimize_button.move(max(16, self.width() - 72), margin_top)
+        self._close_button.move(max(16, self.width() - 40), margin_top)
+
+    def _minimize_to_taskbar(self):
+        self._user_minimized = True
+        self.showMinimized()
+
+    def setWindowTitle(self, title):
+        super().setWindowTitle(title)
+        if hasattr(self, "_title_label"):
+            self._title_label.setText(title)
+
+    def setCancelButtonText(self, text):
+        button = self.cancelButton()
+        if button is not None:
+            button.setText(text)
+        if hasattr(self, "_close_button"):
+            self._close_button.setToolTip(text)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.pos().y() <= 38:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.WindowStateChange:
+            self._user_minimized = self.isMinimized()
+        super().changeEvent(event)
 
     def closeEvent(self, event):
         if self._owner and getattr(self._owner, "_update_in_progress", False):
@@ -154,6 +309,10 @@ class UpdateProgressDialog(QProgressDialog):
             self._owner._handle_update_progress_close_attempt()
             return
         super().reject()
+
+    def _request_cancel(self):
+        if self._owner and getattr(self._owner, "_update_in_progress", False):
+            self._owner._handle_update_progress_close_attempt()
 
 
 class TesseractInstallProgressDialog(QDialog):
@@ -719,9 +878,7 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
 def get_data_file(filename):
     import sys, os
     def get_portable_dir():
-        if hasattr(sys, '_MEIPASS'):
-            return os.path.dirname(os.path.abspath(sys.executable))
-        return os.path.dirname(os.path.abspath(sys.argv[0]))
+        return _portable_base_dir()
     data_dir = os.path.join(get_portable_dir(), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -1528,48 +1685,28 @@ class SettingsWindow(QWidget):
         if not hasattr(self, "_update_progress") or self._update_progress is None:
             self._update_progress = UpdateProgressDialog(self)
             self._update_progress.setWindowTitle(title)
-            self._update_progress.setCancelButton(None)
-            self._update_progress.setWindowModality(Qt.WindowModal)
+            self._update_progress.setCancelButtonText(settings_text(self.parent.current_interface_language, "cancel"))
+            self._update_progress.setWindowModality(Qt.NonModal)
             self._update_progress.setAutoClose(False)
             self._update_progress.setAutoReset(False)
             self._update_progress.setMinimumDuration(0)
             self._update_progress.setMinimumWidth(430)
             self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             try:
-                flags = self._update_progress.windowFlags()
-                flags |= Qt.CustomizeWindowHint | Qt.WindowTitleHint
-                flags &= ~Qt.WindowContextHelpButtonHint
-                flags |= Qt.WindowCloseButtonHint
-                self._update_progress.setWindowFlags(flags)
+                owner_window = self.window()
+                owner_center = owner_window.frameGeometry().center()
+                progress_frame = self._update_progress.frameGeometry()
+                progress_frame.moveCenter(owner_center)
+                self._update_progress.move(progress_frame.topLeft())
             except Exception:
                 pass
-            self._update_progress.setStyleSheet("""
-                QProgressDialog {
-                    background-color: #111111;
-                    color: #ffffff;
-                    border: 1px solid #6f5aa8;
-                    border-radius: 8px;
-                }
-                QProgressBar {
-                    border: 1px solid #555555;
-                    border-radius: 6px;
-                    text-align: center;
-                    background: #1d1d1d;
-                    color: #ffffff;
-                    min-height: 20px;
-                }
-                QProgressBar::chunk {
-                    background-color: #7a61b3;
-                    border-radius: 5px;
-                }
-            """)
         else:
             try:
                 self._update_progress.setWindowTitle(title)
             except Exception:
                 pass
         try:
-            self._update_progress.setWindowModality(Qt.WindowModal)
+            self._update_progress.setWindowModality(Qt.NonModal)
         except Exception:
             pass
         try:
@@ -1581,7 +1718,8 @@ class SettingsWindow(QWidget):
             self._update_progress.setValue(max(0, min(100, int(value))))
         else:
             self._update_progress.setRange(0, 0)
-        self._update_progress.show()
+        if not self._update_progress.isVisible() and not getattr(self._update_progress, "_user_minimized", False):
+            self._update_progress.show()
 
     @QtCore.pyqtSlot(str)
     def _on_update_progress_text(self, text):
@@ -2133,7 +2271,7 @@ class SettingsWindow(QWidget):
 
     def _schedule_update_restart_fallback(self, delay_seconds=14, attempts=45, interval_seconds=2):
         try:
-            exe_path = os.path.abspath(sys.executable)
+            exe_path = _public_executable_path()
             if not exe_path or not os.path.isfile(exe_path):
                 return
 
@@ -2220,8 +2358,8 @@ finally {
         if not getattr(sys, "frozen", False):
             return False, "Auto-update is available only in packaged app"
 
-        app_dir = os.path.dirname(os.path.abspath(sys.executable))
-        exe_name = os.path.basename(sys.executable)
+        app_dir = _portable_base_dir()
+        exe_name = os.path.basename(_public_executable_path())
         current_pid = os.getpid()
 
         fd, script_path = tempfile.mkstemp(prefix="clickntranslate_updater_", suffix=".ps1")
@@ -2240,6 +2378,14 @@ function Write-UpdateLog {
     param([string]$Message)
     $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
     Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
+}
+
+function Clear-PyInstallerEnv {
+    Get-ChildItem Env: -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -like "_PYI_*" -or $_.Name -ieq "_MEIPASS2"
+    } | ForEach-Object {
+        Remove-Item -LiteralPath ("Env:" + $_.Name) -ErrorAction SilentlyContinue
+    }
 }
 
 Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; TargetPid=$TargetPid"
@@ -2300,6 +2446,7 @@ try {
     }
 
     Write-UpdateLog "Starting updated executable: $targetExe"
+    Clear-PyInstallerEnv
     Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
     Write-UpdateLog "Updated executable started"
 }
@@ -2309,6 +2456,7 @@ catch {
         $fallbackExe = Join-Path $AppDir $ExeName
         if (Test-Path -LiteralPath $fallbackExe) {
             Write-UpdateLog "Launching fallback executable after updater failure: $fallbackExe"
+            Clear-PyInstallerEnv
             Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir
         }
     } catch {}
@@ -2595,9 +2743,7 @@ finally {
         self._parent_was_topmost_before_tesseract = None
 
     def _portable_app_dir(self):
-        if getattr(sys, "frozen", False):
-            return os.path.dirname(os.path.abspath(sys.executable))
-        return os.path.dirname(os.path.abspath(sys.argv[0]))
+        return _portable_base_dir()
 
     def _local_tesseract_dir(self):
         return os.path.join(self._portable_app_dir(), "ocr", "tesseract")

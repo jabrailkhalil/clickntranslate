@@ -189,6 +189,32 @@ def apply_windows_dark_frame(widget, enabled=True):
         pass
 
 
+def _frozen_executable_dir():
+    return os.path.dirname(os.path.abspath(sys.executable))
+
+
+def _portable_base_dir():
+    if getattr(sys, "frozen", False):
+        exe_dir = _frozen_executable_dir()
+        parent_dir = os.path.dirname(exe_dir)
+        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
+        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
+            return parent_dir
+        return exe_dir
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
+def _public_executable_path():
+    if getattr(sys, "frozen", False):
+        exe_dir = _frozen_executable_dir()
+        parent_dir = os.path.dirname(exe_dir)
+        launcher_path = os.path.join(parent_dir, "ClicknTranslate.exe")
+        if os.path.basename(exe_dir).lower() == "app" and os.path.isfile(launcher_path):
+            return os.path.abspath(launcher_path)
+        return os.path.abspath(sys.executable)
+    return os.path.abspath(sys.argv[0])
+
+
 def _autostart_startup_dir():
     appdata = os.environ.get("APPDATA")
     if appdata:
@@ -219,7 +245,7 @@ def _autostart_shortcut_path():
 def _current_autostart_shortcut_info():
     """Return target/arguments for the Startup folder shortcut."""
     if getattr(sys, "frozen", False):
-        target = os.path.abspath(sys.executable)
+        target = _public_executable_path()
         return {
             "target": target,
             "arguments": "--autostart",
@@ -484,7 +510,8 @@ def _current_process_path():
 def _is_clickntranslate_process(process_info):
     exe = process_info.get("exe") or ""
     name = (process_info.get("name") or "").lower()
-    if os.path.basename(exe).lower() == "clickntranslate.exe" or name == "clickntranslate.exe":
+    exe_name = os.path.basename(exe).lower()
+    if exe_name in ("clickntranslate.exe", "clickntranslateapp.exe") or name in ("clickntranslate.exe", "clickntranslateapp.exe"):
         return True
     cmdline = process_info.get("cmdline") or []
     return any(os.path.basename(str(arg)).lower() == "main.py" for arg in cmdline)
@@ -617,9 +644,7 @@ def get_app_dir():
 def get_portable_dir():
     """Directory next to the exe for portable data (config, history, cache).
     Settings survive program updates — user just replaces exe/program files."""
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return _portable_base_dir()
 
 def ensure_json_file(filepath, default_content):
     if not os.path.exists(filepath):

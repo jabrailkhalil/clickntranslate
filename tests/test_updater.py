@@ -42,6 +42,38 @@ class TestConfigCacheInvalidation(unittest.TestCase):
         self.assertEqual(called, [True])
 
 
+class TestPortableLayoutHelpers(unittest.TestCase):
+    def test_launcher_layout_uses_parent_as_portable_base(self):
+        temp_dir = tempfile.mkdtemp(prefix="cnt_portable_layout_")
+        try:
+            app_dir = os.path.join(temp_dir, "app")
+            os.makedirs(app_dir)
+            app_exe = os.path.join(app_dir, "ClicknTranslateApp.exe")
+            launcher_exe = os.path.join(temp_dir, "ClicknTranslate.exe")
+            open(app_exe, "w").close()
+            open(launcher_exe, "w").close()
+
+            with mock.patch.object(sw.sys, "frozen", True, create=True):
+                with mock.patch.object(sw.sys, "executable", app_exe):
+                    self.assertEqual(sw._portable_base_dir(), temp_dir)
+                    self.assertEqual(sw._public_executable_path(), launcher_exe)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_standard_frozen_layout_uses_exe_dir(self):
+        temp_dir = tempfile.mkdtemp(prefix="cnt_standard_layout_")
+        try:
+            app_exe = os.path.join(temp_dir, "ClicknTranslate.exe")
+            open(app_exe, "w").close()
+
+            with mock.patch.object(sw.sys, "frozen", True, create=True):
+                with mock.patch.object(sw.sys, "executable", app_exe):
+                    self.assertEqual(sw._portable_base_dir(), temp_dir)
+                    self.assertEqual(sw._public_executable_path(), app_exe)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 class TestUpdateAssetSelection(unittest.TestCase):
     def test_pick_update_asset_prefers_windows_clickntranslate_zip(self):
         dummy = types.SimpleNamespace()
@@ -156,6 +188,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Removing existing program item", script_text)
             self.assertIn("Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force", script_text)
             self.assertIn("Update payload copy failed: _internal directory is missing", script_text)
+            self.assertIn("Clear-PyInstallerEnv", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:
