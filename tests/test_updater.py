@@ -106,6 +106,26 @@ class TestUpdateProgressDialog(unittest.TestCase):
         self.assertEqual(dialog.windowTitle(), "Update")
         self.assertIn("Checking", dialog.message_label.text())
         self.assertEqual(dialog.progress_bar.value(), 42)
+        self.assertTrue(dialog.windowFlags() & sw.Qt.WindowStaysOnTopHint)
+        self.assertTrue(dialog.testAttribute(sw.QtCore.Qt.WA_TranslucentBackground))
+        self.assertEqual(dialog.frame.objectName(), "progressDialogFrame")
+        dialog.close()
+
+    def test_tesseract_progress_dialog_uses_same_topmost_rounded_frame(self):
+        app = QApplication.instance() or QApplication([])
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _tesseract_install_in_progress=False,
+        )
+
+        dialog = sw.TesseractInstallProgressDialog(dummy)
+        dialog.setLabelText("Installing...")
+        dialog.show()
+        app.processEvents()
+
+        self.assertTrue(dialog.windowFlags() & sw.Qt.WindowStaysOnTopHint)
+        self.assertTrue(dialog.testAttribute(sw.QtCore.Qt.WA_TranslucentBackground))
+        self.assertEqual(dialog.frame.objectName(), "progressDialogFrame")
         dialog.close()
 
 
@@ -218,6 +238,7 @@ class TestUpdaterCommands(unittest.TestCase):
                 script_text = f.read()
 
             self.assertIn("clickntranslate_update.log", script_text)
+            self.assertIn("AddSeconds(30)", script_text)
             self.assertIn("[int]$TargetPid", script_text)
             self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
@@ -243,6 +264,35 @@ class TestUpdaterCommands(unittest.TestCase):
 
 
 class TestUpdateCancellation(unittest.TestCase):
+    def test_update_ready_to_restart_uses_nonblocking_progress_dialog(self):
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_in_progress=False,
+            _update_phase="applying",
+            _update_temp_dir=r"C:\Temp\update",
+            _update_cancel_requested=threading.Event(),
+        )
+        dummy._set_update_controls_enabled = mock.Mock()
+        dummy._show_update_progress = mock.Mock()
+        dummy._exit_application_for_update_restart = mock.Mock()
+
+        with mock.patch.object(sw.QMessageBox, "information") as info_mock:
+            with mock.patch.object(sw.QtCore.QTimer, "singleShot") as timer_mock:
+                sw.SettingsWindow._on_update_ready_to_restart(dummy, "1.4.5")
+
+        self.assertTrue(dummy._update_in_progress)
+        self.assertEqual(dummy._update_phase, "restarting")
+        self.assertEqual(dummy._update_temp_dir, "")
+        dummy._set_update_controls_enabled.assert_called_once_with(False, "Restarting...")
+        dummy._show_update_progress.assert_called_once()
+        info_mock.assert_not_called()
+        timer_mock.assert_called_once_with(800, dummy._exit_application_for_update_restart)
+
+    def test_restarting_phase_blocks_progress_close_attempt(self):
+        dummy = types.SimpleNamespace(_update_phase="restarting")
+
+        self.assertTrue(sw.SettingsWindow._is_update_apply_stage(dummy))
+
     def test_handle_update_progress_close_attempt_requests_cancel_before_apply(self):
         dummy = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="ru"),

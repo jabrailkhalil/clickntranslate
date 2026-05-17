@@ -150,6 +150,77 @@ class HyMTInstallCancelledError(RuntimeError):
     pass
 
 
+PROGRESS_DIALOG_STYLE = """
+    QDialog#progressDialogRoot {
+        background: transparent;
+    }
+    QWidget#progressDialogFrame {
+        background-color: #111111;
+        color: #ffffff;
+        border: 1px solid #7a61b3;
+        border-radius: 10px;
+    }
+    QLabel {
+        color: #ffffff;
+        font-size: 15px;
+        background: transparent;
+    }
+    QPushButton {
+        background-color: #1e1e1e;
+        color: #ffffff;
+        border: 1px solid #6f5aa8;
+        padding: 5px 12px;
+    }
+    QPushButton:hover {
+        background-color: #333333;
+    }
+    QProgressBar {
+        border: 1px solid #555555;
+        border-radius: 6px;
+        text-align: center;
+        background: #1d1d1d;
+        color: #ffffff;
+        min-height: 20px;
+    }
+    QProgressBar::chunk {
+        background-color: #7a61b3;
+        border-radius: 5px;
+    }
+    QToolButton {
+        background-color: transparent;
+        color: #ffffff;
+        border: none;
+        font-size: 15px;
+        font-weight: bold;
+    }
+    QToolButton:hover {
+        background-color: #2b2440;
+    }
+"""
+
+
+def _configure_progress_dialog_window(dialog):
+    dialog.setObjectName("progressDialogRoot")
+    dialog.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+    dialog.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+    dialog.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, False)
+    dialog.setWindowModality(Qt.NonModal)
+    dialog.setMinimumWidth(430)
+    dialog.setStyleSheet(PROGRESS_DIALOG_STYLE)
+
+
+def _bring_progress_dialog_to_front(dialog):
+    if getattr(dialog, "_user_minimized", False):
+        return
+    try:
+        if dialog.isMinimized():
+            dialog.showNormal()
+        dialog.raise_()
+        dialog.activateWindow()
+    except Exception:
+        pass
+
+
 class UpdateProgressDialog(QDialog):
     def __init__(self, owner):
         super().__init__(None)
@@ -159,56 +230,19 @@ class UpdateProgressDialog(QDialog):
         owner_parent = getattr(owner, "parent", None)
         self._lang = getattr(owner_parent, "current_interface_language", "en")
         self.setWindowTitle(settings_text(self._lang, "update"))
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.setWindowModality(Qt.NonModal)
-        self.setMinimumWidth(430)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #111111;
-                color: #ffffff;
-                border: 1px solid #7a61b3;
-                border-radius: 10px;
-            }
-            QLabel {
-                color: #ffffff;
-                font-size: 15px;
-            }
-            QPushButton {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #6f5aa8;
-                padding: 5px 12px;
-            }
-            QPushButton:hover {
-                background-color: #333333;
-            }
-            QProgressBar {
-                border: 1px solid #555555;
-                border-radius: 6px;
-                text-align: center;
-                background: #1d1d1d;
-                color: #ffffff;
-                min-height: 20px;
-            }
-            QProgressBar::chunk {
-                background-color: #7a61b3;
-                border-radius: 5px;
-            }
-            QToolButton {
-                background-color: transparent;
-                color: #ffffff;
-                border: none;
-                font-size: 15px;
-                font-weight: bold;
-            }
-            QToolButton:hover {
-                background-color: #2b2440;
-            }
-        """)
+        _configure_progress_dialog_window(self)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(1, 1, 1, 1)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        self.frame = QWidget(self)
+        self.frame.setObjectName("progressDialogFrame")
+        self.frame.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        outer.addWidget(self.frame)
+
+        frame_layout = QVBoxLayout(self.frame)
+        frame_layout.setContentsMargins(1, 1, 1, 1)
+        frame_layout.setSpacing(0)
 
         title_row = QHBoxLayout()
         title_row.setContentsMargins(12, 8, 8, 5)
@@ -229,7 +263,7 @@ class UpdateProgressDialog(QDialog):
         self._close_button.setFixedSize(28, 24)
         self._close_button.clicked.connect(self.reject)
         title_row.addWidget(self._close_button)
-        outer.addLayout(title_row)
+        frame_layout.addLayout(title_row)
 
         body = QVBoxLayout()
         body.setContentsMargins(16, 8, 16, 16)
@@ -244,11 +278,14 @@ class UpdateProgressDialog(QDialog):
         self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
         self.cancel_button.clicked.connect(self.reject)
         body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
-        outer.addLayout(body)
+        frame_layout.addLayout(body)
 
     def _minimize_to_taskbar(self):
         self._user_minimized = True
         self.showMinimized()
+
+    def bring_to_front(self):
+        _bring_progress_dialog_to_front(self)
 
     def setWindowTitle(self, title):
         super().setWindowTitle(title)
@@ -333,56 +370,19 @@ class TesseractInstallProgressDialog(QDialog):
         owner_parent = getattr(owner, "parent", None)
         self._lang = getattr(owner_parent, "current_interface_language", "en")
         self.setWindowTitle(title)
-        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.setWindowModality(Qt.NonModal)
-        self.setMinimumWidth(430)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #111111;
-                color: #ffffff;
-                border: 1px solid #7a61b3;
-                border-radius: 10px;
-            }
-            QLabel {
-                color: #ffffff;
-                font-size: 15px;
-            }
-            QPushButton {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #6f5aa8;
-                padding: 5px 12px;
-            }
-            QPushButton:hover {
-                background-color: #333333;
-            }
-            QProgressBar {
-                border: 1px solid #555555;
-                border-radius: 6px;
-                text-align: center;
-                background: #1d1d1d;
-                color: #ffffff;
-                min-height: 20px;
-            }
-            QProgressBar::chunk {
-                background-color: #7a61b3;
-                border-radius: 5px;
-            }
-            QToolButton {
-                background-color: transparent;
-                color: #ffffff;
-                border: none;
-                font-size: 15px;
-                font-weight: bold;
-            }
-            QToolButton:hover {
-                background-color: #2b2440;
-            }
-        """)
+        _configure_progress_dialog_window(self)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(1, 1, 1, 1)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        self.frame = QWidget(self)
+        self.frame.setObjectName("progressDialogFrame")
+        self.frame.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        outer.addWidget(self.frame)
+
+        frame_layout = QVBoxLayout(self.frame)
+        frame_layout.setContentsMargins(1, 1, 1, 1)
+        frame_layout.setSpacing(0)
 
         title_row = QHBoxLayout()
         title_row.setContentsMargins(12, 8, 8, 5)
@@ -403,7 +403,7 @@ class TesseractInstallProgressDialog(QDialog):
         self.close_button.setFixedSize(28, 24)
         self.close_button.clicked.connect(self.reject)
         title_row.addWidget(self.close_button)
-        outer.addLayout(title_row)
+        frame_layout.addLayout(title_row)
 
         body = QVBoxLayout()
         body.setContentsMargins(16, 8, 16, 16)
@@ -417,11 +417,14 @@ class TesseractInstallProgressDialog(QDialog):
         self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
         self.cancel_button.clicked.connect(self.reject)
         body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
-        outer.addLayout(body)
+        frame_layout.addLayout(body)
 
     def _minimize_to_taskbar(self):
         self._user_minimized = True
         self.showMinimized()
+
+    def bring_to_front(self):
+        _bring_progress_dialog_to_front(self)
 
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
@@ -1724,6 +1727,7 @@ class SettingsWindow(QWidget):
             self._update_progress.setRange(0, 0)
         if not self._update_progress.isVisible() and not getattr(self._update_progress, "_user_minimized", False):
             self._update_progress.show()
+        self._update_progress.bring_to_front()
 
     @QtCore.pyqtSlot(str)
     def _on_update_progress_text(self, text):
@@ -1777,7 +1781,7 @@ class SettingsWindow(QWidget):
             pass
 
     def _is_update_apply_stage(self):
-        return getattr(self, "_update_phase", "") == "applying"
+        return getattr(self, "_update_phase", "") in ("applying", "restarting")
 
     def _is_update_cancelable(self):
         return self._update_in_progress and not self._is_update_apply_stage()
@@ -2280,7 +2284,7 @@ class SettingsWindow(QWidget):
                 continue
         return False, last_err
 
-    def _schedule_update_restart_fallback(self, delay_seconds=14, attempts=45, interval_seconds=2):
+    def _schedule_update_restart_fallback(self, delay_seconds=8, attempts=45, interval_seconds=2):
         try:
             exe_path = _public_executable_path()
             if not exe_path or not os.path.isfile(exe_path):
@@ -2410,7 +2414,7 @@ Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; 
 
 $extractDir = $null
 try {
-    $deadline = (Get-Date).AddSeconds(120)
+    $deadline = (Get-Date).AddSeconds(30)
     while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
         if ((Get-Date) -gt $deadline) {
             Write-UpdateLog "Application did not exit in time, force terminating process $TargetPid"
@@ -2562,31 +2566,49 @@ finally {
 
     @pyqtSlot(str)
     def _on_update_ready_to_restart(self, latest_version):
-        self._update_in_progress = False
-        self._update_phase = "idle"
+        self._update_in_progress = True
+        self._update_phase = "restarting"
         self._update_temp_dir = ""
         self._update_cancel_requested.clear()
-        if hasattr(self, "_update_progress") and self._update_progress is not None:
-            try:
-                self._update_progress.close()
-            except Exception:
-                pass
-            self._update_progress = None
 
         is_ru = self.parent.current_interface_language == "ru"
-        QMessageBox.information(
-            self,
-            "Обновление" if is_ru else "Update",
-            (
-                f"Обновление до V{latest_version} загружено.\nПриложение перезапустится автоматически."
-                if is_ru else
-                f"Update V{latest_version} is downloaded.\nThe app will restart automatically."
-            )
+        restart_text = (
+            f"Обновление до V{latest_version} готово.\nПерезапуск приложения..."
+            if is_ru else
+            f"Update V{latest_version} is ready.\nRestarting the app..."
         )
+        self._set_update_controls_enabled(False, "Перезапуск..." if is_ru else "Restarting...")
+        self._show_update_progress(restart_text, determinate=False)
+        QtCore.QTimer.singleShot(800, self._exit_application_for_update_restart)
+
+    @QtCore.pyqtSlot()
+    def _exit_application_for_update_restart(self):
+        kill_timer = threading.Timer(2.0, lambda: os._exit(0))
+        kill_timer.daemon = True
+        kill_timer.start()
+
+        parent = getattr(self, "parent", None)
         try:
-            self.parent.exit_app()
-        except Exception:
-            QApplication.instance().quit()
+            if parent is not None:
+                if hasattr(parent, "force_quit"):
+                    parent.force_quit = True
+                tray_icon = getattr(parent, "tray_icon", None)
+                if tray_icon is not None:
+                    try:
+                        tray_icon.hide()
+                    except Exception:
+                        pass
+                exit_app = getattr(parent, "exit_app", None)
+                if callable(exit_app):
+                    exit_app()
+                    return
+        except BaseException:
+            pass
+
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+        os._exit(0)
 
     def apply_theme(self):
         THEMES_LOCAL = {
@@ -3170,6 +3192,7 @@ finally {
             self.progress.setRange(0, 0)
         if not self.progress.isVisible() and not getattr(self.progress, "_user_minimized", False):
             self.progress.show()
+        self.progress.bring_to_front()
 
     @QtCore.pyqtSlot(str, int, bool)
     def _on_tesseract_progress(self, text, percent, determinate):
@@ -3526,6 +3549,7 @@ finally {
             self.hymt_progress.setRange(0, 0)
         if not self.hymt_progress.isVisible() and not getattr(self.hymt_progress, "_user_minimized", False):
             self.hymt_progress.show()
+        self.hymt_progress.bring_to_front()
 
     @QtCore.pyqtSlot(str, int, bool)
     def _on_hymt_progress(self, text, percent, determinate):
