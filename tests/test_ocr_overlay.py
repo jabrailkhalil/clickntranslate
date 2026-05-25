@@ -32,7 +32,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         )
         self.assertEqual(
             ocr._combo_data_to_translate_pair(("auto", "ru"), {"ocr_translate_target_language": "en"}),
-            ("auto", "ru"),
+            ("en", "ru"),
         )
         self.assertEqual(
             ocr._combo_data_to_translate_pair("de", {"ocr_translate_target_language": "es"}),
@@ -43,12 +43,21 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         overlay = ocr.ScreenCaptureOverlay("translate", defer_show=True)
         try:
             self.assertIsNotNone(overlay.target_lang_combo)
-            self.assertEqual(overlay.lang_combo.itemData(0), "auto")
+            self.assertNotEqual(overlay.lang_combo.itemData(0), "auto")
             source, target = overlay._current_translate_pair()
 
             self.assertEqual(source, overlay.lang_combo.currentData())
             self.assertEqual(target, overlay.target_lang_combo.currentData())
             self.assertNotEqual(source, target)
+        finally:
+            overlay.deleteLater()
+
+    def test_copy_overlay_does_not_offer_auto_language(self):
+        overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
+        try:
+            values = [overlay.lang_combo.itemData(i) for i in range(overlay.lang_combo.count())]
+            self.assertNotIn("auto", values)
+            self.assertNotIn("universal", values)
         finally:
             overlay.deleteLater()
 
@@ -183,6 +192,96 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             ocr.ScreenCaptureOverlay._score_tesseract_text("~~~~~!!!!"),
         )
 
+    def test_auto_ocr_rejects_noise_before_passing_text_on(self):
+        self.assertEqual(
+            ocr._auto_ocr_rejection_reason("~~~~!!!!", ocr._score_recognized_text("~~~~!!!!")),
+            "no_text_signal",
+        )
+        self.assertEqual(
+            ocr._auto_ocr_rejection_reason(
+                "Привет мир",
+                ocr._score_ocr_text_for_language("Привет мир", "ru"),
+            ),
+            "",
+        )
+        self.assertEqual(
+            ocr._auto_ocr_rejection_reason("404", ocr._score_recognized_text("404")),
+            "",
+        )
+
+    def test_parse_rapidocr_legacy_output_orders_text_lines(self):
+        output = (
+            [
+                [[[10, 30], [50, 30], [50, 45], [10, 45]], "second", 0.92],
+                [[[10, 5], [50, 5], [50, 20], [10, 20]], "first", 0.95],
+            ],
+            [1.0, 2.0, 3.0],
+        )
+
+        items = ocr._parse_rapidocr_output(output)
+
+        self.assertEqual([item[1] for item in items], ["first", "second"])
+        self.assertEqual([item[2] for item in items], [0.95, 0.92])
+
+    def test_parse_rapidocr_dataclass_style_output(self):
+        class Output:
+            boxes = [
+                [[10, 20], [50, 20], [50, 35], [10, 35]],
+                [[10, 2], [50, 2], [50, 17], [10, 17]],
+            ]
+            txts = ["bottom", "top"]
+            scores = [0.8, 0.9]
+
+        items = ocr._parse_rapidocr_output(Output())
+
+        self.assertEqual([item[1] for item in items], ["top", "bottom"])
+
+    def test_parse_easyocr_output_orders_text_lines(self):
+        output = [
+            ([[10, 30], [50, 30], [50, 45], [10, 45]], "second", 0.92),
+            ([[10, 5], [50, 5], [50, 20], [10, 20]], "first", 0.95),
+        ]
+
+        items = ocr._parse_easyocr_output(output)
+
+        self.assertEqual([item[1] for item in items], ["first", "second"])
+        self.assertEqual([item[2] for item in items], [0.95, 0.92])
+
+    def test_easyocr_recognition_uses_selected_language(self):
+        from PIL import Image
+
+        calls = []
+
+        class Reader:
+            def readtext(self, image, detail=1, paragraph=False):
+                calls.append((image.shape[:2], detail, paragraph))
+                return [
+                    ([[0, 0], [50, 0], [50, 20], [0, 20]], "Привет мир", 0.91),
+                ]
+
+        old_reader = ocr._get_easyocr_reader
+        try:
+            requested_languages = []
+
+            def fake_reader(language_code):
+                requested_languages.append(language_code)
+                return Reader()
+
+            ocr._get_easyocr_reader = fake_reader
+            text, failure = ocr._recognize_easyocr_variants(
+                [("raw", Image.new("RGB", (80, 24), "white"))],
+                "ru",
+                "unit",
+                "unit-test",
+            )
+
+            self.assertEqual(text, "Привет мир")
+            self.assertEqual(failure, "")
+            self.assertEqual(requested_languages, ["ru"])
+            self.assertEqual(calls, [((24, 80), 1, False)])
+        finally:
+            ocr._get_easyocr_reader = old_reader
+
     def test_ocr_worker_selects_best_attempt_text(self):
         class Word:
             def __init__(self, text):
@@ -277,7 +376,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         async def fake_runner(_bitmap, _engine):
             return Result()
 
-        def fake_tesseract(_variants, _cmd, _lang, context, _session_id, cancel_check=None):
+        def fake_tesseract(_variants, _cmd, _lang, context, _session_id, status_callback=None, cancel_check=None):
             self.assertEqual(context, "windows-empty-fallback")
             self.assertFalse(cancel_check())
             return "fallback text"
@@ -359,11 +458,102 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             ocr.run_ocr_with_engine = old_runner
             ocr._recognize_tesseract_variants_with_cmd = old_tesseract
 
+    def test_windows_auto_ocr_tries_all_image_attempts(self):
+        class Word:
+            def __init__(self, text):
+                self.text = text
+
+        class Line:
+            def __init__(self, text):
+                self.text = text
+                self.words = [Word(part) for part in text.split()]
+
+        class Result:
+            def __init__(self, *lines):
+                self.lines = [Line(line) for line in lines]
+
+        raw_bitmap = object()
+        enhanced_bitmap = object()
+        ru_engine = object()
+        en_engine = object()
+        old_candidates = ocr._windows_auto_ocr_candidates
+        old_engine_getter = ocr._get_windows_ocr_engine
+        old_runner = ocr.run_ocr_with_engine
+
+        async def fake_runner(bitmap, engine):
+            if bitmap is raw_bitmap:
+                return Result()
+            if bitmap is enhanced_bitmap and engine is ru_engine:
+                return Result("Привет мир")
+            if bitmap is enhanced_bitmap and engine is en_engine:
+                return Result("~~")
+            return Result()
+
+        try:
+            ocr._windows_auto_ocr_candidates = lambda: [("en", "en-US"), ("ru", "ru-RU")]
+            ocr._get_windows_ocr_engine = lambda tag: ru_engine if tag == "ru-RU" else en_engine
+            ocr.run_ocr_with_engine = fake_runner
+
+            text = ocr._recognize_with_windows_auto(
+                [("raw", raw_bitmap), ("enhanced", enhanced_bitmap)],
+                session_id="unit-test",
+            )
+
+            self.assertEqual(text, "Привет мир")
+        finally:
+            ocr._windows_auto_ocr_candidates = old_candidates
+            ocr._get_windows_ocr_engine = old_engine_getter
+            ocr.run_ocr_with_engine = old_runner
+
+    def test_auto_worker_runs_tesseract_fallback_when_windows_auto_is_empty(self):
+        class Result:
+            lines = []
+
+        bitmap = object()
+        old_candidates = ocr._windows_auto_ocr_candidates
+        old_engine_getter = ocr._get_windows_ocr_engine
+        old_universal_getter = ocr._get_universal_ocr_engine
+        old_runner = ocr.run_ocr_with_engine
+        old_tesseract = ocr._recognize_tesseract_variants_with_cmd
+
+        async def fake_runner(_bitmap, _engine):
+            return Result()
+
+        def fake_tesseract(_variants, _cmd, lang, context, _session_id, status_callback=None, cancel_check=None):
+            self.assertEqual(lang, "eng+rus")
+            self.assertEqual(context, "windows-auto-empty-fallback")
+            self.assertFalse(cancel_check())
+            return "fallback auto text"
+
+        try:
+            ocr._windows_auto_ocr_candidates = lambda: [("en", "en-US")]
+            ocr._get_windows_ocr_engine = lambda _tag: object()
+            ocr._get_universal_ocr_engine = lambda: None
+            ocr.run_ocr_with_engine = fake_runner
+            ocr._recognize_tesseract_variants_with_cmd = fake_tesseract
+            worker = ocr.OCRWorker(bitmap, "universal", use_universal=True, attempts=[("raw", bitmap)], session_id="unit-test")
+            worker.tesseract_fallback_enabled = True
+            worker.tesseract_cmd = r"C:\fake\tesseract.exe"
+            worker.fallback_pil_variants = [("raw", object())]
+            captured = []
+            worker.result_ready.connect(captured.append)
+
+            worker.run()
+
+            self.assertEqual(captured, ["fallback auto text"])
+            self.assertTrue(worker.tesseract_fallback_attempted)
+        finally:
+            ocr._windows_auto_ocr_candidates = old_candidates
+            ocr._get_windows_ocr_engine = old_engine_getter
+            ocr._get_universal_ocr_engine = old_universal_getter
+            ocr.run_ocr_with_engine = old_runner
+            ocr._recognize_tesseract_variants_with_cmd = old_tesseract
+
     def test_tesseract_worker_suppresses_result_after_interruption(self):
         old_tesseract = ocr._recognize_tesseract_variants_with_cmd
         worker = None
 
-        def fake_tesseract(_variants, _cmd, _lang, _context, _session_id, cancel_check=None):
+        def fake_tesseract(_variants, _cmd, _lang, _context, _session_id, status_callback=None, cancel_check=None):
             worker.cancel()
             self.assertTrue(cancel_check())
             return "STALE TESSERACT TEXT"

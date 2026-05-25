@@ -11,6 +11,7 @@ class LanguageInfo:
     flag_icon: str
     windows_ocr_tag: str
     tesseract_code: str
+    easyocr_code: str = ""
     google_code: str = ""
     lingva_code: str = ""
     libre_code: str = ""
@@ -94,6 +95,25 @@ def tesseract_language_code(code):
         return "eng+rus"
     language = get_language(code)
     return language.tesseract_code if language else "eng"
+
+
+def easyocr_language_code(code):
+    language = get_language(code)
+    if not language:
+        return "en"
+    if language.easyocr_code:
+        return language.easyocr_code
+    if language.code == "zh":
+        return "ch_sim"
+    return language.code
+
+
+def easyocr_language_codes(code, include_english=True):
+    easy_code = easyocr_language_code(code)
+    codes = [easy_code]
+    if include_english and easy_code != "en":
+        codes.append("en")
+    return codes
 
 
 def translator_api_code(code, engine):

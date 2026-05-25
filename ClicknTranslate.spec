@@ -1,49 +1,39 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
-hiddenimports = [
-    'argostranslate.package',
-    'argostranslate.translate',
-    'winrt.windows.media.ocr',
-    'winrt.windows.globalization',
-    'winrt.windows.graphics.imaging',
-    'winrt.windows.graphics.directx',
-    'winrt.windows.graphics.directx.direct3d11',
-    'winrt.windows.storage.streams',
-    'winrt.windows.storage',
-    'winrt.windows.foundation',
-    'winrt.windows.foundation.collections',
-    'winrt.windows.system',
-    'winrt._winrt',
-    'pypdf',
-]
-hiddenimports += collect_submodules('winrt')
+datas = [('icons', 'icons')]
+binaries = []
+hiddenimports = ['winrt', 'winrt.windows', 'winrt.windows.media', 'winrt.windows.media.ocr', 'winrt.windows.globalization', 'winrt.windows.graphics', 'winrt.windows.graphics.imaging', 'winrt.windows.storage', 'winrt.windows.storage.streams', 'winrt.windows.foundation', 'winrt.windows.foundation.collections', 'winrt.windows.system', 'winrt.windows.graphics.directx', 'winrt.windows.graphics.directx.direct3d11', 'winrt._winrt']
+tmp_ret = collect_all('pyperclip')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('PyQt5')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('PIL')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('requests')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('pytesseract')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('psutil')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('numpy')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('winrt')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('argostranslate')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[('icons', 'icons')],
+    binaries=binaries,
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'torch',
-        'tensorflow',
-        'keras',
-        'scipy',
-        'matplotlib',
-        'pandas',
-        'sklearn',
-        'cv2',
-        'tkinter',
-        '_tkinter',
-        'pytest',
-        'IPython',
-        'jupyter',
-    ],
+    excludes=['easyocr', 'torch', 'torchvision', 'tensorflow', 'keras', 'scipy', 'skimage', 'matplotlib', 'pandas', 'sklearn', 'cv2', 'tkinter', '_tkinter', 'pytest', 'IPython', 'jupyter'],
     noarchive=False,
     optimize=0,
 )

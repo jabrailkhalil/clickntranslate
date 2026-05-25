@@ -22,6 +22,9 @@ class TestLanguages(unittest.TestCase):
         self.assertEqual(languages.windows_ocr_tag("de"), "de-DE")
         self.assertEqual(languages.tesseract_language_code("de"), "deu")
         self.assertEqual(languages.tesseract_language_code("universal"), "eng+rus")
+        self.assertEqual(languages.easyocr_language_code("zh"), "ch_sim")
+        self.assertEqual(languages.easyocr_language_codes("ru"), ["ru", "en"])
+        self.assertEqual(languages.easyocr_language_codes("en"), ["en"])
 
     def test_default_translation_target_keeps_russian_as_hub(self):
         self.assertEqual(languages.default_target_for_source("de"), "ru")

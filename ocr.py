@@ -5,6 +5,7 @@ import json
 import logging
 import logging.handlers
 from datetime import datetime
+from dataclasses import dataclass
 import shutil
 import time
 
@@ -14,6 +15,7 @@ from languages import (
     LANGUAGES as APP_LANGUAGES,
     default_target_for_source,
     detect_language_code,
+    easyocr_language_codes,
     language_display_name,
     language_icon_path,
     language_short_label,
@@ -236,7 +238,15 @@ def _score_recognized_text(text):
         - repeated_noise * 1.6
     )
 
-def _prepare_tesseract_data(tess_cmd, tess_lang):
+def _tesseract_language_display_name(tess_code, interface_language=None):
+    interface_language = interface_language or get_cached_ocr_config().get("interface_language", "en")
+    for language in APP_LANGUAGES:
+        if language.tesseract_code == tess_code:
+            return language.display_name(interface_language)
+    return tess_code
+
+
+def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_check=None):
     tess_dir = os.path.dirname(tess_cmd)
     candidate_dirs = [
         os.path.join(tess_dir, "tessdata"),
@@ -254,18 +264,59 @@ def _prepare_tesseract_data(tess_cmd, tess_lang):
 
     try:
         import requests
+        interface_language = get_cached_ocr_config().get("interface_language", "en")
         for lang_code in [code for code in tess_lang.split("+") if code]:
             fname = f"{lang_code}.traineddata"
             target_path = os.path.join(tessdata_dir, fname)
             if os.path.exists(target_path):
                 continue
+            if cancel_check and cancel_check():
+                return
             url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
-            logging.info(f"Downloading {fname} ...")
-            r = requests.get(url, timeout=30, stream=True)
-            r.raise_for_status()
-            with open(target_path + ".tmp", "wb") as f:
-                shutil.copyfileobj(r.raw, f)
+            display_name = _tesseract_language_display_name(lang_code, interface_language)
+            if interface_language == "ru":
+                status_text = f"Tesseract: скачиваю языковой пакет {display_name}..."
+            else:
+                status_text = f"Tesseract: downloading {display_name} language data..."
+            if status_callback:
+                status_callback(status_text)
+            logging.info(f"Downloading {fname} into {tessdata_dir} ...")
+            tmp_path = target_path + ".tmp"
+            downloaded = 0
+            with requests.get(url, timeout=180, stream=True) as r:
+                r.raise_for_status()
+                try:
+                    total = int((r.headers.get("Content-Length") or "0").strip() or "0")
+                except Exception:
+                    total = 0
+                with open(tmp_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 1024):
+                        if cancel_check and cancel_check():
+                            try:
+                                f.close()
+                            except Exception:
+                                pass
+                            try:
+                                os.remove(tmp_path)
+                            except Exception:
+                                pass
+                            return
+                        if not chunk:
+                            continue
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if status_callback and total > 0:
+                            percent = int(downloaded * 100 / max(total, 1))
+                            if interface_language == "ru":
+                                status_callback(f"Tesseract: скачиваю {display_name}... {percent}%")
+                            else:
+                                status_callback(f"Tesseract: downloading {display_name}... {percent}%")
             os.replace(target_path + ".tmp", target_path)
+            if status_callback:
+                if interface_language == "ru":
+                    status_callback(f"Tesseract: пакет {display_name} готов")
+                else:
+                    status_callback(f"Tesseract: {display_name} language data is ready")
             logging.info(f"{fname} downloaded into {tessdata_dir}")
     except Exception as dl_err:
         logging.warning(f"Could not prepare Tesseract language data {tess_lang}: {dl_err}")
@@ -326,6 +377,7 @@ def _recognize_tesseract_variants_with_cmd(
     tess_lang,
     context,
     session_id,
+    status_callback=None,
     cancel_check=None,
 ):
     if not tess_cmd:
@@ -333,7 +385,9 @@ def _recognize_tesseract_variants_with_cmd(
         return None
 
     logging.info(f"[OCR:{session_id}] Using Tesseract at: {tess_cmd}; context={context}, lang={tess_lang}")
-    _prepare_tesseract_data(tess_cmd, tess_lang)
+    _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=status_callback, cancel_check=cancel_check)
+    if cancel_check and cancel_check():
+        return ""
 
     best_text = ""
     best_score = float("-inf")
@@ -366,6 +420,524 @@ def _recognize_tesseract_variants_with_cmd(
             f"score={best_score:.1f}, preview={_text_preview(best_text)}"
         )
     return best_text
+
+
+_RAPID_OCR_ENGINE = None
+_RAPID_OCR_IMPORT_ERROR = None
+_RAPID_OCR_LOCAL_PATHS_READY = False
+_RAPID_OCR_DLL_DIR_HANDLES = []
+
+
+def _rapidocr_local_root():
+    return (
+        os.environ.get("CLICKNTRANSLATE_RAPIDOCR_DIR")
+        or os.path.join(get_portable_dir(), "ocr", "rapidocr")
+    )
+
+
+def _rapidocr_local_candidate_paths(root_dir=None):
+    root_dir = root_dir or _rapidocr_local_root()
+    candidates = [
+        root_dir,
+        os.path.join(root_dir, "site-packages"),
+        os.path.join(root_dir, "Lib", "site-packages"),
+        os.path.join(root_dir, "lib", "site-packages"),
+    ]
+    try:
+        for name in os.listdir(root_dir):
+            lower = name.lower()
+            if lower.startswith("python") or lower in {"venv", ".venv"}:
+                candidates.append(os.path.join(root_dir, name, "Lib", "site-packages"))
+                candidates.append(os.path.join(root_dir, name, "lib", "site-packages"))
+    except Exception:
+        pass
+
+    unique = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normcase(os.path.abspath(path))
+        if normalized in seen or not os.path.isdir(path):
+            continue
+        seen.add(normalized)
+        unique.append(os.path.abspath(path))
+    return unique
+
+
+def _rapidocr_dll_candidate_paths(package_paths):
+    candidates = []
+    for path in package_paths:
+        candidates.append(path)
+        candidates.append(os.path.join(path, "onnxruntime", "capi"))
+        candidates.append(os.path.join(path, "cv2"))
+    unique = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normcase(os.path.abspath(path))
+        if normalized in seen or not os.path.isdir(path):
+            continue
+        seen.add(normalized)
+        unique.append(os.path.abspath(path))
+    return unique
+
+
+def _ensure_rapidocr_local_paths():
+    global _RAPID_OCR_LOCAL_PATHS_READY
+    if _RAPID_OCR_LOCAL_PATHS_READY:
+        return
+    package_paths = _rapidocr_local_candidate_paths()
+    for path in reversed(package_paths):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+            logging.info(f"RapidOCR local path added: {path}")
+    if hasattr(os, "add_dll_directory"):
+        for path in _rapidocr_dll_candidate_paths(package_paths):
+            try:
+                _RAPID_OCR_DLL_DIR_HANDLES.append(os.add_dll_directory(path))
+            except Exception as exc:
+                logging.debug(f"RapidOCR DLL path skipped {path}: {exc}")
+    _RAPID_OCR_LOCAL_PATHS_READY = True
+
+
+def reset_rapidocr_runtime_cache(clear_modules=False):
+    global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR, _RAPID_OCR_LOCAL_PATHS_READY
+    _RAPID_OCR_ENGINE = None
+    _RAPID_OCR_IMPORT_ERROR = None
+    _RAPID_OCR_LOCAL_PATHS_READY = False
+    while _RAPID_OCR_DLL_DIR_HANDLES:
+        handle = _RAPID_OCR_DLL_DIR_HANDLES.pop()
+        try:
+            handle.close()
+        except Exception:
+            pass
+    if clear_modules:
+        prefixes = ("rapidocr", "rapidocr_onnxruntime", "onnxruntime", "cv2")
+        for module_name in list(sys.modules):
+            if module_name in prefixes or any(module_name.startswith(prefix + ".") for prefix in prefixes):
+                sys.modules.pop(module_name, None)
+
+
+def rapidocr_importable():
+    global _RAPID_OCR_IMPORT_ERROR
+    _ensure_rapidocr_local_paths()
+    errors = []
+    try:
+        from rapidocr import RapidOCR  # noqa: F401
+        _RAPID_OCR_IMPORT_ERROR = None
+        return True, ""
+    except Exception as exc:
+        errors.append(f"rapidocr: {exc}")
+        try:
+            from rapidocr_onnxruntime import RapidOCR  # noqa: F401
+            _RAPID_OCR_IMPORT_ERROR = None
+            return True, ""
+        except Exception as legacy_exc:
+            errors.append(f"rapidocr_onnxruntime: {legacy_exc}")
+    _RAPID_OCR_IMPORT_ERROR = "; ".join(errors)
+    return False, _RAPID_OCR_IMPORT_ERROR
+
+
+def _get_rapidocr_engine():
+    global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR
+    if _RAPID_OCR_ENGINE is not None:
+        return _RAPID_OCR_ENGINE
+
+    _ensure_rapidocr_local_paths()
+    rapid_cls = None
+    errors = []
+    try:
+        from rapidocr import RapidOCR as rapid_cls
+    except Exception as exc:
+        errors.append(f"rapidocr: {exc}")
+        try:
+            from rapidocr_onnxruntime import RapidOCR as rapid_cls
+        except Exception as legacy_exc:
+            errors.append(f"rapidocr_onnxruntime: {legacy_exc}")
+
+    if rapid_cls is None:
+        _RAPID_OCR_IMPORT_ERROR = "; ".join(errors)
+        logging.error(f"RapidOCR is not available: {_RAPID_OCR_IMPORT_ERROR}")
+        return None
+
+    init_attempts = (
+        {"text_score": 0.35, "print_verbose": False},
+        {"print_verbose": False},
+        {},
+    )
+    for kwargs in init_attempts:
+        try:
+            _RAPID_OCR_ENGINE = rapid_cls(**kwargs)
+            _RAPID_OCR_IMPORT_ERROR = None
+            logging.info(f"RapidOCR engine initialized with args={kwargs}")
+            return _RAPID_OCR_ENGINE
+        except TypeError:
+            continue
+        except Exception as exc:
+            _RAPID_OCR_IMPORT_ERROR = str(exc)
+            logging.exception(f"RapidOCR initialization failed with args={kwargs}: {exc}")
+            return None
+
+    _RAPID_OCR_IMPORT_ERROR = "RapidOCR constructor signature is unsupported"
+    logging.error(_RAPID_OCR_IMPORT_ERROR)
+    return None
+
+
+def rapidocr_available():
+    return _get_rapidocr_engine() is not None
+
+
+def rapidocr_status():
+    available = rapidocr_available()
+    return available, "" if available else (_RAPID_OCR_IMPORT_ERROR or "RapidOCR is not available")
+
+
+def _rapidocr_box_origin(box):
+    try:
+        xs = [float(point[0]) for point in box]
+        ys = [float(point[1]) for point in box]
+        return min(ys), min(xs)
+    except Exception:
+        return 0.0, 0.0
+
+
+def _parse_rapidocr_output(output):
+    if isinstance(output, tuple):
+        result = output[0] if output else None
+    else:
+        result = output
+    if result is None:
+        return []
+
+    items = []
+    if hasattr(result, "txts"):
+        raw_texts = getattr(result, "txts", None)
+        raw_scores = getattr(result, "scores", None)
+        raw_boxes = getattr(result, "boxes", None)
+        texts = list(raw_texts) if raw_texts is not None else []
+        scores = list(raw_scores) if raw_scores is not None else []
+        boxes = list(raw_boxes) if raw_boxes is not None else []
+        for index, text in enumerate(texts):
+            score = scores[index] if index < len(scores) else 0.0
+            box = boxes[index] if index < len(boxes) else None
+            items.append((box, str(text or ""), float(score or 0.0)))
+    elif isinstance(result, (list, tuple)):
+        for row in result:
+            if not isinstance(row, (list, tuple)) or len(row) < 2:
+                continue
+            box = row[0]
+            text = row[1]
+            score = row[2] if len(row) >= 3 else 0.0
+            try:
+                score = float(score or 0.0)
+            except Exception:
+                score = 0.0
+            items.append((box, str(text or ""), score))
+
+    items = [
+        (box, text.strip(), score)
+        for box, text, score in items
+        if text and text.strip()
+    ]
+    items.sort(key=lambda item: _rapidocr_box_origin(item[0]))
+    return items
+
+
+def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None):
+    engine = _get_rapidocr_engine()
+    if engine is None:
+        return "", "rapidocr_unavailable"
+    auto_candidates = []
+    best_reason = "rapidocr_empty"
+
+    for label, pil_image in pil_variants or []:
+        if cancel_check and cancel_check():
+            logging.info(f"[OCR:{session_id}] RapidOCR interrupted before variant={label}; context={context}")
+            break
+        try:
+            image = pil_image.convert("RGB") if getattr(pil_image, "mode", "") != "RGB" else pil_image
+            started = time.perf_counter()
+            output = engine(image)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            if cancel_check and cancel_check():
+                logging.info(f"[OCR:{session_id}] RapidOCR interrupted after variant={label}; context={context}")
+                break
+            items = _parse_rapidocr_output(output)
+            text = "\n".join(item[1] for item in items).strip()
+            confidences = [item[2] for item in items if item[2] > 0]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            reject_reason = ""
+            if text and avg_confidence and avg_confidence < 0.28:
+                reject_reason = "low_rapidocr_confidence"
+            candidate = _make_auto_ocr_candidate(
+                text,
+                engine="rapidocr",
+                image_label=label,
+                confidence=avg_confidence,
+                boxes_count=len(items),
+                elapsed_ms=elapsed_ms,
+                reject_reason=reject_reason,
+            )
+            auto_candidates.append(candidate)
+            if candidate.reject_reason:
+                best_reason = candidate.reject_reason
+        except Exception as exc:
+            best_reason = "rapidocr_error"
+            logging.exception(f"[OCR:{session_id}] RapidOCR variant={label}; context={context} failed: {exc}")
+
+    selected, selector_reason = _select_best_auto_ocr_candidate(
+        auto_candidates,
+        session_id=session_id,
+        context=f"RapidOCR {context}",
+    )
+    if selected is not None:
+        return selected.text, ""
+    if selector_reason:
+        best_reason = selector_reason
+    return "", best_reason
+
+
+_EASY_OCR_READERS = {}
+_EASY_OCR_IMPORT_ERROR = None
+_EASY_OCR_LOCAL_PATHS_READY = False
+_EASY_OCR_DLL_DIR_HANDLES = []
+
+
+def _easyocr_local_root():
+    return (
+        os.environ.get("CLICKNTRANSLATE_EASYOCR_DIR")
+        or os.path.join(get_portable_dir(), "ocr", "easyocr")
+    )
+
+
+def _easyocr_local_candidate_paths(root_dir=None):
+    root_dir = root_dir or _easyocr_local_root()
+    candidates = [
+        root_dir,
+        os.path.join(root_dir, "site-packages"),
+        os.path.join(root_dir, "Lib", "site-packages"),
+        os.path.join(root_dir, "lib", "site-packages"),
+    ]
+    try:
+        for name in os.listdir(root_dir):
+            lower = name.lower()
+            if lower.startswith("python") or lower in {"venv", ".venv"}:
+                candidates.append(os.path.join(root_dir, name, "Lib", "site-packages"))
+                candidates.append(os.path.join(root_dir, name, "lib", "site-packages"))
+    except Exception:
+        pass
+
+    unique = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normcase(os.path.abspath(path))
+        if normalized in seen or not os.path.isdir(path):
+            continue
+        seen.add(normalized)
+        unique.append(os.path.abspath(path))
+    return unique
+
+
+def _easyocr_dll_candidate_paths(package_paths):
+    candidates = []
+    for path in package_paths:
+        candidates.append(path)
+        candidates.append(os.path.join(path, "cv2"))
+        candidates.append(os.path.join(path, "torch", "lib"))
+        candidates.append(os.path.join(path, "torchvision"))
+        candidates.append(os.path.join(path, "numpy.libs"))
+    unique = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normcase(os.path.abspath(path))
+        if normalized in seen or not os.path.isdir(path):
+            continue
+        seen.add(normalized)
+        unique.append(os.path.abspath(path))
+    return unique
+
+
+def _ensure_easyocr_local_paths():
+    global _EASY_OCR_LOCAL_PATHS_READY
+    if _EASY_OCR_LOCAL_PATHS_READY:
+        return
+    package_paths = _easyocr_local_candidate_paths()
+    for path in reversed(package_paths):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+            logging.info(f"EasyOCR local path added: {path}")
+    if hasattr(os, "add_dll_directory"):
+        for path in _easyocr_dll_candidate_paths(package_paths):
+            try:
+                _EASY_OCR_DLL_DIR_HANDLES.append(os.add_dll_directory(path))
+            except Exception as exc:
+                logging.debug(f"EasyOCR DLL path skipped {path}: {exc}")
+    _EASY_OCR_LOCAL_PATHS_READY = True
+
+
+def reset_easyocr_runtime_cache(clear_modules=False):
+    global _EASY_OCR_READERS, _EASY_OCR_IMPORT_ERROR, _EASY_OCR_LOCAL_PATHS_READY
+    _EASY_OCR_READERS = {}
+    _EASY_OCR_IMPORT_ERROR = None
+    _EASY_OCR_LOCAL_PATHS_READY = False
+    while _EASY_OCR_DLL_DIR_HANDLES:
+        handle = _EASY_OCR_DLL_DIR_HANDLES.pop()
+        try:
+            handle.close()
+        except Exception:
+            pass
+    if clear_modules:
+        prefixes = (
+            "easyocr",
+            "torch",
+            "torchvision",
+            "cv2",
+            "skimage",
+            "scipy",
+            "pyclipper",
+            "shapely",
+            "bidi",
+            "yaml",
+        )
+        for module_name in list(sys.modules):
+            if module_name in prefixes or any(module_name.startswith(prefix + ".") for prefix in prefixes):
+                sys.modules.pop(module_name, None)
+
+
+def easyocr_importable():
+    global _EASY_OCR_IMPORT_ERROR
+    _ensure_easyocr_local_paths()
+    try:
+        import easyocr  # noqa: F401
+        _EASY_OCR_IMPORT_ERROR = None
+        return True, ""
+    except Exception as exc:
+        _EASY_OCR_IMPORT_ERROR = str(exc)
+        return False, _EASY_OCR_IMPORT_ERROR
+
+
+def _easyocr_model_dir():
+    model_dir = os.path.join(_easyocr_local_root(), "models")
+    os.makedirs(model_dir, exist_ok=True)
+    return model_dir
+
+
+def _get_easyocr_reader(language_code):
+    global _EASY_OCR_IMPORT_ERROR
+    language_codes = tuple(easyocr_language_codes(language_code))
+    if language_codes in _EASY_OCR_READERS:
+        return _EASY_OCR_READERS[language_codes]
+
+    _ensure_easyocr_local_paths()
+    try:
+        import easyocr
+        model_dir = _easyocr_model_dir()
+        user_network_dir = os.path.join(_easyocr_local_root(), "user_network")
+        os.makedirs(user_network_dir, exist_ok=True)
+        reader = easyocr.Reader(
+            list(language_codes),
+            gpu=False,
+            model_storage_directory=model_dir,
+            user_network_directory=user_network_dir,
+            download_enabled=True,
+            verbose=False,
+        )
+        _EASY_OCR_READERS[language_codes] = reader
+        _EASY_OCR_IMPORT_ERROR = None
+        logging.info(f"EasyOCR reader initialized for languages={language_codes}; model_dir={model_dir}")
+        return reader
+    except Exception as exc:
+        _EASY_OCR_IMPORT_ERROR = str(exc)
+        logging.exception(f"EasyOCR reader initialization failed for languages={language_codes}: {exc}")
+        return None
+
+
+def easyocr_available(language_code="en"):
+    return _get_easyocr_reader(language_code) is not None
+
+
+def easyocr_status(language_code="en"):
+    available = easyocr_available(language_code)
+    return available, "" if available else (_EASY_OCR_IMPORT_ERROR or "EasyOCR is not available")
+
+
+def _parse_easyocr_output(output):
+    items = []
+    if output is None:
+        return items
+    for row in output:
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            continue
+        box = row[0]
+        text = row[1]
+        score = row[2] if len(row) >= 3 else 0.0
+        try:
+            score = float(score or 0.0)
+        except Exception:
+            score = 0.0
+        text = str(text or "").strip()
+        if text:
+            items.append((box, text, score))
+    items.sort(key=lambda item: _rapidocr_box_origin(item[0]))
+    return items
+
+
+def _recognize_easyocr_variants(pil_variants, language_code, context, session_id, status_callback=None, cancel_check=None):
+    if status_callback:
+        language_codes = ", ".join(easyocr_language_codes(language_code))
+        status_callback(f"EasyOCR: preparing {language_codes}")
+    reader = _get_easyocr_reader(language_code)
+    if reader is None:
+        return "", "easyocr_unavailable"
+
+    auto_candidates = []
+    best_reason = "easyocr_empty"
+    for label, pil_image in pil_variants or []:
+        if cancel_check and cancel_check():
+            logging.info(f"[OCR:{session_id}] EasyOCR interrupted before variant={label}; context={context}")
+            break
+        try:
+            image = pil_image.convert("RGB") if getattr(pil_image, "mode", "") != "RGB" else pil_image
+            import numpy as np
+            started = time.perf_counter()
+            output = reader.readtext(np.array(image), detail=1, paragraph=False)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            if cancel_check and cancel_check():
+                logging.info(f"[OCR:{session_id}] EasyOCR interrupted after variant={label}; context={context}")
+                break
+            items = _parse_easyocr_output(output)
+            text = "\n".join(item[1] for item in items).strip()
+            confidences = [item[2] for item in items if item[2] > 0]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            reject_reason = ""
+            if text and avg_confidence and avg_confidence < 0.20:
+                reject_reason = "low_easyocr_confidence"
+            candidate = _make_auto_ocr_candidate(
+                text,
+                engine="easyocr",
+                language_code=language_code,
+                image_label=label,
+                confidence=avg_confidence,
+                boxes_count=len(items),
+                elapsed_ms=elapsed_ms,
+                reject_reason=reject_reason,
+            )
+            auto_candidates.append(candidate)
+            if candidate.reject_reason:
+                best_reason = candidate.reject_reason
+        except Exception as exc:
+            best_reason = "easyocr_error"
+            logging.exception(f"[OCR:{session_id}] EasyOCR variant={label}; context={context} failed: {exc}")
+
+    selected, selector_reason = _select_best_auto_ocr_candidate(
+        auto_candidates,
+        session_id=session_id,
+        context=f"EasyOCR {context}",
+    )
+    if selected is not None:
+        return selected.text, ""
+    if selector_reason:
+        best_reason = selector_reason
+    return "", best_reason
+
 
 def _ocr_debug_artifacts_enabled():
     try:
@@ -440,7 +1012,6 @@ def _configured_ocr_translate_pair(config=None, source_code=None):
     source = _normalize_app_language_code(
         source_code or config.get("ocr_translate_source_language") or config.get("last_ocr_language"),
         "en",
-        allow_auto=True,
     )
     target = default_target_for_source(source, config.get("ocr_translate_target_language"))
     return source, target
@@ -448,12 +1019,12 @@ def _configured_ocr_translate_pair(config=None, source_code=None):
 def _combo_data_to_ocr_language(data, fallback="ru"):
     if isinstance(data, (tuple, list)) and data:
         data = data[0]
-    return _normalize_app_language_code(data, fallback, allow_universal=True, allow_auto=True)
+    return _normalize_app_language_code(data, fallback)
 
 def _combo_data_to_translate_pair(data, config=None):
     config = config or get_cached_ocr_config()
     if isinstance(data, (tuple, list)) and len(data) >= 2:
-        source = _normalize_app_language_code(data[0], "en", allow_auto=True)
+        source = _normalize_app_language_code(data[0], "en")
         target = _normalize_app_language_code(data[1], default_target_for_source(source))
         if source == target:
             target = default_target_for_source(source)
@@ -494,6 +1065,21 @@ def _write_ocr_config_updates(updates):
         logging.warning(f"Failed to save OCR config updates: {e}")
         return False
 
+
+def _remove_auto_mode_from_config(config):
+    if not isinstance(config, dict):
+        return {}
+    updates = {}
+    if str(config.get("last_ocr_language", "")).lower() in {"auto", "universal"}:
+        updates["last_ocr_language"] = "ru"
+    for key in ("ocr_translate_source_language", "fullscreen_translate_from"):
+        if str(config.get(key, "")).lower() in {"auto", "universal"}:
+            updates[key] = "en"
+    if updates:
+        config.update(updates)
+    return updates
+
+
 # --- Кэширование конфигурации ---
 _ocr_config_cache = None
 _ocr_config_mtime = 0
@@ -507,6 +1093,14 @@ def get_cached_ocr_config():
         if _ocr_config_cache is None or mtime > _ocr_config_mtime:
             with open(config_path, "r", encoding="utf-8") as f:
                 _ocr_config_cache = json.load(f)
+            auto_updates = _remove_auto_mode_from_config(_ocr_config_cache)
+            if auto_updates:
+                try:
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        json.dump(_ocr_config_cache, f, ensure_ascii=False, indent=4)
+                    mtime = os.path.getmtime(config_path)
+                except Exception as e:
+                    logging.warning(f"Failed to remove AUTO OCR config values: {e}")
             _ocr_config_mtime = mtime
     except Exception:
         if _ocr_config_cache is None:
@@ -614,7 +1208,7 @@ def save_translation_history(original_text, translated_text, language):
     threading.Thread(target=_save_translation_history_sync, args=(original_text, translated_text, language), daemon=True).start()
 
 async def run_ocr_with_engine(bitmap, engine):
-    debug_log(f"run_ocr_with_engine called")
+    debug_log("run_ocr_with_engine called")
     debug_log(f"bitmap = {bitmap}")
     debug_log(f"engine = {engine}")
     try:
@@ -733,7 +1327,7 @@ def _get_windows_ocr_engine(lang_tag: str):
                 _OCR_ENGINE_CACHE[lang_tag] = engine
                 debug_log(f"SUCCESS: OCR engine cached for {lang_tag}")
             else:
-                debug_log(f"FAILED: OcrEngine.try_create_from_language returned None")
+                debug_log("FAILED: OcrEngine.try_create_from_language returned None")
         
         result = _OCR_ENGINE_CACHE.get(lang_tag)
         debug_log(f"Returning engine: {result}")
@@ -836,7 +1430,7 @@ def _get_universal_ocr_engine():
 
 
 def qimage_to_softwarebitmap(qimage):
-    debug_log(f"qimage_to_softwarebitmap called")
+    debug_log("qimage_to_softwarebitmap called")
     debug_log(f"qimage = {qimage}, isNull = {qimage.isNull() if qimage else 'N/A'}")
     
     # Convert QImage (RGBA8888) to SoftwareBitmap without PIL
@@ -1067,6 +1661,178 @@ def _score_ocr_text_for_language(text, language_code):
     return score
 
 
+def _auto_ocr_rejection_reason(text, score):
+    text = str(text or "").strip()
+    if not text:
+        return "empty"
+
+    allowed_punctuation = set(".,:;!?-\u2013\u2014()[]{}\"'`/\\%+\u2116#@&_=<>$€£¥|")
+    alnum = sum(1 for ch in text if ch.isalnum())
+    alpha = sum(1 for ch in text if ch.isalpha())
+    digits = sum(1 for ch in text if ch.isdigit())
+    noise = sum(1 for ch in text if not ch.isalnum() and not ch.isspace() and ch not in allowed_punctuation)
+    compact_len = len(text.replace(" ", "").replace("\n", "").replace("\t", ""))
+
+    if compact_len < 2:
+        return "too_short"
+    if alnum <= 0:
+        return "no_text_signal"
+    if noise > max(2, alnum // 2):
+        return "too_noisy"
+    if alpha <= 0:
+        return "" if digits >= 2 and noise <= 1 else "numeric_signal_too_weak"
+    if score >= 8.0:
+        return ""
+    if alnum >= 4 and noise == 0 and score >= 0.0:
+        return ""
+    return "low_confidence"
+
+
+def _is_acceptable_auto_ocr_text(text, score):
+    return _auto_ocr_rejection_reason(text, score) == ""
+
+
+@dataclass
+class AutoOcrCandidate:
+    text: str
+    engine: str = ""
+    language_code: str = ""
+    image_label: str = ""
+    confidence: float = 0.0
+    boxes_count: int = 0
+    elapsed_ms: float = 0.0
+    score: float = float("-inf")
+    reject_reason: str = ""
+    detected_language: str = ""
+
+
+def _normalized_auto_candidate_text(text):
+    return " ".join(str(text or "").split()).strip().lower()
+
+
+def _is_numeric_auto_candidate(text):
+    text = str(text or "").strip()
+    alnum = sum(1 for ch in text if ch.isalnum())
+    alpha = sum(1 for ch in text if ch.isalpha())
+    digits = sum(1 for ch in text if ch.isdigit())
+    return alnum >= 2 and digits >= 2 and alpha == 0
+
+
+def _make_auto_ocr_candidate(
+    text,
+    engine,
+    language_code="",
+    image_label="",
+    confidence=0.0,
+    boxes_count=0,
+    elapsed_ms=0.0,
+    reject_reason="",
+):
+    text = str(text or "").strip()
+    detected = detect_language_code(text) if text else ""
+    generic_score = _score_recognized_text(text)
+    if language_code and language_code not in {"auto", "universal"}:
+        language_score = _score_ocr_text_for_language(text, language_code)
+    elif detected:
+        language_score = _score_ocr_text_for_language(text, detected)
+    else:
+        language_score = generic_score
+
+    score = max(generic_score, language_score)
+    try:
+        confidence = float(confidence or 0.0)
+    except Exception:
+        confidence = 0.0
+    if confidence > 0:
+        score += min(confidence, 1.0) * 42.0
+    if boxes_count:
+        score += min(int(boxes_count), 16) * 1.4
+    if engine == "rapidocr" and boxes_count:
+        score += 6.0
+    if language_code == "universal" and detected:
+        score += 4.0
+
+    reason = reject_reason or _auto_ocr_rejection_reason(text, score)
+    return AutoOcrCandidate(
+        text=text,
+        engine=engine,
+        language_code=language_code or "",
+        image_label=image_label or "",
+        confidence=confidence,
+        boxes_count=int(boxes_count or 0),
+        elapsed_ms=float(elapsed_ms or 0.0),
+        score=score,
+        reject_reason=reason,
+        detected_language=detected or "",
+    )
+
+
+def _apply_auto_ocr_consensus_bonus(candidates):
+    counts = {}
+    for candidate in candidates:
+        normalized = _normalized_auto_candidate_text(candidate.text)
+        if normalized:
+            counts[normalized] = counts.get(normalized, 0) + 1
+    for candidate in candidates:
+        normalized = _normalized_auto_candidate_text(candidate.text)
+        duplicates = counts.get(normalized, 0) - 1
+        if duplicates > 0:
+            candidate.score += min(18.0, duplicates * 8.0)
+
+
+def _select_best_auto_ocr_candidate(candidates, session_id="unknown", context="AUTO"):
+    candidates = list(candidates or [])
+    _apply_auto_ocr_consensus_bonus(candidates)
+    for candidate in candidates:
+        logging.info(
+            f"[OCR:{session_id}] {context} candidate; engine={candidate.engine}, "
+            f"lang={candidate.language_code or '-'}, detected={candidate.detected_language or '-'}, "
+            f"variant={candidate.image_label or '-'}, boxes={candidate.boxes_count}, "
+            f"conf={candidate.confidence:.3f}, score={candidate.score:.1f}, "
+            f"reject={candidate.reject_reason or '-'}, preview={_text_preview(candidate.text)}"
+        )
+
+    accepted = [
+        candidate for candidate in candidates
+        if candidate.text and not candidate.reject_reason
+    ]
+    if not accepted:
+        reasons = [candidate.reject_reason for candidate in candidates if candidate.reject_reason]
+        return None, reasons[0] if reasons else "empty"
+
+    accepted.sort(key=lambda candidate: candidate.score, reverse=True)
+    best = accepted[0]
+    best_normalized = _normalized_auto_candidate_text(best.text)
+    second = next(
+        (
+            candidate for candidate in accepted[1:]
+            if _normalized_auto_candidate_text(candidate.text) != best_normalized
+        ),
+        None,
+    )
+    if second is not None and best.score < 72.0 and (best.score - second.score) < 7.0:
+        logging.info(
+            f"[OCR:{session_id}] {context} rejected ambiguous candidates; "
+            f"best={best.score:.1f}/{_text_preview(best.text)}, "
+            f"second={second.score:.1f}/{_text_preview(second.text)}"
+        )
+        return None, "ambiguous_candidates"
+
+    if not _is_numeric_auto_candidate(best.text) and best.score < 34.0:
+        logging.info(
+            f"[OCR:{session_id}] {context} rejected weak best candidate; "
+            f"score={best.score:.1f}, preview={_text_preview(best.text)}"
+        )
+        return None, "low_confidence"
+
+    logging.info(
+        f"[OCR:{session_id}] {context} selected; engine={best.engine}, "
+        f"lang={best.language_code or '-'}, variant={best.image_label or '-'}, "
+        f"score={best.score:.1f}, preview={_text_preview(best.text)}"
+    )
+    return best, ""
+
+
 def _match_available_windows_ocr_tag(expected_tag, available_by_tag):
     expected_key = str(expected_tag or "").lower()
     if expected_key in available_by_tag:
@@ -1098,55 +1864,150 @@ def _windows_auto_ocr_candidates(config=None):
     return candidates
 
 
-def _recognize_with_windows_auto(bitmap):
+def _coerce_ocr_attempts(attempts_or_bitmap):
+    if attempts_or_bitmap is None:
+        return []
+    if (
+        isinstance(attempts_or_bitmap, tuple)
+        and len(attempts_or_bitmap) == 2
+        and isinstance(attempts_or_bitmap[0], str)
+    ):
+        label, bitmap = attempts_or_bitmap
+        return [(label, bitmap)] if bitmap is not None else []
+    if isinstance(attempts_or_bitmap, (list, tuple)):
+        attempts = []
+        for index, item in enumerate(attempts_or_bitmap):
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                label, bitmap = item
+            else:
+                label, bitmap = f"attempt-{index + 1}", item
+            if bitmap is not None:
+                attempts.append((str(label), bitmap))
+        return attempts
+    return [("primary", attempts_or_bitmap)]
+
+
+def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_id="unknown"):
+    attempts = _coerce_ocr_attempts(attempts_or_bitmap)
+    if not attempts:
+        logging.warning(f"[OCR:{session_id}] Windows OCR AUTO has no bitmap attempts.")
+        return ""
+    if cancel_check is None:
+        def cancel_check():
+            return False
+
     candidates = _windows_auto_ocr_candidates()
-    if not candidates:
-        logging.warning("Windows OCR AUTO has no installed candidate languages; falling back to universal engine.")
-        engine = _get_universal_ocr_engine()
-        if engine is None:
-            return ""
-        loop = _get_ocr_event_loop()
-        asyncio.set_event_loop(loop)
-        recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, engine))
-        return _windows_ocr_result_to_text(recognized)
-
-    loop = _get_ocr_event_loop()
+    loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    auto_candidates = []
+    try:
+        if candidates:
+            for code, tag in candidates:
+                if cancel_check():
+                    logging.info(f"[OCR:{session_id}] Windows OCR AUTO interrupted before candidate lang={code}, tag={tag}")
+                    break
+                engine = _get_windows_ocr_engine(tag)
+                if engine is None:
+                    continue
+                for attempt_label, bitmap in attempts:
+                    if cancel_check():
+                        logging.info(
+                            f"[OCR:{session_id}] Windows OCR AUTO interrupted before "
+                            f"candidate lang={code}, attempt={attempt_label}"
+                        )
+                        break
+                    try:
+                        started = time.perf_counter()
+                        recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, engine))
+                        elapsed_ms = (time.perf_counter() - started) * 1000.0
+                        if cancel_check():
+                            logging.info(
+                                f"[OCR:{session_id}] Windows OCR AUTO interrupted after "
+                                f"candidate lang={code}, attempt={attempt_label}"
+                            )
+                            break
+                        text = _windows_ocr_result_to_text(recognized)
+                        auto_candidates.append(
+                            _make_auto_ocr_candidate(
+                                text,
+                                engine="windows",
+                                language_code=code,
+                                image_label=attempt_label,
+                                elapsed_ms=elapsed_ms,
+                            )
+                        )
+                    except Exception as e:
+                        logging.exception(
+                            f"[OCR:{session_id}] Windows OCR AUTO candidate failed; "
+                            f"lang={code}, tag={tag}, attempt={attempt_label}: {e}"
+                        )
+        else:
+            logging.warning(
+                f"[OCR:{session_id}] Windows OCR AUTO has no installed candidate languages; "
+                "falling back to universal engine."
+            )
 
-    best_text = ""
-    best_score = float("-inf")
-    best_code = ""
-    best_tag = ""
-    for code, tag in candidates:
-        engine = _get_windows_ocr_engine(tag)
-        if engine is None:
-            continue
-        recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, engine))
-        text = _windows_ocr_result_to_text(recognized)
-        score = _score_ocr_text_for_language(text, code)
-        detected = detect_language_code(text) if text else ""
-        logging.info(
-            f"Windows OCR AUTO candidate; lang={code}, tag={tag}, score={score:.1f}, "
-            f"detected={detected or '-'}, len={len(text)}, preview={_text_preview(text)}"
-        )
-        if text and score > best_score:
-            best_text = text
-            best_score = score
-            best_code = code
-            best_tag = tag
+        if not cancel_check():
+            try:
+                universal_engine = _get_universal_ocr_engine()
+                if universal_engine is not None:
+                    logging.info(f"[OCR:{session_id}] Windows OCR AUTO running universal/user-profile pass")
+                    for attempt_label, bitmap in attempts:
+                        if cancel_check():
+                            logging.info(
+                                f"[OCR:{session_id}] Windows OCR AUTO universal interrupted before attempt={attempt_label}"
+                            )
+                            break
+                        try:
+                            started = time.perf_counter()
+                            recognized = loop.run_until_complete(run_ocr_with_engine(bitmap, universal_engine))
+                            elapsed_ms = (time.perf_counter() - started) * 1000.0
+                            if cancel_check():
+                                logging.info(
+                                    f"[OCR:{session_id}] Windows OCR AUTO universal interrupted after attempt={attempt_label}"
+                                )
+                                break
+                            text = _windows_ocr_result_to_text(recognized)
+                            auto_candidates.append(
+                                _make_auto_ocr_candidate(
+                                    text,
+                                    engine="windows-universal",
+                                    language_code="universal",
+                                    image_label=attempt_label,
+                                    elapsed_ms=elapsed_ms,
+                                )
+                            )
+                        except Exception as e:
+                            logging.exception(
+                                f"[OCR:{session_id}] Windows OCR AUTO universal failed; attempt={attempt_label}: {e}"
+                            )
+            except Exception as e:
+                logging.exception(f"[OCR:{session_id}] Windows OCR AUTO universal setup failed: {e}")
 
-    if best_text:
-        logging.info(
-            f"Windows OCR AUTO selected; lang={best_code}, tag={best_tag}, "
-            f"score={best_score:.1f}, preview={_text_preview(best_text)}"
+        selected, reason = _select_best_auto_ocr_candidate(
+            auto_candidates,
+            session_id=session_id,
+            context="Windows OCR AUTO",
         )
-    else:
-        logging.warning("Windows OCR AUTO did not recognize text with any candidate language.")
-    return best_text
+        if selected is not None:
+            return selected.text
+        if cancel_check():
+            logging.info(f"[OCR:{session_id}] Windows OCR AUTO stopped after cancellation.")
+        else:
+            logging.warning(
+                f"[OCR:{session_id}] Windows OCR AUTO did not produce a reliable candidate; reason={reason}"
+            )
+        return ""
+    finally:
+        try:
+            loop.close()
+        except Exception:
+            pass
 
 
 class OCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
+    status_update = QtCore.pyqtSignal(str)
     def __init__(self, bitmap, language_code, parent=None, use_universal=False, attempts=None, session_id="unknown"):
         super().__init__(parent)
         self.bitmap = bitmap
@@ -1158,6 +2019,7 @@ class OCRWorker(QtCore.QThread):
         self.tesseract_fallback_enabled = False
         self.tesseract_cmd = None
         self.tesseract_fallback_attempted = False
+        self.failure_reason = None
         if attempts is None:
             attempts = [("primary", bitmap)]
         self.attempts = [(str(label), attempt_bitmap) for label, attempt_bitmap in attempts if attempt_bitmap is not None]
@@ -1200,7 +2062,7 @@ class OCRWorker(QtCore.QThread):
         return recognized_text
 
     def run(self):
-        debug_log(f"OCRWorker.run() started")
+        debug_log("OCRWorker.run() started")
         debug_log(f"self.bitmap = {self.bitmap}")
         debug_log(f"self.language_code = {self.language_code}")
         debug_log(f"self.use_universal = {self.use_universal}")
@@ -1210,9 +2072,59 @@ class OCRWorker(QtCore.QThread):
             # Выбираем engine в зависимости от режима
             if self.use_universal:
                 debug_log("Using Windows OCR AUTO language selection")
-                recognized_text = _recognize_with_windows_auto(self.bitmap)
+                recognized_text = _recognize_with_windows_auto(
+                    self.attempts,
+                    cancel_check=self._is_cancelled,
+                    session_id=self.session_id,
+                )
+                if (
+                    not recognized_text
+                    and self.tesseract_fallback_enabled
+                    and self.fallback_pil_variants
+                    and self.tesseract_cmd
+                    and not self._is_cancelled()
+                ):
+                    self.tesseract_fallback_attempted = True
+                    tess_lang = tesseract_language_code(self.language_code)
+                    logging.info(
+                        f"[OCR:{self.session_id}] Windows OCR AUTO empty; running Tesseract fallback; "
+                        f"lang={tess_lang}, variants={[label for label, _image in self.fallback_pil_variants]}"
+                    )
+                    recognized_text = _recognize_tesseract_variants_with_cmd(
+                        self.fallback_pil_variants,
+                        self.tesseract_cmd,
+                        tess_lang,
+                        "windows-auto-empty-fallback",
+                        self.session_id,
+                        status_callback=self.status_update.emit,
+                        cancel_check=self._is_cancelled,
+                    ) or ""
+                    if recognized_text:
+                        candidate = _make_auto_ocr_candidate(
+                            recognized_text,
+                            engine="tesseract",
+                            language_code=self.language_code,
+                            image_label="fallback",
+                        )
+                        selected, reject_reason = _select_best_auto_ocr_candidate(
+                            [candidate],
+                            session_id=self.session_id,
+                            context="Windows OCR AUTO Tesseract fallback",
+                        )
+                        if reject_reason:
+                            logging.info(
+                                f"[OCR:{self.session_id}] Windows OCR AUTO Tesseract fallback rejected; "
+                                f"reason={reject_reason}, score={candidate.score:.1f}, "
+                                f"preview={_text_preview(recognized_text)}"
+                            )
+                            recognized_text = ""
+                        elif selected is not None:
+                            recognized_text = selected.text
                 debug_log(f"Emitting AUTO result: '{recognized_text[:50]}...' (len={len(recognized_text)})")
-                self.result_ready.emit(recognized_text)
+                if not recognized_text and not self._is_cancelled():
+                    self.failure_reason = "auto_low_confidence_or_empty"
+                if not self._is_cancelled():
+                    self.result_ready.emit(recognized_text)
                 return
             else:
                 lang_tag = windows_ocr_tag(self.language_code)
@@ -1237,6 +2149,7 @@ class OCRWorker(QtCore.QThread):
                         tess_lang,
                         "windows-engine-missing-fallback",
                         self.session_id,
+                        status_callback=self.status_update.emit,
                         cancel_check=self._is_cancelled,
                     ) or ""
                 if not self._is_cancelled():
@@ -1367,6 +2280,7 @@ class OCRWorker(QtCore.QThread):
                     tess_lang,
                     "windows-empty-fallback",
                     self.session_id,
+                    status_callback=self.status_update.emit,
                     cancel_check=self._is_cancelled,
                 ) or ""
 
@@ -1390,6 +2304,7 @@ class OCRWorker(QtCore.QThread):
 
 class TesseractOCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
+    status_update = QtCore.pyqtSignal(str)
 
     def __init__(self, pil_variants, language_code, tess_cmd, context, session_id, parent=None):
         super().__init__(parent)
@@ -1399,6 +2314,7 @@ class TesseractOCRWorker(QtCore.QThread):
         self.context = context
         self.session_id = session_id
         self.cancel_requested = False
+        self.failure_reason = None
 
     def cancel(self):
         self.cancel_requested = True
@@ -1426,9 +2342,32 @@ class TesseractOCRWorker(QtCore.QThread):
                     tess_lang,
                     self.context,
                     self.session_id,
+                    status_callback=self.status_update.emit,
                     cancel_check=self._is_cancelled,
                 ) or ""
+                if self.language_code in {"universal", "auto"} and text:
+                    candidate = _make_auto_ocr_candidate(
+                        text,
+                        engine="tesseract",
+                        language_code="universal",
+                        image_label=self.context,
+                    )
+                    selected, reason = _select_best_auto_ocr_candidate(
+                        [candidate],
+                        session_id=self.session_id,
+                        context=f"Tesseract AUTO {self.context}",
+                    )
+                    if selected is None:
+                        self.failure_reason = "auto_low_confidence_or_empty"
+                        logging.info(
+                            f"[OCR:{self.session_id}] Tesseract AUTO result rejected; "
+                            f"reason={reason}, preview={_text_preview(text)}"
+                        )
+                        text = ""
+                    else:
+                        text = selected.text
         except Exception as e:
+            self.failure_reason = "tesseract_error"
             logging.exception(f"[OCR:{self.session_id}] TesseractOCRWorker failed: {e}")
 
         if self._is_cancelled():
@@ -1439,6 +2378,113 @@ class TesseractOCRWorker(QtCore.QThread):
             f"text_len={len(text or '')}, preview={_text_preview(text)}"
         )
         self.result_ready.emit(text)
+
+
+class RapidOCRWorker(QtCore.QThread):
+    result_ready = QtCore.pyqtSignal(str)
+    status_update = QtCore.pyqtSignal(str)
+
+    def __init__(self, pil_variants, context, session_id, parent=None):
+        super().__init__(parent)
+        self.pil_variants = list(pil_variants or [])
+        self.context = context
+        self.session_id = session_id
+        self.cancel_requested = False
+        self.failure_reason = None
+
+    def cancel(self):
+        self.cancel_requested = True
+        self.requestInterruption()
+
+    def _is_cancelled(self):
+        return self.cancel_requested or self.isInterruptionRequested()
+
+    def run(self):
+        logging.info(
+            f"[OCR:{self.session_id}] RapidOCRWorker started; context={self.context}, "
+            f"variants={[label for label, _image in self.pil_variants]}"
+        )
+        text = ""
+        try:
+            if not self.pil_variants:
+                self.failure_reason = "rapidocr_empty"
+                logging.error(f"[OCR:{self.session_id}] RapidOCR worker has no image variants")
+            else:
+                text, failure_reason = _recognize_rapidocr_variants(
+                    self.pil_variants,
+                    self.context,
+                    self.session_id,
+                    cancel_check=self._is_cancelled,
+                )
+                self.failure_reason = failure_reason or None
+        except Exception as e:
+            self.failure_reason = "rapidocr_error"
+            logging.exception(f"[OCR:{self.session_id}] RapidOCRWorker failed: {e}")
+
+        if self._is_cancelled():
+            logging.info(f"[OCR:{self.session_id}] RapidOCR worker result suppressed after interruption")
+            return
+        logging.info(
+            f"[OCR:{self.session_id}] RapidOCRWorker finished; "
+            f"text_len={len(text or '')}, failure={self.failure_reason or '-'}, preview={_text_preview(text)}"
+        )
+        self.result_ready.emit(text)
+
+
+class EasyOCRWorker(QtCore.QThread):
+    result_ready = QtCore.pyqtSignal(str)
+    status_update = QtCore.pyqtSignal(str)
+
+    def __init__(self, pil_variants, language_code, context, session_id, parent=None):
+        super().__init__(parent)
+        self.pil_variants = list(pil_variants or [])
+        self.language_code = language_code
+        self.context = context
+        self.session_id = session_id
+        self.cancel_requested = False
+        self.failure_reason = None
+
+    def cancel(self):
+        self.cancel_requested = True
+        self.requestInterruption()
+
+    def _is_cancelled(self):
+        return self.cancel_requested or self.isInterruptionRequested()
+
+    def run(self):
+        logging.info(
+            f"[OCR:{self.session_id}] EasyOCRWorker started; context={self.context}, "
+            f"language={self.language_code}, easyocr_languages={easyocr_language_codes(self.language_code)}, "
+            f"variants={[label for label, _image in self.pil_variants]}"
+        )
+        text = ""
+        try:
+            if not self.pil_variants:
+                self.failure_reason = "easyocr_empty"
+                logging.error(f"[OCR:{self.session_id}] EasyOCR worker has no image variants")
+            else:
+                text, failure_reason = _recognize_easyocr_variants(
+                    self.pil_variants,
+                    self.language_code,
+                    self.context,
+                    self.session_id,
+                    status_callback=self.status_update.emit,
+                    cancel_check=self._is_cancelled,
+                )
+                self.failure_reason = failure_reason or None
+        except Exception as e:
+            self.failure_reason = "easyocr_error"
+            logging.exception(f"[OCR:{self.session_id}] EasyOCRWorker failed: {e}")
+
+        if self._is_cancelled():
+            logging.info(f"[OCR:{self.session_id}] EasyOCR worker result suppressed after interruption")
+            return
+        logging.info(
+            f"[OCR:{self.session_id}] EasyOCRWorker finished; "
+            f"text_len={len(text or '')}, failure={self.failure_reason or '-'}, preview={_text_preview(text)}"
+        )
+        self.result_ready.emit(text)
+
 
 class ScreenCaptureOverlay(QWidget):
     def __init__(self, mode="ocr", defer_show=False):
@@ -1458,6 +2504,7 @@ class ScreenCaptureOverlay(QWidget):
         self._ignore_ocr_results = False
         self._handling_ocr_result = False
         self._ocr_worker_session_id = None
+        self._ocr_status_text = ""
         self._last_ocr_raw_capture = None
         self._last_ocr_pil_variants = []
         self._last_ocr_capture_meta = {}
@@ -1467,7 +2514,7 @@ class ScreenCaptureOverlay(QWidget):
         if self.mode == "translate":
             self.current_language, self.current_target_language = _configured_ocr_translate_pair(config)
         else:
-            self.current_language = config.get("last_ocr_language", "ru")
+            self.current_language = _normalize_app_language_code(config.get("last_ocr_language"), "ru")
             self.current_target_language = None
         self.setWindowFlags(
             QtCore.Qt.Tool |
@@ -1492,9 +2539,7 @@ class ScreenCaptureOverlay(QWidget):
         self.target_lang_combo = None
         self.translate_arrow_label = None
         
-        # В режиме copy добавляем опцию "Универсальный" первой (эмодзи планеты)
         if self.mode == "copy":
-            self.lang_combo.addItem("🌐  AUTO", "universal")
             for language in APP_LANGUAGES:
                 self.lang_combo.addItem(
                     QtGui.QIcon(resource_path(language_icon_path(language.code))),
@@ -1502,7 +2547,6 @@ class ScreenCaptureOverlay(QWidget):
                     language.code,
                 )
         elif self.mode == "translate":
-            self.lang_combo.addItem("AUTO", "auto")
             # В режиме translate источник и цель выбираются отдельно прямо в OCR-оверлее.
             for language in APP_LANGUAGES:
                 self.lang_combo.addItem(
@@ -1532,15 +2576,8 @@ class ScreenCaptureOverlay(QWidget):
                 )
         
         # Устанавливаем индекс на основе self.current_language (сохраненного)
-        if self.mode == "copy":
-            if self.current_language == "universal":
-                default_index = 0
-            else:
-                idx = self.lang_combo.findData(self.current_language)
-                default_index = idx if idx >= 0 else 0
-        else:
-            idx = self.lang_combo.findData(self.current_language)
-            default_index = idx if idx >= 0 else 0
+        idx = self.lang_combo.findData(self.current_language)
+        default_index = idx if idx >= 0 else 0
         self.lang_combo.setCurrentIndex(default_index)
         
         # Матовый dark-style: ровный popup, читаемые подписи, тонкий кастомный scrollbar.
@@ -1645,7 +2682,7 @@ class ScreenCaptureOverlay(QWidget):
         if self.target_lang_combo is not None:
             self.target_lang_combo.setFixedSize(combo_width, 46)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
-        # Показываем комбобокс (в режиме copy есть опция AUTO)
+        # Показываем комбобокс выбора конкретного языка.
         self.lang_combo.setVisible(True if not defer_show else False)
         if self.translate_arrow_label is not None:
             self.translate_arrow_label.setVisible(True if not defer_show else False)
@@ -1705,7 +2742,6 @@ class ScreenCaptureOverlay(QWidget):
                 language_code = _normalize_app_language_code(
                     config.get("last_ocr_language", self.current_language),
                     "ru",
-                    allow_universal=True,
                 )
                 idx = self.lang_combo.findData(language_code)
                 if idx >= 0:
@@ -1788,6 +2824,7 @@ class ScreenCaptureOverlay(QWidget):
             self._ignore_ocr_results = False
             self._handling_ocr_result = False
             self._ocr_worker_session_id = None
+            self._ocr_status_text = ""
             self._last_ocr_raw_capture = None
             self._last_ocr_pil_variants = []
             self._last_ocr_capture_meta = {}
@@ -1924,6 +2961,15 @@ class ScreenCaptureOverlay(QWidget):
         except Exception as e:
             logging.warning(f"[OCR:{session_id}] Failed to flush overlay paint before capture: {e}")
 
+    def _default_ocr_status_text(self):
+        lang = get_cached_ocr_config().get("interface_language", "en")
+        return "Распознаю текст..." if lang == "ru" else "Recognizing text..."
+
+    @QtCore.pyqtSlot(str)
+    def _set_ocr_status_text(self, text):
+        self._ocr_status_text = str(text or "")
+        self.update()
+
     def closeEvent(self, event):
         # Сначала убираем себя из активных оверлеев
         try:
@@ -2010,6 +3056,27 @@ class ScreenCaptureOverlay(QWidget):
             inner_pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(inner_pen)
             painter.drawRect(rect.adjusted(1, 1, -1, -1))
+
+        if self._ocr_in_progress and getattr(self, "_ocr_status_text", ""):
+            text = self._ocr_status_text
+            font = QtGui.QFont("Segoe UI", 11)
+            font.setWeight(QtGui.QFont.DemiBold)
+            painter.setFont(font)
+            metrics = QtGui.QFontMetrics(font)
+            text_width = min(metrics.horizontalAdvance(text), max(120, self.width() - 80))
+            box_width = min(max(220, text_width + 36), max(220, self.width() - 40))
+            box_height = 42
+            box = QtCore.QRect(
+                max(20, (self.width() - box_width) // 2),
+                78,
+                box_width,
+                box_height,
+            )
+            painter.setPen(QtGui.QPen(QtGui.QColor(140, 170, 210, 170), 1))
+            painter.setBrush(QtGui.QColor(18, 22, 30, 232))
+            painter.drawRoundedRect(box, 10, 10)
+            painter.setPen(QtGui.QColor(245, 248, 252))
+            painter.drawText(box.adjusted(14, 0, -14, 0), QtCore.Qt.AlignCenter, text)
             
         painter.end()
 
@@ -2092,6 +3159,7 @@ class ScreenCaptureOverlay(QWidget):
             self.last_rect = rect
             logging.info(f"[OCR:{self._session_id}] Selection accepted; rect=({_rect_to_text(rect)})")
             self._ocr_in_progress = True
+            self._ocr_status_text = self._default_ocr_status_text()
             self.start_point = None
             self.end_point = None
             self._selection_started_at = None
@@ -2125,7 +3193,7 @@ class ScreenCaptureOverlay(QWidget):
                 source_code, target_code = self._current_translate_pair()
                 self.current_language = source_code
                 self.current_target_language = target_code
-                updates["last_ocr_language"] = "universal" if source_code == "auto" else source_code
+                updates["last_ocr_language"] = source_code
                 updates["ocr_translate_source_language"] = source_code
                 updates["ocr_translate_target_language"] = target_code
             if _write_ocr_config_updates(updates):
@@ -2138,7 +3206,7 @@ class ScreenCaptureOverlay(QWidget):
 
     @staticmethod
     def get_ocr_engine():
-        """Return selected OCR engine from config.json ('Windows' or 'Tesseract')."""
+        """Return selected OCR engine from config.json."""
         return get_cached_ocr_config().get("ocr_engine", "Windows")
 
     # Кэш пути к Tesseract
@@ -2443,6 +3511,31 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
         self.ocr_worker.start()
 
+    def _start_rapidocr_worker(self, pil_variants, context, session_id):
+        self.ocr_worker = RapidOCRWorker(
+            pil_variants,
+            context,
+            session_id,
+        )
+        self._ocr_worker_session_id = session_id
+        self.ocr_worker.status_update.connect(self._set_ocr_status_text)
+        self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
+        self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.start()
+
+    def _start_easyocr_worker(self, pil_variants, language_code, context, session_id):
+        self.ocr_worker = EasyOCRWorker(
+            pil_variants,
+            language_code,
+            context,
+            session_id,
+        )
+        self._ocr_worker_session_id = session_id
+        self.ocr_worker.status_update.connect(self._set_ocr_status_text)
+        self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
+        self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.start()
+
     def _persist_failed_ocr_artifacts(self, reason):
         session_id = getattr(self, "_session_id", "unknown")
         saved = []
@@ -2533,7 +3626,7 @@ class ScreenCaptureOverlay(QWidget):
         )
 
         # ===== PIL-обработка для улучшения качества OCR =====
-        from PIL import Image, ImageEnhance, ImageOps, ImageFilter, ImageStat
+        from PIL import Image, ImageEnhance, ImageOps, ImageStat
 
         # QImage → PIL (через копирование данных для безопасности)
         qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
@@ -2568,7 +3661,6 @@ class ScreenCaptureOverlay(QWidget):
         # Windows OCR лучше всего работает при высоте текста ~35-50px
         # Используем высоту выделения как основной ориентир
         height = pil_image.height
-        TARGET_TEXT_HEIGHT = 48.0
 
         if height < 20:
             scale_factor = 6.0
@@ -2717,7 +3809,7 @@ class ScreenCaptureOverlay(QWidget):
             source_code, target_code = self._current_translate_pair()
             self.current_language = source_code
             self.current_target_language = target_code
-            language_code = "universal" if source_code == "auto" else source_code
+            language_code = source_code
             updates["last_ocr_language"] = language_code
             updates["ocr_translate_source_language"] = source_code
             updates["ocr_translate_target_language"] = target_code
@@ -2738,8 +3830,23 @@ class ScreenCaptureOverlay(QWidget):
             self._start_tesseract_worker(tess_variants, language_code, "primary", session_id)
             return  # Не использовать Windows OCR ниже
 
+        if ocr_engine_type in {"rapidocr", "rapid"}:
+            rapid_variants = [
+                (label, image.convert("RGB") if image.mode != "RGB" else image)
+                for label, image in ocr_pil_variants
+            ]
+            self._start_rapidocr_worker(rapid_variants, "primary", session_id)
+            return  # RapidOCR сам делает text detection + recognition и возвращает confidence
+
+        if ocr_engine_type in {"easyocr", "easy"}:
+            easy_variants = [
+                (label, image.convert("RGB") if image.mode != "RGB" else image)
+                for label, image in ocr_pil_variants
+            ]
+            self._start_easyocr_worker(easy_variants, language_code, "primary", session_id)
+            return  # EasyOCR использует выбранный язык + английский fallback для смешанного текста
+
         # По умолчанию используем Windows OCR (без PIL)
-        # Используем универсальный OCR если выбрано "universal" (AUTO)
         use_universal = (language_code == "universal")
         if use_universal:
             logging.info(f"[OCR:{session_id}] Running Windows OCR in UNIVERSAL mode (auto-detect language)")
@@ -2814,6 +3921,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.tesseract_fallback_enabled = bool(self.ocr_worker.tesseract_cmd)
         
         self._ocr_worker_session_id = session_id
+        self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
         self.ocr_worker.start()
@@ -2851,6 +3959,7 @@ class ScreenCaptureOverlay(QWidget):
             self._handling_ocr_result = False
             self._ocr_in_progress = False
             self._ocr_worker_session_id = None
+            self._ocr_status_text = ""
 
     def _handle_ocr_result_inner(self, text):
         session_id = getattr(self, "_session_id", "unknown")
@@ -2897,12 +4006,6 @@ class ScreenCaptureOverlay(QWidget):
             if self.mode == "translate":
                 from translater import translate_text
                 source_code, target_code = self._current_translate_pair()
-                if source_code == "auto":
-                    detected_source = detect_language_code(text)
-                    if detected_source:
-                        source_code = detected_source
-                    if source_code == target_code:
-                        target_code = default_target_for_source(source_code)
                 logging.info(
                     f"[OCR:{session_id}] Translating from {source_code.upper()} to {target_code.upper()}; "
                     f"source_len={len(text)}"
@@ -2978,25 +4081,115 @@ class ScreenCaptureOverlay(QWidget):
             msg = QMessageBox()
             msg.setWindowIcon(QtGui.QIcon(resource_path("icons/icon.ico")))
             msg.setIcon(QMessageBox.NoIcon)
+            worker = getattr(self, "ocr_worker", None)
+            failure_reason = getattr(worker, "failure_reason", "") if worker is not None else ""
             
             if lang == "ru":
                 msg.setWindowTitle("Не удалось распознать")
-                msg.setText("😔 Текст не распознан")
-                msg.setInformativeText(
-                    "Попробуйте:\n"
-                    "• Выделить область с более крупным текстом\n"
-                    "• Убедиться, что текст контрастный\n"
-                    "• Выбрать другой OCR движок в настройках"
-                )
+                if failure_reason == "rapidocr_unavailable":
+                    msg.setText("RapidOCR недоступен")
+                    msg.setInformativeText(
+                        "Движок RapidOCR не установлен или не загрузился.\n\n"
+                        "Попробуйте:\n"
+                        "• Выбрать RapidOCR в настройках и установить локальный пакет\n"
+                        "• Выбрать Windows или Tesseract в настройках OCR"
+                    )
+                elif failure_reason == "easyocr_unavailable":
+                    msg.setText("EasyOCR недоступен")
+                    msg.setInformativeText(
+                        "Движок EasyOCR не установлен или не загрузился.\n\n"
+                        "Попробуйте:\n"
+                        "• Выбрать EasyOCR в настройках и установить локальный пакет\n"
+                        "• Выбрать Windows, Tesseract или RapidOCR в настройках OCR"
+                    )
+                elif failure_reason in {"rapidocr_empty", "rapidocr_error", "low_rapidocr_confidence"}:
+                    msg.setText("RapidOCR не нашёл надёжный текст")
+                    msg.setInformativeText(
+                        "RapidOCR не обнаружил текстовые блоки с достаточной уверенностью.\n\n"
+                        "Попробуйте:\n"
+                        "• Выделить область точнее\n"
+                        "• Увеличить текст или выбрать более контрастный участок\n"
+                        "• Переключиться на Windows или Tesseract"
+                    )
+                elif failure_reason in {"easyocr_empty", "easyocr_error", "low_easyocr_confidence"}:
+                    msg.setText("EasyOCR не нашёл надёжный текст")
+                    msg.setInformativeText(
+                        "EasyOCR не обнаружил текст с достаточной уверенностью для выбранного языка.\n\n"
+                        "Попробуйте:\n"
+                        "• Проверить выбранный язык распознавания\n"
+                        "• Выделить область точнее и контрастнее\n"
+                        "• Переключиться на Windows, Tesseract или RapidOCR"
+                    )
+                elif failure_reason == "auto_low_confidence_or_empty":
+                    msg.setText("Текст не распознан надёжно")
+                    msg.setInformativeText(
+                        "Слабые результаты отфильтрованы, чтобы не отправлять мусор в переводчик.\n\n"
+                        "Попробуйте:\n"
+                        "• Выделить область точнее, без лишних рамок и фона\n"
+                        "• Выбрать конкретный язык текста\n"
+                        "• Попробовать RapidOCR/Tesseract или установить языковой пакет Windows OCR"
+                    )
+                else:
+                    msg.setText("😔 Текст не распознан")
+                    msg.setInformativeText(
+                        "Попробуйте:\n"
+                        "• Выделить область с более крупным текстом\n"
+                        "• Убедиться, что текст контрастный\n"
+                        "• Выбрать другой OCR движок в настройках"
+                    )
             else:
                 msg.setWindowTitle("Recognition failed")
-                msg.setText("😔 Text not recognized")
-                msg.setInformativeText(
-                    "Try:\n"
-                    "• Select an area with larger text\n"
-                    "• Make sure the text has good contrast\n"
-                    "• Choose a different OCR engine in settings"
-                )
+                if failure_reason == "rapidocr_unavailable":
+                    msg.setText("RapidOCR is unavailable")
+                    msg.setInformativeText(
+                        "The RapidOCR engine is not installed or failed to load.\n\n"
+                        "Try:\n"
+                        "• Choose RapidOCR in settings and install the local package\n"
+                        "• Choose Windows or Tesseract in OCR settings"
+                    )
+                elif failure_reason == "easyocr_unavailable":
+                    msg.setText("EasyOCR is unavailable")
+                    msg.setInformativeText(
+                        "The EasyOCR engine is not installed or failed to load.\n\n"
+                        "Try:\n"
+                        "• Choose EasyOCR in settings and install the local package\n"
+                        "• Choose Windows, Tesseract, or RapidOCR in OCR settings"
+                    )
+                elif failure_reason in {"rapidocr_empty", "rapidocr_error", "low_rapidocr_confidence"}:
+                    msg.setText("RapidOCR did not find reliable text")
+                    msg.setInformativeText(
+                        "RapidOCR did not detect text blocks with enough confidence.\n\n"
+                        "Try:\n"
+                        "• Select the text area more tightly\n"
+                        "• Use larger or higher-contrast text\n"
+                        "• Switch to Windows or Tesseract"
+                    )
+                elif failure_reason in {"easyocr_empty", "easyocr_error", "low_easyocr_confidence"}:
+                    msg.setText("EasyOCR did not find reliable text")
+                    msg.setInformativeText(
+                        "EasyOCR did not detect reliable text for the selected language.\n\n"
+                        "Try:\n"
+                        "• Check the selected recognition language\n"
+                        "• Select a tighter, higher-contrast area\n"
+                        "• Switch to Windows, Tesseract, or RapidOCR"
+                    )
+                elif failure_reason == "auto_low_confidence_or_empty":
+                    msg.setText("Text was not recognized reliably")
+                    msg.setInformativeText(
+                        "Weak results were filtered out so noise is not sent to the translator.\n\n"
+                        "Try:\n"
+                        "• Select the text area more tightly, without extra borders or background\n"
+                        "• Choose the concrete source language\n"
+                        "• Try RapidOCR/Tesseract or install the Windows OCR language pack"
+                    )
+                else:
+                    msg.setText("😔 Text not recognized")
+                    msg.setInformativeText(
+                        "Try:\n"
+                        "• Select an area with larger text\n"
+                        "• Make sure the text has good contrast\n"
+                        "• Choose a different OCR engine in settings"
+                    )
             
             msg.setStandardButtons(QMessageBox.Ok)
             
