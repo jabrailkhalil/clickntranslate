@@ -3025,10 +3025,6 @@ class SettingsWindow(QWidget):
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
 
-            # Дополнительная страховка: если скрипт автозамены не перезапустил приложение
-            # (например, из-за ошибки запуска внешнего процесса), через паузу запускаем запасной запуск.
-            self._schedule_update_restart_fallback()
-
             QMetaObject.invokeMethod(
                 self,
                 "_on_update_ready_to_restart",
@@ -3099,98 +3095,6 @@ class SettingsWindow(QWidget):
                 continue
         return False, last_err
 
-    def _schedule_update_restart_fallback(self, delay_seconds=8, attempts=45, interval_seconds=2):
-        try:
-            exe_path = _public_executable_path()
-            if not exe_path or not os.path.isfile(exe_path):
-                return
-
-            current_pid = os.getpid()
-            delay_seconds = max(1, int(delay_seconds))
-            attempts = max(1, int(attempts))
-            interval_seconds = max(1, int(interval_seconds))
-            exe_dir = os.path.dirname(exe_path)
-            process_name = os.path.splitext(os.path.basename(exe_path))[0]
-            app_process_name = os.path.splitext(os.path.basename(os.path.abspath(sys.executable)))[0]
-
-            fd, script_path = tempfile.mkstemp(prefix="clickntranslate_restart_", suffix=".ps1")
-            os.close(fd)
-            script = r"""param(
-    [string]$ExePath,
-    [string]$ExeDir,
-    [string]$ProcessName,
-    [string]$AppProcessName,
-    [int]$TargetPid,
-    [int]$InitialDelay,
-    [int]$Attempts,
-    [int]$WaitSeconds
-)
-$logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
-$ErrorActionPreference = 'Stop'
-
-function Write-UpdateLog {
-    param([string]$Message)
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
-    Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
-}
-
-Write-UpdateLog "Fallback watcher start: ExePath=$ExePath; TargetPid=$TargetPid; Attempts=$Attempts"
-
-try {
-    Start-Sleep -Seconds $InitialDelay
-    for ($i = 0; $i -lt $Attempts; $i++) {
-        if (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
-            Start-Sleep -Seconds $WaitSeconds
-            continue
-        }
-        if (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue) {
-            Write-UpdateLog "Fallback skip: process $ProcessName is already running"
-            break
-        }
-        if ($AppProcessName -and $AppProcessName -ne $ProcessName -and (Get-Process -Name $AppProcessName -ErrorAction SilentlyContinue)) {
-            Write-UpdateLog "Fallback skip: process $AppProcessName is already running"
-            break
-        }
-        if (-not (Test-Path -LiteralPath $ExePath)) {
-            Write-UpdateLog "Fallback wait: executable is missing: $ExePath"
-            Start-Sleep -Seconds $WaitSeconds
-            continue
-        }
-        Write-UpdateLog "Fallback launching executable: $ExePath"
-        Start-Process -FilePath $ExePath -WorkingDirectory $ExeDir
-        Write-UpdateLog "Fallback launch requested"
-        break
-    }
-}
-catch {
-    Write-UpdateLog ("Fallback watcher failed: " + $_.Exception.Message)
-}
-finally {
-    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-}
-"""
-            with open(script_path, "w", encoding="utf-8") as f:
-                f.write(script)
-
-            ok, err = SettingsWindow._launch_hidden_powershell_script(
-                self,
-                script_path,
-                [
-                    "-ExePath", exe_path,
-                    "-ExeDir", exe_dir,
-                    "-ProcessName", process_name,
-                    "-AppProcessName", app_process_name,
-                    "-TargetPid", str(current_pid),
-                    "-InitialDelay", str(delay_seconds),
-                    "-Attempts", str(attempts),
-                    "-WaitSeconds", str(interval_seconds),
-                ]
-            )
-            if not ok:
-                print(f"Could not launch update restart fallback: {err}")
-        except Exception as e:
-            print(f"Could not schedule update restart fallback: {e}")
-
     def _launch_zip_updater(self, zip_path):
         if not getattr(sys, "frozen", False):
             return False, "Auto-update is available only in packaged app"
@@ -3228,6 +3132,9 @@ function Clear-PyInstallerEnv {
 Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; TargetPid=$TargetPid"
 
 $extractDir = $null
+$backupDir = $null
+$backupComplete = $false
+$updateApplied = $false
 try {
     $deadline = (Get-Date).AddSeconds(30)
     while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
@@ -3254,20 +3161,38 @@ try {
     Write-UpdateLog "Payload root: $payloadRoot"
 
     $payloadHasInternal = Test-Path -LiteralPath (Join-Path $payloadRoot "_internal")
-    Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
-        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { continue }
-        Write-UpdateLog "Removing existing program item: $($_.FullName)"
-        Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    $payloadHasLauncherApp = Test-Path -LiteralPath (Join-Path $payloadRoot "app\ClicknTranslateApp.exe")
+    $payloadHasLauncherInternal = Test-Path -LiteralPath (Join-Path $payloadRoot "app\_internal")
+    if (-not $payloadHasInternal -and -not ($payloadHasLauncherApp -and $payloadHasLauncherInternal)) {
+        throw "Update payload has neither a flat _internal directory nor app\ClicknTranslateApp.exe"
     }
 
+    $appParent = Split-Path -Parent $AppDir
+    $backupDir = Join-Path $appParent (".clickntranslate_backup_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
+    Write-UpdateLog "Program backup directory: $backupDir"
+
+    Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
+        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { return }
+        Write-UpdateLog "Moving existing program item to backup: $($_.FullName)"
+        Move-Item -LiteralPath $_.FullName -Destination $backupDir -Force
+    }
+    $backupComplete = $true
+
     Get-ChildItem -LiteralPath $payloadRoot -Force | ForEach-Object {
-        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { continue }
+        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { return }
         Write-UpdateLog "Copying update item: $($_.FullName)"
         Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force
     }
 
     if ($payloadHasInternal -and -not (Test-Path -LiteralPath (Join-Path $AppDir "_internal"))) {
         throw "Update payload copy failed: _internal directory is missing"
+    }
+    if ($payloadHasLauncherApp -and (
+        -not (Test-Path -LiteralPath (Join-Path $AppDir "app\ClicknTranslateApp.exe")) -or
+        -not (Test-Path -LiteralPath (Join-Path $AppDir "app\_internal"))
+    )) {
+        throw "Update payload copy failed: launcher app directory is incomplete"
     }
 
     $targetExe = Join-Path $AppDir $ExeName
@@ -3286,9 +3211,28 @@ try {
     Clear-PyInstallerEnv
     Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
     Write-UpdateLog "Updated executable started"
+    $updateApplied = $true
 }
 catch {
     Write-UpdateLog ("Updater failed: " + $_.Exception.Message)
+    if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
+        try {
+            if ($backupComplete) {
+                Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
+                    if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { return }
+                    Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+            Get-ChildItem -LiteralPath $backupDir -Force | ForEach-Object {
+                Write-UpdateLog "Restoring program item from backup: $($_.FullName)"
+                Move-Item -LiteralPath $_.FullName -Destination $AppDir -Force
+            }
+            Write-UpdateLog "Previous version restored after updater failure"
+        }
+        catch {
+            Write-UpdateLog ("Rollback failed: " + $_.Exception.Message)
+        }
+    }
     try {
         $fallbackExe = Join-Path $AppDir $ExeName
         if (Test-Path -LiteralPath $fallbackExe) {
@@ -3304,6 +3248,18 @@ finally {
     }
     if (Test-Path -LiteralPath $ZipPath) {
         Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
+        if ($updateApplied) {
+            Write-UpdateLog "Removing successful-update backup: $backupDir"
+            Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        elseif (-not (Get-ChildItem -LiteralPath $backupDir -Force -ErrorAction SilentlyContinue)) {
+            Remove-Item -LiteralPath $backupDir -Force -ErrorAction SilentlyContinue
+        }
+        else {
+            Write-UpdateLog "Preserving non-empty rollback backup for recovery: $backupDir"
+        }
     }
     Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 }

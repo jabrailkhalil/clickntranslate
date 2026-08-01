@@ -20,6 +20,8 @@
 
 > ⚠️ **Important**: Move the folder to its permanent location *before* enabling auto-start or creating shortcuts. Moving the folder later will break these features.
 
+> **Updating from 1.4.5 or 1.4.6:** those versions contain a broken updater and require one manual update. Close the app, extract 1.4.7 into a new folder, and copy the old `data` folder into it. Automatic updates after 1.4.7 use the corrected transactional updater.
+
 ## 🚀 Features
 
 ### 📷 Advanced OCR (Optical Character Recognition)

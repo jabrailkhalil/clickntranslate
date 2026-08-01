@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import tempfile
 import threading
 import types
@@ -177,45 +178,41 @@ class TestUpdateAssetSelection(unittest.TestCase):
 
 
 class TestUpdaterCommands(unittest.TestCase):
-    def test_schedule_update_restart_fallback_builds_expected_powershell_script(self):
-        dummy = types.SimpleNamespace()
-        generated_script = None
-        with mock.patch.object(sw.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
-            with mock.patch.object(sw.os.path, "isfile", return_value=True):
-                with mock.patch.object(sw.os, "getpid", return_value=999):
-                    with mock.patch.object(sw.tempfile, "mkstemp", return_value=tempfile.mkstemp(prefix="restart_fallback_", suffix=".ps1")):
-                        with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
-                            sw.SettingsWindow._schedule_update_restart_fallback(dummy, delay_seconds=6, attempts=5, interval_seconds=2)
+    def _generate_updater_script(self, app_exe, zip_path):
+        fd, script_path = tempfile.mkstemp(prefix="updater_integration_", suffix=".ps1")
+        with mock.patch.object(sw.sys, "frozen", True, create=True):
+            with mock.patch.object(sw.sys, "executable", app_exe):
+                with mock.patch.object(sw.os, "getpid", return_value=2147483000):
+                    with mock.patch.object(sw.tempfile, "mkstemp", return_value=(fd, script_path)):
+                        with mock.patch.object(sw.subprocess, "Popen"):
+                            ok, err = sw.SettingsWindow._launch_zip_updater(
+                                types.SimpleNamespace(), zip_path
+                            )
+        self.assertTrue(ok, err)
+        return script_path
 
-        popen_mock.assert_called_once()
-        args, kwargs = popen_mock.call_args
-        self.assertIn("-File", args[0])
-        self.assertIn("-TargetPid", args[0])
-        generated_script = args[0][args[0].index("-File") + 1]
-        self.assertTrue(generated_script.lower().endswith(".ps1"))
-
-        with open(generated_script, "r", encoding="utf-8") as f:
-            script_text = f.read()
-
-        self.assertIn("[string]$ExePath", script_text)
-        self.assertIn("[string]$AppProcessName", script_text)
-        self.assertIn("[int]$TargetPid", script_text)
-        self.assertIn("Get-Process -Id $TargetPid", script_text)
-        self.assertIn("Get-Process -Name $AppProcessName", script_text)
-        self.assertIn("Start-Process -FilePath $ExePath -WorkingDirectory $ExeDir", script_text)
-        self.assertIn("creationflags", kwargs)
-        try:
-            os.remove(generated_script)
-        except OSError:
-            pass
-
-    def test_schedule_update_restart_fallback_skips_missing_exe(self):
-        dummy = types.SimpleNamespace()
-        with mock.patch.object(sw.sys, "executable", r"C:\Apps\Missing.exe"):
-            with mock.patch.object(sw.os.path, "isfile", return_value=False):
-                with mock.patch.object(sw.subprocess, "Popen") as popen_mock:
-                    sw.SettingsWindow._schedule_update_restart_fallback(dummy)
-        popen_mock.assert_not_called()
+    def _run_updater_script(self, script_path, app_dir, zip_path):
+        powershell = os.path.join(
+            os.environ.get("SystemRoot", r"C:\Windows"),
+            "System32", "WindowsPowerShell", "v1.0", "powershell.exe",
+        )
+        return subprocess.run(
+            [
+                powershell,
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-WindowStyle", "Hidden",
+                "-File", script_path,
+                "-AppDir", app_dir,
+                "-ZipPath", zip_path,
+                "-TargetPid", "2147483000",
+                "-ExeName", "ClicknTranslate.exe",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
 
     def test_launch_zip_updater_generates_expected_script(self):
         dummy = types.SimpleNamespace()
@@ -242,10 +239,14 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("[int]$TargetPid", script_text)
             self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
-            self.assertIn("if ($_.Name -ieq \"data\" -or $_.Name -ieq \"ocr\" -or $_.Name -ieq \"translators\") { continue }", script_text)
-            self.assertIn("Removing existing program item", script_text)
+            self.assertIn("if ($_.Name -ieq \"data\" -or $_.Name -ieq \"ocr\" -or $_.Name -ieq \"translators\") { return }", script_text)
+            self.assertNotIn("{ continue }", script_text)
+            self.assertIn("Moving existing program item to backup", script_text)
+            self.assertIn("Previous version restored after updater failure", script_text)
+            self.assertIn("Update payload has neither a flat _internal directory nor app\\ClicknTranslateApp.exe", script_text)
             self.assertIn("Copy-Item -LiteralPath $_.FullName -Destination $AppDir -Recurse -Force", script_text)
             self.assertIn("Update payload copy failed: _internal directory is missing", script_text)
+            self.assertIn("Update payload copy failed: launcher app directory is incomplete", script_text)
             self.assertIn("Clear-PyInstallerEnv", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
@@ -261,6 +262,72 @@ class TestUpdaterCommands(unittest.TestCase):
             ok, err = sw.SettingsWindow._launch_zip_updater(dummy, r"C:\Temp\update.zip")
         self.assertFalse(ok)
         self.assertIn("packaged app", err)
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
+    def test_updater_script_applies_payload_and_preserves_data(self):
+        root = tempfile.mkdtemp(prefix="updater_apply_e2e_")
+        try:
+            app_dir = os.path.join(root, "install")
+            os.makedirs(os.path.join(app_dir, "_internal"))
+            os.makedirs(os.path.join(app_dir, "data"))
+            old_exe = os.path.join(app_dir, "ClicknTranslate.exe")
+            system_exe = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "whoami.exe")
+            shutil.copy2(system_exe, old_exe)
+            with open(os.path.join(app_dir, "_internal", "old.txt"), "w", encoding="utf-8") as stream:
+                stream.write("old")
+            with open(os.path.join(app_dir, "data", "marker.txt"), "w", encoding="utf-8") as stream:
+                stream.write("preserve")
+
+            zip_path = os.path.join(root, "update.zip")
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.write(system_exe, "ClicknTranslate/ClicknTranslate.exe")
+                archive.writestr("ClicknTranslate/_internal/new.txt", "new")
+
+            script_path = self._generate_updater_script(old_exe, zip_path)
+            result = self._run_updater_script(script_path, app_dir, zip_path)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "_internal", "new.txt")))
+            self.assertFalse(os.path.exists(os.path.join(app_dir, "_internal", "old.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
+            self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
+    def test_updater_script_rolls_back_when_new_executable_cannot_start(self):
+        root = tempfile.mkdtemp(prefix="updater_rollback_e2e_")
+        try:
+            app_dir = os.path.join(root, "install")
+            os.makedirs(os.path.join(app_dir, "_internal"))
+            os.makedirs(os.path.join(app_dir, "data"))
+            old_exe = os.path.join(app_dir, "ClicknTranslate.exe")
+            system_exe = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "whoami.exe")
+            shutil.copy2(system_exe, old_exe)
+            with open(os.path.join(app_dir, "_internal", "old.txt"), "w", encoding="utf-8") as stream:
+                stream.write("old")
+            with open(os.path.join(app_dir, "data", "marker.txt"), "w", encoding="utf-8") as stream:
+                stream.write("preserve")
+
+            zip_path = os.path.join(root, "broken-update.zip")
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("ClicknTranslate/ClicknTranslate.exe", "not a Windows executable")
+                archive.writestr("ClicknTranslate/_internal/new.txt", "new")
+
+            script_path = self._generate_updater_script(old_exe, zip_path)
+            result = self._run_updater_script(script_path, app_dir, zip_path)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "_internal", "old.txt")))
+            self.assertFalse(os.path.exists(os.path.join(app_dir, "_internal", "new.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
+            self.assertEqual(
+                sw.SettingsWindow._compute_sha256(types.SimpleNamespace(), old_exe),
+                sw.SettingsWindow._compute_sha256(types.SimpleNamespace(), system_exe),
+            )
+            self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
 
 
 class TestUpdateCancellation(unittest.TestCase):
@@ -427,7 +494,6 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
         class DummyUpdater:
             def __init__(self):
                 self.parent = types.SimpleNamespace(current_interface_language="en")
-                self.fallback_called = False
                 self.download_calls = 0
                 self._update_cancel_requested = threading.Event()
                 self._update_phase = "idle"
@@ -445,9 +511,6 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
             def _launch_zip_updater(self, _zip_path):
                 return True, None
-
-            def _schedule_update_restart_fallback(self):
-                self.fallback_called = True
 
             def _cleanup_update_temp_dir(self):
                 return None
@@ -469,7 +532,6 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 )
 
         self.assertEqual(dummy.download_calls, 1)
-        self.assertTrue(dummy.fallback_called)
         self.assertIn("_on_update_ready_to_restart", invoke_calls)
 
     def test_download_prepare_failure_reports_error(self):
@@ -491,9 +553,6 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
             def _launch_zip_updater(self, _zip_path):
                 return False, "Updater launch failed"
-
-            def _schedule_update_restart_fallback(self):
-                raise AssertionError("Fallback should not run when updater launch fails")
 
             def _cleanup_update_temp_dir(self):
                 return None
