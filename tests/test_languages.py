@@ -58,11 +58,12 @@ class TestLanguages(unittest.TestCase):
 
 
 class TestTranslatorMultilingualHelpers(unittest.TestCase):
-    def test_hymt_prompt_uses_language_names(self):
+    def test_hymt_prompt_uses_vendor_target_language_template(self):
         prompt = translater._build_hymt_prompt("Hallo", "de", "ru")
 
-        self.assertIn("German", prompt)
+        self.assertIn("Translate the following segment into Russian", prompt)
         self.assertIn("Russian", prompt)
+        self.assertIn("Hallo", prompt)
 
 
 if __name__ == "__main__":

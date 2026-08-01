@@ -11,7 +11,7 @@ winrt-Windows.Foundation.Collections
 winrt-Windows.System
 Pillow
 pyperclip
-argostranslate
+argostranslate~=1.11.0
 pytesseract
 rapidocr-onnxruntime
 requests

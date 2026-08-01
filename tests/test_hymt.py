@@ -111,6 +111,35 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
 
 
 class TestHyMTTranslatorHelpers(unittest.TestCase):
+    def test_build_prompt_uses_vendor_translation_template(self):
+        prompt = translater._build_hymt_prompt("Привет", "ru", "en")
+        self.assertIn("Translate the following segment into English", prompt)
+        self.assertNotIn("from Russian", prompt)
+        self.assertIn("Привет", prompt)
+
+    def test_hymt_uses_utf8_prompt_file_and_removes_it(self):
+        captured = {}
+        prompt_text = "Привет, мир!"
+
+        def fake_run(cmd, **_kwargs):
+            prompt_path = cmd[cmd.index("-f") + 1]
+            captured["path"] = prompt_path
+            captured["prompt"] = open(prompt_path, "r", encoding="utf-8").read()
+            return SimpleNamespace(
+                returncode=0,
+                stdout=captured["prompt"] + "\n\nHello, world!\n\nExiting...\n",
+                stderr="",
+            )
+
+        runtime = {"model": "model.gguf", "runner": "llama-cli.exe"}
+        with mock.patch.object(translater, "_get_hymt_runtime", return_value=runtime):
+            with mock.patch.object(translater.subprocess, "run", side_effect=fake_run):
+                result = translater.hymt_translate(prompt_text, "ru", "en")
+
+        self.assertEqual(result, "Hello, world!")
+        self.assertIn(prompt_text, captured["prompt"])
+        self.assertFalse(os.path.exists(captured["path"]))
+
     def test_clean_hymt_output_removes_prompt_and_special_tokens(self):
         prompt = "<｜hy_begin▁of▁sentence｜><｜hy_User｜>Translate<｜hy_Assistant｜>"
         raw = prompt + " Hello world <｜hy_place▁holder▁no▁2｜>"
@@ -135,10 +164,11 @@ class TestHyMTTranslatorHelpers(unittest.TestCase):
     def test_argos_does_not_silently_fallback_online(self):
         with mock.patch.object(translater, "get_cached_translator_config", return_value={"translator_engine": "argos"}):
             with mock.patch.object(translater, "HAS_ARGOS", True):
-                with mock.patch.object(translater, "_try_argos_translate", return_value=None):
-                    with mock.patch.object(translater, "google_translate") as google_mock:
-                        with self.assertRaises(Exception):
-                            translater.translate_text("hello", "en", "ru")
+                with mock.patch.object(translater, "_ensure_argos_available", return_value=True):
+                    with mock.patch.object(translater, "_try_argos_translate", return_value=None):
+                        with mock.patch.object(translater, "google_translate") as google_mock:
+                            with self.assertRaises(Exception):
+                                translater.translate_text("hello", "en", "ru")
 
         google_mock.assert_not_called()
 

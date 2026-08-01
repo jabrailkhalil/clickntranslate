@@ -1,43 +1,185 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-datas = [('icons', 'icons')]
-binaries = []
-hiddenimports = ['winrt', 'winrt.windows', 'winrt.windows.media', 'winrt.windows.media.ocr', 'winrt.windows.globalization', 'winrt.windows.graphics', 'winrt.windows.graphics.imaging', 'winrt.windows.storage', 'winrt.windows.storage.streams', 'winrt.windows.foundation', 'winrt.windows.foundation.collections', 'winrt.windows.system', 'winrt.windows.graphics.directx', 'winrt.windows.graphics.directx.direct3d11', 'winrt._winrt']
-tmp_ret = collect_all('pyperclip')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('PyQt5')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('PIL')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('requests')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('pytesseract')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('psutil')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('numpy')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('winrt')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('argostranslate')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
+gui_datas = [('icons', 'icons')]
+gui_binaries = []
+gui_hiddenimports = [
+    'winrt.windows.media.ocr',
+    'winrt.windows.globalization',
+    'winrt.windows.graphics.imaging',
+    'winrt.windows.graphics.directx',
+    'winrt.windows.graphics.directx.direct3d11',
+    'winrt.windows.storage.streams',
+    'winrt.windows.storage',
+    'winrt.windows.foundation',
+    'winrt.windows.foundation.collections',
+    'winrt.windows.system',
+    'winrt._winrt',
+    'pypdf',
+]
+
+# Preserve the upstream OCR/GUI package collection while keeping Argos out of
+# the Qt process. Optional RapidOCR/EasyOCR runtimes are installed beside the
+# app at runtime and are deliberately not collected here.
+for package_name in (
+    'pyperclip',
+    'PyQt5',
+    'PIL',
+    'requests',
+    'pytesseract',
+    'psutil',
+    'numpy',
+    'winrt',
+):
+    package_datas, package_binaries, package_hiddenimports = collect_all(package_name)
+    gui_datas += package_datas
+    gui_binaries += package_binaries
+    gui_hiddenimports += package_hiddenimports
+gui_hiddenimports += collect_submodules('winrt')
+
+argos_hiddenimports = [
+    'argostranslate.package',
+    'argostranslate.translate',
+    'filelock',
+]
+
+native_sbd_excludes = [
+    'torch',
+    'stanza',
+    'minisbd',
+    'onnxruntime',
+    'spacy',
+    'thinc',
+]
+
+optional_ocr_excludes = [
+    'easyocr',
+    'rapidocr',
+    'rapidocr_onnxruntime',
+    'torchvision',
+    'skimage',
+]
+
+common_excludes = [
+    'tensorflow',
+    'keras',
+    'scipy',
+    'matplotlib',
+    'pandas',
+    'sklearn',
+    'cv2',
+    'tkinter',
+    '_tkinter',
+    'pytest',
+    'IPython',
+    'jupyter',
+]
+
+# Native OCR packages are installed dynamically, so PyInstaller cannot infer
+# the standard-library helpers they import. Keep this worker self-sufficient
+# without bundling the optional engines themselves.
+ocr_worker_hiddenimports = [
+    'timeit',
+    'pickletools',
+    'uuid',
+    'unittest.mock',
+    'concurrent.futures',
+    'multiprocessing.shared_memory',
+    'multiprocessing.resource_tracker',
+    'html.parser',
+    'http.client',
+    'email.message',
+    'email.parser',
+    'importlib.metadata',
+    'pydoc',
+    'doctest',
+    'sqlite3',
+    'modulefinder',
+    'cProfile',
+    'profile',
+    'pstats',
+    'configparser',
+]
+ocr_worker_hiddenimports += collect_submodules('PIL')
+ocr_worker_hiddenimports += collect_submodules('ctypes')
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=binaries,
-    datas=datas,
-    hiddenimports=hiddenimports,
+    binaries=gui_binaries,
+    datas=gui_datas,
+    hiddenimports=gui_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['easyocr', 'torch', 'torchvision', 'tensorflow', 'keras', 'scipy', 'skimage', 'matplotlib', 'pandas', 'sklearn', 'cv2', 'tkinter', '_tkinter', 'pytest', 'IPython', 'jupyter'],
+    excludes=[
+        # Argos runs in its own non-Qt executable; keep its Python runtime out
+        # of the GUI archive so CTranslate2 cannot initialize inside Qt.
+        'argostranslate',
+        'ctranslate2',
+        'sentencepiece',
+        'sacremoses',
+        'filelock',
+        *native_sbd_excludes,
+        *optional_ocr_excludes,
+        *common_excludes,
+    ],
     noarchive=False,
     optimize=0,
 )
+
+worker_a = Analysis(
+    ['argos_worker.py'],
+    pathex=[],
+    binaries=[],
+    datas=[],
+    hiddenimports=argos_hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        # This process deliberately has no Qt/WinRT runtime hooks.
+        'PyQt5',
+        'winrt',
+        *native_sbd_excludes,
+        *optional_ocr_excludes,
+        *common_excludes,
+    ],
+    noarchive=False,
+    optimize=0,
+)
+
+ocr_worker_a = Analysis(
+    ['ocr_worker.py'],
+    pathex=[],
+    binaries=[],
+    datas=[],
+    hiddenimports=ocr_worker_hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        # Optional OCR packages are loaded from the portable engine directory.
+        'PyQt5',
+        'winrt',
+        'argostranslate',
+        'ctranslate2',
+        'sentencepiece',
+        'sacremoses',
+        'filelock',
+        *native_sbd_excludes,
+        *optional_ocr_excludes,
+        *common_excludes,
+    ],
+    noarchive=False,
+    optimize=0,
+)
+
 pyz = PYZ(a.pure)
+worker_pyz = PYZ(worker_a.pure)
+ocr_worker_pyz = PYZ(ocr_worker_a.pure)
 
 exe = EXE(
     pyz,
@@ -57,10 +199,53 @@ exe = EXE(
     entitlements_file=None,
     icon=['icons\\icon.ico'],
 )
+
+worker_exe = EXE(
+    worker_pyz,
+    worker_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='ArgosWorker',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+ocr_worker_exe = EXE(
+    ocr_worker_pyz,
+    ocr_worker_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='OcrWorker',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
 coll = COLLECT(
     exe,
+    worker_exe,
+    ocr_worker_exe,
     a.binaries,
     a.datas,
+    worker_a.binaries,
+    worker_a.datas,
+    ocr_worker_a.binaries,
+    ocr_worker_a.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

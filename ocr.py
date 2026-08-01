@@ -4,6 +4,8 @@ import os
 import json
 import logging
 import logging.handlers
+import subprocess
+import tempfile
 from datetime import datetime
 from dataclasses import dataclass
 import shutil
@@ -16,6 +18,7 @@ from languages import (
     default_target_for_source,
     detect_language_code,
     easyocr_language_codes,
+    language_likelihood_score,
     language_display_name,
     language_icon_path,
     language_short_label,
@@ -428,6 +431,150 @@ _RAPID_OCR_LOCAL_PATHS_READY = False
 _RAPID_OCR_DLL_DIR_HANDLES = []
 
 
+def _native_ocr_worker_enabled():
+    if sys.platform != "win32":
+        return False
+    return bool(getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_USE_OCR_WORKER") == "1")
+
+
+def _native_ocr_worker_command():
+    if getattr(sys, "frozen", False):
+        worker_path = os.path.join(os.path.dirname(sys.executable), "OcrWorker.exe")
+        return [worker_path] if os.path.isfile(worker_path) else []
+    worker_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr_worker.py")
+    return [sys.executable, worker_script] if os.path.isfile(worker_script) else []
+
+
+def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
+    command = _native_ocr_worker_command()
+    if not command:
+        raise RuntimeError("Native OCR worker is missing from this build.")
+
+    temp_dir = tempfile.mkdtemp(prefix="clickntranslate_ocr_")
+    try:
+        images = []
+        for index, (label, image) in enumerate(pil_variants or []):
+            image_path = os.path.join(temp_dir, f"image-{index + 1}.png")
+            image.save(image_path, format="PNG")
+            images.append({"label": str(label), "path": image_path})
+        payload = dict(request)
+        payload["images"] = images
+        request_path = os.path.join(temp_dir, "request.json")
+        with open(request_path, "w", encoding="utf-8") as request_file:
+            json.dump(payload, request_file, ensure_ascii=False)
+
+        startupinfo = None
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        completed = subprocess.run(
+            [*command, request_path],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
+        )
+        output = (completed.stdout or "").strip()
+        if completed.returncode != 0:
+            detail = (completed.stderr or output or f"exit code {completed.returncode}").strip()
+            raise RuntimeError(f"Native OCR worker failed: {detail[:1200]}")
+        try:
+            response = json.loads(output)
+        except Exception as exc:
+            detail = (completed.stderr or output or "empty output").strip()
+            raise RuntimeError(f"Native OCR worker returned invalid output: {detail[:1200]}") from exc
+        if response.get("error"):
+            raise RuntimeError(str(response["error"]))
+        return response
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _probe_native_ocr_worker(engine, root_dir, language_codes=None, initialize=False):
+    request = {
+        "action": "recognize" if initialize else "import",
+        "engine": engine,
+        "root_dir": root_dir,
+        "language_codes": list(language_codes or []),
+        "allow_download": bool(initialize),
+    }
+    try:
+        _call_native_ocr_worker(request)
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _recognize_with_native_ocr_worker(
+    engine,
+    pil_variants,
+    context,
+    session_id,
+    language_code="en",
+    status_callback=None,
+):
+    if status_callback:
+        status_callback(f"Starting {engine} OCR worker...")
+    root_dir = _rapidocr_local_root() if engine == "rapidocr" else _easyocr_local_root()
+    language_codes = easyocr_language_codes(language_code) if engine == "easyocr" else []
+    response = _call_native_ocr_worker(
+        {
+            "action": "recognize",
+            "engine": engine,
+            "root_dir": root_dir,
+            "language_codes": language_codes,
+            "allow_download": True,
+        },
+        pil_variants=pil_variants,
+    )
+
+    auto_candidates = []
+    best_reason = f"{engine}_empty"
+    for result in response.get("results") or []:
+        if result.get("error"):
+            best_reason = f"{engine}_error"
+            logging.error(
+                f"[OCR:{session_id}] {engine} worker variant={result.get('label')}; "
+                f"context={context} failed: {result['error']}"
+            )
+            continue
+        text = str(result.get("text") or "").strip()
+        confidence = float(result.get("confidence") or 0.0)
+        confidence_floor = 0.20 if engine == "easyocr" else 0.28
+        reject_reason = (
+            f"low_{engine}_confidence"
+            if text and confidence and confidence < confidence_floor
+            else ""
+        )
+        candidate = _make_auto_ocr_candidate(
+            text,
+            engine=engine,
+            language_code=language_code if engine == "easyocr" else "",
+            image_label=str(result.get("label") or ""),
+            confidence=confidence,
+            boxes_count=int(result.get("boxes_count") or 0),
+            elapsed_ms=float(result.get("elapsed_ms") or 0.0),
+            reject_reason=reject_reason,
+        )
+        auto_candidates.append(candidate)
+        if candidate.reject_reason:
+            best_reason = candidate.reject_reason
+
+    selected, selector_reason = _select_best_auto_ocr_candidate(
+        auto_candidates,
+        session_id=session_id,
+        context=f"{engine} OCR worker",
+    )
+    if selected is not None:
+        return selected.text, ""
+    return "", selector_reason or best_reason
+
+
 def _rapidocr_local_root():
     return (
         os.environ.get("CLICKNTRANSLATE_RAPIDOCR_DIR")
@@ -518,6 +665,10 @@ def reset_rapidocr_runtime_cache(clear_modules=False):
 
 def rapidocr_importable():
     global _RAPID_OCR_IMPORT_ERROR
+    if _native_ocr_worker_enabled():
+        available, error = _probe_native_ocr_worker("rapidocr", _rapidocr_local_root())
+        _RAPID_OCR_IMPORT_ERROR = None if available else error
+        return available, error
     _ensure_rapidocr_local_paths()
     errors = []
     try:
@@ -582,6 +733,11 @@ def _get_rapidocr_engine():
 
 
 def rapidocr_available():
+    if _native_ocr_worker_enabled():
+        available, _error = _probe_native_ocr_worker(
+            "rapidocr", _rapidocr_local_root(), initialize=True
+        )
+        return available
     return _get_rapidocr_engine() is not None
 
 
@@ -642,6 +798,14 @@ def _parse_rapidocr_output(output):
 
 
 def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None):
+    if _native_ocr_worker_enabled():
+        try:
+            return _recognize_with_native_ocr_worker(
+                "rapidocr", pil_variants, context, session_id
+            )
+        except Exception as exc:
+            logging.exception(f"[OCR:{session_id}] RapidOCR worker failed: {exc}")
+            return "", "rapidocr_unavailable"
     engine = _get_rapidocr_engine()
     if engine is None:
         return "", "rapidocr_unavailable"
@@ -804,6 +968,10 @@ def reset_easyocr_runtime_cache(clear_modules=False):
 
 def easyocr_importable():
     global _EASY_OCR_IMPORT_ERROR
+    if _native_ocr_worker_enabled():
+        available, error = _probe_native_ocr_worker("easyocr", _easyocr_local_root())
+        _EASY_OCR_IMPORT_ERROR = None if available else error
+        return available, error
     _ensure_easyocr_local_paths()
     try:
         import easyocr  # noqa: F401
@@ -851,6 +1019,14 @@ def _get_easyocr_reader(language_code):
 
 
 def easyocr_available(language_code="en"):
+    if _native_ocr_worker_enabled():
+        available, _error = _probe_native_ocr_worker(
+            "easyocr",
+            _easyocr_local_root(),
+            language_codes=easyocr_language_codes(language_code),
+            initialize=True,
+        )
+        return available
     return _get_easyocr_reader(language_code) is not None
 
 
@@ -881,6 +1057,19 @@ def _parse_easyocr_output(output):
 
 
 def _recognize_easyocr_variants(pil_variants, language_code, context, session_id, status_callback=None, cancel_check=None):
+    if _native_ocr_worker_enabled():
+        try:
+            return _recognize_with_native_ocr_worker(
+                "easyocr",
+                pil_variants,
+                context,
+                session_id,
+                language_code=language_code,
+                status_callback=status_callback,
+            )
+        except Exception as exc:
+            logging.exception(f"[OCR:{session_id}] EasyOCR worker failed: {exc}")
+            return "", "easyocr_unavailable"
     if status_callback:
         language_codes = ", ".join(easyocr_language_codes(language_code))
         status_callback(f"EasyOCR: preparing {language_codes}")
@@ -1645,6 +1834,19 @@ def _score_ocr_text_for_language(text, language_code):
     score -= noise * 1.8
     score -= replacement_chars * 20.0
     score += _script_match_score(text, language_code)
+    score += language_likelihood_score(text, language_code) * 3.0
+
+    # Cross-alphabet OCR often produces odd mixed-case tokens (for example,
+    # Russian "Привет" read by the English engine as "npneT"). Legitimate
+    # title case and all-caps acronyms are left alone.
+    mixed_case_tokens = 0
+    for token in word_tokens:
+        letters = "".join(ch for ch in token if ch.isalpha())
+        if not letters or not (any(ch.islower() for ch in letters) and any(ch.isupper() for ch in letters)):
+            continue
+        if not (letters[0].isupper() and letters[1:].islower()):
+            mixed_case_tokens += 1
+    score -= mixed_case_tokens * 4.0
 
     detected = detect_language_code(text)
     if detected == language_code:
@@ -2003,6 +2205,7 @@ def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_
             loop.close()
         except Exception:
             pass
+        asyncio.set_event_loop(None)
 
 
 class OCRWorker(QtCore.QThread):

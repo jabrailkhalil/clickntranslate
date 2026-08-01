@@ -67,7 +67,7 @@ class TestDocumentTranslation(unittest.TestCase):
     def test_translate_document_text_returns_partial_failures(self):
         calls = []
 
-        def fake_translate(text, source, target):
+        def fake_translate(text, source, target, status_callback=None):
             calls.append(text)
             if len(calls) == 2:
                 raise RuntimeError("provider down")
@@ -89,7 +89,7 @@ class TestDocumentTranslation(unittest.TestCase):
     def test_translate_document_text_can_override_provider(self):
         seen_engines = []
 
-        def fake_translate(text, source, target, engine=None):
+        def fake_translate(text, source, target, status_callback=None, engine=None):
             seen_engines.append(engine)
             return text
 
@@ -102,6 +102,28 @@ class TestDocumentTranslation(unittest.TestCase):
             )
 
         self.assertEqual(seen_engines, ["argos"])
+
+    def test_translate_document_text_reports_engine_status_through_progress(self):
+        messages = []
+
+        def fake_translate(text, source, target, status_callback=None, engine=None):
+            if status_callback:
+                status_callback("Загрузка EN→RU…")
+            return text
+
+        def progress_callback(done, total, message):
+            messages.append((done, total, message))
+
+        with mock.patch("document_translation.translater.translate_text", side_effect=fake_translate):
+            document_translation.translate_document_text(
+                "first paragraph",
+                "en",
+                "ru",
+                provider_engine="argos",
+                progress_callback=progress_callback,
+            )
+
+        self.assertIn((0, 1, "Загрузка EN→RU…"), messages)
 
 
 class TestDocumentTranslationWindowMessages(unittest.TestCase):

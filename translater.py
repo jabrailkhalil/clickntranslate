@@ -4,15 +4,115 @@ import os
 import sys
 import subprocess
 import re
+import tempfile
+import types
 from languages import language_english_name, translator_api_code
 import portable_paths
 
-# Optional Argos Translate (offline). Loaded lazily to keep app startup and tests
-# away from ctranslate2/torch DLLs unless offline translation is actually used.
+# Optional Argos Translate (offline). main.py preloads its native runtime before
+# Qt on Windows; importing this module alone remains lightweight until preloaded.
 HAS_ARGOS = True
 arg_pkg = None
 arg_tr = None
 _argos_import_error = None
+
+# argostranslate.sbd imports stanza and minisbd unconditionally to split text into
+# sentences. stanza pulls in torch (~2 GB, excluded from the build) and minisbd
+# pulls in onnxruntime. Neither native stack is needed here: both imports are
+# stubbed and every Argos sentencizer is replaced by _SentenceSplitter below.
+ARGOS_DEFAULT_CHUNK_TYPE = "MINISBD"
+
+# Sentence end punctuation, including CJK forms, plus closing quotes/brackets.
+# The trailing whitespace is the delimiter; punctuation remains in the sentence.
+_SENTENCE_END_RE = re.compile(r"[.!?…。！？]+[\"'”’»)\]]*(?:\s+|$)")
+_MAX_SENTENCE_CHARS = 250
+_MODULE_NOT_LOADED = object()
+
+
+def split_sentences(text):
+    """Splits a paragraph into sentences without any native dependency."""
+    text = str(text or "")
+    if not text.strip():
+        return []
+    sentences = []
+    parts = []
+    start = 0
+    for match in _SENTENCE_END_RE.finditer(text):
+        # Keep terminal punctuation/quotes, but not the whitespace after them.
+        end = match.end()
+        while end > match.start() and text[end - 1].isspace():
+            end -= 1
+        parts.append(text[start:end])
+        start = match.end()
+    if start < len(text):
+        parts.append(text[start:])
+
+    for part in parts or [text]:
+        part = part.strip()
+        while len(part) > _MAX_SENTENCE_CHARS:
+            # Unpunctuated text still has to be cut, or the model degrades badly.
+            cut = part.rfind(" ", 0, _MAX_SENTENCE_CHARS)
+            if cut <= 0:
+                cut = _MAX_SENTENCE_CHARS
+            sentences.append(part[:cut].strip())
+            part = part[cut:].strip()
+        if part:
+            sentences.append(part)
+    return sentences or [text.strip()]
+
+
+class _SentenceSplitter:
+    """Drop-in replacement for the argostranslate sentencizers."""
+
+    def __init__(self, pkg=None):
+        self.pkg = pkg
+
+    def split_sentences(self, text):
+        return split_sentences(text)
+
+    def __str__(self):
+        return "ClicknTranslate sentence splitter"
+
+
+def _make_module_stub(name, attributes):
+    stub = types.ModuleType(name)
+    for attribute, value in attributes.items():
+        setattr(stub, attribute, value)
+    stub.__argos_stub__ = True
+    return stub
+
+
+def _unavailable_sentencizer(*args, **kwargs):
+    raise RuntimeError(
+        "This sentence splitter is not bundled; ClicknTranslate splits sentences itself."
+    )
+
+
+def _prepare_argos_environment():
+    """Makes argostranslate importable without torch/stanza/onnxruntime."""
+    os.environ["ARGOS_CHUNK_TYPE"] = ARGOS_DEFAULT_CHUNK_TYPE
+    if "stanza" not in sys.modules:
+        sys.modules["stanza"] = _make_module_stub("stanza", {"Pipeline": _unavailable_sentencizer})
+    if "minisbd" not in sys.modules:
+        models = _make_module_stub(
+            "minisbd.models",
+            {
+                "cache_dir": "",
+                "list_models": lambda: [],
+                "get_model_file": lambda *args, **kwargs: "",
+            },
+        )
+        sys.modules["minisbd"] = _make_module_stub(
+            "minisbd", {"SBDetect": _unavailable_sentencizer, "models": models}
+        )
+        sys.modules["minisbd.models"] = models
+
+
+def _install_sentence_splitter(loaded_tr):
+    """Points every argostranslate sentencizer at our dependency-free splitter."""
+    for attribute in ("MiniSBDSentencizer", "StanzaSentencizer", "SpacySentencizerSmall"):
+        if hasattr(loaded_tr, attribute):
+            setattr(loaded_tr, attribute, _SentenceSplitter)
 
 
 def _ensure_argos_available():
@@ -21,16 +121,49 @@ def _ensure_argos_available():
         return False
     if arg_pkg is not None and arg_tr is not None:
         return True
+    _prepare_argos_environment()
+    # CTranslate2 imports torch only for model conversion helpers. Translation
+    # does not need it, and loading torch after Qt on Windows can crash the
+    # process. Make that optional import behave exactly like the frozen build,
+    # where torch is excluded, then restore the import table afterwards.
+    previous_torch = sys.modules.get("torch", _MODULE_NOT_LOADED)
+    if previous_torch is _MODULE_NOT_LOADED:
+        sys.modules["torch"] = None
     try:
         import argostranslate.package as loaded_pkg
         import argostranslate.translate as loaded_tr
     except Exception as exc:
         HAS_ARGOS = False
         _argos_import_error = exc
+        print(f"Argos Translate недоступен: {exc}")
         return False
+    finally:
+        if previous_torch is _MODULE_NOT_LOADED:
+            sys.modules.pop("torch", None)
+    _install_sentence_splitter(loaded_tr)
     arg_pkg = loaded_pkg
     arg_tr = loaded_tr
     return True
+
+
+def preload_argos_runtime():
+    """Loads Argos' native runtime before Qt consumes Windows TLS slots."""
+    if _argos_worker_path():
+        return True
+    return _ensure_argos_available()
+
+
+def argos_unavailable_reason():
+    """Returns why the offline Argos runtime cannot be used, or '' when it can."""
+    if getattr(sys, "frozen", False) and not os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
+        if _argos_worker_path():
+            return ""
+        return "Argos offline worker is missing from this build."
+    if _ensure_argos_available():
+        return ""
+    if _argos_import_error is None:
+        return "Argos offline runtime is unavailable in this build."
+    return f"Argos offline runtime is unavailable in this build: {_argos_import_error}"
 
 def get_app_dir():
     if hasattr(sys, '_MEIPASS'):
@@ -39,6 +172,18 @@ def get_app_dir():
 
 def get_portable_dir():
     return portable_paths.portable_base_dir()
+
+
+def _argos_worker_path():
+    """Returns the packaged non-Qt Argos worker, or an empty string."""
+    if not getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
+        return ""
+    path = os.path.join(os.path.dirname(sys.executable), "ArgosWorker.exe")
+    return path if os.path.isfile(path) else ""
+
+
+def argos_runtime_available():
+    return bool(_argos_worker_path()) or _ensure_argos_available()
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")
@@ -154,13 +299,24 @@ def hymt_installed():
     return bool(runtime.get("model") and runtime.get("runner"))
 
 
+_HYMT_CHINESE_LANGUAGE_NAMES = {
+    "en": "英语", "ru": "俄语", "de": "德语", "fr": "法语",
+    "es": "西班牙语", "it": "意大利语", "pt": "葡萄牙语", "pl": "波兰语",
+    "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
+    "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
+}
+
+
 def _build_hymt_prompt(text, source_code, target_code):
-    source_name = language_english_name(source_code)
     target_name = language_english_name(target_code)
-    user_text = (
-        f"Translate the following text from {source_name} to {target_name}. "
-        f"Return only the translation, without explanations.\n\n{text}"
-    )
+    if source_code == "zh" or target_code == "zh":
+        target_name = _HYMT_CHINESE_LANGUAGE_NAMES.get(target_code, target_name)
+        user_text = f"将以下文本翻译为{target_name}，注意只需要输出翻译后的结果，不要额外解释：\n\n{text}"
+    else:
+        user_text = (
+            f"Translate the following segment into {target_name}, "
+            f"without additional explanation.\n\n{text}"
+        )
     return f"<｜hy_begin▁of▁sentence｜><｜hy_User｜>{user_text}<｜hy_Assistant｜>"
 
 
@@ -247,22 +403,6 @@ def hymt_translate(text, source_code, target_code, status_callback=None):
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-    base_cmd = [
-        runner_path,
-        "-m", model_path,
-        "-p", prompt,
-        "-n", str(max_tokens),
-        "--temp", "0",
-        "--top-p", "1",
-        "--no-display-prompt",
-        "--single-turn",
-        "--no-warmup",
-        "--no-perf",
-        "--no-show-timings",
-        "--log-disable",
-        "--simple-io",
-    ]
-
     def _run(cmd):
         return subprocess.run(
             cmd,
@@ -277,20 +417,53 @@ def hymt_translate(text, source_code, target_code, status_callback=None):
             creationflags=creationflags,
         )
 
-    result = _run(base_cmd)
-    if result.returncode != 0:
-        err_text = (result.stderr or result.stdout or "").lower()
-        if "unknown argument" in err_text or "invalid argument" in err_text:
-            result = _run([
-                runner_path,
-                "-m", model_path,
-                "-p", prompt,
-                "-n", str(max_tokens),
-                "--temp", "0",
-                "--top-p", "1",
-                "--no-display-prompt",
-                "--single-turn",
-            ])
+    # llama.cpp on Windows does not reliably decode non-ASCII prompt text from
+    # argv. A UTF-8 prompt file keeps Cyrillic/CJK input intact end to end.
+    prompt_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".txt", prefix="clickntranslate_hymt_", delete=False
+        ) as prompt_file:
+            prompt_file.write(prompt)
+            prompt_path = prompt_file.name
+
+        base_cmd = [
+            runner_path,
+            "-m", model_path,
+            "-f", prompt_path,
+            "-n", str(max_tokens),
+            "--temp", "0",
+            "--top-p", "1",
+            "--no-display-prompt",
+            "--single-turn",
+            "--no-warmup",
+            "--no-perf",
+            "--no-show-timings",
+            "--log-disable",
+            "--simple-io",
+        ]
+
+        result = _run(base_cmd)
+        if result.returncode != 0:
+            err_text = (result.stderr or result.stdout or "").lower()
+            if "unknown argument" in err_text or "invalid argument" in err_text:
+                result = _run([
+                    runner_path,
+                    "-m", model_path,
+                    "-f", prompt_path,
+                    "-n", str(max_tokens),
+                    "--temp", "0",
+                    "--top-p", "1",
+                    "--no-display-prompt",
+                    "--single-turn",
+                ])
+    finally:
+        if prompt_path:
+            try:
+                os.unlink(prompt_path)
+            except OSError:
+                pass
+
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"Hy-MT failed: {err[:1200]}")
@@ -301,128 +474,184 @@ def hymt_translate(text, source_code, target_code, status_callback=None):
         raise RuntimeError(f"Hy-MT returned empty translation. {err[:500]}")
     return translated
 
-# --- helper to auto-install ru<->en models on first run ---
+# --- helpers to install language packages on demand ---
+
+def _emit_status(status_callback, message):
+    if not status_callback:
+        return
+    try:
+        status_callback(message)
+    except Exception:
+        pass
+
 
 def models_installed_ru_en():
     """Return True if both RU and EN language models are installed in Argos."""
     if not _ensure_argos_available():
         return False
     try:
-        langs = _get_argos_languages()
-        return {'ru', 'en'}.issubset(langs.keys())
+        return {("ru", "en"), ("en", "ru")}.issubset(_installed_pairs())
     except Exception:
         return False
 
-def ensure_models(status_callback=None):
-    if not _ensure_argos_available():
-        return
-    langs = _get_argos_languages()
-    if {'ru', 'en'}.issubset(langs.keys()):
-        return  # обе модели уже есть
+
+def _installed_pairs():
     try:
-        install_models(status_callback=status_callback)
-        _invalidate_argos_cache()  # Сбрасываем кэш после установки
+        return {(pkg.from_code, pkg.to_code) for pkg in arg_pkg.get_installed_packages()}
+    except Exception:
+        return set()
+
+
+def _plan_language_pair(source_code, target_code, available_pairs, installed_pairs):
+    """Packages needed for source->target, pivoting through English when needed.
+
+    Argos ships direct packages only for a subset of pairs; everything else goes
+    through English, which Argos then chains automatically.
+    """
+    if not source_code or not target_code or source_code == target_code:
+        return []
+    direct = (source_code, target_code)
+    if direct in installed_pairs:
+        return []
+    if direct in available_pairs:
+        return [direct]
+    pivot = [pair for pair in ((source_code, "en"), ("en", target_code)) if pair[0] != pair[1]]
+    if all(pair in installed_pairs or pair in available_pairs for pair in pivot):
+        return [pair for pair in pivot if pair not in installed_pairs]
+    return []
+
+
+def ensure_language_pair(source_code, target_code, status_callback=None):
+    """Downloads and installs the Argos packages needed for source->target.
+
+    Returns True when something was installed.
+    """
+    if not _ensure_argos_available():
+        return False
+    if _get_translation_object(source_code, target_code) is not None:
+        return False
+    try:
+        _emit_status(status_callback, "Обновление индекса пакетов…")
+        print("Обновление индекса пакетов...")
+        arg_pkg.update_package_index()
+        available = {(pkg.from_code, pkg.to_code): pkg for pkg in arg_pkg.get_available_packages()}
+        plan = _plan_language_pair(source_code, target_code, set(available), _installed_pairs())
+        if not plan:
+            print(f"Пакет перевода для {source_code}->{target_code} не найден.")
+            _emit_status(status_callback, f"Пакет {source_code.upper()}→{target_code.upper()} не найден")
+            return False
+        for pair in plan:
+            label = f"{pair[0].upper()}→{pair[1].upper()}"
+            _emit_status(status_callback, f"Загрузка {label}…")
+            download_path = available[pair].download()
+            _emit_status(status_callback, f"Установка {label}…")
+            arg_pkg.install_from_path(download_path)
+            print(f"Пакет {pair[0]}->{pair[1]} установлен.")
+            _emit_status(status_callback, f"Пакет {label} установлен")
+        _invalidate_argos_cache()
+        return True
     except Exception as e:
-        if status_callback:
-            try:
-                status_callback(f"Ошибка установки моделей: {e}")
-            except Exception:
-                pass
+        _emit_status(status_callback, f"Ошибка установки моделей: {e}")
         print(f"Не удалось автоматически установить модели Argos Translate: {e}")
+        return False
+
 
 def install_models(status_callback=None):
-    if not _ensure_argos_available():
-        return
-    if status_callback:
-        try:
-            status_callback("Обновление индекса пакетов…")
-        except Exception:
-            pass
-    print("Обновление индекса пакетов...")
-    arg_pkg.update_package_index()
-    if status_callback:
-        try:
-            status_callback("Поиск доступных языковых пакетов…")
-        except Exception:
-            pass
-    available_packages = arg_pkg.get_available_packages()
-    ru_en_package = None
-    en_ru_package = None
-    for pkg in available_packages:
-        if pkg.from_code == "ru" and pkg.to_code == "en":
-            ru_en_package = pkg
-        elif pkg.from_code == "en" and pkg.to_code == "ru":
-            en_ru_package = pkg
-    if ru_en_package:
-        msg = f"Найден пакет RU→EN: {ru_en_package}"
-        print(msg)
-        if status_callback:
-            try:
-                status_callback("Загрузка RU→EN…")
-            except Exception:
-                pass
-        download_path = ru_en_package.download()
-        if status_callback:
-            try:
-                status_callback("Установка RU→EN…")
-            except Exception:
-                pass
-        arg_pkg.install_from_path(download_path)
-        print("Пакет RU->EN установлен.")
-        if status_callback:
-            try:
-                status_callback("Пакет RU→EN установлен")
-            except Exception:
-                pass
-    else:
-        print("Пакет перевода для RU->EN не найден.")
-        if status_callback:
-            try:
-                status_callback("Пакет RU→EN не найден")
-            except Exception:
-                pass
-    if en_ru_package:
-        msg = f"Найден пакет EN→RU: {en_ru_package}"
-        print(msg)
-        if status_callback:
-            try:
-                status_callback("Загрузка EN→RU…")
-            except Exception:
-                pass
-        download_path = en_ru_package.download()
-        if status_callback:
-            try:
-                status_callback("Установка EN→RU…")
-            except Exception:
-                pass
-        arg_pkg.install_from_path(download_path)
-        print("Пакет EN->RU установлен.")
-        if status_callback:
-            try:
-                status_callback("Пакет EN→RU установлен")
-            except Exception:
-                pass
-    else:
-        print("Пакет перевода для EN->RU не найден.")
-        if status_callback:
-            try:
-                status_callback("Пакет EN→RU не найден")
-            except Exception:
-                pass
-
-    # Сбрасываем кэш после установки
-    _invalidate_argos_cache()
+    """Installs the RU<->EN packages (used by the module CLI and first run)."""
+    ensure_language_pair("ru", "en", status_callback=status_callback)
+    ensure_language_pair("en", "ru", status_callback=status_callback)
 
 
-def _try_argos_translate(text, source_code, target_code, status_callback=None, allow_ru_en_install=True):
+def ensure_models(status_callback=None):
+    if models_installed_ru_en():
+        return  # обе модели уже есть
+    install_models(status_callback=status_callback)
+
+
+def _try_argos_translate_local(text, source_code, target_code, status_callback=None, allow_install=True):
     if not _ensure_argos_available():
         return None
-    if allow_ru_en_install and {source_code, target_code} == {"ru", "en"}:
-        ensure_models(status_callback=status_callback)
     translation_obj = _get_translation_object(source_code, target_code)
+    if translation_obj is None and allow_install:
+        if ensure_language_pair(source_code, target_code, status_callback=status_callback):
+            translation_obj = _get_translation_object(source_code, target_code)
     if translation_obj is None:
         return None
     return translation_obj.translate(text)
+
+
+def _try_argos_translate_worker(text, source_code, target_code, status_callback=None, allow_install=True):
+    worker_path = _argos_worker_path()
+    if not worker_path:
+        return _try_argos_translate_local(
+            text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
+        )
+
+    _emit_status(status_callback, "Preparing Argos offline translation…")
+    request_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".json", prefix="clickntranslate_argos_", delete=False
+        ) as request_file:
+            json.dump(
+                {
+                    "text": str(text or ""),
+                    "source_code": source_code,
+                    "target_code": target_code,
+                    "allow_install": bool(allow_install),
+                },
+                request_file,
+                ensure_ascii=False,
+            )
+            request_path = request_file.name
+
+        startupinfo = None
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        completed = subprocess.run(
+            [worker_path, request_path],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=1800,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
+        )
+    finally:
+        if request_path:
+            try:
+                os.unlink(request_path)
+            except OSError:
+                pass
+
+    output = (completed.stdout or "").strip()
+    if completed.returncode != 0:
+        detail = (completed.stderr or output or f"exit code {completed.returncode}").strip()
+        raise RuntimeError(f"Argos offline worker failed: {detail[:1200]}")
+    try:
+        payload = json.loads(output)
+    except Exception as exc:
+        detail = (completed.stderr or output or "empty output").strip()
+        raise RuntimeError(f"Argos offline worker returned invalid output: {detail[:1200]}") from exc
+    for message in payload.get("statuses") or []:
+        _emit_status(status_callback, str(message))
+    if payload.get("error"):
+        raise RuntimeError(str(payload["error"]))
+    return payload.get("result")
+
+
+def _try_argos_translate(text, source_code, target_code, status_callback=None, allow_install=True):
+    if _argos_worker_path():
+        return _try_argos_translate_worker(
+            text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
+        )
+    return _try_argos_translate_local(
+        text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
+    )
 
 def test_translation():
     if not _ensure_argos_available():
@@ -528,23 +757,38 @@ def translate_text(text, source_code, target_code, status_callback=None, engine=
         try:
             return _cache_and_return(_try_online(engine, allow_fallback=allow_provider_fallback))
         except Exception as online_error:
-            if _ensure_argos_available():
-                argos_result = _try_argos_translate(
-                    text, source_code, target_code, status_callback=status_callback, allow_ru_en_install=False
-                )
-                if argos_result:
-                    return _cache_and_return(argos_result)
-            else:
-                raise online_error
+            # Offline rescue only: never switch to another online provider silently.
+            argos_result = _try_argos_translate(
+                text, source_code, target_code, status_callback=status_callback, allow_install=False
+            )
+            if argos_result:
+                return _cache_and_return(argos_result)
+            raise online_error
 
-    if engine == "argos" or HAS_ARGOS:
-        argos_result = _try_argos_translate(text, source_code, target_code, status_callback=status_callback)
+    if engine == "argos":
+        if not argos_runtime_available():
+            raise Exception(argos_unavailable_reason())
+        # Packages are large, so only download them when the caller can show progress.
+        argos_result = _try_argos_translate(
+            text,
+            source_code,
+            target_code,
+            status_callback=status_callback,
+            allow_install=bool(status_callback),
+        )
         if argos_result:
             return _cache_and_return(argos_result)
-        if engine == "argos":
-            raise Exception(
-                f"Argos offline translation package is not installed for {source_code}->{target_code}."
-            )
+        raise Exception(
+            f"Argos offline translation package is not installed for {source_code}->{target_code}. "
+            "Open the main window and press Translate once to download it."
+        )
+
+    # Unknown engine name: use an installed offline package if there is one.
+    argos_result = _try_argos_translate(
+        text, source_code, target_code, status_callback=status_callback, allow_install=False
+    )
+    if argos_result:
+        return _cache_and_return(argos_result)
 
     return _cache_and_return(_try_online("google", allow_fallback=allow_provider_fallback))
 
@@ -635,13 +879,24 @@ def mymemory_translate(text, source_code, target_code):
         return data['responseData']['translatedText']
     raise Exception(f"MyMemory error: {data.get('responseDetails', 'Unknown error')}")
 
+def _server_error_detail(response):
+    """Server-provided error text, so dead or key-gated instances explain themselves."""
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            detail = payload.get('error') or payload.get('message')
+            if detail:
+                return str(detail)
+    except Exception:
+        pass
+    return f"HTTP {response.status_code}"
+
 def lingva_translate(text, source_code, target_code):
     """Lingva - прокси для Google Translate (более стабильный)."""
     # Список публичных инстансов Lingva
     instances = [
         'https://lingva.ml',
         'https://translate.plausibility.cloud',
-        'https://lingva.pussthecat.org',
     ]
     session = _get_http_session()
     last_error = None
@@ -654,17 +909,19 @@ def lingva_translate(text, source_code, target_code):
             if r.status_code == 200:
                 data = r.json()
                 return data.get('translation', '')
+            last_error = f"{base_url}: {_server_error_detail(r)}"
         except Exception as e:
-            last_error = e
+            last_error = f"{base_url}: {e}"
             continue
     raise Exception(f"Lingva translate failed: {last_error}")
 
 def libretranslate(text, source_code, target_code):
     """LibreTranslate - открытый переводчик (публичные серверы)."""
+    # libretranslate.com требует API-ключ, argosopentech/terraprint отключены,
+    # поэтому первым идёт публичный инстанс, который отвечает без ключа.
     instances = [
+        'https://translate.disroot.org',
         'https://libretranslate.com',
-        'https://translate.argosopentech.com',
-        'https://translate.terraprint.co',
     ]
     session = _get_http_session()
     last_error = None
@@ -683,8 +940,9 @@ def libretranslate(text, source_code, target_code):
             if r.status_code == 200:
                 data = r.json()
                 return data.get('translatedText', '')
+            last_error = f"{base_url}: {_server_error_detail(r)}"
         except Exception as e:
-            last_error = e
+            last_error = f"{base_url}: {e}"
             continue
     raise Exception(f"LibreTranslate failed: {last_error}")
 

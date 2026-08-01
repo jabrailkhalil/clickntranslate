@@ -14,6 +14,12 @@ import subprocess
 import ctypes
 import threading
 import time
+import translater
+
+# CTranslate2 can crash when its native runtime is first loaded after Qt on
+# Windows. Load it while startup is still single-threaded; online translation
+# remains available if the optional offline runtime cannot be imported.
+translater.preload_argos_runtime()
 
 
 def _show_dependency_error():
@@ -79,7 +85,6 @@ except Exception:
 from settings_window import SettingsWindow
 from app_version import APP_VERSION
 import portable_paths
-import translater  # Импорт модуля перевода
 from document_parser import DocumentParseError, format_file_size, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
@@ -4857,7 +4862,7 @@ class DarkThemeApp(QMainWindow):
         
         # Получаем конфиг один раз для всей функции
         cached_config = get_cached_config()
-        translator_engine = cached_config.get("translator_engine", "Argos").lower()
+        translator_engine = cached_config.get("translator_engine", "Google").lower()
         ocr_engine = cached_config.get("ocr_engine", "Windows")
         
         # Отображаем конкретный переводчик
@@ -5382,6 +5387,11 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
     dlg.exec_()
 
 if __name__ == "__main__":
+    # ONNX Runtime and torch can fail to initialize after Qt on Windows. The
+    # optional RapidOCR/EasyOCR engines therefore run in the non-Qt worker.
+    if sys.platform == "win32":
+        os.environ["CLICKNTRANSLATE_USE_OCR_WORKER"] = "1"
+
 
     # --- Обработка вызова как OCR подпроцесса -----------------
     if len(sys.argv) > 1 and sys.argv[1] in ("ocr", "copy", "translate"):

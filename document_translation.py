@@ -80,11 +80,21 @@ def translate_document_text(
             break
 
         _emit_progress(progress_callback, position - 1, total, f"Translating chunk {position}/{total}")
+
+        def _status(message, _position=position):
+            # Lets offline engines report language package downloads through the
+            # document progress bar.
+            _emit_progress(progress_callback, _position - 1, total, str(message))
+
         try:
             if provider_engine:
-                translated = translater.translate_text(chunk.text, source_code, target_code, engine=provider_engine)
+                translated = translater.translate_text(
+                    chunk.text, source_code, target_code, status_callback=_status, engine=provider_engine
+                )
             else:
-                translated = translater.translate_text(chunk.text, source_code, target_code)
+                translated = translater.translate_text(
+                    chunk.text, source_code, target_code, status_callback=_status
+                )
             error = ""
         except Exception as exc:
             error = str(exc)

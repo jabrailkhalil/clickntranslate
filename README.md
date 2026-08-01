@@ -24,9 +24,9 @@
 
 ### 📷 Advanced OCR (Optical Character Recognition)
 - **Instant Text Capture**: Select any area on your screen to extract text instantly
-- **Dual Engine Support**: Choose between **Windows OCR** (native, fast) or **Tesseract** (offline, accurate)
-- **Universal Mode (AUTO)**: Auto-detect language for numbers and Latin text
-- **Language Support**: Switch between **Russian** and **English** recognition
+- **Four OCR Engines**: Choose **Windows OCR**, **Tesseract**, **RapidOCR**, or **EasyOCR**; optional portable engines can be installed and removed from Settings
+- **Universal Mode (AUTO)**: Compares available Windows OCR languages and image variants to select the most reliable result
+- **Language Support**: Recognition languages and required engine models can be managed from Settings
 
 ### 🌐 Instant Translation
 - **Multiple Translation Engines**:
@@ -35,6 +35,7 @@
   - **MyMemory** — free API (5000 chars/day limit)
   - **Lingva** — Google proxy via public servers
   - **LibreTranslate** — open source
+- **Offline engine setup**: Argos downloads the required language package on first use, then translates locally; Hy-MT is installed separately from Settings.
 - **Visual Direction**: Clear indication of translation direction (RU → EN, EN → RU)
 - **History Tracking**: Built-in history viewer saves all translations locally
 
@@ -91,7 +92,7 @@ pip install -r requirements.txt
 python main.py
 
 # Build executable
-python build.py
+python -m PyInstaller ClicknTranslate.spec --clean --noconfirm
 ```
 
 This generates a portable executable in the `dist` folder.

@@ -297,6 +297,45 @@ def _detect_latin_language(text):
     return best_code
 
 
+def language_likelihood_score(text, language_code):
+    """Returns lightweight lexical evidence that text belongs to a language.
+
+    Windows OCR can render the same pixels as plausible characters in every
+    installed alphabet. Script matching alone therefore ties (for example,
+    Cyrillic text read as Latin). Reuse the detector's stopwords and patterns as
+    a tie-breaker without adding a language-detection dependency.
+    """
+    code = str(language_code or "").lower()
+    lowered = " " + str(text or "").lower() + " "
+    tokens = _letter_tokens(lowered)
+    if not tokens:
+        return 0.0
+
+    if code in _LATIN_STOPWORDS:
+        score = 0.0
+        for ch in _LATIN_CHAR_HINTS.get(code, ""):
+            score += lowered.count(ch) * 5.0
+        for token in tokens:
+            if token in _LATIN_STOPWORDS[code]:
+                score += 3.0 if len(token) > 2 else 1.0
+        for pattern in _LATIN_PATTERNS.get(code, ()):
+            score += lowered.count(pattern) * 2.0
+        return score
+
+    if code in _CYRILLIC_STOPWORDS:
+        score = 0.0
+        for token in tokens:
+            if token in _CYRILLIC_STOPWORDS[code]:
+                score += 3.0 if len(token) > 2 else 1.0
+        if code == "uk":
+            score += sum(lowered.count(ch) for ch in "іїєґ") * 4.0
+        elif code == "ru":
+            score += sum(lowered.count(ch) for ch in "ыэёъ") * 3.0
+        return score
+
+    return 0.0
+
+
 def detect_language_code(text):
     text = str(text or "").strip()
     if not text:
