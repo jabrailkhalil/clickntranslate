@@ -1747,9 +1747,10 @@ class SettingsWindow(QWidget):
 
         margin_top_val = "-12px" if self.parent.current_theme == "Темная" else "-6px"
         fixed_height = 38
-        engine_combo_width = 130
+        engine_combo_width = 160
+        engine_control_height = 32
+        action_button_height = 36
         
-        # --- СТРОКА 1: Запускать вместе с ОС + Движок OCR ---
         # --- СТРОКА 1: Запускать вместе с ОС + Движок OCR ---
         row1 = QHBoxLayout()
         row1.setContentsMargins(0, 0, 0, 0)
@@ -1762,19 +1763,13 @@ class SettingsWindow(QWidget):
         row1.addWidget(self.autostart_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         row1.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
-        # [ИНСТРУКЦИЯ ПО ВЫРАВНИВАНИЮ]
-        # Для того чтобы текст "OCR:" и "Перевод:" стоял ровно с текстом в выпадающих списках (флагах):
-        # 1. Используем setFixedHeight(38) - высота всей строки.
-        # 2. Используем Qt.AlignTop - прижимаем к верху, чтобы убрать непредсказуемое авто-центрирование.
-        # 3. Ставим padding-top: 2px - эмпирически подобранный отступ, который выравнивает базовые линии шрифтов.
-        # Любое изменение (AlignVCenter, padding > 4px) приведет к тому, что текст "уплывет" или обрежутся выносные элементы букв (р, д, ц).
-        
-        # OCR блок
-        ocr_label = QLabel("OCR:")
-        ocr_label.setStyleSheet("margin:0; padding:0; padding-top: 2px;") 
-        ocr_label.setFixedWidth(90)
-        ocr_label.setFixedHeight(38)
-        ocr_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        # Правые блоки обеих строк имеют одинаковую высоту и разметку.
+        # Кнопка удаления живёт в расширенной правой секции самого списка.
+        self.ocr_engine_label = QLabel("OCR:")
+        self.ocr_engine_label.setStyleSheet("margin:0; padding:0;")
+        self.ocr_engine_label.setFixedWidth(90)
+        self.ocr_engine_label.setFixedHeight(engine_control_height)
+        self.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         self.ocr_engine_combo = QComboBox()
         # OCR движки: Windows, Tesseract, RapidOCR и EasyOCR
@@ -1790,34 +1785,34 @@ class SettingsWindow(QWidget):
         self.ocr_engine_combo.currentTextChanged.connect(lambda _text: self._sync_ocr_engine_delete_button())
         self.ocr_engine_combo.setStyleSheet(self._engine_combo_style())
         self.ocr_engine_combo.setFixedWidth(engine_combo_width)
-        self.ocr_engine_combo.setFixedHeight(32)
+        self.ocr_engine_combo.setFixedHeight(engine_control_height)
         self.ocr_engine_combo.installEventFilter(self)
         self.ocr_engine_delete_btn = QToolButton(self.ocr_engine_combo)
         self.ocr_engine_delete_btn.setObjectName("ocrEngineDeleteButton")
-        self.ocr_engine_delete_btn.setText("x")
+        self.ocr_engine_delete_btn.setText("×")
         self.ocr_engine_delete_btn.setCursor(Qt.PointingHandCursor)
         self.ocr_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_tesseract"))
         self.ocr_engine_delete_btn.clicked.connect(self.remove_ocr_engine)
         self.ocr_engine_delete_btn.setStyleSheet("""
             QToolButton#ocrEngineDeleteButton {
-                background-color: rgba(212, 68, 68, 0.85);
+                background-color: rgba(212, 68, 68, 0.88);
                 color: #ffffff;
                 border: none;
-                border-radius: 7px;
-                font-size: 10px;
+                border-radius: 8px;
+                font-size: 12px;
                 font-weight: bold;
                 padding: 0px;
                 margin: 0px;
             }
             QToolButton#ocrEngineDeleteButton:hover {
-                background-color: #d44444;
+                background-color: #e15454;
             }
         """)
         self._sync_ocr_engine_delete_button()
         QtCore.QTimer.singleShot(0, self._sync_ocr_engine_delete_button)
 
-        # Выравниваем: лейбл занимает всю высоту (38), комбобокс (32) выравнивается по центру высоты строки
-        row1.addWidget(ocr_label) # Alignment внутри виджета
+        # Все три правых элемента имеют высоту 32 px и один вертикальный центр.
+        row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignVCenter)
         row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignVCenter)
         
         # Подсказки для OCR движков
@@ -1826,7 +1821,7 @@ class SettingsWindow(QWidget):
             "en": "Windows — fast, built-in, depends on language packs\nTesseract — offline, many languages\nRapidOCR — neural OCR with text boxes and confidence\nEasyOCR — neural OCR with the selected recognition language"
         }
         self.ocr_engine_combo.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
-        ocr_label.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
+        self.ocr_engine_label.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
         self.main_layout.addLayout(row1)
         
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
@@ -1841,13 +1836,12 @@ class SettingsWindow(QWidget):
         row2.addWidget(self.start_minimized_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         row2.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
-        # Переводчик блок
-        # [ИНСТРУКЦИЯ] См. выше про выравнивание (AlignTop + padding 2px)
-        tr_label = QLabel(settings_text(lang, "translator_label"))
-        tr_label.setStyleSheet("margin:0; padding:0; padding-top: 2px;")
-        tr_label.setFixedWidth(90)
-        tr_label.setFixedHeight(38)
-        tr_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        # Блок переводчика повторяет ту же сетку, чтобы колонки не сдвигались.
+        self.translator_engine_label = QLabel(settings_text(lang, "translator_label"))
+        self.translator_engine_label.setStyleSheet("margin:0; padding:0;")
+        self.translator_engine_label.setFixedWidth(90)
+        self.translator_engine_label.setFixedHeight(engine_control_height)
+        self.translator_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         self.translator_combo = QComboBox()
         # Порядок: Google первый, офлайн-движки рядом.
@@ -1871,34 +1865,34 @@ class SettingsWindow(QWidget):
         self.translator_combo.currentIndexChanged.connect(lambda _idx: self._sync_translator_engine_delete_button())
         self.translator_combo.setStyleSheet(self._engine_combo_style())
         self.translator_combo.setFixedWidth(engine_combo_width)
-        self.translator_combo.setFixedHeight(32)
+        self.translator_combo.setFixedHeight(engine_control_height)
         self.translator_combo.installEventFilter(self)
         self.translator_engine_delete_btn = QToolButton(self.translator_combo)
         self.translator_engine_delete_btn.setObjectName("translatorEngineDeleteButton")
-        self.translator_engine_delete_btn.setText("x")
+        self.translator_engine_delete_btn.setText("×")
         self.translator_engine_delete_btn.setCursor(Qt.PointingHandCursor)
         self.translator_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_hymt"))
         self.translator_engine_delete_btn.clicked.connect(self.remove_hymt_engine)
         self.translator_engine_delete_btn.setStyleSheet("""
             QToolButton#translatorEngineDeleteButton {
-                background-color: rgba(212, 68, 68, 0.85);
+                background-color: rgba(212, 68, 68, 0.88);
                 color: #ffffff;
                 border: none;
-                border-radius: 7px;
-                font-size: 10px;
+                border-radius: 8px;
+                font-size: 12px;
                 font-weight: bold;
                 padding: 0px;
                 margin: 0px;
             }
             QToolButton#translatorEngineDeleteButton:hover {
-                background-color: #d44444;
+                background-color: #e15454;
             }
         """)
         self._sync_translator_engine_delete_button()
         QtCore.QTimer.singleShot(0, self._sync_translator_engine_delete_button)
         
         # Выравниваем
-        row2.addWidget(tr_label) # Alignment внутри виджета
+        row2.addWidget(self.translator_engine_label, alignment=Qt.AlignVCenter)
         row2.addWidget(self.translator_combo, alignment=Qt.AlignVCenter)
         
         # Подсказки для переводчиков
@@ -1907,7 +1901,7 @@ class SettingsWindow(QWidget):
             "en": "Google — fast, accurate, needs internet\nArgos — offline, no internet, private\nHy-MT — local LLM model, installed as a separate package\nMyMemory — free API, 5000 chars/day limit\nLingva — Google proxy, more stable\nLibreTranslate — open source, free"
         }
         self.translator_combo.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
-        tr_label.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
+        self.translator_engine_label.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
         self.main_layout.addLayout(row2)
 
         # --- Подготовим кнопку обновления (перенесена в группу кнопок ниже) ---
@@ -1973,7 +1967,7 @@ class SettingsWindow(QWidget):
                 border-top-right-radius: 0px;
                 border-bottom-right-radius: 0px;
                 padding-top: 0px;
-                padding-bottom: 6px;
+                padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
                 font-size: 16px;
@@ -1981,13 +1975,13 @@ class SettingsWindow(QWidget):
             }
             QPushButton:hover { background-color: #8B70B2; }
         """)
-        self.clear_cache_btn.setFixedHeight(38)
+        self.clear_cache_btn.setFixedHeight(action_button_height)
         self.clear_cache_btn.clicked.connect(self.clear_all_cache)
-        btn_group_layout.addWidget(self.clear_cache_btn)
+        btn_group_layout.addWidget(self.clear_cache_btn, 1)
         
         # Средняя кнопка - без закругления (красная - сброс)
-        reset_btn = QPushButton(settings_text(lang, "reset"))
-        reset_btn.setStyleSheet("""
+        self.reset_btn = QPushButton(settings_text(lang, "reset"))
+        self.reset_btn.setStyleSheet("""
             QPushButton {
                 background-color: #D44444; 
                 color: #fff; 
@@ -1996,7 +1990,7 @@ class SettingsWindow(QWidget):
                 border-left: 1px solid rgba(255,255,255,0.15);
                 border-right: 1px solid rgba(255,255,255,0.15);
                 padding-top: 0px;
-                padding-bottom: 6px;
+                padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
                 font-size: 16px;
@@ -2004,9 +1998,9 @@ class SettingsWindow(QWidget):
             }
             QPushButton:hover { background-color: #E55555; }
         """)
-        reset_btn.setFixedHeight(38)
-        reset_btn.clicked.connect(self.reset_settings)
-        btn_group_layout.addWidget(reset_btn)
+        self.reset_btn.setFixedHeight(action_button_height)
+        self.reset_btn.clicked.connect(self.reset_settings)
+        btn_group_layout.addWidget(self.reset_btn, 1)
         
         # Правая кнопка - закругление справа (фиолетовая - обновление)
         self.update_btn = QPushButton(settings_text(lang, "update"))
@@ -2020,7 +2014,7 @@ class SettingsWindow(QWidget):
                 border-top-right-radius: 8px;
                 border-bottom-right-radius: 0px;
                 padding-top: 0px;
-                padding-bottom: 6px;
+                padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
                 font-size: 16px;
@@ -2028,9 +2022,9 @@ class SettingsWindow(QWidget):
             }
             QPushButton:hover { background-color: #8B70B2; }
         """)
-        self.update_btn.setFixedHeight(38)
+        self.update_btn.setFixedHeight(action_button_height)
         self.update_btn.clicked.connect(self.check_for_updates)
-        btn_group_layout.addWidget(self.update_btn)
+        btn_group_layout.addWidget(self.update_btn, 1)
         
         self.main_layout.addLayout(btn_group_layout)
         # Убрали spacing 10, чтобы кнопки слиплись
@@ -2046,7 +2040,7 @@ class SettingsWindow(QWidget):
         self.ocr_languages_btn.setToolTip(settings_text(lang, "manage_ocr_languages"))
         self.ocr_languages_btn.setStyleSheet("""
             QPushButton {
-                padding: 2px 12px;
+                padding: 0px 12px;
                 font-size: 16px;
                 font-weight: bold;
                 border-radius: 0px;
@@ -2054,17 +2048,17 @@ class SettingsWindow(QWidget):
                 border-bottom: 1px solid rgba(255,255,255,0.05);
             }
         """)
-        self.ocr_languages_btn.setMinimumHeight(40)
+        self.ocr_languages_btn.setFixedHeight(action_button_height)
         self.ocr_languages_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        tools_row.addWidget(self.ocr_languages_btn)
+        tools_row.addWidget(self.ocr_languages_btn, 1)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
         self.hotkeys_button = QPushButton(settings_text(lang, "hotkeys"))
         self.hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
         self.hotkeys_button.setStyleSheet("""
-            padding-top: 2px;
-            padding-bottom: 12px;
+            padding-top: 0px;
+            padding-bottom: 0px;
             padding-left: 16px;
             padding-right: 16px;
             font-size: 16px;
@@ -2072,55 +2066,52 @@ class SettingsWindow(QWidget):
             border-radius: 0px;
             border-bottom: 1px solid rgba(255,255,255,0.05);
         """)
-        self.hotkeys_button.setMinimumWidth(320)
-        self.hotkeys_button.setMinimumHeight(40)
+        self.hotkeys_button.setFixedHeight(action_button_height)
         self.hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        tools_row.addWidget(self.hotkeys_button)
+        tools_row.addWidget(self.hotkeys_button, 1)
+
+        self.translation_history_btn = QPushButton(settings_text(lang, "translation_history_button"))
+        self.translation_history_btn.clicked.connect(self.show_history_view)
+        self.translation_history_btn.setStyleSheet("""
+            QPushButton {
+                padding: 0px 12px;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 0px;
+                border-left: 1px solid rgba(255,255,255,0.1);
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+        """)
+        self.translation_history_btn.setFixedHeight(action_button_height)
+        self.translation_history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        tools_row.addWidget(self.translation_history_btn, 1)
+
         self.main_layout.addLayout(tools_row)
         self.main_layout.addSpacing(0)
         
-        # --- Две кнопки истории объединены (без зазора) ---
+        # --- Нижняя строка без вертикального разреза ---
         btn_row = QHBoxLayout()
         btn_row.setSpacing(0)  # Без зазора
         btn_row.setContentsMargins(0, 0, 0, 0)
-        
-        history_btn = QPushButton(settings_text(lang, "translation_history_button"))
-        history_btn.clicked.connect(self.show_history_view)
-        # History (левая): Верх прямой, низ-лево круглый
-        history_btn.setStyleSheet("""
+
+        self.copy_history_btn = QPushButton(settings_text(lang, "copy_history_button"))
+        self.copy_history_btn.clicked.connect(self.show_copy_history_view)
+        # Единая ячейка замыкает оба нижних угла группы.
+        self.copy_history_btn.setStyleSheet("""
             QPushButton {
-                padding: 2px 12px; 
+                padding: 0px 12px;
                 font-size: 16px;
                 font-weight: bold;
                 border-top-left-radius: 0px;
                 border-bottom-left-radius: 8px;
                 border-top-right-radius: 0px;
-                border-bottom-right-radius: 0px;
-            }
-        """)
-        history_btn.setMinimumHeight(38)
-        history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        
-        copy_history_btn = QPushButton(settings_text(lang, "copy_history_button"))
-        copy_history_btn.clicked.connect(self.show_copy_history_view)
-        # Copy History (правая): Верх прямой, низ-право круглый
-        copy_history_btn.setStyleSheet("""
-            QPushButton {
-                padding: 2px 12px; 
-                font-size: 16px;
-                font-weight: bold;
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-                border-top-right-radius: 0px;
                 border-bottom-right-radius: 8px;
-                border-left: 1px solid rgba(255,255,255,0.1);
             }
         """)
-        copy_history_btn.setMinimumHeight(38)
-        copy_history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.copy_history_btn.setFixedHeight(action_button_height)
+        self.copy_history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
-        btn_row.addWidget(history_btn)
-        btn_row.addWidget(copy_history_btn)
+        btn_row.addWidget(self.copy_history_btn, 1)
         self.main_layout.addLayout(btn_row)
         self.main_layout.addSpacing(10)
         
@@ -2146,15 +2137,20 @@ class SettingsWindow(QWidget):
             QComboBox {{
                 margin-left: 6px;
                 padding-left: 6px;
-                padding-right: 18px;
+                padding-right: 30px;
                 background-color: {bg};
                 color: {text};
                 border: 1px solid {border};
                 border-radius: 4px;
             }}
             QComboBox::drop-down {{
-                width: 18px;
+                width: 30px;
                 border-left: 1px solid {border};
+            }}
+            QComboBox[engineDeleteVisible="true"]::down-arrow {{
+                image: none;
+                width: 0px;
+                height: 0px;
             }}
             QComboBox QAbstractItemView {{
                 background-color: {popup_bg};
@@ -3484,11 +3480,12 @@ finally {
         button = getattr(self, "ocr_engine_delete_btn", None)
         if combo is None or button is None:
             return
-        button_size = 14
+        button_size = 16
+        delete_section_width = 30
         button.setFixedSize(button_size, button_size)
-        x_pos = max(0, combo.width() - 38)
-        y_pos = max(0, (combo.height() - button_size) // 2)
-        button.move(x_pos, y_pos)
+        x_pos = combo.width() - delete_section_width + (delete_section_width - button_size) // 2
+        y_pos = (combo.height() - button_size) // 2
+        button.move(max(0, x_pos), max(0, y_pos))
         button.raise_()
 
     def _sync_ocr_engine_delete_button(self):
@@ -3496,7 +3493,6 @@ finally {
         combo = getattr(self, "ocr_engine_combo", None)
         if button is None or combo is None:
             return
-        self._position_ocr_engine_delete_button()
         current_engine = combo.currentText()
         show_button = False
         if current_engine == "Tesseract":
@@ -3517,6 +3513,13 @@ finally {
                 and not self._easyocr_install_in_progress
             )
             button.setToolTip(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_easyocr"))
+        previous_state = bool(combo.property("engineDeleteVisible"))
+        combo.setProperty("engineDeleteVisible", show_button)
+        if previous_state != show_button:
+            combo.style().unpolish(combo)
+            combo.style().polish(combo)
+            combo.update()
+        self._position_ocr_engine_delete_button()
         button.setVisible(show_button)
         button.setEnabled(show_button)
 
@@ -3525,11 +3528,12 @@ finally {
         button = getattr(self, "translator_engine_delete_btn", None)
         if combo is None or button is None:
             return
-        button_size = 14
+        button_size = 16
+        delete_section_width = 30
         button.setFixedSize(button_size, button_size)
-        x_pos = max(0, combo.width() - 38)
-        y_pos = max(0, (combo.height() - button_size) // 2)
-        button.move(x_pos, y_pos)
+        x_pos = combo.width() - delete_section_width + (delete_section_width - button_size) // 2
+        y_pos = (combo.height() - button_size) // 2
+        button.move(max(0, x_pos), max(0, y_pos))
         button.raise_()
 
     def _sync_translator_engine_delete_button(self):
@@ -3537,12 +3541,18 @@ finally {
         combo = getattr(self, "translator_combo", None)
         if button is None or combo is None:
             return
-        self._position_translator_engine_delete_button()
         show_button = (
             self._current_translator_engine_from_combo() == HYMT_ENGINE_KEY
             and self._hymt_installed()
             and not self._hymt_install_in_progress
         )
+        previous_state = bool(combo.property("engineDeleteVisible"))
+        combo.setProperty("engineDeleteVisible", show_button)
+        if previous_state != show_button:
+            combo.style().unpolish(combo)
+            combo.style().polish(combo)
+            combo.update()
+        self._position_translator_engine_delete_button()
         button.setVisible(show_button)
         button.setEnabled(show_button)
 
