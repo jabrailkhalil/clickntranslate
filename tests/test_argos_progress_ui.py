@@ -32,6 +32,10 @@ class _ImmediateThread:
 
 
 class ArgosProgressUiTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = main.QApplication.instance() or main.QApplication([])
+
     def _dummy(self):
         return SimpleNamespace(
             current_interface_language="ru",
@@ -103,6 +107,48 @@ class ArgosProgressUiTest(unittest.TestCase):
         dummy._show_argos_progress.assert_called_once()
         cancel_button.setEnabled.assert_called_once_with(False)
         close_button.setEnabled.assert_called_once_with(False)
+
+    def test_package_prompt_is_compact_themed_and_never_clips_buttons(self):
+        languages = tuple(main.ARGOS_PACKAGE_DIALOG_TEXT)
+        for index, lang in enumerate(languages):
+            theme = "Темная" if index % 2 == 0 else "Светлая"
+            dialog = main.ArgosPackageInstallDialog(None, "RU→IT", lang=lang, theme=theme)
+            self.assertEqual((dialog.width(), dialog.height()), (510, 310))
+            self.assertEqual(dialog.route_label.text(), "RU → IT")
+            self.assertTrue(dialog.title_label.text().strip())
+            self.assertTrue(dialog.body_label.text().strip())
+            self.assertEqual(
+                dialog.install_button.text(),
+                main.ARGOS_PACKAGE_DIALOG_TEXT[lang]["install"],
+            )
+            self.assertGreaterEqual(dialog.install_button.width(), dialog.install_button.sizeHint().width())
+            self.assertGreaterEqual(dialog.cancel_button.width(), dialog.cancel_button.sizeHint().width())
+            self.assertFalse(dialog.install_button.autoDefault())
+            self.assertIn("argosRouteCard", dialog.styleSheet())
+            if theme == "Темная":
+                self.assertIn("background: #111216", dialog.styleSheet())
+            else:
+                self.assertIn("background: #fbfafc", dialog.styleSheet())
+            dialog.close()
+
+    def test_package_prompt_buttons_return_the_expected_result(self):
+        install_dialog = main.ArgosPackageInstallDialog(None, "RU→IT", "en", "Темная")
+        main.QTimer.singleShot(0, install_dialog.install_button.click)
+        self.assertEqual(install_dialog.exec_(), main.QDialog.Accepted)
+
+        cancel_dialog = main.ArgosPackageInstallDialog(None, "RU→IT", "en", "Темная")
+        main.QTimer.singleShot(0, cancel_dialog.cancel_button.click)
+        self.assertEqual(cancel_dialog.exec_(), main.QDialog.Rejected)
+
+    def test_package_confirmation_uses_custom_dialog(self):
+        dummy = SimpleNamespace(current_interface_language="ru", current_theme="Темная")
+        custom_dialog = mock.Mock()
+        custom_dialog.exec_.return_value = main.QDialog.Accepted
+        with mock.patch.object(main, "ArgosPackageInstallDialog", return_value=custom_dialog) as dialog_class:
+            accepted = main.DarkThemeApp._confirm_argos_package_install(dummy, "RU→IT")
+
+        self.assertTrue(accepted)
+        dialog_class.assert_called_once_with(dummy, "RU→IT", lang="ru", theme="Темная")
 
 
 if __name__ == "__main__":

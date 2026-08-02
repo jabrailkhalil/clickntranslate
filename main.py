@@ -2336,6 +2336,177 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
+
+ARGOS_PACKAGE_DIALOG_TEXT = {
+    "en": {
+        "title": "Download Argos language package?",
+        "eyebrow": "ARGOS · OFFLINE TRANSLATION",
+        "direction": "TRANSLATION DIRECTION",
+        "body": "This direction is not installed yet. After a one-time download, translation works entirely offline.",
+        "detail": "Argos automatically chooses a direct package or a route through English. The download can be several hundred megabytes.",
+        "install": "Download and install",
+        "cancel": "Not now",
+    },
+    "ru": {
+        "title": "Скачать пакет Argos?",
+        "eyebrow": "ARGOS · ОФЛАЙН-ПЕРЕВОД",
+        "direction": "НАПРАВЛЕНИЕ ПЕРЕВОДА",
+        "body": "Это направление ещё не установлено. После однократной загрузки перевод будет полностью работать офлайн.",
+        "detail": "Argos сам выберет прямой пакет или маршрут через английский. Размер загрузки может составлять несколько сотен мегабайт.",
+        "install": "Скачать и установить",
+        "cancel": "Не сейчас",
+    },
+    "es": {
+        "title": "¿Descargar el paquete de Argos?",
+        "eyebrow": "ARGOS · TRADUCCIÓN OFFLINE",
+        "direction": "DIRECCIÓN DE TRADUCCIÓN",
+        "body": "Esta dirección aún no está instalada. Después de una sola descarga, la traducción funcionará completamente offline.",
+        "detail": "Argos elige automáticamente un paquete directo o una ruta por inglés. La descarga puede ocupar varios cientos de megabytes.",
+        "install": "Descargar e instalar",
+        "cancel": "Ahora no",
+    },
+    "de": {
+        "title": "Argos-Sprachpaket herunterladen?",
+        "eyebrow": "ARGOS · OFFLINE-ÜBERSETZUNG",
+        "direction": "ÜBERSETZUNGSRICHTUNG",
+        "body": "Diese Richtung ist noch nicht installiert. Nach einem einmaligen Download funktioniert die Übersetzung vollständig offline.",
+        "detail": "Argos wählt automatisch ein Direktpaket oder eine Route über Englisch. Der Download kann mehrere hundert Megabyte groß sein.",
+        "install": "Herunterladen",
+        "cancel": "Nicht jetzt",
+    },
+    "fr": {
+        "title": "Télécharger le paquet Argos ?",
+        "eyebrow": "ARGOS · TRADUCTION HORS LIGNE",
+        "direction": "DIRECTION DE TRADUCTION",
+        "body": "Cette direction n’est pas encore installée. Après un téléchargement unique, la traduction fonctionnera entièrement hors ligne.",
+        "detail": "Argos choisit automatiquement un paquet direct ou un itinéraire via l’anglais. Le téléchargement peut atteindre plusieurs centaines de mégaoctets.",
+        "install": "Télécharger",
+        "cancel": "Plus tard",
+    },
+    "zh": {
+        "title": "下载 Argos 语言包？",
+        "eyebrow": "ARGOS · 离线翻译",
+        "direction": "翻译方向",
+        "body": "尚未安装此翻译方向。一次下载后，即可完全离线翻译。",
+        "detail": "Argos 会自动选择直连语言包或经英语中转。下载大小可能达到数百 MB。",
+        "install": "下载并安装",
+        "cancel": "暂不",
+    },
+}
+
+
+class ArgosPackageInstallDialog(QDialog):
+    """Theme-aware confirmation shown before an Argos package download."""
+
+    def __init__(self, parent, pair_label, lang="en", theme="Темная"):
+        super().__init__(parent)
+        text = ARGOS_PACKAGE_DIALOG_TEXT.get(lang, ARGOS_PACKAGE_DIALOG_TEXT["en"])
+        self.setWindowTitle(text["title"])
+        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.setFixedSize(510, 310)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(14)
+
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        icon = QLabel("A")
+        icon.setObjectName("argosDialogIcon")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(42, 42)
+        header.addWidget(icon)
+
+        heading = QVBoxLayout()
+        heading.setSpacing(1)
+        eyebrow = QLabel(text["eyebrow"])
+        eyebrow.setObjectName("argosDialogEyebrow")
+        self.title_label = QLabel(text["title"])
+        self.title_label.setObjectName("argosDialogTitle")
+        heading.addWidget(eyebrow)
+        heading.addWidget(self.title_label)
+        header.addLayout(heading)
+        header.addStretch()
+        layout.addLayout(header)
+
+        route_card = QFrame(self)
+        route_card.setObjectName("argosRouteCard")
+        route_layout = QVBoxLayout(route_card)
+        route_layout.setContentsMargins(16, 11, 16, 12)
+        route_layout.setSpacing(2)
+        route_caption = QLabel(text["direction"])
+        route_caption.setObjectName("argosRouteCaption")
+        normalized_pair = " → ".join(part.strip() for part in str(pair_label).split("→"))
+        self.route_label = QLabel(normalized_pair)
+        self.route_label.setObjectName("argosRouteLabel")
+        route_layout.addWidget(route_caption)
+        route_layout.addWidget(self.route_label)
+        layout.addWidget(route_card)
+
+        self.body_label = QLabel(text["body"])
+        self.body_label.setObjectName("argosDialogBody")
+        self.body_label.setWordWrap(True)
+        layout.addWidget(self.body_label)
+
+        detail_label = QLabel(text["detail"])
+        detail_label.setObjectName("argosDialogDetail")
+        detail_label.setWordWrap(True)
+        layout.addWidget(detail_label)
+        layout.addStretch()
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(10)
+        buttons.addStretch()
+        self.cancel_button = QPushButton(text["cancel"])
+        self.cancel_button.setObjectName("argosCancelButton")
+        self.cancel_button.setMinimumSize(112, 38)
+        self.cancel_button.setAutoDefault(False)
+        self.cancel_button.clicked.connect(self.reject)
+        buttons.addWidget(self.cancel_button)
+        self.install_button = QPushButton(text["install"])
+        self.install_button.setObjectName("argosInstallButton")
+        self.install_button.setMinimumSize(168, 38)
+        self.install_button.setAutoDefault(False)
+        self.install_button.clicked.connect(self.accept)
+        buttons.addWidget(self.install_button)
+        layout.addLayout(buttons)
+
+        if theme == "Темная":
+            self.setStyleSheet("""
+                QDialog { background: #111216; color: #f5f2fb; }
+                QLabel#argosDialogIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
+                QLabel#argosDialogEyebrow { color: #a994d2; font-size: 11px; font-weight: 800; }
+                QLabel#argosDialogTitle { color: #ffffff; font-size: 19px; font-weight: 800; }
+                QFrame#argosRouteCard { background: #1b1a22; border: 1px solid #3a3547; border-radius: 10px; }
+                QLabel#argosRouteCaption { color: #9992a8; font-size: 10px; font-weight: 800; }
+                QLabel#argosRouteLabel { color: #ffffff; font-size: 21px; font-weight: 900; }
+                QLabel#argosDialogBody { color: #ece8f2; font-size: 13px; }
+                QLabel#argosDialogDetail { color: #aaa4b4; font-size: 12px; }
+                QPushButton { border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
+                QPushButton#argosCancelButton { background: #232229; color: #ddd8e5; border: 1px solid #484250; }
+                QPushButton#argosCancelButton:hover { background: #302e38; }
+                QPushButton#argosInstallButton { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; }
+                QPushButton#argosInstallButton:hover { background: #8B70B2; }
+            """)
+        else:
+            self.setStyleSheet("""
+                QDialog { background: #fbfafc; color: #24212a; }
+                QLabel#argosDialogIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
+                QLabel#argosDialogEyebrow { color: #725594; font-size: 11px; font-weight: 800; }
+                QLabel#argosDialogTitle { color: #24212a; font-size: 19px; font-weight: 800; }
+                QFrame#argosRouteCard { background: #f1edf6; border: 1px solid #d1c6df; border-radius: 10px; }
+                QLabel#argosRouteCaption { color: #766e80; font-size: 10px; font-weight: 800; }
+                QLabel#argosRouteLabel { color: #24212a; font-size: 21px; font-weight: 900; }
+                QLabel#argosDialogBody { color: #35303d; font-size: 13px; }
+                QLabel#argosDialogDetail { color: #6f6877; font-size: 12px; }
+                QPushButton { border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
+                QPushButton#argosCancelButton { background: #ffffff; color: #4a4353; border: 1px solid #cfc5da; }
+                QPushButton#argosCancelButton:hover { background: #f0ecf4; }
+                QPushButton#argosInstallButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; }
+                QPushButton#argosInstallButton:hover { background: #8B70B2; }
+            """)
+
 class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -5277,19 +5448,13 @@ class DarkThemeApp(QMainWindow):
         sys.exit(0)
 
     def _confirm_argos_package_install(self, pair_label):
-        is_ru = self.current_interface_language == "ru"
-        message = QMessageBox(self)
-        message.setWindowTitle(ui_text(self.current_interface_language, "argos_package_missing_title"))
-        message.setText(
-            ui_text(self.current_interface_language, "argos_package_missing_prompt").format(pair=pair_label)
+        dialog = ArgosPackageInstallDialog(
+            self,
+            pair_label,
+            lang=self.current_interface_language,
+            theme=self.current_theme,
         )
-        message.setIcon(QMessageBox.Question)
-        message.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        message.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-        install_button = message.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        message.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
-        message.exec_()
-        return message.clickedButton() == install_button
+        return dialog.exec_() == QDialog.Accepted
 
     def _show_argos_progress(self, text, percent=0, determinate=False):
         is_ru = self.current_interface_language == "ru"
