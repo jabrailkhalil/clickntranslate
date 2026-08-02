@@ -12,6 +12,7 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", category=UserWarning, module=r"pkg_resources")
 import subprocess
 import ctypes
+import asyncio
 import threading
 import time
 import logging
@@ -103,7 +104,10 @@ from languages import (
 )
 
 AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
-AUTOSTART_BACKEND = "startup_shortcut"
+STORE_STARTUP_TASK_ID = "ClicknTranslateStartup"
+AUTOSTART_BACKEND = (
+    "store_startup_task" if portable_paths.is_windows_packaged() else "startup_shortcut"
+)
 
 INTERFACE_LANGUAGE_OPTIONS = [
     {"code": "en", "name": "English", "icon": "icons/American_flag.png"},
@@ -249,6 +253,44 @@ def _autostart_startup_dir():
 
 def _autostart_shortcut_path():
     return os.path.join(_autostart_startup_dir(), AUTOSTART_SHORTCUT_NAME)
+
+
+def _run_store_async(awaitable):
+    """Run a WinRT asynchronous operation from the synchronous Qt UI thread."""
+    return asyncio.run(awaitable)
+
+
+def _get_store_startup_task():
+    from winrt.windows.applicationmodel import StartupTask
+
+    return _run_store_async(StartupTask.get_async(STORE_STARTUP_TASK_ID))
+
+
+def _store_startup_state_name(state):
+    return str(getattr(state, "name", state) or "").upper()
+
+
+def _read_store_autostart_state():
+    try:
+        task = _get_store_startup_task()
+        return _store_startup_state_name(task.state) in {
+            "ENABLED",
+            "ENABLED_BY_POLICY",
+        }
+    except Exception:
+        return False
+
+
+def _write_store_autostart_state(enable):
+    task = _get_store_startup_task()
+    if enable:
+        state = _run_store_async(task.request_enable_async())
+        return _store_startup_state_name(state) in {
+            "ENABLED",
+            "ENABLED_BY_POLICY",
+        }
+    task.disable()
+    return False
 
 
 def _current_autostart_shortcut_info():
@@ -4393,6 +4435,13 @@ class DarkThemeApp(QMainWindow):
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
+        if portable_paths.is_windows_packaged():
+            enabled = _read_store_autostart_state()
+            self.autostart = enabled
+            self.config["autostart"] = enabled
+            self.config["autostart_backend"] = AUTOSTART_BACKEND
+            return enabled
+
         shortcut_info = _read_autostart_shortcut()
         stored_autostart = bool(self.config.get("autostart", DEFAULT_CONFIG["autostart"]))
         stored_backend = self.config.get("autostart_backend")
@@ -4415,6 +4464,12 @@ class DarkThemeApp(QMainWindow):
 
     def set_autostart(self, enable: bool):
         try:
+            if portable_paths.is_windows_packaged():
+                actual = _write_store_autostart_state(bool(enable))
+                self.autostart = bool(actual)
+                self.config["autostart"] = self.autostart
+                self.config["autostart_backend"] = AUTOSTART_BACKEND
+                return self.autostart
             _write_autostart_command(bool(enable))
             actual = _autostart_shortcut_matches_current(_read_autostart_shortcut())
             self.autostart = bool(actual)

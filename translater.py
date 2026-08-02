@@ -97,6 +97,13 @@ def _unavailable_sentencizer(*args, **kwargs):
 
 def _prepare_argos_environment():
     """Makes argostranslate importable without torch/stanza/onnxruntime."""
+    if portable_paths.is_windows_packaged():
+        # Keep Argos models and indexes in the package's writable LocalState.
+        # The MSIX installation directory is read-only and changes on updates.
+        argos_root = os.path.join(portable_paths.portable_base_dir(), "argos")
+        os.environ.setdefault("XDG_DATA_HOME", os.path.join(argos_root, "data"))
+        os.environ.setdefault("XDG_CONFIG_HOME", os.path.join(argos_root, "config"))
+        os.environ.setdefault("XDG_CACHE_HOME", os.path.join(argos_root, "cache"))
     os.environ["ARGOS_CHUNK_TYPE"] = ARGOS_DEFAULT_CHUNK_TYPE
     if "stanza" not in sys.modules:
         sys.modules["stanza"] = _make_module_stub("stanza", {"Pipeline": _unavailable_sentencizer})

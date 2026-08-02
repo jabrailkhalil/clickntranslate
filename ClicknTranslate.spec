@@ -198,6 +198,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['icons\\icon.ico'],
+    manifest='installer\\windows\\ClicknTranslate.exe.manifest',
 )
 
 worker_exe = EXE(

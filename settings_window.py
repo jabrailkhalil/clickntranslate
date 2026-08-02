@@ -19,8 +19,8 @@ from PyQt5.QtWidgets import (
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QLineEdit, QFrame, QGridLayout
 )
-from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
-from PyQt5.QtGui import QKeySequence, QIcon, QColor, QBrush
+from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
+from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
 from PyQt5 import QtCore, QtGui
 from styled_dialogs import StyledMessageBox
 
@@ -69,6 +69,7 @@ GITHUB_OWNER = "jabrailkhalil"
 GITHUB_REPO = "clickntranslate"
 GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/"
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
 TESSERACT_BUNDLE_URL_WIN64 = (
@@ -3323,6 +3324,22 @@ class SettingsWindow(QWidget):
         lang = self.parent.current_interface_language
         is_ru = lang == "ru"
 
+        if portable_paths.is_windows_packaged():
+            if not QDesktopServices.openUrl(QUrl(MICROSOFT_STORE_UPDATES_URI)):
+                QMessageBox.information(
+                    self,
+                    settings_text(lang, "update"),
+                    (
+                        "Обновления этой версии устанавливает Microsoft Store. "
+                        "Откройте Библиотеку Microsoft Store и нажмите «Получить обновления»."
+                        if is_ru
+                        else
+                        "Updates for this version are delivered by Microsoft Store. "
+                        "Open the Microsoft Store Library and choose Get updates."
+                    ),
+                )
+            return
+
         if not getattr(sys, "frozen", False):
             msg = QMessageBox(self)
             msg.setWindowTitle(settings_text(lang, "update"))
@@ -3959,6 +3976,8 @@ class SettingsWindow(QWidget):
         return False, last_err
 
     def _launch_zip_updater(self, zip_path):
+        if portable_paths.is_windows_packaged():
+            return False, "Microsoft Store manages updates for this package"
         if not getattr(sys, "frozen", False):
             return False, "Auto-update is available only in packaged app"
 
@@ -6465,7 +6484,11 @@ finally {
             "interface_language": "en",
             "ocr_language": "ru",
             "autostart": False,
-            "autostart_backend": "startup_shortcut",
+            "autostart_backend": (
+                "store_startup_task"
+                if portable_paths.is_windows_packaged()
+                else "startup_shortcut"
+            ),
             "translation_mode": "English",
             "main_translation_source_language": "en",
             "main_translation_target_language": "ru",

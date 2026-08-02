@@ -78,3 +78,4 @@ data/**/*.log
 *.sh
 
 !build_release.bat
+!tools/build_msix.ps1

@@ -2,12 +2,66 @@ import os
 import sys
 
 
+APPMODEL_ERROR_NO_PACKAGE = 15700
+ERROR_INSUFFICIENT_BUFFER = 122
+PACKAGE_MODE_ENV = "CLICKNTRANSLATE_PACKAGE_MODE"
+PACKAGE_FAMILY_ENV = "CLICKNTRANSLATE_PACKAGE_FAMILY"
+
+
 PUBLIC_EXE_NAME = "ClicknTranslate.exe"
 APP_DIR_NAME = "app"
 
 
 def frozen_executable_dir():
     return os.path.dirname(os.path.abspath(sys.executable))
+
+
+def windows_package_family_name():
+    """Return the current MSIX package family name, or an empty string."""
+    override = str(os.environ.get(PACKAGE_FAMILY_ENV, "") or "").strip()
+    if override:
+        return override
+    if sys.platform != "win32":
+        return ""
+    try:
+        import ctypes
+
+        length = ctypes.c_uint32(0)
+        get_family_name = ctypes.windll.kernel32.GetCurrentPackageFamilyName
+        result = get_family_name(ctypes.byref(length), None)
+        if result == APPMODEL_ERROR_NO_PACKAGE:
+            return ""
+        if result not in (0, ERROR_INSUFFICIENT_BUFFER) or length.value <= 1:
+            return ""
+        buffer = ctypes.create_unicode_buffer(length.value)
+        result = get_family_name(ctypes.byref(length), buffer)
+        return buffer.value if result == 0 else ""
+    except Exception:
+        return ""
+
+
+def is_windows_packaged():
+    """Whether this process is running with MSIX package identity."""
+    override = str(os.environ.get(PACKAGE_MODE_ENV, "") or "").strip().lower()
+    if override:
+        return override in {"1", "true", "yes", "on"}
+    return bool(windows_package_family_name())
+
+
+def packaged_data_dir():
+    """Writable per-user state directory used by the Microsoft Store build."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        local_app_data = os.path.join(os.path.expanduser("~"), "AppData", "Local")
+    package_family = windows_package_family_name()
+    if package_family:
+        return os.path.abspath(
+            os.path.join(local_app_data, "Packages", package_family, "LocalState")
+        )
+    # Deterministic fallback for packaging tests run outside an installed MSIX.
+    return os.path.abspath(
+        os.path.join(local_app_data, "JabrailDigital", "ClicknTranslate", "StoreData")
+    )
 
 
 def is_launcher_layout():
@@ -20,6 +74,8 @@ def is_launcher_layout():
 
 
 def portable_base_dir():
+    if is_windows_packaged():
+        return packaged_data_dir()
     if getattr(sys, "frozen", False):
         if is_launcher_layout():
             return os.path.dirname(frozen_executable_dir())

@@ -54,6 +54,31 @@ class TestStartupShortcutAutostart(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertEqual(dummy.config["autostart_backend"], main.AUTOSTART_BACKEND)
 
+    def test_store_autostart_uses_manifest_startup_task(self):
+        dummy = types.SimpleNamespace(
+            config={"autostart": False},
+            autostart=False,
+        )
+
+        with mock.patch("main.portable_paths.is_windows_packaged", return_value=True):
+            with mock.patch("main._write_store_autostart_state", return_value=True) as write:
+                enabled = main.DarkThemeApp.set_autostart(dummy, True)
+
+        self.assertTrue(enabled)
+        self.assertEqual(dummy.config["autostart_backend"], main.AUTOSTART_BACKEND)
+        write.assert_called_once_with(True)
+
+    def test_store_autostart_sync_does_not_touch_startup_shortcut(self):
+        dummy = types.SimpleNamespace(config={"autostart": False}, autostart=False)
+
+        with mock.patch("main.portable_paths.is_windows_packaged", return_value=True):
+            with mock.patch("main._read_store_autostart_state", return_value=True):
+                with mock.patch("main._read_autostart_shortcut") as read_shortcut:
+                    enabled = main.DarkThemeApp.sync_autostart_state(dummy, repair_stale=True)
+
+        self.assertTrue(enabled)
+        read_shortcut.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

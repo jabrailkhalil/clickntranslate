@@ -98,6 +98,7 @@ The release uses a folder-based PyInstaller build for responsive startup. Option
 ## Support and feedback
 
 - [Report a bug or request a feature](https://github.com/jabrailkhalil/clickntranslate/issues)
+- [Privacy policy](PRIVACY.md)
 - Telegram: [@jabrail_digital](https://t.me/jabrail_digital)
 
 If the best screen translator for Windows saves you time, star the repository and help more people discover it.

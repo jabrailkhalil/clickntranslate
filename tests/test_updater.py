@@ -85,6 +85,30 @@ class TestPortableLayoutHelpers(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+    def test_store_layout_uses_package_local_state(self):
+        with tempfile.TemporaryDirectory(prefix="cnt_store_layout_") as local_app_data:
+            family = "JabrailDigital.ClicknTranslate_test123"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    portable_paths.PACKAGE_MODE_ENV: "1",
+                    portable_paths.PACKAGE_FAMILY_ENV: family,
+                    "LOCALAPPDATA": local_app_data,
+                },
+                clear=False,
+            ):
+                expected = os.path.join(
+                    local_app_data,
+                    "Packages",
+                    family,
+                    "LocalState",
+                )
+                self.assertTrue(portable_paths.is_windows_packaged())
+                self.assertEqual(portable_paths.portable_base_dir(), expected)
+                self.assertEqual(sw._portable_base_dir(), expected)
+                self.assertEqual(ocr.get_portable_dir(), expected)
+                self.assertEqual(translater.get_portable_dir(), expected)
+
 
 class TestUpdateProgressDialog(unittest.TestCase):
     def test_update_progress_dialog_supports_update_flow_methods(self):
@@ -211,6 +235,16 @@ class TestUpdaterCommands(unittest.TestCase):
                             )
         self.assertTrue(ok, err)
         return script_path
+
+    def test_store_package_never_launches_github_zip_updater(self):
+        with mock.patch("settings_window.portable_paths.is_windows_packaged", return_value=True):
+            ok, error = sw.SettingsWindow._launch_zip_updater(
+                types.SimpleNamespace(),
+                r"C:\Temp\ClicknTranslate-v1.4.7-win64.zip",
+            )
+
+        self.assertFalse(ok)
+        self.assertIn("Microsoft Store", error)
 
     def _run_updater_script(self, script_path, app_dir, zip_path):
         powershell = os.path.join(

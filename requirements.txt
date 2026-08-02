@@ -9,6 +9,7 @@ winrt-Windows.Storage
 winrt-Windows.Foundation
 winrt-Windows.Foundation.Collections
 winrt-Windows.System
+winrt-Windows.ApplicationModel
 Pillow
 pyperclip
 argostranslate~=1.11.0
