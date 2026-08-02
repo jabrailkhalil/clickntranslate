@@ -12,9 +12,13 @@
 
 </div>
 
-![Click'n'Translate — copia texto desde cualquier área de la pantalla](../images/copy-to-clipboard.png)
+![Tres formas de utilizar Click'n'Translate](../images/how-it-works.png)
 
 Click'n'Translate convierte cualquier texto visible en Windows en contenido que puedes copiar o traducir. Selecciona un área, pulsa un atajo global y continúa trabajando: sin abrir el navegador, volver a escribir ni cambiar de ventana.
+
+## Míralo en acción
+
+![Click'n'Translate traduce texto de un juego al chino y al francés](../images/translation-demo.gif)
 
 ## ¿Por qué Click'n'Translate?
 

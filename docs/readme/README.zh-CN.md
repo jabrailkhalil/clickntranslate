@@ -12,9 +12,13 @@
 
 </div>
 
-![Click'n'Translate — 从屏幕任意区域复制文字](../images/copy-to-clipboard.png)
+![Click'n'Translate 的三种使用方式](../images/how-it-works.png)
 
 Click'n'Translate 可将 Windows 屏幕上的任何内容转换为可复制或可翻译的文字。选择一个区域，按下全局快捷键，然后继续工作——无需打开浏览器、手动输入或频繁切换窗口。
+
+## 实际演示
+
+![Click'n'Translate 将游戏文字翻译成中文和法语](../images/translation-demo.gif)
 
 ## 为什么选择 Click'n'Translate？
 

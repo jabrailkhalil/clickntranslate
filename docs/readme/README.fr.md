@@ -12,9 +12,13 @@
 
 </div>
 
-![Click'n'Translate — copiez le texte de n'importe quelle zone de l'écran](../images/copy-to-clipboard.png)
+![Trois façons d'utiliser Click'n'Translate](../images/how-it-works.png)
 
 Click'n'Translate transforme tout texte visible sous Windows en contenu que vous pouvez copier ou traduire. Sélectionnez une zone, utilisez un raccourci global et poursuivez votre travail — sans navigateur, sans saisie manuelle et sans changer de fenêtre.
+
+## Démonstration
+
+![Click'n'Translate traduit du texte de jeu en chinois et en français](../images/translation-demo.gif)
 
 ## Pourquoi Click'n'Translate ?
 
