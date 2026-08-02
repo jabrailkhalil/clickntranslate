@@ -249,7 +249,13 @@ def _tesseract_language_display_name(tess_code, interface_language=None):
     return tess_code
 
 
-def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_check=None):
+def _prepare_tesseract_data(
+    tess_cmd,
+    tess_lang,
+    status_callback=None,
+    cancel_check=None,
+    raise_on_error=False,
+):
     tess_dir = os.path.dirname(tess_cmd)
     candidate_dirs = [
         os.path.join(tess_dir, "tessdata"),
@@ -263,18 +269,25 @@ def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_ch
             break
     if not tessdata_dir:
         os.environ.pop("TESSDATA_PREFIX", None)
-        return
+        error = RuntimeError("Tesseract tessdata directory was not found.")
+        if raise_on_error:
+            raise error
+        logging.warning(str(error))
+        return []
 
+    prepared = []
+    tmp_path = ""
     try:
         import requests
         interface_language = get_cached_ocr_config().get("interface_language", "en")
         for lang_code in [code for code in tess_lang.split("+") if code]:
             fname = f"{lang_code}.traineddata"
             target_path = os.path.join(tessdata_dir, fname)
-            if os.path.exists(target_path):
+            if os.path.isfile(target_path) and os.path.getsize(target_path) > 0:
+                prepared.append(target_path)
                 continue
             if cancel_check and cancel_check():
-                return
+                return prepared
             url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
             display_name = _tesseract_language_display_name(lang_code, interface_language)
             if interface_language == "ru":
@@ -285,6 +298,10 @@ def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_ch
                 status_callback(status_text)
             logging.info(f"Downloading {fname} into {tessdata_dir} ...")
             tmp_path = target_path + ".tmp"
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
             downloaded = 0
             with requests.get(url, timeout=180, stream=True) as r:
                 r.raise_for_status()
@@ -303,7 +320,7 @@ def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_ch
                                 os.remove(tmp_path)
                             except Exception:
                                 pass
-                            return
+                            return prepared
                         if not chunk:
                             continue
                         f.write(chunk)
@@ -314,7 +331,16 @@ def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_ch
                                 status_callback(f"Tesseract: скачиваю {display_name}... {percent}%")
                             else:
                                 status_callback(f"Tesseract: downloading {display_name}... {percent}%")
-            os.replace(target_path + ".tmp", target_path)
+            if total and downloaded != total:
+                raise RuntimeError(
+                    f"Incomplete Tesseract package {fname}: "
+                    f"received {downloaded} of {total} bytes."
+                )
+            if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) <= 0:
+                raise RuntimeError(f"Downloaded Tesseract package {fname} is empty.")
+            os.replace(tmp_path, target_path)
+            tmp_path = ""
+            prepared.append(target_path)
             if status_callback:
                 if interface_language == "ru":
                     status_callback(f"Tesseract: пакет {display_name} готов")
@@ -322,7 +348,15 @@ def _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=None, cancel_ch
                     status_callback(f"Tesseract: {display_name} language data is ready")
             logging.info(f"{fname} downloaded into {tessdata_dir}")
     except Exception as dl_err:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         logging.warning(f"Could not prepare Tesseract language data {tess_lang}: {dl_err}")
+        if raise_on_error:
+            raise
+    return prepared
 
 def _tesseract_psm_order(width, height):
     psm_order = [6]

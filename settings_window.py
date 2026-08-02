@@ -15,7 +15,8 @@ import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
-    QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
+    QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QLineEdit
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon, QColor, QBrush
@@ -590,8 +591,8 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "Remove local RapidOCR",
         "remove_local_easyocr": "Remove local EasyOCR",
         "remove_local_hymt": "Remove local Hy-MT",
-        "ocr_language_packs": "OCR language packs",
-        "manage_ocr_languages": "Manage OCR languages",
+        "ocr_language_packs": "Language packages",
+        "manage_ocr_languages": "Manage OCR and Argos language packages",
         "clearing": "Clearing...",
         "cleared": "Cleared {size}",
         "yes": "Yes",
@@ -649,8 +650,8 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "Удалить локальный RapidOCR",
         "remove_local_easyocr": "Удалить локальный EasyOCR",
         "remove_local_hymt": "Удалить локальный Hy-MT",
-        "ocr_language_packs": "Языки OCR",
-        "manage_ocr_languages": "Управление языками OCR",
+        "ocr_language_packs": "Языковые пакеты",
+        "manage_ocr_languages": "Управление пакетами OCR и Argos",
         "clearing": "Выполняется...",
         "cleared": "Очищено {size}",
         "yes": "Да",
@@ -983,6 +984,11 @@ class OcrLanguageManagerDialog(QDialog):
         self._install_in_progress = False
         self._cancel_requested = threading.Event()
         self.progress_dialog = None
+        self._task_success_message = ""
+        self._argos_catalog = []
+        self._argos_catalog_error = ""
+        self._argos_catalog_loading = True
+        self._argos_catalog_request_active = False
 
         self.setWindowTitle(settings_text(self.lang, "ocr_language_packs"))
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
@@ -994,11 +1000,11 @@ class OcrLanguageManagerDialog(QDialog):
         layout.setSpacing(8)
 
         intro = QLabel(
-            "Выберите OCR-движок и заранее установите нужные языковые пакеты. "
-            "Основное окно настроек не меняется по размеру."
+            "Установите нужные языки для OCR или офлайн-направления перевода Argos. "
+            "Пакеты загружаются здесь заранее, а не во время распознавания или перевода."
             if self.lang == "ru" else
-            "Choose an OCR engine and preinstall the language packs you need. "
-            "The main settings window keeps its fixed size."
+            "Install OCR languages or Argos offline translation directions here. "
+            "Packages are downloaded in advance, not during recognition or translation."
         )
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
@@ -1011,19 +1017,21 @@ class OcrLanguageManagerDialog(QDialog):
         self.tesseract_table = None
         self.easyocr_table = None
         self.rapidocr_table = None
+        self.argos_table = None
         self._build_tabs()
 
         bottom = QHBoxLayout()
         bottom.addStretch()
-        refresh_btn = QPushButton("Обновить" if self.lang == "ru" else "Refresh")
-        refresh_btn.clicked.connect(self.refresh_all)
-        bottom.addWidget(refresh_btn)
-        close_btn = QPushButton(settings_text(self.lang, "back"))
-        close_btn.clicked.connect(self.accept)
-        bottom.addWidget(close_btn)
+        self.refresh_btn = QPushButton("Обновить" if self.lang == "ru" else "Refresh")
+        self.refresh_btn.clicked.connect(self.refresh_catalog)
+        bottom.addWidget(self.refresh_btn)
+        self.close_btn = QPushButton(settings_text(self.lang, "back"))
+        self.close_btn.clicked.connect(self.accept)
+        bottom.addWidget(self.close_btn)
         layout.addLayout(bottom)
 
         self._apply_style()
+        QtCore.QTimer.singleShot(0, lambda: self._start_argos_catalog_refresh(True))
 
     def _owner_app(self):
         owner_parent = getattr(self.owner, "parent", None)
@@ -1055,6 +1063,17 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #3a3645; color: #8f889c; }
+                QLineEdit { background: #17181d; color: #f4f6fb; border: 1px solid #34313f; border-radius: 6px; padding: 6px 9px; }
+                QLineEdit:focus { border-color: #7A5FA1; }
+                QScrollBar:vertical { background: #14151a; width: 12px; margin: 0; border: none; }
+                QScrollBar::handle:vertical { background: #67577b; min-height: 36px; border-radius: 5px; margin: 2px; }
+                QScrollBar::handle:vertical:hover { background: #80699a; }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: transparent; }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+                QScrollBar:horizontal { background: #14151a; height: 12px; margin: 0; border: none; }
+                QScrollBar::handle:horizontal { background: #67577b; min-width: 36px; border-radius: 5px; margin: 2px; }
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
+                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """)
         else:
             self.setStyleSheet("""
@@ -1064,6 +1083,17 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #d8d4e2; color: #777; }
+                QLineEdit { background: #ffffff; color: #202124; border: 1px solid #cfc8df; border-radius: 6px; padding: 6px 9px; }
+                QLineEdit:focus { border-color: #7A5FA1; }
+                QScrollBar:vertical { background: #f1eff5; width: 12px; margin: 0; border: none; }
+                QScrollBar::handle:vertical { background: #9b87b6; min-height: 36px; border-radius: 5px; margin: 2px; }
+                QScrollBar::handle:vertical:hover { background: #7A5FA1; }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: transparent; }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+                QScrollBar:horizontal { background: #f1eff5; height: 12px; margin: 0; border: none; }
+                QScrollBar::handle:horizontal { background: #9b87b6; min-width: 36px; border-radius: 5px; margin: 2px; }
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
+                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """)
 
     def _build_tabs(self):
@@ -1084,7 +1114,10 @@ class OcrLanguageManagerDialog(QDialog):
             if self.lang == "ru" else
             "Tick languages to download into the local tessdata folder.",
             self._populate_tesseract_table,
-            [("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_tesseract)],
+            [
+                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_tesseract),
+                ("Установить движок" if self.lang == "ru" else "Install engine", self._install_tesseract_engine),
+            ],
         )
         self.easyocr_table = self._add_engine_tab(
             "EasyOCR",
@@ -1092,7 +1125,10 @@ class OcrLanguageManagerDialog(QDialog):
             if self.lang == "ru" else
             "Tick languages to predownload EasyOCR models. The English model is added as fallback.",
             self._populate_easyocr_table,
-            [("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_easyocr)],
+            [
+                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_easyocr),
+                ("Установить движок" if self.lang == "ru" else "Install engine", self._install_easyocr_engine),
+            ],
         )
         self.rapidocr_table = self._add_engine_tab(
             "RapidOCR",
@@ -1103,7 +1139,38 @@ class OcrLanguageManagerDialog(QDialog):
             [("Установить движок" if self.lang == "ru" else "Install engine", self._install_rapidocr_engine)],
         )
 
-    def _add_engine_tab(self, title, note, populate_func, actions):
+        self.argos_table = self._add_engine_tab(
+            "Argos",
+            "Показаны все реально доступные пакеты Argos. Перевод между двумя неанглийскими языками собирается из двух пакетов через английский."
+            if self.lang == "ru" else
+            "All actual Argos packages are shown. Translation between two non-English languages is assembled from two packages through English.",
+            self._populate_argos_table,
+            [
+                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_argos),
+                ("Удалить выделенные" if self.lang == "ru" else "Remove highlighted", self._remove_selected_argos),
+            ],
+            header_labels=[
+                "",
+                "Направление" if self.lang == "ru" else "Direction",
+                "Пакет" if self.lang == "ru" else "Package",
+                "Статус" if self.lang == "ru" else "Status",
+            ],
+            search_placeholder=(
+                "Поиск: русский, ru, en→ru…"
+                if self.lang == "ru" else
+                "Search: Russian, ru, en→ru…"
+            ),
+        )
+
+    def _add_engine_tab(
+        self,
+        title,
+        note,
+        populate_func,
+        actions,
+        header_labels=None,
+        search_placeholder="",
+    ):
         page = QWidget(self)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -1113,9 +1180,16 @@ class OcrLanguageManagerDialog(QDialog):
         note_label.setWordWrap(True)
         layout.addWidget(note_label)
 
+        filter_edit = None
+        if search_placeholder:
+            filter_edit = QLineEdit(page)
+            filter_edit.setPlaceholderText(search_placeholder)
+            filter_edit.setClearButtonEnabled(True)
+            layout.addWidget(filter_edit)
+
         table = QTableWidget(page)
         table.setColumnCount(4)
-        table.setHorizontalHeaderLabels([
+        table.setHorizontalHeaderLabels(header_labels or [
             "",
             "Язык" if self.lang == "ru" else "Language",
             "Пакет" if self.lang == "ru" else "Package",
@@ -1126,6 +1200,9 @@ class OcrLanguageManagerDialog(QDialog):
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setAlternatingRowColors(False)
         table.setIconSize(QtCore.QSize(22, 22))
+        table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.verticalScrollBar().setSingleStep(24)
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -1136,13 +1213,18 @@ class OcrLanguageManagerDialog(QDialog):
         else:
             header.setStyleSheet("QHeaderView::section { background-color: #f0eef7; color: #202124; border: 0; padding: 5px; }")
         table.setColumnWidth(0, 34)
+        table._package_filter_edit = filter_edit
+        if filter_edit is not None:
+            filter_edit.textChanged.connect(lambda _text, target=table: populate_func(target))
         layout.addWidget(table)
 
         action_row = QHBoxLayout()
         action_row.addStretch()
+        table._package_action_buttons = []
         for text, callback in actions:
             button = QPushButton(text)
             button.clicked.connect(callback)
+            table._package_action_buttons.append(button)
             action_row.addWidget(button)
         layout.addLayout(action_row)
 
@@ -1155,6 +1237,11 @@ class OcrLanguageManagerDialog(QDialog):
         self._populate_tesseract_table(self.tesseract_table)
         self._populate_easyocr_table(self.easyocr_table)
         self._populate_rapidocr_table(self.rapidocr_table)
+        self._populate_argos_table(self.argos_table)
+
+    def refresh_catalog(self):
+        self.refresh_all()
+        self._start_argos_catalog_refresh(True)
 
     def _set_language_rows(self, table, rows):
         table.setRowCount(len(rows))
@@ -1183,7 +1270,9 @@ class OcrLanguageManagerDialog(QDialog):
             check_item.setForeground(QBrush(fg if data.get("selectable", False) else muted_fg))
             table.setItem(row, 0, check_item)
 
-            lang_item = QTableWidgetItem(QIcon(resource_path(data["icon"])), data["name"])
+            icon_path = data.get("icon", "")
+            icon = QIcon(resource_path(icon_path)) if icon_path else QIcon()
+            lang_item = QTableWidgetItem(icon, data["name"])
             lang_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             lang_item.setBackground(QBrush(bg))
             lang_item.setForeground(QBrush(fg))
@@ -1333,22 +1422,155 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _populate_rapidocr_table(self, table):
         engine_ready, _error = self.owner._rapidocr_importable_status()
-        rows = []
-        for language in APP_LANGUAGES:
-            rows.append({
-                "code": language.code,
-                "icon": language_icon_path(language.code),
-                "name": self._language_name(language),
-                "package": "shared model",
-                "status": (
-                    "Движок установлен" if engine_ready and self.lang == "ru" else
-                    "Engine installed" if engine_ready else
-                    "Движок не установлен" if self.lang == "ru" else "Engine missing"
-                ),
-                "checked": bool(engine_ready),
-                "selectable": False,
-            })
+        rows = [{
+            "code": "rapidocr",
+            "icon": "",
+            "name": "Общая модель" if self.lang == "ru" else "Shared model",
+            "package": "RapidOCR (Chinese + English)",
+            "status": (
+                "Движок установлен" if engine_ready and self.lang == "ru" else
+                "Engine installed" if engine_ready else
+                "Движок не установлен" if self.lang == "ru" else "Engine missing"
+            ),
+            "checked": bool(engine_ready),
+            "selectable": False,
+        }]
         self._set_language_rows(table, rows)
+
+    def _argos_direction_name(self, source_code, target_code):
+        by_code = {language.code: language for language in APP_LANGUAGES}
+        source = by_code.get(source_code)
+        target = by_code.get(target_code)
+        source_name = source.display_name(self.lang) if source else source_code.upper()
+        target_name = target.display_name(self.lang) if target else target_code.upper()
+        return f"{source_name} → {target_name}"
+
+    def _populate_argos_table(self, table):
+        languages_by_code = {language.code: language for language in APP_LANGUAGES}
+        supported = set(languages_by_code)
+        rows = []
+        filter_edit = getattr(table, "_package_filter_edit", None)
+        query = str(filter_edit.text() if filter_edit is not None else "").strip().casefold()
+        normalized_query = query.replace("→", "->").replace(" ", "")
+
+        def package_sort_key(package):
+            source_code = str(package.get("source_code") or "").lower()
+            target_code = str(package.get("target_code") or "").lower()
+            pair = (source_code, target_code)
+            preferred_rank = {("en", "ru"): 0, ("ru", "en"): 1}.get(pair, 2)
+            return (
+                0 if package.get("installed") else 1,
+                preferred_rank,
+                source_code,
+                target_code,
+            )
+
+        packages = sorted(
+            self._argos_catalog,
+            key=package_sort_key,
+        )
+        for package in packages:
+            source_code = str(package.get("source_code") or "").lower()
+            target_code = str(package.get("target_code") or "").lower()
+            if source_code not in supported or target_code not in supported:
+                continue
+            source = languages_by_code[source_code]
+            target = languages_by_code[target_code]
+            pair_code = f"{source_code}->{target_code}"
+            searchable = " ".join(
+                (
+                    pair_code,
+                    pair_code.replace("->", "→"),
+                    source.english_name,
+                    source.russian_name,
+                    target.english_name,
+                    target.russian_name,
+                    str(package.get("package_name") or ""),
+                )
+            ).casefold()
+            normalized_searchable = searchable.replace("→", "->").replace(" ", "")
+            if query and query not in searchable and normalized_query not in normalized_searchable:
+                continue
+            installed = bool(package.get("installed"))
+            available = bool(package.get("available"))
+            version = str(package.get("version") or "").strip()
+            status = self._status_installed() if installed else self._status_can_download() if available else self._status_missing()
+            if version:
+                status = f"{status} · v{version}"
+            rows.append({
+                "code": pair_code,
+                "icon": language_icon_path(source_code),
+                "name": self._argos_direction_name(source_code, target_code),
+                "package": str(package.get("package_name") or f"translate-{source_code}_{target_code}"),
+                "status": status,
+                "checked": installed,
+                "selectable": bool(available and not installed),
+            })
+        if not rows:
+            if self._argos_catalog_loading:
+                message = "Загрузка списка пакетов…" if self.lang == "ru" else "Loading package list…"
+            elif self._argos_catalog_error:
+                message = ("Не удалось загрузить список: " if self.lang == "ru" else "Could not load package list: ") + self._argos_catalog_error
+            elif query:
+                message = "По вашему запросу ничего не найдено" if self.lang == "ru" else "No packages match your search"
+            else:
+                message = "Доступные пакеты не найдены" if self.lang == "ru" else "No packages found"
+            rows = [{
+                "code": "",
+                "icon": "",
+                "name": message,
+                "package": "",
+                "status": "",
+                "checked": False,
+                "selectable": False,
+            }]
+        self._set_language_rows(table, rows)
+
+    def _start_argos_catalog_refresh(self, refresh):
+        if self._argos_catalog_request_active:
+            return
+        self._argos_catalog_request_active = True
+        self._argos_catalog_loading = True
+        self._argos_catalog_error = ""
+        if self.argos_table is not None:
+            self._populate_argos_table(self.argos_table)
+        threading.Thread(
+            target=self._load_argos_catalog_worker,
+            args=(bool(refresh),),
+            daemon=True,
+        ).start()
+
+    def _load_argos_catalog_worker(self, refresh):
+        error = ""
+        packages = []
+        try:
+            import translater
+            packages = translater.argos_package_catalog(refresh=refresh)
+        except Exception as exc:
+            error = str(exc)
+            if refresh:
+                try:
+                    packages = translater.argos_package_catalog(refresh=False)
+                except Exception:
+                    pass
+        self._argos_catalog = list(packages or [])
+        try:
+            QMetaObject.invokeMethod(
+                self,
+                "_on_argos_catalog_ready",
+                Qt.QueuedConnection,
+                QtCore.Q_ARG(str, str(error)),
+            )
+        except RuntimeError:
+            pass
+
+    @QtCore.pyqtSlot(str)
+    def _on_argos_catalog_ready(self, error):
+        self._argos_catalog_request_active = False
+        self._argos_catalog_loading = False
+        self._argos_catalog_error = str(error or "")
+        if self.argos_table is not None:
+            self._populate_argos_table(self.argos_table)
 
     def _selected_codes(self, table):
         codes = []
@@ -1360,6 +1582,16 @@ class OcrLanguageManagerDialog(QDialog):
                 continue
             if item.checkState() == Qt.Checked:
                 codes.append(item.data(Qt.UserRole))
+        return codes
+
+    def _highlighted_codes(self, table):
+        rows = sorted({index.row() for index in table.selectionModel().selectedRows()})
+        codes = []
+        for row in rows:
+            item = table.item(row, 0)
+            code = item.data(Qt.UserRole) if item is not None else ""
+            if code:
+                codes.append(code)
         return codes
 
     def _show_no_selection(self):
@@ -1376,6 +1608,35 @@ class OcrLanguageManagerDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Windows OCR", str(exc))
 
+    def _refresh_after_owner_install(self, in_progress_attr):
+        if bool(getattr(self.owner, in_progress_attr, False)):
+            QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install(in_progress_attr))
+            return
+        self.refresh_all()
+
+    def _install_tesseract_engine(self):
+        if self.owner._find_available_tesseract_exe():
+            QMessageBox.information(
+                self,
+                "Tesseract",
+                "Tesseract уже установлен." if self.lang == "ru" else "Tesseract is already installed.",
+            )
+            return
+        self.owner.start_tesseract_install()
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_tesseract_install_in_progress"))
+
+    def _install_easyocr_engine(self):
+        ready, _error = self.owner._easyocr_importable_status()
+        if ready:
+            QMessageBox.information(
+                self,
+                EASYOCR_ENGINE_DISPLAY,
+                "EasyOCR уже установлен." if self.lang == "ru" else "EasyOCR is already installed.",
+            )
+            return
+        self.owner.start_easyocr_install()
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_easyocr_install_in_progress"))
+
     def _install_rapidocr_engine(self):
         ready, _error = self.owner._rapidocr_importable_status()
         if ready:
@@ -1386,6 +1647,7 @@ class OcrLanguageManagerDialog(QDialog):
             )
             return
         self.owner.start_rapidocr_install()
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_rapidocr_install_in_progress"))
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
@@ -1413,21 +1675,17 @@ class OcrLanguageManagerDialog(QDialog):
         self._run_language_task("Windows OCR", codes, self._install_windows_ocr_worker)
 
     def _install_selected_tesseract(self):
+        tess_cmd = self.owner._find_available_tesseract_exe()
+        if not tess_cmd:
+            self._install_tesseract_engine()
+            return
         codes = self._selected_codes(self.tesseract_table)
         if not codes:
             self._show_no_selection()
             return
-        tess_cmd = self.owner._find_available_tesseract_exe()
-        if not tess_cmd:
-            self.owner.start_tesseract_install()
-            return
         self._run_language_task("Tesseract", codes, self._install_tesseract_worker)
 
     def _install_selected_easyocr(self):
-        codes = self._selected_codes(self.easyocr_table)
-        if not codes:
-            self._show_no_selection()
-            return
         ready, error = self.owner._easyocr_importable_status()
         if not ready:
             msg = QMessageBox(self)
@@ -1444,9 +1702,71 @@ class OcrLanguageManagerDialog(QDialog):
             msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.NoRole)
             msg.exec_()
             if msg.clickedButton() == yes_btn:
-                self.owner.start_easyocr_install()
+                self._install_easyocr_engine()
+            return
+        codes = self._selected_codes(self.easyocr_table)
+        if not codes:
+            self._show_no_selection()
             return
         self._run_language_task("EasyOCR", codes, self._install_easyocr_worker)
+
+    def _install_selected_argos(self):
+        codes = self._selected_codes(self.argos_table)
+        if not codes:
+            self._show_no_selection()
+            return
+        self._run_language_task(
+            "Argos",
+            codes,
+            self._install_argos_worker,
+            success_message=(
+                "Выбранные направления Argos установлены."
+                if self.lang == "ru" else
+                "Selected Argos directions are installed."
+            ),
+        )
+
+    def _remove_selected_argos(self):
+        highlighted = self._highlighted_codes(self.argos_table)
+        installed = {
+            f"{package.get('source_code')}->{package.get('target_code')}"
+            for package in self._argos_catalog
+            if package.get("installed")
+        }
+        codes = [code for code in highlighted if code in installed]
+        if not codes:
+            QMessageBox.information(
+                self,
+                "Argos",
+                "Выделите одну или несколько установленных строк."
+                if self.lang == "ru" else
+                "Highlight one or more installed rows."
+            )
+            return
+        labels = ", ".join(code.replace("->", "→").upper() for code in codes)
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Argos")
+        msg.setText(
+            f"Удалить пакеты Argos: {labels}?\n\nПосле удаления эти направления перестанут работать офлайн."
+            if self.lang == "ru" else
+            f"Remove Argos packages: {labels}?\n\nThese directions will no longer work offline."
+        )
+        msg.setIcon(QMessageBox.Question)
+        remove_btn = msg.addButton(settings_text(self.lang, "remove"), QMessageBox.DestructiveRole)
+        msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.RejectRole)
+        msg.exec_()
+        if msg.clickedButton() != remove_btn:
+            return
+        self._run_language_task(
+            "Argos",
+            codes,
+            self._remove_argos_worker,
+            success_message=(
+                "Выбранные пакеты Argos удалены."
+                if self.lang == "ru" else
+                "Selected Argos packages were removed."
+            ),
+        )
 
     def _is_process_elevated(self):
         if sys.platform != "win32":
@@ -1488,10 +1808,11 @@ class OcrLanguageManagerDialog(QDialog):
             timeout=None,
         )
 
-    def _run_language_task(self, title, codes, worker_func):
+    def _run_language_task(self, title, codes, worker_func, success_message=""):
         if self._install_in_progress:
             return
         self._install_in_progress = True
+        self._task_success_message = str(success_message or "")
         self._cancel_requested.clear()
         self.progress_dialog = TesseractInstallProgressDialog(
             self,
@@ -1550,7 +1871,10 @@ class OcrLanguageManagerDialog(QDialog):
             self.progress_dialog.hide()
             self.progress_dialog = None
         self.refresh_all()
+        if engine == "Argos":
+            self._start_argos_catalog_refresh(False)
         if error:
+            self._task_success_message = ""
             QMessageBox.warning(
                 self,
                 engine,
@@ -1560,8 +1884,11 @@ class OcrLanguageManagerDialog(QDialog):
         QMessageBox.information(
             self,
             engine,
-            "Выбранные языковые пакеты готовы." if self.lang == "ru" else "Selected language packs are ready.",
+            self._task_success_message or (
+                "Выбранные языковые пакеты готовы." if self.lang == "ru" else "Selected language packs are ready."
+            ),
         )
+        self._task_success_message = ""
 
     def _install_tesseract_worker(self, codes):
         try:
@@ -1578,10 +1905,19 @@ class OcrLanguageManagerDialog(QDialog):
                 "+".join(tess_codes),
                 status_callback=lambda text: self._emit_language_progress(text, 0, False),
                 cancel_check=lambda: self._cancel_requested.is_set(),
+                raise_on_error=True,
             )
             if self._cancel_requested.is_set():
                 self._finish_language_task("Tesseract", "Отменено" if self.lang == "ru" else "Canceled")
                 return
+            _tess_cmd, data_dirs = self._tesseract_data_dirs()
+            missing = [
+                f"{code}.traineddata"
+                for code in tess_codes
+                if not self._tesseract_language_installed(code, data_dirs)
+            ]
+            if missing:
+                raise RuntimeError("Downloaded packages were not found: " + ", ".join(missing))
             self._finish_language_task("Tesseract")
         except Exception as exc:
             self._finish_language_task("Tesseract", str(exc))
@@ -1648,6 +1984,60 @@ class OcrLanguageManagerDialog(QDialog):
             self._finish_language_task("EasyOCR")
         except Exception as exc:
             self._finish_language_task("EasyOCR", str(exc))
+
+    def _parse_argos_codes(self, codes):
+        pairs = []
+        for code in codes:
+            source_code, separator, target_code = str(code or "").partition("->")
+            if separator and source_code and target_code:
+                pairs.append((source_code, target_code))
+        return pairs
+
+    def _install_argos_worker(self, codes):
+        try:
+            import translater
+
+            pairs = self._parse_argos_codes(codes)
+
+            def status_callback(message):
+                self._emit_language_progress(str(message), 0, False)
+
+            def progress_callback(message, downloaded_bytes, total_bytes):
+                total_bytes = int(total_bytes or 0)
+                downloaded_bytes = int(downloaded_bytes or 0)
+                if total_bytes > 0:
+                    percent = int(downloaded_bytes * 100 / max(total_bytes, 1))
+                    self._emit_language_progress(
+                        f"Argos {message}: {downloaded_bytes // (1024 * 1024)} / {max(1, total_bytes // (1024 * 1024))} MB",
+                        percent,
+                        True,
+                    )
+                else:
+                    self._emit_language_progress(f"Argos {message}", 0, False)
+
+            translater.install_argos_packages(
+                pairs,
+                status_callback=status_callback,
+                progress_callback=progress_callback,
+                cancel_callback=lambda: self._cancel_requested.is_set(),
+            )
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Argos", "Отменено" if self.lang == "ru" else "Canceled")
+                return
+            self._finish_language_task("Argos")
+        except Exception as exc:
+            self._finish_language_task("Argos", str(exc))
+
+    def _remove_argos_worker(self, codes):
+        try:
+            import translater
+            translater.uninstall_argos_packages(
+                self._parse_argos_codes(codes),
+                status_callback=lambda message: self._emit_language_progress(str(message), 0, False),
+            )
+            self._finish_language_task("Argos")
+        except Exception as exc:
+            self._finish_language_task("Argos", str(exc))
 
 
 class SettingsWindow(QWidget):

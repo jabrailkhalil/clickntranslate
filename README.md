@@ -28,7 +28,7 @@
 - **Instant Text Capture**: Select any area on your screen to extract text instantly
 - **Four OCR Engines**: Choose **Windows OCR**, **Tesseract**, **RapidOCR**, or **EasyOCR**; optional portable engines can be installed and removed from Settings
 - **Universal Mode (AUTO)**: Compares available Windows OCR languages and image variants to select the most reliable result
-- **Language Support**: Recognition languages and required engine models can be managed from Settings
+- **Language packages**: Open **Settings → Language packages** to install Windows OCR capabilities, Tesseract/EasyOCR language data, the shared RapidOCR model, and Argos translation directions before first use
 
 ### 🌐 Instant Translation
 - **Multiple Translation Engines**:
@@ -37,7 +37,7 @@
   - **MyMemory** — free API (5000 chars/day limit)
   - **Lingva** — Google proxy via public servers
   - **LibreTranslate** — open source
-- **Offline engine setup**: Argos downloads the required language package on first use, then translates locally; Hy-MT is installed separately from Settings.
+- **Offline engine setup**: Argos directions can be installed or removed in **Settings → Language packages** with visible download progress; Hy-MT is installed separately from Settings.
 - **Visual Direction**: Clear indication of translation direction (RU → EN, EN → RU)
 - **History Tracking**: Built-in history viewer saves all translations locally
 
@@ -78,7 +78,8 @@
 - **RU mode** works best for Cyrillic text
 - **Right-click** during selection to exit the app
 - **ESC** to cancel current selection
-- Windows OCR requires language packs installed in Windows (Settings → Language)
+- Windows OCR requires its Windows capability for each language; install it from **Settings → Language packages → Windows**
+- RapidOCR uses one shared Chinese/English recognition model rather than separate per-language packs
 
 ## 📦 Building from Source
 

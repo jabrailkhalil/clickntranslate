@@ -58,6 +58,36 @@ def run_request(request, event_callback=None):
                 "statuses": statuses,
                 "error": "",
             }
+        if action == "catalog":
+            return {
+                "packages": translater._argos_package_catalog_local(
+                    refresh=bool(request.get("refresh", False))
+                ),
+                "statuses": statuses,
+                "error": "",
+            }
+        if action == "install_packages":
+            installed = translater._install_argos_packages_local(
+                request.get("pairs") or [],
+                status_callback=status_callback,
+                progress_callback=progress_callback,
+                cancel_callback=cancel_callback,
+            )
+            return {
+                "installed": [list(pair) for pair in installed],
+                "statuses": statuses,
+                "error": "",
+            }
+        if action == "uninstall_packages":
+            removed = translater._uninstall_argos_packages_local(
+                request.get("pairs") or [],
+                status_callback=status_callback,
+            )
+            return {
+                "removed": [list(pair) for pair in removed],
+                "statuses": statuses,
+                "error": "",
+            }
         if action != "translate":
             raise ValueError(f"Unknown Argos worker action: {action}")
         result = translater._try_argos_translate_local(

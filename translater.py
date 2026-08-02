@@ -611,6 +611,138 @@ def _installed_pairs():
         return set()
 
 
+def _normalize_argos_pairs(pairs):
+    """Return unique, valid direct Argos package pairs in input order."""
+    normalized = []
+    seen = set()
+    for pair in pairs or []:
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            continue
+        source_code = str(pair[0] or "").strip().lower()
+        target_code = str(pair[1] or "").strip().lower()
+        value = (source_code, target_code)
+        if not source_code or not target_code or source_code == target_code or value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return normalized
+
+
+def _argos_package_catalog_local(refresh=False):
+    """Return serializable direct-package metadata for the package manager."""
+    if not _ensure_argos_available():
+        raise RuntimeError(argos_unavailable_reason())
+    if refresh:
+        arg_pkg.update_package_index()
+
+    installed_packages = {
+        (pkg.from_code, pkg.to_code): pkg
+        for pkg in arg_pkg.get_installed_packages()
+        if getattr(pkg, "from_code", "") and getattr(pkg, "to_code", "")
+    }
+    available_packages = {
+        (pkg.from_code, pkg.to_code): pkg
+        for pkg in arg_pkg.get_available_packages()
+        if getattr(pkg, "from_code", "") and getattr(pkg, "to_code", "")
+    }
+    rows = []
+    for pair in sorted(set(installed_packages) | set(available_packages)):
+        installed = installed_packages.get(pair)
+        available = available_packages.get(pair)
+        package = available or installed
+        rows.append(
+            {
+                "source_code": pair[0],
+                "target_code": pair[1],
+                "version": str(
+                    getattr(installed, "package_version", "")
+                    or getattr(available, "package_version", "")
+                    or ""
+                ),
+                "installed": installed is not None,
+                "available": available is not None,
+                "package_name": (
+                    arg_pkg.argospm_package_name(package) if package is not None else ""
+                ),
+            }
+        )
+    return rows
+
+
+def _install_argos_packages_local(
+    pairs,
+    status_callback=None,
+    progress_callback=None,
+    cancel_callback=None,
+):
+    """Install the selected direct Argos packages with one index refresh."""
+    if not _ensure_argos_available():
+        raise RuntimeError(argos_unavailable_reason())
+    requested = _normalize_argos_pairs(pairs)
+    if not requested:
+        return []
+
+    _check_argos_install_cancelled(cancel_callback)
+    _emit_status(status_callback, "Обновление индекса пакетов…")
+    arg_pkg.update_package_index()
+    _check_argos_install_cancelled(cancel_callback)
+    available = {
+        (pkg.from_code, pkg.to_code): pkg
+        for pkg in arg_pkg.get_available_packages()
+    }
+    installed = _installed_pairs()
+    completed = []
+    for pair in requested:
+        if pair in installed:
+            continue
+        package = available.get(pair)
+        label = f"{pair[0].upper()}→{pair[1].upper()}"
+        if package is None:
+            raise RuntimeError(f"Argos package {label} is not available.")
+        _check_argos_install_cancelled(cancel_callback)
+        _emit_status(status_callback, f"Загрузка {label}…")
+        download_path = _download_argos_package(
+            package,
+            label,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
+        )
+        _check_argos_install_cancelled(cancel_callback)
+        _emit_status(status_callback, f"Установка {label}…")
+        arg_pkg.install_from_path(download_path)
+        installed.add(pair)
+        completed.append(pair)
+        _emit_status(status_callback, f"Пакет {label} установлен")
+    if completed:
+        _invalidate_argos_cache()
+    return completed
+
+
+def _uninstall_argos_packages_local(pairs, status_callback=None):
+    """Uninstall selected direct Argos packages through the upstream API."""
+    if not _ensure_argos_available():
+        raise RuntimeError(argos_unavailable_reason())
+    requested = set(_normalize_argos_pairs(pairs))
+    if not requested:
+        return []
+    installed = {
+        (pkg.from_code, pkg.to_code): pkg
+        for pkg in arg_pkg.get_installed_packages()
+    }
+    removed = []
+    for pair in sorted(requested):
+        package = installed.get(pair)
+        if package is None:
+            continue
+        label = f"{pair[0].upper()}→{pair[1].upper()}"
+        _emit_status(status_callback, f"Удаление {label}…")
+        arg_pkg.uninstall(package)
+        removed.append(pair)
+    if removed:
+        _invalidate_argos_cache()
+    return removed
+
+
 def _plan_language_pair(source_code, target_code, available_pairs, installed_pairs):
     """Packages needed for source->target, pivoting through English when needed.
 
@@ -858,6 +990,63 @@ def _run_argos_worker_request(
             except Exception:
                 pass
         shutil.rmtree(request_dir, ignore_errors=True)
+
+
+def argos_package_catalog(refresh=False):
+    """Return Argos direct packages without loading its native runtime in Qt."""
+    if _argos_worker_path():
+        payload = _run_argos_worker_request(
+            {"action": "catalog", "refresh": bool(refresh)},
+            timeout=180,
+        )
+        if payload.get("error"):
+            raise RuntimeError(str(payload["error"]))
+        return list(payload.get("packages") or [])
+    return _argos_package_catalog_local(refresh=refresh)
+
+
+def install_argos_packages(
+    pairs,
+    status_callback=None,
+    progress_callback=None,
+    cancel_callback=None,
+):
+    """Install selected direct Argos packages in-process or via ArgosWorker."""
+    pairs = _normalize_argos_pairs(pairs)
+    if _argos_worker_path():
+        payload = _run_argos_worker_request(
+            {"action": "install_packages", "pairs": pairs},
+            status_callback=status_callback,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
+        )
+        if payload.get("error"):
+            error = str(payload["error"])
+            if "ArgosInstallCancelledError" in error:
+                raise ArgosInstallCancelledError(error)
+            raise RuntimeError(error)
+        return [tuple(pair) for pair in payload.get("installed") or []]
+    return _install_argos_packages_local(
+        pairs,
+        status_callback=status_callback,
+        progress_callback=progress_callback,
+        cancel_callback=cancel_callback,
+    )
+
+
+def uninstall_argos_packages(pairs, status_callback=None):
+    """Uninstall selected direct Argos packages in-process or via ArgosWorker."""
+    pairs = _normalize_argos_pairs(pairs)
+    if _argos_worker_path():
+        payload = _run_argos_worker_request(
+            {"action": "uninstall_packages", "pairs": pairs},
+            status_callback=status_callback,
+            timeout=180,
+        )
+        if payload.get("error"):
+            raise RuntimeError(str(payload["error"]))
+        return [tuple(pair) for pair in payload.get("removed") or []]
+    return _uninstall_argos_packages_local(pairs, status_callback=status_callback)
 
 
 def argos_pair_installed(source_code, target_code):
