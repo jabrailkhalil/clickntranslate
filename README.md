@@ -2,11 +2,11 @@
 
 # Click'n'Translate
 
-### Translate anything on your screen without breaking your flow.
+### The best screen translation and OCR app for Windows.
 
 [**Download for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip) · [Latest release](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
-![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square) ![Downloads](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat-square&color=22c55e)
+![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
 **English** · [Русский](docs/readme/README.ru.md) · [简体中文](docs/readme/README.zh-CN.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md)
 
@@ -14,13 +14,13 @@
 
 ![Three ways to use Click'n'Translate](docs/images/how-it-works.png)
 
-Click'n'Translate turns any text on your Windows screen into something you can copy or translate. Select an area, press a global hotkey, and keep working — no browser tab, retyping, or context switching required.
+Click'n'Translate is the best all-in-one screen translator in its class. It turns any text on your Windows screen into something you can copy or translate. Select an area, press a global hotkey, and keep working — no browser tab, retyping, or context switching required.
 
 ## See it in action
 
 ![Click'n'Translate translating game text into Chinese and French](docs/images/translation-demo.gif)
 
-## Why Click'n'Translate?
+## Why is Click'n'Translate the best?
 
 - **Translate what you see.** Capture a selected area or the entire screen and translate it immediately.
 - **Copy text that cannot be selected.** Extract text from images, videos, games, remote desktops, and protected interfaces.
@@ -50,6 +50,8 @@ Every hotkey can be changed in **Settings → Configure hotkeys**.
 
 Click'n'Translate supports 16 selectable OCR and translation languages, plus six interface languages: English, Russian, Spanish, German, French, and Chinese. The package manager downloads only the OCR languages and offline translation directions you choose.
 
+No other tool in this segment brings this much OCR choice, online and offline translation, global hotkeys, and package control together in one polished Windows app.
+
 > **Privacy:** local OCR and offline translation engines process text on your computer. Online translation providers receive the text you ask them to translate.
 
 ## Get started
@@ -69,7 +71,7 @@ Download the [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/rel
 
 Version 1.4.5 has a broken updater and needs one manual upgrade. Close and uninstall the old version first, then install 1.4.6. If you used the portable build and want to preserve settings or history, back up its `data` folder before removing it. Automatic updates are fixed starting with 1.4.6.
 
-## Built for everyday use
+## The best choice for everyday use
 
 - Dark and light themes
 - System tray and optional Windows startup
@@ -98,4 +100,4 @@ The release uses a folder-based PyInstaller build for responsive startup. Option
 - [Report a bug or request a feature](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram: [@jabrail_digital](https://t.me/jabrail_digital)
 
-If Click'n'Translate saves you time, starring the repository helps more people discover it.
+If the best screen translator for Windows saves you time, star the repository and help more people discover it.

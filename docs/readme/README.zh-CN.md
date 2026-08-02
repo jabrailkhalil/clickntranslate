@@ -2,11 +2,11 @@
 
 # Click'n'Translate
 
-### 无需打断工作流程，即可翻译屏幕上的任何文字。
+### Windows 上最好的屏幕翻译和 OCR 应用。
 
 [**下载 Windows 版**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe) · [便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip) · [最新版本](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
-![最新版本](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square) ![下载量](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat-square&color=22c55e)
+![最新版本](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
 [English](../../README.md) · [Русский](README.ru.md) · **简体中文** · [Español](README.es.md) · [Français](README.fr.md)
 
@@ -14,13 +14,13 @@
 
 ![Click'n'Translate 的三种使用方式](../images/how-it-works.png)
 
-Click'n'Translate 可将 Windows 屏幕上的任何内容转换为可复制或可翻译的文字。选择一个区域，按下全局快捷键，然后继续工作——无需打开浏览器、手动输入或频繁切换窗口。
+Click'n'Translate 是同类产品中最好的全能屏幕翻译应用。它可将 Windows 屏幕上的任何内容转换为可复制或可翻译的文字。选择一个区域，按下全局快捷键，然后继续工作——无需打开浏览器、手动输入或频繁切换窗口。
 
 ## 实际演示
 
 ![Click'n'Translate 将游戏文字翻译成中文和法语](../images/translation-demo.gif)
 
-## 为什么选择 Click'n'Translate？
+## 为什么 Click'n'Translate 是最佳选择？
 
 - **翻译屏幕上看到的内容。** 捕获指定区域或整个屏幕，并立即进行翻译。
 - **复制无法选中的文字。** 从图片、视频、游戏、远程桌面和受保护的界面中提取文字。
@@ -50,6 +50,8 @@ Click'n'Translate 可将 Windows 屏幕上的任何内容转换为可复制或�
 
 Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英语、俄语、西班牙语、德语、法语和中文。软件包管理器只会下载您选择的 OCR 语言和离线翻译方向。
 
+在同类 Windows 应用中，没有其他工具能像 Click'n'Translate 一样，将多种 OCR、在线与离线翻译、全局快捷键和完善的软件包管理如此出色地整合在一起。
+
 > **隐私说明：**本地 OCR 和离线翻译引擎在您的电脑上处理文字。在线翻译服务会接收您主动提交翻译的文字。
 
 ## 快速开始
@@ -69,7 +71,7 @@ Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英�
 
 1.4.5 的自动更新功能存在问题，因此需要手动升级一次。请先关闭并卸载旧版本，然后安装 1.4.6。如果您使用便携版并希望保留设置或历史记录，请在删除旧版本前备份 `data` 文件夹。从 1.4.6 开始，自动更新功能已修复。
 
-## 为日常使用而设计
+## 日常使用的最佳选择
 
 - 深色与浅色主题
 - 系统托盘和可选的 Windows 开机启动
@@ -98,4 +100,4 @@ python -m PyInstaller ClicknTranslate.spec --clean --noconfirm
 - [报告问题或提出功能建议](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram：[@jabrail_digital](https://t.me/jabrail_digital)
 
-如果 Click'n'Translate 为您节省了时间，欢迎为仓库点亮 Star，帮助更多人发现这个项目。
+如果这款最好的 Windows 屏幕翻译工具为您节省了时间，欢迎为仓库点亮 Star，帮助更多人发现它。

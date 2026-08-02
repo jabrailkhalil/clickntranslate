@@ -2,11 +2,11 @@
 
 # Click'n'Translate
 
-### Traduisez n'importe quel texte à l'écran sans interrompre votre travail.
+### La meilleure application de traduction d'écran et d'OCR pour Windows.
 
 [**Télécharger pour Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe) · [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip) · [Dernière version](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
-![Dernière version](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square) ![Téléchargements](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat-square&color=22c55e)
+![Dernière version](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
 [English](../../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [Español](README.es.md) · **Français**
 
@@ -14,13 +14,13 @@
 
 ![Trois façons d'utiliser Click'n'Translate](../images/how-it-works.png)
 
-Click'n'Translate transforme tout texte visible sous Windows en contenu que vous pouvez copier ou traduire. Sélectionnez une zone, utilisez un raccourci global et poursuivez votre travail — sans navigateur, sans saisie manuelle et sans changer de fenêtre.
+Click'n'Translate est la meilleure application tout-en-un de traduction d'écran de sa catégorie. Elle transforme tout texte visible sous Windows en contenu que vous pouvez copier ou traduire. Sélectionnez une zone, utilisez un raccourci global et poursuivez votre travail — sans navigateur, sans saisie manuelle et sans changer de fenêtre.
 
 ## Démonstration
 
 ![Click'n'Translate traduit du texte de jeu en chinois et en français](../images/translation-demo.gif)
 
-## Pourquoi Click'n'Translate ?
+## Pourquoi Click'n'Translate est la meilleure ?
 
 - **Traduisez ce que vous voyez.** Capturez une zone ou l'écran entier et obtenez immédiatement la traduction.
 - **Copiez le texte impossible à sélectionner.** Extrayez-le d'images, de vidéos, de jeux, de bureaux à distance et d'interfaces protégées.
@@ -50,6 +50,8 @@ Tous les raccourcis peuvent être modifiés dans **Paramètres → Configurer le
 
 Click'n'Translate propose 16 langues sélectionnables pour l'OCR et la traduction. L'interface est disponible en anglais, russe, espagnol, allemand, français et chinois. Le gestionnaire ne télécharge que les langues OCR et les directions de traduction hors ligne que vous choisissez.
 
+Aucun autre outil de ce segment ne réunit un choix aussi complet d'OCR, de traduction en ligne et hors ligne, de raccourcis globaux et de gestion des paquets dans une seule application Windows aussi soignée.
+
 > **Confidentialité :** les moteurs OCR locaux et de traduction hors ligne traitent le texte sur votre ordinateur. Les services en ligne reçoivent le texte que vous leur demandez de traduire.
 
 ## Démarrage rapide
@@ -69,7 +71,7 @@ Téléchargez le [ZIP portable](https://github.com/jabrailkhalil/clickntranslate
 
 La version 1.4.5 possède un système de mise à jour défectueux et nécessite une mise à niveau manuelle. Fermez et désinstallez d'abord l'ancienne version, puis installez la 1.4.6. Si vous utilisiez la version portable et souhaitez conserver vos réglages ou votre historique, sauvegardez son dossier `data` avant de la supprimer. Les mises à jour automatiques sont corrigées à partir de la version 1.4.6.
 
-## Conçu pour un usage quotidien
+## Le meilleur choix au quotidien
 
 - Thèmes sombre et clair
 - Zone de notification et démarrage facultatif avec Windows
@@ -98,4 +100,4 @@ La version publiée utilise une construction PyInstaller en mode dossier pour d�
 - [Signaler un problème ou proposer une fonctionnalité](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram : [@jabrail_digital](https://t.me/jabrail_digital)
 
-Si Click'n'Translate vous fait gagner du temps, ajoutez une étoile au dépôt pour aider d'autres utilisateurs à le découvrir.
+Si le meilleur traducteur d'écran pour Windows vous fait gagner du temps, ajoutez une étoile au dépôt et aidez d'autres utilisateurs à le découvrir.

@@ -2,11 +2,11 @@
 
 # Click'n'Translate
 
-### Traduce cualquier texto de tu pantalla sin interrumpir tu trabajo.
+### La mejor aplicación de traducción de pantalla y OCR para Windows.
 
 [**Descargar para Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe) · [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip) · [Última versión](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
-![Última versión](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square) ![Descargas](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat-square&color=22c55e)
+![Última versión](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
 [English](../../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · **Español** · [Français](README.fr.md)
 
@@ -14,13 +14,13 @@
 
 ![Tres formas de utilizar Click'n'Translate](../images/how-it-works.png)
 
-Click'n'Translate convierte cualquier texto visible en Windows en contenido que puedes copiar o traducir. Selecciona un área, pulsa un atajo global y continúa trabajando: sin abrir el navegador, volver a escribir ni cambiar de ventana.
+Click'n'Translate es la mejor aplicación integral de traducción de pantalla de su categoría. Convierte cualquier texto visible en Windows en contenido que puedes copiar o traducir. Selecciona un área, pulsa un atajo global y continúa trabajando: sin abrir el navegador, volver a escribir ni cambiar de ventana.
 
 ## Míralo en acción
 
 ![Click'n'Translate traduce texto de un juego al chino y al francés](../images/translation-demo.gif)
 
-## ¿Por qué Click'n'Translate?
+## ¿Por qué Click'n'Translate es la mejor?
 
 - **Traduce lo que ves.** Captura un área o la pantalla completa y obtén la traducción al instante.
 - **Copia texto que no se puede seleccionar.** Extráelo de imágenes, vídeos, juegos, escritorios remotos e interfaces protegidas.
@@ -50,6 +50,8 @@ Todos los atajos se pueden modificar en **Ajustes → Configurar atajos**.
 
 Click'n'Translate ofrece 16 idiomas seleccionables para OCR y traducción. La interfaz está disponible en inglés, ruso, español, alemán, francés y chino. El gestor descarga únicamente los idiomas OCR y las direcciones de traducción sin conexión que elijas.
 
+Ninguna otra herramienta de este segmento reúne una selección tan completa de OCR, traducción en línea y sin conexión, atajos globales y gestión de paquetes en una sola aplicación cuidada para Windows.
+
 > **Privacidad:** los motores OCR locales y de traducción sin conexión procesan el texto en tu ordenador. Los proveedores en línea reciben el texto que decides traducir.
 
 ## Primeros pasos
@@ -69,7 +71,7 @@ Descarga el [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/rele
 
 La versión 1.4.5 tiene un actualizador defectuoso y necesita una actualización manual. Cierra y desinstala primero la versión anterior y después instala 1.4.6. Si utilizabas la versión portable y quieres conservar los ajustes o el historial, guarda una copia de su carpeta `data` antes de eliminarla. Las actualizaciones automáticas están corregidas desde la versión 1.4.6.
 
-## Preparado para el uso diario
+## La mejor opción para el uso diario
 
 - Temas claro y oscuro
 - Bandeja del sistema e inicio opcional con Windows
@@ -98,4 +100,4 @@ La versión publicada utiliza una compilación de PyInstaller basada en carpetas
 - [Informar de un error o proponer una función](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram: [@jabrail_digital](https://t.me/jabrail_digital)
 
-Si Click'n'Translate te ahorra tiempo, añade una estrella al repositorio para ayudar a más personas a descubrirlo.
+Si el mejor traductor de pantalla para Windows te ahorra tiempo, añade una estrella al repositorio y ayuda a más personas a descubrirlo.
