@@ -83,6 +83,9 @@ try:
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
     _show_dependency_error()
+from styled_dialogs import NativeDialogFrameFilter, StyledMessageBox, install_qt_exception_guard
+
+QMessageBox = StyledMessageBox
 from settings_window import SettingsWindow, TesseractInstallProgressDialog
 from app_version import APP_VERSION
 import portable_paths
@@ -144,6 +147,15 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": "Ctrl+Alt+Q"
 }
+
+
+def merge_config_defaults(config):
+    """Add newly introduced defaults without restoring intentionally empty values."""
+    source = config if isinstance(config, dict) else {}
+    missing_keys = tuple(key for key in DEFAULT_CONFIG if key not in source)
+    merged = DEFAULT_CONFIG.copy()
+    merged.update(source)
+    return merged, missing_keys
 
 
 def normalize_interface_language(language_code):
@@ -451,7 +463,8 @@ def get_cached_config():
         mtime = os.path.getmtime(config_path)
         if _config_cache is None or mtime > _config_mtime:
             with open(config_path, "r", encoding="utf-8-sig") as f:
-                _config_cache = json.load(f)
+                loaded_config = json.load(f)
+            _config_cache, _missing_keys = merge_config_defaults(loaded_config)
             _config_mtime = mtime
     except Exception:
         if _config_cache is None:
@@ -4260,9 +4273,11 @@ class DarkThemeApp(QMainWindow):
 
     def load_config(self):
         config_path = get_data_file("config.json")
+        migrated_keys = ()
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8-sig") as f:
-                self.config = json.load(f)
+                loaded_config = json.load(f)
+            self.config, migrated_keys = merge_config_defaults(loaded_config)
         else:
             self.config = DEFAULT_CONFIG.copy()
             with open(config_path, "w", encoding="utf-8") as f:
@@ -4284,6 +4299,7 @@ class DarkThemeApp(QMainWindow):
             raw_interface_language != self.current_interface_language
             or stored_autostart != self.autostart
             or stored_autostart_backend != AUTOSTART_BACKEND
+            or bool(migrated_keys)
         ):
             self.save_config()
 
@@ -6220,6 +6236,9 @@ if __name__ == "__main__":
     except Exception:
         pass
     app = QApplication([])
+    install_qt_exception_guard()
+    _native_dialog_frame_filter = NativeDialogFrameFilter(app)
+    app.installEventFilter(_native_dialog_frame_filter)
     app.setQuitOnLastWindowClosed(False)
     if _SHOW_WINDOW_MESSAGE_ID:
         try:

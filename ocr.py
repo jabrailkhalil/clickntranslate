@@ -13,6 +13,9 @@ import time
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
+from styled_dialogs import NativeDialogFrameFilter, StyledMessageBox, install_qt_exception_guard
+
+QMessageBox = StyledMessageBox
 from languages import (
     LANGUAGES as APP_LANGUAGES,
     default_target_for_source,
@@ -4540,6 +4543,9 @@ def run_screen_capture(mode="ocr"):
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
+        install_qt_exception_guard()
+        app._native_dialog_frame_filter = NativeDialogFrameFilter(app)
+        app.installEventFilter(app._native_dialog_frame_filter)
         logging.info("Запуск OCR приложения...")
         get_or_show_overlay(mode)
         app.exec_()

@@ -1417,6 +1417,9 @@ def lingva_translate(text, source_code, target_code):
     """Lingva - прокси для Google Translate (более стабильный)."""
     # Список публичных инстансов Lingva
     instances = [
+        # Active Vercel deployment. Keep it first: the older public domains
+        # below remain useful fallbacks but currently fail intermittently.
+        'https://lingva.vercel.app',
         'https://lingva.ml',
         'https://translate.plausibility.cloud',
     ]

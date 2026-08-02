@@ -8,15 +8,14 @@
 
 **[Download Latest Release](https://github.com/jabrailkhalil/clickntranslate/releases)**
 
-> The application is **fully portable** — no registry entries, no system modifications. It cleans up its own cache (button available in Settings).
+> The ZIP build is fully portable. The recommended setup build adds the normal Windows uninstall entry and shortcuts you select.
 
 ## 🛠 Installation
 
-1. **Download** the latest release from [Releases](https://github.com/jabrailkhalil/clickntranslate/releases)
-2. **Extract** the archive to your preferred location (e.g., `C:\Programs\ClicknTranslate`)
-3. **Run** `ClicknTranslate.exe`
-4. **(Optional)** Enable "Start with Windows" in Settings for auto-start
-5. **(Optional)** Run `CreateShortcut.bat` to create a desktop shortcut
+1. **Recommended:** download and run `ClicknTranslate-Setup-v1.4.6-win64.exe` from [Releases](https://github.com/jabrailkhalil/clickntranslate/releases).
+2. **Portable option:** download the ZIP, extract it to a permanent folder, and run `ClicknTranslate.exe`.
+3. **(Optional)** Enable "Start with Windows" in Settings for auto-start.
+4. **(Optional, portable build)** Run `CreateShortcut.bat` to create a desktop shortcut.
 
 > ⚠️ **Important**: Move the folder to its permanent location *before* enabling auto-start or creating shortcuts. Moving the folder later will break these features.
 
@@ -34,6 +33,7 @@
 - **Multiple Translation Engines**:
   - **Google Translate** — fast and accurate (recommended)
   - **Argos Translate** — fully offline, private
+  - **Hy-MT** — optional local LLM translation model
   - **MyMemory** — free API (5000 chars/day limit)
   - **Lingva** — Google proxy via public servers
   - **LibreTranslate** — open source
@@ -45,6 +45,8 @@
 - **Global Hotkeys**:
   - **`Ctrl + Alt + C`**: Quick Copy Mode — OCR & copy to clipboard
   - **`Ctrl + Alt + T`**: Quick Translate Mode — OCR & translate
+  - **`Ctrl + Alt + F`**: Fullscreen Translate — translate the entire screen
+  - **`Ctrl + Alt + Q`**: Selection Translate — translate a selected screen area
 - **Photoshop-style Overlay**: Professional selection interface with glow effects
 - **Smart Clipboard**: Automatically copies recognized/translated text
 - **Separate Histories**: Maintains copy history and translation history

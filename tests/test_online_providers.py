@@ -57,12 +57,24 @@ class LibreTranslateTest(unittest.TestCase):
 class LingvaTest(unittest.TestCase):
     def test_failing_instance_falls_through_and_reports_status(self):
         def fake_get(url, timeout=None):
-            if "lingva.ml" in url:
+            if "vercel.app" in url or "lingva.ml" in url:
                 return FakeResponse(500, {"error": "An error occurred while retrieving the translation"})
             return FakeResponse(200, {"translation": "привет"})
 
         with mock.patch.object(translater, "_get_http_session", return_value=SimpleNamespace(get=fake_get)):
             self.assertEqual(translater.lingva_translate("hello", "en", "ru"), "привет")
+
+    def test_active_vercel_instance_is_configured_first(self):
+        calls = []
+
+        def fake_get(url, timeout=None):
+            calls.append(url)
+            return FakeResponse(200, {"translation": "привет"})
+
+        with mock.patch.object(translater, "_get_http_session", return_value=SimpleNamespace(get=fake_get)):
+            self.assertEqual(translater.lingva_translate("hello", "en", "ru"), "привет")
+
+        self.assertTrue(calls[0].startswith("https://lingva.vercel.app/"))
 
     def test_all_instances_down_surfaces_server_message(self):
         def fake_get(url, timeout=None):

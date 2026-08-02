@@ -96,6 +96,44 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertTrue(self.dialog.rapidocr_table.isColumnHidden(0))
         self.assertIn("QScrollBar::handle:vertical", self.dialog.styleSheet())
 
+    def test_manager_uses_black_custom_title_bar_and_centers_on_owner(self):
+        self.parent.setGeometry(140, 90, 700, 600)
+        self.parent.show()
+        self.owner.show()
+        self.dialog.show()
+        self.app.processEvents()
+        # The fixture suppresses all zero-delay timers used by the dialog, so
+        # invoke the same post-show centering pass directly here.
+        self.dialog._center_on_owner()
+        self.app.processEvents()
+
+        self.assertTrue(self.dialog.windowFlags() & Qt.FramelessWindowHint)
+        self.assertEqual(self.dialog.objectName(), "languageManagerDialog")
+        self.assertEqual(self.dialog.title_bar.objectName(), "languageManagerTitleBar")
+        self.assertEqual(self.dialog.title_bar.height(), 38)
+        self.assertEqual(self.dialog.title_close_btn.objectName(), "languageManagerTitleClose")
+        self.assertEqual(self.dialog.title_label.text(), "Language packages")
+        self.assertIn("background-color: #090a0d", self.dialog.styleSheet())
+        self.assertEqual(self.dialog.size().width(), 640)
+        self.assertEqual(self.dialog.size().height(), 558)
+
+        owner_center = self.parent.frameGeometry().center()
+        available = self.app.primaryScreen().availableGeometry()
+        expected_x = max(
+            available.left(),
+            min(owner_center.x() - self.dialog.width() // 2, available.right() - self.dialog.width() + 1),
+        )
+        expected_y = max(
+            available.top(),
+            min(owner_center.y() - self.dialog.height() // 2, available.bottom() - self.dialog.height() + 1),
+        )
+        self.assertLessEqual(abs(expected_x - self.dialog.frameGeometry().left()), 2)
+        self.assertLessEqual(abs(expected_y - self.dialog.frameGeometry().top()), 2)
+
+        self.dialog.title_close_btn.click()
+        self.app.processEvents()
+        self.assertFalse(self.dialog.isVisible())
+
     def test_every_ocr_language_is_present_in_each_per_language_table(self):
         expected = {language.code for language in LANGUAGES}
         for table in (

@@ -12,15 +12,19 @@ import subprocess
 import platform
 import re
 import time
+import html
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit
+    QLineEdit, QFrame, QGridLayout
 )
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 from PyQt5.QtGui import QKeySequence, QIcon, QColor, QBrush
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtGui
+from styled_dialogs import StyledMessageBox
+
+QMessageBox = StyledMessageBox
 from app_version import APP_VERSION
 import portable_paths
 from languages import (
@@ -1047,15 +1051,57 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_error = ""
         self._argos_catalog_loading = True
         self._argos_catalog_request_active = False
+        self._title_drag_offset = None
+        self._centered_once = False
 
         self.setWindowTitle(settings_text(self.lang, "ocr_language_packs"))
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self.setFixedSize(640, 520)
-        self.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        self.setObjectName("languageManagerDialog")
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setFixedSize(640, 558)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        self.title_bar = QFrame(self)
+        self.title_bar.setObjectName("languageManagerTitleBar")
+        self.title_bar.setFixedHeight(38)
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(10, 0, 5, 0)
+        title_layout.setSpacing(8)
+
+        self.title_icon = QLabel()
+        self.title_icon.setObjectName("languageManagerTitleIcon")
+        self.title_icon.setFixedSize(18, 18)
+        self.title_icon.setPixmap(QIcon(resource_path("icons/icon.ico")).pixmap(18, 18))
+        title_layout.addWidget(self.title_icon, 0, Qt.AlignVCenter)
+
+        self.title_label = QLabel(settings_text(self.lang, "ocr_language_packs"))
+        self.title_label.setObjectName("languageManagerTitleLabel")
+        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        title_layout.addWidget(self.title_label, 1)
+
+        self.title_close_btn = QToolButton()
+        self.title_close_btn.setObjectName("languageManagerTitleClose")
+        self.title_close_btn.setText("×")
+        self.title_close_btn.setCursor(Qt.PointingHandCursor)
+        self.title_close_btn.setFixedSize(30, 28)
+        self.title_close_btn.clicked.connect(self.reject)
+        title_layout.addWidget(self.title_close_btn, 0, Qt.AlignVCenter)
+        root_layout.addWidget(self.title_bar)
+
+        self.content_widget = QWidget(self)
+        self.content_widget.setObjectName("languageManagerContent")
+        root_layout.addWidget(self.content_widget, 1)
+
+        layout = QVBoxLayout(self.content_widget)
+        layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(8)
+
+        self._title_drag_widgets = (self.title_bar, self.title_icon, self.title_label)
+        for drag_widget in self._title_drag_widgets:
+            drag_widget.installEventFilter(self)
 
         intro = QLabel(
             "Установите нужные языки для OCR или офлайн-направления перевода Argos. "
@@ -1105,9 +1151,41 @@ class OcrLanguageManagerDialog(QDialog):
         return bool(theme) and theme not in {"светлая", "light", "white"}
 
     def _apply_style(self):
+        chrome_style = """
+            QFrame#languageManagerTitleBar {
+                background-color: #090a0d;
+                border: none;
+                border-bottom: 1px solid #302a3a;
+            }
+            QLabel#languageManagerTitleIcon {
+                background: transparent;
+                border: none;
+            }
+            QLabel#languageManagerTitleLabel {
+                background: transparent;
+                color: #f7f3ff;
+                border: none;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QToolButton#languageManagerTitleClose {
+                background: transparent;
+                color: #f4eefc;
+                border: none;
+                border-radius: 6px;
+                font-size: 18px;
+                font-weight: 500;
+                padding: 0px;
+            }
+            QToolButton#languageManagerTitleClose:hover {
+                background-color: #d44b55;
+                color: #ffffff;
+            }
+        """
         if self._is_dark_theme():
-            self.setStyleSheet("""
-                QDialog { background-color: #111216; color: #f4f6fb; }
+            self.setStyleSheet(chrome_style + """
+                QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; }
+                QWidget#languageManagerContent { background-color: #111216; }
                 QLabel { color: #f4f6fb; }
                 QTabWidget::pane { border: 1px solid #34313f; }
                 QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
@@ -1134,8 +1212,9 @@ class OcrLanguageManagerDialog(QDialog):
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """)
         else:
-            self.setStyleSheet("""
-                QDialog { background-color: #ffffff; color: #202124; }
+            self.setStyleSheet(chrome_style + """
+                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #302a3a; }
+                QWidget#languageManagerContent { background-color: #ffffff; }
                 QTableWidget { background: #ffffff; alternate-background-color: #f7f6fb; color: #202124; gridline-color: #d8d8d8; selection-background-color: #d9cdf0; selection-color: #202124; }
                 QHeaderView::section { background: #f0eef7; color: #202124; border: 0; padding: 5px; }
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
@@ -1153,6 +1232,50 @@ class OcrLanguageManagerDialog(QDialog):
                 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """)
+
+    def eventFilter(self, obj, event):
+        if obj in getattr(self, "_title_drag_widgets", ()):
+            if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                self._title_drag_offset = event.globalPos() - self.frameGeometry().topLeft()
+                return True
+            if event.type() == QtCore.QEvent.MouseMove and event.buttons() & Qt.LeftButton:
+                if self._title_drag_offset is not None:
+                    self.move(event.globalPos() - self._title_drag_offset)
+                return True
+            if event.type() == QtCore.QEvent.MouseButtonRelease:
+                self._title_drag_offset = None
+                return True
+        return super().eventFilter(obj, event)
+
+    def _center_on_owner(self):
+        owner_window = None
+        try:
+            owner_window = self.owner.window() if self.owner is not None else None
+        except Exception:
+            owner_window = None
+        if owner_window is not None and owner_window.isVisible():
+            target = owner_window.frameGeometry().center() - self.rect().center()
+        else:
+            screen = QApplication.screenAt(QtGui.QCursor.pos()) if hasattr(QApplication, "screenAt") else None
+            screen = screen or QApplication.primaryScreen()
+            if screen is None:
+                return
+            target = screen.availableGeometry().center() - self.rect().center()
+
+        screen = QApplication.screenAt(target) if hasattr(QApplication, "screenAt") else None
+        screen = screen or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            target.setX(max(available.left(), min(target.x(), available.right() - self.width() + 1)))
+            target.setY(max(available.top(), min(target.y(), available.bottom() - self.height() + 1)))
+        self.move(target)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._centered_once:
+            self._centered_once = True
+            self._center_on_owner()
+            QtCore.QTimer.singleShot(0, self._center_on_owner)
 
     def _build_tabs(self):
         self.windows_table = self._add_engine_tab(
@@ -2231,6 +2354,8 @@ class SettingsWindow(QWidget):
     def init_ui(self):
         self.setup_new_layout()
         self.hotkeys_mode = False
+        self._secondary_view_kind = None
+        self.secondary_view_shell = None
         self.main_layout.setContentsMargins(5, 5, 5, 5)
         self.main_layout.setSpacing(8)
         lang = self.parent.current_interface_language
@@ -2653,72 +2778,271 @@ class SettingsWindow(QWidget):
             }}
         """
 
+    def _secondary_palette(self):
+        if self.parent.current_theme == "Темная":
+            return {
+                "surface": "#111218",
+                "card": "#181820",
+                "field": "#101117",
+                "text": "#f7f3ff",
+                "muted": "#aaa0b8",
+                "border": "#393243",
+                "soft_border": "#2b2733",
+                "accent": "#a98bd7",
+                "accent_hover": "#b99be8",
+                "danger": "#d85b64",
+                "danger_hover": "#e66b74",
+                "scroll": "#6f5a8c",
+            }
+        return {
+            "surface": "#f6f3fa",
+            "card": "#ffffff",
+            "field": "#fbfaff",
+            "text": "#241d2d",
+            "muted": "#756b80",
+            "border": "#d5cae2",
+            "soft_border": "#e8e0ef",
+            "accent": "#76599d",
+            "accent_hover": "#8566ad",
+            "danger": "#c94e58",
+            "danger_hover": "#dc5d67",
+            "scroll": "#9b84b8",
+        }
+
+    def _secondary_view_stylesheet(self):
+        colors = self._secondary_palette()
+        return f"""
+            QFrame#secondaryViewShell {{
+                background-color: {colors['surface']};
+                border: 1px solid {colors['soft_border']};
+                border-radius: 12px;
+            }}
+            QFrame#secondaryViewShell QLabel {{
+                background: transparent;
+                border: none;
+                color: {colors['text']};
+            }}
+            QLabel#secondaryTitle {{
+                color: {colors['text']};
+                font-size: 21px;
+                font-weight: 800;
+            }}
+            QLabel#secondaryHint {{
+                color: {colors['muted']};
+                font-size: 12px;
+            }}
+            QLabel#secondaryCount {{
+                color: {colors['accent']};
+                background-color: {colors['card']};
+                border: 1px solid {colors['border']};
+                border-radius: 10px;
+                padding: 3px 9px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+            QFrame#secondaryCard {{
+                background-color: {colors['card']};
+                border: 1px solid {colors['border']};
+                border-radius: 10px;
+            }}
+            QLabel#secondaryFieldLabel {{
+                color: {colors['text']};
+                font-size: 14px;
+                font-weight: 600;
+                padding-left: 2px;
+            }}
+            QKeySequenceEdit#secondaryHotkeyInput {{
+                background: transparent;
+                border: none;
+                padding: 0px;
+            }}
+            QKeySequenceEdit#secondaryHotkeyInput QLineEdit {{
+                background-color: {colors['field']};
+                color: {colors['text']};
+                border: 1px solid {colors['border']};
+                border-radius: 8px;
+                padding: 6px 10px;
+                font-size: 14px;
+                font-weight: 700;
+                selection-background-color: {colors['accent']};
+                selection-color: #ffffff;
+            }}
+            QKeySequenceEdit#secondaryHotkeyInput QLineEdit:focus {{
+                border: 1px solid {colors['accent']};
+            }}
+            QTextEdit#secondaryHistory {{
+                background-color: {colors['field']};
+                color: {colors['text']};
+                border: 1px solid {colors['border']};
+                border-radius: 10px;
+                padding: 8px;
+                font-size: 13px;
+                selection-background-color: {colors['accent']};
+            }}
+            QPushButton#secondaryBackButton {{
+                background-color: {colors['accent']};
+                color: #ffffff;
+                border: none;
+                border-radius: 9px;
+                padding: 7px 22px;
+                font-size: 14px;
+                font-weight: 800;
+            }}
+            QPushButton#secondaryBackButton:hover {{
+                background-color: {colors['accent_hover']};
+            }}
+            QPushButton#secondaryClearButton {{
+                background-color: transparent;
+                color: {colors['danger']};
+                border: 1px solid {colors['danger']};
+                border-radius: 9px;
+                padding: 7px 16px;
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            QPushButton#secondaryClearButton:hover {{
+                background-color: {colors['danger_hover']};
+                color: #ffffff;
+            }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 10px;
+                margin: 4px 1px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {colors['scroll']};
+                min-height: 30px;
+                border-radius: 4px;
+                margin: 1px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {colors['accent']};
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+                background: transparent;
+                border: none;
+            }}
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
+        """
+
+    def _create_secondary_shell(self, title, count_label=None):
+        shell = QFrame()
+        shell.setObjectName("secondaryViewShell")
+        shell.setStyleSheet(self._secondary_view_stylesheet())
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(14, 10, 14, 10)
+        shell_layout.setSpacing(8)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(2, 0, 2, 0)
+        title_label = QLabel(title)
+        title_label.setObjectName("secondaryTitle")
+        header.addWidget(title_label, 1)
+        if count_label is not None:
+            count_label.setObjectName("secondaryCount")
+            count_label.setAlignment(Qt.AlignCenter)
+            header.addWidget(count_label, 0, Qt.AlignVCenter)
+        shell_layout.addLayout(header)
+
+        self.secondary_view_shell = shell
+        self.secondary_title_label = title_label
+        self.main_layout.addWidget(shell)
+        return shell_layout
+
+    @staticmethod
+    def _configure_secondary_button(button, object_name):
+        button.setObjectName(object_name)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setFixedHeight(38)
+
+    def _refresh_secondary_view_theme(self):
+        shell = getattr(self, "secondary_view_shell", None)
+        if shell is None:
+            return
+        try:
+            shell.setStyleSheet(self._secondary_view_stylesheet())
+        except RuntimeError:
+            self.secondary_view_shell = None
+
     def show_hotkeys_screen(self):
         self.setup_new_layout()
         self.hotkeys_mode = True
-        self.main_layout.setContentsMargins(9, 5, 9, 5)
-        self.main_layout.setSpacing(3)
+        self._secondary_view_kind = "hotkeys"
+        self.main_layout.setContentsMargins(10, 7, 10, 7)
+        self.main_layout.setSpacing(0)
 
         lang = self.parent.current_interface_language
+        shell_layout = self._create_secondary_shell(settings_text(lang, "hotkeys"))
 
-        # Блок для настройки горячей клавиши "Copy Selected"
-        label_copy = QLabel(settings_text(lang, "copy_hotkey_label"))
-        self.main_layout.addWidget(label_copy)
+        hotkey_card = QFrame()
+        hotkey_card.setObjectName("secondaryCard")
+        hotkey_grid = QGridLayout(hotkey_card)
+        hotkey_grid.setContentsMargins(12, 9, 12, 9)
+        hotkey_grid.setHorizontalSpacing(14)
+        hotkey_grid.setVerticalSpacing(7)
+        hotkey_grid.setColumnStretch(0, 1)
+        hotkey_grid.setColumnMinimumWidth(1, 230)
+        self.hotkey_card = hotkey_card
 
         self.copy_hotkey_input = ClearableKeySequenceEdit()
         saved_copy_hotkey = self.parent.config.get("copy_hotkey", "")
         self.copy_hotkey_input.setKeySequence(QKeySequence(saved_copy_hotkey))
-        self.main_layout.addWidget(self.copy_hotkey_input)
-        self.copy_hotkey_input.keySequenceChanged.connect(self.save_copy_hotkey)
-
-        self.main_layout.addSpacing(2)
-
-        # Блок для настройки горячей клавиши "Translate Selected"
-        label_translate = QLabel(settings_text(lang, "translate_hotkey_label"))
-        self.main_layout.addWidget(label_translate)
-
         self.translate_hotkey_input = ClearableKeySequenceEdit()
         saved_translate_hotkey = self.parent.config.get("translate_hotkey", "")
         self.translate_hotkey_input.setKeySequence(QKeySequence(saved_translate_hotkey))
-        self.main_layout.addWidget(self.translate_hotkey_input)
-        self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
-
-        self.main_layout.addSpacing(4)
-
-        # Блок для настройки горячей клавиши "Fullscreen Translate"
-        label_fullscreen = QLabel(settings_text(lang, "fullscreen_translate_label"))
-        self.main_layout.addWidget(label_fullscreen)
-
         self.fullscreen_translate_hotkey_input = ClearableKeySequenceEdit()
         saved_fs_hotkey = self.parent.config.get("fullscreen_translate_hotkey", "")
         self.fullscreen_translate_hotkey_input.setKeySequence(QKeySequence(saved_fs_hotkey))
-        self.main_layout.addWidget(self.fullscreen_translate_hotkey_input)
-        self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
-
-        self.main_layout.addSpacing(4)
-
-        # Блок для настройки горячей клавиши "Translate Selection" (перевод выделенного текста)
-        label_selection = QLabel(settings_text(lang, "selection_translate_label"))
-        self.main_layout.addWidget(label_selection)
-
         self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
         saved_sel_hotkey = self.parent.config.get("translate_selection_hotkey", "")
         self.translate_selection_hotkey_input.setKeySequence(QKeySequence(saved_sel_hotkey))
-        self.main_layout.addWidget(self.translate_selection_hotkey_input)
+
+        hotkey_rows = (
+            (settings_text(lang, "copy_hotkey_label"), self.copy_hotkey_input),
+            (settings_text(lang, "translate_hotkey_label"), self.translate_hotkey_input),
+            (settings_text(lang, "fullscreen_translate_label"), self.fullscreen_translate_hotkey_input),
+            (settings_text(lang, "selection_translate_label"), self.translate_selection_hotkey_input),
+        )
+        self.hotkey_labels = []
+        for row, (label_text, key_input) in enumerate(hotkey_rows):
+            label = QLabel(label_text.rstrip(":"))
+            label.setObjectName("secondaryFieldLabel")
+            label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            key_input.setObjectName("secondaryHotkeyInput")
+            key_input.setFixedHeight(40)
+            key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            hotkey_grid.addWidget(label, row, 0)
+            hotkey_grid.addWidget(key_input, row, 1)
+            self.hotkey_labels.append(label)
+        shell_layout.addWidget(hotkey_card)
+
+        self.copy_hotkey_input.keySequenceChanged.connect(self.save_copy_hotkey)
+        self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
+        self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
         self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
 
-        # Инструктивная надпись для удаления комбинации
         remove_label = QLabel(settings_text(lang, "remove_hotkey"))
-        self.main_layout.addWidget(remove_label)
+        remove_label.setObjectName("secondaryHint")
+        remove_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.hotkey_hint_label = remove_label
 
-        self.main_layout.addStretch()
-
-        # Кнопка возврата
         back_button = QPushButton(settings_text(lang, "back"))
+        self._configure_secondary_button(back_button, "secondaryBackButton")
         back_button.clicked.connect(self.back_from_hotkeys)
-        self.main_layout.addWidget(back_button)
+        self.hotkey_back_button = back_button
 
-        self.apply_theme()
+        footer = QHBoxLayout()
+        footer.setContentsMargins(2, 0, 2, 0)
+        footer.addWidget(remove_label, 1)
+        footer.addWidget(back_button, 0)
+        shell_layout.addLayout(footer)
+
+        self._refresh_secondary_view_theme()
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
 
@@ -2791,31 +3115,98 @@ class SettingsWindow(QWidget):
 
     def show_history_view(self):
         self.clear_main_layout()
+        self.hotkeys_mode = False
+        self._secondary_view_kind = "history"
+        self.main_layout.setContentsMargins(10, 7, 10, 7)
+        self.main_layout.setSpacing(0)
         lang = self.parent.current_interface_language
 
-        title_label = QLabel(settings_text(lang, "history_title"))
-        self.main_layout.addWidget(title_label)
+        self.history_count_label = QLabel("0")
+        shell_layout = self._create_secondary_shell(
+            settings_text(lang, "history_title"),
+            self.history_count_label,
+        )
 
         self.history_text_edit = QTextEdit()
+        self.history_text_edit.setObjectName("secondaryHistory")
         self.history_text_edit.setReadOnly(True)
-        if self.parent.current_theme == "Темная":
-            self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
-        else:
-            self.history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
-        self.main_layout.addWidget(self.history_text_edit)
+        self.history_text_edit.setFrameShape(QFrame.NoFrame)
+        shell_layout.addWidget(self.history_text_edit, 1)
         self.load_history_embedded()
 
-        self.main_layout.addSpacing(10)
-
         clear_button = QPushButton(settings_text(lang, "clear_translation_history"))
+        self._configure_secondary_button(clear_button, "secondaryClearButton")
         clear_button.clicked.connect(self.clear_history)
-        self.main_layout.addWidget(clear_button)
-
-        self.main_layout.addSpacing(10)
-
         back_button = QPushButton(settings_text(lang, "back"))
+        self._configure_secondary_button(back_button, "secondaryBackButton")
         back_button.clicked.connect(self.back_from_history)
-        self.main_layout.addWidget(back_button)
+        self.history_clear_button = clear_button
+        self.history_back_button = back_button
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(8)
+        footer.addWidget(clear_button, 0)
+        footer.addStretch(1)
+        footer.addWidget(back_button, 0)
+        shell_layout.addLayout(footer)
+        self._refresh_secondary_view_theme()
+
+    @staticmethod
+    def _history_safe_text(value):
+        return html.escape(str(value or "")).replace("\n", "<br>")
+
+    def _render_history_records(self, records, copy_mode=False):
+        colors = self._secondary_palette()
+        lang = self.parent.current_interface_language
+        if not records:
+            return (
+                f"<div style='color:{colors['muted']}; font-size:14px; "
+                "text-align:center; margin-top:52px;'>"
+                f"{self._history_safe_text(settings_text(lang, 'history_empty'))}</div>"
+            )
+
+        rendered = []
+        for record in reversed(records):
+            try:
+                from datetime import datetime
+                timestamp = record.get("timestamp", "")
+                date_text = datetime.fromisoformat(timestamp).strftime("%d.%m.%Y  ·  %H:%M")
+            except Exception:
+                date_text = str(record.get("timestamp", ""))
+
+            meta = self._history_safe_text(date_text)
+            if not copy_mode:
+                language = str(record.get("language", "")).upper()
+                if language:
+                    meta += "&nbsp;&nbsp;·&nbsp;&nbsp;" + self._history_safe_text(language)
+
+            if copy_mode:
+                body = (
+                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
+                    f"{self._history_safe_text(record.get('text'))}</div>"
+                )
+            elif "original" in record and "translated" in record:
+                body = (
+                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
+                    f"{self._history_safe_text(record.get('original'))}</div>"
+                    f"<div style='color:{colors['accent']}; font-size:12px; margin:5px 0;'>→</div>"
+                    f"<div style='color:{colors['text']}; font-size:14px; font-weight:600;'>"
+                    f"{self._history_safe_text(record.get('translated'))}</div>"
+                )
+            else:
+                body = (
+                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
+                    f"{self._history_safe_text(record.get('text'))}</div>"
+                )
+
+            rendered.append(
+                f"<div style='background-color:{colors['card']}; border:1px solid {colors['border']}; "
+                "padding:9px 11px; margin:0 0 9px 0;'>"
+                f"<div style='color:{colors['muted']}; font-size:11px; font-weight:600;'>{meta}</div>"
+                f"{body}</div>"
+            )
+        return "".join(rendered)
 
     def load_history_embedded(self):
         history_file = get_data_file("translation_history.json")
@@ -2824,34 +3215,12 @@ class SettingsWindow(QWidget):
         try:
             with open(history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
-            if history:
-                text = ""
-                for record in reversed(history):  # Новые сверху
-                    # Форматируем дату красиво
-                    try:
-                        from datetime import datetime
-                        ts = record.get('timestamp', '')
-                        dt = datetime.fromisoformat(ts)
-                        date_str = dt.strftime("%d.%m.%Y %H:%M")
-                    except Exception:
-                        date_str = record.get('timestamp', '')
-                    
-                    lang_code = record.get('language', '').upper()
-                    text += f"📅 {date_str}  •  {lang_code}\n"
-                    
-                    # Поддержка и старого формата (text), и нового (original + translated)
-                    if 'original' in record and 'translated' in record:
-                        text += f"📝 {record.get('original')}\n"
-                        text += f"🌐 {record.get('translated')}\n"
-                    else:
-                        # Старый формат
-                        text += f"📝 {record.get('text')}\n"
-                    text += "━" * 35 + "\n\n"
-                self.history_text_edit.setText(text)
-            else:
-                self.history_text_edit.setText(settings_text(lang, "history_empty"))
+            history = history if isinstance(history, list) else []
+            self.history_count_label.setText(str(len(history)))
+            self.history_text_edit.setHtml(self._render_history_records(history))
         except Exception:
-            self.history_text_edit.setText(settings_text(lang, "history_error"))
+            self.history_count_label.setText("!")
+            self.history_text_edit.setPlainText(settings_text(lang, "history_error"))
 
     def clear_history(self):
         history_file = get_data_file("translation_history.json")
@@ -2869,31 +3238,42 @@ class SettingsWindow(QWidget):
 
     def show_copy_history_view(self):
         self.clear_main_layout()
+        self.hotkeys_mode = False
+        self._secondary_view_kind = "copy_history"
+        self.main_layout.setContentsMargins(10, 7, 10, 7)
+        self.main_layout.setSpacing(0)
         lang = self.parent.current_interface_language
 
-        title_label = QLabel(settings_text(lang, "copy_history_title"))
-        self.main_layout.addWidget(title_label)
+        self.copy_history_count_label = QLabel("0")
+        shell_layout = self._create_secondary_shell(
+            settings_text(lang, "copy_history_title"),
+            self.copy_history_count_label,
+        )
 
         self.copy_history_text_edit = QTextEdit()
+        self.copy_history_text_edit.setObjectName("secondaryHistory")
         self.copy_history_text_edit.setReadOnly(True)
-        if self.parent.current_theme == "Темная":
-            self.copy_history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
-        else:
-            self.copy_history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
-        self.main_layout.addWidget(self.copy_history_text_edit)
+        self.copy_history_text_edit.setFrameShape(QFrame.NoFrame)
+        shell_layout.addWidget(self.copy_history_text_edit, 1)
         self.load_copy_history_embedded()
 
-        self.main_layout.addSpacing(10)
-
         clear_button = QPushButton(settings_text(lang, "clear_copy_history"))
+        self._configure_secondary_button(clear_button, "secondaryClearButton")
         clear_button.clicked.connect(self.clear_copy_history)
-        self.main_layout.addWidget(clear_button)
-
-        self.main_layout.addSpacing(10)
-
         back_button = QPushButton(settings_text(lang, "back"))
+        self._configure_secondary_button(back_button, "secondaryBackButton")
         back_button.clicked.connect(self.back_from_copy_history)
-        self.main_layout.addWidget(back_button)
+        self.copy_history_clear_button = clear_button
+        self.copy_history_back_button = back_button
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(8)
+        footer.addWidget(clear_button, 0)
+        footer.addStretch(1)
+        footer.addWidget(back_button, 0)
+        shell_layout.addLayout(footer)
+        self._refresh_secondary_view_theme()
 
     def load_copy_history_embedded(self):
         history_file = get_data_file("copy_history.json")
@@ -2902,26 +3282,14 @@ class SettingsWindow(QWidget):
         try:
             with open(history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
-            if history:
-                text = ""
-                for record in reversed(history):  # Новые сверху
-                    # Форматируем дату красиво
-                    try:
-                        from datetime import datetime
-                        ts = record.get('timestamp', '')
-                        dt = datetime.fromisoformat(ts)
-                        date_str = dt.strftime("%d.%m.%Y %H:%M")
-                    except Exception:
-                        date_str = record.get('timestamp', '')
-                    
-                    text += f"📅 {date_str}\n"
-                    text += f"📋 {record.get('text')}\n"
-                    text += "━" * 35 + "\n\n"
-                self.copy_history_text_edit.setText(text)
-            else:
-                self.copy_history_text_edit.setText(settings_text(lang, "history_empty"))
+            history = history if isinstance(history, list) else []
+            self.copy_history_count_label.setText(str(len(history)))
+            self.copy_history_text_edit.setHtml(
+                self._render_history_records(history, copy_mode=True)
+            )
         except Exception:
-            self.copy_history_text_edit.setText(settings_text(lang, "history_error"))
+            self.copy_history_count_label.setText("!")
+            self.copy_history_text_edit.setPlainText(settings_text(lang, "history_error"))
 
     def clear_copy_history(self):
         history_file = get_data_file("copy_history.json")
@@ -3924,29 +4292,16 @@ finally {
                 except RuntimeError:
                     pass
 
-        if self.hotkeys_mode:
-            if self.parent.current_theme == "Темная":
-                hotkey_style = "background-color: #2a2a2a; color: #ffffff; border: 1px solid #ffffff; padding: 4px;"
-            else:
-                hotkey_style = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px;"
-            self.copy_hotkey_input.setStyleSheet(hotkey_style)
-            self.translate_hotkey_input.setStyleSheet(hotkey_style)
-            self.fullscreen_translate_hotkey_input.setStyleSheet(hotkey_style)
-            self.translate_selection_hotkey_input.setStyleSheet(hotkey_style)
-        if hasattr(self, "history_text_edit") and self.history_text_edit is not None:
+        self._refresh_secondary_view_theme()
+        secondary_kind = getattr(self, "_secondary_view_kind", None)
+        if secondary_kind == "history":
             try:
-                if self.parent.current_theme == "Темная":
-                    self.history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
-                else:
-                    self.history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+                self.load_history_embedded()
             except RuntimeError:
                 self.history_text_edit = None
-        if hasattr(self, "copy_history_text_edit") and self.copy_history_text_edit is not None:
+        elif secondary_kind == "copy_history":
             try:
-                if self.parent.current_theme == "Темная":
-                    self.copy_history_text_edit.setStyleSheet("background-color: #121212; color: #ffffff;")
-                else:
-                    self.copy_history_text_edit.setStyleSheet("background-color: #ffffff; color: #000000;")
+                self.load_copy_history_embedded()
             except RuntimeError:
                 self.copy_history_text_edit = None
 
@@ -6134,7 +6489,9 @@ finally {
             "last_ocr_language": "ru",
             "ocr_translate_source_language": "en",
             "ocr_translate_target_language": "ru",
-            "no_screen_dimming": False
+            "no_screen_dimming": False,
+            "fullscreen_translate_hotkey": "Ctrl+Alt+F",
+            "translate_selection_hotkey": "Ctrl+Alt+Q"
         }
         # Save to disk
         config_path = get_data_file("config.json")
