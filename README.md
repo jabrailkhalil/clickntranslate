@@ -1,111 +1,97 @@
+<div align="center">
+
 # Click'n'Translate
 
-![Click'n'Translate Logo](icons/icon.ico)
+### Translate anything on your screen without breaking your flow.
 
-**Click'n'Translate** is a powerful, lightweight desktop application for instant screen translation and text extraction (OCR). Capture any text on your screen, translate it instantly, or copy it to clipboard — all with simple hotkeys.
+[**Download for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip) · [Latest release](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
-## 📥 Download
+![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square) ![Downloads](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat-square&color=22c55e)
 
-**[Download Latest Release](https://github.com/jabrailkhalil/clickntranslate/releases)**
+**English** · [Русский](docs/readme/README.ru.md) · [简体中文](docs/readme/README.zh-CN.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md)
 
-> The ZIP build is fully portable. The recommended setup build adds the normal Windows uninstall entry and shortcuts you select.
+</div>
 
-## 🛠 Installation
+![Click'n'Translate — copy text from any screen area](docs/images/copy-to-clipboard.png)
 
-1. **Recommended:** download and run `ClicknTranslate-Setup-v1.4.6-win64.exe` from [Releases](https://github.com/jabrailkhalil/clickntranslate/releases).
-2. **Portable option:** download the ZIP, extract it to a permanent folder, and run `ClicknTranslate.exe`.
-3. **(Optional)** Enable "Start with Windows" in Settings for auto-start.
-4. **(Optional, portable build)** Run `CreateShortcut.bat` to create a desktop shortcut.
+Click'n'Translate turns any text on your Windows screen into something you can copy or translate. Select an area, press a global hotkey, and keep working — no browser tab, retyping, or context switching required.
 
-> ⚠️ **Important**: Move the folder to its permanent location *before* enabling auto-start or creating shortcuts. Moving the folder later will break these features.
+## Why Click'n'Translate?
 
-> **Updating from 1.4.5:** that version contains a broken updater and requires one manual update. Close the app, extract 1.4.6 into a new folder, and copy the old `data` folder into it. Automatic updates after 1.4.6 use the corrected transactional updater.
+- **Translate what you see.** Capture a selected area or the entire screen and translate it immediately.
+- **Copy text that cannot be selected.** Extract text from images, videos, games, remote desktops, and protected interfaces.
+- **Choose online or offline.** Use fast online providers, or keep text on your PC with Argos and Hy-MT.
+- **Pick the right OCR engine.** Windows OCR, Tesseract, RapidOCR, and EasyOCR are available from one package manager.
+- **Work from anywhere.** Four customizable global hotkeys remain available across applications.
+- **Keep control.** Translation and copy histories are optional and stored locally.
 
-## 🚀 Features
+## Four actions. Zero friction.
 
-### 📷 Advanced OCR (Optical Character Recognition)
-- **Instant Text Capture**: Select any area on your screen to extract text instantly
-- **Four OCR Engines**: Choose **Windows OCR**, **Tesseract**, **RapidOCR**, or **EasyOCR**; optional portable engines can be installed and removed from Settings
-- **Universal Mode (AUTO)**: Compares available Windows OCR languages and image variants to select the most reliable result
-- **Language packages**: Open **Settings → Language packages** to install Windows OCR capabilities, Tesseract/EasyOCR language data, the shared RapidOCR model, and Argos translation directions before first use
+| Default hotkey | Action |
+| --- | --- |
+| `Ctrl + Alt + C` | Extract text from an area and copy it |
+| `Ctrl + Alt + T` | Capture an area, recognize its text, and translate it |
+| `Ctrl + Alt + F` | Translate the entire screen |
+| `Ctrl + Alt + Q` | Translate a selected screen area |
 
-### 🌐 Instant Translation
-- **Multiple Translation Engines**:
-  - **Google Translate** — fast and accurate (recommended)
-  - **Argos Translate** — fully offline, private
-  - **Hy-MT** — optional local LLM translation model
-  - **MyMemory** — free API (5000 chars/day limit)
-  - **Lingva** — Google proxy via public servers
-  - **LibreTranslate** — open source
-- **Offline engine setup**: Argos directions can be installed or removed in **Settings → Language packages** with visible download progress; Hy-MT is installed separately from Settings.
-- **Visual Direction**: Clear indication of translation direction (RU → EN, EN → RU)
-- **History Tracking**: Built-in history viewer saves all translations locally
+Every hotkey can be changed in **Settings → Configure hotkeys**.
 
-### ⚡ Productivity & Workflow
-- **Global Hotkeys**:
-  - **`Ctrl + Alt + C`**: Quick Copy Mode — OCR & copy to clipboard
-  - **`Ctrl + Alt + T`**: Quick Translate Mode — OCR & translate
-  - **`Ctrl + Alt + F`**: Fullscreen Translate — translate the entire screen
-  - **`Ctrl + Alt + Q`**: Selection Translate — translate a selected screen area
-- **Photoshop-style Overlay**: Professional selection interface with glow effects
-- **Smart Clipboard**: Automatically copies recognized/translated text
-- **Separate Histories**: Maintains copy history and translation history
+## Translation and OCR engines
 
-### 🎨 Modern UI & Customization
-- **Dark & Light Themes**: Fully distinct themes
-- **System Tray Integration**: Minimizes to tray for clean taskbar
-- **Bilingual Interface**: Russian and English UI
-- **Cache Management**: Clear cache button in Settings
-- **Responsive Design**: Polished layout with smooth interactions
+| Type | Engines | Best for |
+| --- | --- | --- |
+| Online translation | Google, MyMemory, Lingva, LibreTranslate | Fast translation without downloading a model |
+| Offline translation | Argos Translate, Hy-MT | Private translation after the selected packages are installed |
+| OCR | Windows OCR, Tesseract, RapidOCR, EasyOCR | Text extraction across different scripts and image styles |
 
-## 🎮 How to Use
+Click'n'Translate supports 16 selectable OCR and translation languages, plus six interface languages: English, Russian, Spanish, German, French, and Chinese. The package manager downloads only the OCR languages and offline translation directions you choose.
 
-1. **Launch the App**: Main window provides access to all settings
-2. **Configure Settings**:
-   - Select your OCR Engine (Windows recommended)
-   - Set your Interface Language and Target Translation Language
-   - Customize Hotkeys if desired
-3. **Copy Text** (`Ctrl + Alt + C`):
-   - Select **AUTO** for numbers/Latin, or specific language for better accuracy
-   - Click and drag to select text area
-   - Text is copied to clipboard
-4. **Translate Text** (`Ctrl + Alt + T`):
-   - Select source language (RU → EN or EN → RU)
-   - Click and drag to select text area
-   - Translation appears in popup and copies to clipboard
+> **Privacy:** local OCR and offline translation engines process text on your computer. Online translation providers receive the text you ask them to translate.
 
-## 💡 Tips
+## Get started
 
-- **AUTO mode** works best for numbers, dates, and Latin text
-- **RU mode** works best for Cyrillic text
-- **Right-click** during selection to exit the app
-- **ESC** to cancel current selection
-- Windows OCR requires its Windows capability for each language; install it from **Settings → Language packages → Windows**
-- RapidOCR uses one shared Chinese/English recognition model rather than separate per-language packs
+1. Download and run the **[Windows installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.4.6-win64.exe)**.
+2. Launch Click'n'Translate and choose your interface, OCR, and translation languages.
+3. Press `Ctrl + Alt + T`, select an area, and receive the translation.
+4. For offline translation or extra OCR engines, open **Settings → Language packages** and install only what you need.
 
-## 📦 Building from Source
+No Python installation or account is required. Windows 10 or Windows 11 x64 is supported. Internet access is needed for online translation and for downloading optional packages; installed offline engines work without it.
 
-```bash
-# Clone repository
+### Portable version
+
+Download the [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.6-win64.zip), extract it to a permanent folder, and run `ClicknTranslate.exe`. Move the folder before enabling autostart or creating shortcuts.
+
+### Updating from 1.4.5
+
+Version 1.4.5 has a broken updater and needs one manual upgrade. Close and uninstall the old version first, then install 1.4.6. If you used the portable build and want to preserve settings or history, back up its `data` folder before removing it. Automatic updates are fixed starting with 1.4.6.
+
+## Built for everyday use
+
+- Dark and light themes
+- System tray and optional Windows startup
+- Customizable hotkeys
+- Local copy and translation histories
+- Download progress and package removal controls
+- Dedicated worker processes for OCR and Argos stability
+- Transactional updates that preserve user data
+
+## Build from source
+
+```powershell
 git clone https://github.com/jabrailkhalil/clickntranslate.git
 cd clickntranslate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run application
 python main.py
 
-# Build executable
+# Build the folder-based Windows distribution
 python -m PyInstaller ClicknTranslate.spec --clean --noconfirm
 ```
 
-This generates a portable executable in the `dist` folder.
+The release uses a folder-based PyInstaller build for responsive startup. Optional OCR runtimes and language models are installed separately instead of making every download several gigabytes.
 
-## 🤝 Contributing
+## Support and feedback
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- [Report a bug or request a feature](https://github.com/jabrailkhalil/clickntranslate/issues)
+- Telegram: [@jabrail_digital](https://t.me/jabrail_digital)
 
-## 📬 Contact
-
-- **Telegram**: [@jabrail_digital](https://t.me/jabrail_digital)
+If Click'n'Translate saves you time, starring the repository helps more people discover it.
