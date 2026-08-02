@@ -93,7 +93,9 @@ from document_translation import translate_document_text
 from languages import (
     default_target_for_source,
     detect_language_code,
+    get_language,
     language_code_from_name,
+    language_display_name,
     language_names,
 )
 
@@ -117,6 +119,8 @@ DEFAULT_CONFIG = {
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
     "translation_mode": "English",
+    "main_translation_source_language": "en",
+    "main_translation_target_language": "ru",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
     "notifications": False,
@@ -4284,6 +4288,7 @@ class DarkThemeApp(QMainWindow):
             self.save_config()
 
     def save_config(self):
+        self._capture_main_translation_languages()
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
@@ -4295,6 +4300,80 @@ class DarkThemeApp(QMainWindow):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+
+    def _configured_main_translation_pair(self):
+        source_code = str(
+            self.config.get(
+                "main_translation_source_language",
+                DEFAULT_CONFIG["main_translation_source_language"],
+            )
+        ).lower()
+        target_code = str(
+            self.config.get(
+                "main_translation_target_language",
+                DEFAULT_CONFIG["main_translation_target_language"],
+            )
+        ).lower()
+        if get_language(source_code) is None:
+            source_code = DEFAULT_CONFIG["main_translation_source_language"]
+        if get_language(target_code) is None or target_code == source_code:
+            target_code = default_target_for_source(source_code)
+        return source_code, target_code
+
+    def _capture_main_translation_languages(self):
+        if not hasattr(self, "config"):
+            return
+        source_combo = getattr(self, "source_lang", None)
+        target_combo = getattr(self, "target_lang", None)
+        try:
+            if source_combo is None or target_combo is None:
+                return
+            source_code = language_code_from_name(
+                source_combo.currentText(), self.current_interface_language
+            )
+            target_code = language_code_from_name(
+                target_combo.currentText(), self.current_interface_language
+            )
+            if get_language(source_code) is None or get_language(target_code) is None:
+                return
+            if source_code == target_code:
+                target_code = default_target_for_source(source_code)
+            self.config["main_translation_source_language"] = source_code
+            self.config["main_translation_target_language"] = target_code
+        except RuntimeError:
+            # The main-screen controls may already be queued for deletion while
+            # navigating to settings or shutting down.
+            return
+
+    def _restore_main_translation_languages(self):
+        source_code, target_code = self._configured_main_translation_pair()
+        source_name = language_display_name(source_code, self.current_interface_language)
+        target_name = language_display_name(target_code, self.current_interface_language)
+
+        self.source_lang.blockSignals(True)
+        self.target_lang.blockSignals(True)
+        try:
+            self.source_lang.setCurrentText(source_name)
+            available_targets = [
+                name for name in LANGUAGES[self.current_interface_language]
+                if name != source_name
+            ]
+            self.target_lang.clear()
+            self.target_lang.addItems(available_targets)
+            if target_name in available_targets:
+                self.target_lang.setCurrentText(target_name)
+            elif available_targets:
+                self.target_lang.setCurrentText(
+                    language_display_name(default_target_for_source(source_code), self.current_interface_language)
+                )
+        finally:
+            self.source_lang.blockSignals(False)
+            self.target_lang.blockSignals(False)
+        self._capture_main_translation_languages()
+
+    def _save_main_translation_languages(self):
+        self._capture_main_translation_languages()
+        self.save_config()
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
@@ -5471,15 +5550,12 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.addSpacing(2)
         self.source_lang = QComboBox()
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
-        self.source_lang.setCurrentIndex(0)
-        self.source_lang.currentIndexChanged.connect(self.update_languages)
         self.main_layout.addWidget(self.source_lang)
         self.target_lang = QComboBox()
-        self.target_lang.addItems(
-            [lang for lang in LANGUAGES[self.current_interface_language] if lang != self.source_lang.currentText()]
-        )
-        self.target_lang.setCurrentIndex(0)
         self.main_layout.addWidget(self.target_lang)
+        self._restore_main_translation_languages()
+        self.source_lang.currentIndexChanged.connect(self.update_languages)
+        self.target_lang.currentIndexChanged.connect(self._save_main_translation_languages)
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText(
             f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
@@ -5562,16 +5638,28 @@ class DarkThemeApp(QMainWindow):
 
     def update_languages(self):
         src = self.source_lang.currentText()
-        tgt = self.target_lang.currentText()
+        source_code = language_code_from_name(src, self.current_interface_language)
+        target_code = language_code_from_name(
+            self.target_lang.currentText(), self.current_interface_language
+        )
+        if target_code == source_code or get_language(target_code) is None:
+            _stored_source, stored_target = self._configured_main_translation_pair()
+            target_code = default_target_for_source(source_code, stored_target)
         available_targets = LANGUAGES[self.current_interface_language][:]
         if src in available_targets:
             available_targets.remove(src)
-        self.target_lang.clear()
-        self.target_lang.addItems(available_targets)
-        if tgt in available_targets:
-            self.target_lang.setCurrentText(tgt)
-        else:
-            self.target_lang.setCurrentIndex(0)
+        target_name = language_display_name(target_code, self.current_interface_language)
+        self.target_lang.blockSignals(True)
+        try:
+            self.target_lang.clear()
+            self.target_lang.addItems(available_targets)
+            if target_name in available_targets:
+                self.target_lang.setCurrentText(target_name)
+            elif available_targets:
+                self.target_lang.setCurrentIndex(0)
+        finally:
+            self.target_lang.blockSignals(False)
+        self._save_main_translation_languages()
 
     def clear_layout(self):
         # Удаляем все виджеты и layout'ы из main_layout

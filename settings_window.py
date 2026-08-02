@@ -6112,6 +6112,8 @@ finally {
             "autostart": False,
             "autostart_backend": "startup_shortcut",
             "translation_mode": "English",
+            "main_translation_source_language": "en",
+            "main_translation_target_language": "ru",
             "ocr_hotkeys": "Ctrl+O",
             "copy_hotkey": "Ctrl+Alt+C",
             "translate_hotkey": "Ctrl+Alt+T",
