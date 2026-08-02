@@ -129,6 +129,27 @@ class TestUpdateProgressDialog(unittest.TestCase):
         self.assertEqual(dialog.frame.objectName(), "progressDialogFrame")
         dialog.close()
 
+    def test_package_progress_dialog_centers_on_its_owner(self):
+        app = QApplication.instance() or QApplication([])
+        owner = sw.QWidget()
+        owner.setGeometry(180, 120, 640, 520)
+        owner.show()
+        app.processEvents()
+        owner._tesseract_install_in_progress = False
+        owner.current_interface_language = "en"
+
+        dialog = sw.TesseractInstallProgressDialog(owner)
+        dialog.setLabelText("Installing package...")
+        dialog.show()
+        app.processEvents()
+
+        owner_center = owner.frameGeometry().center()
+        dialog_center = dialog.frameGeometry().center()
+        self.assertLessEqual(abs(owner_center.x() - dialog_center.x()), 2)
+        self.assertLessEqual(abs(owner_center.y() - dialog_center.y()), 2)
+        dialog.close()
+        owner.close()
+
 
 class TestUpdateAssetSelection(unittest.TestCase):
     def test_pick_update_asset_prefers_windows_clickntranslate_zip(self):

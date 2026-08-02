@@ -78,7 +78,7 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
     from PyQt5.QtCore import Qt, QTimer, QSize
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
@@ -2654,6 +2654,243 @@ class ArgosTranslationErrorDialog(QDialog):
                 QPushButton#argosErrorCloseButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
                 QPushButton#argosErrorCloseButton:hover { background: #8B70B2; }
             """)
+
+TRANSLATION_RESULT_DIALOG_TEXT = {
+    "en": {
+        "eyebrow": "TRANSLATION RESULT",
+        "title": "Translation ready",
+        "auto_copied": "Copied to the clipboard automatically",
+        "ready": "Result is ready to copy",
+        "copied": "Copied to the clipboard",
+        "copy_again": "Copy again",
+    },
+    "ru": {
+        "eyebrow": "РЕЗУЛЬТАТ ПЕРЕВОДА",
+        "title": "Перевод готов",
+        "auto_copied": "Автоматически скопировано в буфер обмена",
+        "ready": "Результат готов к копированию",
+        "copied": "Скопировано в буфер обмена",
+        "copy_again": "Копировать ещё раз",
+    },
+    "es": {
+        "eyebrow": "RESULTADO DE LA TRADUCCIÓN",
+        "title": "Traducción lista",
+        "auto_copied": "Copiado automáticamente al portapapeles",
+        "ready": "El resultado está listo para copiar",
+        "copied": "Copiado al portapapeles",
+        "copy_again": "Copiar de nuevo",
+    },
+    "de": {
+        "eyebrow": "ÜBERSETZUNGSERGEBNIS",
+        "title": "Übersetzung fertig",
+        "auto_copied": "Automatisch in die Zwischenablage kopiert",
+        "ready": "Das Ergebnis kann kopiert werden",
+        "copied": "In die Zwischenablage kopiert",
+        "copy_again": "Erneut kopieren",
+    },
+    "fr": {
+        "eyebrow": "RÉSULTAT DE LA TRADUCTION",
+        "title": "Traduction terminée",
+        "auto_copied": "Copié automatiquement dans le presse-papiers",
+        "ready": "Le résultat est prêt à être copié",
+        "copied": "Copié dans le presse-papiers",
+        "copy_again": "Copier à nouveau",
+    },
+    "zh": {
+        "eyebrow": "翻译结果",
+        "title": "翻译完成",
+        "auto_copied": "已自动复制到剪贴板",
+        "ready": "结果可复制",
+        "copied": "已复制到剪贴板",
+        "copy_again": "再次复制",
+    },
+}
+
+
+class TranslationResultDialog(QDialog):
+    """Frameless themed translation result window with consistent actions."""
+
+    def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная"):
+        super().__init__(parent)
+        self.translated_text = str(translated_text or "")
+        self.lang = lang if lang in TRANSLATION_RESULT_DIALOG_TEXT else "en"
+        self.text = TRANSLATION_RESULT_DIALOG_TEXT[self.lang]
+        self._drag_position = None
+        self.setObjectName("translationResultRoot")
+        self.setWindowTitle(self.text["title"])
+        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+
+        visual_lines = max(self.translated_text.count("\n") + 1, (len(self.translated_text) // 56) + 1)
+        self.resize(580, min(540, max(315, 275 + min(10, visual_lines) * 20)))
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(12, 12, 12, 12)
+        outer.setSpacing(0)
+        frame = QFrame(self)
+        frame.setObjectName("translationResultFrame")
+        outer.addWidget(frame)
+
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(22, 18, 22, 20)
+        layout.setSpacing(13)
+
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        icon = QLabel("T")
+        icon.setObjectName("translationResultIcon")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(42, 42)
+        header.addWidget(icon)
+
+        heading = QVBoxLayout()
+        heading.setSpacing(1)
+        eyebrow = QLabel(self.text["eyebrow"])
+        eyebrow.setObjectName("translationResultEyebrow")
+        self.title_label = QLabel(self.text["title"])
+        self.title_label.setObjectName("translationResultTitle")
+        heading.addWidget(eyebrow)
+        heading.addWidget(self.title_label)
+        header.addLayout(heading)
+        header.addStretch()
+
+        self.title_close_button = QToolButton(self)
+        self.title_close_button.setObjectName("translationResultTitleClose")
+        self.title_close_button.setText("×")
+        self.title_close_button.setFixedSize(32, 32)
+        self.title_close_button.setToolTip(ui_text(self.lang, "close"))
+        self.title_close_button.clicked.connect(self.accept)
+        header.addWidget(self.title_close_button, alignment=Qt.AlignTop)
+        layout.addLayout(header)
+
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setObjectName("translationResultText")
+        self.text_edit.setPlainText(self.translated_text)
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setMinimumHeight(110)
+        layout.addWidget(self.text_edit, stretch=1)
+
+        self.status_label = QLabel(self.text["auto_copied"] if auto_copy else self.text["ready"])
+        self.status_label.setObjectName("translationResultStatus")
+        layout.addWidget(self.status_label)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(10)
+        buttons.addStretch()
+        self.google_button = QPushButton(ui_text(self.lang, "google"))
+        self.google_button.setObjectName("translationResultGoogle")
+        self.google_button.setMinimumSize(108, 38)
+        self.google_button.setAutoDefault(False)
+        self.google_button.clicked.connect(self._open_google)
+        buttons.addWidget(self.google_button)
+
+        copy_label = self.text["copy_again"] if auto_copy else ui_text(self.lang, "copy")
+        self.copy_button = QPushButton(copy_label)
+        self.copy_button.setObjectName("translationResultCopy")
+        self.copy_button.setMinimumSize(128, 38)
+        self.copy_button.setAutoDefault(False)
+        self.copy_button.clicked.connect(self._copy_result)
+        buttons.addWidget(self.copy_button)
+
+        self.close_button = QPushButton(ui_text(self.lang, "close"))
+        self.close_button.setObjectName("translationResultClose")
+        self.close_button.setMinimumSize(108, 38)
+        self.close_button.setAutoDefault(False)
+        self.close_button.clicked.connect(self.accept)
+        buttons.addWidget(self.close_button)
+        layout.addLayout(buttons)
+
+        if theme == "Темная":
+            self.setStyleSheet("""
+                QDialog#translationResultRoot { background: transparent; }
+                QFrame#translationResultFrame { background: #111216; border: 1px solid #494056; border-radius: 14px; }
+                QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
+                QLabel#translationResultEyebrow { color: #a994d2; font-size: 10px; font-weight: 800; }
+                QLabel#translationResultTitle { color: #ffffff; font-size: 20px; font-weight: 800; }
+                QToolButton#translationResultTitleClose { background: transparent; color: #c8c2d0; border: none; border-radius: 7px; font-size: 22px; }
+                QToolButton#translationResultTitleClose:hover { background: #302a39; color: #ffffff; }
+                QTextEdit#translationResultText { background: #19181e; color: #f5f2fb; border: 1px solid #3a3547; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #7A5FA1; }
+                QLabel#translationResultStatus { color: #aaa4b4; font-size: 12px; }
+                QPushButton { border-radius: 8px; padding: 7px 15px; font-size: 13px; font-weight: 700; }
+                QPushButton#translationResultGoogle { background: #232229; color: #ddd8e5; border: 1px solid #484250; }
+                QPushButton#translationResultGoogle:hover { background: #302e38; }
+                QPushButton#translationResultCopy { background: #2b2733; color: #efeaf6; border: 1px solid #6d5a82; }
+                QPushButton#translationResultCopy:hover { background: #393143; }
+                QPushButton#translationResultClose { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; }
+                QPushButton#translationResultClose:hover { background: #8B70B2; }
+                QScrollBar:vertical { background: #17161c; width: 10px; margin: 2px; }
+                QScrollBar::handle:vertical { background: #665677; min-height: 30px; border-radius: 4px; }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            """)
+        else:
+            self.setStyleSheet("""
+                QDialog#translationResultRoot { background: transparent; }
+                QFrame#translationResultFrame { background: #fbfafc; border: 1px solid #cfc5da; border-radius: 14px; }
+                QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
+                QLabel#translationResultEyebrow { color: #725594; font-size: 10px; font-weight: 800; }
+                QLabel#translationResultTitle { color: #24212a; font-size: 20px; font-weight: 800; }
+                QToolButton#translationResultTitleClose { background: transparent; color: #655d6e; border: none; border-radius: 7px; font-size: 22px; }
+                QToolButton#translationResultTitleClose:hover { background: #eee8f3; color: #24212a; }
+                QTextEdit#translationResultText { background: #ffffff; color: #24212a; border: 1px solid #d1c6df; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #a98cca; }
+                QLabel#translationResultStatus { color: #6f6877; font-size: 12px; }
+                QPushButton { border-radius: 8px; padding: 7px 15px; font-size: 13px; font-weight: 700; }
+                QPushButton#translationResultGoogle { background: #ffffff; color: #4a4353; border: 1px solid #cfc5da; }
+                QPushButton#translationResultGoogle:hover { background: #f0ecf4; }
+                QPushButton#translationResultCopy { background: #eee8f3; color: #44364f; border: 1px solid #bba8ca; }
+                QPushButton#translationResultCopy:hover { background: #e3d8eb; }
+                QPushButton#translationResultClose { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; }
+                QPushButton#translationResultClose:hover { background: #8B70B2; }
+                QScrollBar:vertical { background: #f3f0f6; width: 10px; margin: 2px; }
+                QScrollBar::handle:vertical { background: #a28cb5; min-height: 30px; border-radius: 4px; }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            """)
+
+    def _copy_result(self):
+        pyperclip.copy(self.translated_text)
+        self.status_label.setText(self.text["copied"])
+        self.copy_button.setText(self.text["copy_again"])
+
+    def _open_google(self):
+        webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(self.translated_text))
+
+    def _center_on_parent(self):
+        self.ensurePolished()
+        target = self.parentWidget()
+        if target is not None:
+            target_geometry = target.window().frameGeometry()
+        else:
+            screen = QApplication.primaryScreen()
+            target_geometry = screen.availableGeometry() if screen is not None else None
+        if target_geometry is None:
+            return
+        frame = self.frameGeometry()
+        frame.moveCenter(target_geometry.center())
+        self.move(frame.topLeft())
+
+    def showEvent(self, event):
+        self._center_on_parent()
+        super().showEvent(event)
+        QTimer.singleShot(0, self._center_on_parent)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.pos().y() <= 78:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
+
 
 class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
@@ -5821,77 +6058,16 @@ class DarkThemeApp(QMainWindow):
 
 # --- Универсальный диалог перевода ---
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная'):
-    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
-    is_dark = theme == "Темная"
-    bg = "#121212" if is_dark else "#ffffff"
-    fg = "#ffffff" if is_dark else "#000000"
-    btn_bg = "#1e1e1e" if is_dark else "#f0f0f0"
-    btn_border = "#550000" if is_dark else "#cccccc"
-    btn_hover = "#333333" if is_dark else "#e0e0e0"
-
-    dlg = QDialog(parent)
-    dlg.setWindowTitle("Click'n'Translate")
-    dlg.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
-    dlg.setWindowIcon(QIcon(resource_path("icons/icon.png")))
-    dlg.setMinimumSize(350, 150)
-    dlg.setMaximumSize(800, 600)
-    dlg.setStyleSheet(f"QDialog {{ background-color: {bg}; }}")
-
-    layout = QVBoxLayout(dlg)
-    layout.setContentsMargins(12, 12, 12, 12)
-
-    text_edit = QTextEdit()
-    text_edit.setPlainText(translated_text)
-    text_edit.setReadOnly(True)
-    text_edit.setStyleSheet(
-        f"QTextEdit {{ background-color: {bg}; color: {fg}; border: none; font-size: 16px; }}"
-        f"QScrollBar:vertical {{ background: {bg}; width: 8px; }}"
-        f"QScrollBar::handle:vertical {{ background: #555; border-radius: 4px; }}"
-    )
-    layout.addWidget(text_edit)
-
-    btn_style = (
-        f"QPushButton {{ background-color: {btn_bg}; color: {fg}; border: 1px solid {btn_border}; "
-        f"padding: 6px 16px; min-width: 80px; font-size: 13px; }}"
-        f"QPushButton:hover {{ background-color: {btn_hover}; }}"
-    )
-
-    btn_layout = QHBoxLayout()
-    btn_layout.addStretch()
-
-    copy_text = ui_text(lang, "copy")
-    google_text = ui_text(lang, "google")
-    close_text = ui_text(lang, "close")
-
-    if not auto_copy:
-        copy_btn = QPushButton(copy_text)
-        copy_btn.setStyleSheet(btn_style)
-        copy_btn.clicked.connect(lambda: pyperclip.copy(translated_text))
-        btn_layout.addWidget(copy_btn)
-
-    google_btn = QPushButton(google_text)
-    google_btn.setStyleSheet(btn_style)
-    google_btn.clicked.connect(lambda: (webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(translated_text)), dlg.accept()))
-    btn_layout.addWidget(google_btn)
-
-    close_btn = QPushButton(close_text)
-    close_btn.setStyleSheet(btn_style)
-    close_btn.clicked.connect(dlg.accept)
-    btn_layout.addWidget(close_btn)
-
-    layout.addLayout(btn_layout)
-
-    # Auto-size based on text length
-    lines = translated_text.count('\n') + 1
-    text_len = len(translated_text)
-    height = min(max(150, lines * 28 + 80, text_len // 2 + 100), 600)
-    width = min(max(350, min(text_len * 8, 700)), 800)
-    dlg.resize(width, height)
-
     if auto_copy:
         pyperclip.copy(translated_text)
-
-    dlg.exec_()
+    dialog = TranslationResultDialog(
+        parent,
+        translated_text,
+        auto_copy=auto_copy,
+        lang=lang,
+        theme=theme,
+    )
+    return dialog.exec_()
 
 if __name__ == "__main__":
     # ONNX Runtime and torch can fail to initialize after Qt on Windows. The

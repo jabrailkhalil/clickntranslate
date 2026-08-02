@@ -81,11 +81,19 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.owner.close()
         self.parent.close()
 
-    def test_manager_contains_argos_and_one_rapidocr_shared_model(self):
+    def test_manager_contains_argos_and_complete_rapidocr_bundle(self):
         titles = [self.dialog.tabs.tabText(index) for index in range(self.dialog.tabs.count())]
         self.assertEqual(titles, ["Windows", "Tesseract", "EasyOCR", "RapidOCR", "Argos"])
-        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 1)
-        self.assertIn("Chinese + English", self.dialog.rapidocr_table.item(0, 2).text())
+        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 4)
+        packages = {
+            self.dialog.rapidocr_table.item(row, 2).text()
+            for row in range(self.dialog.rapidocr_table.rowCount())
+        }
+        self.assertIn("rapidocr", packages)
+        self.assertIn("onnxruntime", packages)
+        self.assertIn("PP-OCR detector", packages)
+        self.assertIn("Chinese + English", packages)
+        self.assertTrue(self.dialog.rapidocr_table.isColumnHidden(0))
         self.assertIn("QScrollBar::handle:vertical", self.dialog.styleSheet())
 
     def test_every_ocr_language_is_present_in_each_per_language_table(self):

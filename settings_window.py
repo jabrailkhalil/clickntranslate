@@ -246,6 +246,48 @@ def _bring_progress_dialog_to_front(dialog):
         pass
 
 
+def _center_progress_dialog(dialog, owner):
+    """Center a frameless progress window after its final size is known."""
+    owner_window = None
+    if isinstance(owner, QWidget):
+        try:
+            owner_window = owner.window()
+        except Exception:
+            owner_window = owner
+    if owner_window is None:
+        owner_parent = getattr(owner, "parent", None)
+        if isinstance(owner_parent, QWidget):
+            try:
+                owner_window = owner_parent.window()
+            except Exception:
+                owner_window = owner_parent
+
+    target_geometry = None
+    if owner_window is not None:
+        try:
+            target_geometry = owner_window.frameGeometry()
+        except Exception:
+            target_geometry = None
+    if target_geometry is None or not target_geometry.isValid():
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            target_geometry = screen.availableGeometry()
+    if target_geometry is None or not target_geometry.isValid():
+        return
+
+    dialog.ensurePolished()
+    dialog.adjustSize()
+    frame = dialog.frameGeometry()
+    frame.moveCenter(target_geometry.center())
+    screen = QApplication.screenAt(target_geometry.center()) or QApplication.primaryScreen()
+    if screen is not None:
+        available = screen.availableGeometry()
+        x = max(available.left(), min(frame.left(), available.right() - frame.width() + 1))
+        y = max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1))
+        frame.moveTopLeft(QtCore.QPoint(x, y))
+    dialog.move(frame.topLeft())
+
+
 class UpdateProgressDialog(QDialog):
     def __init__(self, owner):
         super().__init__(None)
@@ -311,6 +353,14 @@ class UpdateProgressDialog(QDialog):
 
     def bring_to_front(self):
         _bring_progress_dialog_to_front(self)
+
+    def center_on_owner(self):
+        _center_progress_dialog(self, self._owner)
+
+    def showEvent(self, event):
+        self.center_on_owner()
+        super().showEvent(event)
+        QtCore.QTimer.singleShot(0, self.center_on_owner)
 
     def setWindowTitle(self, title):
         super().setWindowTitle(title)
@@ -456,6 +506,14 @@ class TesseractInstallProgressDialog(QDialog):
 
     def bring_to_front(self):
         _bring_progress_dialog_to_front(self)
+
+    def center_on_owner(self):
+        _center_progress_dialog(self, self._owner)
+
+    def showEvent(self, event):
+        self.center_on_owner()
+        super().showEvent(event)
+        QtCore.QTimer.singleShot(0, self.center_on_owner)
 
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
@@ -1132,12 +1190,21 @@ class OcrLanguageManagerDialog(QDialog):
         )
         self.rapidocr_table = self._add_engine_tab(
             "RapidOCR",
-            "RapidOCR использует общий движок без отдельных языковых пакетов."
+            "RapidOCR использует один общий комплект: движок, ONNX-runtime, детектор и модель распознавания Chinese + English. "
+            "Отдельных языковых пакетов и русской модели у него нет — для русского используйте Windows OCR, Tesseract или EasyOCR."
             if self.lang == "ru" else
-            "RapidOCR uses one engine and has no separate language packs.",
+            "RapidOCR uses one shared bundle: the engine, ONNX runtime, detector, and a Chinese + English recognition model. "
+            "It has no per-language packages or Russian model; use Windows OCR, Tesseract, or EasyOCR for Russian.",
             self._populate_rapidocr_table,
             [("Установить движок" if self.lang == "ru" else "Install engine", self._install_rapidocr_engine)],
+            header_labels=[
+                "",
+                "Компонент" if self.lang == "ru" else "Component",
+                "Пакет" if self.lang == "ru" else "Package",
+                "Статус" if self.lang == "ru" else "Status",
+            ],
         )
+        self.rapidocr_table.setColumnHidden(0, True)
 
         self.argos_table = self._add_engine_tab(
             "Argos",
@@ -1261,9 +1328,11 @@ class OcrLanguageManagerDialog(QDialog):
             bg = odd_bg if row % 2 else even_bg
             check_item = QTableWidgetItem()
             check_item.setData(Qt.UserRole, data["code"])
-            check_item.setCheckState(Qt.Checked if data["checked"] else Qt.Unchecked)
-            flags = Qt.ItemIsUserCheckable
-            if data.get("selectable", False):
+            show_checkbox = data.get("show_checkbox", True)
+            if show_checkbox:
+                check_item.setCheckState(Qt.Checked if data["checked"] else Qt.Unchecked)
+            flags = Qt.ItemIsUserCheckable if show_checkbox else Qt.NoItemFlags
+            if show_checkbox and data.get("selectable", False):
                 flags |= Qt.ItemIsEnabled
             check_item.setFlags(flags)
             check_item.setBackground(QBrush(bg))
@@ -1422,19 +1491,52 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _populate_rapidocr_table(self, table):
         engine_ready, _error = self.owner._rapidocr_importable_status()
-        rows = [{
-            "code": "rapidocr",
-            "icon": "",
-            "name": "Общая модель" if self.lang == "ru" else "Shared model",
-            "package": "RapidOCR (Chinese + English)",
-            "status": (
-                "Движок установлен" if engine_ready and self.lang == "ru" else
-                "Engine installed" if engine_ready else
-                "Движок не установлен" if self.lang == "ru" else "Engine missing"
-            ),
-            "checked": bool(engine_ready),
-            "selectable": False,
-        }]
+        installed = "Установлен" if self.lang == "ru" else "Installed"
+        missing = "Не установлен" if self.lang == "ru" else "Missing"
+        first_use = "Подготовится при первом OCR" if self.lang == "ru" else "Prepared on first OCR"
+        needs_engine = "Сначала установите движок" if self.lang == "ru" else "Install the engine first"
+        rows = [
+            {
+                "code": "rapidocr-engine",
+                "icon": "",
+                "name": "OCR-движок" if self.lang == "ru" else "OCR engine",
+                "package": "rapidocr",
+                "status": installed if engine_ready else missing,
+                "checked": bool(engine_ready),
+                "selectable": False,
+                "show_checkbox": False,
+            },
+            {
+                "code": "rapidocr-runtime",
+                "icon": "",
+                "name": "Нейросетевой runtime" if self.lang == "ru" else "Neural runtime",
+                "package": "onnxruntime",
+                "status": installed if engine_ready else missing,
+                "checked": bool(engine_ready),
+                "selectable": False,
+                "show_checkbox": False,
+            },
+            {
+                "code": "rapidocr-detector",
+                "icon": "",
+                "name": "Поиск и ориентация текста" if self.lang == "ru" else "Text detection + orientation",
+                "package": "PP-OCR detector",
+                "status": first_use if engine_ready else needs_engine,
+                "checked": bool(engine_ready),
+                "selectable": False,
+                "show_checkbox": False,
+            },
+            {
+                "code": "rapidocr-recognition",
+                "icon": "",
+                "name": "Распознавание" if self.lang == "ru" else "Recognition",
+                "package": "Chinese + English",
+                "status": first_use if engine_ready else needs_engine,
+                "checked": bool(engine_ready),
+                "selectable": False,
+                "show_checkbox": False,
+            },
+        ]
         self._set_language_rows(table, rows)
 
     def _argos_direction_name(self, source_code, target_code):
@@ -1824,6 +1926,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.progress_dialog.setLabelText("Подготовка..." if self.lang == "ru" else "Preparing...")
         self.progress_dialog.setRange(0, 0)
         self.progress_dialog.show()
+        self.progress_dialog.center_on_owner()
         self.progress_dialog.bring_to_front()
         threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
 
