@@ -14,6 +14,7 @@ import subprocess
 import ctypes
 import threading
 import time
+import logging
 import translater
 
 # CTranslate2 can crash when its native runtime is first loaded after Qt on
@@ -2505,6 +2506,153 @@ class ArgosPackageInstallDialog(QDialog):
                 QPushButton#argosCancelButton:hover { background: #f0ecf4; }
                 QPushButton#argosInstallButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; }
                 QPushButton#argosInstallButton:hover { background: #8B70B2; }
+            """)
+
+
+ARGOS_ERROR_DIALOG_TEXT = {
+    "en": {
+        "title": "Translation failed",
+        "eyebrow": "ARGOS · OFFLINE TRANSLATION",
+        "body": "Argos could not complete this translation. Try once more. If the error repeats, reinstall the packages for this direction.",
+        "details": "TECHNICAL DETAILS",
+        "fallback": "Argos did not return an error description.",
+        "close": "Close",
+    },
+    "ru": {
+        "title": "Не удалось перевести",
+        "eyebrow": "ARGOS · ОФЛАЙН-ПЕРЕВОД",
+        "body": "Argos не смог завершить перевод. Попробуйте ещё раз. Если ошибка повторится, переустановите пакеты для этого направления.",
+        "details": "ТЕХНИЧЕСКИЕ ПОДРОБНОСТИ",
+        "fallback": "Argos не вернул описание ошибки.",
+        "close": "Закрыть",
+    },
+    "es": {
+        "title": "No se pudo traducir",
+        "eyebrow": "ARGOS · TRADUCCIÓN OFFLINE",
+        "body": "Argos no pudo completar la traducción. Inténtalo de nuevo. Si el error se repite, reinstala los paquetes de esta dirección.",
+        "details": "DETALLES TÉCNICOS",
+        "fallback": "Argos no proporcionó una descripción del error.",
+        "close": "Cerrar",
+    },
+    "de": {
+        "title": "Übersetzung fehlgeschlagen",
+        "eyebrow": "ARGOS · OFFLINE-ÜBERSETZUNG",
+        "body": "Argos konnte die Übersetzung nicht abschließen. Versuche es erneut. Falls der Fehler wiederkehrt, installiere die Pakete für diese Richtung neu.",
+        "details": "TECHNISCHE DETAILS",
+        "fallback": "Argos hat keine Fehlerbeschreibung zurückgegeben.",
+        "close": "Schließen",
+    },
+    "fr": {
+        "title": "Échec de la traduction",
+        "eyebrow": "ARGOS · TRADUCTION HORS LIGNE",
+        "body": "Argos n’a pas pu terminer la traduction. Réessayez. Si l’erreur persiste, réinstallez les paquets pour cette direction.",
+        "details": "DÉTAILS TECHNIQUES",
+        "fallback": "Argos n’a fourni aucune description de l’erreur.",
+        "close": "Fermer",
+    },
+    "zh": {
+        "title": "翻译失败",
+        "eyebrow": "ARGOS · 离线翻译",
+        "body": "Argos 无法完成此次翻译。请重试；如果错误再次出现，请重新安装此方向的语言包。",
+        "details": "技术详情",
+        "fallback": "Argos 未返回错误说明。",
+        "close": "关闭",
+    },
+}
+
+
+class ArgosTranslationErrorDialog(QDialog):
+    """Compact themed error dialog that keeps the actual Argos error visible."""
+
+    def __init__(self, parent, pair_label, error_text, lang="en", theme="Темная"):
+        super().__init__(parent)
+        text = ARGOS_ERROR_DIALOG_TEXT.get(lang, ARGOS_ERROR_DIALOG_TEXT["en"])
+        self.setWindowTitle(text["title"])
+        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.setFixedSize(520, 320)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(13)
+
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        icon = QLabel("!")
+        icon.setObjectName("argosErrorIcon")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(42, 42)
+        header.addWidget(icon)
+
+        heading = QVBoxLayout()
+        heading.setSpacing(1)
+        eyebrow = QLabel(text["eyebrow"])
+        eyebrow.setObjectName("argosErrorEyebrow")
+        self.title_label = QLabel(text["title"])
+        self.title_label.setObjectName("argosErrorTitle")
+        heading.addWidget(eyebrow)
+        heading.addWidget(self.title_label)
+        header.addLayout(heading)
+        header.addStretch()
+        layout.addLayout(header)
+
+        normalized_pair = " → ".join(part.strip() for part in str(pair_label).split("→"))
+        self.route_label = QLabel(normalized_pair or "ARGOS")
+        self.route_label.setObjectName("argosErrorRoute")
+        layout.addWidget(self.route_label)
+
+        self.body_label = QLabel(text["body"])
+        self.body_label.setObjectName("argosErrorBody")
+        self.body_label.setWordWrap(True)
+        layout.addWidget(self.body_label)
+
+        details_caption = QLabel(text["details"])
+        details_caption.setObjectName("argosErrorDetailsCaption")
+        layout.addWidget(details_caption)
+        self.details_box = QTextEdit(self)
+        self.details_box.setObjectName("argosErrorDetails")
+        self.details_box.setReadOnly(True)
+        self.details_box.setPlainText(str(error_text or "").strip() or text["fallback"])
+        self.details_box.setFixedHeight(58)
+        self.details_box.setTabChangesFocus(True)
+        layout.addWidget(self.details_box)
+        layout.addStretch()
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        self.close_button = QPushButton(text["close"])
+        self.close_button.setObjectName("argosErrorCloseButton")
+        self.close_button.setMinimumSize(112, 38)
+        self.close_button.setAutoDefault(False)
+        self.close_button.clicked.connect(self.accept)
+        buttons.addWidget(self.close_button)
+        layout.addLayout(buttons)
+
+        if theme == "Темная":
+            self.setStyleSheet("""
+                QDialog { background: #111216; color: #f5f2fb; }
+                QLabel#argosErrorIcon { background: #9f3341; color: #ffffff; border-radius: 12px; font-size: 25px; font-weight: 900; }
+                QLabel#argosErrorEyebrow { color: #a994d2; font-size: 11px; font-weight: 800; }
+                QLabel#argosErrorTitle { color: #ffffff; font-size: 19px; font-weight: 800; }
+                QLabel#argosErrorRoute { background: #1b1a22; color: #ffffff; border: 1px solid #3a3547; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 800; }
+                QLabel#argosErrorBody { color: #ece8f2; font-size: 13px; }
+                QLabel#argosErrorDetailsCaption { color: #9992a8; font-size: 10px; font-weight: 800; }
+                QTextEdit#argosErrorDetails { background: #19181e; color: #c9c3d0; border: 1px solid #3a3547; border-radius: 7px; padding: 5px 7px; selection-background-color: #7A5FA1; }
+                QPushButton#argosErrorCloseButton { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
+                QPushButton#argosErrorCloseButton:hover { background: #8B70B2; }
+            """)
+        else:
+            self.setStyleSheet("""
+                QDialog { background: #fbfafc; color: #24212a; }
+                QLabel#argosErrorIcon { background: #c43f50; color: #ffffff; border-radius: 12px; font-size: 25px; font-weight: 900; }
+                QLabel#argosErrorEyebrow { color: #725594; font-size: 11px; font-weight: 800; }
+                QLabel#argosErrorTitle { color: #24212a; font-size: 19px; font-weight: 800; }
+                QLabel#argosErrorRoute { background: #f1edf6; color: #24212a; border: 1px solid #d1c6df; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 800; }
+                QLabel#argosErrorBody { color: #35303d; font-size: 13px; }
+                QLabel#argosErrorDetailsCaption { color: #766e80; font-size: 10px; font-weight: 800; }
+                QTextEdit#argosErrorDetails { background: #ffffff; color: #4a4353; border: 1px solid #d1c6df; border-radius: 7px; padding: 5px 7px; selection-background-color: #a98cca; }
+                QPushButton#argosErrorCloseButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
+                QPushButton#argosErrorCloseButton:hover { background: #8B70B2; }
             """)
 
 class WelcomeDialog(QDialog):
@@ -5580,7 +5728,7 @@ class DarkThemeApp(QMainWindow):
         try:
             package_installed = translater.argos_pair_installed(source_code, target_code)
         except Exception as exc:
-            QMessageBox.warning(self, ui_text(self.current_interface_language, "translation_error"), str(exc))
+            self._show_argos_translation_error(str(exc), pair_label)
             return
         if not package_installed and not self._confirm_argos_package_install(pair_label):
             return
@@ -5613,6 +5761,9 @@ class DarkThemeApp(QMainWindow):
             except translater.ArgosInstallCancelledError:
                 self._argos_translation_cancelled_signal.emit()
             except Exception as exc:
+                logging.getLogger("clickntranslate.argos").exception(
+                    "Argos translation failed for %s", pair_label
+                )
                 self._argos_translation_error_signal.emit(str(exc))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -5625,11 +5776,17 @@ class DarkThemeApp(QMainWindow):
     @QtCore.pyqtSlot(str)
     def _on_argos_translation_error(self, error_text):
         self._finish_argos_translation_state()
-        QMessageBox.warning(
+        self._show_argos_translation_error(error_text, self._argos_active_pair)
+
+    def _show_argos_translation_error(self, error_text, pair_label=""):
+        dialog = ArgosTranslationErrorDialog(
             self,
-            ui_text(self.current_interface_language, "translation_error"),
-            str(error_text),
+            pair_label,
+            error_text,
+            lang=self.current_interface_language,
+            theme=self.current_theme,
         )
+        dialog.exec_()
 
     @QtCore.pyqtSlot()
     def _on_argos_translation_cancelled(self):

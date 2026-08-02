@@ -1089,24 +1089,49 @@ def _try_argos_translate_worker(
             cancel_callback=cancel_callback,
         )
 
-    payload = _run_argos_worker_request(
-        {
-            "action": "translate",
-            "text": str(text or ""),
-            "source_code": source_code,
-            "target_code": target_code,
-            "allow_install": bool(allow_install),
-        },
-        status_callback=status_callback,
-        progress_callback=progress_callback,
-        cancel_callback=cancel_callback,
-    )
-    if payload.get("error"):
-        error = str(payload["error"])
-        if "ArgosInstallCancelledError" in error:
-            raise ArgosInstallCancelledError(error)
-        raise RuntimeError(error)
-    return payload.get("result")
+    def request_translation(install_allowed):
+        payload = _run_argos_worker_request(
+            {
+                "action": "translate",
+                "text": str(text or ""),
+                "source_code": source_code,
+                "target_code": target_code,
+                "allow_install": bool(install_allowed),
+            },
+            status_callback=status_callback,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
+        )
+        if payload.get("error"):
+            error = str(payload["error"])
+            if "ArgosInstallCancelledError" in error:
+                raise ArgosInstallCancelledError(error)
+            raise RuntimeError(error)
+        return payload.get("result")
+
+    try:
+        return request_translation(allow_install)
+    except ArgosInstallCancelledError:
+        raise
+    except Exception as first_error:
+        # Each packaged translation runs in a fresh worker. Directly after a
+        # package install Windows may still be releasing model files, so retry
+        # once only when a fresh probe confirms the complete route is installed.
+        if cancel_callback and cancel_callback():
+            raise ArgosInstallCancelledError(
+                "Argos language-package installation was canceled."
+            ) from first_error
+        try:
+            if not argos_pair_installed(source_code, target_code):
+                raise first_error
+            _emit_status(status_callback, "Retrying Argos translation…")
+            return request_translation(False)
+        except ArgosInstallCancelledError:
+            raise
+        except Exception as retry_error:
+            if retry_error is first_error:
+                raise
+            raise RuntimeError(str(retry_error) or str(first_error)) from retry_error
 
 
 def _try_argos_translate(

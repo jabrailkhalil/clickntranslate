@@ -134,6 +134,45 @@ class ArgosRuntimeTest(unittest.TestCase):
         self.assertIn("Ready", statuses)
         self.assertEqual(progress, [("RU→EN", 50, 100)])
 
+    def test_packaged_translation_retries_once_after_installed_route_probe(self):
+        requests = []
+
+        def fake_worker(request, **_kwargs):
+            requests.append(dict(request))
+            if request["action"] == "probe":
+                return {"pair_installed": True, "error": ""}
+            if sum(item["action"] == "translate" for item in requests) == 1:
+                return {"result": None, "error": "RuntimeError: model files are temporarily busy"}
+            return {"result": "Coreano", "error": ""}
+
+        statuses = []
+        with mock.patch.object(translater, "_argos_worker_path", return_value="ArgosWorker.exe"):
+            with mock.patch.object(translater, "_run_argos_worker_request", side_effect=fake_worker):
+                result = translater._try_argos_translate_worker(
+                    "кореец", "ru", "pt", status_callback=statuses.append
+                )
+
+        self.assertEqual(result, "Coreano")
+        self.assertEqual([request["action"] for request in requests], ["translate", "probe", "translate"])
+        self.assertFalse(requests[-1]["allow_install"])
+        self.assertIn("Retrying Argos translation…", statuses)
+
+    def test_packaged_translation_does_not_retry_when_route_is_missing(self):
+        requests = []
+
+        def fake_worker(request, **_kwargs):
+            requests.append(dict(request))
+            if request["action"] == "probe":
+                return {"pair_installed": False, "error": ""}
+            return {"result": None, "error": "RuntimeError: package is missing"}
+
+        with mock.patch.object(translater, "_argos_worker_path", return_value="ArgosWorker.exe"):
+            with mock.patch.object(translater, "_run_argos_worker_request", side_effect=fake_worker):
+                with self.assertRaisesRegex(RuntimeError, "package is missing"):
+                    translater._try_argos_translate_worker("hello", "en", "pt")
+
+        self.assertEqual([request["action"] for request in requests], ["translate", "probe"])
+
     def test_worker_runs_local_argos_path_without_redispatch(self):
         with mock.patch.dict(os.environ, {"CLICKNTRANSLATE_ARGOS_WORKER": "1"}, clear=False):
             argos_worker = importlib.import_module("argos_worker")

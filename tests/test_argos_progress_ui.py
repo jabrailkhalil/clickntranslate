@@ -150,6 +150,69 @@ class ArgosProgressUiTest(unittest.TestCase):
         self.assertTrue(accepted)
         dialog_class.assert_called_once_with(dummy, "RU→IT", lang="ru", theme="Темная")
 
+    def test_translation_error_dialog_is_themed_localized_and_keeps_details_visible(self):
+        for index, lang in enumerate(main.ARGOS_ERROR_DIALOG_TEXT):
+            theme = "Темная" if index % 2 == 0 else "Светлая"
+            dialog = main.ArgosTranslationErrorDialog(
+                None,
+                "RU→PT",
+                "RuntimeError: test failure",
+                lang=lang,
+                theme=theme,
+            )
+            self.assertEqual((dialog.width(), dialog.height()), (520, 320))
+            self.assertEqual(dialog.route_label.text(), "RU → PT")
+            self.assertTrue(dialog.title_label.text().strip())
+            self.assertTrue(dialog.body_label.text().strip())
+            self.assertEqual(dialog.details_box.toPlainText(), "RuntimeError: test failure")
+            self.assertEqual(dialog.close_button.text(), main.ARGOS_ERROR_DIALOG_TEXT[lang]["close"])
+            self.assertGreaterEqual(dialog.close_button.width(), dialog.close_button.sizeHint().width())
+            self.assertFalse(dialog.close_button.autoDefault())
+            if theme == "Темная":
+                self.assertIn("background: #111216", dialog.styleSheet())
+            else:
+                self.assertIn("background: #fbfafc", dialog.styleSheet())
+            dialog.close()
+
+    def test_translation_error_dialog_has_localized_fallback_for_empty_error(self):
+        dialog = main.ArgosTranslationErrorDialog(None, "RU→PT", "", "ru", "Темная")
+        self.assertEqual(
+            dialog.details_box.toPlainText(),
+            main.ARGOS_ERROR_DIALOG_TEXT["ru"]["fallback"],
+        )
+        dialog.close()
+
+    def test_argos_error_handler_uses_custom_dialog(self):
+        dummy = SimpleNamespace(
+            current_interface_language="ru",
+            current_theme="Темная",
+            _argos_active_pair="RU→PT",
+            _finish_argos_translation_state=mock.Mock(),
+            _show_argos_translation_error=mock.Mock(),
+        )
+        main.DarkThemeApp._on_argos_translation_error(dummy, "RuntimeError: test failure")
+
+        dummy._finish_argos_translation_state.assert_called_once_with()
+        dummy._show_argos_translation_error.assert_called_once_with(
+            "RuntimeError: test failure", "RU→PT"
+        )
+
+        presenter = SimpleNamespace(current_interface_language="ru", current_theme="Темная")
+        custom_dialog = mock.Mock()
+        with mock.patch.object(main, "ArgosTranslationErrorDialog", return_value=custom_dialog) as dialog_class:
+            main.DarkThemeApp._show_argos_translation_error(
+                presenter, "RuntimeError: test failure", "RU→PT"
+            )
+
+        dialog_class.assert_called_once_with(
+            presenter,
+            "RU→PT",
+            "RuntimeError: test failure",
+            lang="ru",
+            theme="Темная",
+        )
+        custom_dialog.exec_.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()
