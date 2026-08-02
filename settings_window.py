@@ -392,7 +392,13 @@ class TesseractInstallProgressDialog(QDialog):
         self._drag_position = None
         self._user_minimized = False
         owner_parent = getattr(owner, "parent", None)
-        self._lang = getattr(owner_parent, "current_interface_language", "en")
+        if callable(owner_parent):
+            owner_parent = None
+        self._lang = getattr(
+            owner_parent,
+            "current_interface_language",
+            getattr(owner, "current_interface_language", "en"),
+        )
         self.setWindowTitle(title)
         _configure_progress_dialog_window(self)
 

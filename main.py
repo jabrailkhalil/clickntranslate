@@ -77,12 +77,12 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QProgressDialog, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter)
     from PyQt5.QtCore import Qt, QTimer, QSize
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
     _show_dependency_error()
-from settings_window import SettingsWindow
+from settings_window import SettingsWindow, TesseractInstallProgressDialog
 from app_version import APP_VERSION
 import portable_paths
 from document_parser import DocumentParseError, format_file_size, parse_document
@@ -947,7 +947,14 @@ INTERFACE_TEXT = {
         "no_text_selected": "No text selected",
         "translating": "Translating...",
         "translation_error": "Translation error",
-        "installing_language_packages": "Installing language packages…"
+        "installing_language_packages": "Installing language packages…",
+        "argos_package_missing_title": "Argos language package required",
+        "argos_package_missing_prompt": "The Argos package for {pair} is not installed. Download and install it now?\n\nThe size depends on the language and can be several hundred megabytes.",
+        "argos_preparing": "Preparing Argos package {pair}…",
+        "argos_downloading": "Downloading Argos package {pair}…",
+        "argos_installing": "Installing Argos package {pair}…",
+        "argos_canceling": "Canceling Argos package installation…",
+        "argos_install_cancelled": "Argos package installation was canceled."
     },
     "ru": {
         "title": "Click'n'Translate",
@@ -981,7 +988,14 @@ INTERFACE_TEXT = {
         "no_text_selected": "Текст не выделен",
         "translating": "Переводим...",
         "translation_error": "Ошибка перевода",
-        "installing_language_packages": "Установка языковых пакетов…"
+        "installing_language_packages": "Установка языковых пакетов…",
+        "argos_package_missing_title": "Нужен языковой пакет Argos",
+        "argos_package_missing_prompt": "Пакет Argos для направления {pair} не установлен. Скачать и установить его сейчас?\n\nРазмер зависит от языка и может составлять несколько сотен мегабайт.",
+        "argos_preparing": "Подготовка пакета Argos {pair}…",
+        "argos_downloading": "Загрузка пакета Argos {pair}…",
+        "argos_installing": "Установка пакета Argos {pair}…",
+        "argos_canceling": "Отмена установки пакета Argos…",
+        "argos_install_cancelled": "Установка пакета Argos отменена."
     },
     "es": {
         "title": "Click'n'Translate",
@@ -3575,10 +3589,26 @@ class DocumentTranslationDialog(QDialog):
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str)
+    _argos_status_signal = QtCore.pyqtSignal(str)
+    _argos_progress_signal = QtCore.pyqtSignal(str, int, int)
+    _argos_translation_done_signal = QtCore.pyqtSignal(str)
+    _argos_translation_error_signal = QtCore.pyqtSignal(str)
+    _argos_translation_cancelled_signal = QtCore.pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self._show_selection_signal.connect(self._show_selection_translation)
+        self._argos_status_signal.connect(self._on_argos_status)
+        self._argos_progress_signal.connect(self._on_argos_progress)
+        self._argos_translation_done_signal.connect(self._on_argos_translation_done)
+        self._argos_translation_error_signal.connect(self._on_argos_translation_error)
+        self._argos_translation_cancelled_signal.connect(self._on_argos_translation_cancelled)
+        self._argos_translation_running = False
+        self._argos_install_required = False
+        self._argos_cancel_enabled = False
+        self._argos_active_pair = ""
+        self._argos_progress = None
+        self._argos_cancel_requested = threading.Event()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setWindowTitle(APP_WINDOW_TITLE)
         self.setFixedSize(700, 400)
@@ -5246,68 +5276,223 @@ class DarkThemeApp(QMainWindow):
         # Принудительный выход из процесса Python
         sys.exit(0)
 
+    def _confirm_argos_package_install(self, pair_label):
+        is_ru = self.current_interface_language == "ru"
+        message = QMessageBox(self)
+        message.setWindowTitle(ui_text(self.current_interface_language, "argos_package_missing_title"))
+        message.setText(
+            ui_text(self.current_interface_language, "argos_package_missing_prompt").format(pair=pair_label)
+        )
+        message.setIcon(QMessageBox.Question)
+        message.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        message.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        install_button = message.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
+        message.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        message.exec_()
+        return message.clickedButton() == install_button
+
+    def _show_argos_progress(self, text, percent=0, determinate=False):
+        is_ru = self.current_interface_language == "ru"
+        if self._argos_progress is None:
+            self._argos_progress = TesseractInstallProgressDialog(
+                self,
+                title="Argos",
+                in_progress_attr="_argos_translation_running",
+                cancel_callback=self._request_argos_install_cancel,
+            )
+            self._argos_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
+            self._argos_progress.setWindowModality(Qt.NonModal)
+            self._argos_progress.setAutoClose(False)
+            self._argos_progress.setAutoReset(False)
+            self._argos_progress.setMinimumDuration(0)
+            self._argos_progress.setMinimumWidth(430)
+            self._argos_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            try:
+                progress_frame = self._argos_progress.frameGeometry()
+                progress_frame.moveCenter(self.frameGeometry().center())
+                self._argos_progress.move(progress_frame.topLeft())
+            except Exception:
+                pass
+        self._argos_progress.setLabelText(str(text))
+        if determinate:
+            self._argos_progress.setRange(0, 100)
+            self._argos_progress.setValue(max(0, min(100, int(percent))))
+        else:
+            self._argos_progress.setRange(0, 0)
+        if not self._argos_progress.isVisible() and not getattr(self._argos_progress, "_user_minimized", False):
+            self._argos_progress.show()
+        self._argos_progress.bring_to_front()
+
+    @QtCore.pyqtSlot(str)
+    def _on_argos_status(self, message):
+        if not self._argos_install_required:
+            return
+        pair_label = self._argos_active_pair
+        message_lower = str(message or "").lower()
+        if "индекса" in message_lower or "prepar" in message_lower:
+            text = ui_text(self.current_interface_language, "argos_preparing").format(pair=pair_label)
+        elif "загрузка" in message_lower or "download" in message_lower:
+            text = ui_text(self.current_interface_language, "argos_downloading").format(pair=pair_label)
+        elif "установка" in message_lower or "install" in message_lower or "установлен" in message_lower:
+            text = ui_text(self.current_interface_language, "argos_installing").format(pair=pair_label)
+            self._argos_cancel_enabled = False
+            if self._argos_progress is not None:
+                self._argos_progress.cancel_button.setEnabled(False)
+                self._argos_progress.close_button.setEnabled(False)
+        else:
+            text = str(message)
+        self._show_argos_progress(text, determinate=False)
+
+    @QtCore.pyqtSlot(str, int, int)
+    def _on_argos_progress(self, pair_label, downloaded_bytes, total_bytes):
+        if not self._argos_install_required:
+            return
+        if pair_label:
+            self._argos_active_pair = str(pair_label)
+        text = ui_text(self.current_interface_language, "argos_downloading").format(
+            pair=self._argos_active_pair
+        )
+        if total_bytes > 0:
+            percent = int(max(0, min(100, downloaded_bytes * 100 / total_bytes)))
+            self._show_argos_progress(text, percent=percent, determinate=True)
+        else:
+            self._show_argos_progress(text, determinate=False)
+
+    def _request_argos_install_cancel(self):
+        if not self._argos_translation_running or not self._argos_cancel_enabled:
+            return
+        self._argos_cancel_requested.set()
+        text = ui_text(self.current_interface_language, "argos_canceling")
+        self._show_argos_progress(text, determinate=False)
+        if self._argos_progress is not None:
+            self._argos_progress.cancel_button.setEnabled(False)
+            self._argos_progress.close_button.setEnabled(False)
+
+    def _finish_argos_translation_state(self):
+        self._argos_translation_running = False
+        self._argos_install_required = False
+        self._argos_cancel_enabled = False
+        if hasattr(self, "translate_button"):
+            try:
+                self.translate_button.setEnabled(True)
+            except RuntimeError:
+                pass
+        if self._argos_progress is not None:
+            progress = self._argos_progress
+            self._argos_progress = None
+            try:
+                progress.blockSignals(True)
+                progress.hide()
+                progress.close()
+                progress.deleteLater()
+            except Exception:
+                pass
+
+    def _present_main_translation_result(self, translated_text):
+        config = get_cached_config()
+        auto_copy = config.get("copy_translated_text", True)
+        lang = config.get("interface_language", "ru")
+        theme = config.get("theme", "Темная")
+        if auto_copy:
+            pyperclip.copy(translated_text)
+            try:
+                if config.get("copy_history", False):
+                    save_copy_history(translated_text)
+            except Exception:
+                pass
+        show_translation_dialog(self, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
+        if not auto_copy:
+            try:
+                if config.get("copy_history", False):
+                    save_copy_history(translated_text)
+            except Exception:
+                pass
+
+    def _start_argos_translation(self, text, source_code, target_code):
+        if self._argos_translation_running:
+            return
+        pair_label = f"{source_code.upper()}→{target_code.upper()}"
+        try:
+            package_installed = translater.argos_pair_installed(source_code, target_code)
+        except Exception as exc:
+            QMessageBox.warning(self, ui_text(self.current_interface_language, "translation_error"), str(exc))
+            return
+        if not package_installed and not self._confirm_argos_package_install(pair_label):
+            return
+
+        self._argos_translation_running = True
+        self._argos_install_required = not package_installed
+        self._argos_cancel_enabled = not package_installed
+        self._argos_active_pair = pair_label
+        self._argos_cancel_requested.clear()
+        if hasattr(self, "translate_button"):
+            self.translate_button.setEnabled(False)
+        if self._argos_install_required:
+            text_label = ui_text(self.current_interface_language, "argos_preparing").format(pair=pair_label)
+            self._show_argos_progress(text_label, determinate=False)
+
+        def worker():
+            try:
+                translated_text = translater.translate_text(
+                    text,
+                    source_code,
+                    target_code,
+                    engine="argos",
+                    status_callback=lambda message: self._argos_status_signal.emit(str(message)),
+                    progress_callback=lambda message, done, total: self._argos_progress_signal.emit(
+                        str(message), int(done), int(total)
+                    ),
+                    cancel_callback=lambda: self._argos_cancel_requested.is_set(),
+                )
+                self._argos_translation_done_signal.emit(str(translated_text or ""))
+            except translater.ArgosInstallCancelledError:
+                self._argos_translation_cancelled_signal.emit()
+            except Exception as exc:
+                self._argos_translation_error_signal.emit(str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @QtCore.pyqtSlot(str)
+    def _on_argos_translation_done(self, translated_text):
+        self._finish_argos_translation_state()
+        self._present_main_translation_result(translated_text)
+
+    @QtCore.pyqtSlot(str)
+    def _on_argos_translation_error(self, error_text):
+        self._finish_argos_translation_state()
+        QMessageBox.warning(
+            self,
+            ui_text(self.current_interface_language, "translation_error"),
+            str(error_text),
+        )
+
+    @QtCore.pyqtSlot()
+    def _on_argos_translation_cancelled(self):
+        self._finish_argos_translation_state()
+        QMessageBox.information(
+            self,
+            "Argos",
+            ui_text(self.current_interface_language, "argos_install_cancelled"),
+        )
+
     def translate_input_text(self):
         text = self.text_input.toPlainText()
         if text:
             source_code = language_code_from_name(self.source_lang.currentText(), self.current_interface_language)
             target_code = language_code_from_name(self.target_lang.currentText(), self.current_interface_language)
+            engine = str(get_cached_config().get("translator_engine", "Google")).lower()
+            if engine == "argos":
+                self._start_argos_translation(text, source_code, target_code)
+                return
             try:
-                # Показать прогресс, если потребуется установка моделей Argos
-                progress = None
-                # Локальный колбэк для обновления статуса
-                def _status(msg):
-                    nonlocal progress
-                    if progress is None:
-                        title = ui_text(self.current_interface_language, "installing_language_packages")
-                        progress = QProgressDialog(title, None, 0, 0, self)
-                        progress.setCancelButton(None)
-                        progress.setWindowModality(Qt.WindowModal)
-                        progress.setAutoClose(False)
-                        # hide ? button
-                        try:
-                            progress.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-                        except Exception:
-                            pass
-                        progress.show()
-                        QApplication.processEvents()
-                    try:
-                        progress.setLabelText(str(msg))
-                    except Exception:
-                        pass
-                    QApplication.processEvents()
-
-                # Оборачиваем вызов перевода, передавая колбэк установки моделей
-                def _translate_with_progress():
-                    return translater.translate_text(text, source_code, target_code, status_callback=_status)
-
-                translated_text = _translate_with_progress()
-                if progress is not None:
-                    try:
-                        progress.close()
-                    except Exception:
-                        pass
-                # Проверяем флаг copy_translated_text из кэша
-                config = get_cached_config()
-                auto_copy = config.get("copy_translated_text", True)
-                lang = config.get("interface_language", "ru")
-                theme = config.get("theme", "Темная")
-                if auto_copy:
-                    pyperclip.copy(translated_text)
-                    try:
-                        if config.get("copy_history", False):
-                            save_copy_history(translated_text)
-                    except Exception:
-                        pass
-                # Показываем универсальный диалог
-                show_translation_dialog(self, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
-                if not auto_copy:
-                    try:
-                        if config.get("copy_history", False):
-                            save_copy_history(translated_text)
-                    except Exception:
-                        pass
+                translated_text = translater.translate_text(text, source_code, target_code)
+                self._present_main_translation_result(translated_text)
             except Exception as e:
-                QMessageBox.warning(self, "Ошибка перевода", str(e))
+                QMessageBox.warning(
+                    self,
+                    ui_text(self.current_interface_language, "translation_error"),
+                    str(e),
+                )
 
     def minimize_to_tray(self):
         self.hide()

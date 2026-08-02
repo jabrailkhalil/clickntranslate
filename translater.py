@@ -4,8 +4,11 @@ import os
 import sys
 import subprocess
 import re
+import shutil
 import tempfile
+import time
 import types
+import zipfile
 from languages import language_english_name, translator_api_code
 import portable_paths
 
@@ -27,6 +30,10 @@ ARGOS_DEFAULT_CHUNK_TYPE = "MINISBD"
 _SENTENCE_END_RE = re.compile(r"[.!?…。！？]+[\"'”’»)\]]*(?:\s+|$)")
 _MAX_SENTENCE_CHARS = 250
 _MODULE_NOT_LOADED = object()
+
+
+class ArgosInstallCancelledError(RuntimeError):
+    """Raised when the user cancels an Argos language-package download."""
 
 
 def split_sentences(text):
@@ -485,6 +492,108 @@ def _emit_status(status_callback, message):
         pass
 
 
+def _emit_argos_progress(progress_callback, message, downloaded_bytes, total_bytes):
+    if not progress_callback:
+        return
+    try:
+        progress_callback(str(message), int(downloaded_bytes), int(total_bytes))
+    except Exception:
+        pass
+
+
+def _check_argos_install_cancelled(cancel_callback):
+    if cancel_callback and cancel_callback():
+        raise ArgosInstallCancelledError("Argos language-package installation was canceled.")
+
+
+def _download_argos_package(
+    available_package,
+    label,
+    progress_callback=None,
+    cancel_callback=None,
+):
+    """Download an Argos model atomically while reporting byte progress."""
+    downloads_dir = os.fspath(arg_pkg.settings.downloads_dir)
+    os.makedirs(downloads_dir, exist_ok=True)
+    filename = f"{arg_pkg.argospm_package_name(available_package)}.argosmodel"
+    destination = os.path.join(downloads_dir, filename)
+
+    if os.path.isfile(destination) and zipfile.is_zipfile(destination):
+        size = os.path.getsize(destination)
+        _emit_argos_progress(progress_callback, label, size, size)
+        return destination
+    if os.path.exists(destination):
+        try:
+            os.remove(destination)
+        except OSError:
+            pass
+
+    links = list(getattr(available_package, "links", None) or [])
+    if not links:
+        _check_argos_install_cancelled(cancel_callback)
+        downloaded_path = os.fspath(available_package.download())
+        _check_argos_install_cancelled(cancel_callback)
+        if not zipfile.is_zipfile(downloaded_path):
+            raise RuntimeError(f"Downloaded Argos package {label} is not a valid archive.")
+        return downloaded_path
+
+    partial_path = destination + ".part"
+    last_error = None
+    download_attempts = [url for url in links for _attempt in range(3)]
+    for url in download_attempts:
+        try:
+            _check_argos_install_cancelled(cancel_callback)
+            try:
+                os.remove(partial_path)
+            except OSError:
+                pass
+            with requests.get(
+                url,
+                stream=True,
+                timeout=(20, 180),
+                headers={"User-Agent": "ClicknTranslate Argos package installer"},
+            ) as response:
+                response.raise_for_status()
+                try:
+                    total_bytes = int((response.headers.get("Content-Length") or "0").strip() or "0")
+                except Exception:
+                    total_bytes = 0
+                downloaded_bytes = 0
+                _emit_argos_progress(progress_callback, label, downloaded_bytes, total_bytes)
+                with open(partial_path, "wb") as package_file:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        _check_argos_install_cancelled(cancel_callback)
+                        if not chunk:
+                            continue
+                        package_file.write(chunk)
+                        downloaded_bytes += len(chunk)
+                        _emit_argos_progress(progress_callback, label, downloaded_bytes, total_bytes)
+            _check_argos_install_cancelled(cancel_callback)
+            if total_bytes and downloaded_bytes != total_bytes:
+                raise RuntimeError(
+                    f"Incomplete Argos package download for {label}: "
+                    f"received {downloaded_bytes} of {total_bytes} bytes."
+                )
+            if not zipfile.is_zipfile(partial_path):
+                raise RuntimeError(f"Downloaded Argos package {label} is not a valid archive.")
+            os.replace(partial_path, destination)
+            return destination
+        except ArgosInstallCancelledError:
+            try:
+                os.remove(partial_path)
+            except OSError:
+                pass
+            raise
+        except Exception as exc:
+            last_error = exc
+            try:
+                os.remove(partial_path)
+            except OSError:
+                pass
+
+    raise RuntimeError(f"Failed to download Argos package {label}: {last_error}")
+
+
 def models_installed_ru_en():
     """Return True if both RU and EN language models are installed in Argos."""
     if not _ensure_argos_available():
@@ -521,7 +630,13 @@ def _plan_language_pair(source_code, target_code, available_pairs, installed_pai
     return []
 
 
-def ensure_language_pair(source_code, target_code, status_callback=None):
+def ensure_language_pair(
+    source_code,
+    target_code,
+    status_callback=None,
+    progress_callback=None,
+    cancel_callback=None,
+):
     """Downloads and installs the Argos packages needed for source->target.
 
     Returns True when something was installed.
@@ -531,9 +646,11 @@ def ensure_language_pair(source_code, target_code, status_callback=None):
     if _get_translation_object(source_code, target_code) is not None:
         return False
     try:
+        _check_argos_install_cancelled(cancel_callback)
         _emit_status(status_callback, "Обновление индекса пакетов…")
         print("Обновление индекса пакетов...")
         arg_pkg.update_package_index()
+        _check_argos_install_cancelled(cancel_callback)
         available = {(pkg.from_code, pkg.to_code): pkg for pkg in arg_pkg.get_available_packages()}
         plan = _plan_language_pair(source_code, target_code, set(available), _installed_pairs())
         if not plan:
@@ -543,67 +660,136 @@ def ensure_language_pair(source_code, target_code, status_callback=None):
         for pair in plan:
             label = f"{pair[0].upper()}→{pair[1].upper()}"
             _emit_status(status_callback, f"Загрузка {label}…")
-            download_path = available[pair].download()
+            download_path = _download_argos_package(
+                available[pair],
+                label,
+                progress_callback=progress_callback,
+                cancel_callback=cancel_callback,
+            )
+            _check_argos_install_cancelled(cancel_callback)
             _emit_status(status_callback, f"Установка {label}…")
             arg_pkg.install_from_path(download_path)
             print(f"Пакет {pair[0]}->{pair[1]} установлен.")
             _emit_status(status_callback, f"Пакет {label} установлен")
         _invalidate_argos_cache()
         return True
+    except ArgosInstallCancelledError:
+        _emit_status(status_callback, "Установка языкового пакета Argos отменена")
+        raise
     except Exception as e:
         _emit_status(status_callback, f"Ошибка установки моделей: {e}")
         print(f"Не удалось автоматически установить модели Argos Translate: {e}")
-        return False
+        raise RuntimeError(f"Failed to install Argos language package: {e}") from e
 
 
-def install_models(status_callback=None):
+def install_models(status_callback=None, progress_callback=None, cancel_callback=None):
     """Installs the RU<->EN packages (used by the module CLI and first run)."""
-    ensure_language_pair("ru", "en", status_callback=status_callback)
-    ensure_language_pair("en", "ru", status_callback=status_callback)
+    ensure_language_pair(
+        "ru", "en", status_callback=status_callback,
+        progress_callback=progress_callback, cancel_callback=cancel_callback,
+    )
+    ensure_language_pair(
+        "en", "ru", status_callback=status_callback,
+        progress_callback=progress_callback, cancel_callback=cancel_callback,
+    )
 
 
-def ensure_models(status_callback=None):
+def ensure_models(status_callback=None, progress_callback=None, cancel_callback=None):
     if models_installed_ru_en():
         return  # обе модели уже есть
-    install_models(status_callback=status_callback)
+    install_models(
+        status_callback=status_callback,
+        progress_callback=progress_callback,
+        cancel_callback=cancel_callback,
+    )
 
 
-def _try_argos_translate_local(text, source_code, target_code, status_callback=None, allow_install=True):
+def _try_argos_translate_local(
+    text,
+    source_code,
+    target_code,
+    status_callback=None,
+    allow_install=True,
+    progress_callback=None,
+    cancel_callback=None,
+):
     if not _ensure_argos_available():
         return None
     translation_obj = _get_translation_object(source_code, target_code)
     if translation_obj is None and allow_install:
-        if ensure_language_pair(source_code, target_code, status_callback=status_callback):
+        if ensure_language_pair(
+            source_code,
+            target_code,
+            status_callback=status_callback,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
+        ):
             translation_obj = _get_translation_object(source_code, target_code)
     if translation_obj is None:
         return None
     return translation_obj.translate(text)
 
 
-def _try_argos_translate_worker(text, source_code, target_code, status_callback=None, allow_install=True):
+def _run_argos_worker_request(
+    request,
+    status_callback=None,
+    progress_callback=None,
+    cancel_callback=None,
+    timeout=1800,
+):
     worker_path = _argos_worker_path()
     if not worker_path:
-        return _try_argos_translate_local(
-            text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
-        )
+        raise RuntimeError("Argos offline worker is missing from this build.")
 
-    _emit_status(status_callback, "Preparing Argos offline translation…")
-    request_path = ""
+    request_dir = tempfile.mkdtemp(prefix="clickntranslate_argos_")
+    request_path = os.path.join(request_dir, "request.json")
+    event_path = os.path.join(request_dir, "events.jsonl")
+    cancel_path = os.path.join(request_dir, "cancel")
+    stdout_path = os.path.join(request_dir, "stdout.json")
+    stderr_path = os.path.join(request_dir, "stderr.txt")
+    process = None
+    status_events_seen = 0
+    event_offset = 0
+    event_buffer = ""
+    cancel_sent_at = None
+
+    def drain_events():
+        nonlocal status_events_seen, event_offset, event_buffer
+        if not os.path.isfile(event_path):
+            return
+        try:
+            with open(event_path, "r", encoding="utf-8") as event_file:
+                event_file.seek(event_offset)
+                event_buffer += event_file.read()
+                event_offset = event_file.tell()
+        except OSError:
+            return
+        lines = event_buffer.split("\n")
+        event_buffer = lines.pop()
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            if event.get("type") == "status":
+                status_events_seen += 1
+                _emit_status(status_callback, event.get("message", ""))
+            elif event.get("type") == "progress":
+                _emit_argos_progress(
+                    progress_callback,
+                    event.get("message", ""),
+                    event.get("downloaded_bytes", 0),
+                    event.get("total_bytes", 0),
+                )
+
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", suffix=".json", prefix="clickntranslate_argos_", delete=False
-        ) as request_file:
-            json.dump(
-                {
-                    "text": str(text or ""),
-                    "source_code": source_code,
-                    "target_code": target_code,
-                    "allow_install": bool(allow_install),
-                },
-                request_file,
-                ensure_ascii=False,
-            )
-            request_path = request_file.name
+        request = dict(request or {})
+        request["event_path"] = event_path
+        request["cancel_path"] = cancel_path
+        with open(request_path, "w", encoding="utf-8") as request_file:
+            json.dump(request, request_file, ensure_ascii=False)
 
         startupinfo = None
         creationflags = 0
@@ -611,46 +797,156 @@ def _try_argos_translate_worker(text, source_code, target_code, status_callback=
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        completed = subprocess.run(
-            [worker_path, request_path],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=1800,
-            startupinfo=startupinfo,
-            creationflags=creationflags,
-        )
-    finally:
-        if request_path:
-            try:
-                os.unlink(request_path)
-            except OSError:
-                pass
+        with open(stdout_path, "w", encoding="utf-8") as stdout_file, open(
+            stderr_path, "w", encoding="utf-8", errors="replace"
+        ) as stderr_file:
+            process = subprocess.Popen(
+                [worker_path, request_path],
+                stdout=stdout_file,
+                stderr=stderr_file,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+            )
+            deadline = time.monotonic() + max(1, int(timeout))
+            while process.poll() is None:
+                drain_events()
+                if cancel_callback and cancel_callback():
+                    if cancel_sent_at is None:
+                        with open(cancel_path, "w", encoding="utf-8") as cancel_file:
+                            cancel_file.write("cancel\n")
+                        cancel_sent_at = time.monotonic()
+                    elif time.monotonic() - cancel_sent_at > 10:
+                        process.terminate()
+                if time.monotonic() > deadline:
+                    process.kill()
+                    raise RuntimeError("Argos offline worker timed out.")
+                time.sleep(0.1)
+            drain_events()
+            return_code = process.wait()
 
-    output = (completed.stdout or "").strip()
-    if completed.returncode != 0:
-        detail = (completed.stderr or output or f"exit code {completed.returncode}").strip()
-        raise RuntimeError(f"Argos offline worker failed: {detail[:1200]}")
-    try:
-        payload = json.loads(output)
-    except Exception as exc:
-        detail = (completed.stderr or output or "empty output").strip()
-        raise RuntimeError(f"Argos offline worker returned invalid output: {detail[:1200]}") from exc
-    for message in payload.get("statuses") or []:
-        _emit_status(status_callback, str(message))
+        try:
+            with open(stdout_path, "r", encoding="utf-8", errors="replace") as stdout_file:
+                output = stdout_file.read().strip()
+        except OSError:
+            output = ""
+        try:
+            with open(stderr_path, "r", encoding="utf-8", errors="replace") as stderr_file:
+                stderr_output = stderr_file.read().strip()
+        except OSError:
+            stderr_output = ""
+        if return_code != 0:
+            if cancel_sent_at is not None:
+                raise ArgosInstallCancelledError("Argos language-package installation was canceled.")
+            detail = stderr_output or output or f"exit code {return_code}"
+            raise RuntimeError(f"Argos offline worker failed: {detail[:1200]}")
+        try:
+            payload = json.loads(output)
+        except Exception as exc:
+            detail = stderr_output or output or "empty output"
+            raise RuntimeError(f"Argos offline worker returned invalid output: {detail[:1200]}") from exc
+        if not status_events_seen:
+            for message in payload.get("statuses") or []:
+                _emit_status(status_callback, str(message))
+        return payload
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        shutil.rmtree(request_dir, ignore_errors=True)
+
+
+def argos_pair_installed(source_code, target_code):
+    """Return whether Argos can translate this pair without a download."""
+    if _argos_worker_path():
+        payload = _run_argos_worker_request(
+            {
+                "action": "probe",
+                "source_code": source_code,
+                "target_code": target_code,
+            },
+            timeout=60,
+        )
+        if payload.get("error"):
+            raise RuntimeError(str(payload["error"]))
+        return bool(payload.get("pair_installed"))
+    if not _ensure_argos_available():
+        return False
+    return _get_translation_object(source_code, target_code) is not None
+
+
+def _try_argos_translate_worker(
+    text,
+    source_code,
+    target_code,
+    status_callback=None,
+    allow_install=True,
+    progress_callback=None,
+    cancel_callback=None,
+):
+    worker_path = _argos_worker_path()
+    if not worker_path:
+        return _try_argos_translate_local(
+            text,
+            source_code,
+            target_code,
+            status_callback=status_callback,
+            allow_install=allow_install,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
+        )
+
+    payload = _run_argos_worker_request(
+        {
+            "action": "translate",
+            "text": str(text or ""),
+            "source_code": source_code,
+            "target_code": target_code,
+            "allow_install": bool(allow_install),
+        },
+        status_callback=status_callback,
+        progress_callback=progress_callback,
+        cancel_callback=cancel_callback,
+    )
     if payload.get("error"):
-        raise RuntimeError(str(payload["error"]))
+        error = str(payload["error"])
+        if "ArgosInstallCancelledError" in error:
+            raise ArgosInstallCancelledError(error)
+        raise RuntimeError(error)
     return payload.get("result")
 
 
-def _try_argos_translate(text, source_code, target_code, status_callback=None, allow_install=True):
+def _try_argos_translate(
+    text,
+    source_code,
+    target_code,
+    status_callback=None,
+    allow_install=True,
+    progress_callback=None,
+    cancel_callback=None,
+):
     if _argos_worker_path():
         return _try_argos_translate_worker(
-            text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
+            text,
+            source_code,
+            target_code,
+            status_callback=status_callback,
+            allow_install=allow_install,
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
         )
     return _try_argos_translate_local(
-        text, source_code, target_code, status_callback=status_callback, allow_install=allow_install
+        text,
+        source_code,
+        target_code,
+        status_callback=status_callback,
+        allow_install=allow_install,
+        progress_callback=progress_callback,
+        cancel_callback=cancel_callback,
     )
 
 def test_translation():
@@ -684,7 +980,15 @@ def test_translation():
     else:
         print("Нет модели для EN->RU")
 
-def translate_text(text, source_code, target_code, status_callback=None, engine=None):
+def translate_text(
+    text,
+    source_code,
+    target_code,
+    status_callback=None,
+    engine=None,
+    progress_callback=None,
+    cancel_callback=None,
+):
     """Перевод текста с выбранным движком и автоматическим фоллбеком."""
     config = get_cached_translator_config()
     engine = (engine or config.get("translator_engine", "Google")).lower()
@@ -768,13 +1072,17 @@ def translate_text(text, source_code, target_code, status_callback=None, engine=
     if engine == "argos":
         if not argos_runtime_available():
             raise Exception(argos_unavailable_reason())
-        # Packages are large, so only download them when the caller can show progress.
+        # Packages are large, so only download them when the caller provides the
+        # dedicated byte-progress flow. A status-only callback (used by document
+        # translation) must never trigger an unconfirmed background download.
         argos_result = _try_argos_translate(
             text,
             source_code,
             target_code,
             status_callback=status_callback,
-            allow_install=bool(status_callback),
+            allow_install=bool(progress_callback),
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
         )
         if argos_result:
             return _cache_and_return(argos_result)

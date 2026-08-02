@@ -1,10 +1,13 @@
 import contextlib
+import io
 import importlib
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -102,30 +105,34 @@ class ArgosRuntimeTest(unittest.TestCase):
         self.assertGreater(len(chunks), 1)
         self.assertTrue(all(len(chunk) <= translater._MAX_SENTENCE_CHARS for chunk in chunks))
 
-    def test_packaged_dispatch_uses_utf8_worker_request(self):
+    def test_packaged_dispatch_passes_worker_request_and_callbacks(self):
         captured = {}
 
-        def fake_run(command, **_kwargs):
-            captured["command"] = command
-            captured["request"] = json.loads(Path(command[1]).read_text(encoding="utf-8"))
-            return SimpleNamespace(
-                returncode=0,
-                stdout=json.dumps({"result": "Hello", "statuses": ["Ready"], "error": ""}),
-                stderr="",
-            )
+        def fake_worker(request, **kwargs):
+            captured["request"] = request
+            kwargs["status_callback"]("Ready")
+            kwargs["progress_callback"]("RU→EN", 50, 100)
+            return {"result": "Hello", "statuses": ["Ready"], "error": ""}
 
         statuses = []
+        progress = []
         with mock.patch.object(translater, "_argos_worker_path", return_value="ArgosWorker.exe"):
-            with mock.patch.object(translater.subprocess, "run", side_effect=fake_run):
+            with mock.patch.object(translater, "_run_argos_worker_request", side_effect=fake_worker):
                 result = translater._try_argos_translate(
-                    "Привет", "ru", "en", status_callback=statuses.append, allow_install=False
+                    "Привет",
+                    "ru",
+                    "en",
+                    status_callback=statuses.append,
+                    progress_callback=lambda message, done, total: progress.append((message, done, total)),
+                    allow_install=False,
                 )
 
         self.assertEqual(result, "Hello")
         self.assertEqual(captured["request"]["text"], "Привет")
+        self.assertEqual(captured["request"]["action"], "translate")
         self.assertFalse(captured["request"]["allow_install"])
         self.assertIn("Ready", statuses)
-        self.assertFalse(Path(captured["command"][1]).exists())
+        self.assertEqual(progress, [("RU→EN", 50, 100)])
 
     def test_worker_runs_local_argos_path_without_redispatch(self):
         with mock.patch.dict(os.environ, {"CLICKNTRANSLATE_ARGOS_WORKER": "1"}, clear=False):
@@ -137,6 +144,98 @@ class ArgosRuntimeTest(unittest.TestCase):
 
         self.assertEqual(payload["result"], "Hello")
         self.assertFalse(payload["error"])
+
+    def test_worker_probe_reports_installed_pair(self):
+        with mock.patch.dict(os.environ, {"CLICKNTRANSLATE_ARGOS_WORKER": "1"}, clear=False):
+            argos_worker = importlib.import_module("argos_worker")
+        request = {"action": "probe", "source_code": "ru", "target_code": "en"}
+        with mock.patch.object(argos_worker.translater, "_ensure_argos_available", return_value=True):
+            with mock.patch.object(argos_worker.translater, "_get_translation_object", return_value=object()):
+                payload = argos_worker.run_request(request)
+
+        self.assertTrue(payload["pair_installed"])
+        self.assertFalse(payload["error"])
+
+    def test_pair_probe_uses_packaged_worker(self):
+        with mock.patch.object(translater, "_argos_worker_path", return_value="ArgosWorker.exe"):
+            with mock.patch.object(
+                translater,
+                "_run_argos_worker_request",
+                return_value={"pair_installed": True, "error": ""},
+            ) as worker:
+                self.assertTrue(translater.argos_pair_installed("ru", "en"))
+
+        self.assertEqual(worker.call_args.args[0]["action"], "probe")
+
+
+class ArgosPackageDownloadTest(unittest.TestCase):
+    @staticmethod
+    def _archive_bytes():
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("model/model.bin", b"model")
+        return buffer.getvalue()
+
+    @staticmethod
+    def _response(data):
+        class Response:
+            headers = {"Content-Length": str(len(data))}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                for offset in range(0, len(data), max(1, chunk_size)):
+                    yield data[offset:offset + chunk_size]
+
+        return Response()
+
+    def test_download_reports_bytes_and_applies_atomically(self):
+        data = self._archive_bytes()
+        progress = []
+        package = SimpleNamespace(links=["https://example.test/model.argosmodel"])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_arg_pkg = SimpleNamespace(
+                settings=SimpleNamespace(downloads_dir=Path(temp_dir)),
+                argospm_package_name=lambda _package: "translate-ru_en",
+            )
+            with mock.patch.object(translater, "arg_pkg", fake_arg_pkg):
+                with mock.patch.object(translater.requests, "get", return_value=self._response(data)):
+                    path = translater._download_argos_package(
+                        package,
+                        "RU→EN",
+                        progress_callback=lambda message, done, total: progress.append((message, done, total)),
+                    )
+
+            self.assertTrue(zipfile.is_zipfile(path))
+            self.assertFalse(Path(str(path) + ".part").exists())
+            self.assertEqual(progress[-1], ("RU→EN", len(data), len(data)))
+
+    def test_cancel_removes_partial_download(self):
+        data = self._archive_bytes()
+        package = SimpleNamespace(links=["https://example.test/model.argosmodel"])
+        cancel_checks = iter((False, True))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_arg_pkg = SimpleNamespace(
+                settings=SimpleNamespace(downloads_dir=Path(temp_dir)),
+                argospm_package_name=lambda _package: "translate-ru_en",
+            )
+            with mock.patch.object(translater, "arg_pkg", fake_arg_pkg):
+                with mock.patch.object(translater.requests, "get", return_value=self._response(data)):
+                    with self.assertRaises(translater.ArgosInstallCancelledError):
+                        translater._download_argos_package(
+                            package,
+                            "RU→EN",
+                            cancel_callback=lambda: next(cancel_checks, True),
+                        )
+
+            self.assertFalse(any(Path(temp_dir).iterdir()))
 
 
 class ArgosErrorReportingTest(unittest.TestCase):
@@ -176,6 +275,14 @@ class ArgosErrorReportingTest(unittest.TestCase):
 
                         argos_mock.reset_mock()
                         translater.translate_text("hello", "en", "ru", status_callback=lambda _message: None)
+                        self.assertFalse(argos_mock.call_args.kwargs["allow_install"])
+
+                        translater.translate_text(
+                            "hello",
+                            "en",
+                            "ru",
+                            progress_callback=lambda _message, _done, _total: None,
+                        )
                         self.assertTrue(argos_mock.call_args.kwargs["allow_install"])
 
 
@@ -250,6 +357,15 @@ class ArgosPackagingTest(unittest.TestCase):
         preload_at = main_source.index("translater.preload_argos_runtime()")
         qt_at = main_source.index("from PyQt5 import QtCore")
         self.assertLess(preload_at, qt_at)
+
+    def test_main_uses_background_argos_install_dialog_with_cancel(self):
+        main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+        self.assertIn("TesseractInstallProgressDialog", main_source)
+        self.assertIn("translater.argos_pair_installed", main_source)
+        self.assertIn("_argos_progress_signal", main_source)
+        self.assertIn("progress_callback=lambda message, done, total", main_source)
+        self.assertIn("cancel_callback=lambda: self._argos_cancel_requested.is_set()", main_source)
+        self.assertIn("threading.Thread(target=worker, daemon=True).start()", main_source)
 
 
 if __name__ == "__main__":

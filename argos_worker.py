@@ -12,18 +12,63 @@ os.environ["CLICKNTRANSLATE_ARGOS_WORKER"] = "1"
 import translater
 
 
-def run_request(request):
+def run_request(request, event_callback=None):
     statuses = []
+
+    def emit_event(event):
+        if not event_callback:
+            return
+        try:
+            event_callback(event)
+        except Exception:
+            pass
+
+    def status_callback(message):
+        message = str(message)
+        statuses.append(message)
+        emit_event({"type": "status", "message": message})
+
+    def progress_callback(message, downloaded_bytes, total_bytes):
+        emit_event(
+            {
+                "type": "progress",
+                "message": str(message),
+                "downloaded_bytes": int(downloaded_bytes),
+                "total_bytes": int(total_bytes),
+            }
+        )
+
+    cancel_path = str(request.get("cancel_path") or "")
+
+    def cancel_callback():
+        return bool(cancel_path and os.path.exists(cancel_path))
+
     try:
+        if not translater._ensure_argos_available():
+            raise RuntimeError(translater.argos_unavailable_reason())
+        action = str(request.get("action") or "translate").lower()
+        if action == "probe":
+            pair_installed = translater._get_translation_object(
+                request.get("source_code", ""),
+                request.get("target_code", ""),
+            ) is not None
+            return {
+                "result": None,
+                "pair_installed": pair_installed,
+                "statuses": statuses,
+                "error": "",
+            }
+        if action != "translate":
+            raise ValueError(f"Unknown Argos worker action: {action}")
         result = translater._try_argos_translate_local(
             request.get("text", ""),
             request.get("source_code", ""),
             request.get("target_code", ""),
-            status_callback=lambda message: statuses.append(str(message)),
+            status_callback=status_callback,
             allow_install=bool(request.get("allow_install", False)),
+            progress_callback=progress_callback,
+            cancel_callback=cancel_callback,
         )
-        if not translater._ensure_argos_available():
-            raise RuntimeError(translater.argos_unavailable_reason())
         return {"result": result, "statuses": statuses, "error": ""}
     except Exception as exc:
         return {
@@ -44,9 +89,18 @@ def main(argv=None):
     try:
         with open(argv[0], "r", encoding="utf-8") as request_file:
             request = json.load(request_file)
+
+        event_path = str(request.get("event_path") or "")
+
+        def write_event(event):
+            if not event_path:
+                return
+            with open(event_path, "a", encoding="utf-8") as event_file:
+                event_file.write(json.dumps(event, ensure_ascii=False) + "\n")
+
         # Existing diagnostic prints must not corrupt the JSON protocol.
         with contextlib.redirect_stdout(sys.stderr):
-            payload = run_request(request)
+            payload = run_request(request, event_callback=write_event)
         print(json.dumps(payload, ensure_ascii=False))
         # A valid JSON error payload is still a successful protocol exchange;
         # the GUI will surface payload["error"] to the user.
