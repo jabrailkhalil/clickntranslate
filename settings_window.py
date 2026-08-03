@@ -13,6 +13,8 @@ import platform
 import re
 import time
 import html
+import ctypes
+from urllib.parse import urlparse
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
@@ -69,6 +71,8 @@ GITHUB_OWNER = "jabrailkhalil"
 GITHUB_REPO = "clickntranslate"
 GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/"
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+UPDATE_API_ENV = "CLICKNTRANSLATE_UPDATE_API_URL"
+UPDATE_TOKEN_ENV = "CLICKNTRANSLATE_UPDATE_TOKEN"
 MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
@@ -110,6 +114,32 @@ TRANSLATOR_ENGINE_OPTIONS = (
     ("lingva", "Lingva", "online"),
     ("libretranslate", "LibreTranslate", "online"),
 )
+
+
+def _update_feed_api_url():
+    return (os.environ.get(UPDATE_API_ENV) or GITHUB_LATEST_RELEASE_API).strip()
+
+
+def _update_request_headers(url="", accept_json=False):
+    headers = {"User-Agent": f"ClicknTranslate/{APP_VERSION}"}
+    if accept_json:
+        headers["Accept"] = "application/vnd.github+json"
+
+    token = (os.environ.get(UPDATE_TOKEN_ENV) or "").strip()
+    if token:
+        host = (urlparse(url or _update_feed_api_url()).hostname or "").lower()
+        if host in ("api.github.com", "github.com"):
+            headers["Authorization"] = f"Bearer {token}"
+            if host == "api.github.com" and "/releases/assets/" in (urlparse(url).path or ""):
+                headers["Accept"] = "application/octet-stream"
+    return headers
+
+
+def _update_asset_download_url(asset):
+    token = (os.environ.get(UPDATE_TOKEN_ENV) or "").strip()
+    if token and asset.get("url"):
+        return asset.get("url")
+    return asset.get("browser_download_url")
 
 
 def _provider_kind_text(kind, lang):
@@ -4197,11 +4227,9 @@ class SettingsWindow(QWidget):
     def _check_latest_release_worker(self):
         lang = self.parent.current_interface_language
         try:
-            headers = {
-                "Accept": "application/vnd.github+json",
-                "User-Agent": f"ClicknTranslate/{APP_VERSION}",
-            }
-            response = requests.get(GITHUB_LATEST_RELEASE_API, headers=headers, timeout=20)
+            update_api_url = _update_feed_api_url()
+            headers = _update_request_headers(update_api_url, accept_json=True)
+            response = requests.get(update_api_url, headers=headers, timeout=20)
             response.raise_for_status()
             release = response.json()
         except Exception as e:
@@ -4238,7 +4266,7 @@ class SettingsWindow(QWidget):
             return
 
         asset_name = selected_asset.get("name") or f"ClicknTranslate-v{latest_version}.zip"
-        asset_url = selected_asset.get("browser_download_url")
+        asset_url = _update_asset_download_url(selected_asset)
         if not asset_url:
             self._post_update_check_result({
                 "status": "invalid_asset",
@@ -4403,13 +4431,13 @@ class SettingsWindow(QWidget):
             if "sha256" not in name:
                 continue
             if name == direct_name + ".sha256" or name == direct_name + ".sha256.txt" or name == direct_txt_name:
-                return asset.get("browser_download_url", "")
+                return _update_asset_download_url(asset) or ""
             if ("." + base_name + ".") in name:
-                return asset.get("browser_download_url", "")
+                return _update_asset_download_url(asset) or ""
         for asset in assets:
             name = (asset.get("name") or "").lower()
             if name in candidates:
-                return asset.get("browser_download_url", "")
+                return _update_asset_download_url(asset) or ""
         return ""
 
     def _read_checksum(self, checksum_path, archive_name):
@@ -4448,7 +4476,8 @@ class SettingsWindow(QWidget):
         return digest.hexdigest().lower()
 
     def _download_file(self, url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
-        with requests.get(url, stream=True, timeout=timeout) as r:
+        headers = _update_request_headers(url)
+        with requests.get(url, stream=True, timeout=timeout, headers=headers) as r:
             r.raise_for_status()
             try:
                 total_bytes = int((r.headers.get("Content-Length") or "0").strip() or "0")
@@ -4600,7 +4629,57 @@ class SettingsWindow(QWidget):
                 unique.append(candidate)
         return unique
 
-    def _launch_hidden_powershell_script(self, script_path, extra_args):
+    def _install_dir_requires_elevation(self, app_dir):
+        if os.name != "nt" or not os.path.isdir(app_dir):
+            return False
+        probe_path = os.path.join(app_dir, f".clickntranslate-write-probe-{os.getpid()}-{threading.get_ident()}")
+        try:
+            descriptor = os.open(probe_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(descriptor)
+            os.remove(probe_path)
+            return False
+        except OSError as error:
+            try:
+                if os.path.exists(probe_path):
+                    os.remove(probe_path)
+            except OSError:
+                pass
+            return isinstance(error, PermissionError) or getattr(error, "winerror", None) == 5
+
+    def _launch_elevated_process(self, executable, arguments, cwd):
+        if os.name != "nt":
+            return False, RuntimeError("Elevation is available only on Windows")
+        try:
+            parameters = subprocess.list2cmdline(list(arguments))
+            shell_execute = ctypes.windll.shell32.ShellExecuteW
+            shell_execute.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_wchar_p,
+                ctypes.c_wchar_p,
+                ctypes.c_wchar_p,
+                ctypes.c_wchar_p,
+                ctypes.c_int,
+            ]
+            # ShellExecuteW returns an HINSTANCE/INT_PTR.  Leaving ctypes at
+            # its default c_int return type truncates valid 64-bit handles and
+            # can make a successful UAC launch look like a failure.
+            shell_execute.restype = ctypes.c_void_p
+            result = shell_execute(
+                None,
+                "runas",
+                executable,
+                parameters,
+                cwd,
+                0,
+            )
+            result_value = int(result or 0)
+            if result_value <= 32:
+                return False, OSError(result_value, "Windows refused to start the elevated updater")
+            return True, None
+        except Exception as error:
+            return False, error
+
+    def _launch_hidden_powershell_script(self, script_path, extra_args, elevated=False):
         create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         # The public launcher historically started the inner PyInstaller app
         # with ``app`` as its current directory. A child updater inherited
@@ -4611,15 +4690,26 @@ class SettingsWindow(QWidget):
         last_err = None
         for candidate in SettingsWindow._powershell_launch_candidates(self):
             try:
-                subprocess.Popen(
-                    [
+                arguments = [
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-WindowStyle", "Hidden",
+                    "-File", script_path,
+                    *extra_args,
+                ]
+                if elevated:
+                    ok, error = SettingsWindow._launch_elevated_process(
+                        self,
                         candidate,
-                        "-NoProfile",
-                        "-ExecutionPolicy", "Bypass",
-                        "-WindowStyle", "Hidden",
-                        "-File", script_path,
-                        *extra_args,
-                    ],
+                        arguments,
+                        updater_cwd,
+                    )
+                    if ok:
+                        return True, None
+                    last_err = error
+                    continue
+                subprocess.Popen(
+                    [candidate, *arguments],
                     creationflags=create_no_window,
                     cwd=updater_cwd,
                 )
@@ -4845,6 +4935,7 @@ finally {
             return False, f"Failed to create updater script: {e}"
 
         try:
+            requires_elevation = SettingsWindow._install_dir_requires_elevation(self, app_dir)
             ok, err = SettingsWindow._launch_hidden_powershell_script(
                 self,
                 script_path,
@@ -4853,7 +4944,8 @@ finally {
                     "-ZipPath", zip_path,
                     "-TargetPid", str(current_pid),
                     "-ExeName", exe_name,
-                ]
+                ],
+                elevated=requires_elevation,
             )
             if ok:
                 return True, None

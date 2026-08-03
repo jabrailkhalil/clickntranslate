@@ -105,8 +105,14 @@ class TestUpdateRepair(unittest.TestCase):
 
     def test_release_repair_uses_pinned_https_package(self):
         source = (ROOT / "tools" / "build_update_repair.ps1").read_text(encoding="utf-8")
+        repair_source = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
+        repair_manifest = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
         self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.4.7/", source)
         self.assertIn("37C0BDF4B88BBB3DF0E12C838BDA517E5F3FF4C1032A7AA88642DC6C5EFEEF0E", source)
+        self.assertIn("ClicknTranslateUpdateRepair.manifest", source)
+        self.assertIn('level="requireAdministrator"', repair_manifest)
+        self.assertIn('Verb = "runas"', repair_source)
+        self.assertIn("CanWriteInstallRoot(installRoot)", repair_source)
 
     def test_checksum_failure_leaves_installed_version_untouched(self):
         powershell = shutil.which("powershell.exe") or shutil.which("powershell")

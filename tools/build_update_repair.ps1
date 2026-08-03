@@ -73,7 +73,7 @@ internal static class RepairBuildInfo
         /reference:System.IO.Compression.FileSystem.dll `
         /reference:System.Windows.Forms.dll `
         "/win32icon:$root\icons\icon.ico" `
-        "/win32manifest:$root\installer\windows\ClicknTranslate.exe.manifest" `
+        "/win32manifest:$root\launcher\ClicknTranslateUpdateRepair.manifest" `
         "/out:$OutputPath" `
         "$root\launcher\ClicknTranslateUpdateRepair.cs" `
         $versionSource `

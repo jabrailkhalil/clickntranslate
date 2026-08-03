@@ -227,6 +227,62 @@ class TestUpdateAssetSelection(unittest.TestCase):
             get_mock.call_args.kwargs["headers"]["User-Agent"],
             "ClicknTranslate/1.4.6",
         )
+        self.assertNotIn("Authorization", get_mock.call_args.kwargs["headers"])
+
+    def test_private_update_feed_uses_environment_url_and_bearer_token(self):
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"tag_name": "v1.4.8", "assets": []}
+        posted = []
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_cancel_requested=threading.Event(),
+            _post_update_check_result=posted.append,
+        )
+        dummy._pick_update_asset = types.MethodType(sw.SettingsWindow._pick_update_asset, dummy)
+        dummy._pick_checksum_url = types.MethodType(sw.SettingsWindow._pick_checksum_url, dummy)
+        private_api = "https://api.github.com/repos/example/private-update-lab/releases/latest"
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                sw.UPDATE_API_ENV: private_api,
+                sw.UPDATE_TOKEN_ENV: "test-token-not-committed",
+            },
+        ), mock.patch("settings_window.requests.get", return_value=response) as get_mock:
+            sw.SettingsWindow._check_latest_release_worker(dummy)
+
+        self.assertEqual(get_mock.call_args.args[0], private_api)
+        self.assertEqual(
+            get_mock.call_args.kwargs["headers"]["Authorization"],
+            "Bearer test-token-not-committed",
+        )
+        self.assertEqual(posted[0]["status"], "no_asset")
+
+    def test_update_token_is_not_sent_to_non_github_downloads(self):
+        with mock.patch.dict(os.environ, {sw.UPDATE_TOKEN_ENV: "secret-test-token"}):
+            github_headers = sw._update_request_headers(
+                "https://github.com/example/private/releases/download/v1/app.zip"
+            )
+            external_headers = sw._update_request_headers(
+                "https://huggingface.co/example/model.bin"
+            )
+
+        self.assertEqual(github_headers["Authorization"], "Bearer secret-test-token")
+        self.assertNotIn("Authorization", external_headers)
+
+    def test_private_asset_uses_authenticated_api_download_url(self):
+        asset = {
+            "url": "https://api.github.com/repos/example/private/releases/assets/123",
+            "browser_download_url": "https://github.com/example/private/releases/download/v1/app.zip",
+        }
+        with mock.patch.dict(os.environ, {sw.UPDATE_TOKEN_ENV: "secret-test-token"}):
+            selected_url = sw._update_asset_download_url(asset)
+            headers = sw._update_request_headers(selected_url)
+
+        self.assertEqual(selected_url, asset["url"])
+        self.assertEqual(headers["Authorization"], "Bearer secret-test-token")
+        self.assertEqual(headers["Accept"], "application/octet-stream")
 
     def test_pick_update_asset_prefers_windows_clickntranslate_zip(self):
         dummy = types.SimpleNamespace()
@@ -374,6 +430,38 @@ class TestUpdaterCommands(unittest.TestCase):
             ok, err = sw.SettingsWindow._launch_zip_updater(dummy, r"C:\Temp\update.zip")
         self.assertFalse(ok)
         self.assertIn("packaged app", err)
+
+    def test_install_dir_permission_probe_requests_elevation_on_access_denied(self):
+        with tempfile.TemporaryDirectory(prefix="updater_permission_probe_") as app_dir:
+            with mock.patch("settings_window.os.open", side_effect=PermissionError(13, "denied")):
+                requires_elevation = sw.SettingsWindow._install_dir_requires_elevation(
+                    types.SimpleNamespace(), app_dir
+                )
+        self.assertTrue(requires_elevation)
+
+    def test_hidden_powershell_uses_run_as_path_when_elevation_is_required(self):
+        dummy = types.SimpleNamespace()
+        with mock.patch.object(
+            sw.SettingsWindow,
+            "_powershell_launch_candidates",
+            return_value=["powershell.exe"],
+        ), mock.patch.object(
+            sw.SettingsWindow,
+            "_launch_elevated_process",
+            return_value=(True, None),
+        ) as elevated_mock, mock.patch("settings_window.subprocess.Popen") as popen_mock:
+            ok, error = sw.SettingsWindow._launch_hidden_powershell_script(
+                dummy,
+                r"C:\Temp\updater.ps1",
+                ["-AppDir", r"C:\Program Files\ClicknTranslate"],
+                elevated=True,
+            )
+
+        self.assertTrue(ok, error)
+        popen_mock.assert_not_called()
+        elevated_mock.assert_called_once()
+        self.assertIn("-File", elevated_mock.call_args.args[2])
+        self.assertIn(r"C:\Temp\updater.ps1", elevated_mock.call_args.args[2])
 
     @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
     def test_updater_script_applies_payload_and_preserves_data(self):

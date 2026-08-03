@@ -23,6 +23,7 @@ internal static class ClicknTranslateUpdateRepair
     private static int Main(string[] args)
     {
         bool silent = args.Any(value => value.Equals("/silent", StringComparison.OrdinalIgnoreCase));
+        bool elevatedChild = args.Any(value => value.Equals("/elevated", StringComparison.OrdinalIgnoreCase));
         try
         {
             // Never keep the installed application directory locked while its contents are replaced.
@@ -35,6 +36,18 @@ internal static class ClicknTranslateUpdateRepair
                 throw new InvalidOperationException(
                     "Click'n'Translate 1.4.6 or 1.4.7 was not found. Place this repair tool in the application folder and run it again."
                 );
+            }
+
+            if (!CanWriteInstallRoot(installRoot))
+            {
+                if (elevatedChild)
+                {
+                    throw new UnauthorizedAccessException(
+                        "Administrator access is still unavailable for " + installRoot + "."
+                    );
+                }
+                RelaunchElevated(args);
+                return 0;
             }
 
             if (!silent)
@@ -93,6 +106,85 @@ internal static class ClicknTranslateUpdateRepair
                 );
             }
             return 1;
+        }
+    }
+
+    private static bool CanWriteInstallRoot(string installRoot)
+    {
+        string probe = Path.Combine(
+            installRoot,
+            ".clickntranslate-write-probe-" + Process.GetCurrentProcess().Id + "-" + Guid.NewGuid().ToString("N")
+        );
+        try
+        {
+            using (FileStream stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.WriteByte(1);
+                stream.Flush(true);
+            }
+            File.Delete(probe);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TryDeleteFile(probe);
+            return false;
+        }
+        catch (IOException error)
+        {
+            TryDeleteFile(probe);
+            if ((uint)error.HResult == 0x80070005)
+            {
+                return false;
+            }
+            throw;
+        }
+    }
+
+    private static void RelaunchElevated(string[] originalArgs)
+    {
+        string executable = Assembly.GetExecutingAssembly().Location;
+        string arguments = string.Join(
+            " ",
+            originalArgs
+                .Where(value => !value.Equals("/elevated", StringComparison.OrdinalIgnoreCase))
+                .Select(QuoteArgument)
+                .Concat(new[] { "/elevated" })
+        );
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = executable,
+            Arguments = arguments,
+            WorkingDirectory = Path.GetTempPath(),
+            UseShellExecute = true,
+            Verb = "runas",
+        });
+    }
+
+    private static string QuoteArgument(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "\"\"";
+        }
+        if (value.IndexOfAny(new[] { ' ', '\t', '\"' }) < 0)
+        {
+            return value;
+        }
+        return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
         }
     }
 
