@@ -1,12 +1,20 @@
 param(
     [string]$Version = "1.4.7.0",
-    [string]$OutputPath = ""
+    [string]$OutputPath = "",
+    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.4.7/ClicknTranslate-v1.4.7-win64.zip",
+    [string]$PackageSha256 = "37C0BDF4B88BBB3DF0E12C838BDA517E5F3FF4C1032A7AA88642DC6C5EFEEF0E"
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
     throw "Version must contain four numeric parts, for example 1.4.7.0."
+}
+if (-not [Uri]::IsWellFormedUriString($PackageUrl, [UriKind]::Absolute)) {
+    throw "PackageUrl must be an absolute URL."
+}
+if ($PackageSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
+    throw "PackageSha256 must be a 64-character SHA-256 digest."
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -27,15 +35,10 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 
 $buildDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("ClicknTranslateUpdateRepair_" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $buildDirectory -Force | Out-Null
-$launcherPath = Join-Path $buildDirectory "ClicknTranslate.exe"
 $versionSource = Join-Path $buildDirectory "Version.cs"
+$buildInfoSource = Join-Path $buildDirectory "RepairBuildInfo.cs"
 
 try {
-    & (Join-Path $PSScriptRoot "build_launcher.ps1") -Version $Version -OutputPath $launcherPath
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $launcherPath)) {
-        throw "The repaired launcher payload could not be built."
-    }
-
     $versionCode = @"
 using System.Reflection;
 [assembly: AssemblyTitle("Click'n'Translate Update Repair")]
@@ -46,6 +49,18 @@ using System.Reflection;
 "@
     [System.IO.File]::WriteAllText($versionSource, $versionCode, [System.Text.UTF8Encoding]::new($false))
 
+    $displayVersion = ($Version -split '\.')[0..2] -join '.'
+    $escapedPackageUrl = $PackageUrl.Replace('"', '""')
+    $buildInfoCode = @"
+internal static class RepairBuildInfo
+{
+    internal const string DisplayVersion = "$displayVersion";
+    internal const string PackageUrl = @"$escapedPackageUrl";
+    internal const string PackageSha256 = "$($PackageSha256.ToUpperInvariant())";
+}
+"@
+    [System.IO.File]::WriteAllText($buildInfoSource, $buildInfoCode, [System.Text.UTF8Encoding]::new($false))
+
     & $compiler `
         /nologo `
         /target:winexe `
@@ -53,13 +68,16 @@ using System.Reflection;
         /optimize+ `
         /reference:System.dll `
         /reference:System.Core.dll `
+        /reference:System.Drawing.dll `
+        /reference:System.IO.Compression.dll `
+        /reference:System.IO.Compression.FileSystem.dll `
         /reference:System.Windows.Forms.dll `
         "/win32icon:$root\icons\icon.ico" `
         "/win32manifest:$root\installer\windows\ClicknTranslate.exe.manifest" `
-        "/resource:$launcherPath,FixedLauncher" `
         "/out:$OutputPath" `
         "$root\launcher\ClicknTranslateUpdateRepair.cs" `
-        $versionSource
+        $versionSource `
+        $buildInfoSource
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) {
         throw "Update repair compilation failed with exit code $LASTEXITCODE."

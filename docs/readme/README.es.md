@@ -69,7 +69,7 @@ Descarga el [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/rele
 
 ### Actualización desde 1.4.5 o 1.4.6
 
-El launcher original de 1.4.5/1.4.6 no puede sustituir la aplicación en ejecución. Ejecuta una vez **Update Repair** desde la última versión y después usa Update en la aplicación para instalar la versión 1.4.7 reeditada. Se conservan los ajustes, historiales y paquetes de idioma. Las actualizaciones automáticas están corregidas en la versión reeditada.
+El launcher original de 1.4.5/1.4.6 no puede sustituir la aplicación en ejecución. Ejecuta una vez **Update Repair** desde la última versión: descargará, verificará, instalará e iniciará automáticamente la versión 1.4.7 reeditada. Se conservan los ajustes, historiales y paquetes de idioma. Las actualizaciones automáticas están corregidas en la versión reeditada.
 
 ## La mejor opción para el uso diario
 

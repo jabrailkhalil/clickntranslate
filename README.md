@@ -69,7 +69,7 @@ Download the [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/rel
 
 ### Updating from 1.4.5 or 1.4.6
 
-The original 1.4.5/1.4.6 updater launcher cannot replace the running application. Run the small **Update Repair** from the latest release once, then use the in-app Update button to install the reissued 1.4.7. Settings, histories and language packages are preserved. Automatic updates are fixed in the reissued 1.4.7.
+The original 1.4.5/1.4.6 updater launcher cannot replace the running application. Run the small **Update Repair** from the latest release once; it downloads, verifies, installs and starts the reissued 1.4.7 automatically. Settings, histories and language packages are preserved. Automatic updates are fixed in the reissued 1.4.7.
 
 ## The best choice for everyday use
 

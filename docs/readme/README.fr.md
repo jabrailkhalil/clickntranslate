@@ -69,7 +69,7 @@ Téléchargez le [ZIP portable](https://github.com/jabrailkhalil/clickntranslate
 
 ### Mise à jour depuis la version 1.4.5 ou 1.4.6
 
-Le launcher d'origine de la 1.4.5/1.4.6 ne peut pas remplacer l'application en cours d'exécution. Exécutez une fois **Update Repair** depuis la dernière version, puis utilisez Update dans l'application pour installer la version 1.4.7 rééditée. Les réglages, historiques et packs de langue sont conservés. Les mises à jour automatiques sont corrigées dans cette réédition.
+Le launcher d'origine de la 1.4.5/1.4.6 ne peut pas remplacer l'application en cours d'exécution. Exécutez une fois **Update Repair** depuis la dernière version : il télécharge, vérifie, installe et démarre automatiquement la version 1.4.7 rééditée. Les réglages, historiques et packs de langue sont conservés. Les mises à jour automatiques sont corrigées dans cette réédition.
 
 ## Le meilleur choix au quotidien
 
