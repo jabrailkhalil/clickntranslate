@@ -11,4 +11,6 @@ def test_installer_uses_the_verified_launcher_release_layout():
     assert 'ClicknTranslate-v" + MyAppVersion + "-win64-stage\\ClicknTranslate' in source
     assert "ClicknTranslate-Setup-v{#MyAppVersion}-win64" in source
     assert 'Excludes: "data\\*"' in source
+    assert 'Type: filesandordirs; Name: "{app}\\app"' in source
+    assert 'Type: filesandordirs; Name: "{app}\\_internal"' in source
     assert "PrivilegesRequired=lowest" in source

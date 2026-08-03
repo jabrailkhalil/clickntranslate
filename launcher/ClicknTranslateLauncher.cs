@@ -5,9 +5,12 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 internal static class ClicknTranslateLauncher
 {
+    private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}_is1";
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -18,6 +21,7 @@ internal static class ClicknTranslateLauncher
         try
         {
             RestoreInstallerMetadata(root);
+            SyncInstalledVersion(root);
 
             if (!File.Exists(innerExecutable))
             {
@@ -44,6 +48,47 @@ internal static class ClicknTranslateLauncher
                 MessageBoxIcon.Error
             );
             return 1;
+        }
+    }
+
+    private static void SyncInstalledVersion(string root)
+    {
+        try
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(UninstallKey, true))
+            {
+                if (key == null)
+                {
+                    return;
+                }
+
+                string registered = key.GetValue("InstallLocation") as string;
+                if (string.IsNullOrWhiteSpace(registered))
+                {
+                    return;
+                }
+
+                string registeredRoot = Path.GetFullPath(registered).TrimEnd('\\', '/');
+                string launcherRoot = Path.GetFullPath(root).TrimEnd('\\', '/');
+                if (!registeredRoot.Equals(launcherRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                Version assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
+                string version = string.Format(
+                    "{0}.{1}.{2}",
+                    assemblyVersion.Major,
+                    assemblyVersion.Minor,
+                    assemblyVersion.Build
+                );
+                key.SetValue("DisplayVersion", version, RegistryValueKind.String);
+                key.SetValue("DisplayName", "Click'n'Translate " + version, RegistryValueKind.String);
+            }
+        }
+        catch (Exception error)
+        {
+            WriteFailureLog(new InvalidOperationException("Could not synchronize the installed version.", error));
         }
     }
 
