@@ -104,7 +104,52 @@ HYMT_ENGINE_DISPLAY = "Hy-MT"
 RAPIDOCR_ENGINE_DISPLAY = "RapidOCR"
 RAPIDOCR_PIP_PACKAGES = ("rapidocr-onnxruntime==1.4.4",)
 EASYOCR_ENGINE_DISPLAY = "EasyOCR"
-EASYOCR_PIP_PACKAGES = ("easyocr",)
+EASYOCR_PYTHON_VERSION = "3.12.10"
+EASYOCR_PYTHON_ARCHIVE = f"python-{EASYOCR_PYTHON_VERSION}-embed-amd64.zip"
+EASYOCR_PYTHON_URL = (
+    f"https://www.python.org/ftp/python/{EASYOCR_PYTHON_VERSION}/"
+    f"{EASYOCR_PYTHON_ARCHIVE}"
+)
+EASYOCR_PYTHON_SHA256 = "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+EASYOCR_PIP_WHEEL = "pip-25.2-py3-none-any.whl"
+EASYOCR_PIP_URL = (
+    "https://files.pythonhosted.org/packages/b7/3f/"
+    "945ef7ab14dc4f9d7f40288d2df998d1837ee0888ec3659c813487572faa/"
+    f"{EASYOCR_PIP_WHEEL}"
+)
+EASYOCR_PIP_SHA256 = "6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717"
+EASYOCR_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cpu"
+# Keep this dependency set reproducible.  EasyOCR's metadata leaves most
+# dependencies unpinned, which previously made an installation performed
+# months after release depend on whatever PyPI happened to serve that day.
+EASYOCR_PIP_PACKAGES = (
+    "easyocr==1.7.2",
+    "torch==2.12.1+cpu",
+    "torchvision==0.27.1+cpu",
+    "opencv-python-headless==5.0.0.93",
+    "scipy==1.18.0",
+    "numpy==2.5.1",
+    "Pillow==12.3.0",
+    "scikit-image==0.26.0",
+    "python-bidi==0.6.11",
+    "PyYAML==6.0.3",
+    "Shapely==2.1.2",
+    "pyclipper==1.4.0",
+    "ninja==1.13.0",
+    "filelock==3.32.2",
+    "typing-extensions==4.16.0",
+    "setuptools==81.0.0",
+    "sympy==1.14.0",
+    "networkx==3.6.1",
+    "jinja2==3.1.6",
+    "fsspec==2026.7.0",
+    "mpmath==1.3.0",
+    "MarkupSafe==3.0.3",
+    "imageio==2.37.4",
+    "tifffile==2026.7.31",
+    "packaging==26.2",
+    "lazy-loader==0.5",
+)
 
 TRANSLATOR_ENGINE_OPTIONS = (
     ("google", "Google", "online"),
@@ -1151,8 +1196,8 @@ ENGINE_TEXT = {
     "en": {
         "not_found": "{engine} not found", "install": "Install", "cancel": "Cancel", "remove": "Remove",
         "tesseract_prompt": "Tesseract-OCR was not found. Download and install it locally?",
-        "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and a Python interpreter matching the app build. This is a large package: it pulls PyTorch/torchvision, and language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and a Python interpreter matching the app build. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
+        "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and about 1 GB of free disk space. The app downloads its own private installer runtime; you do not need to install Python. Language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet. The app downloads its own private installer runtime; you do not need to install Python. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
         "hymt_prompt": "The local Hy-MT model is not installed. Download and install the offline translation package?\n\nAbout 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime.",
         "preparing": "Preparing {engine} install...", "downloading_packages": "Downloading and installing {engine} packages...",
         "downloading_engine": "Downloading {engine}...", "extracting_engine": "Extracting {engine}...",
@@ -1169,8 +1214,8 @@ ENGINE_TEXT = {
     "ru": {
         "not_found": "{engine} не найден", "install": "Установить", "cancel": "Отмена", "remove": "Удалить",
         "tesseract_prompt": "Tesseract-OCR не найден. Скачать и установить локально?",
-        "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится Python той же версии, что у сборки, и интернет. Пакет большой: он устанавливает PyTorch/torchvision, а языковые модели загружаются при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится Python той же версии, что у сборки, и интернет. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
+        "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет и около 1 ГБ свободного места. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Языковые модели загрузятся при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
         "hymt_prompt": "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\nБудет скачано около 1,2 ГБ: модель Hy-MT и локальный runtime llama.cpp.",
         "preparing": "Подготовка установки {engine}...", "downloading_packages": "Загрузка и установка пакетов {engine}...",
         "downloading_engine": "Загрузка {engine}...", "extracting_engine": "Распаковка {engine}...",
@@ -1187,8 +1232,8 @@ ENGINE_TEXT = {
     "es": {
         "not_found": "No se encontró {engine}", "install": "Instalar", "cancel": "Cancelar", "remove": "Eliminar",
         "tesseract_prompt": "No se encontró Tesseract-OCR. ¿Descargarlo e instalarlo localmente?",
-        "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y una versión de Python compatible con la aplicación. El paquete es grande: incluye PyTorch/torchvision y los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y una versión de Python compatible con la aplicación. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
+        "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y aproximadamente 1 GB de espacio libre. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
         "hymt_prompt": "El modelo local Hy-MT no está instalado. ¿Descargar e instalar el paquete de traducción sin conexión?\n\nSe descargarán aproximadamente 1,2 GB: el modelo Hy-MT y el runtime local de llama.cpp.",
         "preparing": "Preparando la instalación de {engine}...", "downloading_packages": "Descargando e instalando paquetes de {engine}...",
         "downloading_engine": "Descargando {engine}...", "extracting_engine": "Extrayendo {engine}...",
@@ -1205,8 +1250,8 @@ ENGINE_TEXT = {
     "de": {
         "not_found": "{engine} nicht gefunden", "install": "Installieren", "cancel": "Abbrechen", "remove": "Entfernen",
         "tesseract_prompt": "Tesseract-OCR wurde nicht gefunden. Lokal herunterladen und installieren?",
-        "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und eine zur App passende Python-Version benötigt. Das Paket ist groß: Es installiert PyTorch/torchvision; Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
-        "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und eine zur App passende Python-Version benötigt. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
+        "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und etwa 1 GB freier Speicherplatz benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
+        "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür wird Internet benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
         "hymt_prompt": "Das lokale Hy-MT-Modell ist nicht installiert. Das Offline-Übersetzungspaket herunterladen und installieren?\n\nEtwa 1,2 GB werden geladen: das Hy-MT-Modell und die lokale llama.cpp-Laufzeit.",
         "preparing": "Installation von {engine} wird vorbereitet...", "downloading_packages": "Pakete für {engine} werden heruntergeladen und installiert...",
         "downloading_engine": "{engine} wird heruntergeladen...", "extracting_engine": "{engine} wird entpackt...",
@@ -1223,8 +1268,8 @@ ENGINE_TEXT = {
     "fr": {
         "not_found": "{engine} introuvable", "install": "Installer", "cancel": "Annuler", "remove": "Supprimer",
         "tesseract_prompt": "Tesseract-OCR est introuvable. Le télécharger et l’installer localement ?",
-        "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et une version de Python compatible avec l’application sont nécessaires. Le paquet est volumineux : il installe PyTorch/torchvision et les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et une version de Python compatible avec l’application sont nécessaires. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
+        "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et environ 1 Go d’espace libre sont nécessaires. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet est nécessaire. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
         "hymt_prompt": "Le modèle Hy-MT local n’est pas installé. Télécharger et installer le paquet de traduction hors ligne ?\n\nEnviron 1,2 Go seront téléchargés : le modèle Hy-MT et le runtime local llama.cpp.",
         "preparing": "Préparation de l’installation de {engine}...", "downloading_packages": "Téléchargement et installation des paquets de {engine}...",
         "downloading_engine": "Téléchargement de {engine}...", "extracting_engine": "Extraction de {engine}...",
@@ -1241,8 +1286,8 @@ ENGINE_TEXT = {
     "zh": {
         "not_found": "未找到 {engine}", "install": "安装", "cancel": "取消", "remove": "删除",
         "tesseract_prompt": "未找到 Tesseract-OCR。是否下载并在本地安装？",
-        "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并安装与应用版本匹配的 Python。该软件包较大，会安装 PyTorch/torchvision；语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
-        "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并安装与应用版本匹配的 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
+        "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并预留约 1 GB 可用空间。应用会自行下载独立的安装环境，无需另外安装 Python。语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
+        "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网。应用会自行下载独立的安装环境，无需另外安装 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
         "hymt_prompt": "本地 Hy-MT 模型尚未安装。是否下载并安装离线翻译包？\n\n将下载约 1.2 GB：Hy-MT 模型和本地 llama.cpp 运行时。",
         "preparing": "正在准备安装 {engine}...", "downloading_packages": "正在下载并安装 {engine} 软件包...",
         "downloading_engine": "正在下载 {engine}...", "extracting_engine": "正在解压 {engine}...",
@@ -5996,6 +6041,103 @@ finally {
             f"{engine_name} packages into {package_dir or self._local_rapidocr_dir()}."
         )
 
+    def _portable_pip_bootstrap_plan(self, is_x64=True):
+        if not is_x64:
+            raise RuntimeError("Automatic OCR engine installation supports Windows x64 only.")
+        return {
+            "python": {
+                "name": EASYOCR_PYTHON_ARCHIVE,
+                "url": EASYOCR_PYTHON_URL,
+                "sha256": EASYOCR_PYTHON_SHA256,
+            },
+            "pip": {
+                "name": EASYOCR_PIP_WHEEL,
+                "url": EASYOCR_PIP_URL,
+                "sha256": EASYOCR_PIP_SHA256,
+            },
+        }
+
+    def _prepare_portable_pip_command(
+        self,
+        temp_dir,
+        engine_name,
+        cancel_callback=None,
+        progress_callback=None,
+    ):
+        """Download a private Python/pip bootstrap without modifying Windows."""
+        is_x64 = platform.machine().lower() in {"amd64", "x86_64"} and sys.maxsize > 2**32
+        plan = self._portable_pip_bootstrap_plan(is_x64=is_x64)
+        bootstrap_dir = os.path.join(temp_dir, "python-bootstrap")
+        runtime_dir = os.path.join(bootstrap_dir, "runtime")
+        os.makedirs(runtime_dir, exist_ok=True)
+
+        def download(item, base_percent, span):
+            destination = os.path.join(bootstrap_dir, item["name"])
+
+            def report(downloaded, total):
+                if progress_callback is None:
+                    return
+                if total > 0:
+                    percent = base_percent + int((downloaded * span) / total)
+                    progress_callback(percent, True)
+                else:
+                    progress_callback(base_percent, False)
+
+            self._download_file(
+                item["url"],
+                destination,
+                timeout=180,
+                progress_callback=report,
+                cancel_callback=cancel_callback,
+            )
+            self._verify_file_sha256(destination, item["sha256"], item["name"])
+            return destination
+
+        python_archive = download(plan["python"], 1, 8)
+        if cancel_callback and cancel_callback():
+            raise UpdateCancelledError(f"{engine_name} installation canceled by user.")
+        if not zipfile.is_zipfile(python_archive):
+            raise RuntimeError("Downloaded portable Python package is not a zip archive.")
+        with zipfile.ZipFile(python_archive, "r") as archive:
+            archive.extractall(runtime_dir)
+        if cancel_callback and cancel_callback():
+            raise UpdateCancelledError(f"{engine_name} installation canceled by user.")
+
+        python_exe = os.path.join(runtime_dir, "python.exe")
+        if not os.path.isfile(python_exe):
+            raise RuntimeError("Portable Python package does not contain python.exe.")
+        required = f"{sys.version_info.major}.{sys.version_info.minor}"
+        installed = self._python_command_version([python_exe])
+        if installed != required:
+            raise RuntimeError(
+                f"Portable Python {installed or 'unknown'} is incompatible with the app runtime {required}."
+            )
+
+        pip_wheel = download(plan["pip"], 9, 2)
+        if cancel_callback and cancel_callback():
+            raise UpdateCancelledError(f"{engine_name} installation canceled by user.")
+        pip_entry = os.path.join(pip_wheel, "pip")
+        return [python_exe, pip_entry]
+
+    def _prepare_engine_pip_command(
+        self,
+        temp_dir,
+        engine_name,
+        package_dir,
+        cancel_callback=None,
+        progress_callback=None,
+    ):
+        try:
+            python_command = self._find_rapidocr_install_python_command(engine_name, package_dir)
+            return [*python_command, "-m", "pip"]
+        except RuntimeError:
+            return self._prepare_portable_pip_command(
+                temp_dir,
+                engine_name,
+                cancel_callback=cancel_callback,
+                progress_callback=progress_callback,
+            )
+
     def _restore_rapidocr_backup(self, final_dir, backup_dir):
         if not backup_dir or not os.path.isdir(backup_dir):
             return
@@ -6037,7 +6179,6 @@ finally {
         final_dir = self._local_rapidocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
-            python_command = self._find_rapidocr_install_python_command()
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_rapidocr_")
             self._rapidocr_temp_dir = temp_dir
             package_root = os.path.join(temp_dir, "site-packages")
@@ -6046,12 +6187,24 @@ finally {
             self._rapidocr_install_phase = "installing"
             install_text = engine_text(lang, "downloading_packages", engine="RapidOCR")
             self._emit_rapidocr_progress(install_text, 0, False)
+            pip_command = self._prepare_engine_pip_command(
+                temp_dir,
+                RAPIDOCR_ENGINE_DISPLAY,
+                final_dir,
+                cancel_callback=lambda: self._rapidocr_cancel_requested.is_set(),
+                progress_callback=lambda percent, determinate: self._emit_rapidocr_progress(
+                    engine_text(lang, "preparing", engine="RapidOCR"),
+                    percent,
+                    determinate,
+                ),
+            )
             cmd = [
-                *python_command,
-                "-m",
-                "pip",
+                *pip_command,
                 "install",
                 "--upgrade",
+                "--disable-pip-version-check",
+                "--no-cache-dir",
+                "--only-binary=:all:",
                 "--no-warn-script-location",
                 "--target",
                 package_root,
@@ -6300,10 +6453,6 @@ finally {
         final_dir = self._local_easyocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
-            python_command = self._find_rapidocr_install_python_command(
-                EASYOCR_ENGINE_DISPLAY,
-                final_dir,
-            )
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_easyocr_")
             self._easyocr_temp_dir = temp_dir
             package_root = os.path.join(temp_dir, "site-packages")
@@ -6312,15 +6461,29 @@ finally {
             self._easyocr_install_phase = "installing"
             install_text = engine_text(lang, "downloading_packages", engine="EasyOCR")
             self._emit_easyocr_progress(install_text, 0, False)
+            pip_command = self._prepare_engine_pip_command(
+                temp_dir,
+                EASYOCR_ENGINE_DISPLAY,
+                final_dir,
+                cancel_callback=lambda: self._easyocr_cancel_requested.is_set(),
+                progress_callback=lambda percent, determinate: self._emit_easyocr_progress(
+                    engine_text(lang, "preparing", engine="EasyOCR"),
+                    percent,
+                    determinate,
+                ),
+            )
             cmd = [
-                *python_command,
-                "-m",
-                "pip",
+                *pip_command,
                 "install",
                 "--upgrade",
+                "--disable-pip-version-check",
+                "--no-cache-dir",
+                "--only-binary=:all:",
                 "--no-warn-script-location",
                 "--target",
                 package_root,
+                "--extra-index-url",
+                EASYOCR_EXTRA_INDEX_URL,
                 *EASYOCR_PIP_PACKAGES,
             ]
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)

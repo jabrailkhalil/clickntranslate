@@ -232,7 +232,7 @@ class TestUpdateAssetSelection(unittest.TestCase):
     def test_private_update_feed_uses_environment_url_and_bearer_token(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"tag_name": "v1.5.1", "assets": []}
+        response.json.return_value = {"tag_name": "v1.5.2", "assets": []}
         posted = []
         dummy = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="en"),

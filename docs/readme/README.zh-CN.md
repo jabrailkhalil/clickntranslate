@@ -4,7 +4,7 @@
 
 ### Windows 上最好的屏幕翻译和 OCR 应用。
 
-[**下载 Windows 版**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.0-win64.exe) · [便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.0-win64.zip) · [最新版本](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[**下载 Windows 版**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.1-win64.exe) · [便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.1-win64.zip) · [最新版本](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 ![最新版本](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
@@ -56,7 +56,7 @@ Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英�
 
 ## 快速开始
 
-1. 下载并运行 **[Windows 安装程序](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.0-win64.exe)**。
+1. 下载并运行 **[Windows 安装程序](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.1-win64.exe)**。
 2. 启动 Click'n'Translate，选择界面语言、OCR 语言和翻译语言。
 3. 按下 `Ctrl + Alt + T`，选择一个区域，即可获得翻译。
 4. 如需离线翻译或其他 OCR 引擎，请打开 **设置 → 语言包**，只安装需要的组件。
@@ -65,11 +65,11 @@ Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英�
 
 ### 便携版
 
-下载[便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.0-win64.zip)，将其解压到固定文件夹，然后运行 `ClicknTranslate.exe`。请在启用开机启动或创建快捷方式之前确定最终存放位置。
+下载[便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.1-win64.zip)，将其解压到固定文件夹，然后运行 `ClicknTranslate.exe`。请在启用开机启动或创建快捷方式之前确定最终存放位置。
 
 ### 从旧版本升级
 
-旧版本的更新程序无法可靠地安装 1.5.0。请关闭旧应用，通过上方链接下载 **Windows 安装程序**，并手动安装一次 1.5.0。从 1.5.0 开始，后续的内置自动更新将正常工作。
+1.5.0 之前版本的更新程序无法可靠地安装当前版本。如果从 1.4.x 升级，请关闭旧应用并手动安装一次 1.5.1。1.5.0 用户可以直接在应用内更新到 1.5.1。
 
 ## 日常使用的最佳选择
 
