@@ -7,6 +7,7 @@ import types
 import unittest
 from unittest import mock
 import zipfile
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -297,7 +298,7 @@ class TestUpdaterCommands(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Microsoft Store", error)
 
-    def _run_updater_script(self, script_path, app_dir, zip_path):
+    def _run_updater_script(self, script_path, app_dir, zip_path, cwd=None):
         powershell = os.path.join(
             os.environ.get("SystemRoot", r"C:\Windows"),
             "System32", "WindowsPowerShell", "v1.0", "powershell.exe",
@@ -318,6 +319,7 @@ class TestUpdaterCommands(unittest.TestCase):
             text=True,
             timeout=60,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            cwd=cwd,
         )
 
     def test_launch_zip_updater_generates_expected_script(self):
@@ -336,6 +338,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertTrue(ok)
             self.assertIsNone(err)
             popen_mock.assert_called_once()
+            self.assertEqual(popen_mock.call_args.kwargs["cwd"], tempfile.gettempdir())
 
             with open(script_path, "r", encoding="utf-8") as f:
                 script_text = f.read()
@@ -354,6 +357,9 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Update payload copy failed: _internal directory is missing", script_text)
             self.assertIn("Update payload copy failed: launcher app directory is incomplete", script_text)
             self.assertIn("Clear-PyInstallerEnv", script_text)
+            self.assertIn("Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())", script_text)
+            self.assertIn("Move-UpdateItemWithRetry", script_text)
+            self.assertIn("^unins\\d*\\.(exe|dat|msg)$", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:
@@ -396,6 +402,61 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "_internal", "new.txt")))
             self.assertFalse(os.path.exists(os.path.join(app_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
+            self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
+    def test_updater_uses_external_cwd_and_preserves_installer_metadata(self):
+        root = tempfile.mkdtemp(prefix="updater_launcher_cwd_e2e_")
+        try:
+            app_dir = os.path.join(root, "install")
+            inner_dir = os.path.join(app_dir, "app")
+            os.makedirs(os.path.join(inner_dir, "_internal"))
+            os.makedirs(os.path.join(app_dir, "data"))
+            system_exe = os.path.join(
+                os.environ.get("SystemRoot", r"C:\Windows"),
+                "System32",
+                "whoami.exe",
+            )
+            old_exe = os.path.join(app_dir, "ClicknTranslate.exe")
+            shutil.copy2(system_exe, old_exe)
+            shutil.copy2(system_exe, os.path.join(inner_dir, "ClicknTranslateApp.exe"))
+            with open(os.path.join(inner_dir, "_internal", "old.txt"), "w", encoding="utf-8") as stream:
+                stream.write("old")
+            with open(os.path.join(app_dir, "data", "marker.txt"), "w", encoding="utf-8") as stream:
+                stream.write("preserve")
+            with open(os.path.join(app_dir, "unins000.dat"), "w", encoding="utf-8") as stream:
+                stream.write("installer metadata")
+            shutil.copy2(system_exe, os.path.join(app_dir, "unins000.exe"))
+
+            zip_path = os.path.join(root, "update.zip")
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.write(system_exe, "ClicknTranslate/ClicknTranslate.exe")
+                archive.write(system_exe, "ClicknTranslate/app/ClicknTranslateApp.exe")
+                archive.writestr("ClicknTranslate/app/_internal/new.txt", "new")
+
+            script_path = self._generate_updater_script(old_exe, zip_path)
+            result = self._run_updater_script(
+                script_path,
+                app_dir,
+                zip_path,
+                # This is the critical regression guard. PowerShell must be
+                # created outside ``app``; changing directory from inside an
+                # already-created PowerShell process does not release every
+                # Windows directory handle reliably.
+                cwd=tempfile.gettempdir(),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
+            self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "unins000.exe")))
+            self.assertEqual(
+                Path(os.path.join(app_dir, "unins000.dat")).read_text(encoding="utf-8"),
+                "installer metadata",
+            )
             self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
         finally:
             shutil.rmtree(root, ignore_errors=True)

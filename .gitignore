@@ -78,4 +78,8 @@ data/**/*.log
 *.sh
 
 !build_release.bat
+!installer/windows/CreateShortcut.bat
 !tools/build_msix.ps1
+!tools/build_launcher.ps1
+!tools/build_update_repair.ps1
+!tools/stage_release.ps1

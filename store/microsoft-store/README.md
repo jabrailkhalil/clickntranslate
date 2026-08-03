@@ -25,12 +25,12 @@ Build the Store package with the exact Partner Center identity:
   -Version "1.4.7.0"
 ```
 
-Upload `releases/ClicknTranslate-1.4.7.0-store-x64.msixupload`. The package contains version `1.4.7.0` for `x64`, targets Windows Desktop 10.0.17763.0 or later, and is 205,331,073 bytes. Do not upload the test package: its identity is intentionally different from the Store identity.
+Upload `releases/ClicknTranslate-1.4.7.0-store-x64.msixupload`. The package contains version `1.4.7.0` for `x64`, targets Windows Desktop 10.0.17763.0 or later, and is 205,332,530 bytes. Do not upload the test package: its identity is intentionally different from the Store identity.
 
-The exact MSIX payload is `releases/ClicknTranslate-1.4.7.0-store-x64.msix` (207,970,814 bytes) with SHA-256:
+The exact MSIX payload is `releases/ClicknTranslate-1.4.7.0-store-x64.msix` (207,971,782 bytes) with SHA-256:
 
 ```text
-87047F31C539E2D894AD8DEA2CED3B552124652E8AC6591D8060227A6F7DF293
+B85958C7496AAE7A3223DF0AA783D00DE9E26E9543CD9AAA00854E0C53636E17
 ```
 
 ## Prepared material
@@ -63,9 +63,9 @@ The exact MSIX payload is `releases/ClicknTranslate-1.4.7.0-store-x64.msix` (207
 
 ## Verification completed
 
-- Ten consecutive runs of 201 automated tests plus 8 packaging subtests pass.
+- Ten consecutive runs of 205 automated tests plus 8 packaging subtests pass.
 - MakeAppx semantic package validation passes.
-- The Windows App Certification Kit 10.0.26100.7175 reports **OVERALL_RESULT=PASS** for the exact Store-identity package. The report is written to `build/msix/wack-report-store-1.4.7-174476bb9da046109cb37447b3d5ee4b.xml`.
+- The Windows App Certification Kit 10.0.26100.7175 reports **OVERALL_RESULT=PASS** for the exact reissued Store-identity package. The report is written to `build/msix/wack-report-store-reissue-1.4.7.xml`.
 - The built main executable contains the Per-Monitor V2 DPI and `asInvoker` manifest.
 - The packaged Argos worker starts successfully in forced Store mode and creates its package data under LocalState.
 - The `.msixupload` contains the exact MSIX payload verified by SHA-256.

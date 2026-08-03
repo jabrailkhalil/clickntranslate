@@ -67,9 +67,9 @@ No necesitas instalar Python ni crear una cuenta. Compatible con Windows 10 y Wi
 
 Descarga el [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.4.7-win64.zip), extráelo en una carpeta permanente y ejecuta `ClicknTranslate.exe`. Coloca la carpeta en su ubicación definitiva antes de activar el inicio automático o crear accesos directos.
 
-### Actualización desde 1.4.5
+### Actualización desde 1.4.5 o 1.4.6
 
-La versión 1.4.5 tiene un actualizador defectuoso y necesita una actualización manual. Cierra y desinstala primero la versión anterior y después instala 1.4.7. Si utilizabas la versión portable y quieres conservar los ajustes o el historial, guarda una copia de su carpeta `data` antes de eliminarla. Las actualizaciones automáticas están corregidas desde la versión 1.4.6.
+El launcher original de 1.4.5/1.4.6 no puede sustituir la aplicación en ejecución. Ejecuta una vez **Update Repair** desde la última versión y después usa Update en la aplicación para instalar la versión 1.4.7 reeditada. Se conservan los ajustes, historiales y paquetes de idioma. Las actualizaciones automáticas están corregidas en la versión reeditada.
 
 ## La mejor opción para el uso diario
 

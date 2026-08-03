@@ -4602,6 +4602,12 @@ class SettingsWindow(QWidget):
 
     def _launch_hidden_powershell_script(self, script_path, extra_args):
         create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        # The public launcher historically started the inner PyInstaller app
+        # with ``app`` as its current directory. A child updater inherited
+        # that directory and then Windows refused to move it, so the update
+        # silently rolled back to the old version. Always start PowerShell
+        # from a directory outside the installation tree.
+        updater_cwd = tempfile.gettempdir()
         last_err = None
         for candidate in SettingsWindow._powershell_launch_candidates(self):
             try:
@@ -4614,7 +4620,8 @@ class SettingsWindow(QWidget):
                         "-File", script_path,
                         *extra_args,
                     ],
-                    creationflags=create_no_window
+                    creationflags=create_no_window,
+                    cwd=updater_cwd,
                 )
                 return True, None
             except Exception as e:
@@ -4658,7 +4665,43 @@ function Clear-PyInstallerEnv {
     }
 }
 
+function Test-PreservedInstallItem {
+    param([System.IO.FileSystemInfo]$Item)
+    if ($Item.Name -ieq "data" -or $Item.Name -ieq "ocr" -or $Item.Name -ieq "translators") {
+        return $true
+    }
+    if (-not $Item.PSIsContainer -and $Item.Name -match '^unins\d*\.(exe|dat|msg)$') {
+        return $true
+    }
+    return $false
+}
+
+function Move-UpdateItemWithRetry {
+    param(
+        [string]$LiteralPath,
+        [string]$Destination,
+        [int]$Attempts = 40
+    )
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        try {
+            Move-Item -LiteralPath $LiteralPath -Destination $Destination -Force
+            return
+        }
+        catch {
+            if ($attempt -ge $Attempts) { throw }
+            Write-UpdateLog "Move attempt $attempt failed for ${LiteralPath}: $($_.Exception.Message)"
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
+# Normalize the script location as an additional safeguard. The process is
+# also created with a temp-directory cwd above; that creation-time setting is
+# the part that reliably avoids the Windows directory lock.
+Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())
+
 Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; TargetPid=$TargetPid"
+Write-UpdateLog "Updater working directory: $(Get-Location)"
 
 $extractDir = $null
 $backupDir = $null
@@ -4702,9 +4745,9 @@ try {
     Write-UpdateLog "Program backup directory: $backupDir"
 
     Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
-        if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { return }
+        if (Test-PreservedInstallItem $_) { return }
         Write-UpdateLog "Moving existing program item to backup: $($_.FullName)"
-        Move-Item -LiteralPath $_.FullName -Destination $backupDir -Force
+        Move-UpdateItemWithRetry -LiteralPath $_.FullName -Destination $backupDir
     }
     $backupComplete = $true
 
@@ -4750,7 +4793,7 @@ catch {
         try {
             if ($backupComplete) {
                 Get-ChildItem -LiteralPath $AppDir -Force | ForEach-Object {
-                    if ($_.Name -ieq "data" -or $_.Name -ieq "ocr" -or $_.Name -ieq "translators") { return }
+                    if (Test-PreservedInstallItem $_) { return }
                     Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
