@@ -177,22 +177,22 @@ class TestUpdateProgressDialog(unittest.TestCase):
 
 
 class TestUpdateAssetSelection(unittest.TestCase):
-    def test_release_1_4_6_detects_1_4_7_portable_update(self):
+    def test_release_1_4_7_detects_1_5_0_portable_update(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
         response.json.return_value = {
-            "tag_name": "v1.4.7",
+            "tag_name": "v1.5.0",
             "assets": [
                 {
-                    "name": "ClicknTranslate-Setup-v1.4.7-win64.exe",
+                    "name": "ClicknTranslate-Setup-v1.5.0-win64.exe",
                     "browser_download_url": "https://example.com/setup.exe",
                 },
                 {
-                    "name": "ClicknTranslate-v1.4.7-win64.zip",
+                    "name": "ClicknTranslate-v1.5.0-win64.zip",
                     "browser_download_url": "https://example.com/app.zip",
                 },
                 {
-                    "name": "ClicknTranslate-v1.4.7-win64.zip.sha256",
+                    "name": "ClicknTranslate-v1.5.0-win64.zip.sha256",
                     "browser_download_url": "https://example.com/app.zip.sha256",
                 },
             ],
@@ -206,7 +206,7 @@ class TestUpdateAssetSelection(unittest.TestCase):
         dummy._pick_update_asset = types.MethodType(sw.SettingsWindow._pick_update_asset, dummy)
         dummy._pick_checksum_url = types.MethodType(sw.SettingsWindow._pick_checksum_url, dummy)
 
-        with mock.patch("settings_window.APP_VERSION", "1.4.6"), mock.patch(
+        with mock.patch("settings_window.APP_VERSION", "1.4.7"), mock.patch(
             "settings_window.requests.get", return_value=response
         ) as get_mock:
             sw.SettingsWindow._check_latest_release_worker(dummy)
@@ -216,8 +216,8 @@ class TestUpdateAssetSelection(unittest.TestCase):
             [
                 {
                     "status": "ready",
-                    "latest_version": "1.4.7",
-                    "asset_name": "ClicknTranslate-v1.4.7-win64.zip",
+                    "latest_version": "1.5.0",
+                    "asset_name": "ClicknTranslate-v1.5.0-win64.zip",
                     "asset_url": "https://example.com/app.zip",
                     "checksum_url": "https://example.com/app.zip.sha256",
                 }
@@ -225,14 +225,14 @@ class TestUpdateAssetSelection(unittest.TestCase):
         )
         self.assertEqual(
             get_mock.call_args.kwargs["headers"]["User-Agent"],
-            "ClicknTranslate/1.4.6",
+            "ClicknTranslate/1.4.7",
         )
         self.assertNotIn("Authorization", get_mock.call_args.kwargs["headers"])
 
     def test_private_update_feed_uses_environment_url_and_bearer_token(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"tag_name": "v1.4.8", "assets": []}
+        response.json.return_value = {"tag_name": "v1.5.1", "assets": []}
         posted = []
         dummy = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="en"),
@@ -348,7 +348,7 @@ class TestUpdaterCommands(unittest.TestCase):
         with mock.patch("settings_window.portable_paths.is_windows_packaged", return_value=True):
             ok, error = sw.SettingsWindow._launch_zip_updater(
                 types.SimpleNamespace(),
-                r"C:\Temp\ClicknTranslate-v1.4.7-win64.zip",
+                r"C:\Temp\ClicknTranslate-v1.5.0-win64.zip",
             )
 
         self.assertFalse(ok)

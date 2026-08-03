@@ -3602,15 +3602,22 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         control_row.addWidget(self.target_field_label)
         self.target_combo = QComboBox()
         self.target_combo.addItems(LANGUAGES[self.lang])
+        target_code = str(
+            get_cached_config().get("main_translation_target_language", "ru") or "ru"
+        ).lower()
         target_widget = getattr(self.parent_app, "target_lang", None)
         if target_widget is not None:
             try:
                 target_text = target_widget.currentText()
                 target_index = self.target_combo.findText(target_text)
                 if target_index >= 0:
-                    self.target_combo.setCurrentIndex(target_index)
+                    target_code = language_code_from_name(target_text, self.lang)
             except RuntimeError:
                 pass
+        for target_index in range(self.target_combo.count()):
+            if language_code_from_name(self.target_combo.itemText(target_index), self.lang) == target_code:
+                self.target_combo.setCurrentIndex(target_index)
+                break
         self.target_combo.currentIndexChanged.connect(self._update_metadata)
         self.target_combo.setMinimumWidth(150)
         control_row.addWidget(self.target_combo)

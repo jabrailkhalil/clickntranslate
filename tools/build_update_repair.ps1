@@ -1,14 +1,14 @@
 param(
-    [string]$Version = "1.4.7.0",
+    [string]$Version = "1.5.0.0",
     [string]$OutputPath = "",
-    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.4.7/ClicknTranslate-v1.4.7-win64.zip",
-    [string]$PackageSha256 = "37C0BDF4B88BBB3DF0E12C838BDA517E5F3FF4C1032A7AA88642DC6C5EFEEF0E"
+    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.0/ClicknTranslate-v1.5.0-win64.zip",
+    [string]$PackageSha256 = "F087F7692C508491DED4B660F7BD307BF4AD7BA6F1FC3A69F16FA889F182B248"
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-    throw "Version must contain four numeric parts, for example 1.4.7.0."
+    throw "Version must contain four numeric parts, for example 1.5.0.0."
 }
 if (-not [Uri]::IsWellFormedUriString($PackageUrl, [UriKind]::Absolute)) {
     throw "PackageUrl must be an absolute URL."

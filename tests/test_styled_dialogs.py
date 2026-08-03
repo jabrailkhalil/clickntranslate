@@ -119,6 +119,26 @@ def test_document_window_uses_the_shared_frameless_chrome():
     owner.close()
 
 
+def test_document_window_uses_saved_target_when_opened_from_settings(monkeypatch):
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "РўРµРјРЅР°СЏ"
+    monkeypatch.setattr(
+        main,
+        "get_cached_config",
+        lambda: {"main_translation_target_language": "ru", "translator_engine": "Google"},
+    )
+
+    dialog = main.DocumentTranslationDialog(owner)
+    app.processEvents()
+
+    assert dialog.target_combo.currentText() == "Russian"
+
+    dialog.close()
+    owner.close()
+
+
 def test_faq_uses_custom_chrome_and_exposes_project_links():
     app = _app()
 

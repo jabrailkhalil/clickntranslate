@@ -21,7 +21,7 @@ class TestUpdateRepair(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="update_repair_e2e_") as temporary:
             temporary_path = Path(temporary)
             build_path = temporary_path / "ClicknTranslate-Update-Repair.exe"
-            package_path = temporary_path / "ClicknTranslate-v1.4.7-win64.zip"
+            package_path = temporary_path / "ClicknTranslate-v1.5.0-win64.zip"
             install_root = temporary_path / "ClicknTranslate"
             inner_root = install_root / "app"
             data_root = install_root / "data"
@@ -48,7 +48,7 @@ class TestUpdateRepair(unittest.TestCase):
                     "-File",
                     str(ROOT / "tools" / "build_update_repair.ps1"),
                     "-Version",
-                    "1.4.7.0",
+                    "1.5.0.0",
                     "-OutputPath",
                     str(build_path),
                     "-PackageUrl",
@@ -107,8 +107,9 @@ class TestUpdateRepair(unittest.TestCase):
         source = (ROOT / "tools" / "build_update_repair.ps1").read_text(encoding="utf-8")
         repair_source = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
         repair_manifest = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
-        self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.4.7/", source)
-        self.assertIn("37C0BDF4B88BBB3DF0E12C838BDA517E5F3FF4C1032A7AA88642DC6C5EFEEF0E", source)
+        self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.0/", source)
+        self.assertNotIn("SHA256_PENDING", source)
+        self.assertIn("F087F7692C508491DED4B660F7BD307BF4AD7BA6F1FC3A69F16FA889F182B248", source)
         self.assertIn("ClicknTranslateUpdateRepair.manifest", source)
         self.assertIn('level="requireAdministrator"', repair_manifest)
         self.assertIn('Verb = "runas"', repair_source)
@@ -140,7 +141,7 @@ class TestUpdateRepair(unittest.TestCase):
                     "-File",
                     str(ROOT / "tools" / "build_update_repair.ps1"),
                     "-Version",
-                    "1.4.7.0",
+                    "1.5.0.0",
                     "-OutputPath",
                     str(repair_path),
                     "-PackageUrl",

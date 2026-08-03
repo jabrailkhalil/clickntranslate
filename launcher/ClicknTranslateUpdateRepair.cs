@@ -34,7 +34,7 @@ internal static class ClicknTranslateUpdateRepair
             if (installRoot == null)
             {
                 throw new InvalidOperationException(
-                    "Click'n'Translate 1.4.6 or 1.4.7 was not found. Place this repair tool in the application folder and run it again."
+                    "Click'n'Translate was not found. Place this repair tool in the application folder and run it again."
                 );
             }
 

@@ -1,4 +1,4 @@
-# Microsoft Store release kit — 1.4.7
+# Microsoft Store release kit — 1.5.0
 
 This folder contains the copy, policy notes, and submission checklist for the first Microsoft Store release of Click'n'Translate. The package itself is produced by `tools/build_msix.ps1` and written to the ignored `releases` directory.
 
@@ -22,15 +22,15 @@ Build the Store package with the exact Partner Center identity:
   -IdentityName "Jabrail.ClicknTranslate" `
   -Publisher "CN=563C277C-890B-44F4-AF41-691AE5E82D7B" `
   -PublisherDisplayName "Jabrail" `
-  -Version "1.4.7.0"
+  -Version "1.5.0.0"
 ```
 
-Upload `releases/ClicknTranslate-1.4.7.0-store-x64.msixupload`. The package contains version `1.4.7.0` for `x64`, targets Windows Desktop 10.0.17763.0 or later, and is 205,332,530 bytes. Do not upload the test package: its identity is intentionally different from the Store identity.
+Upload `releases/ClicknTranslate-1.5.0.0-store-x64.msixupload`. The package contains version `1.5.0.0` for `x64`, targets Windows Desktop 10.0.17763.0 or later, and is 205,335,656 bytes. Do not upload the test package: its identity is intentionally different from the Store identity.
 
-The exact MSIX payload is `releases/ClicknTranslate-1.4.7.0-store-x64.msix` (207,971,782 bytes) with SHA-256:
+The exact MSIX payload is `releases/ClicknTranslate-1.5.0.0-store-x64.msix` (207,976,997 bytes) with SHA-256:
 
 ```text
-B85958C7496AAE7A3223DF0AA783D00DE9E26E9543CD9AAA00854E0C53636E17
+232C95D07C738A40AE40173F9E71FA2F6F9A3BB6D4AA05AC6EACE8390F8FD8A3
 ```
 
 ## Prepared material
@@ -63,13 +63,13 @@ B85958C7496AAE7A3223DF0AA783D00DE9E26E9543CD9AAA00854E0C53636E17
 
 ## Verification completed
 
-- Ten consecutive runs of 205 automated tests plus 8 packaging subtests pass.
+- The complete suite reports 215 automated tests plus 8 packaging subtests passing.
 - MakeAppx semantic package validation passes.
-- The Windows App Certification Kit 10.0.26100.7175 reports **OVERALL_RESULT=PASS** for the exact reissued Store-identity package. The report is written to `build/msix/wack-report-store-reissue-1.4.7.xml`.
+- The Windows App Certification Kit 10.0.26100.7175 reports **OVERALL_RESULT=PASS**, zero failures and zero warnings for the exact 1.5.0 Store-identity package. The final report is written to `build/msix/wack-report-store-1.5.0-final.xml`.
 - The built main executable contains the Per-Monitor V2 DPI and `asInvoker` manifest.
 - The packaged Argos worker starts successfully in forced Store mode and creates its package data under LocalState.
 - The `.msixupload` contains the exact MSIX payload verified by SHA-256.
-- Partner Center previously accepted and analyzed the 1.4.6 package. The 1.4.7 package retains the same identity and documented `runFullTrust` capability.
+- Partner Center previously accepted and analyzed the earlier package. The 1.5.0 candidate retains the same identity and documented `runFullTrust` capability, but has not been uploaded or submitted.
 
 Local sideload installation was not completed on the build PC because Developer Mode/sideloading is disabled and Windows requires interactive trust confirmation for a temporary self-signed root. The temporary certificate was removed. Microsoft supplies the final Store signature after certification.
 

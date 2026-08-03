@@ -21,7 +21,7 @@ class TestMsixPackaging(unittest.TestCase):
             text.replace("__IDENTITY_NAME__", "JabrailDigital.ClicknTranslate.Test")
             .replace("__PUBLISHER__", "CN=Jabrail Digital Test")
             .replace("__PUBLISHER_DISPLAY_NAME__", "Jabrail Digital")
-            .replace("__VERSION__", "1.4.7.0")
+            .replace("__VERSION__", "1.5.0.0")
         )
         root = ElementTree.fromstring(rendered)
         ns = {
@@ -31,7 +31,7 @@ class TestMsixPackaging(unittest.TestCase):
         }
 
         identity = root.find("f:Identity", ns)
-        self.assertEqual(identity.attrib["Version"], "1.4.7.0")
+        self.assertEqual(identity.attrib["Version"], "1.5.0.0")
         app = root.find("f:Applications/f:Application", ns)
         self.assertEqual(app.attrib["Executable"], "ClicknTranslate.exe")
         self.assertEqual(app.attrib["EntryPoint"], "Windows.FullTrustApplication")

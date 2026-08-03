@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.4.7",
+    [string]$Version = "1.5.0",
     [switch]$SkipPyInstaller
 )
 
@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "Version must contain three numeric parts, for example 1.4.7."
+    throw "Version must contain three numeric parts, for example 1.5.0."
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))

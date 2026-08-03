@@ -45,7 +45,7 @@ class TestLauncher(unittest.TestCase):
                     "-File",
                     str(ROOT / "tools" / "build_launcher.ps1"),
                     "-Version",
-                    "1.4.7.0",
+                    "1.5.0.0",
                     "-OutputPath",
                     str(launcher_path),
                 ],
