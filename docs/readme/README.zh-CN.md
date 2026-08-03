@@ -67,9 +67,9 @@ Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英�
 
 下载[便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.0-win64.zip)，将其解压到固定文件夹，然后运行 `ClicknTranslate.exe`。请在启用开机启动或创建快捷方式之前确定最终存放位置。
 
-### 从 1.4.5 或 1.4.6 升级
+### 从旧版本升级
 
-原版 1.4.5/1.4.6 launcher 无法替换正在运行的应用。请运行一次最新版中的小型 **Update Repair**；它会自动下载、校验、安装并启动 1.5.0。设置、历史记录和语言包都会保留；此后内置更新可正常工作。
+旧版本的更新程序无法可靠地安装 1.5.0。请关闭旧应用，通过上方链接下载 **Windows 安装程序**，并手动安装一次 1.5.0。从 1.5.0 开始，后续的内置自动更新将正常工作。
 
 ## 日常使用的最佳选择
 
