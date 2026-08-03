@@ -37,6 +37,9 @@ class _ManagerOwner(QWidget):
         self.tesseract_installs = 0
         self.easyocr_installs = 0
         self.rapidocr_installs = 0
+        self.easyocr_status_checks = 0
+        self.rapidocr_status_checks = 0
+        self.last_progress_owner = None
         self._tesseract_install_in_progress = False
         self._easyocr_install_in_progress = False
         self._rapidocr_install_in_progress = False
@@ -45,22 +48,27 @@ class _ManagerOwner(QWidget):
         return self.tesseract_path
 
     def _easyocr_importable_status(self):
+        self.easyocr_status_checks += 1
         return self.easyocr_status
 
     def _rapidocr_importable_status(self):
+        self.rapidocr_status_checks += 1
         return self.rapidocr_status
 
     def _local_easyocr_dir(self):
         return str(ROOT / "ocr" / "easyocr")
 
-    def start_tesseract_install(self):
+    def start_tesseract_install(self, progress_owner=None):
         self.tesseract_installs += 1
+        self.last_progress_owner = progress_owner
 
-    def start_easyocr_install(self):
+    def start_easyocr_install(self, progress_owner=None):
         self.easyocr_installs += 1
+        self.last_progress_owner = progress_owner
 
-    def start_rapidocr_install(self):
+    def start_rapidocr_install(self, progress_owner=None):
         self.rapidocr_installs += 1
+        self.last_progress_owner = progress_owner
 
 
 class LanguagePackageDialogTest(unittest.TestCase):
@@ -95,6 +103,36 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertIn("Chinese + English", packages)
         self.assertTrue(self.dialog.rapidocr_table.isColumnHidden(0))
         self.assertIn("QScrollBar::handle:vertical", self.dialog.styleSheet())
+
+    def test_constructor_does_not_run_native_engine_probes_on_the_ui_thread(self):
+        self.assertEqual(self.owner.easyocr_status_checks, 0)
+        self.assertEqual(self.owner.rapidocr_status_checks, 0)
+        self.assertEqual(self.dialog.easyocr_table.item(0, 3).text(), "Checking…")
+        self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Checking…")
+
+    def test_windows_probe_updates_without_waiting_for_optional_ocr_imports(self):
+        self.dialog._runtime_probe_active = True
+        self.dialog._on_runtime_probe_ready({
+            "windows_tags": ["en-US", "ru"],
+            "windows_capabilities": {
+                "en-us": "Installed",
+                "ru-ru": "Installed",
+                "de-de": "NotPresent",
+            },
+        })
+
+        german_row = next(
+            row for row in range(self.dialog.windows_table.rowCount())
+            if self.dialog.windows_table.item(row, 0).data(Qt.UserRole) == "de"
+        )
+        self.assertTrue(self.dialog.windows_table.item(german_row, 0).flags() & Qt.ItemIsEnabled)
+        self.assertEqual(self.dialog.easyocr_table.item(0, 3).text(), "Checking…")
+        self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Checking…")
+        self.assertTrue(self.dialog._runtime_probe_active)
+
+        self.dialog._on_runtime_probe_ready({"rapidocr": (True, ""), "complete": True})
+        self.assertFalse(self.dialog._runtime_probe_active)
+        self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Installed")
 
     def test_manager_uses_black_custom_title_bar_and_centers_on_owner(self):
         self.parent.setGeometry(140, 90, 700, 600)
@@ -148,12 +186,122 @@ class LanguagePackageDialogTest(unittest.TestCase):
             self.assertEqual(actual, expected)
             self.assertIn("ru", actual)
 
+    def test_windows_package_selection_uses_the_whole_row_and_survives_refresh(self):
+        self.dialog._windows_tags_cache = ["en-US", "ru"]
+        self.dialog._windows_capabilities_cache = {
+            "en-us": "Installed",
+            "ru-ru": "Installed",
+            "de-de": "NotPresent",
+        }
+        self.dialog._populate_windows_table(self.dialog.windows_table)
+        table = self.dialog.windows_table
+        german_row = next(
+            row for row in range(table.rowCount())
+            if table.item(row, 0).data(Qt.UserRole) == "de"
+        )
+        checkbox = table.item(german_row, 0)
+        self.assertTrue(checkbox.flags() & Qt.ItemIsEnabled)
+        self.assertTrue(checkbox.flags() & Qt.ItemIsSelectable)
+        self.assertTrue(checkbox.flags() & Qt.ItemIsUserCheckable)
+
+        self.dialog._on_package_row_clicked(table, german_row, 2)
+        self.assertEqual(checkbox.checkState(), Qt.Checked)
+        self.assertEqual(self.dialog._selected_codes(table), ["de"])
+
+        self.dialog._populate_windows_table(table)
+        german_row = next(
+            row for row in range(table.rowCount())
+            if table.item(row, 0).data(Qt.UserRole) == "de"
+        )
+        self.assertEqual(table.item(german_row, 0).checkState(), Qt.Checked)
+        self.assertEqual(self.dialog._selected_codes(table), ["de"])
+
+    def test_windows_table_disables_capabilities_missing_from_this_windows_build(self):
+        self.dialog._windows_tags_cache = ["en-US", "ru"]
+        self.dialog._windows_capabilities_cache = {
+            "en-us": "Installed",
+            "ru-ru": "Installed",
+            "de-de": "NotPresent",
+        }
+        self.dialog._populate_windows_table(self.dialog.windows_table)
+        table = self.dialog.windows_table
+        hindi_row = next(
+            row for row in range(table.rowCount())
+            if table.item(row, 0).data(Qt.UserRole) == "hi"
+        )
+        self.assertFalse(table.item(hindi_row, 0).flags() & Qt.ItemIsEnabled)
+        self.assertIn("Not available", table.item(hindi_row, 3).text())
+
+    def test_all_package_action_buttons_share_the_same_explicit_style(self):
+        for table in (
+            self.dialog.windows_table,
+            self.dialog.tesseract_table,
+            self.dialog.easyocr_table,
+            self.dialog.rapidocr_table,
+            self.dialog.argos_table,
+        ):
+            for button in table._package_action_buttons:
+                self.assertEqual(button.objectName(), "languagePackageAction")
+                self.assertGreaterEqual(button.minimumHeight(), 32)
+                self.assertIn("background-color: #7A5FA1", button.styleSheet())
+        self.assertIn("QPushButton#languagePackageAction", self.dialog.styleSheet())
+
+    def test_windows_capability_catalog_parses_supported_and_installed_states(self):
+        completed = SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "Language.OCR~~~en-US~0.0.1.0|Installed\n"
+                "Language.OCR~~~de-DE~0.0.1.0|NotPresent\n"
+            ),
+        )
+        with mock.patch("settings_window.sys.platform", "win32"):
+            with mock.patch("settings_window.subprocess.run", return_value=completed):
+                catalog = self.dialog._windows_ocr_capability_catalog()
+        self.assertEqual(catalog, {"en-us": "Installed", "de-de": "NotPresent"})
+
+    def test_windows_install_script_and_result_are_both_verified(self):
+        completed = SimpleNamespace(returncode=0, stdout="")
+        self.dialog._windows_capabilities_cache = {"de-de": "NotPresent"}
+        captured = {}
+        def read_script(path, elevated=False):
+            captured["text"] = Path(path).read_text(encoding="utf-8")
+            return completed
+        with mock.patch.object(self.dialog, "_run_powershell_script", side_effect=read_script):
+            with mock.patch.object(
+                self.dialog,
+                "_windows_ocr_capability_catalog",
+                return_value={"de-de": "Installed"},
+            ):
+                with mock.patch.object(self.dialog, "_finish_language_task") as finish:
+                    self.dialog._install_windows_ocr_worker(["de"])
+        self.assertIn("Get-WindowsCapability", captured["text"])
+        self.assertIn("Add-WindowsCapability", captured["text"])
+        self.assertIn("State -ne 'Installed'", captured["text"])
+        finish.assert_called_once_with("Windows OCR")
+
+    def test_windows_install_verification_waits_for_dism_state_propagation(self):
+        capability = self.dialog._windows_ocr_capability_name("de")
+        with mock.patch.object(
+            self.dialog,
+            "_windows_ocr_capability_catalog",
+            side_effect=[{"de-de": "NotPresent"}, {"de-de": "Installed"}],
+        ) as catalog:
+            with mock.patch("settings_window.time.sleep") as sleep:
+                missing = self.dialog._wait_for_windows_ocr_capabilities(
+                    [capability], attempts=3, delay=0.01
+                )
+
+        self.assertEqual(missing, [])
+        self.assertEqual(catalog.call_count, 2)
+        sleep.assert_called_once_with(0.01)
+
     def test_missing_tesseract_engine_action_is_reachable_without_language_selection(self):
         self.assertFalse(self.dialog._selected_codes(self.dialog.tesseract_table))
         self.dialog._install_selected_tesseract()
         self.assertEqual(self.owner.tesseract_installs, 1)
 
     def test_missing_easyocr_engine_action_is_reachable_without_language_selection(self):
+        self.dialog._easyocr_status_cache = (False, "missing")
         self.dialog._install_easyocr_engine()
         self.assertEqual(self.owner.easyocr_installs, 1)
 
@@ -251,6 +399,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
 
         # Keep the EasyOCR "install selected" path non-modal in this wiring test.
         self.owner.easyocr_status = (True, "")
+        self.dialog._easyocr_status_cache = (True, "")
+        self.dialog._rapidocr_status_cache = (False, "missing")
         self.dialog._populate_easyocr_table(self.dialog.easyocr_table)
         self.dialog._argos_catalog_request_active = True
         with mock.patch("settings_window.QMessageBox.information"):
@@ -264,6 +414,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         startfile.assert_called_once_with("ms-settings:regionlanguage")
         self.assertGreaterEqual(self.owner.tesseract_installs, 1)
         self.assertGreaterEqual(self.owner.rapidocr_installs, 1)
+        self.assertIs(self.owner.last_progress_owner, self.dialog)
         self.assertEqual(self.dialog.result(), self.dialog.Accepted)
 
 

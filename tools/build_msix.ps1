@@ -2,7 +2,7 @@ param(
     [string]$IdentityName = "JabrailDigital.ClicknTranslate.Test",
     [string]$Publisher = "CN=Jabrail Digital Test",
     [string]$PublisherDisplayName = "Jabrail Digital",
-    [string]$Version = "1.4.6.0",
+    [string]$Version = "1.4.7.0",
     [string]$BuildPath = "",
     [string]$OutputPath = "",
     [string]$CertificatePath = "",
@@ -31,7 +31,7 @@ if ($IdentityName -notmatch '^[A-Za-z0-9.-]{3,50}$') {
     throw "IdentityName must contain 3-50 letters, numbers, dots, or dashes."
 }
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-    throw "Version must use four numeric parts, for example 1.4.6.0."
+    throw "Version must use four numeric parts, for example 1.4.7.0."
 }
 
 function Reset-SafeDirectory([string]$Path) {

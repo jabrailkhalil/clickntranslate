@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 
 gui_datas = [('icons', 'icons')]
@@ -19,9 +19,8 @@ gui_hiddenimports = [
     'pypdf',
 ]
 
-# Preserve the upstream OCR/GUI package collection while keeping Argos out of
-# the Qt process. Optional RapidOCR/EasyOCR runtimes are installed beside the
-# app at runtime and are deliberately not collected here.
+# Preserve the upstream OCR/GUI package collection while keeping Argos and the
+# native neural OCR runtimes out of the Qt process.
 for package_name in (
     'pyperclip',
     'PyQt5',
@@ -76,9 +75,15 @@ common_excludes = [
     'jupyter',
 ]
 
-# Native OCR packages are installed dynamically, so PyInstaller cannot infer
-# the standard-library helpers they import. Keep this worker self-sufficient
-# without bundling the optional engines themselves.
+# RapidOCR is bundled only into the isolated worker. This makes it available on
+# first launch without requiring a matching system Python, while keeping the Qt
+# GUI startup path free of ONNX/OpenCV imports. EasyOCR remains an optional
+# runtime because its torch payload is substantially larger.
+ocr_worker_datas = collect_data_files(
+    'rapidocr_onnxruntime',
+    includes=['**/*.onnx', '**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
+)
+ocr_worker_binaries = []
 ocr_worker_hiddenimports = [
     'timeit',
     'pickletools',
@@ -101,7 +106,19 @@ ocr_worker_hiddenimports = [
     'pstats',
     'configparser',
 ]
-ocr_worker_hiddenimports += collect_submodules('PIL')
+ocr_worker_hiddenimports += collect_submodules('rapidocr_onnxruntime')
+ocr_worker_hiddenimports += [
+    'PIL',
+    'numpy',
+    'rapidocr_onnxruntime',
+    'onnxruntime',
+    'cv2',
+    'pyclipper',
+    'shapely',
+    'yaml',
+    'tqdm',
+    'six',
+]
 ocr_worker_hiddenimports += collect_submodules('ctypes')
 
 
@@ -154,14 +171,15 @@ worker_a = Analysis(
 ocr_worker_a = Analysis(
     ['ocr_worker.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
+    binaries=ocr_worker_binaries,
+    datas=ocr_worker_datas,
     hiddenimports=ocr_worker_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Optional OCR packages are loaded from the portable engine directory.
+        # EasyOCR is loaded from the portable engine directory. RapidOCR and
+        # its native dependencies are collected above for this worker only.
         'PyQt5',
         'winrt',
         'argostranslate',
@@ -169,9 +187,25 @@ ocr_worker_a = Analysis(
         'sentencepiece',
         'sacremoses',
         'filelock',
-        *native_sbd_excludes,
-        *optional_ocr_excludes,
-        *common_excludes,
+        'torch',
+        'stanza',
+        'minisbd',
+        'spacy',
+        'thinc',
+        'easyocr',
+        'torchvision',
+        'skimage',
+        'tensorflow',
+        'keras',
+        'scipy',
+        'matplotlib',
+        'pandas',
+        'sklearn',
+        'tkinter',
+        '_tkinter',
+        'pytest',
+        'IPython',
+        'jupyter',
     ],
     noarchive=False,
     optimize=0,

@@ -98,7 +98,7 @@ HYMT_NOTICE_TEXT = (
 HYMT_ENGINE_KEY = "hymt"
 HYMT_ENGINE_DISPLAY = "Hy-MT"
 RAPIDOCR_ENGINE_DISPLAY = "RapidOCR"
-RAPIDOCR_PIP_PACKAGES = ("rapidocr", "onnxruntime")
+RAPIDOCR_PIP_PACKAGES = ("rapidocr-onnxruntime==1.4.4",)
 EASYOCR_ENGINE_DISPLAY = "EasyOCR"
 EASYOCR_PIP_PACKAGES = ("easyocr",)
 
@@ -137,26 +137,19 @@ def _translator_combo_labels(lang):
     ]
 
 
+TRANSLATOR_DETAIL_TEXT = {
+    "en": {"google": "fast, accurate, needs internet", "argos": "local translation, requires installed language packages", HYMT_ENGINE_KEY: "local LLM model, installed separately", "mymemory": "online API with daily limit", "lingva": "online Google proxy", "libretranslate": "online LibreTranslate server"},
+    "ru": {"google": "быстрый, точный, нужен интернет", "argos": "локальный перевод, нужен установленный языковой пакет", HYMT_ENGINE_KEY: "локальная LLM-модель, ставится отдельным пакетом", "mymemory": "онлайн API, есть дневной лимит", "lingva": "онлайн прокси Google", "libretranslate": "онлайн сервер LibreTranslate"},
+    "es": {"google": "rápido y preciso; necesita internet", "argos": "traducción local; requiere paquetes de idioma instalados", HYMT_ENGINE_KEY: "modelo LLM local; se instala por separado", "mymemory": "API en línea con límite diario", "lingva": "proxy en línea de Google", "libretranslate": "servidor en línea LibreTranslate"},
+    "de": {"google": "schnell und genau; benötigt Internet", "argos": "lokale Übersetzung; installierte Sprachpakete erforderlich", HYMT_ENGINE_KEY: "lokales LLM-Modell; wird separat installiert", "mymemory": "Online-API mit Tageslimit", "lingva": "Online-Proxy für Google", "libretranslate": "Online-Server LibreTranslate"},
+    "fr": {"google": "rapide et précis ; connexion Internet requise", "argos": "traduction locale ; modules de langue installés requis", HYMT_ENGINE_KEY: "modèle LLM local ; installé séparément", "mymemory": "API en ligne avec limite quotidienne", "lingva": "proxy Google en ligne", "libretranslate": "serveur LibreTranslate en ligne"},
+    "zh": {"google": "快速、准确，需要联网", "argos": "本地翻译，需要已安装的语言包", HYMT_ENGINE_KEY: "本地 LLM 模型，需要单独安装", "mymemory": "在线 API，设有每日限额", "lingva": "Google 在线代理", "libretranslate": "LibreTranslate 在线服务器"},
+}
+
+
 def _translator_combo_tooltip(engine, name, kind, lang):
     kind_text = _provider_kind_text(kind, lang)
-    if lang == "ru":
-        details = {
-            "google": "быстрый, точный, нужен интернет",
-            "argos": "локальный перевод, нужен установленный языковой пакет",
-            HYMT_ENGINE_KEY: "локальная LLM-модель, ставится отдельным пакетом",
-            "mymemory": "онлайн API, есть дневной лимит",
-            "lingva": "онлайн прокси Google",
-            "libretranslate": "онлайн сервер LibreTranslate",
-        }
-    else:
-        details = {
-            "google": "fast, accurate, needs internet",
-            "argos": "local translation, requires installed language packages",
-            HYMT_ENGINE_KEY: "local LLM model, installed separately",
-            "mymemory": "online API with daily limit",
-            "lingva": "online Google proxy",
-            "libretranslate": "online LibreTranslate server",
-        }
+    details = TRANSLATOR_DETAIL_TEXT.get(lang, TRANSLATOR_DETAIL_TEXT["en"])
     return f"{name}: {kind_text}. {details.get(engine, '')}".strip()
 
 
@@ -325,7 +318,7 @@ class UpdateProgressDialog(QDialog):
         title_row.addStretch()
         self._minimize_button = QToolButton(self)
         self._minimize_button.setText("-")
-        self._minimize_button.setToolTip("Minimize")
+        self._minimize_button.setToolTip(settings_text(self._lang, "minimize"))
         self._minimize_button.setFixedSize(28, 24)
         self._minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self._minimize_button)
@@ -439,9 +432,18 @@ class UpdateProgressDialog(QDialog):
 class TesseractInstallProgressDialog(QDialog):
     canceled = QtCore.pyqtSignal()
 
-    def __init__(self, owner, title="Tesseract", in_progress_attr="_tesseract_install_in_progress", cancel_callback=None):
-        super().__init__(None)
+    def __init__(
+        self,
+        owner,
+        title="Tesseract",
+        in_progress_attr="_tesseract_install_in_progress",
+        cancel_callback=None,
+        anchor_owner=None,
+    ):
+        transient_owner = anchor_owner if isinstance(anchor_owner, QWidget) else owner if isinstance(owner, QWidget) else None
+        super().__init__(transient_owner)
         self._owner = owner
+        self._anchor_owner = transient_owner or owner
         self._title = title
         self._in_progress_attr = in_progress_attr
         self._cancel_callback = cancel_callback
@@ -479,7 +481,7 @@ class TesseractInstallProgressDialog(QDialog):
         title_row.addStretch()
         self.minimize_button = QToolButton(self)
         self.minimize_button.setText("–")
-        self.minimize_button.setToolTip("Свернуть" if self._lang == "ru" else "Minimize")
+        self.minimize_button.setToolTip(settings_text(self._lang, "minimize"))
         self.minimize_button.setFixedSize(28, 24)
         self.minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self.minimize_button)
@@ -513,7 +515,7 @@ class TesseractInstallProgressDialog(QDialog):
         _bring_progress_dialog_to_front(self)
 
     def center_on_owner(self):
-        _center_progress_dialog(self, self._owner)
+        _center_progress_dialog(self, self._anchor_owner)
 
     def showEvent(self, event):
         self.center_on_owner()
@@ -633,6 +635,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "Copy history",
         "history_empty": "History is empty.",
         "history_error": "Error reading history.",
+        "error_title": "Error",
+        "clear_translation_history_error": "Could not clear translation history.",
+        "clear_copy_history_error": "Could not clear copy history.",
         "copy_translated_text": "Copy translated text automatically",
         "freeze_screen_on_ocr": "Freeze screen during OCR",
         "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
@@ -661,6 +666,7 @@ SETTINGS_TEXT = {
         "yes": "Yes",
         "no": "No",
         "cancel": "Cancel",
+        "minimize": "Minimize",
         "open": "Open",
         "install": "Install",
         "later": "Later",
@@ -692,6 +698,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "История копирований",
         "history_empty": "История пуста.",
         "history_error": "Ошибка чтения истории.",
+        "error_title": "Ошибка",
+        "clear_translation_history_error": "Не удалось очистить историю переводов.",
+        "clear_copy_history_error": "Не удалось очистить историю копирований.",
         "copy_translated_text": "Копировать сразу переведённый текст",
         "freeze_screen_on_ocr": "Заморозить экран при OCR",
         "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
@@ -720,6 +729,7 @@ SETTINGS_TEXT = {
         "yes": "Да",
         "no": "Нет",
         "cancel": "Отмена",
+        "minimize": "Свернуть",
         "open": "Открыть",
         "install": "Установить",
         "later": "Позже",
@@ -750,6 +760,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "Historial de copias",
         "history_empty": "El historial esta vacio.",
         "history_error": "Error al leer el historial.",
+        "error_title": "Error",
+        "clear_translation_history_error": "No se pudo borrar el historial de traducciones.",
+        "clear_copy_history_error": "No se pudo borrar el historial de copias.",
         "copy_translated_text": "Copiar automaticamente el texto traducido",
         "freeze_screen_on_ocr": "Congelar pantalla durante OCR",
         "fullscreen_translate_hotkey": "Atajo de traduccion de pantalla:",
@@ -771,11 +784,14 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "Eliminar RapidOCR local",
         "remove_local_easyocr": "Eliminar EasyOCR local",
         "remove_local_hymt": "Eliminar Hy-MT local",
+        "ocr_language_packs": "Paquetes de idiomas",
+        "manage_ocr_languages": "Gestionar paquetes de OCR y Argos",
         "clearing": "Borrando...",
         "cleared": "Borrado {size}",
         "yes": "Si",
         "no": "No",
         "cancel": "Cancelar",
+        "minimize": "Minimizar",
         "open": "Abrir",
         "install": "Instalar",
         "later": "Mas tarde",
@@ -806,6 +822,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "Kopierverlauf",
         "history_empty": "Der Verlauf ist leer.",
         "history_error": "Fehler beim Lesen des Verlaufs.",
+        "error_title": "Fehler",
+        "clear_translation_history_error": "Der Übersetzungsverlauf konnte nicht gelöscht werden.",
+        "clear_copy_history_error": "Der Kopierverlauf konnte nicht gelöscht werden.",
         "copy_translated_text": "Ubersetzten Text automatisch kopieren",
         "freeze_screen_on_ocr": "Bildschirm wahrend OCR einfrieren",
         "fullscreen_translate_hotkey": "Tastenkurzel fur Bildschirmubersetzung:",
@@ -827,11 +846,14 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "Lokales RapidOCR entfernen",
         "remove_local_easyocr": "Lokales EasyOCR entfernen",
         "remove_local_hymt": "Lokales Hy-MT entfernen",
+        "ocr_language_packs": "Sprachpakete",
+        "manage_ocr_languages": "OCR- und Argos-Sprachpakete verwalten",
         "clearing": "Wird geleert...",
         "cleared": "{size} geleert",
         "yes": "Ja",
         "no": "Nein",
         "cancel": "Abbrechen",
+        "minimize": "Minimieren",
         "open": "Offnen",
         "install": "Installieren",
         "later": "Spater",
@@ -862,6 +884,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "Historique des copies",
         "history_empty": "L'historique est vide.",
         "history_error": "Erreur de lecture de l'historique.",
+        "error_title": "Erreur",
+        "clear_translation_history_error": "Impossible d’effacer l’historique des traductions.",
+        "clear_copy_history_error": "Impossible d’effacer l’historique des copies.",
         "copy_translated_text": "Copier automatiquement le texte traduit",
         "freeze_screen_on_ocr": "Figer l'ecran pendant l'OCR",
         "fullscreen_translate_hotkey": "Raccourci traduction plein ecran :",
@@ -883,11 +908,14 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "Supprimer RapidOCR local",
         "remove_local_easyocr": "Supprimer EasyOCR local",
         "remove_local_hymt": "Supprimer Hy-MT local",
+        "ocr_language_packs": "Modules linguistiques",
+        "manage_ocr_languages": "Gérer les modules OCR et Argos",
         "clearing": "Nettoyage...",
         "cleared": "{size} nettoye",
         "yes": "Oui",
         "no": "Non",
         "cancel": "Annuler",
+        "minimize": "Réduire",
         "open": "Ouvrir",
         "install": "Installer",
         "later": "Plus tard",
@@ -918,6 +946,9 @@ SETTINGS_TEXT = {
         "copy_history_title": "复制历史",
         "history_empty": "历史为空。",
         "history_error": "读取历史时出错。",
+        "error_title": "错误",
+        "clear_translation_history_error": "无法清除翻译历史。",
+        "clear_copy_history_error": "无法清除复制历史。",
         "copy_translated_text": "自动复制翻译文本",
         "freeze_screen_on_ocr": "OCR 时冻结屏幕",
         "fullscreen_translate_hotkey": "全屏翻译快捷键：",
@@ -939,11 +970,14 @@ SETTINGS_TEXT = {
         "remove_local_rapidocr": "删除本地 RapidOCR",
         "remove_local_easyocr": "删除本地 EasyOCR",
         "remove_local_hymt": "删除本地 Hy-MT",
+        "ocr_language_packs": "语言包",
+        "manage_ocr_languages": "管理 OCR 和 Argos 语言包",
         "clearing": "正在清除...",
         "cleared": "已清除 {size}",
         "yes": "是",
         "no": "否",
         "cancel": "取消",
+        "minimize": "最小化",
         "open": "打开",
         "install": "安装",
         "later": "稍后",
@@ -958,6 +992,253 @@ SETTINGS_TEXT = {
 def settings_text(lang, key):
     texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
     return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
+
+
+UPDATE_TEXT = {
+    "en": {
+        "store_updates": "Updates for this version are delivered by Microsoft Store. Open the Microsoft Store Library and choose Get updates.",
+        "dev_build": "Auto-update is available only in the packaged app.\nOpen releases page?",
+        "checking_button": "Checking...", "checking": "Checking updates...", "downloading_word": "Downloading",
+        "downloading_button": "Downloading...", "apply_wait": "The update is being applied.\nPlease wait...",
+        "apply_close": "The update is already being applied. Closing is disabled right now.\nPlease wait.",
+        "canceling_button": "Canceling...", "canceling_clean": "Canceling the update...\nCleaning temporary files, please wait.",
+        "canceling_wait": "Canceling the update...\nPlease wait.", "check_failed": "Failed to check for updates:\n{error}",
+        "parse_failed": "Failed to parse update response.", "check_cancelled": "Update check was canceled.",
+        "error_title": "Update error", "unknown_error": "Unknown update error.",
+        "up_to_date": "You already have the latest version: V{version}",
+        "no_asset": "No compatible auto-update asset found in the release. Open releases page?",
+        "invalid_url": "Invalid update asset URL.", "available_title": "Update available",
+        "available_prompt": "New version found: V{latest}\nCurrent version: V{current}\n\nInstall now?",
+        "preparing_download": "Preparing download...", "stage_download": "Downloading update package...",
+        "stage_checksum": "Downloading checksum...", "stage_verify": "Verifying checksum...", "stage_prepare": "Preparing update...",
+        "cancelled": "Update canceled. Temporary files were removed.",
+        "install_failed": "Failed to install update:\n{error}",
+        "restart_ready": "Update V{version} is ready.\nRestarting the app...", "restarting": "Restarting...",
+    },
+    "ru": {
+        "store_updates": "Обновления этой версии устанавливает Microsoft Store. Откройте Библиотеку Microsoft Store и нажмите «Получить обновления».",
+        "dev_build": "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?",
+        "checking_button": "Проверка...", "checking": "Проверка обновлений...", "downloading_word": "Скачивание",
+        "downloading_button": "Скачивание...", "apply_wait": "Обновление уже применяется.\nПожалуйста, подождите...",
+        "apply_close": "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите.",
+        "canceling_button": "Отмена...", "canceling_clean": "Отмена обновления...\nУдаляем временные файлы, пожалуйста, подождите.",
+        "canceling_wait": "Отмена обновления...\nПожалуйста, подождите.", "check_failed": "Не удалось проверить обновления:\n{error}",
+        "parse_failed": "Не удалось обработать ответ от сервера обновлений.", "check_cancelled": "Проверка обновлений отменена.",
+        "error_title": "Ошибка обновления", "unknown_error": "Неизвестная ошибка обновления.",
+        "up_to_date": "У вас уже актуальная версия: V{version}",
+        "no_asset": "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?",
+        "invalid_url": "Некорректный URL файла обновления.", "available_title": "Доступно обновление",
+        "available_prompt": "Найдена новая версия: V{latest}\nТекущая версия: V{current}\n\nУстановить сейчас?",
+        "preparing_download": "Подготовка загрузки...", "stage_download": "Загрузка файла обновления...",
+        "stage_checksum": "Загрузка контрольной суммы...", "stage_verify": "Проверка контрольной суммы...", "stage_prepare": "Подготовка обновления...",
+        "cancelled": "Обновление отменено. Временные файлы удалены.",
+        "install_failed": "Не удалось установить обновление:\n{error}",
+        "restart_ready": "Обновление до V{version} готово.\nПерезапуск приложения...", "restarting": "Перезапуск...",
+    },
+    "es": {
+        "store_updates": "Las actualizaciones de esta versión se instalan desde Microsoft Store. Abre la Biblioteca de Microsoft Store y selecciona Obtener actualizaciones.",
+        "dev_build": "La actualización automática solo está disponible en la aplicación compilada.\n¿Abrir la página de versiones?",
+        "checking_button": "Comprobando...", "checking": "Buscando actualizaciones...", "downloading_word": "Descargando",
+        "downloading_button": "Descargando...", "apply_wait": "La actualización se está aplicando.\nEspera...",
+        "apply_close": "La actualización ya se está aplicando. No se puede cerrar ahora.\nEspera.",
+        "canceling_button": "Cancelando...", "canceling_clean": "Cancelando la actualización...\nEliminando archivos temporales, espera.",
+        "canceling_wait": "Cancelando la actualización...\nEspera.", "check_failed": "No se pudo buscar actualizaciones:\n{error}",
+        "parse_failed": "No se pudo procesar la respuesta del servidor de actualizaciones.", "check_cancelled": "Se canceló la búsqueda de actualizaciones.",
+        "error_title": "Error de actualización", "unknown_error": "Error de actualización desconocido.",
+        "up_to_date": "Ya tienes la versión más reciente: V{version}",
+        "no_asset": "La versión no contiene un archivo compatible para la actualización automática. ¿Abrir la página de versiones?",
+        "invalid_url": "La URL del archivo de actualización no es válida.", "available_title": "Actualización disponible",
+        "available_prompt": "Nueva versión: V{latest}\nVersión actual: V{current}\n\n¿Instalar ahora?",
+        "preparing_download": "Preparando la descarga...", "stage_download": "Descargando el paquete de actualización...",
+        "stage_checksum": "Descargando la suma de comprobación...", "stage_verify": "Verificando la suma de comprobación...", "stage_prepare": "Preparando la actualización...",
+        "cancelled": "Actualización cancelada. Se eliminaron los archivos temporales.",
+        "install_failed": "No se pudo instalar la actualización:\n{error}",
+        "restart_ready": "La actualización V{version} está lista.\nReiniciando la aplicación...", "restarting": "Reiniciando...",
+    },
+    "de": {
+        "store_updates": "Updates für diese Version werden über den Microsoft Store installiert. Öffne die Bibliothek im Microsoft Store und wähle Updates abrufen.",
+        "dev_build": "Die automatische Aktualisierung ist nur in der kompilierten App verfügbar.\nRelease-Seite öffnen?",
+        "checking_button": "Prüfen...", "checking": "Nach Updates suchen...", "downloading_word": "Herunterladen",
+        "downloading_button": "Herunterladen...", "apply_wait": "Das Update wird angewendet.\nBitte warten...",
+        "apply_close": "Das Update wird bereits angewendet. Schließen ist momentan nicht möglich.\nBitte warten.",
+        "canceling_button": "Abbrechen...", "canceling_clean": "Update wird abgebrochen...\nTemporäre Dateien werden entfernt. Bitte warten.",
+        "canceling_wait": "Update wird abgebrochen...\nBitte warten.", "check_failed": "Updates konnten nicht geprüft werden:\n{error}",
+        "parse_failed": "Die Antwort des Update-Servers konnte nicht verarbeitet werden.", "check_cancelled": "Die Update-Prüfung wurde abgebrochen.",
+        "error_title": "Update-Fehler", "unknown_error": "Unbekannter Update-Fehler.",
+        "up_to_date": "Du verwendest bereits die neueste Version: V{version}",
+        "no_asset": "Das Release enthält keine kompatible Datei für die automatische Aktualisierung. Release-Seite öffnen?",
+        "invalid_url": "Die URL der Update-Datei ist ungültig.", "available_title": "Update verfügbar",
+        "available_prompt": "Neue Version: V{latest}\nAktuelle Version: V{current}\n\nJetzt installieren?",
+        "preparing_download": "Download wird vorbereitet...", "stage_download": "Update-Paket wird heruntergeladen...",
+        "stage_checksum": "Prüfsumme wird heruntergeladen...", "stage_verify": "Prüfsumme wird geprüft...", "stage_prepare": "Update wird vorbereitet...",
+        "cancelled": "Update abgebrochen. Temporäre Dateien wurden entfernt.",
+        "install_failed": "Update konnte nicht installiert werden:\n{error}",
+        "restart_ready": "Update V{version} ist bereit.\nDie App wird neu gestartet...", "restarting": "Neustart...",
+    },
+    "fr": {
+        "store_updates": "Les mises à jour de cette version sont installées par le Microsoft Store. Ouvrez la Bibliothèque du Microsoft Store et choisissez Obtenir les mises à jour.",
+        "dev_build": "La mise à jour automatique est disponible uniquement dans l’application compilée.\nOuvrir la page des versions ?",
+        "checking_button": "Vérification...", "checking": "Recherche de mises à jour...", "downloading_word": "Téléchargement",
+        "downloading_button": "Téléchargement...", "apply_wait": "La mise à jour est en cours d’application.\nVeuillez patienter...",
+        "apply_close": "La mise à jour est déjà en cours d’application. La fermeture est momentanément impossible.\nVeuillez patienter.",
+        "canceling_button": "Annulation...", "canceling_clean": "Annulation de la mise à jour...\nSuppression des fichiers temporaires, veuillez patienter.",
+        "canceling_wait": "Annulation de la mise à jour...\nVeuillez patienter.", "check_failed": "Impossible de rechercher les mises à jour :\n{error}",
+        "parse_failed": "Impossible de traiter la réponse du serveur de mises à jour.", "check_cancelled": "La recherche de mises à jour a été annulée.",
+        "error_title": "Erreur de mise à jour", "unknown_error": "Erreur de mise à jour inconnue.",
+        "up_to_date": "Vous utilisez déjà la dernière version : V{version}",
+        "no_asset": "La version ne contient aucun fichier compatible avec la mise à jour automatique. Ouvrir la page des versions ?",
+        "invalid_url": "L’URL du fichier de mise à jour n’est pas valide.", "available_title": "Mise à jour disponible",
+        "available_prompt": "Nouvelle version : V{latest}\nVersion actuelle : V{current}\n\nInstaller maintenant ?",
+        "preparing_download": "Préparation du téléchargement...", "stage_download": "Téléchargement du paquet de mise à jour...",
+        "stage_checksum": "Téléchargement de la somme de contrôle...", "stage_verify": "Vérification de la somme de contrôle...", "stage_prepare": "Préparation de la mise à jour...",
+        "cancelled": "Mise à jour annulée. Les fichiers temporaires ont été supprimés.",
+        "install_failed": "Impossible d’installer la mise à jour :\n{error}",
+        "restart_ready": "La mise à jour V{version} est prête.\nRedémarrage de l’application...", "restarting": "Redémarrage...",
+    },
+    "zh": {
+        "store_updates": "此版本由 Microsoft Store 提供更新。请打开 Microsoft Store 的“库”，然后选择“获取更新”。",
+        "dev_build": "自动更新仅适用于已打包的应用。\n是否打开发布页面？",
+        "checking_button": "正在检查...", "checking": "正在检查更新...", "downloading_word": "正在下载",
+        "downloading_button": "正在下载...", "apply_wait": "正在应用更新。\n请稍候...",
+        "apply_close": "更新已在应用中，现在无法关闭。\n请稍候。",
+        "canceling_button": "正在取消...", "canceling_clean": "正在取消更新...\n正在清理临时文件，请稍候。",
+        "canceling_wait": "正在取消更新...\n请稍候。", "check_failed": "无法检查更新：\n{error}",
+        "parse_failed": "无法处理更新服务器的响应。", "check_cancelled": "已取消更新检查。",
+        "error_title": "更新错误", "unknown_error": "未知更新错误。",
+        "up_to_date": "当前已是最新版本：V{version}",
+        "no_asset": "此版本中没有兼容的自动更新文件。是否打开发布页面？",
+        "invalid_url": "更新文件 URL 无效。", "available_title": "有可用更新",
+        "available_prompt": "发现新版本：V{latest}\n当前版本：V{current}\n\n现在安装吗？",
+        "preparing_download": "正在准备下载...", "stage_download": "正在下载更新包...",
+        "stage_checksum": "正在下载校验和...", "stage_verify": "正在验证校验和...", "stage_prepare": "正在准备更新...",
+        "cancelled": "更新已取消，临时文件已删除。", "install_failed": "无法安装更新：\n{error}",
+        "restart_ready": "更新 V{version} 已准备好。\n正在重启应用...", "restarting": "正在重启...",
+    },
+}
+
+
+ENGINE_TEXT = {
+    "en": {
+        "not_found": "{engine} not found", "install": "Install", "cancel": "Cancel", "remove": "Remove",
+        "tesseract_prompt": "Tesseract-OCR was not found. Download and install it locally?",
+        "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and a Python interpreter matching the app build. This is a large package: it pulls PyTorch/torchvision, and language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and a Python interpreter matching the app build. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
+        "hymt_prompt": "The local Hy-MT model is not installed. Download and install the offline translation package?\n\nAbout 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime.",
+        "preparing": "Preparing {engine} install...", "downloading_packages": "Downloading and installing {engine} packages...",
+        "downloading_engine": "Downloading {engine}...", "extracting_engine": "Extracting {engine}...",
+        "downloading_language": "Downloading language data {name}...", "applying": "Applying install...", "done": "Done",
+        "canceling": "Canceling install...", "ready": "{engine} is installed and ready.",
+        "hymt_ready": "Hy-MT is installed and ready for offline translation.", "error_title": "{engine} error",
+        "install_failed": "Failed to install {engine}:\n{error}", "cancelled_title": "Cancelled",
+        "install_cancelled": "{engine} installation canceled. Temporary files were removed.",
+        "remove_title": "Remove {engine}", "remove_ocr_prompt": "Remove the local {engine} engine from the app folder?",
+        "remove_hymt_prompt": "Remove the local Hy-MT model and runtime from the app folder?", "removed": "Local {engine} was removed.",
+        "remove_failed": "Failed to remove {engine}:\n{error}", "hymt_runtime": "Downloading Hy-MT runtime...",
+        "hymt_extract": "Extracting Hy-MT runtime...", "hymt_model": "Downloading Hy-MT model...", "hymt_license": "Saving Hy-MT license...",
+    },
+    "ru": {
+        "not_found": "{engine} не найден", "install": "Установить", "cancel": "Отмена", "remove": "Удалить",
+        "tesseract_prompt": "Tesseract-OCR не найден. Скачать и установить локально?",
+        "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится Python той же версии, что у сборки, и интернет. Пакет большой: он устанавливает PyTorch/torchvision, а языковые модели загружаются при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится Python той же версии, что у сборки, и интернет. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
+        "hymt_prompt": "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\nБудет скачано около 1,2 ГБ: модель Hy-MT и локальный runtime llama.cpp.",
+        "preparing": "Подготовка установки {engine}...", "downloading_packages": "Загрузка и установка пакетов {engine}...",
+        "downloading_engine": "Загрузка {engine}...", "extracting_engine": "Распаковка {engine}...",
+        "downloading_language": "Загрузка языковой модели {name}...", "applying": "Применение установки...", "done": "Готово",
+        "canceling": "Отмена установки...", "ready": "{engine} установлен и готов к работе.",
+        "hymt_ready": "Hy-MT установлен и готов к офлайн-переводу.", "error_title": "Ошибка {engine}",
+        "install_failed": "Не удалось установить {engine}:\n{error}", "cancelled_title": "Отмена",
+        "install_cancelled": "Установка {engine} отменена. Временные файлы удалены.",
+        "remove_title": "Удалить {engine}", "remove_ocr_prompt": "Удалить локальный движок {engine} из папки программы?",
+        "remove_hymt_prompt": "Удалить локальную модель Hy-MT и runtime из папки программы?", "removed": "Локальный {engine} удалён.",
+        "remove_failed": "Не удалось удалить {engine}:\n{error}", "hymt_runtime": "Загрузка runtime Hy-MT...",
+        "hymt_extract": "Распаковка runtime Hy-MT...", "hymt_model": "Загрузка модели Hy-MT...", "hymt_license": "Сохранение лицензии Hy-MT...",
+    },
+    "es": {
+        "not_found": "No se encontró {engine}", "install": "Instalar", "cancel": "Cancelar", "remove": "Eliminar",
+        "tesseract_prompt": "No se encontró Tesseract-OCR. ¿Descargarlo e instalarlo localmente?",
+        "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y una versión de Python compatible con la aplicación. El paquete es grande: incluye PyTorch/torchvision y los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y una versión de Python compatible con la aplicación. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
+        "hymt_prompt": "El modelo local Hy-MT no está instalado. ¿Descargar e instalar el paquete de traducción sin conexión?\n\nSe descargarán aproximadamente 1,2 GB: el modelo Hy-MT y el runtime local de llama.cpp.",
+        "preparing": "Preparando la instalación de {engine}...", "downloading_packages": "Descargando e instalando paquetes de {engine}...",
+        "downloading_engine": "Descargando {engine}...", "extracting_engine": "Extrayendo {engine}...",
+        "downloading_language": "Descargando datos del idioma {name}...", "applying": "Aplicando la instalación...", "done": "Listo",
+        "canceling": "Cancelando la instalación...", "ready": "{engine} está instalado y listo.",
+        "hymt_ready": "Hy-MT está instalado y listo para traducir sin conexión.", "error_title": "Error de {engine}",
+        "install_failed": "No se pudo instalar {engine}:\n{error}", "cancelled_title": "Cancelado",
+        "install_cancelled": "Se canceló la instalación de {engine}. Se eliminaron los archivos temporales.",
+        "remove_title": "Eliminar {engine}", "remove_ocr_prompt": "¿Eliminar el motor local {engine} de la carpeta de la aplicación?",
+        "remove_hymt_prompt": "¿Eliminar el modelo local Hy-MT y el runtime de la carpeta de la aplicación?", "removed": "Se eliminó {engine} local.",
+        "remove_failed": "No se pudo eliminar {engine}:\n{error}", "hymt_runtime": "Descargando el runtime de Hy-MT...",
+        "hymt_extract": "Extrayendo el runtime de Hy-MT...", "hymt_model": "Descargando el modelo Hy-MT...", "hymt_license": "Guardando la licencia de Hy-MT...",
+    },
+    "de": {
+        "not_found": "{engine} nicht gefunden", "install": "Installieren", "cancel": "Abbrechen", "remove": "Entfernen",
+        "tesseract_prompt": "Tesseract-OCR wurde nicht gefunden. Lokal herunterladen und installieren?",
+        "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und eine zur App passende Python-Version benötigt. Das Paket ist groß: Es installiert PyTorch/torchvision; Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
+        "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und eine zur App passende Python-Version benötigt. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
+        "hymt_prompt": "Das lokale Hy-MT-Modell ist nicht installiert. Das Offline-Übersetzungspaket herunterladen und installieren?\n\nEtwa 1,2 GB werden geladen: das Hy-MT-Modell und die lokale llama.cpp-Laufzeit.",
+        "preparing": "Installation von {engine} wird vorbereitet...", "downloading_packages": "Pakete für {engine} werden heruntergeladen und installiert...",
+        "downloading_engine": "{engine} wird heruntergeladen...", "extracting_engine": "{engine} wird entpackt...",
+        "downloading_language": "Sprachdaten {name} werden heruntergeladen...", "applying": "Installation wird angewendet...", "done": "Fertig",
+        "canceling": "Installation wird abgebrochen...", "ready": "{engine} ist installiert und bereit.",
+        "hymt_ready": "Hy-MT ist installiert und für Offline-Übersetzungen bereit.", "error_title": "{engine}-Fehler",
+        "install_failed": "{engine} konnte nicht installiert werden:\n{error}", "cancelled_title": "Abgebrochen",
+        "install_cancelled": "Die Installation von {engine} wurde abgebrochen. Temporäre Dateien wurden entfernt.",
+        "remove_title": "{engine} entfernen", "remove_ocr_prompt": "Die lokale {engine}-Engine aus dem App-Ordner entfernen?",
+        "remove_hymt_prompt": "Das lokale Hy-MT-Modell und die Laufzeit aus dem App-Ordner entfernen?", "removed": "Das lokale {engine} wurde entfernt.",
+        "remove_failed": "{engine} konnte nicht entfernt werden:\n{error}", "hymt_runtime": "Hy-MT-Laufzeit wird heruntergeladen...",
+        "hymt_extract": "Hy-MT-Laufzeit wird entpackt...", "hymt_model": "Hy-MT-Modell wird heruntergeladen...", "hymt_license": "Hy-MT-Lizenz wird gespeichert...",
+    },
+    "fr": {
+        "not_found": "{engine} introuvable", "install": "Installer", "cancel": "Annuler", "remove": "Supprimer",
+        "tesseract_prompt": "Tesseract-OCR est introuvable. Le télécharger et l’installer localement ?",
+        "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et une version de Python compatible avec l’application sont nécessaires. Le paquet est volumineux : il installe PyTorch/torchvision et les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
+        "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et une version de Python compatible avec l’application sont nécessaires. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
+        "hymt_prompt": "Le modèle Hy-MT local n’est pas installé. Télécharger et installer le paquet de traduction hors ligne ?\n\nEnviron 1,2 Go seront téléchargés : le modèle Hy-MT et le runtime local llama.cpp.",
+        "preparing": "Préparation de l’installation de {engine}...", "downloading_packages": "Téléchargement et installation des paquets de {engine}...",
+        "downloading_engine": "Téléchargement de {engine}...", "extracting_engine": "Extraction de {engine}...",
+        "downloading_language": "Téléchargement des données de langue {name}...", "applying": "Application de l’installation...", "done": "Terminé",
+        "canceling": "Annulation de l’installation...", "ready": "{engine} est installé et prêt.",
+        "hymt_ready": "Hy-MT est installé et prêt pour la traduction hors ligne.", "error_title": "Erreur {engine}",
+        "install_failed": "Impossible d’installer {engine} :\n{error}", "cancelled_title": "Annulé",
+        "install_cancelled": "L’installation de {engine} a été annulée. Les fichiers temporaires ont été supprimés.",
+        "remove_title": "Supprimer {engine}", "remove_ocr_prompt": "Supprimer le moteur local {engine} du dossier de l’application ?",
+        "remove_hymt_prompt": "Supprimer le modèle Hy-MT local et le runtime du dossier de l’application ?", "removed": "Le {engine} local a été supprimé.",
+        "remove_failed": "Impossible de supprimer {engine} :\n{error}", "hymt_runtime": "Téléchargement du runtime Hy-MT...",
+        "hymt_extract": "Extraction du runtime Hy-MT...", "hymt_model": "Téléchargement du modèle Hy-MT...", "hymt_license": "Enregistrement de la licence Hy-MT...",
+    },
+    "zh": {
+        "not_found": "未找到 {engine}", "install": "安装", "cancel": "取消", "remove": "删除",
+        "tesseract_prompt": "未找到 Tesseract-OCR。是否下载并在本地安装？",
+        "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并安装与应用版本匹配的 Python。该软件包较大，会安装 PyTorch/torchvision；语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
+        "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并安装与应用版本匹配的 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
+        "hymt_prompt": "本地 Hy-MT 模型尚未安装。是否下载并安装离线翻译包？\n\n将下载约 1.2 GB：Hy-MT 模型和本地 llama.cpp 运行时。",
+        "preparing": "正在准备安装 {engine}...", "downloading_packages": "正在下载并安装 {engine} 软件包...",
+        "downloading_engine": "正在下载 {engine}...", "extracting_engine": "正在解压 {engine}...",
+        "downloading_language": "正在下载语言数据 {name}...", "applying": "正在应用安装...", "done": "完成",
+        "canceling": "正在取消安装...", "ready": "{engine} 已安装并可用。",
+        "hymt_ready": "Hy-MT 已安装并可用于离线翻译。", "error_title": "{engine} 错误",
+        "install_failed": "无法安装 {engine}：\n{error}", "cancelled_title": "已取消",
+        "install_cancelled": "已取消安装 {engine}，临时文件已删除。",
+        "remove_title": "删除 {engine}", "remove_ocr_prompt": "是否从应用文件夹中删除本地 {engine} 引擎？",
+        "remove_hymt_prompt": "是否从应用文件夹中删除本地 Hy-MT 模型和运行时？", "removed": "本地 {engine} 已删除。",
+        "remove_failed": "无法删除 {engine}：\n{error}", "hymt_runtime": "正在下载 Hy-MT 运行时...",
+        "hymt_extract": "正在解压 Hy-MT 运行时...", "hymt_model": "正在下载 Hy-MT 模型...", "hymt_license": "正在保存 Hy-MT 许可证...",
+    },
+}
+
+
+def update_text(lang, key, **values):
+    texts = UPDATE_TEXT.get(lang, UPDATE_TEXT["en"])
+    template = texts.get(key, UPDATE_TEXT["en"].get(key, key))
+    return template.format(**values)
+
+
+def engine_text(lang, key, **values):
+    texts = ENGINE_TEXT.get(lang, ENGINE_TEXT["en"])
+    template = texts.get(key, ENGINE_TEXT["en"].get(key, key))
+    return template.format(**values)
 
 class ClearableKeySequenceEdit(QKeySequenceEdit):
     """QKeySequenceEdit that always stores English key names regardless of keyboard layout."""
@@ -1039,11 +1320,153 @@ EASYOCR_MODEL_FILE_VARIANTS = {
 }
 
 
+LANGUAGE_MANAGER_TEXT = {
+    "en": {
+        "intro": "Install OCR languages or Argos offline translation directions here. Packages are downloaded in advance, not during recognition or translation.",
+        "refresh": "Refresh", "windows_note": "Shows OCR languages available in Windows. Install only OCR without adding a keyboard.",
+        "install_selected": "Install selected", "windows_settings": "Windows settings", "tesseract_note": "Tick languages to download into the local tessdata folder.",
+        "install_engine": "Install engine", "easyocr_note": "Tick languages to predownload EasyOCR models. English is added as a fallback.",
+        "rapidocr_note": "RapidOCR uses one shared engine, ONNX runtime, detector, and Chinese + English model. For Russian use Windows OCR, Tesseract, or EasyOCR.",
+        "component": "Component", "package": "Package", "status": "Status", "argos_note": "All available Argos packages are shown. Non-English pairs use two packages through English.",
+        "remove_highlighted": "Remove highlighted", "direction": "Direction", "search": "Search: Russian, ru, en→ru…", "language": "Language",
+        "installed": "Installed", "missing": "Missing", "can_download": "Can download", "engine_missing": "{engine} missing", "checking": "Checking…",
+        "unavailable": "Not available on this Windows build", "first_use": "Prepared on first OCR", "engine_first": "Install the engine first",
+        "ocr_engine": "OCR engine", "runtime": "Neural runtime", "detector": "Text detection + orientation", "recognition": "Recognition",
+        "loading": "Loading package list…", "load_error": "Could not load package list: ", "no_match": "No packages match your search", "no_packages": "No packages found",
+        "no_selection": "Tick at least one language to install.", "already": "{engine} is already installed.", "still": "{engine} is still being checked. Please wait a moment.",
+        "win_confirm": "Install selected Windows OCR components?\n\nAdministrator permission will be requested. Only OCR is installed; no keyboard or input layout is added.",
+        "easy_prompt": "EasyOCR must be installed first. Start engine installation?", "argos_installed": "Selected Argos directions are installed.",
+        "highlight": "Highlight one or more installed rows.", "remove_confirm": "Remove Argos packages: {packages}?\n\nThese directions will no longer work offline.", "removed": "Selected Argos packages were removed.",
+        "preparing": "Preparing…", "canceling": "Canceling…", "install_failed": "Failed to install language packages:\n", "ready": "Selected language packages are ready.", "canceled": "Canceled",
+        "tess_down": "Tesseract: downloading languages…", "win_wait": "Windows OCR: waiting for installer…", "win_done": "Windows OCR: done",
+        "easy_down": "EasyOCR: downloading {language} models…", "easy_done": "EasyOCR: done",
+    },
+    "ru": {
+        "intro": "Установите языки OCR или офлайн-направления Argos. Пакеты загружаются заранее, а не во время распознавания или перевода.",
+        "refresh": "Обновить", "windows_note": "Показаны OCR-языки Windows. Можно установить только OCR без добавления клавиатуры.",
+        "install_selected": "Установить выбранные", "windows_settings": "Настройки Windows", "tesseract_note": "Отметьте языки для загрузки в локальную папку tessdata.",
+        "install_engine": "Установить движок", "easyocr_note": "Отметьте языки для загрузки моделей EasyOCR. Английский добавляется как резервный.",
+        "rapidocr_note": "RapidOCR использует общий движок, ONNX runtime, детектор и модель Chinese + English. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
+        "component": "Компонент", "package": "Пакет", "status": "Статус", "argos_note": "Показаны все пакеты Argos. Неанглийские пары используют два пакета через английский.",
+        "remove_highlighted": "Удалить выделенные", "direction": "Направление", "search": "Поиск: русский, ru, en→ru…", "language": "Язык",
+        "installed": "Установлен", "missing": "Не установлен", "can_download": "Можно скачать", "engine_missing": "{engine} не установлен", "checking": "Проверка…",
+        "unavailable": "Недоступен в этой версии Windows", "first_use": "Подготовится при первом OCR", "engine_first": "Сначала установите движок",
+        "ocr_engine": "OCR-движок", "runtime": "Нейросетевой runtime", "detector": "Поиск и ориентация текста", "recognition": "Распознавание",
+        "loading": "Загрузка списка пакетов…", "load_error": "Не удалось загрузить список: ", "no_match": "По запросу ничего не найдено", "no_packages": "Пакеты не найдены",
+        "no_selection": "Отметьте хотя бы один язык.", "already": "{engine} уже установлен.", "still": "Проверка {engine} ещё выполняется. Подождите немного.",
+        "win_confirm": "Установить выбранные OCR-компоненты Windows?\n\nБудет запрошено разрешение администратора. Устанавливается только OCR без клавиатуры и раскладки.",
+        "easy_prompt": "Сначала нужно установить EasyOCR. Запустить установку движка?", "argos_installed": "Выбранные направления Argos установлены.",
+        "highlight": "Выделите установленные строки.", "remove_confirm": "Удалить пакеты Argos: {packages}?\n\nЭти направления перестанут работать офлайн.", "removed": "Выбранные пакеты Argos удалены.",
+        "preparing": "Подготовка…", "canceling": "Отмена…", "install_failed": "Не удалось установить языковые пакеты:\n", "ready": "Выбранные пакеты готовы.", "canceled": "Отменено",
+        "tess_down": "Tesseract: загрузка языков…", "win_wait": "Windows OCR: ожидание установки…", "win_done": "Windows OCR: готово",
+        "easy_down": "EasyOCR: загрузка моделей {language}…", "easy_done": "EasyOCR: готово",
+    },
+    "es": {
+        "intro": "Instala aquí idiomas OCR o direcciones sin conexión de Argos. Los paquetes se descargan por adelantado.",
+        "refresh": "Actualizar", "windows_note": "Muestra los idiomas OCR de Windows. Instala solo OCR sin añadir un teclado.",
+        "install_selected": "Instalar seleccionados", "windows_settings": "Configuración de Windows", "tesseract_note": "Marca idiomas para descargarlos en la carpeta tessdata local.",
+        "install_engine": "Instalar motor", "easyocr_note": "Marca idiomas para descargar modelos EasyOCR. Se añade inglés como reserva.",
+        "rapidocr_note": "RapidOCR usa un motor, ONNX runtime, detector y modelo Chinese + English compartidos. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
+        "component": "Componente", "package": "Paquete", "status": "Estado", "argos_note": "Se muestran todos los paquetes Argos. Los pares sin inglés usan dos paquetes a través del inglés.",
+        "remove_highlighted": "Eliminar resaltados", "direction": "Dirección", "search": "Buscar: ruso, ru, en→ru…", "language": "Idioma",
+        "installed": "Instalado", "missing": "No instalado", "can_download": "Disponible", "engine_missing": "Falta {engine}", "checking": "Comprobando…",
+        "unavailable": "No disponible en esta versión de Windows", "first_use": "Se preparará en el primer OCR", "engine_first": "Instala primero el motor",
+        "ocr_engine": "Motor OCR", "runtime": "Entorno neuronal", "detector": "Detección y orientación", "recognition": "Reconocimiento",
+        "loading": "Cargando lista de paquetes…", "load_error": "No se pudo cargar la lista: ", "no_match": "No hay paquetes coincidentes", "no_packages": "No se encontraron paquetes",
+        "no_selection": "Marca al menos un idioma.", "already": "{engine} ya está instalado.", "still": "Todavía se está comprobando {engine}. Espera un momento.",
+        "win_confirm": "¿Instalar los componentes OCR de Windows seleccionados?\n\nSe solicitará permiso de administrador. Solo se instala OCR, sin teclado ni distribución.",
+        "easy_prompt": "Primero debes instalar EasyOCR. ¿Iniciar la instalación?", "argos_installed": "Las direcciones de Argos seleccionadas están instaladas.",
+        "highlight": "Resalta filas instaladas.", "remove_confirm": "¿Eliminar paquetes Argos: {packages}?\n\nEstas direcciones dejarán de funcionar sin conexión.", "removed": "Se eliminaron los paquetes Argos seleccionados.",
+        "preparing": "Preparando…", "canceling": "Cancelando…", "install_failed": "No se pudieron instalar los paquetes:\n", "ready": "Los paquetes seleccionados están listos.", "canceled": "Cancelado",
+        "tess_down": "Tesseract: descargando idiomas…", "win_wait": "Windows OCR: esperando al instalador…", "win_done": "Windows OCR: listo",
+        "easy_down": "EasyOCR: descargando modelos de {language}…", "easy_done": "EasyOCR: listo",
+    },
+    "de": {
+        "intro": "Installiere hier OCR-Sprachen oder Argos-Offline-Richtungen. Pakete werden vorab heruntergeladen.",
+        "refresh": "Aktualisieren", "windows_note": "Zeigt Windows-OCR-Sprachen. Installiert nur OCR ohne zusätzliche Tastatur.",
+        "install_selected": "Ausgewählte installieren", "windows_settings": "Windows-Einstellungen", "tesseract_note": "Markiere Sprachen für den lokalen tessdata-Ordner.",
+        "install_engine": "Engine installieren", "easyocr_note": "Markiere Sprachen für EasyOCR-Modelle. Englisch wird als Reserve ergänzt.",
+        "rapidocr_note": "RapidOCR nutzt Engine, ONNX Runtime, Detektor und Chinese + English-Modell gemeinsam. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
+        "component": "Komponente", "package": "Paket", "status": "Status", "argos_note": "Alle Argos-Pakete werden angezeigt. Nicht englische Paare verwenden zwei Pakete über Englisch.",
+        "remove_highlighted": "Markierte entfernen", "direction": "Richtung", "search": "Suchen: Russisch, ru, en→ru…", "language": "Sprache",
+        "installed": "Installiert", "missing": "Nicht installiert", "can_download": "Verfügbar", "engine_missing": "{engine} fehlt", "checking": "Prüfung…",
+        "unavailable": "In dieser Windows-Version nicht verfügbar", "first_use": "Beim ersten OCR vorbereitet", "engine_first": "Zuerst die Engine installieren",
+        "ocr_engine": "OCR-Engine", "runtime": "Neuronale Laufzeit", "detector": "Texterkennung und Ausrichtung", "recognition": "Erkennung",
+        "loading": "Paketliste wird geladen…", "load_error": "Paketliste konnte nicht geladen werden: ", "no_match": "Keine passenden Pakete", "no_packages": "Keine Pakete gefunden",
+        "no_selection": "Markiere mindestens eine Sprache.", "already": "{engine} ist bereits installiert.", "still": "{engine} wird noch geprüft. Bitte kurz warten.",
+        "win_confirm": "Ausgewählte Windows-OCR-Komponenten installieren?\n\nAdministratorrechte werden angefordert. Nur OCR wird installiert, ohne Tastatur oder Layout.",
+        "easy_prompt": "EasyOCR muss zuerst installiert werden. Installation starten?", "argos_installed": "Die ausgewählten Argos-Richtungen sind installiert.",
+        "highlight": "Markiere installierte Zeilen.", "remove_confirm": "Argos-Pakete entfernen: {packages}?\n\nDiese Richtungen funktionieren danach nicht mehr offline.", "removed": "Die ausgewählten Argos-Pakete wurden entfernt.",
+        "preparing": "Vorbereitung…", "canceling": "Abbruch…", "install_failed": "Sprachpakete konnten nicht installiert werden:\n", "ready": "Die ausgewählten Pakete sind bereit.", "canceled": "Abgebrochen",
+        "tess_down": "Tesseract: Sprachen werden geladen…", "win_wait": "Windows OCR: Warten auf Installer…", "win_done": "Windows OCR: fertig",
+        "easy_down": "EasyOCR: Modelle für {language} werden geladen…", "easy_done": "EasyOCR: fertig",
+    },
+    "fr": {
+        "intro": "Installez ici les langues OCR ou les directions Argos hors ligne. Les modules sont téléchargés à l’avance.",
+        "refresh": "Actualiser", "windows_note": "Affiche les langues OCR Windows. Installe uniquement OCR sans ajouter de clavier.",
+        "install_selected": "Installer la sélection", "windows_settings": "Paramètres Windows", "tesseract_note": "Cochez les langues à placer dans le dossier tessdata local.",
+        "install_engine": "Installer le moteur", "easyocr_note": "Cochez les langues pour les modèles EasyOCR. L’anglais est ajouté en secours.",
+        "rapidocr_note": "RapidOCR partage moteur, ONNX runtime, détecteur et modèle Chinese + English. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
+        "component": "Composant", "package": "Module", "status": "État", "argos_note": "Tous les modules Argos sont affichés. Les paires sans anglais utilisent deux modules via l’anglais.",
+        "remove_highlighted": "Supprimer la sélection", "direction": "Direction", "search": "Rechercher : russe, ru, en→ru…", "language": "Langue",
+        "installed": "Installé", "missing": "Non installé", "can_download": "Disponible", "engine_missing": "{engine} manquant", "checking": "Vérification…",
+        "unavailable": "Indisponible dans cette version de Windows", "first_use": "Préparé au premier OCR", "engine_first": "Installez d’abord le moteur",
+        "ocr_engine": "Moteur OCR", "runtime": "Runtime neuronal", "detector": "Détection et orientation", "recognition": "Reconnaissance",
+        "loading": "Chargement de la liste…", "load_error": "Impossible de charger la liste : ", "no_match": "Aucun module correspondant", "no_packages": "Aucun module trouvé",
+        "no_selection": "Cochez au moins une langue.", "already": "{engine} est déjà installé.", "still": "{engine} est encore vérifié. Patientez un instant.",
+        "win_confirm": "Installer les composants OCR Windows sélectionnés ?\n\nUne autorisation administrateur sera demandée. Seul OCR sera installé, sans clavier ni disposition.",
+        "easy_prompt": "EasyOCR doit d’abord être installé. Lancer l’installation ?", "argos_installed": "Les directions Argos sélectionnées sont installées.",
+        "highlight": "Sélectionnez des lignes installées.", "remove_confirm": "Supprimer les modules Argos : {packages} ?\n\nCes directions ne fonctionneront plus hors ligne.", "removed": "Les modules Argos sélectionnés ont été supprimés.",
+        "preparing": "Préparation…", "canceling": "Annulation…", "install_failed": "Impossible d’installer les modules :\n", "ready": "Les modules sélectionnés sont prêts.", "canceled": "Annulé",
+        "tess_down": "Tesseract : téléchargement des langues…", "win_wait": "Windows OCR : attente de l’installation…", "win_done": "Windows OCR : terminé",
+        "easy_down": "EasyOCR : téléchargement des modèles {language}…", "easy_done": "EasyOCR : terminé",
+    },
+    "zh": {
+        "intro": "在此安装 OCR 语言或 Argos 离线翻译方向。语言包会提前下载，不会在识别或翻译时临时下载。",
+        "refresh": "刷新", "windows_note": "显示 Windows 可用的 OCR 语言。只安装 OCR 组件，不添加键盘。",
+        "install_selected": "安装所选项", "windows_settings": "Windows 设置", "tesseract_note": "勾选要下载到本地 tessdata 文件夹的语言。",
+        "install_engine": "安装引擎", "easyocr_note": "勾选要预下载的 EasyOCR 模型。英语模型会作为备用模型。",
+        "rapidocr_note": "RapidOCR 共用引擎、ONNX runtime、检测器和 Chinese + English 模型。俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
+        "component": "组件", "package": "语言包", "status": "状态", "argos_note": "显示所有 Argos 语言包。两个非英语语言之间需要通过英语使用两个语言包。",
+        "remove_highlighted": "删除高亮项", "direction": "方向", "search": "搜索：俄语、ru、en→ru…", "language": "语言",
+        "installed": "已安装", "missing": "未安装", "can_download": "可下载", "engine_missing": "未安装 {engine}", "checking": "正在检查…",
+        "unavailable": "此 Windows 版本不可用", "first_use": "首次 OCR 时准备", "engine_first": "请先安装引擎",
+        "ocr_engine": "OCR 引擎", "runtime": "神经网络运行时", "detector": "文本检测与方向", "recognition": "识别",
+        "loading": "正在加载语言包列表…", "load_error": "无法加载语言包列表：", "no_match": "没有匹配的语言包", "no_packages": "未找到语言包",
+        "no_selection": "请至少勾选一种语言。", "already": "{engine} 已安装。", "still": "仍在检查 {engine}，请稍候。",
+        "win_confirm": "安装所选 Windows OCR 组件？\n\n系统将请求管理员权限。只安装 OCR 组件，不添加键盘或输入法布局。",
+        "easy_prompt": "需要先安装 EasyOCR。是否开始安装？", "argos_installed": "所选 Argos 翻译方向已安装。",
+        "highlight": "请高亮已安装项。", "remove_confirm": "删除 Argos 语言包：{packages}？\n\n这些方向将无法继续离线使用。", "removed": "所选 Argos 语言包已删除。",
+        "preparing": "正在准备…", "canceling": "正在取消…", "install_failed": "无法安装语言包：\n", "ready": "所选语言包已准备就绪。", "canceled": "已取消",
+        "tess_down": "Tesseract：正在下载语言…", "win_wait": "Windows OCR：正在等待安装程序…", "win_done": "Windows OCR：完成",
+        "easy_down": "EasyOCR：正在下载 {language} 模型…", "easy_done": "EasyOCR：完成",
+    },
+}
+
+
+def language_manager_text(lang, key, **values):
+    texts = LANGUAGE_MANAGER_TEXT.get(lang, LANGUAGE_MANAGER_TEXT["en"])
+    value = texts.get(key, LANGUAGE_MANAGER_TEXT["en"].get(key, key))
+    return value.format(**values) if values else value
+
+
 class OcrLanguageManagerDialog(QDialog):
+    _runtime_probe_ready = QtCore.pyqtSignal(object)
+
     def __init__(self, owner):
         super().__init__(owner)
         self.owner = owner
-        self.lang = getattr(getattr(owner, "parent", None), "current_interface_language", "en")
+        owner_parent = getattr(owner, "parent", None)
+        if callable(owner_parent):
+            try:
+                owner_parent = owner_parent()
+            except Exception:
+                owner_parent = None
+        self.lang = getattr(
+            owner_parent,
+            "current_interface_language",
+            getattr(owner, "current_interface_language", "en"),
+        )
         self._install_in_progress = False
         self._cancel_requested = threading.Event()
         self.progress_dialog = None
@@ -1052,6 +1475,11 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_error = ""
         self._argos_catalog_loading = True
         self._argos_catalog_request_active = False
+        self._windows_tags_cache = None
+        self._windows_capabilities_cache = None
+        self._easyocr_status_cache = None
+        self._rapidocr_status_cache = None
+        self._runtime_probe_active = False
         self._title_drag_offset = None
         self._centered_once = False
 
@@ -1104,13 +1532,7 @@ class OcrLanguageManagerDialog(QDialog):
         for drag_widget in self._title_drag_widgets:
             drag_widget.installEventFilter(self)
 
-        intro = QLabel(
-            "Установите нужные языки для OCR или офлайн-направления перевода Argos. "
-            "Пакеты загружаются здесь заранее, а не во время распознавания или перевода."
-            if self.lang == "ru" else
-            "Install OCR languages or Argos offline translation directions here. "
-            "Packages are downloaded in advance, not during recognition or translation."
-        )
+        intro = QLabel(language_manager_text(self.lang, "intro"))
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
@@ -1127,7 +1549,7 @@ class OcrLanguageManagerDialog(QDialog):
 
         bottom = QHBoxLayout()
         bottom.addStretch()
-        self.refresh_btn = QPushButton("Обновить" if self.lang == "ru" else "Refresh")
+        self.refresh_btn = QPushButton(language_manager_text(self.lang, "refresh"))
         self.refresh_btn.clicked.connect(self.refresh_catalog)
         bottom.addWidget(self.refresh_btn)
         self.close_btn = QPushButton(settings_text(self.lang, "back"))
@@ -1136,6 +1558,8 @@ class OcrLanguageManagerDialog(QDialog):
         layout.addLayout(bottom)
 
         self._apply_style()
+        self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
+        QtCore.QTimer.singleShot(0, self._start_runtime_probe)
         QtCore.QTimer.singleShot(0, lambda: self._start_argos_catalog_refresh(True))
 
     def _owner_app(self):
@@ -1200,6 +1624,10 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #3a3645; color: #8f889c; }
+                QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
+                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
+                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
+                QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
                 QLineEdit { background: #17181d; color: #f4f6fb; border: 1px solid #34313f; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
                 QScrollBar:vertical { background: #14151a; width: 12px; margin: 0; border: none; }
@@ -1221,6 +1649,10 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #d8d4e2; color: #777; }
+                QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
+                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
+                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
+                QPushButton#languagePackageAction:disabled { background-color: #d8d4e2; color: #777777; }
                 QLineEdit { background: #ffffff; color: #202124; border: 1px solid #cfc8df; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
                 QScrollBar:vertical { background: #f1eff5; width: 12px; margin: 0; border: none; }
@@ -1281,76 +1713,60 @@ class OcrLanguageManagerDialog(QDialog):
     def _build_tabs(self):
         self.windows_table = self._add_engine_tab(
             "Windows",
-            "Показывает OCR-языки, которые реально доступны в Windows. Можно поставить только OCR-компонент без добавления клавиатуры."
-            if self.lang == "ru" else
-            "Shows OCR languages currently available in Windows. You can install only the OCR component without adding a keyboard.",
+            language_manager_text(self.lang, "windows_note"),
             self._populate_windows_table,
             [
-                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_windows),
-                ("Настройки Windows" if self.lang == "ru" else "Windows settings", self._open_windows_settings),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_windows),
+                (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings),
             ],
         )
         self.tesseract_table = self._add_engine_tab(
             "Tesseract",
-            "Отметьте языки, которые нужно заранее скачать в локальную tessdata."
-            if self.lang == "ru" else
-            "Tick languages to download into the local tessdata folder.",
+            language_manager_text(self.lang, "tesseract_note"),
             self._populate_tesseract_table,
             [
-                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_tesseract),
-                ("Установить движок" if self.lang == "ru" else "Install engine", self._install_tesseract_engine),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract),
+                (language_manager_text(self.lang, "install_engine"), self._install_tesseract_engine),
             ],
         )
         self.easyocr_table = self._add_engine_tab(
             "EasyOCR",
-            "Отметьте языки, чтобы заранее скачать модели EasyOCR. Английская модель добавляется как fallback."
-            if self.lang == "ru" else
-            "Tick languages to predownload EasyOCR models. The English model is added as fallback.",
+            language_manager_text(self.lang, "easyocr_note"),
             self._populate_easyocr_table,
             [
-                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_easyocr),
-                ("Установить движок" if self.lang == "ru" else "Install engine", self._install_easyocr_engine),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr),
+                (language_manager_text(self.lang, "install_engine"), self._install_easyocr_engine),
             ],
         )
         self.rapidocr_table = self._add_engine_tab(
             "RapidOCR",
-            "RapidOCR использует один общий комплект: движок, ONNX-runtime, детектор и модель распознавания Chinese + English. "
-            "Отдельных языковых пакетов и русской модели у него нет — для русского используйте Windows OCR, Tesseract или EasyOCR."
-            if self.lang == "ru" else
-            "RapidOCR uses one shared bundle: the engine, ONNX runtime, detector, and a Chinese + English recognition model. "
-            "It has no per-language packages or Russian model; use Windows OCR, Tesseract, or EasyOCR for Russian.",
+            language_manager_text(self.lang, "rapidocr_note"),
             self._populate_rapidocr_table,
-            [("Установить движок" if self.lang == "ru" else "Install engine", self._install_rapidocr_engine)],
+            [(language_manager_text(self.lang, "install_engine"), self._install_rapidocr_engine)],
             header_labels=[
                 "",
-                "Компонент" if self.lang == "ru" else "Component",
-                "Пакет" if self.lang == "ru" else "Package",
-                "Статус" if self.lang == "ru" else "Status",
+                language_manager_text(self.lang, "component"),
+                language_manager_text(self.lang, "package"),
+                language_manager_text(self.lang, "status"),
             ],
         )
         self.rapidocr_table.setColumnHidden(0, True)
 
         self.argos_table = self._add_engine_tab(
             "Argos",
-            "Показаны все реально доступные пакеты Argos. Перевод между двумя неанглийскими языками собирается из двух пакетов через английский."
-            if self.lang == "ru" else
-            "All actual Argos packages are shown. Translation between two non-English languages is assembled from two packages through English.",
+            language_manager_text(self.lang, "argos_note"),
             self._populate_argos_table,
             [
-                ("Установить выбранные" if self.lang == "ru" else "Install selected", self._install_selected_argos),
-                ("Удалить выделенные" if self.lang == "ru" else "Remove highlighted", self._remove_selected_argos),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_argos),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_argos),
             ],
             header_labels=[
                 "",
-                "Направление" if self.lang == "ru" else "Direction",
-                "Пакет" if self.lang == "ru" else "Package",
-                "Статус" if self.lang == "ru" else "Status",
+                language_manager_text(self.lang, "direction"),
+                language_manager_text(self.lang, "package"),
+                language_manager_text(self.lang, "status"),
             ],
-            search_placeholder=(
-                "Поиск: русский, ru, en→ru…"
-                if self.lang == "ru" else
-                "Search: Russian, ru, en→ru…"
-            ),
+            search_placeholder=language_manager_text(self.lang, "search"),
         )
 
     def _add_engine_tab(
@@ -1382,9 +1798,9 @@ class OcrLanguageManagerDialog(QDialog):
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(header_labels or [
             "",
-            "Язык" if self.lang == "ru" else "Language",
-            "Пакет" if self.lang == "ru" else "Package",
-            "Статус" if self.lang == "ru" else "Status",
+            language_manager_text(self.lang, "language"),
+            language_manager_text(self.lang, "package"),
+            language_manager_text(self.lang, "status"),
         ])
         table.verticalHeader().setVisible(False)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -1405,6 +1821,13 @@ class OcrLanguageManagerDialog(QDialog):
             header.setStyleSheet("QHeaderView::section { background-color: #f0eef7; color: #202124; border: 0; padding: 5px; }")
         table.setColumnWidth(0, 34)
         table._package_filter_edit = filter_edit
+        table._pending_package_codes = set()
+        table.itemChanged.connect(
+            lambda item, target=table: self._on_package_item_changed(target, item)
+        )
+        table.cellClicked.connect(
+            lambda row, column, target=table: self._on_package_row_clicked(target, row, column)
+        )
         if filter_edit is not None:
             filter_edit.textChanged.connect(lambda _text, target=table: populate_func(target))
         layout.addWidget(table)
@@ -1414,6 +1837,20 @@ class OcrLanguageManagerDialog(QDialog):
         table._package_action_buttons = []
         for text, callback in actions:
             button = QPushButton(text)
+            button.setObjectName("languagePackageAction")
+            button.setMinimumHeight(32)
+            button.setStyleSheet("""
+                QPushButton#languagePackageAction {
+                    background-color: #7A5FA1;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 7px;
+                    padding: 7px 12px;
+                }
+                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
+                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
+                QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
+            """)
             button.clicked.connect(callback)
             table._package_action_buttons.append(button)
             action_row.addWidget(button)
@@ -1431,10 +1868,111 @@ class OcrLanguageManagerDialog(QDialog):
         self._populate_argos_table(self.argos_table)
 
     def refresh_catalog(self):
+        self._windows_tags_cache = None
+        self._windows_capabilities_cache = None
+        self._easyocr_status_cache = None
+        self._rapidocr_status_cache = None
         self.refresh_all()
+        self._start_runtime_probe()
         self._start_argos_catalog_refresh(True)
 
+    def _start_runtime_probe(self):
+        """Refresh slow OCR capabilities without delaying the dialog itself."""
+        if self._runtime_probe_active:
+            return
+        self._runtime_probe_active = True
+        threading.Thread(target=self._runtime_probe_worker, daemon=True).start()
+
+    def _runtime_probe_worker(self):
+        windows_payload = {
+            "windows_tags": [],
+            "windows_capabilities": None,
+        }
+        try:
+            windows_payload["windows_tags"] = self._available_windows_tags()
+        except Exception as exc:
+            windows_payload["windows_error"] = str(exc)
+        try:
+            windows_payload["windows_capabilities"] = self._windows_ocr_capability_catalog()
+        except Exception as exc:
+            windows_payload["windows_capabilities_error"] = str(exc)
+        self._emit_runtime_probe_payload(windows_payload)
+
+        easyocr_status = (False, "EasyOCR check failed")
+        try:
+            easyocr_status = self.owner._easyocr_importable_status()
+        except Exception as exc:
+            easyocr_status = (False, str(exc))
+        self._emit_runtime_probe_payload({"easyocr": easyocr_status})
+
+        rapidocr_status = (False, "RapidOCR check failed")
+        try:
+            rapidocr_status = self.owner._rapidocr_importable_status()
+        except Exception as exc:
+            rapidocr_status = (False, str(exc))
+        self._emit_runtime_probe_payload({"rapidocr": rapidocr_status, "complete": True})
+
+    def _emit_runtime_probe_payload(self, payload):
+        try:
+            self._runtime_probe_ready.emit(payload)
+        except RuntimeError:
+            # The user may close the package window while a native worker is
+            # still finishing its import probe.
+            pass
+
+    @QtCore.pyqtSlot(object)
+    def _on_runtime_probe_ready(self, payload):
+        if not isinstance(payload, dict):
+            return
+        if payload.get("complete"):
+            self._runtime_probe_active = False
+        if "windows_tags" in payload:
+            self._windows_tags_cache = list(payload.get("windows_tags") or [])
+            capabilities = payload.get("windows_capabilities")
+            self._windows_capabilities_cache = (
+                dict(capabilities)
+                if isinstance(capabilities, dict) and capabilities
+                else None
+            )
+        if "easyocr" in payload:
+            self._easyocr_status_cache = tuple(payload.get("easyocr") or (False, ""))
+        if "rapidocr" in payload:
+            self._rapidocr_status_cache = tuple(payload.get("rapidocr") or (False, ""))
+        if "windows_tags" in payload and self.windows_table is not None:
+            self._populate_windows_table(self.windows_table)
+        if "easyocr" in payload and self.easyocr_table is not None:
+            self._populate_easyocr_table(self.easyocr_table)
+        if "rapidocr" in payload and self.rapidocr_table is not None:
+            self._populate_rapidocr_table(self.rapidocr_table)
+
+    def _on_package_item_changed(self, table, item):
+        if item is None or item.column() != 0:
+            return
+        code = item.data(Qt.UserRole)
+        if not code or not (item.flags() & Qt.ItemIsEnabled):
+            return
+        pending = table._pending_package_codes
+        if item.checkState() == Qt.Checked:
+            pending.add(code)
+        else:
+            pending.discard(code)
+
+    def _on_package_row_clicked(self, table, row, column):
+        # Qt already toggles the actual checkbox. Let the rest of the row act
+        # as a larger hit target without toggling column 0 twice.
+        if column == 0:
+            return
+        item = table.item(row, 0)
+        if item is None:
+            return
+        required = Qt.ItemIsEnabled | Qt.ItemIsUserCheckable
+        if (item.flags() & required) != required:
+            return
+        item.setCheckState(Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked)
+
     def _set_language_rows(self, table, rows):
+        pending = set(getattr(table, "_pending_package_codes", set()))
+        signal_blocker = QtCore.QSignalBlocker(table)
         table.setRowCount(len(rows))
         dark = self._is_dark_theme()
         header_bg = QColor("#24212e" if dark else "#f0eef7")
@@ -1451,16 +1989,24 @@ class OcrLanguageManagerDialog(QDialog):
         for row, data in enumerate(rows):
             bg = odd_bg if row % 2 else even_bg
             check_item = QTableWidgetItem()
-            check_item.setData(Qt.UserRole, data["code"])
+            code = data["code"]
+            check_item.setData(Qt.UserRole, code)
             show_checkbox = data.get("show_checkbox", True)
+            selectable = bool(data.get("selectable", False))
+            if data.get("checked") or data.get("selection_invalid", False):
+                pending.discard(code)
             if show_checkbox:
-                check_item.setCheckState(Qt.Checked if data["checked"] else Qt.Unchecked)
+                check_item.setCheckState(
+                    Qt.Checked
+                    if data["checked"] or (selectable and code in pending)
+                    else Qt.Unchecked
+                )
             flags = Qt.ItemIsUserCheckable if show_checkbox else Qt.NoItemFlags
-            if show_checkbox and data.get("selectable", False):
-                flags |= Qt.ItemIsEnabled
+            if show_checkbox and selectable:
+                flags |= Qt.ItemIsEnabled | Qt.ItemIsSelectable
             check_item.setFlags(flags)
             check_item.setBackground(QBrush(bg))
-            check_item.setForeground(QBrush(fg if data.get("selectable", False) else muted_fg))
+            check_item.setForeground(QBrush(fg if selectable else muted_fg))
             table.setItem(row, 0, check_item)
 
             icon_path = data.get("icon", "")
@@ -1483,21 +2029,26 @@ class OcrLanguageManagerDialog(QDialog):
             status_item.setForeground(QBrush(fg if data.get("checked") or data.get("selectable") else muted_fg))
             table.setItem(row, 3, status_item)
         table.resizeRowsToContents()
+        table._pending_package_codes = pending
+        del signal_blocker
 
     def _language_name(self, language):
         return language.display_name(self.lang)
 
     def _status_installed(self):
-        return "Установлен" if self.lang == "ru" else "Installed"
+        return language_manager_text(self.lang, "installed")
 
     def _status_missing(self):
-        return "Не установлен" if self.lang == "ru" else "Missing"
+        return language_manager_text(self.lang, "missing")
 
     def _status_can_download(self):
-        return "Можно скачать" if self.lang == "ru" else "Can download"
+        return language_manager_text(self.lang, "can_download")
 
     def _status_engine_missing(self, engine_name):
-        return f"{engine_name} не установлен" if self.lang == "ru" else f"{engine_name} missing"
+        return language_manager_text(self.lang, "engine_missing", engine=engine_name)
+
+    def _status_checking(self):
+        return language_manager_text(self.lang, "checking")
 
     def _available_windows_tags(self):
         try:
@@ -1506,8 +2057,44 @@ class OcrLanguageManagerDialog(QDialog):
         except Exception:
             return []
 
+    def _windows_ocr_capability_catalog(self):
+        """Return OCR capability tags and states available on this Windows build."""
+        if sys.platform != "win32":
+            return {}
+        create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        command = (
+            "$ErrorActionPreference='Stop'; "
+            "Get-WindowsCapability -Online | "
+            "Where-Object { $_.Name -like 'Language.OCR~~~*' } | "
+            "ForEach-Object { '{0}|{1}' -f $_.Name,$_.State }"
+        )
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=create_no_window,
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError((completed.stdout or "").strip() or "Could not query Windows OCR capabilities")
+        catalog = {}
+        pattern = re.compile(r"^Language\.OCR~~~(.+?)~0\.0\.1\.0\|(.+)$", re.IGNORECASE)
+        for line in (completed.stdout or "").splitlines():
+            match = pattern.match(line.strip())
+            if match:
+                catalog[match.group(1).lower()] = match.group(2).strip()
+        return catalog
+
     def _populate_windows_table(self, table):
-        available_tags = self._available_windows_tags()
+        available_tags = self._windows_tags_cache
+        checking = available_tags is None
+        available_tags = available_tags or []
+        capability_catalog = self._windows_capabilities_cache
+        catalog_known = isinstance(capability_catalog, dict)
+        capability_catalog = capability_catalog or {}
         available_by_tag = {str(tag).lower(): str(tag) for tag in available_tags if str(tag).strip()}
         rows = []
         for language in APP_LANGUAGES:
@@ -1519,14 +2106,28 @@ class OcrLanguageManagerDialog(QDialog):
             except Exception:
                 matched = available_by_tag.get(expected.lower(), "")
             installed = bool(matched)
+            capability_state = capability_catalog.get(expected.lower(), "")
+            capability_installed = capability_state.lower() == "installed"
+            installed = installed or capability_installed
+            supported = not catalog_known or expected.lower() in capability_catalog
+            unavailable = bool(catalog_known and not supported)
+            if checking:
+                status = self._status_checking()
+            elif installed:
+                status = f"{self._status_installed()} ({matched or expected})"
+            elif unavailable:
+                status = language_manager_text(self.lang, "unavailable")
+            else:
+                status = self._status_missing()
             rows.append({
                 "code": language.code,
                 "icon": language_icon_path(language.code),
                 "name": self._language_name(language),
                 "package": expected,
-                "status": f"{self._status_installed()} ({matched})" if installed else self._status_missing(),
+                "status": status,
                 "checked": installed,
-                "selectable": not installed,
+                "selectable": bool(not checking and supported and not installed),
+                "selection_invalid": unavailable,
             })
         self._set_language_rows(table, rows)
 
@@ -1590,7 +2191,8 @@ class OcrLanguageManagerDialog(QDialog):
         return all(self._easyocr_group_installed(group) for group in self._easyocr_model_groups_for_language(language_code))
 
     def _populate_easyocr_table(self, table):
-        engine_ready, _error = self.owner._easyocr_importable_status()
+        checking = self._easyocr_status_cache is None
+        engine_ready, _error = self._easyocr_status_cache or (False, "")
         rows = []
         for language in APP_LANGUAGES:
             groups = self._easyocr_model_groups_for_language(language.code)
@@ -1602,6 +2204,8 @@ class OcrLanguageManagerDialog(QDialog):
                 "name": self._language_name(language),
                 "package": package,
                 "status": (
+                    self._status_checking()
+                    if checking else
                     self._status_engine_missing(EASYOCR_ENGINE_DISPLAY)
                     if not engine_ready else
                     self._status_installed()
@@ -1614,18 +2218,19 @@ class OcrLanguageManagerDialog(QDialog):
         self._set_language_rows(table, rows)
 
     def _populate_rapidocr_table(self, table):
-        engine_ready, _error = self.owner._rapidocr_importable_status()
-        installed = "Установлен" if self.lang == "ru" else "Installed"
-        missing = "Не установлен" if self.lang == "ru" else "Missing"
-        first_use = "Подготовится при первом OCR" if self.lang == "ru" else "Prepared on first OCR"
-        needs_engine = "Сначала установите движок" if self.lang == "ru" else "Install the engine first"
+        checking = self._rapidocr_status_cache is None
+        engine_ready, _error = self._rapidocr_status_cache or (False, "")
+        installed = self._status_installed()
+        missing = self._status_missing()
+        first_use = language_manager_text(self.lang, "first_use")
+        needs_engine = language_manager_text(self.lang, "engine_first")
         rows = [
             {
                 "code": "rapidocr-engine",
                 "icon": "",
-                "name": "OCR-движок" if self.lang == "ru" else "OCR engine",
+                "name": language_manager_text(self.lang, "ocr_engine"),
                 "package": "rapidocr",
-                "status": installed if engine_ready else missing,
+                "status": self._status_checking() if checking else installed if engine_ready else missing,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -1633,9 +2238,9 @@ class OcrLanguageManagerDialog(QDialog):
             {
                 "code": "rapidocr-runtime",
                 "icon": "",
-                "name": "Нейросетевой runtime" if self.lang == "ru" else "Neural runtime",
+                "name": language_manager_text(self.lang, "runtime"),
                 "package": "onnxruntime",
-                "status": installed if engine_ready else missing,
+                "status": self._status_checking() if checking else installed if engine_ready else missing,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -1643,9 +2248,9 @@ class OcrLanguageManagerDialog(QDialog):
             {
                 "code": "rapidocr-detector",
                 "icon": "",
-                "name": "Поиск и ориентация текста" if self.lang == "ru" else "Text detection + orientation",
+                "name": language_manager_text(self.lang, "detector"),
                 "package": "PP-OCR detector",
-                "status": first_use if engine_ready else needs_engine,
+                "status": self._status_checking() if checking else first_use if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -1653,9 +2258,9 @@ class OcrLanguageManagerDialog(QDialog):
             {
                 "code": "rapidocr-recognition",
                 "icon": "",
-                "name": "Распознавание" if self.lang == "ru" else "Recognition",
+                "name": language_manager_text(self.lang, "recognition"),
                 "package": "Chinese + English",
-                "status": first_use if engine_ready else needs_engine,
+                "status": self._status_checking() if checking else first_use if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -1709,8 +2314,10 @@ class OcrLanguageManagerDialog(QDialog):
                     pair_code.replace("->", "→"),
                     source.english_name,
                     source.russian_name,
+                    source.display_name(self.lang),
                     target.english_name,
                     target.russian_name,
+                    target.display_name(self.lang),
                     str(package.get("package_name") or ""),
                 )
             ).casefold()
@@ -1734,13 +2341,13 @@ class OcrLanguageManagerDialog(QDialog):
             })
         if not rows:
             if self._argos_catalog_loading:
-                message = "Загрузка списка пакетов…" if self.lang == "ru" else "Loading package list…"
+                message = language_manager_text(self.lang, "loading")
             elif self._argos_catalog_error:
-                message = ("Не удалось загрузить список: " if self.lang == "ru" else "Could not load package list: ") + self._argos_catalog_error
+                message = language_manager_text(self.lang, "load_error") + self._argos_catalog_error
             elif query:
-                message = "По вашему запросу ничего не найдено" if self.lang == "ru" else "No packages match your search"
+                message = language_manager_text(self.lang, "no_match")
             else:
-                message = "Доступные пакеты не найдены" if self.lang == "ru" else "No packages found"
+                message = language_manager_text(self.lang, "no_packages")
             rows = [{
                 "code": "",
                 "icon": "",
@@ -1808,6 +2415,9 @@ class OcrLanguageManagerDialog(QDialog):
                 continue
             if item.checkState() == Qt.Checked:
                 codes.append(item.data(Qt.UserRole))
+        for code in sorted(getattr(table, "_pending_package_codes", set())):
+            if code and code not in codes:
+                codes.append(code)
         return codes
 
     def _highlighted_codes(self, table):
@@ -1824,7 +2434,7 @@ class OcrLanguageManagerDialog(QDialog):
         QMessageBox.information(
             self,
             settings_text(self.lang, "ocr_language_packs"),
-            "Отметьте хотя бы один язык для установки." if self.lang == "ru" else "Tick at least one language to install.",
+            language_manager_text(self.lang, "no_selection"),
         )
 
     def _open_windows_settings(self):
@@ -1838,45 +2448,91 @@ class OcrLanguageManagerDialog(QDialog):
         if bool(getattr(self.owner, in_progress_attr, False)):
             QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install(in_progress_attr))
             return
+        self._windows_tags_cache = None
+        self._windows_capabilities_cache = None
+        self._easyocr_status_cache = None
+        self._rapidocr_status_cache = None
         self.refresh_all()
+        self._start_runtime_probe()
 
     def _install_tesseract_engine(self):
         if self.owner._find_available_tesseract_exe():
             QMessageBox.information(
                 self,
                 "Tesseract",
-                "Tesseract уже установлен." if self.lang == "ru" else "Tesseract is already installed.",
+                language_manager_text(self.lang, "already", engine="Tesseract"),
             )
             return
-        self.owner.start_tesseract_install()
+        self.owner.start_tesseract_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_tesseract_install_in_progress"))
 
     def _install_easyocr_engine(self):
-        ready, _error = self.owner._easyocr_importable_status()
+        if self._easyocr_status_cache is None:
+            QMessageBox.information(
+                self,
+                EASYOCR_ENGINE_DISPLAY,
+                language_manager_text(self.lang, "still", engine=EASYOCR_ENGINE_DISPLAY),
+            )
+            return
+        ready, _error = self._easyocr_status_cache or (False, "")
         if ready:
             QMessageBox.information(
                 self,
                 EASYOCR_ENGINE_DISPLAY,
-                "EasyOCR уже установлен." if self.lang == "ru" else "EasyOCR is already installed.",
+                language_manager_text(self.lang, "already", engine=EASYOCR_ENGINE_DISPLAY),
             )
             return
-        self.owner.start_easyocr_install()
+        self.owner.start_easyocr_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_easyocr_install_in_progress"))
 
     def _install_rapidocr_engine(self):
-        ready, _error = self.owner._rapidocr_importable_status()
+        if self._rapidocr_status_cache is None:
+            QMessageBox.information(
+                self,
+                RAPIDOCR_ENGINE_DISPLAY,
+                language_manager_text(self.lang, "still", engine=RAPIDOCR_ENGINE_DISPLAY),
+            )
+            return
+        ready, _error = self._rapidocr_status_cache or (False, "")
         if ready:
             QMessageBox.information(
                 self,
                 RAPIDOCR_ENGINE_DISPLAY,
-                "RapidOCR уже установлен." if self.lang == "ru" else "RapidOCR is already installed.",
+                language_manager_text(self.lang, "already", engine=RAPIDOCR_ENGINE_DISPLAY),
             )
             return
-        self.owner.start_rapidocr_install()
+        self.owner.start_rapidocr_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_rapidocr_install_in_progress"))
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
+
+    @staticmethod
+    def _windows_ocr_tag_from_capability(capability):
+        return str(capability).split("~~~", 1)[1].rsplit("~", 1)[0].lower()
+
+    def _wait_for_windows_ocr_capabilities(self, capabilities, attempts=12, delay=0.75):
+        """Wait for DISM state propagation after the elevated installer exits."""
+        missing = list(capabilities)
+        last_error = None
+        for attempt in range(max(1, int(attempts))):
+            try:
+                catalog = self._windows_ocr_capability_catalog()
+                last_error = None
+                missing = [
+                    capability
+                    for capability in capabilities
+                    if catalog.get(self._windows_ocr_tag_from_capability(capability), "").lower() != "installed"
+                ]
+                if not missing:
+                    return []
+            except Exception as exc:
+                last_error = exc
+            if attempt + 1 < attempts:
+                time.sleep(max(0.0, float(delay)))
+        if last_error is not None:
+            raise RuntimeError(str(last_error))
+        return missing
 
     def _install_selected_windows(self):
         codes = self._selected_codes(self.windows_table)
@@ -1885,13 +2541,7 @@ class OcrLanguageManagerDialog(QDialog):
             return
         msg = QMessageBox(self)
         msg.setWindowTitle("Windows OCR")
-        msg.setText(
-            "Установить выбранные OCR-компоненты Windows?\n\n"
-            "Будет запрошено разрешение администратора. Это ставит только OCR-пакет и не добавляет клавиатуру/раскладку."
-            if self.lang == "ru" else
-            "Install selected Windows OCR components?\n\n"
-            "Administrator permission will be requested. This installs only the OCR capability and does not add a keyboard/input layout."
-        )
+        msg.setText(language_manager_text(self.lang, "win_confirm"))
         msg.setIcon(QMessageBox.Question)
         yes_btn = msg.addButton(settings_text(self.lang, "install"), QMessageBox.YesRole)
         msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.NoRole)
@@ -1912,15 +2562,18 @@ class OcrLanguageManagerDialog(QDialog):
         self._run_language_task("Tesseract", codes, self._install_tesseract_worker)
 
     def _install_selected_easyocr(self):
-        ready, error = self.owner._easyocr_importable_status()
+        if self._easyocr_status_cache is None:
+            QMessageBox.information(
+                self,
+                EASYOCR_ENGINE_DISPLAY,
+                language_manager_text(self.lang, "still", engine=EASYOCR_ENGINE_DISPLAY),
+            )
+            return
+        ready, error = self._easyocr_status_cache
         if not ready:
             msg = QMessageBox(self)
             msg.setWindowTitle("EasyOCR")
-            msg.setText(
-                "Сначала нужно установить сам EasyOCR. Запустить установку движка?"
-                if self.lang == "ru" else
-                "EasyOCR itself must be installed first. Start engine installation?"
-            )
+            msg.setText(language_manager_text(self.lang, "easy_prompt"))
             if error:
                 msg.setDetailedText(str(error))
             msg.setIcon(QMessageBox.Question)
@@ -1945,11 +2598,7 @@ class OcrLanguageManagerDialog(QDialog):
             "Argos",
             codes,
             self._install_argos_worker,
-            success_message=(
-                "Выбранные направления Argos установлены."
-                if self.lang == "ru" else
-                "Selected Argos directions are installed."
-            ),
+            success_message=language_manager_text(self.lang, "argos_installed"),
         )
 
     def _remove_selected_argos(self):
@@ -1964,19 +2613,13 @@ class OcrLanguageManagerDialog(QDialog):
             QMessageBox.information(
                 self,
                 "Argos",
-                "Выделите одну или несколько установленных строк."
-                if self.lang == "ru" else
-                "Highlight one or more installed rows."
+                language_manager_text(self.lang, "highlight"),
             )
             return
         labels = ", ".join(code.replace("->", "→").upper() for code in codes)
         msg = QMessageBox(self)
         msg.setWindowTitle("Argos")
-        msg.setText(
-            f"Удалить пакеты Argos: {labels}?\n\nПосле удаления эти направления перестанут работать офлайн."
-            if self.lang == "ru" else
-            f"Remove Argos packages: {labels}?\n\nThese directions will no longer work offline."
-        )
+        msg.setText(language_manager_text(self.lang, "remove_confirm", packages=labels))
         msg.setIcon(QMessageBox.Question)
         remove_btn = msg.addButton(settings_text(self.lang, "remove"), QMessageBox.DestructiveRole)
         msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.RejectRole)
@@ -1987,11 +2630,7 @@ class OcrLanguageManagerDialog(QDialog):
             "Argos",
             codes,
             self._remove_argos_worker,
-            success_message=(
-                "Выбранные пакеты Argos удалены."
-                if self.lang == "ru" else
-                "Selected Argos packages were removed."
-            ),
+            success_message=language_manager_text(self.lang, "removed"),
         )
 
     def _is_process_elevated(self):
@@ -2047,7 +2686,7 @@ class OcrLanguageManagerDialog(QDialog):
             cancel_callback=self._request_install_cancel,
         )
         self.progress_dialog.setCancelButtonText(settings_text(self.lang, "cancel"))
-        self.progress_dialog.setLabelText("Подготовка..." if self.lang == "ru" else "Preparing...")
+        self.progress_dialog.setLabelText(language_manager_text(self.lang, "preparing"))
         self.progress_dialog.setRange(0, 0)
         self.progress_dialog.show()
         self.progress_dialog.center_on_owner()
@@ -2057,7 +2696,7 @@ class OcrLanguageManagerDialog(QDialog):
     def _request_install_cancel(self):
         self._cancel_requested.set()
         if self.progress_dialog is not None:
-            self.progress_dialog.setLabelText("Отмена..." if self.lang == "ru" else "Canceling...")
+            self.progress_dialog.setLabelText(language_manager_text(self.lang, "canceling"))
             self.progress_dialog.setRange(0, 0)
 
     def _emit_language_progress(self, text, percent=0, determinate=True):
@@ -2097,7 +2736,12 @@ class OcrLanguageManagerDialog(QDialog):
         if self.progress_dialog is not None:
             self.progress_dialog.hide()
             self.progress_dialog = None
+        self._windows_tags_cache = None
+        self._windows_capabilities_cache = None
+        self._easyocr_status_cache = None
+        self._rapidocr_status_cache = None
         self.refresh_all()
+        self._start_runtime_probe()
         if engine == "Argos":
             self._start_argos_catalog_refresh(False)
         if error:
@@ -2105,15 +2749,13 @@ class OcrLanguageManagerDialog(QDialog):
             QMessageBox.warning(
                 self,
                 engine,
-                ("Не удалось установить языковые пакеты:\n" if self.lang == "ru" else "Failed to install language packs:\n") + error,
+                language_manager_text(self.lang, "install_failed") + error,
             )
             return
         QMessageBox.information(
             self,
             engine,
-            self._task_success_message or (
-                "Выбранные языковые пакеты готовы." if self.lang == "ru" else "Selected language packs are ready."
-            ),
+            self._task_success_message or language_manager_text(self.lang, "ready"),
         )
         self._task_success_message = ""
 
@@ -2126,7 +2768,7 @@ class OcrLanguageManagerDialog(QDialog):
                 tess_code = tesseract_language_code(code)
                 if tess_code not in tess_codes:
                     tess_codes.append(tess_code)
-            self._emit_language_progress("Tesseract: загрузка языков..." if self.lang == "ru" else "Tesseract: downloading languages...", 0, False)
+            self._emit_language_progress(language_manager_text(self.lang, "tess_down"), 0, False)
             ocr._prepare_tesseract_data(
                 tess_cmd,
                 "+".join(tess_codes),
@@ -2135,7 +2777,7 @@ class OcrLanguageManagerDialog(QDialog):
                 raise_on_error=True,
             )
             if self._cancel_requested.is_set():
-                self._finish_language_task("Tesseract", "Отменено" if self.lang == "ru" else "Canceled")
+                self._finish_language_task("Tesseract", language_manager_text(self.lang, "canceled"))
                 return
             _tess_cmd, data_dirs = self._tesseract_data_dirs()
             missing = [
@@ -2158,7 +2800,7 @@ class OcrLanguageManagerDialog(QDialog):
                 if capability not in capabilities:
                     capabilities.append(capability)
             self._emit_language_progress(
-                "Windows OCR: ожидание установки..." if self.lang == "ru" else "Windows OCR: waiting for installer...",
+                language_manager_text(self.lang, "win_wait"),
                 0,
                 False,
             )
@@ -2167,7 +2809,15 @@ class OcrLanguageManagerDialog(QDialog):
                 "$ProgressPreference = 'Continue'",
             ]
             for capability in capabilities:
-                commands.append(f"Add-WindowsCapability -Online -Name '{capability}'")
+                commands.extend([
+                    f"$capability = Get-WindowsCapability -Online -Name '{capability}'",
+                    "if ($capability.State -ne 'Installed') {",
+                    f"    $capability = Add-WindowsCapability -Online -Name '{capability}'",
+                    "}",
+                    "if ($capability.State -ne 'Installed') {",
+                    f"    throw 'Windows did not install {capability}. State: ' + $capability.State",
+                    "}",
+                ])
             fd, script_path = tempfile.mkstemp(prefix="clickntranslate_windows_ocr_", suffix=".ps1")
             with os.fdopen(fd, "w", encoding="utf-8") as script:
                 script.write("\n".join(commands))
@@ -2176,10 +2826,21 @@ class OcrLanguageManagerDialog(QDialog):
             if completed.returncode != 0:
                 output = (completed.stdout or "").strip()
                 raise RuntimeError(output or f"PowerShell exited with code {completed.returncode}")
+            missing = self._wait_for_windows_ocr_capabilities(capabilities)
+            if missing:
+                raise RuntimeError(
+                    "Windows reported that these OCR capabilities are still not installed: "
+                    + ", ".join(missing)
+                )
+            try:
+                import ocr
+                ocr._UNIVERSAL_OCR_ENGINE = None
+            except Exception:
+                pass
             if self._cancel_requested.is_set():
-                self._finish_language_task("Windows OCR", "Отменено" if self.lang == "ru" else "Canceled")
+                self._finish_language_task("Windows OCR", language_manager_text(self.lang, "canceled"))
                 return
-            self._emit_language_progress("Windows OCR: готово" if self.lang == "ru" else "Windows OCR: done", 100, True)
+            self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
             self._finish_language_task("Windows OCR")
         except Exception as exc:
             self._finish_language_task("Windows OCR", str(exc))
@@ -2196,18 +2857,18 @@ class OcrLanguageManagerDialog(QDialog):
             total = max(1, len(codes))
             for index, code in enumerate(codes, 1):
                 if self._cancel_requested.is_set():
-                    self._finish_language_task("EasyOCR", "Отменено" if self.lang == "ru" else "Canceled")
+                    self._finish_language_task("EasyOCR", language_manager_text(self.lang, "canceled"))
                     return
                 language = next((item for item in APP_LANGUAGES if item.code == code), None)
                 language_name = language.display_name(self.lang) if language else code.upper()
                 self._emit_language_progress(
-                    f"EasyOCR: загружаю модели {language_name}..." if self.lang == "ru" else f"EasyOCR: downloading {language_name} models...",
+                    language_manager_text(self.lang, "easy_down", language=language_name),
                     int((index - 1) * 100 / total),
                     True,
                 )
                 if not ocr.easyocr_available(code):
                     raise RuntimeError(f"EasyOCR could not prepare models for {language_name}")
-            self._emit_language_progress("EasyOCR: готово" if self.lang == "ru" else "EasyOCR: done", 100, True)
+            self._emit_language_progress(language_manager_text(self.lang, "easy_done"), 100, True)
             self._finish_language_task("EasyOCR")
         except Exception as exc:
             self._finish_language_task("EasyOCR", str(exc))
@@ -2249,7 +2910,7 @@ class OcrLanguageManagerDialog(QDialog):
                 cancel_callback=lambda: self._cancel_requested.is_set(),
             )
             if self._cancel_requested.is_set():
-                self._finish_language_task("Argos", "Отменено" if self.lang == "ru" else "Canceled")
+                self._finish_language_task("Argos", language_manager_text(self.lang, "canceled"))
                 return
             self._finish_language_task("Argos")
         except Exception as exc:
@@ -2304,16 +2965,19 @@ class SettingsWindow(QWidget):
         self._tesseract_install_phase = "idle"
         self._tesseract_temp_dir = ""
         self._tesseract_cancel_requested = threading.Event()
+        self._tesseract_progress_owner = None
         self._rapidocr_install_in_progress = False
         self._rapidocr_install_phase = "idle"
         self._rapidocr_temp_dir = ""
         self._rapidocr_install_process = None
         self._rapidocr_cancel_requested = threading.Event()
+        self._rapidocr_progress_owner = None
         self._easyocr_install_in_progress = False
         self._easyocr_install_phase = "idle"
         self._easyocr_temp_dir = ""
         self._easyocr_install_process = None
         self._easyocr_cancel_requested = threading.Event()
+        self._easyocr_progress_owner = None
         self._hymt_install_in_progress = False
         self._hymt_install_phase = "idle"
         self._hymt_temp_dir = ""
@@ -3231,7 +3895,12 @@ class SettingsWindow(QWidget):
                 json.dump([], f, ensure_ascii=False, indent=4)
             self.load_history_embedded()
         except Exception:
-            QMessageBox.warning(self, "Ошибка", "Не удалось очистить историю переводов.")
+            lang = self.parent.current_interface_language
+            QMessageBox.warning(
+                self,
+                settings_text(lang, "error_title"),
+                settings_text(lang, "clear_translation_history_error"),
+            )
 
     def back_from_history(self):
         self.init_ui()
@@ -3300,7 +3969,12 @@ class SettingsWindow(QWidget):
                 json.dump([], f, ensure_ascii=False, indent=4)
             self.load_copy_history_embedded()
         except Exception:
-            QMessageBox.warning(self, "Ошибка", "Не удалось очистить историю копирований.")
+            lang = self.parent.current_interface_language
+            QMessageBox.warning(
+                self,
+                settings_text(lang, "error_title"),
+                settings_text(lang, "clear_copy_history_error"),
+            )
 
     def back_from_copy_history(self):
         self.init_ui()
@@ -3322,32 +3996,20 @@ class SettingsWindow(QWidget):
 
     def check_for_updates(self):
         lang = self.parent.current_interface_language
-        is_ru = lang == "ru"
 
         if portable_paths.is_windows_packaged():
             if not QDesktopServices.openUrl(QUrl(MICROSOFT_STORE_UPDATES_URI)):
                 QMessageBox.information(
                     self,
                     settings_text(lang, "update"),
-                    (
-                        "Обновления этой версии устанавливает Microsoft Store. "
-                        "Откройте Библиотеку Microsoft Store и нажмите «Получить обновления»."
-                        if is_ru
-                        else
-                        "Updates for this version are delivered by Microsoft Store. "
-                        "Open the Microsoft Store Library and choose Get updates."
-                    ),
+                    update_text(lang, "store_updates"),
                 )
             return
 
         if not getattr(sys, "frozen", False):
             msg = QMessageBox(self)
             msg.setWindowTitle(settings_text(lang, "update"))
-            msg.setText(
-                "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?"
-                if is_ru else
-                "Auto-update is available only in the packaged app.\nOpen releases page?"
-            )
+            msg.setText(update_text(lang, "dev_build"))
             msg.setIcon(QMessageBox.Information)
             msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
@@ -3363,12 +4025,12 @@ class SettingsWindow(QWidget):
         self._start_update_check()
 
     def _start_update_check(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._update_cancel_requested.clear()
         self._update_phase = "checking"
         self._update_temp_dir = ""
-        self._set_update_controls_enabled(False, "Проверка..." if is_ru else "Checking...")
-        self._show_update_progress("Проверка обновлений..." if is_ru else "Checking updates...")
+        self._set_update_controls_enabled(False, update_text(lang, "checking_button"))
+        self._show_update_progress(update_text(lang, "checking"))
         self._update_in_progress = True
 
         worker = threading.Thread(target=self._check_latest_release_worker, daemon=True)
@@ -3430,7 +4092,7 @@ class SettingsWindow(QWidget):
 
     @QtCore.pyqtSlot(str, int, int)
     def _on_update_download_progress(self, stage_text, downloaded_bytes, total_bytes):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         downloaded_bytes = max(0, int(downloaded_bytes))
         total_bytes = max(0, int(total_bytes))
         downloaded_mb = downloaded_bytes / (1024 * 1024)
@@ -3440,13 +4102,13 @@ class SettingsWindow(QWidget):
             total_mb = total_bytes / (1024 * 1024)
             label = f"{stage_text}\n{downloaded_mb:.1f}/{total_mb:.1f} MB ({percent}%)"
             self._show_update_progress(label, determinate=True, value=percent)
-            prefix = "Скачивание" if is_ru else "Downloading"
+            prefix = update_text(lang, "downloading_word")
             self._set_update_controls_enabled(False, f"{prefix} {percent}%")
             return
 
         label = f"{stage_text}\n{downloaded_mb:.1f} MB"
         self._show_update_progress(label, determinate=False)
-        self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
+        self._set_update_controls_enabled(False, update_text(lang, "downloading_button"))
 
     def _hide_update_progress(self):
         if hasattr(self, "_update_progress") and self._update_progress is not None:
@@ -3485,38 +4147,31 @@ class SettingsWindow(QWidget):
         if not self._update_in_progress:
             return
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self._is_update_apply_stage():
             self._show_update_progress(
-                "Обновление уже применяется.\nПожалуйста, подождите..." if is_ru else
-                "The update is being applied.\nPlease wait...",
+                update_text(lang, "apply_wait"),
                 determinate=False
             )
             QMessageBox.information(
                 self,
-                settings_text(self.parent.current_interface_language, "update"),
-                "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите."
-                if is_ru else
-                "The update is already being applied. Closing is disabled right now.\nPlease wait."
+                settings_text(lang, "update"),
+                update_text(lang, "apply_close"),
             )
             return
 
         if not self._update_cancel_requested.is_set():
             self._update_cancel_requested.set()
             self._update_phase = "canceling"
-            self._set_update_controls_enabled(False, "Отмена..." if is_ru else "Canceling...")
+            self._set_update_controls_enabled(False, update_text(lang, "canceling_button"))
             self._show_update_progress(
-                "Отмена обновления...\nУдаляем временные файлы, пожалуйста, подождите."
-                if is_ru else
-                "Canceling the update...\nCleaning temporary files, please wait.",
+                update_text(lang, "canceling_clean"),
                 determinate=False
             )
             return
 
         self._show_update_progress(
-            "Отмена обновления...\nПожалуйста, подождите."
-            if is_ru else
-            "Canceling the update...\nPlease wait.",
+            update_text(lang, "canceling_wait"),
             determinate=False
         )
 
@@ -3540,7 +4195,7 @@ class SettingsWindow(QWidget):
         )
 
     def _check_latest_release_worker(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         try:
             headers = {
                 "Accept": "application/vnd.github+json",
@@ -3555,7 +4210,7 @@ class SettingsWindow(QWidget):
                 return
             self._post_update_check_result({
                 "status": "error",
-                "error": ("Не удалось проверить обновления:\n" if is_ru else "Failed to check for updates:\n") + str(e),
+                "error": update_text(lang, "check_failed", error=str(e)),
             })
             return
 
@@ -3602,7 +4257,7 @@ class SettingsWindow(QWidget):
 
     @QtCore.pyqtSlot(str)
     def _on_update_check_result(self, payload_text):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._update_in_progress = False
         self._update_phase = "idle"
         self._set_update_controls_enabled(True)
@@ -3611,7 +4266,7 @@ class SettingsWindow(QWidget):
         try:
             payload = json.loads(payload_text)
         except Exception:
-            payload = {"status": "error", "error": "Не удалось обработать ответ от сервера обновлений." if is_ru else "Failed to parse update response."}
+            payload = {"status": "error", "error": update_text(lang, "parse_failed")}
 
         status = payload.get("status")
         latest_version = payload.get("latest_version") or APP_VERSION
@@ -3621,39 +4276,35 @@ class SettingsWindow(QWidget):
             self._cleanup_update_temp_dir()
             QMessageBox.information(
                 self,
-                settings_text(self.parent.current_interface_language, "update"),
-                "Проверка обновлений отменена." if is_ru else "Update check was canceled."
+                settings_text(lang, "update"),
+                update_text(lang, "check_cancelled"),
             )
             return
 
         if status == "error":
             QMessageBox.warning(
                 self,
-                "Ошибка обновления" if is_ru else "Update error",
-                payload.get("error", "Unknown update error.")
+                update_text(lang, "error_title"),
+                payload.get("error", update_text(lang, "unknown_error")),
             )
             return
 
         if status == "up_to_date":
             QMessageBox.information(
                 self,
-                "Обновление" if is_ru else "Update",
-                f"У вас уже актуальная версия: V{APP_VERSION}" if is_ru else f"You already have the latest version: V{APP_VERSION}"
+                settings_text(lang, "update"),
+                update_text(lang, "up_to_date", version=APP_VERSION),
             )
             return
 
         if status in ("no_asset", "invalid_asset"):
             msg = QMessageBox(self)
-            msg.setWindowTitle(settings_text(self.parent.current_interface_language, "update"))
-            msg.setText(
-                "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?"
-                if is_ru else
-                "No compatible auto-update asset found in the release. Open releases page?"
-            )
+            msg.setWindowTitle(settings_text(lang, "update"))
+            msg.setText(update_text(lang, "no_asset"))
             msg.setIcon(QMessageBox.Information)
             msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton(settings_text(self.parent.current_interface_language, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(self.parent.current_interface_language, "cancel"), QMessageBox.NoRole)
+            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
+            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
             msg.exec_()
             if msg.clickedButton() == yes_btn:
                 webbrowser.open(GITHUB_RELEASES_PAGE)
@@ -3666,22 +4317,18 @@ class SettingsWindow(QWidget):
             if not asset_url:
                 QMessageBox.warning(
                     self,
-                    "Ошибка обновления" if is_ru else "Update error",
-                    "Некорректный URL файла обновления." if is_ru else "Invalid update asset URL."
+                    update_text(lang, "error_title"),
+                    update_text(lang, "invalid_url"),
                 )
                 return
 
             confirm = QMessageBox(self)
-            confirm.setWindowTitle("Доступно обновление" if is_ru else "Update available")
+            confirm.setWindowTitle(update_text(lang, "available_title"))
             confirm.setIcon(QMessageBox.Question)
             confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            confirm.setText(
-                f"Найдена новая версия: V{latest_version}\nТекущая версия: V{APP_VERSION}\n\nУстановить сейчас?"
-                if is_ru else
-                f"New version found: V{latest_version}\nCurrent version: V{APP_VERSION}\n\nInstall now?"
-            )
-            yes_btn = confirm.addButton(settings_text(self.parent.current_interface_language, "install"), QMessageBox.YesRole)
-            confirm.addButton(settings_text(self.parent.current_interface_language, "later"), QMessageBox.NoRole)
+            confirm.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
+            yes_btn = confirm.addButton(settings_text(lang, "install"), QMessageBox.YesRole)
+            confirm.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
             confirm.exec_()
             if confirm.clickedButton() != yes_btn:
                 return
@@ -3689,13 +4336,13 @@ class SettingsWindow(QWidget):
             self._start_update_download(asset_url, asset_name, latest_version, checksum_url)
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._update_in_progress = True
         self._update_phase = "preparing_download"
         self._update_temp_dir = ""
         self._update_cancel_requested.clear()
-        self._set_update_controls_enabled(False, "Скачивание..." if is_ru else "Downloading...")
-        self._show_update_progress("Подготовка загрузки..." if is_ru else "Preparing download...", determinate=False)
+        self._set_update_controls_enabled(False, update_text(lang, "downloading_button"))
+        self._show_update_progress(update_text(lang, "preparing_download"), determinate=False)
         worker = threading.Thread(
             target=self._download_and_prepare_update,
             args=(asset_url, asset_name, latest_version, checksum_url),
@@ -3831,11 +4478,11 @@ class SettingsWindow(QWidget):
     def _download_and_prepare_update(self, asset_url, asset_name, latest_version, checksum_url=""):
         temp_dir = None
         try:
-            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
-            stage_download = "Загрузка файла обновления..." if is_ru else "Downloading update package..."
-            stage_checksum = "Загрузка контрольной суммы..." if is_ru else "Downloading checksum..."
-            stage_verify = "Проверка контрольной суммы..." if is_ru else "Verifying checksum..."
-            stage_prepare = "Подготовка обновления..." if is_ru else "Preparing update..."
+            lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
+            stage_download = update_text(lang, "stage_download")
+            stage_checksum = update_text(lang, "stage_checksum")
+            stage_verify = update_text(lang, "stage_verify")
+            stage_prepare = update_text(lang, "stage_prepare")
 
             def _emit_stage_text(stage_text):
                 QMetaObject.invokeMethod(
@@ -4095,6 +4742,8 @@ try {
     Write-UpdateLog "Updated executable started"
     $updateApplied = $true
 }
+
+
 catch {
     Write-UpdateLog ("Updater failed: " + $_.Exception.Message)
     if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
@@ -4187,13 +4836,11 @@ finally {
         self._set_update_controls_enabled(True)
         self._hide_update_progress()
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
-            "Обновление" if is_ru else "Update",
-            "Обновление отменено. Временные файлы удалены."
-            if is_ru else
-            "Update canceled. Temporary files were removed."
+            settings_text(lang, "update"),
+            update_text(lang, "cancelled"),
         )
 
     @pyqtSlot(str)
@@ -4210,11 +4857,11 @@ finally {
                 pass
             self._update_progress = None
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
-            "Ошибка обновления" if is_ru else "Update error",
-            ("Не удалось установить обновление:\n" if is_ru else "Failed to install update:\n") + str(error_text)
+            update_text(lang, "error_title"),
+            update_text(lang, "install_failed", error=str(error_text)),
         )
 
     @pyqtSlot(str)
@@ -4224,13 +4871,9 @@ finally {
         self._update_temp_dir = ""
         self._update_cancel_requested.clear()
 
-        is_ru = self.parent.current_interface_language == "ru"
-        restart_text = (
-            f"Обновление до V{latest_version} готово.\nПерезапуск приложения..."
-            if is_ru else
-            f"Update V{latest_version} is ready.\nRestarting the app..."
-        )
-        self._set_update_controls_enabled(False, "Перезапуск..." if is_ru else "Restarting...")
+        lang = self.parent.current_interface_language
+        restart_text = update_text(lang, "restart_ready", version=latest_version)
+        self._set_update_controls_enabled(False, update_text(lang, "restarting"))
         self._show_update_progress(restart_text, determinate=False)
         QtCore.QTimer.singleShot(800, self._exit_application_for_update_restart)
 
@@ -4642,19 +5285,15 @@ finally {
             self.save_ocr_engine("Tesseract")
             return
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         msg = QMessageBox(self)
-        msg.setWindowTitle("Tesseract не найден" if is_ru else "Tesseract not found")
-        msg.setText(
-            "Tesseract-OCR не найден. Скачать и установить локально?"
-            if is_ru else
-            "Tesseract-OCR was not found. Download and install it locally?"
-        )
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
+        msg.setText(engine_text(lang, "tesseract_prompt"))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
+        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
             self.start_tesseract_install()
@@ -4671,27 +5310,17 @@ finally {
             self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
             return
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         msg = QMessageBox(self)
-        msg.setWindowTitle("EasyOCR не найден" if is_ru else "EasyOCR not found")
-        msg.setText(
-            "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\n"
-            "Понадобится Python той же версии, что у сборки, и интернет. Пакет большой: он тянет "
-            "PyTorch/torchvision, а модели будут докачиваться при первом распознавании выбранного "
-            "языка. Пакеты будут сохранены в ocr\\easyocr."
-            if is_ru else
-            "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\n"
-            "This needs internet and a Python interpreter matching the app build. This is a large "
-            "package: it pulls PyTorch/torchvision, and language models are downloaded on first "
-            "recognition. Packages will be saved to ocr\\easyocr."
-        )
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="EasyOCR"))
+        msg.setText(engine_text(lang, "easyocr_prompt"))
         if error and self._local_easyocr_installed():
             msg.setDetailedText(str(error))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
+        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
             self.start_easyocr_install()
@@ -4708,25 +5337,17 @@ finally {
             self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
             return
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         msg = QMessageBox(self)
-        msg.setWindowTitle("RapidOCR не найден" if is_ru else "RapidOCR not found")
-        msg.setText(
-            "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\n"
-            "Понадобится Python той же версии, что у сборки, и интернет. Пакеты будут сохранены в "
-            "ocr\\rapidocr, модели будут кешироваться там же при первом распознавании."
-            if is_ru else
-            "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\n"
-            "This needs internet and a Python interpreter matching the app build. Packages will be saved to "
-            "ocr\\rapidocr, and models will be cached there on first recognition."
-        )
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="RapidOCR"))
+        msg.setText(engine_text(lang, "rapidocr_prompt"))
         if error and self._local_rapidocr_installed():
             msg.setDetailedText(str(error))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
+        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
             self.start_rapidocr_install()
@@ -4865,21 +5486,15 @@ finally {
             self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
             return
 
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         msg = QMessageBox(self)
-        msg.setWindowTitle("Hy-MT не найден" if is_ru else "Hy-MT not found")
-        msg.setText(
-            "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\n"
-            "Будет скачано около 1.2 ГБ: модель Hy-MT и локальный llama.cpp runtime."
-            if is_ru else
-            "The local Hy-MT model is not installed. Download and install the offline translation package?\n\n"
-            "About 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime."
-        )
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
+        msg.setText(engine_text(lang, "hymt_prompt"))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton("Установить" if is_ru else "Install", QMessageBox.YesRole)
-        msg.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
+        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
             self.start_hymt_install()
@@ -4892,7 +5507,7 @@ finally {
     def start_download_thread(self):
         self.start_tesseract_install()
 
-    def start_tesseract_install(self):
+    def start_tesseract_install(self, progress_owner=None):
         if (
             self._tesseract_install_in_progress
             or self._rapidocr_install_in_progress
@@ -4900,15 +5515,16 @@ finally {
             or self._hymt_install_in_progress
         ):
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._tesseract_install_in_progress = True
         self._tesseract_install_phase = "starting"
         self._tesseract_cancel_requested.clear()
         self._tesseract_temp_dir = ""
+        self._tesseract_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
         self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
-        self._show_tesseract_progress("Подготовка установки Tesseract..." if is_ru else "Preparing Tesseract install...", 0)
+        self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
         threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
 
     def _get_tesseract_bundle_url(self, is_x64=True):
@@ -4935,7 +5551,7 @@ finally {
         backup_dir = ""
         final_dir = self._local_tesseract_dir()
         try:
-            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             machine = platform.machine().lower()
             is_x64 = machine in ("amd64", "x86_64")
             bundle_url = self._get_tesseract_bundle_url(is_x64)
@@ -4945,7 +5561,7 @@ finally {
             extract_dir = os.path.join(temp_dir, "extract")
             os.makedirs(extract_dir, exist_ok=True)
 
-            download_text = "Загрузка Tesseract..." if is_ru else "Downloading Tesseract..."
+            download_text = engine_text(lang, "downloading_engine", engine="Tesseract")
             self._tesseract_install_phase = "downloading"
             self._emit_tesseract_progress(download_text, 1)
 
@@ -4967,7 +5583,7 @@ finally {
             if not zipfile.is_zipfile(bundle_path):
                 raise RuntimeError("Downloaded Tesseract bundle is not a zip archive.")
 
-            extract_text = "Распаковка Tesseract..." if is_ru else "Extracting Tesseract..."
+            extract_text = engine_text(lang, "extracting_engine", engine="Tesseract")
             self._tesseract_install_phase = "extracting"
             self._emit_tesseract_progress(extract_text, 74)
             with zipfile.ZipFile(bundle_path, "r") as zip_ref:
@@ -4992,7 +5608,7 @@ finally {
                 if os.path.isfile(model_path) and os.path.getsize(model_path) > 1024:
                     continue
                 self._check_tesseract_cancel_requested()
-                model_text = f"Загрузка языковой модели {name}..." if is_ru else f"Downloading language data {name}..."
+                model_text = engine_text(lang, "downloading_language", name=name)
                 start = 82 + index * 6
 
                 def model_progress(done, total, base=start, label=model_text):
@@ -5012,7 +5628,7 @@ finally {
 
             self._check_tesseract_cancel_requested()
             self._tesseract_install_phase = "applying"
-            self._emit_tesseract_progress("Применение установки..." if is_ru else "Applying install...", 96)
+            self._emit_tesseract_progress(engine_text(lang, "applying"), 96)
             os.makedirs(os.path.dirname(final_dir), exist_ok=True)
             if os.path.isdir(final_dir):
                 backup_dir = f"{final_dir}.backup-{int(time.time())}"
@@ -5026,7 +5642,7 @@ finally {
             if not final_exe:
                 raise RuntimeError("tesseract.exe not found after applying install")
 
-            self._emit_tesseract_progress("Готово" if is_ru else "Done", 100)
+            self._emit_tesseract_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(
                 self,
                 "_on_tesseract_install_ready",
@@ -5058,12 +5674,17 @@ finally {
             self._tesseract_temp_dir = ""
 
     def _show_tesseract_progress(self, text, percent=0, determinate=True):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if not hasattr(self, "progress") or self.progress is None:
-            self.progress = TesseractInstallProgressDialog(self)
+            self.progress = TesseractInstallProgressDialog(
+                self,
+                anchor_owner=self._tesseract_progress_owner,
+            )
             self.progress.setWindowTitle("Tesseract")
-            self.progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
-            self.progress.setWindowModality(Qt.NonModal)
+            self.progress.setCancelButtonText(engine_text(lang, "cancel"))
+            self.progress.setWindowModality(
+                Qt.WindowModal if self._tesseract_progress_owner is not None else Qt.NonModal
+            )
             self.progress.setAutoClose(False)
             self.progress.setAutoReset(False)
             self.progress.setMinimumDuration(0)
@@ -5106,14 +5727,15 @@ finally {
     def _request_tesseract_install_cancel(self):
         if not self._tesseract_install_in_progress:
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._tesseract_cancel_requested.set()
-        self._show_tesseract_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
+        self._show_tesseract_progress(engine_text(lang, "canceling"), 0, False)
 
     def _finish_tesseract_install_state(self):
         self._tesseract_install_in_progress = False
         self._tesseract_install_phase = "idle"
         self._tesseract_cancel_requested.clear()
+        self._tesseract_progress_owner = None
         self.ocr_engine_combo.setEnabled(True)
         self._sync_ocr_engine_delete_button()
         self._restore_parent_topmost_after_tesseract_install()
@@ -5130,11 +5752,11 @@ finally {
         self._set_ocr_combo_silently("Tesseract")
         self.save_ocr_engine("Tesseract")
         self._sync_ocr_engine_delete_button()
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
             "Tesseract",
-            "Tesseract установлен и готов к работе." if is_ru else "Tesseract is installed and ready."
+            engine_text(lang, "ready", engine="Tesseract"),
         )
 
     @QtCore.pyqtSlot(str)
@@ -5145,11 +5767,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
-            "Ошибка Tesseract" if is_ru else "Tesseract error",
-            ("Не удалось установить Tesseract:\n" if is_ru else "Failed to install Tesseract:\n") + str(error)
+            engine_text(lang, "error_title", engine="Tesseract"),
+            engine_text(lang, "install_failed", engine="Tesseract", error=str(error)),
         )
 
     @QtCore.pyqtSlot()
@@ -5160,13 +5782,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
-            "Отмена" if is_ru else "Cancelled",
-            "Установка Tesseract отменена. Временные файлы удалены."
-            if is_ru else
-            "Tesseract installation canceled. Temporary files were removed."
+            engine_text(lang, "cancelled_title"),
+            engine_text(lang, "install_cancelled", engine="Tesseract"),
         )
 
     def _emit_rapidocr_progress(self, text, percent=0, determinate=True):
@@ -5251,7 +5871,7 @@ finally {
         except Exception:
             pass
 
-    def start_rapidocr_install(self):
+    def start_rapidocr_install(self, progress_owner=None):
         if (
             self._rapidocr_install_in_progress
             or self._tesseract_install_in_progress
@@ -5259,17 +5879,18 @@ finally {
             or self._hymt_install_in_progress
         ):
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._rapidocr_install_in_progress = True
         self._rapidocr_install_phase = "starting"
         self._rapidocr_cancel_requested.clear()
         self._rapidocr_temp_dir = ""
         self._rapidocr_install_process = None
+        self._rapidocr_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
         self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_rapidocr_progress(
-            "Подготовка установки RapidOCR..." if is_ru else "Preparing RapidOCR install...",
+            engine_text(lang, "preparing", engine="RapidOCR"),
             0,
             False
         )
@@ -5280,7 +5901,7 @@ finally {
         backup_dir = ""
         final_dir = self._local_rapidocr_dir()
         try:
-            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             python_command = self._find_rapidocr_install_python_command()
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_rapidocr_")
             self._rapidocr_temp_dir = temp_dir
@@ -5288,7 +5909,7 @@ finally {
             os.makedirs(package_root, exist_ok=True)
 
             self._rapidocr_install_phase = "installing"
-            install_text = "Загрузка и установка пакетов RapidOCR..." if is_ru else "Downloading and installing RapidOCR packages..."
+            install_text = engine_text(lang, "downloading_packages", engine="RapidOCR")
             self._emit_rapidocr_progress(install_text, 0, False)
             cmd = [
                 *python_command,
@@ -5337,7 +5958,7 @@ finally {
                 raise RuntimeError("RapidOCR packages were not found after pip install.")
 
             self._rapidocr_install_phase = "applying"
-            self._emit_rapidocr_progress("Применение установки..." if is_ru else "Applying install...", 92)
+            self._emit_rapidocr_progress(engine_text(lang, "applying"), 92)
             os.makedirs(os.path.dirname(final_dir), exist_ok=True)
             if os.path.isdir(final_dir):
                 backup_dir = f"{final_dir}.backup-{int(time.time())}"
@@ -5351,7 +5972,7 @@ finally {
                 shutil.rmtree(backup_dir, ignore_errors=True)
                 backup_dir = ""
 
-            self._emit_rapidocr_progress("Готово" if is_ru else "Done", 100)
+            self._emit_rapidocr_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(self, "_on_rapidocr_install_ready", Qt.QueuedConnection)
         except (RapidOCRInstallCancelledError, UpdateCancelledError):
             self._restore_rapidocr_backup(final_dir, backup_dir)
@@ -5378,16 +5999,19 @@ finally {
             self._rapidocr_temp_dir = ""
 
     def _show_rapidocr_progress(self, text, percent=0, determinate=True):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self.rapidocr_progress is None:
             self.rapidocr_progress = TesseractInstallProgressDialog(
                 self,
                 title=RAPIDOCR_ENGINE_DISPLAY,
                 in_progress_attr="_rapidocr_install_in_progress",
-                cancel_callback=self._request_rapidocr_install_cancel
+                cancel_callback=self._request_rapidocr_install_cancel,
+                anchor_owner=self._rapidocr_progress_owner,
             )
-            self.rapidocr_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
-            self.rapidocr_progress.setWindowModality(Qt.NonModal)
+            self.rapidocr_progress.setCancelButtonText(engine_text(lang, "cancel"))
+            self.rapidocr_progress.setWindowModality(
+                Qt.WindowModal if self._rapidocr_progress_owner is not None else Qt.NonModal
+            )
             self.rapidocr_progress.setAutoClose(False)
             self.rapidocr_progress.setAutoReset(False)
             self.rapidocr_progress.setMinimumDuration(0)
@@ -5429,7 +6053,7 @@ finally {
     def _request_rapidocr_install_cancel(self):
         if not self._rapidocr_install_in_progress:
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._rapidocr_cancel_requested.set()
         process = self._rapidocr_install_process
         if process is not None and process.poll() is None:
@@ -5437,13 +6061,14 @@ finally {
                 process.terminate()
             except Exception:
                 pass
-        self._show_rapidocr_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
+        self._show_rapidocr_progress(engine_text(lang, "canceling"), 0, False)
 
     def _finish_rapidocr_install_state(self):
         self._rapidocr_install_in_progress = False
         self._rapidocr_install_phase = "idle"
         self._rapidocr_cancel_requested.clear()
         self._rapidocr_install_process = None
+        self._rapidocr_progress_owner = None
         if hasattr(self, "ocr_engine_combo"):
             self.ocr_engine_combo.setEnabled(True)
         self._sync_ocr_engine_delete_button()
@@ -5458,13 +6083,11 @@ finally {
         self._set_ocr_combo_silently(RAPIDOCR_ENGINE_DISPLAY)
         self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
         self._sync_ocr_engine_delete_button()
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
             RAPIDOCR_ENGINE_DISPLAY,
-            "RapidOCR установлен. При первом распознавании он может докачать модели в локальную папку."
-            if is_ru else
-            "RapidOCR is installed. On first recognition it may download models into the local folder."
+            engine_text(lang, "ready", engine="RapidOCR"),
         )
 
     @QtCore.pyqtSlot(str)
@@ -5475,11 +6098,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
-            "Ошибка RapidOCR" if is_ru else "RapidOCR error",
-            ("Не удалось установить RapidOCR:\n" if is_ru else "Failed to install RapidOCR:\n") + str(error)
+            engine_text(lang, "error_title", engine="RapidOCR"),
+            engine_text(lang, "install_failed", engine="RapidOCR", error=str(error)),
         )
 
     @QtCore.pyqtSlot()
@@ -5490,13 +6113,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
-            "Отмена" if is_ru else "Cancelled",
-            "Установка RapidOCR отменена. Временные файлы удалены."
-            if is_ru else
-            "RapidOCR installation canceled. Temporary files were removed."
+            engine_text(lang, "cancelled_title"),
+            engine_text(lang, "install_cancelled", engine="RapidOCR"),
         )
 
     def _emit_easyocr_progress(self, text, percent=0, determinate=True):
@@ -5513,7 +6134,7 @@ finally {
         if self._easyocr_cancel_requested.is_set():
             raise EasyOCRInstallCancelledError("EasyOCR installation canceled by user.")
 
-    def start_easyocr_install(self):
+    def start_easyocr_install(self, progress_owner=None):
         if (
             self._easyocr_install_in_progress
             or self._rapidocr_install_in_progress
@@ -5521,17 +6142,18 @@ finally {
             or self._hymt_install_in_progress
         ):
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._easyocr_install_in_progress = True
         self._easyocr_install_phase = "starting"
         self._easyocr_cancel_requested.clear()
         self._easyocr_temp_dir = ""
         self._easyocr_install_process = None
+        self._easyocr_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
         self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_easyocr_progress(
-            "Подготовка установки EasyOCR..." if is_ru else "Preparing EasyOCR install...",
+            engine_text(lang, "preparing", engine="EasyOCR"),
             0,
             False
         )
@@ -5542,7 +6164,7 @@ finally {
         backup_dir = ""
         final_dir = self._local_easyocr_dir()
         try:
-            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             python_command = self._find_rapidocr_install_python_command(
                 EASYOCR_ENGINE_DISPLAY,
                 final_dir,
@@ -5553,7 +6175,7 @@ finally {
             os.makedirs(package_root, exist_ok=True)
 
             self._easyocr_install_phase = "installing"
-            install_text = "Загрузка и установка пакетов EasyOCR..." if is_ru else "Downloading and installing EasyOCR packages..."
+            install_text = engine_text(lang, "downloading_packages", engine="EasyOCR")
             self._emit_easyocr_progress(install_text, 0, False)
             cmd = [
                 *python_command,
@@ -5602,7 +6224,7 @@ finally {
                 raise RuntimeError("EasyOCR packages were not found after pip install.")
 
             self._easyocr_install_phase = "applying"
-            self._emit_easyocr_progress("Применение установки..." if is_ru else "Applying install...", 92)
+            self._emit_easyocr_progress(engine_text(lang, "applying"), 92)
             os.makedirs(os.path.dirname(final_dir), exist_ok=True)
             if os.path.isdir(final_dir):
                 backup_dir = f"{final_dir}.backup-{int(time.time())}"
@@ -5616,7 +6238,7 @@ finally {
                 shutil.rmtree(backup_dir, ignore_errors=True)
                 backup_dir = ""
 
-            self._emit_easyocr_progress("Готово" if is_ru else "Done", 100)
+            self._emit_easyocr_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(self, "_on_easyocr_install_ready", Qt.QueuedConnection)
         except (EasyOCRInstallCancelledError, UpdateCancelledError):
             self._restore_rapidocr_backup(final_dir, backup_dir)
@@ -5643,16 +6265,19 @@ finally {
             self._easyocr_temp_dir = ""
 
     def _show_easyocr_progress(self, text, percent=0, determinate=True):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self.easyocr_progress is None:
             self.easyocr_progress = TesseractInstallProgressDialog(
                 self,
                 title=EASYOCR_ENGINE_DISPLAY,
                 in_progress_attr="_easyocr_install_in_progress",
-                cancel_callback=self._request_easyocr_install_cancel
+                cancel_callback=self._request_easyocr_install_cancel,
+                anchor_owner=self._easyocr_progress_owner,
             )
-            self.easyocr_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
-            self.easyocr_progress.setWindowModality(Qt.NonModal)
+            self.easyocr_progress.setCancelButtonText(engine_text(lang, "cancel"))
+            self.easyocr_progress.setWindowModality(
+                Qt.WindowModal if self._easyocr_progress_owner is not None else Qt.NonModal
+            )
             self.easyocr_progress.setAutoClose(False)
             self.easyocr_progress.setAutoReset(False)
             self.easyocr_progress.setMinimumDuration(0)
@@ -5694,7 +6319,7 @@ finally {
     def _request_easyocr_install_cancel(self):
         if not self._easyocr_install_in_progress:
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._easyocr_cancel_requested.set()
         process = self._easyocr_install_process
         if process is not None and process.poll() is None:
@@ -5702,13 +6327,14 @@ finally {
                 process.terminate()
             except Exception:
                 pass
-        self._show_easyocr_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
+        self._show_easyocr_progress(engine_text(lang, "canceling"), 0, False)
 
     def _finish_easyocr_install_state(self):
         self._easyocr_install_in_progress = False
         self._easyocr_install_phase = "idle"
         self._easyocr_cancel_requested.clear()
         self._easyocr_install_process = None
+        self._easyocr_progress_owner = None
         if hasattr(self, "ocr_engine_combo"):
             self.ocr_engine_combo.setEnabled(True)
         self._sync_ocr_engine_delete_button()
@@ -5723,13 +6349,11 @@ finally {
         self._set_ocr_combo_silently(EASYOCR_ENGINE_DISPLAY)
         self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
         self._sync_ocr_engine_delete_button()
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
             EASYOCR_ENGINE_DISPLAY,
-            "EasyOCR установлен. При первом распознавании выбранного языка он может докачать модели в локальную папку."
-            if is_ru else
-            "EasyOCR is installed. On first recognition for a language it may download models into the local folder."
+            engine_text(lang, "ready", engine="EasyOCR"),
         )
 
     @QtCore.pyqtSlot(str)
@@ -5740,11 +6364,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
-            "Ошибка EasyOCR" if is_ru else "EasyOCR error",
-            ("Не удалось установить EasyOCR:\n" if is_ru else "Failed to install EasyOCR:\n") + str(error)
+            engine_text(lang, "error_title", engine="EasyOCR"),
+            engine_text(lang, "install_failed", engine="EasyOCR", error=str(error)),
         )
 
     @QtCore.pyqtSlot()
@@ -5755,13 +6379,11 @@ finally {
         prev_engine = self.previous_ocr_engine or "Windows"
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
-            "Отмена" if is_ru else "Cancelled",
-            "Установка EasyOCR отменена. Временные файлы удалены."
-            if is_ru else
-            "EasyOCR installation canceled. Temporary files were removed."
+            engine_text(lang, "cancelled_title"),
+            engine_text(lang, "install_cancelled", engine="EasyOCR"),
         )
 
     def start_hymt_install(self):
@@ -5772,7 +6394,7 @@ finally {
             or self._easyocr_install_in_progress
         ):
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._hymt_install_in_progress = True
         self._hymt_install_phase = "starting"
         self._hymt_cancel_requested.clear()
@@ -5781,7 +6403,7 @@ finally {
         self._sync_translator_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_hymt_progress(
-            "Подготовка установки Hy-MT..." if is_ru else "Preparing Hy-MT install...",
+            engine_text(lang, "preparing", engine="Hy-MT"),
             0
         )
         threading.Thread(target=self._install_hymt_worker, daemon=True).start()
@@ -5851,7 +6473,7 @@ finally {
         backup_dir = ""
         final_dir = self._local_hymt_dir()
         try:
-            is_ru = getattr(getattr(self, "parent", None), "current_interface_language", "en") == "ru"
+            lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             machine = platform.machine().lower()
             is_x64 = machine in ("amd64", "x86_64")
             plan = self._get_hymt_download_plan(is_x64)
@@ -5861,7 +6483,7 @@ finally {
             runtime_dir = os.path.join(package_root, "runtime")
             os.makedirs(runtime_dir, exist_ok=True)
 
-            runtime_text = "Загрузка runtime Hy-MT..." if is_ru else "Downloading Hy-MT runtime..."
+            runtime_text = engine_text(lang, "hymt_runtime")
             self._hymt_install_phase = "downloading"
             self._emit_hymt_progress(runtime_text, 1)
 
@@ -5886,7 +6508,7 @@ finally {
             if not zipfile.is_zipfile(runtime_zip_path):
                 raise RuntimeError("Downloaded Hy-MT runtime is not a zip archive.")
 
-            extract_text = "Распаковка runtime Hy-MT..." if is_ru else "Extracting Hy-MT runtime..."
+            extract_text = engine_text(lang, "hymt_extract")
             self._hymt_install_phase = "extracting"
             self._emit_hymt_progress(extract_text, 13)
             with zipfile.ZipFile(runtime_zip_path, "r") as zip_ref:
@@ -5897,7 +6519,7 @@ finally {
             if not runner_path:
                 raise RuntimeError("Hy-MT runtime must contain llama-cli.exe, llama-run.exe, or hymt.exe.")
 
-            model_text = "Загрузка модели Hy-MT..." if is_ru else "Downloading Hy-MT model..."
+            model_text = engine_text(lang, "hymt_model")
             model_path = os.path.join(package_root, plan["model"]["name"])
             self._emit_hymt_progress(model_text, 15)
 
@@ -5918,7 +6540,7 @@ finally {
             self._check_hymt_cancel_requested()
             self._verify_file_sha256(model_path, plan["model"]["sha256"], plan["model"]["name"])
 
-            docs_text = "Сохранение лицензии Hy-MT..." if is_ru else "Saving Hy-MT license..."
+            docs_text = engine_text(lang, "hymt_license")
             self._emit_hymt_progress(docs_text, 92)
             for index, doc in enumerate(plan["docs"]):
                 self._check_hymt_cancel_requested()
@@ -5974,7 +6596,7 @@ finally {
                 raise RuntimeError("Hy-MT runtime not found after download.")
 
             self._hymt_install_phase = "applying"
-            self._emit_hymt_progress("Применение установки..." if is_ru else "Applying install...", 96)
+            self._emit_hymt_progress(engine_text(lang, "applying"), 96)
             os.makedirs(os.path.dirname(final_dir), exist_ok=True)
             if os.path.isdir(final_dir):
                 backup_dir = f"{final_dir}.backup-{int(time.time())}"
@@ -5989,7 +6611,7 @@ finally {
                 shutil.rmtree(backup_dir, ignore_errors=True)
                 backup_dir = ""
 
-            self._emit_hymt_progress("Готово" if is_ru else "Done", 100)
+            self._emit_hymt_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(
                 self,
                 "_on_hymt_install_ready",
@@ -6012,7 +6634,7 @@ finally {
             self._hymt_temp_dir = ""
 
     def _show_hymt_progress(self, text, percent=0, determinate=True):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self.hymt_progress is None:
             self.hymt_progress = TesseractInstallProgressDialog(
                 self,
@@ -6020,7 +6642,7 @@ finally {
                 in_progress_attr="_hymt_install_in_progress",
                 cancel_callback=self._request_hymt_install_cancel
             )
-            self.hymt_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
+            self.hymt_progress.setCancelButtonText(engine_text(lang, "cancel"))
             self.hymt_progress.setWindowModality(Qt.NonModal)
             self.hymt_progress.setAutoClose(False)
             self.hymt_progress.setAutoReset(False)
@@ -6063,9 +6685,9 @@ finally {
     def _request_hymt_install_cancel(self):
         if not self._hymt_install_in_progress:
             return
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         self._hymt_cancel_requested.set()
-        self._show_hymt_progress("Отмена установки..." if is_ru else "Canceling install...", 0, False)
+        self._show_hymt_progress(engine_text(lang, "canceling"), 0, False)
 
     def _finish_hymt_install_state(self):
         self._hymt_install_in_progress = False
@@ -6085,11 +6707,11 @@ finally {
         self._set_translator_combo_silently(HYMT_ENGINE_KEY)
         self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
         self._sync_translator_engine_delete_button()
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
             HYMT_ENGINE_DISPLAY,
-            "Hy-MT установлен и готов к офлайн-переводу." if is_ru else "Hy-MT is installed and ready for offline translation."
+            engine_text(lang, "hymt_ready"),
         )
 
     @QtCore.pyqtSlot(str)
@@ -6100,11 +6722,11 @@ finally {
         prev_engine = self.previous_translator_engine or "google"
         self._set_translator_combo_silently(prev_engine)
         self.auto_save_setting("translator_engine", prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
-            "Ошибка Hy-MT" if is_ru else "Hy-MT error",
-            ("Не удалось установить Hy-MT:\n" if is_ru else "Failed to install Hy-MT:\n") + str(error)
+            engine_text(lang, "error_title", engine="Hy-MT"),
+            engine_text(lang, "install_failed", engine="Hy-MT", error=str(error)),
         )
 
     @QtCore.pyqtSlot()
@@ -6115,17 +6737,15 @@ finally {
         prev_engine = self.previous_translator_engine or "google"
         self._set_translator_combo_silently(prev_engine)
         self.auto_save_setting("translator_engine", prev_engine)
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
-            "Отмена" if is_ru else "Cancelled",
-            "Установка Hy-MT отменена. Временные файлы удалены."
-            if is_ru else
-            "Hy-MT installation canceled. Temporary files were removed."
+            engine_text(lang, "cancelled_title"),
+            engine_text(lang, "install_cancelled", engine="Hy-MT"),
         )
 
     def remove_hymt_engine(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self._hymt_install_in_progress:
             self._request_hymt_install_cancel()
             return
@@ -6134,17 +6754,13 @@ finally {
             self._sync_translator_engine_delete_button()
             return
         confirm = QMessageBox(self)
-        confirm.setWindowTitle("Удалить Hy-MT" if is_ru else "Remove Hy-MT")
-        confirm.setText(
-            "Удалить локальную модель Hy-MT и runtime из папки программы?"
-            if is_ru else
-            "Remove the local Hy-MT model and runtime from the app folder?"
-        )
+        confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Hy-MT"))
+        confirm.setText(engine_text(lang, "remove_hymt_prompt"))
         confirm.setIcon(QMessageBox.Question)
         confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         confirm.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
-        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
+        confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
         if confirm.clickedButton() != yes_btn:
             return
@@ -6159,14 +6775,14 @@ finally {
             QMessageBox.information(
                 self,
                 HYMT_ENGINE_DISPLAY,
-                "Локальный Hy-MT удалён." if is_ru else "Local Hy-MT was removed."
+                engine_text(lang, "removed", engine="Hy-MT"),
             )
         except Exception as e:
             self._sync_translator_engine_delete_button()
             QMessageBox.warning(
                 self,
-                "Ошибка Hy-MT" if is_ru else "Hy-MT error",
-                ("Не удалось удалить Hy-MT:\n" if is_ru else "Failed to remove Hy-MT:\n") + str(e)
+                engine_text(lang, "error_title", engine="Hy-MT"),
+                engine_text(lang, "remove_failed", engine="Hy-MT", error=str(e)),
             )
 
     def remove_ocr_engine(self):
@@ -6180,7 +6796,7 @@ finally {
         self.remove_tesseract_engine()
 
     def remove_rapidocr_engine(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self._rapidocr_install_in_progress:
             self._request_rapidocr_install_cancel()
             return
@@ -6189,16 +6805,12 @@ finally {
             self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
-        confirm.setWindowTitle("Удалить RapidOCR" if is_ru else "Remove RapidOCR")
-        confirm.setText(
-            "Удалить локальный движок RapidOCR из папки программы?"
-            if is_ru else
-            "Remove the local RapidOCR engine from the app folder?"
-        )
+        confirm.setWindowTitle(engine_text(lang, "remove_title", engine="RapidOCR"))
+        confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="RapidOCR"))
         confirm.setIcon(QMessageBox.Question)
         confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
-        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
+        confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
         if confirm.clickedButton() != yes_btn:
             return
@@ -6213,18 +6825,18 @@ finally {
             QMessageBox.information(
                 self,
                 RAPIDOCR_ENGINE_DISPLAY,
-                "Локальный RapidOCR удалён." if is_ru else "Local RapidOCR was removed."
+                engine_text(lang, "removed", engine="RapidOCR"),
             )
         except Exception as e:
             self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
-                "Ошибка RapidOCR" if is_ru else "RapidOCR error",
-                ("Не удалось удалить RapidOCR:\n" if is_ru else "Failed to remove RapidOCR:\n") + str(e)
+                engine_text(lang, "error_title", engine="RapidOCR"),
+                engine_text(lang, "remove_failed", engine="RapidOCR", error=str(e)),
             )
 
     def remove_easyocr_engine(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self._easyocr_install_in_progress:
             self._request_easyocr_install_cancel()
             return
@@ -6233,16 +6845,12 @@ finally {
             self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
-        confirm.setWindowTitle("Удалить EasyOCR" if is_ru else "Remove EasyOCR")
-        confirm.setText(
-            "Удалить локальный движок EasyOCR из папки программы?"
-            if is_ru else
-            "Remove the local EasyOCR engine from the app folder?"
-        )
+        confirm.setWindowTitle(engine_text(lang, "remove_title", engine="EasyOCR"))
+        confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="EasyOCR"))
         confirm.setIcon(QMessageBox.Question)
         confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
-        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
+        confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
         if confirm.clickedButton() != yes_btn:
             return
@@ -6257,18 +6865,18 @@ finally {
             QMessageBox.information(
                 self,
                 EASYOCR_ENGINE_DISPLAY,
-                "Локальный EasyOCR удалён." if is_ru else "Local EasyOCR was removed."
+                engine_text(lang, "removed", engine="EasyOCR"),
             )
         except Exception as e:
             self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
-                "Ошибка EasyOCR" if is_ru else "EasyOCR error",
-                ("Не удалось удалить EasyOCR:\n" if is_ru else "Failed to remove EasyOCR:\n") + str(e)
+                engine_text(lang, "error_title", engine="EasyOCR"),
+                engine_text(lang, "remove_failed", engine="EasyOCR", error=str(e)),
             )
 
     def remove_tesseract_engine(self):
-        is_ru = self.parent.current_interface_language == "ru"
+        lang = self.parent.current_interface_language
         if self._tesseract_install_in_progress:
             self._request_tesseract_install_cancel()
             return
@@ -6277,16 +6885,12 @@ finally {
             self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
-        confirm.setWindowTitle("Удалить Tesseract" if is_ru else "Remove Tesseract")
-        confirm.setText(
-            "Удалить локальный движок Tesseract из папки программы?"
-            if is_ru else
-            "Remove the local Tesseract engine from the app folder?"
-        )
+        confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Tesseract"))
+        confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="Tesseract"))
         confirm.setIcon(QMessageBox.Question)
         confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        yes_btn = confirm.addButton("Удалить" if is_ru else "Remove", QMessageBox.YesRole)
-        confirm.addButton("Отмена" if is_ru else "Cancel", QMessageBox.NoRole)
+        yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
+        confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
         if confirm.clickedButton() != yes_btn:
             return
@@ -6301,14 +6905,14 @@ finally {
             QMessageBox.information(
                 self,
                 "Tesseract",
-                "Локальный Tesseract удалён." if is_ru else "Local Tesseract was removed."
+                engine_text(lang, "removed", engine="Tesseract"),
             )
         except Exception as e:
             self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
-                "Ошибка Tesseract" if is_ru else "Tesseract error",
-                ("Не удалось удалить Tesseract:\n" if is_ru else "Failed to remove Tesseract:\n") + str(e)
+                engine_text(lang, "error_title", engine="Tesseract"),
+                engine_text(lang, "remove_failed", engine="Tesseract", error=str(e)),
             )
 
     def clear_all_cache(self):

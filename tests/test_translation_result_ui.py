@@ -68,7 +68,8 @@ class TranslationResultUiTest(unittest.TestCase):
 
     def test_wrapper_uses_new_dialog_and_preserves_auto_copy(self):
         dialog = mock.Mock()
-        dialog.exec_.return_value = main.QDialog.Accepted
+        dialog.isVisible.return_value = True
+        main._translation_result_dialogs.clear()
         with mock.patch.object(main.pyperclip, "copy") as copy:
             with mock.patch.object(main, "TranslationResultDialog", return_value=dialog) as dialog_class:
                 result = main.show_translation_dialog(
@@ -87,8 +88,25 @@ class TranslationResultUiTest(unittest.TestCase):
             lang="en",
             theme="Темная",
         )
-        dialog.exec_.assert_called_once_with()
-        self.assertEqual(result, main.QDialog.Accepted)
+        dialog.exec_.assert_not_called()
+        dialog.show.assert_called_once_with()
+        dialog.raise_.assert_called_once_with()
+        dialog.activateWindow.assert_called_once_with()
+        self.assertIs(result, dialog)
+
+    def test_multiple_results_stay_open_and_are_cascaded_downward(self):
+        main._translation_result_dialogs.clear()
+        first = main.show_translation_dialog(None, "First", auto_copy=False, lang="en", theme="Темная")
+        second = main.show_translation_dialog(None, "Second", auto_copy=False, lang="en", theme="Темная")
+        self.app.processEvents()
+
+        self.assertTrue(first.isVisible())
+        self.assertTrue(second.isVisible())
+        self.assertGreater(second._stack_offset.y(), first._stack_offset.y())
+
+        first.close()
+        second.close()
+        self.app.processEvents()
 
 
 if __name__ == "__main__":

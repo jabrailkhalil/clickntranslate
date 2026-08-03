@@ -18,6 +18,16 @@ class TestLanguages(unittest.TestCase):
         self.assertEqual(languages.language_code_from_name("Немецкий", "ru"), "de")
         self.assertEqual(languages.language_code_from_name("German", "en"), "de")
 
+    def test_every_supported_interface_has_localized_language_names(self):
+        for interface_language in ("en", "ru", "es", "de", "fr", "zh"):
+            names = languages.language_names(interface_language)
+            self.assertEqual(len(names), len(languages.LANGUAGES))
+            self.assertEqual(len(set(names)), len(names))
+        self.assertEqual(languages.language_display_name("ru", "zh"), "俄语")
+        self.assertEqual(languages.language_display_name("de", "es"), "Alemán")
+        self.assertEqual(languages.language_code_from_name("Alemán", "es"), "de")
+        self.assertEqual(languages.language_code_from_name("俄语", "zh"), "ru")
+
     def test_ocr_and_tesseract_codes_are_available(self):
         self.assertEqual(languages.windows_ocr_tag("de"), "de-DE")
         self.assertEqual(languages.tesseract_language_code("de"), "deu")

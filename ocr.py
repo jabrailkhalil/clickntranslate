@@ -33,6 +33,117 @@ import portable_paths
 
 APP_LANGUAGE_CODES = {language.code for language in APP_LANGUAGES}
 
+OCR_UI_TEXT = {
+    "en": {
+        "tess_download_data": "Tesseract: downloading {language} language data...", "tess_downloading": "Tesseract: downloading {language}... {percent}%",
+        "tess_ready": "Tesseract: {language} language data is ready", "recognizing": "Recognizing text...",
+        "win_missing_title": "Windows OCR pack missing", "win_unavailable": "Windows OCR is not available right now.",
+        "win_components": "Windows OCR components failed to load. The app can continue with Tesseract if it is installed.",
+        "win_unsupported": "Windows OCR does not support: {language} ({tag}).",
+        "win_pack": "The Windows OCR language pack is probably not installed. You can open Windows language settings and add the required language.",
+        "win_continue": "Recognition will continue with Tesseract now.", "win_stopped": "Tesseract was not found, so recognition for this language is stopped.",
+        "open_windows": "Open Windows settings", "continue_tesseract": "Continue with Tesseract", "close": "Close",
+        "recognition_failed": "Recognition failed", "engine_unavailable": "{engine} is unavailable",
+        "engine_unavailable_info": "The {engine} engine is not installed or failed to load.\n\nTry:\n• Choose {engine} in settings and install the local package\n• Choose another OCR engine in settings",
+        "engine_unreliable": "{engine} did not find reliable text",
+        "engine_unreliable_info": "{engine} did not detect text with enough confidence.\n\nTry:\n• Check the selected recognition language\n• Select a tighter, higher-contrast area\n• Switch to another OCR engine",
+        "auto_unreliable": "Text was not recognized reliably",
+        "auto_unreliable_info": "Weak results were filtered out so noise is not sent to the translator.\n\nTry:\n• Select the text area more tightly, without extra borders or background\n• Choose the specific source language\n• Try another OCR engine or install the Windows OCR language pack",
+        "not_recognized": "😔 Text not recognized", "not_recognized_info": "Try:\n• Select an area with larger text\n• Make sure the text has good contrast\n• Choose a different OCR engine in settings",
+        "translate": "Translate", "ocr_init_failed": "OCR initialization failed", "screen_no_text": "No text recognized on screen",
+        "translation_failed": "Translation failed", "translating_screen": "Translating screen...", "fullscreen_hint": "ESC — close  |  RMB — drag",
+    },
+    "ru": {
+        "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
+        "tess_ready": "Tesseract: пакет {language} готов", "recognizing": "Распознаю текст...",
+        "win_missing_title": "Пакет Windows OCR не найден", "win_unavailable": "Windows OCR сейчас недоступен.",
+        "win_components": "Компоненты Windows OCR не загрузились. Можно продолжить через Tesseract, если он установлен.",
+        "win_unsupported": "Windows OCR не поддерживает язык: {language} ({tag}).",
+        "win_pack": "Скорее всего, в Windows не установлен языковой пакет распознавания. Можно открыть настройки языка Windows и установить нужный язык.",
+        "win_continue": "Сейчас распознавание продолжится через Tesseract.", "win_stopped": "Tesseract не найден, поэтому распознавание для этого языка остановлено.",
+        "open_windows": "Открыть настройки Windows", "continue_tesseract": "Продолжить через Tesseract", "close": "Закрыть",
+        "recognition_failed": "Не удалось распознать", "engine_unavailable": "{engine} недоступен",
+        "engine_unavailable_info": "Движок {engine} не установлен или не загрузился.\n\nПопробуйте:\n• Выбрать {engine} в настройках и установить локальный пакет\n• Выбрать другой OCR-движок в настройках",
+        "engine_unreliable": "{engine} не нашёл надёжный текст",
+        "engine_unreliable_info": "{engine} не обнаружил текст с достаточной уверенностью.\n\nПопробуйте:\n• Проверить выбранный язык распознавания\n• Выделить область точнее и контрастнее\n• Переключиться на другой OCR-движок",
+        "auto_unreliable": "Текст не распознан надёжно",
+        "auto_unreliable_info": "Слабые результаты отфильтрованы, чтобы не отправлять мусор в переводчик.\n\nПопробуйте:\n• Выделить область точнее, без лишних рамок и фона\n• Выбрать конкретный язык текста\n• Попробовать другой OCR-движок или установить языковой пакет Windows OCR",
+        "not_recognized": "😔 Текст не распознан", "not_recognized_info": "Попробуйте:\n• Выделить область с более крупным текстом\n• Убедиться, что текст контрастный\n• Выбрать другой OCR-движок в настройках",
+        "translate": "Перевести", "ocr_init_failed": "Не удалось запустить OCR", "screen_no_text": "Текст на экране не распознан",
+        "translation_failed": "Ошибка перевода", "translating_screen": "Перевод экрана...", "fullscreen_hint": "ESC — закрыть  |  ПКМ — перетащить",
+    },
+    "es": {
+        "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
+        "tess_ready": "Tesseract: los datos de {language} están listos", "recognizing": "Reconociendo texto...",
+        "win_missing_title": "Falta el paquete de Windows OCR", "win_unavailable": "Windows OCR no está disponible ahora.",
+        "win_components": "No se pudieron cargar los componentes de Windows OCR. La aplicación puede continuar con Tesseract si está instalado.",
+        "win_unsupported": "Windows OCR no admite: {language} ({tag}).", "win_pack": "Probablemente no está instalado el paquete de idioma de Windows OCR. Puedes abrir la configuración de idioma de Windows y añadir el idioma necesario.",
+        "win_continue": "El reconocimiento continuará ahora con Tesseract.", "win_stopped": "No se encontró Tesseract, por lo que se detuvo el reconocimiento para este idioma.",
+        "open_windows": "Abrir configuración de Windows", "continue_tesseract": "Continuar con Tesseract", "close": "Cerrar",
+        "recognition_failed": "Error de reconocimiento", "engine_unavailable": "{engine} no está disponible",
+        "engine_unavailable_info": "El motor {engine} no está instalado o no se pudo cargar.\n\nPrueba:\n• Elige {engine} en la configuración e instala el paquete local\n• Elige otro motor OCR",
+        "engine_unreliable": "{engine} no encontró texto fiable", "engine_unreliable_info": "{engine} no detectó texto con suficiente confianza.\n\nPrueba:\n• Revisa el idioma de reconocimiento\n• Selecciona un área más ajustada y con más contraste\n• Cambia de motor OCR",
+        "auto_unreliable": "El texto no se reconoció de forma fiable", "auto_unreliable_info": "Los resultados débiles se filtraron para no enviar ruido al traductor.\n\nPrueba:\n• Selecciona el área con más precisión\n• Elige el idioma de origen\n• Usa otro motor OCR o instala el paquete de Windows OCR",
+        "not_recognized": "😔 No se reconoció el texto", "not_recognized_info": "Prueba:\n• Selecciona texto más grande\n• Comprueba que tenga buen contraste\n• Elige otro motor OCR",
+        "translate": "Traducir", "ocr_init_failed": "No se pudo iniciar OCR", "screen_no_text": "No se reconoció texto en la pantalla",
+        "translation_failed": "Error de traducción", "translating_screen": "Traduciendo la pantalla...", "fullscreen_hint": "ESC — cerrar  |  Botón derecho — arrastrar",
+    },
+    "de": {
+        "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
+        "tess_ready": "Tesseract: Sprachdaten für {language} sind bereit", "recognizing": "Text wird erkannt...",
+        "win_missing_title": "Windows-OCR-Paket fehlt", "win_unavailable": "Windows OCR ist momentan nicht verfügbar.",
+        "win_components": "Windows-OCR-Komponenten konnten nicht geladen werden. Die App kann mit Tesseract fortfahren, wenn es installiert ist.",
+        "win_unsupported": "Windows OCR unterstützt {language} ({tag}) nicht.", "win_pack": "Das Windows-OCR-Sprachpaket ist wahrscheinlich nicht installiert. Öffne die Windows-Spracheinstellungen und füge die benötigte Sprache hinzu.",
+        "win_continue": "Die Erkennung wird jetzt mit Tesseract fortgesetzt.", "win_stopped": "Tesseract wurde nicht gefunden; die Erkennung für diese Sprache wurde gestoppt.",
+        "open_windows": "Windows-Einstellungen öffnen", "continue_tesseract": "Mit Tesseract fortfahren", "close": "Schließen",
+        "recognition_failed": "Erkennung fehlgeschlagen", "engine_unavailable": "{engine} ist nicht verfügbar",
+        "engine_unavailable_info": "Die {engine}-Engine ist nicht installiert oder konnte nicht geladen werden.\n\nVersuche:\n• {engine} in den Einstellungen wählen und das lokale Paket installieren\n• Eine andere OCR-Engine wählen",
+        "engine_unreliable": "{engine} hat keinen zuverlässigen Text gefunden", "engine_unreliable_info": "{engine} hat Text nicht mit ausreichender Sicherheit erkannt.\n\nVersuche:\n• Erkennungssprache prüfen\n• Einen engeren, kontrastreicheren Bereich auswählen\n• Eine andere OCR-Engine wählen",
+        "auto_unreliable": "Text wurde nicht zuverlässig erkannt", "auto_unreliable_info": "Schwache Ergebnisse wurden gefiltert, damit kein Rauschen übersetzt wird.\n\nVersuche:\n• Den Textbereich genauer auswählen\n• Die konkrete Ausgangssprache wählen\n• Eine andere OCR-Engine verwenden oder das Windows-OCR-Paket installieren",
+        "not_recognized": "😔 Text nicht erkannt", "not_recognized_info": "Versuche:\n• Einen Bereich mit größerem Text auswählen\n• Auf guten Kontrast achten\n• Eine andere OCR-Engine wählen",
+        "translate": "Übersetzen", "ocr_init_failed": "OCR konnte nicht gestartet werden", "screen_no_text": "Auf dem Bildschirm wurde kein Text erkannt",
+        "translation_failed": "Übersetzung fehlgeschlagen", "translating_screen": "Bildschirm wird übersetzt...", "fullscreen_hint": "ESC — schließen  |  Rechtsklick — ziehen",
+    },
+    "fr": {
+        "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
+        "tess_ready": "Tesseract : les données de {language} sont prêtes", "recognizing": "Reconnaissance du texte...",
+        "win_missing_title": "Module Windows OCR manquant", "win_unavailable": "Windows OCR n’est pas disponible actuellement.",
+        "win_components": "Les composants Windows OCR n’ont pas pu être chargés. L’application peut continuer avec Tesseract s’il est installé.",
+        "win_unsupported": "Windows OCR ne prend pas en charge : {language} ({tag}).", "win_pack": "Le module de langue Windows OCR n’est probablement pas installé. Ouvrez les paramètres de langue de Windows et ajoutez la langue requise.",
+        "win_continue": "La reconnaissance va continuer avec Tesseract.", "win_stopped": "Tesseract est introuvable ; la reconnaissance pour cette langue est arrêtée.",
+        "open_windows": "Ouvrir les paramètres Windows", "continue_tesseract": "Continuer avec Tesseract", "close": "Fermer",
+        "recognition_failed": "Échec de la reconnaissance", "engine_unavailable": "{engine} n’est pas disponible",
+        "engine_unavailable_info": "Le moteur {engine} n’est pas installé ou n’a pas pu être chargé.\n\nEssayez :\n• Choisir {engine} dans les paramètres et installer le paquet local\n• Choisir un autre moteur OCR",
+        "engine_unreliable": "{engine} n’a pas trouvé de texte fiable", "engine_unreliable_info": "{engine} n’a pas détecté de texte avec une confiance suffisante.\n\nEssayez :\n• Vérifier la langue de reconnaissance\n• Sélectionner une zone plus précise et contrastée\n• Changer de moteur OCR",
+        "auto_unreliable": "Le texte n’a pas été reconnu de façon fiable", "auto_unreliable_info": "Les résultats faibles ont été filtrés pour ne pas envoyer de bruit au traducteur.\n\nEssayez :\n• Sélectionner la zone plus précisément\n• Choisir la langue source exacte\n• Utiliser un autre moteur OCR ou installer le module Windows OCR",
+        "not_recognized": "😔 Texte non reconnu", "not_recognized_info": "Essayez :\n• Sélectionner une zone avec un texte plus grand\n• Vérifier le contraste\n• Choisir un autre moteur OCR",
+        "translate": "Traduire", "ocr_init_failed": "Impossible de démarrer l’OCR", "screen_no_text": "Aucun texte reconnu à l’écran",
+        "translation_failed": "Échec de la traduction", "translating_screen": "Traduction de l’écran...", "fullscreen_hint": "ESC — fermer  |  Clic droit — déplacer",
+    },
+    "zh": {
+        "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
+        "tess_ready": "Tesseract：{language} 语言数据已就绪", "recognizing": "正在识别文本...",
+        "win_missing_title": "缺少 Windows OCR 语言包", "win_unavailable": "Windows OCR 当前不可用。",
+        "win_components": "Windows OCR 组件加载失败。如果已安装 Tesseract，应用可以继续使用它。",
+        "win_unsupported": "Windows OCR 不支持：{language}（{tag}）。", "win_pack": "可能尚未安装 Windows OCR 语言包。你可以打开 Windows 语言设置并添加所需语言。",
+        "win_continue": "现在将使用 Tesseract 继续识别。", "win_stopped": "未找到 Tesseract，因此已停止识别此语言。",
+        "open_windows": "打开 Windows 设置", "continue_tesseract": "使用 Tesseract 继续", "close": "关闭",
+        "recognition_failed": "识别失败", "engine_unavailable": "{engine} 不可用",
+        "engine_unavailable_info": "{engine} 引擎未安装或加载失败。\n\n请尝试：\n• 在设置中选择 {engine} 并安装本地包\n• 选择其他 OCR 引擎",
+        "engine_unreliable": "{engine} 未找到可靠文本", "engine_unreliable_info": "{engine} 未以足够置信度检测到文本。\n\n请尝试：\n• 检查所选识别语言\n• 更精确地选择高对比度区域\n• 切换到其他 OCR 引擎",
+        "auto_unreliable": "未能可靠识别文本", "auto_unreliable_info": "已过滤置信度较低的结果，以免向翻译器发送噪声。\n\n请尝试：\n• 更精确地选择文本区域\n• 选择具体的源语言\n• 使用其他 OCR 引擎或安装 Windows OCR 语言包",
+        "not_recognized": "😔 未识别到文本", "not_recognized_info": "请尝试：\n• 选择字号更大的文本区域\n• 确保文本对比度良好\n• 在设置中选择其他 OCR 引擎",
+        "translate": "翻译", "ocr_init_failed": "OCR 初始化失败", "screen_no_text": "未识别到屏幕文字",
+        "translation_failed": "翻译失败", "translating_screen": "正在翻译屏幕...", "fullscreen_hint": "ESC — 关闭  |  右键 — 拖动",
+    },
+}
+
+
+def ocr_ui_text(lang, key, **values):
+    texts = OCR_UI_TEXT.get(lang, OCR_UI_TEXT["en"])
+    template = texts.get(key, OCR_UI_TEXT["en"].get(key, key))
+    return template.format(**values)
+
 if sys.platform == "win32":
     import ctypes
 
@@ -293,10 +404,7 @@ def _prepare_tesseract_data(
                 return prepared
             url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{fname}"
             display_name = _tesseract_language_display_name(lang_code, interface_language)
-            if interface_language == "ru":
-                status_text = f"Tesseract: скачиваю языковой пакет {display_name}..."
-            else:
-                status_text = f"Tesseract: downloading {display_name} language data..."
+            status_text = ocr_ui_text(interface_language, "tess_download_data", language=display_name)
             if status_callback:
                 status_callback(status_text)
             logging.info(f"Downloading {fname} into {tessdata_dir} ...")
@@ -330,10 +438,14 @@ def _prepare_tesseract_data(
                         downloaded += len(chunk)
                         if status_callback and total > 0:
                             percent = int(downloaded * 100 / max(total, 1))
-                            if interface_language == "ru":
-                                status_callback(f"Tesseract: скачиваю {display_name}... {percent}%")
-                            else:
-                                status_callback(f"Tesseract: downloading {display_name}... {percent}%")
+                            status_callback(
+                                ocr_ui_text(
+                                    interface_language,
+                                    "tess_downloading",
+                                    language=display_name,
+                                    percent=percent,
+                                )
+                            )
             if total and downloaded != total:
                 raise RuntimeError(
                     f"Incomplete Tesseract package {fname}: "
@@ -345,10 +457,7 @@ def _prepare_tesseract_data(
             tmp_path = ""
             prepared.append(target_path)
             if status_callback:
-                if interface_language == "ru":
-                    status_callback(f"Tesseract: пакет {display_name} готов")
-                else:
-                    status_callback(f"Tesseract: {display_name} language data is ready")
+                status_callback(ocr_ui_text(interface_language, "tess_ready", language=display_name))
             logging.info(f"{fname} downloaded into {tessdata_dir}")
     except Exception as dl_err:
         if tmp_path:
@@ -556,7 +665,8 @@ def _recognize_with_native_ocr_worker(
     status_callback=None,
 ):
     if status_callback:
-        status_callback(f"Starting {engine} OCR worker...")
+        engine_name = "RapidOCR" if engine == "rapidocr" else "EasyOCR" if engine == "easyocr" else engine
+        status_callback(f"Starting {engine_name}…")
     root_dir = _rapidocr_local_root() if engine == "rapidocr" else _easyocr_local_root()
     language_codes = easyocr_language_codes(language_code) if engine == "easyocr" else []
     response = _call_native_ocr_worker(
@@ -3203,7 +3313,7 @@ class ScreenCaptureOverlay(QWidget):
 
     def _default_ocr_status_text(self):
         lang = get_cached_ocr_config().get("interface_language", "en")
-        return "Распознаю текст..." if lang == "ru" else "Recognizing text..."
+        return ocr_ui_text(lang, "recognizing")
 
     @QtCore.pyqtSlot(str)
     def _set_ocr_status_text(self, text):
@@ -3306,9 +3416,10 @@ class ScreenCaptureOverlay(QWidget):
             text_width = min(metrics.horizontalAdvance(text), max(120, self.width() - 80))
             box_width = min(max(220, text_width + 36), max(220, self.width() - 40))
             box_height = 42
+            status_top = 132 if self.height() >= 220 else max(78, self.height() - box_height - 20)
             box = QtCore.QRect(
                 max(20, (self.width() - box_width) // 2),
-                78,
+                status_top,
                 box_width,
                 box_height,
             )
@@ -3559,7 +3670,6 @@ class ScreenCaptureOverlay(QWidget):
 
         config = get_cached_ocr_config()
         interface_lang = config.get("interface_language", "ru")
-        is_ru = interface_lang == "ru"
         language_name = language_display_name(language_code, interface_lang)
         available_tags = _get_available_windows_ocr_language_tags()
 
@@ -3578,48 +3688,22 @@ class ScreenCaptureOverlay(QWidget):
         except Exception:
             pass
 
-        if is_ru:
-            msg.setWindowTitle("Пакет Windows OCR не найден")
-            if not _WINRT_AVAILABLE:
-                msg.setText("Windows OCR сейчас недоступен.")
-                details = (
-                    "Компоненты Windows OCR не загрузились. "
-                    "Можно продолжить через Tesseract, если он установлен."
-                )
-            else:
-                msg.setText(f"Windows OCR не поддерживает язык: {language_name} ({win_lang_tag}).")
-                details = (
-                    "Скорее всего, в Windows не установлен языковой пакет распознавания. "
-                    "Можно открыть настройки языка Windows и установить нужный язык."
-                )
-            if fallback_available:
-                details += "\n\nСейчас распознавание продолжится через Tesseract."
-            else:
-                details += "\n\nTesseract не найден, поэтому распознавание для этого языка остановлено."
-            open_text = "Открыть настройки Windows"
-            continue_text = "Продолжить через Tesseract"
-            close_text = "Закрыть"
+        msg.setWindowTitle(ocr_ui_text(interface_lang, "win_missing_title"))
+        if not _WINRT_AVAILABLE:
+            msg.setText(ocr_ui_text(interface_lang, "win_unavailable"))
+            details = ocr_ui_text(interface_lang, "win_components")
         else:
-            msg.setWindowTitle("Windows OCR pack missing")
-            if not _WINRT_AVAILABLE:
-                msg.setText("Windows OCR is not available right now.")
-                details = (
-                    "Windows OCR components failed to load. "
-                    "The app can continue with Tesseract if it is installed."
-                )
-            else:
-                msg.setText(f"Windows OCR does not support: {language_name} ({win_lang_tag}).")
-                details = (
-                    "The Windows OCR language pack is probably not installed. "
-                    "You can open Windows language settings and add the required language."
-                )
-            if fallback_available:
-                details += "\n\nRecognition will continue with Tesseract now."
-            else:
-                details += "\n\nTesseract was not found, so recognition for this language is stopped."
-            open_text = "Open Windows settings"
-            continue_text = "Continue with Tesseract"
-            close_text = "Close"
+            msg.setText(
+                ocr_ui_text(interface_lang, "win_unsupported", language=language_name, tag=win_lang_tag)
+            )
+            details = ocr_ui_text(interface_lang, "win_pack")
+        if fallback_available:
+            details += "\n\n" + ocr_ui_text(interface_lang, "win_continue")
+        else:
+            details += "\n\n" + ocr_ui_text(interface_lang, "win_stopped")
+        open_text = ocr_ui_text(interface_lang, "open_windows")
+        continue_text = ocr_ui_text(interface_lang, "continue_tesseract")
+        close_text = ocr_ui_text(interface_lang, "close")
 
         msg.setInformativeText(details)
         open_btn = msg.addButton(open_text, QMessageBox.ActionRole)
@@ -4324,112 +4408,24 @@ class ScreenCaptureOverlay(QWidget):
             worker = getattr(self, "ocr_worker", None)
             failure_reason = getattr(worker, "failure_reason", "") if worker is not None else ""
             
-            if lang == "ru":
-                msg.setWindowTitle("Не удалось распознать")
-                if failure_reason == "rapidocr_unavailable":
-                    msg.setText("RapidOCR недоступен")
-                    msg.setInformativeText(
-                        "Движок RapidOCR не установлен или не загрузился.\n\n"
-                        "Попробуйте:\n"
-                        "• Выбрать RapidOCR в настройках и установить локальный пакет\n"
-                        "• Выбрать Windows или Tesseract в настройках OCR"
-                    )
-                elif failure_reason == "easyocr_unavailable":
-                    msg.setText("EasyOCR недоступен")
-                    msg.setInformativeText(
-                        "Движок EasyOCR не установлен или не загрузился.\n\n"
-                        "Попробуйте:\n"
-                        "• Выбрать EasyOCR в настройках и установить локальный пакет\n"
-                        "• Выбрать Windows, Tesseract или RapidOCR в настройках OCR"
-                    )
-                elif failure_reason in {"rapidocr_empty", "rapidocr_error", "low_rapidocr_confidence"}:
-                    msg.setText("RapidOCR не нашёл надёжный текст")
-                    msg.setInformativeText(
-                        "RapidOCR не обнаружил текстовые блоки с достаточной уверенностью.\n\n"
-                        "Попробуйте:\n"
-                        "• Выделить область точнее\n"
-                        "• Увеличить текст или выбрать более контрастный участок\n"
-                        "• Переключиться на Windows или Tesseract"
-                    )
-                elif failure_reason in {"easyocr_empty", "easyocr_error", "low_easyocr_confidence"}:
-                    msg.setText("EasyOCR не нашёл надёжный текст")
-                    msg.setInformativeText(
-                        "EasyOCR не обнаружил текст с достаточной уверенностью для выбранного языка.\n\n"
-                        "Попробуйте:\n"
-                        "• Проверить выбранный язык распознавания\n"
-                        "• Выделить область точнее и контрастнее\n"
-                        "• Переключиться на Windows, Tesseract или RapidOCR"
-                    )
-                elif failure_reason == "auto_low_confidence_or_empty":
-                    msg.setText("Текст не распознан надёжно")
-                    msg.setInformativeText(
-                        "Слабые результаты отфильтрованы, чтобы не отправлять мусор в переводчик.\n\n"
-                        "Попробуйте:\n"
-                        "• Выделить область точнее, без лишних рамок и фона\n"
-                        "• Выбрать конкретный язык текста\n"
-                        "• Попробовать RapidOCR/Tesseract или установить языковой пакет Windows OCR"
-                    )
-                else:
-                    msg.setText("😔 Текст не распознан")
-                    msg.setInformativeText(
-                        "Попробуйте:\n"
-                        "• Выделить область с более крупным текстом\n"
-                        "• Убедиться, что текст контрастный\n"
-                        "• Выбрать другой OCR движок в настройках"
-                    )
+            msg.setWindowTitle(ocr_ui_text(lang, "recognition_failed"))
+            if failure_reason in {"rapidocr_unavailable", "easyocr_unavailable"}:
+                engine = "RapidOCR" if failure_reason.startswith("rapid") else "EasyOCR"
+                msg.setText(ocr_ui_text(lang, "engine_unavailable", engine=engine))
+                msg.setInformativeText(ocr_ui_text(lang, "engine_unavailable_info", engine=engine))
+            elif failure_reason in {
+                "rapidocr_empty", "rapidocr_error", "low_rapidocr_confidence",
+                "easyocr_empty", "easyocr_error", "low_easyocr_confidence",
+            }:
+                engine = "RapidOCR" if failure_reason.startswith("rapid") or "rapidocr" in failure_reason else "EasyOCR"
+                msg.setText(ocr_ui_text(lang, "engine_unreliable", engine=engine))
+                msg.setInformativeText(ocr_ui_text(lang, "engine_unreliable_info", engine=engine))
+            elif failure_reason == "auto_low_confidence_or_empty":
+                msg.setText(ocr_ui_text(lang, "auto_unreliable"))
+                msg.setInformativeText(ocr_ui_text(lang, "auto_unreliable_info"))
             else:
-                msg.setWindowTitle("Recognition failed")
-                if failure_reason == "rapidocr_unavailable":
-                    msg.setText("RapidOCR is unavailable")
-                    msg.setInformativeText(
-                        "The RapidOCR engine is not installed or failed to load.\n\n"
-                        "Try:\n"
-                        "• Choose RapidOCR in settings and install the local package\n"
-                        "• Choose Windows or Tesseract in OCR settings"
-                    )
-                elif failure_reason == "easyocr_unavailable":
-                    msg.setText("EasyOCR is unavailable")
-                    msg.setInformativeText(
-                        "The EasyOCR engine is not installed or failed to load.\n\n"
-                        "Try:\n"
-                        "• Choose EasyOCR in settings and install the local package\n"
-                        "• Choose Windows, Tesseract, or RapidOCR in OCR settings"
-                    )
-                elif failure_reason in {"rapidocr_empty", "rapidocr_error", "low_rapidocr_confidence"}:
-                    msg.setText("RapidOCR did not find reliable text")
-                    msg.setInformativeText(
-                        "RapidOCR did not detect text blocks with enough confidence.\n\n"
-                        "Try:\n"
-                        "• Select the text area more tightly\n"
-                        "• Use larger or higher-contrast text\n"
-                        "• Switch to Windows or Tesseract"
-                    )
-                elif failure_reason in {"easyocr_empty", "easyocr_error", "low_easyocr_confidence"}:
-                    msg.setText("EasyOCR did not find reliable text")
-                    msg.setInformativeText(
-                        "EasyOCR did not detect reliable text for the selected language.\n\n"
-                        "Try:\n"
-                        "• Check the selected recognition language\n"
-                        "• Select a tighter, higher-contrast area\n"
-                        "• Switch to Windows, Tesseract, or RapidOCR"
-                    )
-                elif failure_reason == "auto_low_confidence_or_empty":
-                    msg.setText("Text was not recognized reliably")
-                    msg.setInformativeText(
-                        "Weak results were filtered out so noise is not sent to the translator.\n\n"
-                        "Try:\n"
-                        "• Select the text area more tightly, without extra borders or background\n"
-                        "• Choose the concrete source language\n"
-                        "• Try RapidOCR/Tesseract or install the Windows OCR language pack"
-                    )
-                else:
-                    msg.setText("😔 Text not recognized")
-                    msg.setInformativeText(
-                        "Try:\n"
-                        "• Select an area with larger text\n"
-                        "• Make sure the text has good contrast\n"
-                        "• Choose a different OCR engine in settings"
-                    )
+                msg.setText(ocr_ui_text(lang, "not_recognized"))
+                msg.setInformativeText(ocr_ui_text(lang, "not_recognized_info"))
             
             msg.setStandardButtons(QMessageBox.Ok)
             
@@ -4712,7 +4708,7 @@ class FullScreenTranslateOverlay(QWidget):
 
         # --- Кнопка запуска перевода ---
         config_lang = config.get("interface_language", "en")
-        go_text = "Перевести" if config_lang == "ru" else "Translate"
+        go_text = ocr_ui_text(config_lang, "translate")
         self.go_button = QtWidgets.QPushButton(go_text, self)
         self.go_button.setStyleSheet("""
             QPushButton {
@@ -4784,7 +4780,8 @@ class FullScreenTranslateOverlay(QWidget):
         bitmap = qimage_to_softwarebitmap(qimage)
         if bitmap is None:
             self.loading = False
-            self.error_message = "OCR initialization failed"
+            lang = get_cached_ocr_config().get("interface_language", "en")
+            self.error_message = ocr_ui_text(lang, "ocr_init_failed")
             self.update()
             return
 
@@ -4797,7 +4794,7 @@ class FullScreenTranslateOverlay(QWidget):
             self.loading = False
             config = get_cached_ocr_config()
             lang = config.get("interface_language", "en")
-            self.error_message = "Текст на экране не распознан" if lang == "ru" else "No text recognized on screen"
+            self.error_message = ocr_ui_text(lang, "screen_no_text")
             self.update()
             # Auto-close after 2 seconds
             QtCore.QTimer.singleShot(2000, self.close)
@@ -4838,7 +4835,7 @@ class FullScreenTranslateOverlay(QWidget):
             else:
                 config = get_cached_ocr_config()
                 lang = config.get("interface_language", "en")
-                self.error_message = "Ошибка перевода" if lang == "ru" else "Translation failed"
+                self.error_message = ocr_ui_text(lang, "translation_failed")
         except Exception as e:
             self.error_message = str(e)
 
@@ -4876,7 +4873,7 @@ class FullScreenTranslateOverlay(QWidget):
     def _paint_loading(self, painter):
         config = get_cached_ocr_config()
         lang = config.get("interface_language", "en")
-        text = "Перевод экрана..." if lang == "ru" else "Translating screen..."
+        text = ocr_ui_text(lang, "translating_screen")
         self._paint_center_msg(painter, text, QtGui.QColor(30, 20, 60, 230))
 
     def _paint_center_msg(self, painter, text, bg_color):
@@ -4918,10 +4915,7 @@ class FullScreenTranslateOverlay(QWidget):
     def _paint_hint(self, painter):
         config = get_cached_ocr_config()
         lang = config.get("interface_language", "en")
-        if lang == "ru":
-            hint = "ESC \u2014 \u0437\u0430\u043a\u0440\u044b\u0442\u044c  |  \u041f\u041a\u041c \u2014 \u043f\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044c"
-        else:
-            hint = "ESC \u2014 close  |  RMB \u2014 drag"
+        hint = ocr_ui_text(lang, "fullscreen_hint")
         font = QtGui.QFont("Segoe UI", 11)
         painter.setFont(font)
         fm = QtGui.QFontMetrics(font)

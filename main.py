@@ -79,7 +79,7 @@ import webbrowser
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
-                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
+                                 QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QTextBrowser, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
     from PyQt5.QtCore import Qt, QTimer, QSize
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
@@ -1089,7 +1089,14 @@ INTERFACE_TEXT = {
         "no_text_selected": "No hay texto seleccionado",
         "translating": "Traduciendo...",
         "translation_error": "Error de traducción",
-        "installing_language_packages": "Instalando paquetes de idioma…"
+        "installing_language_packages": "Instalando paquetes de idioma…",
+        "argos_package_missing_title": "Se necesita el paquete de idioma de Argos",
+        "argos_package_missing_prompt": "El paquete de Argos para {pair} no está instalado. ¿Descargarlo e instalarlo ahora?\n\nEl tamaño depende del idioma y puede ser de varios cientos de megabytes.",
+        "argos_preparing": "Preparando el paquete de Argos {pair}…",
+        "argos_downloading": "Descargando el paquete de Argos {pair}…",
+        "argos_installing": "Instalando el paquete de Argos {pair}…",
+        "argos_canceling": "Cancelando la instalación del paquete de Argos…",
+        "argos_install_cancelled": "Se canceló la instalación del paquete de Argos."
     },
     "de": {
         "title": "Click'n'Translate",
@@ -1123,7 +1130,14 @@ INTERFACE_TEXT = {
         "no_text_selected": "Kein Text ausgewählt",
         "translating": "Übersetze...",
         "translation_error": "Übersetzungsfehler",
-        "installing_language_packages": "Sprachpakete werden installiert…"
+        "installing_language_packages": "Sprachpakete werden installiert…",
+        "argos_package_missing_title": "Argos-Sprachpaket erforderlich",
+        "argos_package_missing_prompt": "Das Argos-Paket für {pair} ist nicht installiert. Jetzt herunterladen und installieren?\n\nDie Größe hängt von der Sprache ab und kann mehrere hundert Megabyte betragen.",
+        "argos_preparing": "Argos-Paket {pair} wird vorbereitet…",
+        "argos_downloading": "Argos-Paket {pair} wird heruntergeladen…",
+        "argos_installing": "Argos-Paket {pair} wird installiert…",
+        "argos_canceling": "Installation des Argos-Pakets wird abgebrochen…",
+        "argos_install_cancelled": "Die Installation des Argos-Pakets wurde abgebrochen."
     },
     "fr": {
         "title": "Click'n'Translate",
@@ -1157,7 +1171,14 @@ INTERFACE_TEXT = {
         "no_text_selected": "Aucun texte sélectionné",
         "translating": "Traduction...",
         "translation_error": "Erreur de traduction",
-        "installing_language_packages": "Installation des modules de langue…"
+        "installing_language_packages": "Installation des modules de langue…",
+        "argos_package_missing_title": "Module linguistique Argos requis",
+        "argos_package_missing_prompt": "Le module Argos pour {pair} n’est pas installé. Le télécharger et l’installer maintenant ?\n\nSa taille dépend de la langue et peut atteindre plusieurs centaines de mégaoctets.",
+        "argos_preparing": "Préparation du module Argos {pair}…",
+        "argos_downloading": "Téléchargement du module Argos {pair}…",
+        "argos_installing": "Installation du module Argos {pair}…",
+        "argos_canceling": "Annulation de l’installation du module Argos…",
+        "argos_install_cancelled": "L’installation du module Argos a été annulée."
     },
     "zh": {
         "title": "Click'n'Translate",
@@ -1191,13 +1212,35 @@ INTERFACE_TEXT = {
         "no_text_selected": "未选择文本",
         "translating": "正在翻译...",
         "translation_error": "翻译错误",
-        "installing_language_packages": "正在安装语言包…"
+        "installing_language_packages": "正在安装语言包…",
+        "argos_package_missing_title": "需要 Argos 语言包",
+        "argos_package_missing_prompt": "尚未安装 {pair} 的 Argos 语言包。是否立即下载并安装？\n\n大小取决于语言，可能达到数百 MB。",
+        "argos_preparing": "正在准备 Argos 语言包 {pair}…",
+        "argos_downloading": "正在下载 Argos 语言包 {pair}…",
+        "argos_installing": "正在安装 Argos 语言包 {pair}…",
+        "argos_canceling": "正在取消 Argos 语言包安装…",
+        "argos_install_cancelled": "Argos 语言包安装已取消。"
     }
 }
 
 
 def ui_text(lang, key):
     return INTERFACE_TEXT.get(lang, INTERFACE_TEXT["en"]).get(key, INTERFACE_TEXT["en"].get(key, key))
+
+
+HOTKEY_ERROR_TEXT = {
+    "en": {"title": "Hotkey unavailable", "message": "Failed to register <b>{hotkey}</b>.<br><br>This combination is already used by the browser or system (for example, Ctrl+Shift+T reopens a closed tab).<br><br>Try a different combination in settings."},
+    "ru": {"title": "Горячая клавиша недоступна", "message": "Не удалось зарегистрировать <b>{hotkey}</b>.<br><br>Эта комбинация уже используется браузером или системой (например, Ctrl+Shift+T открывает закрытую вкладку).<br><br>Попробуйте другую комбинацию в настройках."},
+    "es": {"title": "Atajo no disponible", "message": "No se pudo registrar <b>{hotkey}</b>.<br><br>El navegador o el sistema ya usan esta combinación (por ejemplo, Ctrl+Shift+T vuelve a abrir una pestaña cerrada).<br><br>Prueba otra combinación en la configuración."},
+    "de": {"title": "Tastenkürzel nicht verfügbar", "message": "<b>{hotkey}</b> konnte nicht registriert werden.<br><br>Diese Kombination wird bereits vom Browser oder System verwendet (zum Beispiel öffnet Ctrl+Shift+T einen geschlossenen Tab erneut).<br><br>Wähle in den Einstellungen eine andere Kombination."},
+    "fr": {"title": "Raccourci indisponible", "message": "Impossible d’enregistrer <b>{hotkey}</b>.<br><br>Cette combinaison est déjà utilisée par le navigateur ou le système (par exemple, Ctrl+Shift+T rouvre un onglet fermé).<br><br>Essayez une autre combinaison dans les paramètres."},
+    "zh": {"title": "快捷键不可用", "message": "无法注册 <b>{hotkey}</b>。<br><br>此组合已被浏览器或系统使用（例如，Ctrl+Shift+T 会重新打开关闭的标签页）。<br><br>请在设置中尝试其他组合。"},
+}
+
+
+def hotkey_error_text(lang, key, **values):
+    texts = HOTKEY_ERROR_TEXT.get(lang, HOTKEY_ERROR_TEXT["en"])
+    return texts.get(key, HOTKEY_ERROR_TEXT["en"].get(key, key)).format(**values)
 
 
 DOCUMENT_TEXT = {
@@ -1241,7 +1284,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT works offline, but the local Hy-MT package is not installed. Open Settings, choose Hy-MT and download the offline package, or choose another provider here.",
         "provider_unavailable_online": "This online provider did not return a translation. Check your internet connection or choose another provider here.",
         "provider_unavailable_generic": "Choose another provider here, or open Settings and install the required local package for the selected provider.",
-        "technical_error": "Technical error",
+        "technical_error": "Technical error", "documents_filter": "Documents", "all_files_filter": "All files",
+        "text_file_filter": "Text file", "markdown_file_filter": "Markdown file", "session_file_filter": "Session file",
+        "translation_sessions_filter": "Translation sessions",
     },
     "ru": {
         "title": "Перевод документов",
@@ -1283,7 +1328,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT работает офлайн, но локальный пакет Hy-MT не установлен. Откройте настройки, выберите Hy-MT и скачайте офлайн-пакет, либо выберите другой провайдер здесь.",
         "provider_unavailable_online": "Онлайн-провайдер не вернул перевод. Проверьте интернет или выберите другой провайдер здесь.",
         "provider_unavailable_generic": "Выберите другой провайдер здесь, либо откройте настройки и установите нужный локальный пакет для выбранного провайдера.",
-        "technical_error": "Техническая ошибка",
+        "technical_error": "Техническая ошибка", "documents_filter": "Документы", "all_files_filter": "Все файлы",
+        "text_file_filter": "Текстовый файл", "markdown_file_filter": "Файл Markdown", "session_file_filter": "Файл сессии",
+        "translation_sessions_filter": "Сессии перевода",
     },
     "es": {
         "title": "Traduccion de documentos",
@@ -1325,7 +1372,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT funciona offline, pero el paquete local no esta instalado. Abre Ajustes, elige Hy-MT y descarga el paquete offline, o elige otro proveedor aqui.",
         "provider_unavailable_online": "Este proveedor online no devolvio traduccion. Revisa internet o elige otro proveedor aqui.",
         "provider_unavailable_generic": "Elige otro proveedor aqui, o abre Ajustes e instala el paquete local requerido.",
-        "technical_error": "Error tecnico",
+        "technical_error": "Error técnico", "documents_filter": "Documentos", "all_files_filter": "Todos los archivos",
+        "text_file_filter": "Archivo de texto", "markdown_file_filter": "Archivo Markdown", "session_file_filter": "Archivo de sesión",
+        "translation_sessions_filter": "Sesiones de traducción",
     },
     "de": {
         "title": "Dokumentubersetzung",
@@ -1367,7 +1416,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT arbeitet offline, aber das lokale Hy-MT-Paket fehlt. Offne Einstellungen, wahle Hy-MT und lade das Offline-Paket, oder wahle hier einen anderen Anbieter.",
         "provider_unavailable_online": "Dieser Online-Anbieter hat keine Ubersetzung geliefert. Prufe die Internetverbindung oder wahle hier einen anderen Anbieter.",
         "provider_unavailable_generic": "Wahle hier einen anderen Anbieter, oder offne Einstellungen und installiere das erforderliche lokale Paket.",
-        "technical_error": "Technischer Fehler",
+        "technical_error": "Technischer Fehler", "documents_filter": "Dokumente", "all_files_filter": "Alle Dateien",
+        "text_file_filter": "Textdatei", "markdown_file_filter": "Markdown-Datei", "session_file_filter": "Sitzungsdatei",
+        "translation_sessions_filter": "Übersetzungssitzungen",
     },
     "fr": {
         "title": "Traduction de documents",
@@ -1409,7 +1460,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT fonctionne hors ligne, mais le paquet local Hy-MT n'est pas installe. Ouvrez les reglages, choisissez Hy-MT et telechargez le paquet offline, ou choisissez un autre fournisseur ici.",
         "provider_unavailable_online": "Ce fournisseur en ligne n'a pas renvoye de traduction. Verifiez internet ou choisissez un autre fournisseur ici.",
         "provider_unavailable_generic": "Choisissez un autre fournisseur ici, ou ouvrez les reglages et installez le paquet local requis.",
-        "technical_error": "Erreur technique",
+        "technical_error": "Erreur technique", "documents_filter": "Documents", "all_files_filter": "Tous les fichiers",
+        "text_file_filter": "Fichier texte", "markdown_file_filter": "Fichier Markdown", "session_file_filter": "Fichier de session",
+        "translation_sessions_filter": "Sessions de traduction",
     },
     "zh": {
         "title": "文档翻译",
@@ -1451,7 +1504,9 @@ DOCUMENT_TEXT = {
         "provider_unavailable_hymt": "Hy-MT 可离线工作，但本地 Hy-MT 包尚未安装。请打开设置，选择 Hy-MT 并下载离线包，或在这里选择其他提供商。",
         "provider_unavailable_online": "该在线提供商没有返回翻译。请检查网络，或在这里选择其他提供商。",
         "provider_unavailable_generic": "请在这里选择其他提供商，或打开设置并安装所选提供商所需的本地包。",
-        "technical_error": "技术错误",
+        "technical_error": "技术错误", "documents_filter": "文档", "all_files_filter": "所有文件",
+        "text_file_filter": "文本文件", "markdown_file_filter": "Markdown 文件", "session_file_filter": "会话文件",
+        "translation_sessions_filter": "翻译会话",
     },
 }
 
@@ -1461,9 +1516,24 @@ def doc_text(lang, key):
     return text.get(key, DOCUMENT_TEXT["en"].get(key, key))
 
 
-def document_file_filter():
+def document_file_filter(lang="en"):
     extensions = " ".join(f"*{extension}" for extension in sorted(SUPPORTED_EXTENSIONS))
-    return f"Documents ({extensions});;All files (*.*)"
+    return f"{doc_text(lang, 'documents_filter')} ({extensions});;{doc_text(lang, 'all_files_filter')} (*.*)"
+
+
+def translation_save_filter(lang="en"):
+    return (
+        f"{doc_text(lang, 'text_file_filter')} (*.txt);;"
+        f"{doc_text(lang, 'markdown_file_filter')} (*.md);;"
+        f"{doc_text(lang, 'session_file_filter')} (*.json)"
+    )
+
+
+def translation_session_filter(lang="en"):
+    return (
+        f"{doc_text(lang, 'translation_sessions_filter')} (*.json);;"
+        f"{doc_text(lang, 'all_files_filter')} (*.*)"
+    )
 
 
 TRANSLATION_PROVIDER_OPTIONS = (
@@ -1753,7 +1823,7 @@ _HELP_STYLE = """
 <style>
     body { color: #e8e0f7; font-family: "Segoe UI"; }
     .hero {
-        background-color: rgba(197, 179, 233, 0.12);
+        background-color: transparent;
         border: 1px solid rgba(197, 179, 233, 0.45);
         border-radius: 14px;
         padding: 13px;
@@ -1762,7 +1832,7 @@ _HELP_STYLE = """
     .hero-title { color: #ffffff; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
     .hero-subtitle { color: #cfc4e8; font-size: 13px; line-height: 1.45; }
     .section {
-        background-color: rgba(255, 255, 255, 0.045);
+        background-color: transparent;
         border: 1px solid rgba(197, 179, 233, 0.22);
         border-radius: 13px;
         margin-bottom: 12px;
@@ -1770,6 +1840,7 @@ _HELP_STYLE = """
     }
     .section-title {
         color: #c5b3e9;
+        background-color: transparent;
         font-size: 16px;
         font-weight: 900;
         margin-bottom: 8px;
@@ -1798,6 +1869,15 @@ _HELP_STYLE = """
         border-radius: 10px;
         padding: 9px;
         margin-top: 8px;
+    }
+    .footer { margin-top: 16px; text-align: center; }
+    .footer a {
+        color: #efe8ff;
+        background-color: #2a2238;
+        border: 1px solid #8f6fd1;
+        padding: 8px 16px;
+        font-weight: 800;
+        text-decoration: none;
     }
 </style>
 """
@@ -2336,12 +2416,12 @@ DOCUMENT_HELP_CONTENT = {
 
 
 HELP_ACTION_TEXT = {
-    "en": {"title": "FAQ", "guide": "Start interactive guide", "close": "Got it"},
-    "ru": {"title": "Справка", "guide": "Пройти обучение", "close": "Понятно"},
-    "es": {"title": "Ayuda", "guide": "Iniciar guía", "close": "Entendido"},
-    "de": {"title": "Hilfe", "guide": "Tour starten", "close": "Verstanden"},
-    "fr": {"title": "Aide", "guide": "Lancer le guide", "close": "Compris"},
-    "zh": {"title": "帮助", "guide": "开始引导", "close": "知道了"},
+    "en": {"title": "FAQ", "guide": "Start interactive guide", "github": "GitHub project", "telegram": "Telegram", "close": "Got it"},
+    "ru": {"title": "Справка", "guide": "Пройти обучение", "github": "Проект на GitHub", "telegram": "Telegram", "close": "Понятно"},
+    "es": {"title": "Ayuda", "guide": "Iniciar guía", "github": "Proyecto en GitHub", "telegram": "Telegram", "close": "Entendido"},
+    "de": {"title": "Hilfe", "guide": "Tour starten", "github": "Projekt auf GitHub", "telegram": "Telegram", "close": "Verstanden"},
+    "fr": {"title": "Aide", "guide": "Lancer le guide", "github": "Projet sur GitHub", "telegram": "Telegram", "close": "Compris"},
+    "zh": {"title": "帮助", "guide": "开始引导", "github": "GitHub 项目", "telegram": "Telegram", "close": "知道了"},
 }
 
 
@@ -2363,6 +2443,10 @@ def help_text(lang):
         for item in items:
             blocks.append(f'<div class="item">{item}</div>')
         blocks.append("</div>")
+    blocks.append(
+        '<div class="footer"><a href="https://github.com/jabrailkhalil/clickntranslate">'
+        f'{help_action_text(lang, "github")}</a></div>'
+    )
     return "\n".join(blocks)
 
 THEMES = {
@@ -2576,6 +2660,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "TECHNICAL DETAILS",
         "fallback": "Argos did not return an error description.",
         "close": "Close",
+        "cancel": "Cancel",
     },
     "ru": {
         "title": "Не удалось перевести",
@@ -2584,6 +2669,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "ТЕХНИЧЕСКИЕ ПОДРОБНОСТИ",
         "fallback": "Argos не вернул описание ошибки.",
         "close": "Закрыть",
+        "cancel": "Отмена",
     },
     "es": {
         "title": "No se pudo traducir",
@@ -2592,6 +2678,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "DETALLES TÉCNICOS",
         "fallback": "Argos no proporcionó una descripción del error.",
         "close": "Cerrar",
+        "cancel": "Cancelar",
     },
     "de": {
         "title": "Übersetzung fehlgeschlagen",
@@ -2600,6 +2687,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "TECHNISCHE DETAILS",
         "fallback": "Argos hat keine Fehlerbeschreibung zurückgegeben.",
         "close": "Schließen",
+        "cancel": "Abbrechen",
     },
     "fr": {
         "title": "Échec de la traduction",
@@ -2608,6 +2696,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "DÉTAILS TECHNIQUES",
         "fallback": "Argos n’a fourni aucune description de l’erreur.",
         "close": "Fermer",
+        "cancel": "Annuler",
     },
     "zh": {
         "title": "翻译失败",
@@ -2616,6 +2705,7 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "details": "技术详情",
         "fallback": "Argos 未返回错误说明。",
         "close": "关闭",
+        "cancel": "取消",
     },
 }
 
@@ -2766,6 +2856,58 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
 }
 
 
+class CenteredFramelessDialog(QDialog):
+    """Shared movable dark-window shell used by secondary app windows."""
+
+    def __init__(self, parent=None, drag_height=86):
+        super().__init__(parent)
+        self._drag_position = None
+        self._drag_height = int(drag_height)
+        self._centered_once = False
+
+    def _center_on_owner(self):
+        owner = self.parentWidget()
+        target = owner.window().frameGeometry() if owner is not None else None
+        if target is None or not target.isValid():
+            screen = QApplication.primaryScreen()
+            target = screen.availableGeometry() if screen is not None else None
+        if target is None or not target.isValid():
+            return
+        frame = self.frameGeometry()
+        frame.moveCenter(target.center())
+        screen = QApplication.screenAt(target.center()) or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
+            frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
+        self.move(frame.topLeft())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._centered_once:
+            self._centered_once = True
+            self._center_on_owner()
+            QTimer.singleShot(0, self._center_on_owner)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.pos().y() <= self._drag_height:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
+
+
 class TranslationResultDialog(QDialog):
     """Frameless themed translation result window with consistent actions."""
 
@@ -2775,6 +2917,7 @@ class TranslationResultDialog(QDialog):
         self.lang = lang if lang in TRANSLATION_RESULT_DIALOG_TEXT else "en"
         self.text = TRANSLATION_RESULT_DIALOG_TEXT[self.lang]
         self._drag_position = None
+        self._stack_offset = QtCore.QPoint()
         self.setObjectName("translationResultRoot")
         self.setWindowTitle(self.text["title"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
@@ -2925,6 +3068,12 @@ class TranslationResultDialog(QDialog):
             return
         frame = self.frameGeometry()
         frame.moveCenter(target_geometry.center())
+        frame.translate(self._stack_offset)
+        screen = QApplication.screenAt(target_geometry.center()) or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
+            frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
         self.move(frame.topLeft())
 
     def showEvent(self, event):
@@ -3321,14 +3470,14 @@ class WelcomeDialog(QDialog):
         self._stop_animations()
         super().closeEvent(event)
 
-class DocumentTranslationDialog(QDialog):
+class DocumentTranslationDialog(CenteredFramelessDialog):
     _document_loaded_signal = QtCore.pyqtSignal(object)
     _document_error_signal = QtCore.pyqtSignal(str)
     _document_progress_signal = QtCore.pyqtSignal(int, int, str)
     _document_done_signal = QtCore.pyqtSignal(str, object)
 
     def __init__(self, parent_app, initial_path=None):
-        super().__init__(parent_app)
+        super().__init__(parent_app, drag_height=92)
         self.parent_app = parent_app
         self.lang = getattr(parent_app, "current_interface_language", "en")
         self.theme_name = getattr(parent_app, "current_theme", DEFAULT_CONFIG["theme"])
@@ -3345,8 +3494,10 @@ class DocumentTranslationDialog(QDialog):
         self._document_done_signal.connect(self._on_translation_done)
 
         self.setWindowTitle(doc_text(self.lang, "title"))
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
+        self.setObjectName("documentTranslationDialog")
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMinimumSize(980, 680)
         self.resize(1080, 700)
         self.setAcceptDrops(True)
@@ -3364,7 +3515,16 @@ class DocumentTranslationDialog(QDialog):
         self._apply_native_frame_theme()
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setSpacing(0)
+
+        self.window_frame = QFrame(self)
+        self.window_frame.setObjectName("docWindowFrame")
+        self.window_frame.setAttribute(Qt.WA_StyledBackground, True)
+        root_layout.addWidget(self.window_frame)
+
+        layout = QVBoxLayout(self.window_frame)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
@@ -3403,6 +3563,22 @@ class DocumentTranslationDialog(QDialog):
         self.status_pill.setAlignment(Qt.AlignCenter)
         self.status_pill.setMinimumWidth(128)
         header_top.addWidget(self.status_pill)
+
+        self.doc_minimize_button = QToolButton(self)
+        self.doc_minimize_button.setObjectName("docWindowButton")
+        self.doc_minimize_button.setText("−")
+        self.doc_minimize_button.setToolTip(ui_text(self.lang, "minimize"))
+        self.doc_minimize_button.setFixedSize(34, 32)
+        self.doc_minimize_button.clicked.connect(self.showMinimized)
+        header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignTop)
+
+        self.doc_close_button = QToolButton(self)
+        self.doc_close_button.setObjectName("docWindowClose")
+        self.doc_close_button.setText("×")
+        self.doc_close_button.setToolTip(ui_text(self.lang, "close"))
+        self.doc_close_button.setFixedSize(34, 32)
+        self.doc_close_button.clicked.connect(self.close)
+        header_top.addWidget(self.doc_close_button, alignment=Qt.AlignTop)
         header_layout.addLayout(header_top)
 
         control_row = QHBoxLayout()
@@ -3571,9 +3747,14 @@ class DocumentTranslationDialog(QDialog):
         if hasattr(self, "doc_icon_label"):
             self.doc_icon_label.setPixmap(document_translation_icon(self.theme_name).pixmap(30, 30))
         self.setStyleSheet(f"""
-            QDialog {{
-                background-color: {bg};
+            QDialog#documentTranslationDialog {{
+                background: transparent;
                 color: {fg};
+            }}
+            QFrame#docWindowFrame {{
+                background-color: {bg};
+                border: 1px solid {border};
+                border-radius: 12px;
             }}
             QLabel {{
                 color: {fg};
@@ -3582,6 +3763,8 @@ class DocumentTranslationDialog(QDialog):
             QFrame#docTopBar {{
                 background-color: {top};
                 border-bottom: 1px solid {soft_border};
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
             }}
             QFrame#docToolBar {{
                 background-color: {toolbar};
@@ -3644,6 +3827,23 @@ class DocumentTranslationDialog(QDialog):
                 color: {fg};
                 font-size: 13px;
                 font-weight: 900;
+            }}
+            QToolButton#docWindowButton,
+            QToolButton#docWindowClose {{
+                background: transparent;
+                color: {muted};
+                border: none;
+                border-radius: 7px;
+                font-size: 20px;
+                font-weight: 700;
+            }}
+            QToolButton#docWindowButton:hover {{
+                background-color: {control_hover};
+                color: {fg};
+            }}
+            QToolButton#docWindowClose:hover {{
+                background-color: #d44b55;
+                color: #ffffff;
             }}
             QPushButton {{
                 min-height: 28px;
@@ -3776,6 +3976,8 @@ class DocumentTranslationDialog(QDialog):
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.header_title.setText(doc_text(self.lang, "title"))
         self.header_subtitle.setText(doc_text(self.lang, "drop_hint"))
+        self.doc_minimize_button.setToolTip(ui_text(self.lang, "minimize"))
+        self.doc_close_button.setToolTip(ui_text(self.lang, "close"))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
         self.remove_button.setText(doc_text(self.lang, "remove_file"))
         self.translate_file_button.setText(doc_text(self.lang, "translate_file"))
@@ -3842,7 +4044,7 @@ class DocumentTranslationDialog(QDialog):
             self,
             doc_text(self.lang, "attach_file"),
             "",
-            "Documents (*.txt *.md *.docx *.pdf *.html *.htm *.rtf);;All files (*.*)",
+            document_file_filter(self.lang),
         )
         if path:
             self.load_file(path)
@@ -4025,16 +4227,16 @@ class DocumentTranslationDialog(QDialog):
             self,
             doc_text(self.lang, "save_translation"),
             paths["txt"],
-            "Text file (*.txt);;Markdown file (*.md);;Session file (*.json)",
+            translation_save_filter(self.lang),
         )
         if not path:
             return
 
         selected_filter = selected_filter or ""
         root, ext = os.path.splitext(path)
-        if "Markdown" in selected_filter and not ext:
+        if selected_filter.startswith(doc_text(self.lang, "markdown_file_filter")) and not ext:
             path = root + ".md"
-        elif "Session" in selected_filter and not ext:
+        elif selected_filter.startswith(doc_text(self.lang, "session_file_filter")) and not ext:
             path = root + ".json"
         elif not ext:
             path = root + ".txt"
@@ -4052,7 +4254,7 @@ class DocumentTranslationDialog(QDialog):
             self,
             doc_text(self.lang, "open_session"),
             root,
-            "Translation sessions (*.json);;All files (*.*)",
+            translation_session_filter(self.lang),
         )
         if not path:
             return
@@ -5373,13 +5575,22 @@ class DarkThemeApp(QMainWindow):
         lang = self.current_interface_language
         theme = self.current_theme
 
-        dialog = QDialog(self)
+        dialog = CenteredFramelessDialog(self, drag_height=76)
+        dialog.setObjectName("helpDialogRoot")
         dialog.setWindowTitle(help_action_text(lang, "title"))
         dialog.setFixedSize(610, 620)
-        dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        dialog.setAttribute(Qt.WA_TranslucentBackground, True)
         dialog.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
 
-        layout = QVBoxLayout(dialog)
+        outer = QVBoxLayout(dialog)
+        outer.setContentsMargins(10, 10, 10, 10)
+        outer.setSpacing(0)
+        frame = QFrame(dialog)
+        frame.setObjectName("helpDialogFrame")
+        outer.addWidget(frame)
+
+        layout = QVBoxLayout(frame)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
@@ -5410,21 +5621,46 @@ class DarkThemeApp(QMainWindow):
         title_stack.addWidget(subtitle_label)
         title_row.addLayout(title_stack)
         title_row.addStretch()
+        title_close = QToolButton(dialog)
+        title_close.setObjectName("helpTitleClose")
+        title_close.setText("×")
+        title_close.setFixedSize(34, 34)
+        title_close.setToolTip(help_action_text(lang, "close"))
+        title_close.clicked.connect(dialog.accept)
+        title_row.addWidget(title_close, alignment=Qt.AlignTop)
         layout.addLayout(title_row)
 
         # Текст FAQ всегда строится из актуального языка интерфейса.
         help_html = help_text(lang)
 
-        text_edit = QTextEdit()
+        text_edit = QTextBrowser()
         text_edit.setReadOnly(True)
+        text_edit.setOpenExternalLinks(True)
         text_edit.setHtml(help_html)
+        text_edit.setFocusPolicy(Qt.NoFocus)
 
         # Стилизация под тему
         if theme == "Темная":
             dialog.setStyleSheet("""
-                QDialog {
+                QDialog#helpDialogRoot {
+                    background: transparent;
+                }
+                QFrame#helpDialogFrame {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                         stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
+                    border: 1px solid rgba(197, 179, 233, 105);
+                    border-radius: 16px;
+                }
+                QToolButton#helpTitleClose {
+                    background: transparent;
+                    color: #cfc7dd;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 22px;
+                }
+                QToolButton#helpTitleClose:hover {
+                    background: #d44b55;
+                    color: #ffffff;
                 }
             """)
             text_edit.setStyleSheet("""
@@ -5460,9 +5696,25 @@ class DarkThemeApp(QMainWindow):
             """)
         else:
             dialog.setStyleSheet("""
-                QDialog {
+                QDialog#helpDialogRoot {
+                    background: transparent;
+                }
+                QFrame#helpDialogFrame {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                         stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
+                    border: 1px solid rgba(197, 179, 233, 105);
+                    border-radius: 16px;
+                }
+                QToolButton#helpTitleClose {
+                    background: transparent;
+                    color: #cfc7dd;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 22px;
+                }
+                QToolButton#helpTitleClose:hover {
+                    background: #d44b55;
+                    color: #ffffff;
                 }
             """)
             text_edit.setStyleSheet("""
@@ -5518,6 +5770,28 @@ class DarkThemeApp(QMainWindow):
         """)
         guide_btn.clicked.connect(lambda: self._close_help_and_start_guide(dialog))
         button_row.addWidget(guide_btn)
+
+        telegram_btn = QPushButton(help_action_text(lang, "telegram"))
+        telegram_btn.setObjectName("helpTelegramButton")
+        telegram_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 12);
+                color: #efe8ff;
+                border: 1px solid rgba(197, 179, 233, 92);
+                border-radius: 12px;
+                padding: 10px 16px;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            QPushButton:hover {
+                background: rgba(197, 179, 233, 48);
+                border-color: #c5b3e9;
+            }
+        """)
+        telegram_btn.clicked.connect(
+            lambda: webbrowser.open("https://t.me/jabrail_digital")
+        )
+        button_row.addWidget(telegram_btn)
         button_row.addStretch()
 
         # Кнопка закрытия
@@ -5821,7 +6095,7 @@ class DarkThemeApp(QMainWindow):
             self,
             doc_text(self.current_interface_language, "attach_file"),
             initial_dir or "",
-            document_file_filter(),
+            document_file_filter(self.current_interface_language),
         )
         if path:
             self.open_document_translation(path)
@@ -5896,18 +6170,8 @@ class DarkThemeApp(QMainWindow):
     def _on_hotkey_registration_failed(self, hotkey_str):
         """Показать уведомление, когда хоткей занят другим приложением."""
         lang = self.current_interface_language
-        if lang == "ru":
-            title = "Горячая клавиша недоступна"
-            msg = (f"Не удалось зарегистрировать <b>{hotkey_str}</b>.<br><br>"
-                   f"Эта комбинация уже используется браузером или системой "
-                   f"(например, Ctrl+Shift+T открывает закрытую вкладку).<br><br>"
-                   f"Попробуйте другую комбинацию в настройках.")
-        else:
-            title = "Hotkey unavailable"
-            msg = (f"Failed to register <b>{hotkey_str}</b>.<br><br>"
-                   f"This combination is already used by browser or system "
-                   f"(e.g., Ctrl+Shift+T reopens closed tab).<br><br>"
-                   f"Try a different combination in settings.")
+        title = hotkey_error_text(lang, "title")
+        msg = hotkey_error_text(lang, "message", hotkey=hotkey_str)
 
         # Используем QTimer для показа в главном потоке
         QTimer.singleShot(100, lambda: self._show_hotkey_error_dialog(title, msg))
@@ -6001,7 +6265,6 @@ class DarkThemeApp(QMainWindow):
         return dialog.exec_() == QDialog.Accepted
 
     def _show_argos_progress(self, text, percent=0, determinate=False):
-        is_ru = self.current_interface_language == "ru"
         if self._argos_progress is None:
             self._argos_progress = TesseractInstallProgressDialog(
                 self,
@@ -6009,7 +6272,7 @@ class DarkThemeApp(QMainWindow):
                 in_progress_attr="_argos_translation_running",
                 cancel_callback=self._request_argos_install_cancel,
             )
-            self._argos_progress.setCancelButtonText("Отменить" if is_ru else "Cancel")
+            self._argos_progress.setCancelButtonText(ui_text(self.current_interface_language, "cancel"))
             self._argos_progress.setWindowModality(Qt.NonModal)
             self._argos_progress.setAutoClose(False)
             self._argos_progress.setAutoReset(False)
@@ -6215,10 +6478,32 @@ class DarkThemeApp(QMainWindow):
     def minimize_to_tray(self):
         self.hide()
 
+_translation_result_dialogs = []
+
+
+def _forget_translation_result_dialog(dialog):
+    try:
+        _translation_result_dialogs.remove(dialog)
+    except ValueError:
+        pass
+
+
+def _live_translation_result_dialogs():
+    live = []
+    for dialog in _translation_result_dialogs:
+        try:
+            if dialog is not None and dialog.isVisible():
+                live.append(dialog)
+        except RuntimeError:
+            continue
+    return live
+
+
 # --- Универсальный диалог перевода ---
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная'):
     if auto_copy:
         pyperclip.copy(translated_text)
+    _translation_result_dialogs[:] = _live_translation_result_dialogs()
     dialog = TranslationResultDialog(
         parent,
         translated_text,
@@ -6226,7 +6511,15 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
         lang=lang,
         theme=theme,
     )
-    return dialog.exec_()
+    stack_index = min(len(_translation_result_dialogs), 4)
+    dialog._stack_offset = QtCore.QPoint(18 * stack_index, 48 * stack_index)
+    dialog.setAttribute(Qt.WA_DeleteOnClose, True)
+    dialog.finished.connect(lambda _result, item=dialog: _forget_translation_result_dialog(item))
+    _translation_result_dialogs.append(dialog)
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+    return dialog
 
 if __name__ == "__main__":
     # ONNX Runtime and torch can fail to initialize after Qt on Windows. The

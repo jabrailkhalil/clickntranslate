@@ -14,7 +14,7 @@ Pillow
 pyperclip
 argostranslate~=1.11.0
 pytesseract
-rapidocr-onnxruntime
+rapidocr-onnxruntime==1.4.4
 requests
 setuptools<81
 psutil

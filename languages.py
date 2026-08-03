@@ -2,6 +2,46 @@ import re
 from dataclasses import dataclass
 
 
+LOCALIZED_LANGUAGE_NAMES = {
+    "en": {
+        "en": "English", "ru": "Russian", "de": "German", "fr": "French",
+        "es": "Spanish", "it": "Italian", "pt": "Portuguese", "pl": "Polish",
+        "uk": "Ukrainian", "tr": "Turkish", "nl": "Dutch", "zh": "Chinese",
+        "ja": "Japanese", "ko": "Korean", "ar": "Arabic", "hi": "Hindi",
+    },
+    "ru": {
+        "en": "Английский", "ru": "Русский", "de": "Немецкий", "fr": "Французский",
+        "es": "Испанский", "it": "Итальянский", "pt": "Португальский", "pl": "Польский",
+        "uk": "Украинский", "tr": "Турецкий", "nl": "Нидерландский", "zh": "Китайский",
+        "ja": "Японский", "ko": "Корейский", "ar": "Арабский", "hi": "Хинди",
+    },
+    "es": {
+        "en": "Inglés", "ru": "Ruso", "de": "Alemán", "fr": "Francés",
+        "es": "Español", "it": "Italiano", "pt": "Portugués", "pl": "Polaco",
+        "uk": "Ucraniano", "tr": "Turco", "nl": "Neerlandés", "zh": "Chino",
+        "ja": "Japonés", "ko": "Coreano", "ar": "Árabe", "hi": "Hindi",
+    },
+    "de": {
+        "en": "Englisch", "ru": "Russisch", "de": "Deutsch", "fr": "Französisch",
+        "es": "Spanisch", "it": "Italienisch", "pt": "Portugiesisch", "pl": "Polnisch",
+        "uk": "Ukrainisch", "tr": "Türkisch", "nl": "Niederländisch", "zh": "Chinesisch",
+        "ja": "Japanisch", "ko": "Koreanisch", "ar": "Arabisch", "hi": "Hindi",
+    },
+    "fr": {
+        "en": "Anglais", "ru": "Russe", "de": "Allemand", "fr": "Français",
+        "es": "Espagnol", "it": "Italien", "pt": "Portugais", "pl": "Polonais",
+        "uk": "Ukrainien", "tr": "Turc", "nl": "Néerlandais", "zh": "Chinois",
+        "ja": "Japonais", "ko": "Coréen", "ar": "Arabe", "hi": "Hindi",
+    },
+    "zh": {
+        "en": "英语", "ru": "俄语", "de": "德语", "fr": "法语",
+        "es": "西班牙语", "it": "意大利语", "pt": "葡萄牙语", "pl": "波兰语",
+        "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
+        "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
+    },
+}
+
+
 @dataclass(frozen=True)
 class LanguageInfo:
     code: str
@@ -18,7 +58,11 @@ class LanguageInfo:
     mymemory_code: str = ""
 
     def display_name(self, interface_language="en"):
-        return self.russian_name if interface_language == "ru" else self.english_name
+        language_names = LOCALIZED_LANGUAGE_NAMES.get(
+            interface_language,
+            LOCALIZED_LANGUAGE_NAMES["en"],
+        )
+        return language_names.get(self.code, self.russian_name if interface_language == "ru" else self.english_name)
 
 
 LANGUAGES = [
@@ -79,6 +123,10 @@ def language_code_from_name(name, interface_language="en"):
         if name in (language.english_name, language.russian_name):
             return language.code
     normalized = name.strip().lower()
+    localized_names = LOCALIZED_LANGUAGE_NAMES.get(interface_language, {})
+    for code, localized_name in localized_names.items():
+        if normalized == localized_name.lower():
+            return code
     for language in LANGUAGES:
         if normalized == language.code:
             return language.code

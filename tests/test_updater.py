@@ -176,6 +176,57 @@ class TestUpdateProgressDialog(unittest.TestCase):
 
 
 class TestUpdateAssetSelection(unittest.TestCase):
+    def test_release_1_4_6_detects_1_4_7_portable_update(self):
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "tag_name": "v1.4.7",
+            "assets": [
+                {
+                    "name": "ClicknTranslate-Setup-v1.4.7-win64.exe",
+                    "browser_download_url": "https://example.com/setup.exe",
+                },
+                {
+                    "name": "ClicknTranslate-v1.4.7-win64.zip",
+                    "browser_download_url": "https://example.com/app.zip",
+                },
+                {
+                    "name": "ClicknTranslate-v1.4.7-win64.zip.sha256",
+                    "browser_download_url": "https://example.com/app.zip.sha256",
+                },
+            ],
+        }
+        posted = []
+        dummy = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_cancel_requested=threading.Event(),
+            _post_update_check_result=posted.append,
+        )
+        dummy._pick_update_asset = types.MethodType(sw.SettingsWindow._pick_update_asset, dummy)
+        dummy._pick_checksum_url = types.MethodType(sw.SettingsWindow._pick_checksum_url, dummy)
+
+        with mock.patch("settings_window.APP_VERSION", "1.4.6"), mock.patch(
+            "settings_window.requests.get", return_value=response
+        ) as get_mock:
+            sw.SettingsWindow._check_latest_release_worker(dummy)
+
+        self.assertEqual(
+            posted,
+            [
+                {
+                    "status": "ready",
+                    "latest_version": "1.4.7",
+                    "asset_name": "ClicknTranslate-v1.4.7-win64.zip",
+                    "asset_url": "https://example.com/app.zip",
+                    "checksum_url": "https://example.com/app.zip.sha256",
+                }
+            ],
+        )
+        self.assertEqual(
+            get_mock.call_args.kwargs["headers"]["User-Agent"],
+            "ClicknTranslate/1.4.6",
+        )
+
     def test_pick_update_asset_prefers_windows_clickntranslate_zip(self):
         dummy = types.SimpleNamespace()
         assets = [

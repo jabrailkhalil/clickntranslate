@@ -94,3 +94,69 @@ def test_qt_exception_guard_is_idempotent():
         assert installed._clickntranslate_qt_guard is True
     finally:
         __import__("sys").excepthook = previous
+
+
+def test_document_window_uses_the_shared_frameless_chrome():
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "Темная"
+    owner.resize(700, 500)
+    owner.show()
+
+    dialog = main.DocumentTranslationDialog(owner)
+    dialog.show()
+    app.processEvents()
+
+    assert dialog.windowFlags() & QtCore.Qt.FramelessWindowHint
+    assert dialog.testAttribute(QtCore.Qt.WA_TranslucentBackground)
+    assert dialog.window_frame.objectName() == "docWindowFrame"
+    assert dialog.doc_minimize_button.objectName() == "docWindowButton"
+    assert dialog.doc_close_button.objectName() == "docWindowClose"
+    assert "QFrame#docWindowFrame" in dialog.styleSheet()
+
+    dialog.close()
+    owner.close()
+
+
+def test_faq_uses_custom_chrome_and_exposes_project_links():
+    app = _app()
+
+    class HelpOwner(QtWidgets.QWidget):
+        current_interface_language = "en"
+        current_theme = "Темная"
+
+        def _complete_guide_step(self, _step):
+            pass
+
+        def _close_help_and_start_guide(self, dialog):
+            dialog.accept()
+
+    owner = HelpOwner()
+    observed = {}
+
+    def inspect_and_close():
+        dialog = next(
+            widget for widget in app.topLevelWidgets()
+            if widget.objectName() == "helpDialogRoot"
+        )
+        observed["frameless"] = bool(dialog.windowFlags() & QtCore.Qt.FramelessWindowHint)
+        help_text = dialog.findChild(QtWidgets.QTextEdit)
+        observed["github_at_end"] = help_text.toHtml().rfind("github.com/jabrailkhalil/clickntranslate") > help_text.toHtml().rfind("section-title")
+        observed["external_links"] = help_text.openExternalLinks()
+        observed["telegram"] = dialog.findChild(QtWidgets.QPushButton, "helpTelegramButton") is not None
+        observed["frame"] = dialog.findChild(QtWidgets.QFrame, "helpDialogFrame") is not None
+        dialog.accept()
+
+    QtCore.QTimer.singleShot(0, inspect_and_close)
+    main.DarkThemeApp.show_help_dialog(owner)
+
+    assert observed == {
+        "frameless": True,
+        "github_at_end": True,
+        "external_links": True,
+        "telegram": True,
+        "frame": True,
+    }
+    assert "background-color: transparent" in main._HELP_STYLE
+    owner.close()
