@@ -8,9 +8,12 @@
 #ifndef ReleaseDir
   #define ReleaseDir "..\releases"
 #endif
+#ifndef MyAppId
+  #define MyAppId "{{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}"
+#endif
 
 [Setup]
-AppId={{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -31,7 +34,8 @@ UninstallDisplayIcon={app}\ClicknTranslate.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-CloseApplications=yes
+CloseApplications=force
+CloseApplicationsFilter=*.*
 RestartApplications=no
 SetupLogging=yes
 VersionInfoVersion={#MyAppVersion}.0

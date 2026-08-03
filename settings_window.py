@@ -15,6 +15,10 @@ import time
 import html
 import ctypes
 from urllib.parse import urlparse
+try:
+    import winreg
+except ImportError:  # pragma: no cover - non-Windows development hosts
+    winreg = None
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
@@ -73,6 +77,10 @@ GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/release
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 UPDATE_API_ENV = "CLICKNTRANSLATE_UPDATE_API_URL"
 UPDATE_TOKEN_ENV = "CLICKNTRANSLATE_UPDATE_TOKEN"
+INNO_UNINSTALL_KEY = (
+    r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
+    r"\{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}_is1"
+)
 MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
@@ -185,6 +193,32 @@ def _update_asset_download_url(asset):
     if token and asset.get("url"):
         return asset.get("url")
     return asset.get("browser_download_url")
+
+
+def _normalized_windows_path(path):
+    try:
+        return os.path.normcase(os.path.realpath(os.path.abspath(str(path or "")))).rstrip("\\/")
+    except (OSError, TypeError, ValueError):
+        return ""
+
+
+def _inno_install_root():
+    if winreg is None or os.name != "nt":
+        return ""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, INNO_UNINSTALL_KEY) as key:
+            value, _kind = winreg.QueryValueEx(key, "InstallLocation")
+    except OSError:
+        return ""
+    return _normalized_windows_path(value)
+
+
+def _is_inno_installed_copy(app_dir=None):
+    if portable_paths.is_windows_packaged() or not getattr(sys, "frozen", False):
+        return False
+    registered_root = _inno_install_root()
+    current_root = _normalized_windows_path(app_dir or _portable_base_dir())
+    return bool(registered_root and current_root and registered_root == current_root)
 
 
 def _provider_kind_text(kind, lang):
@@ -4424,10 +4458,37 @@ class SettingsWindow(QWidget):
         worker.start()
 
     def _pick_update_asset(self, assets):
+        installed_copy = _is_inno_installed_copy()
+        if installed_copy:
+            setup_assets = []
+            for asset in assets:
+                name = (asset.get("name") or "").lower()
+                if (
+                    name.endswith(".exe")
+                    and "clickntranslate" in name
+                    and "setup" in name
+                    and (asset.get("browser_download_url") or asset.get("url"))
+                ):
+                    setup_assets.append(asset)
+            if setup_assets:
+                return sorted(
+                    setup_assets,
+                    key=lambda asset: (
+                        "win64" in (asset.get("name") or "").lower(),
+                        "x64" in (asset.get("name") or "").lower(),
+                    ),
+                    reverse=True,
+                )[0]
+
         zip_assets = []
         for asset in assets:
             name = (asset.get("name") or "").lower()
-            if name.endswith(".zip") and asset.get("browser_download_url"):
+            if (
+                name.endswith(".zip")
+                and "bootstrap" not in name
+                and "update-bridge" not in name
+                and (asset.get("browser_download_url") or asset.get("url"))
+            ):
                 zip_assets.append(asset)
         if not zip_assets:
             return None
@@ -4457,7 +4518,7 @@ class SettingsWindow(QWidget):
     def _pick_checksum_url(self, assets, asset_name):
         if not asset_name:
             return ""
-        base_name = re.sub(r"\.zip$", "", asset_name.lower())
+        base_name = re.sub(r"\.(zip|exe)$", "", asset_name.lower())
         direct_name = f"{asset_name.lower()}"
         direct_txt_name = f"{direct_name}.txt"
         candidates = set()
@@ -4578,17 +4639,20 @@ class SettingsWindow(QWidget):
 
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_update_")
             self._update_temp_dir = temp_dir
-            safe_name = asset_name or f"ClicknTranslate-v{latest_version}.zip"
-            zip_path = os.path.join(temp_dir, safe_name)
-            if not zip_path.lower().endswith(".zip"):
-                zip_path = zip_path + ".zip"
+            safe_name = os.path.basename(asset_name or f"ClicknTranslate-v{latest_version}.zip")
+            package_path = os.path.join(temp_dir, safe_name)
+            package_kind = os.path.splitext(safe_name)[1].lower()
+            if package_kind not in (".zip", ".exe"):
+                raise RuntimeError("Unsupported update package type.")
+            if package_kind == ".exe" and not _is_inno_installed_copy():
+                raise RuntimeError("Installer updates are available only for an installed copy.")
 
             self._check_update_cancel_requested()
             self._update_phase = "downloading"
             _emit_stage_text(stage_download)
             self._download_file(
                 asset_url,
-                zip_path,
+                package_path,
                 timeout=120,
                 progress_callback=lambda done, total: _emit_download_progress(stage_download, done, total),
                 cancel_callback=lambda: self._update_cancel_requested.is_set()
@@ -4610,19 +4674,30 @@ class SettingsWindow(QWidget):
                 _emit_stage_text(stage_verify)
                 expected = self._read_checksum(checksum_path, safe_name)
                 if expected:
-                    actual = self._compute_sha256(zip_path)
+                    actual = self._compute_sha256(package_path)
                     if not actual:
                         raise RuntimeError("Не удалось вычислить SHA256 для загруженного архива.")
                     if actual != expected:
                         raise RuntimeError("Контрольная сумма обновления не совпала (checksum mismatch).")
-            if not zipfile.is_zipfile(zip_path):
+            if package_kind == ".zip" and not zipfile.is_zipfile(package_path):
                 raise RuntimeError("Скачанный файл не является zip архивом.")
+
+            if package_kind == ".exe":
+                try:
+                    with open(package_path, "rb") as executable:
+                        if executable.read(2) != b"MZ":
+                            raise RuntimeError("The downloaded installer is not a valid Windows executable.")
+                except OSError as error:
+                    raise RuntimeError(f"Could not validate the downloaded installer: {error}") from error
 
             self._check_update_cancel_requested()
             self._update_phase = "preparing"
             _emit_stage_text(stage_prepare)
             self._update_phase = "applying"
-            ok, err = self._launch_zip_updater(zip_path)
+            if package_kind == ".exe":
+                ok, err = self._launch_setup_updater(package_path, latest_version)
+            else:
+                ok, err = self._launch_zip_updater(package_path)
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
 
@@ -4764,6 +4839,152 @@ class SettingsWindow(QWidget):
                 continue
         return False, last_err
 
+    def _launch_setup_updater(self, setup_path, latest_version):
+        if portable_paths.is_windows_packaged():
+            return False, "Microsoft Store manages updates for this package"
+        if not getattr(sys, "frozen", False) or not _is_inno_installed_copy():
+            return False, "Installer update is available only for an installed copy"
+
+        app_dir = _portable_base_dir()
+        exe_name = os.path.basename(_public_executable_path())
+        current_pid = os.getpid()
+        fd, script_path = tempfile.mkstemp(prefix="clickntranslate_setup_updater_", suffix=".ps1")
+        os.close(fd)
+
+        script = r'''param(
+    [string]$AppDir,
+    [string]$SetupPath,
+    [int]$TargetPid,
+    [string]$ExeName,
+    [string]$ExpectedVersion
+)
+$logPath = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_update.log"
+$setupLog = Join-Path ([System.IO.Path]::GetTempPath()) "clickntranslate_setup_update.log"
+$ErrorActionPreference = 'Stop'
+
+function Write-UpdateLog {
+    param([string]$Message)
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+    Add-Content -Path $logPath -Value "[$ts] $Message" -ErrorAction SilentlyContinue
+}
+
+function Clear-PyInstallerEnv {
+    Get-ChildItem Env: -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -like "_PYI_*" -or $_.Name -ieq "_MEIPASS2"
+    } | ForEach-Object {
+        Remove-Item -LiteralPath ("Env:" + $_.Name) -ErrorAction SilentlyContinue
+    }
+}
+
+function Show-UpdateError {
+    param([string]$Message)
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show(
+            $Message,
+            "Click'n'Translate update",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    } catch {}
+}
+
+Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())
+Write-UpdateLog "Installer updater start: AppDir=$AppDir; SetupPath=$SetupPath; TargetPid=$TargetPid; Expected=$ExpectedVersion"
+
+try {
+    $deadline = (Get-Date).AddSeconds(30)
+    while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
+        if ((Get-Date) -gt $deadline) {
+            Write-UpdateLog "Application did not exit; terminating process tree $TargetPid"
+            & taskkill.exe /PID $TargetPid /T /F 2>&1 | ForEach-Object { Write-UpdateLog $_ }
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    $quotedDir = '"' + $AppDir.Replace('"', '') + '"'
+    $quotedLog = '"' + $setupLog.Replace('"', '') + '"'
+    $setupArguments = @(
+        "/SILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NOCANCEL",
+        "/NORESTART",
+        "/CLOSEAPPLICATIONS",
+        "/FORCECLOSEAPPLICATIONS",
+        "/NORESTARTAPPLICATIONS",
+        "/LOGCLOSEAPPLICATIONS",
+        "/DIR=$quotedDir",
+        "/LOG=$quotedLog"
+    )
+    Write-UpdateLog "Starting Inno Setup with Windows Restart Manager"
+    $setup = Start-Process -FilePath $SetupPath -ArgumentList $setupArguments -WorkingDirectory ([System.IO.Path]::GetTempPath()) -Wait -PassThru
+    Write-UpdateLog "Setup exit code: $($setup.ExitCode)"
+    if ($setup.ExitCode -ne 0) {
+        throw "Installer exited with code $($setup.ExitCode). See $setupLog"
+    }
+
+    $targetExe = Join-Path $AppDir $ExeName
+    if (-not (Test-Path -LiteralPath $targetExe)) {
+        throw "Updated launcher was not installed: $targetExe"
+    }
+    $fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($targetExe).FileVersion
+    Write-UpdateLog "Installed launcher version: $fileVersion"
+    if (-not $fileVersion -or -not $fileVersion.StartsWith($ExpectedVersion + ".")) {
+        throw "Installed version $fileVersion does not match expected version $ExpectedVersion"
+    }
+
+    Clear-PyInstallerEnv
+    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
+    Write-UpdateLog "Updated installed copy started successfully"
+}
+catch {
+    $message = "The update could not be installed.`n`n$($_.Exception.Message)"
+    Write-UpdateLog ("Installer updater failed: " + $_.Exception.Message)
+    try {
+        $fallbackExe = Join-Path $AppDir $ExeName
+        if (Test-Path -LiteralPath $fallbackExe) {
+            Clear-PyInstallerEnv
+            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir
+        }
+    } catch {}
+    Show-UpdateError $message
+}
+finally {
+    Remove-Item -LiteralPath $SetupPath -Force -ErrorAction SilentlyContinue
+    $packageDirectory = Split-Path -Parent $SetupPath
+    if ($packageDirectory -and (Test-Path -LiteralPath $packageDirectory)) {
+        Remove-Item -LiteralPath $packageDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+'''
+        try:
+            with open(script_path, "w", encoding="utf-8") as script_file:
+                script_file.write(script)
+        except Exception as error:
+            return False, f"Failed to create installer updater script: {error}"
+
+        try:
+            requires_elevation = SettingsWindow._install_dir_requires_elevation(self, app_dir)
+            ok, error = SettingsWindow._launch_hidden_powershell_script(
+                self,
+                script_path,
+                [
+                    "-AppDir", app_dir,
+                    "-SetupPath", setup_path,
+                    "-TargetPid", str(current_pid),
+                    "-ExeName", exe_name,
+                    "-ExpectedVersion", str(latest_version),
+                ],
+                elevated=requires_elevation,
+            )
+            if ok:
+                return True, None
+            return False, f"Failed to launch installer updater: {error}"
+        except Exception as error:
+            return False, f"Failed to launch installer updater: {error}"
+
     def _launch_zip_updater(self, zip_path):
         if portable_paths.is_windows_packaged():
             return False, "Microsoft Store manages updates for this package"
@@ -4811,11 +5032,73 @@ function Test-PreservedInstallItem {
     return $false
 }
 
+function Get-DescendantProcessIds {
+    param([int]$RootPid)
+    try {
+        $snapshot = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+        $pending = New-Object System.Collections.Generic.Queue[int]
+        $result = New-Object System.Collections.Generic.List[int]
+        $pending.Enqueue($RootPid)
+        while ($pending.Count -gt 0) {
+            $parentPid = $pending.Dequeue()
+            foreach ($process in $snapshot) {
+                if ([int]$process.ParentProcessId -eq $parentPid -and -not $result.Contains([int]$process.ProcessId)) {
+                    $childPid = [int]$process.ProcessId
+                    $result.Add($childPid)
+                    $pending.Enqueue($childPid)
+                }
+            }
+        }
+        return @($result)
+    } catch {
+        Write-UpdateLog ("Could not snapshot child processes: " + $_.Exception.Message)
+        return @()
+    }
+}
+
+function Stop-InstallProcesses {
+    param([string]$InstallRoot, [int[]]$KnownChildPids)
+    foreach ($childPid in @($KnownChildPids)) {
+        if (Get-Process -Id $childPid -ErrorAction SilentlyContinue) {
+            Write-UpdateLog "Stopping surviving application child process $childPid"
+            Stop-Process -Id $childPid -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $rootPrefix = [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    try {
+        foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
+            $executable = [string]$process.ExecutablePath
+            if ($executable -and $executable.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Write-UpdateLog "Stopping process from install directory: PID=$($process.ProcessId); Path=$executable"
+                Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch {
+        Write-UpdateLog ("Could not enumerate install-directory processes: " + $_.Exception.Message)
+    }
+
+    for ($attempt = 1; $attempt -le 40; $attempt++) {
+        $remaining = @()
+        try {
+            $remaining = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
+                $path = [string]$_.ExecutablePath
+                $path -and $path.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+            })
+        } catch {}
+        if ($remaining.Count -eq 0) { return }
+        if ($attempt -eq 40) {
+            throw "Application processes are still using files in $InstallRoot"
+        }
+        Start-Sleep -Milliseconds 250
+    }
+}
+
 function Move-UpdateItemWithRetry {
     param(
         [string]$LiteralPath,
         [string]$Destination,
-        [int]$Attempts = 40
+        [int]$Attempts = 120
     )
     for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
         try {
@@ -4837,6 +5120,8 @@ Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())
 
 Write-UpdateLog "Updater start: AppDir=$AppDir; ZipPath=$ZipPath; Exe=$ExeName; TargetPid=$TargetPid"
 Write-UpdateLog "Updater working directory: $(Get-Location)"
+$knownChildPids = @(Get-DescendantProcessIds -RootPid $TargetPid)
+Write-UpdateLog "Captured child process IDs: $($knownChildPids -join ',')"
 
 $extractDir = $null
 $backupDir = $null
@@ -4846,14 +5131,15 @@ try {
     $deadline = (Get-Date).AddSeconds(30)
     while (Get-Process -Id $TargetPid -ErrorAction SilentlyContinue) {
         if ((Get-Date) -gt $deadline) {
-            Write-UpdateLog "Application did not exit in time, force terminating process $TargetPid"
-            try { Stop-Process -Id $TargetPid -Force -ErrorAction SilentlyContinue } catch {}
+            Write-UpdateLog "Application did not exit in time, force terminating process tree $TargetPid"
+            try { & taskkill.exe /PID $TargetPid /T /F 2>&1 | ForEach-Object { Write-UpdateLog $_ } } catch {}
             break
         }
         Start-Sleep -Milliseconds 300
     }
 
     Write-UpdateLog "Target app process is not running; start applying update"
+    Stop-InstallProcesses -InstallRoot $AppDir -KnownChildPids $knownChildPids
     $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
     New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
     Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force

@@ -295,6 +295,40 @@ class TestUpdateAssetSelection(unittest.TestCase):
         self.assertIsNotNone(selected)
         self.assertEqual(selected["name"], "ClicknTranslate-v1.3.3-win64.zip")
 
+    def test_installed_copy_prefers_setup_executable(self):
+        assets = [
+            {
+                "name": "ClicknTranslate-v1.5.2-win64.zip",
+                "browser_download_url": "https://example.com/portable.zip",
+            },
+            {
+                "name": "ClicknTranslate-Setup-v1.5.2-win64.exe",
+                "browser_download_url": "https://example.com/setup.exe",
+            },
+        ]
+
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=True):
+            selected = sw.SettingsWindow._pick_update_asset(types.SimpleNamespace(), assets)
+
+        self.assertEqual(selected["name"], "ClicknTranslate-Setup-v1.5.2-win64.exe")
+
+    def test_portable_copy_ignores_legacy_bootstrap_asset(self):
+        assets = [
+            {
+                "name": "ClicknTranslate-v1.5.2-win64-portable-bootstrap.zip",
+                "browser_download_url": "https://example.com/bootstrap.zip",
+            },
+            {
+                "name": "ClicknTranslate-v1.5.2-win64.zip",
+                "browser_download_url": "https://example.com/portable.zip",
+            },
+        ]
+
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=False):
+            selected = sw.SettingsWindow._pick_update_asset(types.SimpleNamespace(), assets)
+
+        self.assertEqual(selected["name"], "ClicknTranslate-v1.5.2-win64.zip")
+
     def test_pick_update_asset_ignores_engine_bundles(self):
         dummy = types.SimpleNamespace()
         assets = [
@@ -402,7 +436,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("clickntranslate_update.log", script_text)
             self.assertIn("AddSeconds(30)", script_text)
             self.assertIn("[int]$TargetPid", script_text)
-            self.assertIn("Stop-Process -Id $TargetPid -Force", script_text)
+            self.assertIn("taskkill.exe /PID $TargetPid /T /F", script_text)
             self.assertIn("Start-Process -FilePath $targetExe -WorkingDirectory $AppDir", script_text)
             self.assertIn("if ($_.Name -ieq \"data\" -or $_.Name -ieq \"ocr\" -or $_.Name -ieq \"translators\") { return }", script_text)
             self.assertNotIn("{ continue }", script_text)
@@ -415,9 +449,54 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Clear-PyInstallerEnv", script_text)
             self.assertIn("Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())", script_text)
             self.assertIn("Move-UpdateItemWithRetry", script_text)
+            self.assertIn("Get-DescendantProcessIds", script_text)
+            self.assertIn("Stop-InstallProcesses", script_text)
             self.assertIn("^unins\\d*\\.(exe|dat|msg)$", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
+        finally:
+            try:
+                os.remove(script_path)
+            except OSError:
+                pass
+
+    def test_installed_updater_runs_inno_setup_with_restart_manager(self):
+        fd, script_path = tempfile.mkstemp(prefix="setup_updater_test_", suffix=".ps1")
+        try:
+            with mock.patch.object(sw.sys, "frozen", True, create=True), mock.patch(
+                "settings_window._is_inno_installed_copy", return_value=True
+            ), mock.patch(
+                "settings_window._portable_base_dir", return_value=r"C:\Apps\ClicknTranslate"
+            ), mock.patch(
+                "settings_window._public_executable_path",
+                return_value=r"C:\Apps\ClicknTranslate\ClicknTranslate.exe",
+            ), mock.patch.object(
+                sw.os, "getpid", return_value=1234
+            ), mock.patch.object(
+                sw.tempfile, "mkstemp", return_value=(fd, script_path)
+            ), mock.patch.object(
+                sw.SettingsWindow, "_install_dir_requires_elevation", return_value=False
+            ), mock.patch.object(
+                sw.SettingsWindow, "_launch_hidden_powershell_script", return_value=(True, None)
+            ) as launch_mock:
+                ok, error = sw.SettingsWindow._launch_setup_updater(
+                    types.SimpleNamespace(),
+                    r"C:\Temp\ClicknTranslate-Setup-v1.5.2-win64.exe",
+                    "1.5.2",
+                )
+
+            self.assertTrue(ok, error)
+            script_text = Path(script_path).read_text(encoding="utf-8")
+            self.assertIn("Starting Inno Setup with Windows Restart Manager", script_text)
+            self.assertEqual(script_text.count("function Clear-PyInstallerEnv {"), 1)
+            self.assertIn('"/CLOSEAPPLICATIONS"', script_text)
+            self.assertIn('"/FORCECLOSEAPPLICATIONS"', script_text)
+            self.assertIn('"/LOGCLOSEAPPLICATIONS"', script_text)
+            self.assertIn("Installed version $fileVersion does not match expected version", script_text)
+            launch_mock.assert_called_once()
+            arguments = launch_mock.call_args.args[2]
+            self.assertIn("-ExpectedVersion", arguments)
+            self.assertIn("1.5.2", arguments)
         finally:
             try:
                 os.remove(script_path)
@@ -547,6 +626,64 @@ class TestUpdaterCommands(unittest.TestCase):
             )
             self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
         finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
+    def test_updater_stops_locked_worker_before_replacing_install(self):
+        root = tempfile.mkdtemp(prefix="updater_locked_worker_e2e_")
+        blocker = None
+        try:
+            app_dir = os.path.join(root, "install")
+            inner_dir = os.path.join(app_dir, "app")
+            os.makedirs(os.path.join(inner_dir, "_internal"))
+            os.makedirs(os.path.join(app_dir, "data"))
+            system_dir = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+            system_exe = os.path.join(system_dir, "whoami.exe")
+            command_exe = os.path.join(system_dir, "cmd.exe")
+            old_exe = os.path.join(app_dir, "ClicknTranslate.exe")
+            worker_exe = os.path.join(inner_dir, "OcrWorker.exe")
+            shutil.copy2(system_exe, old_exe)
+            shutil.copy2(system_exe, os.path.join(inner_dir, "ClicknTranslateApp.exe"))
+            shutil.copy2(command_exe, worker_exe)
+            with open(os.path.join(inner_dir, "_internal", "old.txt"), "w", encoding="utf-8") as stream:
+                stream.write("old")
+            with open(os.path.join(app_dir, "data", "marker.txt"), "w", encoding="utf-8") as stream:
+                stream.write("preserve")
+
+            blocker = subprocess.Popen(
+                [worker_exe, "/d", "/c", "ping.exe -n 120 127.0.0.1 >nul"],
+                cwd=app_dir,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+
+            zip_path = os.path.join(root, "update.zip")
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.write(system_exe, "ClicknTranslate/ClicknTranslate.exe")
+                archive.write(system_exe, "ClicknTranslate/app/ClicknTranslateApp.exe")
+                archive.writestr("ClicknTranslate/app/_internal/new.txt", "new")
+
+            script_path = self._generate_updater_script(old_exe, zip_path)
+            result = self._run_updater_script(
+                script_path,
+                app_dir,
+                zip_path,
+                cwd=tempfile.gettempdir(),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
+            self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
+            self.assertIsNotNone(blocker.poll(), "Locked OCR worker was left running")
+        finally:
+            if blocker is not None and blocker.poll() is None:
+                subprocess.run(
+                    ["taskkill.exe", "/PID", str(blocker.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
             shutil.rmtree(root, ignore_errors=True)
 
     @unittest.skipUnless(os.name == "nt", "PowerShell updater is Windows-only")
@@ -787,6 +924,48 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 )
 
         self.assertEqual(dummy.download_calls, 1)
+        self.assertIn("_on_update_ready_to_restart", invoke_calls)
+
+    def test_installed_copy_downloads_and_launches_setup_package(self):
+        class DummyUpdater:
+            def __init__(self):
+                self.parent = types.SimpleNamespace(current_interface_language="en")
+                self._update_cancel_requested = threading.Event()
+                self._update_phase = "idle"
+                self._update_temp_dir = ""
+                self.setup_calls = []
+
+            def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
+                Path(destination_path).write_bytes(b"MZ" + b"setup")
+                if progress_callback:
+                    progress_callback(7, 7)
+
+            def _check_update_cancel_requested(self):
+                return None
+
+            def _launch_setup_updater(self, setup_path, version):
+                self.setup_calls.append((setup_path, version))
+                return True, None
+
+            def _cleanup_update_temp_dir(self):
+                return None
+
+        dummy = DummyUpdater()
+        invoke_calls = []
+
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=True), mock.patch.object(
+            sw.QMetaObject, "invokeMethod", side_effect=lambda _obj, method_name, *_args: invoke_calls.append(method_name) or True
+        ), mock.patch.object(sw.QtCore, "Q_ARG", side_effect=lambda _t, value: value):
+            sw.SettingsWindow._download_and_prepare_update(
+                dummy,
+                "https://example.com/setup.exe",
+                "ClicknTranslate-Setup-v1.5.2-win64.exe",
+                "1.5.2",
+            )
+
+        self.assertEqual(len(dummy.setup_calls), 1)
+        self.assertTrue(dummy.setup_calls[0][0].endswith(".exe"))
+        self.assertEqual(dummy.setup_calls[0][1], "1.5.2")
         self.assertIn("_on_update_ready_to_restart", invoke_calls)
 
     def test_download_prepare_failure_reports_error(self):

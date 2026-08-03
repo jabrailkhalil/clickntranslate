@@ -20,10 +20,12 @@ def test_release_version_is_synchronized_everywhere():
     assert f'#define MyAppVersion "{version}"' in _read("installer/ClicknTranslate.iss")
     assert f'version="{four_part}"' in _read("installer/windows/ClicknTranslate.exe.manifest")
     assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateRepair.manifest")
+    assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateBootstrap.manifest")
     assert f'[string]$Version = "{version}"' in _read("tools/stage_release.ps1")
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_launcher.ps1")
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_msix.ps1")
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_update_repair.ps1")
+    assert f'[string]$Version = "{version}"' in _read("tools/build_update_bootstrap.ps1")
     assert f"/v{version}/ClicknTranslate-v{version}-win64.zip" in _read("tools/build_update_repair.ps1")
 
 
