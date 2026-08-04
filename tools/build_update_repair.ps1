@@ -1,8 +1,8 @@
 param(
-    [string]$Version = "1.5.1.0",
+    [string]$Version = "1.5.2.0",
     [string]$OutputPath = "",
-    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.1/ClicknTranslate-v1.5.1-win64.zip",
-    [string]$PackageSha256 = "F087F7692C508491DED4B660F7BD307BF4AD7BA6F1FC3A69F16FA889F182B248"
+    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.2/ClicknTranslate-v1.5.2-win64.zip",
+    [string]$PackageSha256 = "1E6594368FEA3771259AB3384DDDC26F343A8AA7F489AAEB9EAF40AC57650488"
 )
 
 $ErrorActionPreference = "Stop"

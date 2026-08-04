@@ -20,6 +20,8 @@ class TestLauncher(unittest.TestCase):
         self.assertIn("UseShellExecute = false", source)
         self.assertIn("SyncInstalledVersion(root)", source)
         self.assertIn('key.SetValue("DisplayVersion", version', source)
+        self.assertIn('key.SetValue("DisplayName", "Click\'n\'Translate"', source)
+        self.assertNotIn('"Click\'n\'Translate " + version', source)
         self.assertNotIn("WorkingDirectory = Path.GetDirectoryName(innerExecutable)", source)
 
     @unittest.skipUnless(os.name == "nt", "The release launcher is Windows-only")

@@ -83,7 +83,7 @@ internal static class ClicknTranslateLauncher
                     assemblyVersion.Build
                 );
                 key.SetValue("DisplayVersion", version, RegistryValueKind.String);
-                key.SetValue("DisplayName", "Click'n'Translate " + version, RegistryValueKind.String);
+                key.SetValue("DisplayName", "Click'n'Translate", RegistryValueKind.String);
             }
         }
         catch (Exception error)

@@ -1,6 +1,6 @@
 """
 Cache Manager for Click'n'Translate
-Manages all cached data: history, translation cache, temp files.
+Manages histories and disposable translation cache data.
 Provides cleanup, size limits, and statistics.
 """
 
@@ -23,6 +23,24 @@ TRANSLATION_CACHE_FILE = "translation_cache.json"
 _cache_lock = threading.Lock()
 
 
+def _tree_size(path):
+    """Return the current size of a file or directory tree."""
+    if os.path.isfile(path):
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
+    total = 0
+    if os.path.isdir(path):
+        for root, _dirs, files in os.walk(path):
+            for filename in files:
+                try:
+                    total += os.path.getsize(os.path.join(root, filename))
+                except OSError:
+                    pass
+    return total
+
+
 def get_cache_dir(data_dir):
     """Get or create the cache directory inside data_dir."""
     cache_dir = os.path.join(data_dir, CACHE_DIR_NAME)
@@ -38,6 +56,9 @@ def get_cache_stats(data_dir):
         "translation_history": {"records": 0, "size_bytes": 0},
         "translation_cache": {"records": 0, "size_bytes": 0},
         "pycache": {"size_bytes": 0},
+        "logs": {"size_bytes": 0},
+        "temp": {"size_bytes": 0},
+        "cache_bytes": 0,
         "total_bytes": 0,
     }
 
@@ -77,14 +98,18 @@ def get_cache_stats(data_dir):
 
     # __pycache__
     pycache_dir = os.path.join(os.path.dirname(data_dir), "__pycache__")
-    if os.path.exists(pycache_dir):
-        total = 0
-        for f in os.listdir(pycache_dir):
-            fp = os.path.join(pycache_dir, f)
-            if os.path.isfile(fp):
-                total += os.path.getsize(fp)
-        stats["pycache"]["size_bytes"] = total
+    stats["pycache"]["size_bytes"] = _tree_size(pycache_dir)
+    stats["logs"]["size_bytes"] = _tree_size(os.path.join(data_dir, "logs"))
+    stats["temp"]["size_bytes"] = _tree_size(
+        os.path.join(os.path.dirname(data_dir), "temp")
+    )
 
+    stats["cache_bytes"] = (
+        stats["translation_cache"]["size_bytes"]
+        + stats["pycache"]["size_bytes"]
+        + stats["logs"]["size_bytes"]
+        + stats["temp"]["size_bytes"]
+    )
     stats["total_bytes"] = sum(
         v.get("size_bytes", 0) for v in stats.values() if isinstance(v, dict)
     )
@@ -176,49 +201,53 @@ def cleanup_history(data_dir, max_copy=MAX_COPY_HISTORY,
     return removed
 
 
-def clear_all_cache(data_dir):
+def clear_all_cache(data_dir, portable_root=None):
     """
-    Clear all cache data:
-    - Empty copy_history.json
-    - Empty translation_history.json
-    - Delete translation cache
-    - Delete __pycache__
+    Clear disposable cache data without deleting user history or settings:
+    - Delete the complete translation cache directory
+    - Delete diagnostic logs and OCR debug artifacts
+    - Delete the app's temporary directory and __pycache__
+    Settings, histories and installed OCR/translation packages are preserved.
     Returns total bytes freed.
     """
     freed = 0
+    cache_id = os.path.abspath(data_dir)
+    portable_root = os.path.abspath(portable_root or os.path.dirname(cache_id))
+
+    def safe_cache_target(path, owner):
+        resolved = os.path.abspath(path)
+        owner = os.path.abspath(owner)
+        try:
+            if os.path.commonpath([resolved, owner]) != owner or resolved == owner:
+                raise ValueError(f"Unsafe cache target: {resolved}")
+        except ValueError as exc:
+            raise ValueError(f"Unsafe cache target: {resolved}") from exc
+        return resolved
+
+    targets = (
+        safe_cache_target(os.path.join(cache_id, CACHE_DIR_NAME), cache_id),
+        safe_cache_target(os.path.join(cache_id, "logs"), cache_id),
+        safe_cache_target(os.path.join(portable_root, "temp"), portable_root),
+        safe_cache_target(os.path.join(portable_root, "__pycache__"), portable_root),
+    )
 
     with _cache_lock:
-        # Copy history
-        ch_path = os.path.join(data_dir, "copy_history.json")
-        if os.path.exists(ch_path):
-            freed += os.path.getsize(ch_path)
-            with open(ch_path, "w", encoding="utf-8") as f:
-                json.dump([], f)
+        # Invalidate first so an already queued asynchronous write cannot
+        # recreate a cache that the user has just cleared.
+        _translation_caches.pop(cache_id, None)
 
-        # Translation history
-        th_path = os.path.join(data_dir, "translation_history.json")
-        if os.path.exists(th_path):
-            freed += os.path.getsize(th_path)
-            with open(th_path, "w", encoding="utf-8") as f:
-                json.dump([], f)
-
-        # Translation cache dir
-        cache_dir = os.path.join(data_dir, CACHE_DIR_NAME)
-        if os.path.exists(cache_dir):
-            for f in os.listdir(cache_dir):
-                fp = os.path.join(cache_dir, f)
-                if os.path.isfile(fp):
-                    freed += os.path.getsize(fp)
-                    os.remove(fp)
-
-        # __pycache__
-        pycache_dir = os.path.join(os.path.dirname(data_dir), "__pycache__")
-        if os.path.exists(pycache_dir):
-            for f in os.listdir(pycache_dir):
-                fp = os.path.join(pycache_dir, f)
-                if os.path.isfile(fp):
-                    freed += os.path.getsize(fp)
-            shutil.rmtree(pycache_dir, ignore_errors=True)
+        for target in targets:
+            before = _tree_size(target)
+            try:
+                if os.path.isdir(target):
+                    shutil.rmtree(target)
+                elif os.path.exists(target):
+                    os.remove(target)
+            except OSError:
+                # Count only bytes that were actually removed. A live file
+                # handle can keep one log locked while the rest is cleared.
+                pass
+            freed += max(0, before - _tree_size(target))
 
     return freed
 
@@ -308,6 +337,9 @@ def save_cached_translation(data_dir, text, source_code, target_code, translated
 
 def _save_translation_cache(data_dir, cache):
     with _cache_lock:
+        cache_id = os.path.abspath(data_dir)
+        if _translation_caches.get(cache_id) is not cache:
+            return
         try:
             path = _get_cache_path(data_dir)
             with open(path, "w", encoding="utf-8") as f:
@@ -318,4 +350,5 @@ def _save_translation_cache(data_dir, cache):
 
 def invalidate_translation_cache():
     """Force reload of translation cache on next access."""
-    _translation_caches.clear()
+    with _cache_lock:
+        _translation_caches.clear()

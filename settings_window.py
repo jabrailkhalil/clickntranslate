@@ -12,8 +12,8 @@ import subprocess
 import platform
 import re
 import time
-import html
 import ctypes
+from pathlib import Path
 from urllib.parse import urlparse
 try:
     import winreg
@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout
+    QLineEdit, QFrame, QGridLayout, QScrollArea
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
@@ -244,6 +244,151 @@ def _translator_combo_labels(lang):
         name
         for _key, name, kind in TRANSLATOR_ENGINE_OPTIONS
     ]
+
+
+TRANSLATOR_GROUP_TEXT = {
+    "en": {"online": "Online", "offline": "Offline"},
+    "ru": {"online": "Онлайн", "offline": "Офлайн"},
+    "es": {"online": "En línea", "offline": "Sin conexión"},
+    "de": {"online": "Online", "offline": "Offline"},
+    "fr": {"online": "En ligne", "offline": "Hors ligne"},
+    "zh": {"online": "在线", "offline": "离线"},
+}
+
+
+def _configure_engine_group_header(combo, index, foreground="#f4f6fb"):
+    header_item = combo.model().item(index)
+    if header_item is None:
+        return
+    header_item.setEnabled(False)
+    header_font = header_item.font()
+    header_font.setBold(True)
+    header_item.setFont(header_font)
+    header_item.setForeground(QBrush(QColor(foreground)))
+
+
+def _populate_grouped_translator_combo(
+    combo,
+    lang,
+    foreground="#f4f6fb",
+    installed_engines=None,
+):
+    """Populate a compact combo with disabled online/offline group labels."""
+    combo.clear()
+    groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
+    installed = {str(engine).lower() for engine in (installed_engines or ())}
+    engines_by_index = []
+    for kind in ("online", "offline"):
+        combo.addItem(f"  {groups[kind]}", None)
+        header_index = combo.count() - 1
+        engines_by_index.append(None)
+        _configure_engine_group_header(combo, header_index, foreground)
+        options = [
+            option
+            for option in TRANSLATOR_ENGINE_OPTIONS
+            if option[2] == kind
+        ]
+        if not options:
+            combo.removeItem(header_index)
+            engines_by_index.pop()
+            continue
+        options = [
+            option
+            for _index, option in sorted(
+                enumerate(options),
+                key=lambda pair: (
+                    0 if pair[1][0].lower() in installed else 1,
+                    pair[0],
+                ),
+            )
+        ]
+        for engine, name, option_kind in options:
+            combo.addItem(name, engine)
+            option_index = combo.count() - 1
+            engines_by_index.append(engine)
+            combo.setItemData(
+                option_index,
+                _translator_combo_tooltip(engine, name, option_kind, lang),
+                Qt.ToolTipRole,
+            )
+    return engines_by_index
+
+
+def _populate_grouped_ocr_combo(
+    combo,
+    lang,
+    foreground="#f4f6fb",
+    installed_engines=None,
+):
+    """All bundled OCR providers process recognition locally/offline."""
+    combo.clear()
+    groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
+    combo.addItem(f"  {groups['offline']}", None)
+    _configure_engine_group_header(combo, 0, foreground)
+    installed = {str(engine).lower() for engine in (installed_engines or ())}
+    engines = ("Windows", "Tesseract", "RapidOCR", "EasyOCR")
+    engines = [
+        engine
+        for _index, engine in sorted(
+            enumerate(engines),
+            key=lambda pair: (
+                0 if pair[1].lower() in installed else 1,
+                pair[0],
+            ),
+        )
+    ]
+    for engine in engines:
+        combo.addItem(engine, engine)
+        combo.setItemData(
+            combo.count() - 1,
+            _ocr_combo_tooltip(engine, lang),
+            Qt.ToolTipRole,
+        )
+
+
+OCR_DETAIL_TEXT = {
+    "en": {
+        "windows": "Built into Windows. Fast for regular interface text; languages are installed in Language packages.",
+        "tesseract": "Local classic OCR. Broad language support and predictable offline recognition.",
+        "rapidocr": "Local neural OCR optimized for text blocks and orientation; bundled model supports Chinese and English.",
+        "easyocr": "Local neural OCR for difficult images and multiple scripts; selected language models must be installed first.",
+    },
+    "ru": {
+        "windows": "Встроен в Windows. Быстрый для обычного текста интерфейса; языки ставятся в разделе «Языковые пакеты».",
+        "tesseract": "Классический локальный OCR. Много языков и предсказуемое офлайн-распознавание.",
+        "rapidocr": "Локальный нейросетевой OCR для блоков текста и ориентации; встроенная модель поддерживает китайский и английский.",
+        "easyocr": "Локальный нейросетевой OCR для сложных изображений и разных письменностей; языковые модели ставятся заранее.",
+    },
+    "es": {
+        "windows": "Integrado en Windows; rápido para texto normal. Los idiomas se instalan en Paquetes de idioma.",
+        "tesseract": "OCR clásico local con muchos idiomas y funcionamiento sin conexión.",
+        "rapidocr": "OCR neuronal local para bloques y orientación; el modelo incluido admite chino e inglés.",
+        "easyocr": "OCR neuronal local para imágenes difíciles; instala antes los modelos de idioma.",
+    },
+    "de": {
+        "windows": "In Windows integriert und schnell für normalen Text. Sprachen werden unter Sprachpakete installiert.",
+        "tesseract": "Klassische lokale OCR mit vielen Sprachen und zuverlässigem Offline-Betrieb.",
+        "rapidocr": "Lokale neuronale OCR für Textblöcke und Ausrichtung; das Modell unterstützt Chinesisch und Englisch.",
+        "easyocr": "Lokale neuronale OCR für schwierige Bilder; Sprachmodelle müssen vorher installiert werden.",
+    },
+    "fr": {
+        "windows": "Intégré à Windows et rapide pour le texte courant. Les langues s’installent dans Modules de langue.",
+        "tesseract": "OCR local classique avec de nombreuses langues et un fonctionnement hors ligne fiable.",
+        "rapidocr": "OCR neuronal local pour les blocs et l’orientation ; le modèle inclus prend en charge le chinois et l’anglais.",
+        "easyocr": "OCR neuronal local pour les images difficiles ; installez d’abord les modèles de langue.",
+    },
+    "zh": {
+        "windows": "Windows 内置，适合普通界面文字；语言可在“语言包”中安装。",
+        "tesseract": "经典本地 OCR，支持多种语言，可离线稳定运行。",
+        "rapidocr": "用于文本块和方向检测的本地神经 OCR；内置模型支持中文和英文。",
+        "easyocr": "适合复杂图像和多种文字的本地神经 OCR；需提前安装语言模型。",
+    },
+}
+
+
+def _ocr_combo_tooltip(engine, lang):
+    details = OCR_DETAIL_TEXT.get(lang, OCR_DETAIL_TEXT["en"])
+    return details.get(str(engine or "").lower(), str(engine or ""))
 
 
 TRANSLATOR_DETAIL_TEXT = {
@@ -1103,6 +1248,21 @@ def settings_text(lang, key):
     return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
 
 
+HISTORY_RECORD_TEXT = {
+    "en": {"original": "Original", "translated": "Translation", "copy": "Copy", "delete": "Delete"},
+    "ru": {"original": "Оригинал", "translated": "Перевод", "copy": "Копировать", "delete": "Удалить"},
+    "es": {"original": "Original", "translated": "Traducción", "copy": "Copiar", "delete": "Eliminar"},
+    "de": {"original": "Original", "translated": "Übersetzung", "copy": "Kopieren", "delete": "Löschen"},
+    "fr": {"original": "Original", "translated": "Traduction", "copy": "Copier", "delete": "Supprimer"},
+    "zh": {"original": "原文", "translated": "译文", "copy": "复制", "delete": "删除"},
+}
+
+
+def history_record_text(lang, key):
+    texts = HISTORY_RECORD_TEXT.get(lang, HISTORY_RECORD_TEXT["en"])
+    return texts.get(key, HISTORY_RECORD_TEXT["en"].get(key, key))
+
+
 UPDATE_TEXT = {
     "en": {
         "store_updates": "Updates for this version are delivered by Microsoft Store. Open the Microsoft Store Library and choose Get updates.",
@@ -1435,7 +1595,7 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Refresh", "windows_note": "Shows OCR languages available in Windows. Install only OCR without adding a keyboard.",
         "install_selected": "Install selected", "windows_settings": "Windows settings", "tesseract_note": "Tick languages to download into the local tessdata folder.",
         "install_engine": "Install engine", "easyocr_note": "Tick languages to predownload EasyOCR models. English is added as a fallback.",
-        "rapidocr_note": "RapidOCR uses one shared engine, ONNX runtime, detector, and Chinese + English model. For Russian use Windows OCR, Tesseract, or EasyOCR.",
+        "rapidocr_note": "RapidOCR has no separate language packages. Its local neural engine includes one Chinese + English model. For Russian use Windows OCR, Tesseract, or EasyOCR.",
         "component": "Component", "package": "Package", "status": "Status", "argos_note": "All available Argos packages are shown. Non-English pairs use two packages through English.",
         "remove_highlighted": "Remove highlighted", "direction": "Direction", "search": "Search: Russian, ru, en→ru…", "language": "Language",
         "installed": "Installed", "missing": "Missing", "can_download": "Can download", "engine_missing": "{engine} missing", "checking": "Checking…",
@@ -1447,15 +1607,27 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "EasyOCR must be installed first. Start engine installation?", "argos_installed": "Selected Argos directions are installed.",
         "highlight": "Highlight one or more installed rows.", "remove_confirm": "Remove Argos packages: {packages}?\n\nThese directions will no longer work offline.", "removed": "Selected Argos packages were removed.",
         "preparing": "Preparing…", "canceling": "Canceling…", "install_failed": "Failed to install language packages:\n", "ready": "Selected language packages are ready.", "canceled": "Canceled",
-        "tess_down": "Tesseract: downloading languages…", "win_wait": "Windows OCR: waiting for installer…", "win_done": "Windows OCR: done",
+        "tess_down": "Tesseract: downloading languages…", "win_wait": "Windows OCR: waiting for administrator permission…", "win_done": "Windows OCR: done",
+        "win_installing": "Windows OCR: installing {language} ({current}/{total})…",
+        "win_checking": "Windows OCR: checking {language}…",
+        "win_verifying": "Windows OCR: verifying {language}…",
         "easy_down": "EasyOCR: downloading {language} models…", "easy_done": "EasyOCR: done",
+        "ocr_section": "OCR", "translation_section": "Translation",
+        "engine_not_installed_title": "{engine} is not installed",
+        "engine_not_installed_body": "Install the engine first. Language packages will appear here after installation.",
+        "repair_needed": "Needs repair",
+        "remove_packages_confirm": "Remove selected {engine} packages: {packages}?",
+        "packages_removed": "Selected {engine} language packages were removed.",
+        "remove_failed": "Failed to remove language packages:\n",
+        "win_removing": "Windows OCR: removing {language} ({current}/{total})…",
+        "win_rolling_back": "Windows OCR: canceling and removing incomplete packages…",
     },
     "ru": {
         "intro": "Установите языки OCR или офлайн-направления Argos. Пакеты загружаются заранее, а не во время распознавания или перевода.",
         "refresh": "Обновить", "windows_note": "Показаны OCR-языки Windows. Можно установить только OCR без добавления клавиатуры.",
         "install_selected": "Установить выбранные", "windows_settings": "Настройки Windows", "tesseract_note": "Отметьте языки для загрузки в локальную папку tessdata.",
         "install_engine": "Установить движок", "easyocr_note": "Отметьте языки для загрузки моделей EasyOCR. Английский добавляется как резервный.",
-        "rapidocr_note": "RapidOCR использует общий движок, ONNX runtime, детектор и модель Chinese + English. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
+        "rapidocr_note": "Для RapidOCR не нужны отдельные языковые пакеты. Локальный нейросетевой движок включает одну модель Chinese + English. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
         "component": "Компонент", "package": "Пакет", "status": "Статус", "argos_note": "Показаны все пакеты Argos. Неанглийские пары используют два пакета через английский.",
         "remove_highlighted": "Удалить выделенные", "direction": "Направление", "search": "Поиск: русский, ru, en→ru…", "language": "Язык",
         "installed": "Установлен", "missing": "Не установлен", "can_download": "Можно скачать", "engine_missing": "{engine} не установлен", "checking": "Проверка…",
@@ -1467,15 +1639,27 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "Сначала нужно установить EasyOCR. Запустить установку движка?", "argos_installed": "Выбранные направления Argos установлены.",
         "highlight": "Выделите установленные строки.", "remove_confirm": "Удалить пакеты Argos: {packages}?\n\nЭти направления перестанут работать офлайн.", "removed": "Выбранные пакеты Argos удалены.",
         "preparing": "Подготовка…", "canceling": "Отмена…", "install_failed": "Не удалось установить языковые пакеты:\n", "ready": "Выбранные пакеты готовы.", "canceled": "Отменено",
-        "tess_down": "Tesseract: загрузка языков…", "win_wait": "Windows OCR: ожидание установки…", "win_done": "Windows OCR: готово",
+        "tess_down": "Tesseract: загрузка языков…", "win_wait": "Windows OCR: ожидание разрешения администратора…", "win_done": "Windows OCR: готово",
+        "win_installing": "Windows OCR: установка {language} ({current}/{total})…",
+        "win_checking": "Windows OCR: проверка {language}…",
+        "win_verifying": "Windows OCR: подтверждение установки {language}…",
         "easy_down": "EasyOCR: загрузка моделей {language}…", "easy_done": "EasyOCR: готово",
+        "ocr_section": "OCR", "translation_section": "Переводчики",
+        "engine_not_installed_title": "{engine} не установлен",
+        "engine_not_installed_body": "Сначала установите движок. После установки здесь появятся языковые пакеты.",
+        "repair_needed": "Требуется восстановление",
+        "remove_packages_confirm": "Удалить выбранные пакеты {engine}: {packages}?",
+        "packages_removed": "Выбранные языковые пакеты {engine} удалены.",
+        "remove_failed": "Не удалось удалить языковые пакеты:\n",
+        "win_removing": "Windows OCR: удаление {language} ({current}/{total})…",
+        "win_rolling_back": "Windows OCR: отмена и удаление незавершённых пакетов…",
     },
     "es": {
         "intro": "Instala aquí idiomas OCR o direcciones sin conexión de Argos. Los paquetes se descargan por adelantado.",
         "refresh": "Actualizar", "windows_note": "Muestra los idiomas OCR de Windows. Instala solo OCR sin añadir un teclado.",
         "install_selected": "Instalar seleccionados", "windows_settings": "Configuración de Windows", "tesseract_note": "Marca idiomas para descargarlos en la carpeta tessdata local.",
         "install_engine": "Instalar motor", "easyocr_note": "Marca idiomas para descargar modelos EasyOCR. Se añade inglés como reserva.",
-        "rapidocr_note": "RapidOCR usa un motor, ONNX runtime, detector y modelo Chinese + English compartidos. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
+        "rapidocr_note": "RapidOCR no usa paquetes de idioma separados. Su motor neuronal local incluye un modelo Chinese + English. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
         "component": "Componente", "package": "Paquete", "status": "Estado", "argos_note": "Se muestran todos los paquetes Argos. Los pares sin inglés usan dos paquetes a través del inglés.",
         "remove_highlighted": "Eliminar resaltados", "direction": "Dirección", "search": "Buscar: ruso, ru, en→ru…", "language": "Idioma",
         "installed": "Instalado", "missing": "No instalado", "can_download": "Disponible", "engine_missing": "Falta {engine}", "checking": "Comprobando…",
@@ -1487,15 +1671,27 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "Primero debes instalar EasyOCR. ¿Iniciar la instalación?", "argos_installed": "Las direcciones de Argos seleccionadas están instaladas.",
         "highlight": "Resalta filas instaladas.", "remove_confirm": "¿Eliminar paquetes Argos: {packages}?\n\nEstas direcciones dejarán de funcionar sin conexión.", "removed": "Se eliminaron los paquetes Argos seleccionados.",
         "preparing": "Preparando…", "canceling": "Cancelando…", "install_failed": "No se pudieron instalar los paquetes:\n", "ready": "Los paquetes seleccionados están listos.", "canceled": "Cancelado",
-        "tess_down": "Tesseract: descargando idiomas…", "win_wait": "Windows OCR: esperando al instalador…", "win_done": "Windows OCR: listo",
+        "tess_down": "Tesseract: descargando idiomas…", "win_wait": "Windows OCR: esperando permiso de administrador…", "win_done": "Windows OCR: listo",
+        "win_installing": "Windows OCR: instalando {language} ({current}/{total})…",
+        "win_checking": "Windows OCR: comprobando {language}…",
+        "win_verifying": "Windows OCR: verificando {language}…",
         "easy_down": "EasyOCR: descargando modelos de {language}…", "easy_done": "EasyOCR: listo",
+        "ocr_section": "OCR", "translation_section": "Traducción",
+        "engine_not_installed_title": "{engine} no está instalado",
+        "engine_not_installed_body": "Instala primero el motor. Los paquetes de idioma aparecerán aquí después.",
+        "repair_needed": "Requiere reparación",
+        "remove_packages_confirm": "¿Eliminar los paquetes seleccionados de {engine}: {packages}?",
+        "packages_removed": "Se eliminaron los paquetes de idioma seleccionados de {engine}.",
+        "remove_failed": "No se pudieron eliminar los paquetes:\n",
+        "win_removing": "Windows OCR: eliminando {language} ({current}/{total})…",
+        "win_rolling_back": "Windows OCR: cancelando y eliminando paquetes incompletos…",
     },
     "de": {
         "intro": "Installiere hier OCR-Sprachen oder Argos-Offline-Richtungen. Pakete werden vorab heruntergeladen.",
         "refresh": "Aktualisieren", "windows_note": "Zeigt Windows-OCR-Sprachen. Installiert nur OCR ohne zusätzliche Tastatur.",
         "install_selected": "Ausgewählte installieren", "windows_settings": "Windows-Einstellungen", "tesseract_note": "Markiere Sprachen für den lokalen tessdata-Ordner.",
         "install_engine": "Engine installieren", "easyocr_note": "Markiere Sprachen für EasyOCR-Modelle. Englisch wird als Reserve ergänzt.",
-        "rapidocr_note": "RapidOCR nutzt Engine, ONNX Runtime, Detektor und Chinese + English-Modell gemeinsam. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
+        "rapidocr_note": "RapidOCR benötigt keine separaten Sprachpakete. Die lokale neuronale Engine enthält ein Chinese + English-Modell. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
         "component": "Komponente", "package": "Paket", "status": "Status", "argos_note": "Alle Argos-Pakete werden angezeigt. Nicht englische Paare verwenden zwei Pakete über Englisch.",
         "remove_highlighted": "Markierte entfernen", "direction": "Richtung", "search": "Suchen: Russisch, ru, en→ru…", "language": "Sprache",
         "installed": "Installiert", "missing": "Nicht installiert", "can_download": "Verfügbar", "engine_missing": "{engine} fehlt", "checking": "Prüfung…",
@@ -1507,15 +1703,27 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "EasyOCR muss zuerst installiert werden. Installation starten?", "argos_installed": "Die ausgewählten Argos-Richtungen sind installiert.",
         "highlight": "Markiere installierte Zeilen.", "remove_confirm": "Argos-Pakete entfernen: {packages}?\n\nDiese Richtungen funktionieren danach nicht mehr offline.", "removed": "Die ausgewählten Argos-Pakete wurden entfernt.",
         "preparing": "Vorbereitung…", "canceling": "Abbruch…", "install_failed": "Sprachpakete konnten nicht installiert werden:\n", "ready": "Die ausgewählten Pakete sind bereit.", "canceled": "Abgebrochen",
-        "tess_down": "Tesseract: Sprachen werden geladen…", "win_wait": "Windows OCR: Warten auf Installer…", "win_done": "Windows OCR: fertig",
+        "tess_down": "Tesseract: Sprachen werden geladen…", "win_wait": "Windows OCR: Administratorfreigabe wird erwartet…", "win_done": "Windows OCR: fertig",
+        "win_installing": "Windows OCR: {language} wird installiert ({current}/{total})…",
+        "win_checking": "Windows OCR: {language} wird geprüft…",
+        "win_verifying": "Windows OCR: {language} wird verifiziert…",
         "easy_down": "EasyOCR: Modelle für {language} werden geladen…", "easy_done": "EasyOCR: fertig",
+        "ocr_section": "OCR", "translation_section": "Übersetzung",
+        "engine_not_installed_title": "{engine} ist nicht installiert",
+        "engine_not_installed_body": "Installiere zuerst die Engine. Danach werden die Sprachpakete hier angezeigt.",
+        "repair_needed": "Reparatur erforderlich",
+        "remove_packages_confirm": "Ausgewählte {engine}-Pakete entfernen: {packages}?",
+        "packages_removed": "Die ausgewählten {engine}-Sprachpakete wurden entfernt.",
+        "remove_failed": "Sprachpakete konnten nicht entfernt werden:\n",
+        "win_removing": "Windows OCR: {language} wird entfernt ({current}/{total})…",
+        "win_rolling_back": "Windows OCR: Abbruch und Entfernung unvollständiger Pakete…",
     },
     "fr": {
         "intro": "Installez ici les langues OCR ou les directions Argos hors ligne. Les modules sont téléchargés à l’avance.",
         "refresh": "Actualiser", "windows_note": "Affiche les langues OCR Windows. Installe uniquement OCR sans ajouter de clavier.",
         "install_selected": "Installer la sélection", "windows_settings": "Paramètres Windows", "tesseract_note": "Cochez les langues à placer dans le dossier tessdata local.",
         "install_engine": "Installer le moteur", "easyocr_note": "Cochez les langues pour les modèles EasyOCR. L’anglais est ajouté en secours.",
-        "rapidocr_note": "RapidOCR partage moteur, ONNX runtime, détecteur et modèle Chinese + English. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
+        "rapidocr_note": "RapidOCR n’utilise pas de modules de langue séparés. Son moteur neuronal local inclut un modèle Chinese + English. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
         "component": "Composant", "package": "Module", "status": "État", "argos_note": "Tous les modules Argos sont affichés. Les paires sans anglais utilisent deux modules via l’anglais.",
         "remove_highlighted": "Supprimer la sélection", "direction": "Direction", "search": "Rechercher : russe, ru, en→ru…", "language": "Langue",
         "installed": "Installé", "missing": "Non installé", "can_download": "Disponible", "engine_missing": "{engine} manquant", "checking": "Vérification…",
@@ -1527,15 +1735,27 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "EasyOCR doit d’abord être installé. Lancer l’installation ?", "argos_installed": "Les directions Argos sélectionnées sont installées.",
         "highlight": "Sélectionnez des lignes installées.", "remove_confirm": "Supprimer les modules Argos : {packages} ?\n\nCes directions ne fonctionneront plus hors ligne.", "removed": "Les modules Argos sélectionnés ont été supprimés.",
         "preparing": "Préparation…", "canceling": "Annulation…", "install_failed": "Impossible d’installer les modules :\n", "ready": "Les modules sélectionnés sont prêts.", "canceled": "Annulé",
-        "tess_down": "Tesseract : téléchargement des langues…", "win_wait": "Windows OCR : attente de l’installation…", "win_done": "Windows OCR : terminé",
+        "tess_down": "Tesseract : téléchargement des langues…", "win_wait": "Windows OCR : attente de l’autorisation administrateur…", "win_done": "Windows OCR : terminé",
+        "win_installing": "Windows OCR : installation de {language} ({current}/{total})…",
+        "win_checking": "Windows OCR : vérification de {language}…",
+        "win_verifying": "Windows OCR : validation de {language}…",
         "easy_down": "EasyOCR : téléchargement des modèles {language}…", "easy_done": "EasyOCR : terminé",
+        "ocr_section": "OCR", "translation_section": "Traduction",
+        "engine_not_installed_title": "{engine} n’est pas installé",
+        "engine_not_installed_body": "Installez d’abord le moteur. Les modules de langue apparaîtront ensuite ici.",
+        "repair_needed": "Réparation requise",
+        "remove_packages_confirm": "Supprimer les modules {engine} sélectionnés : {packages} ?",
+        "packages_removed": "Les modules linguistiques {engine} sélectionnés ont été supprimés.",
+        "remove_failed": "Impossible de supprimer les modules :\n",
+        "win_removing": "Windows OCR : suppression de {language} ({current}/{total})…",
+        "win_rolling_back": "Windows OCR : annulation et suppression des modules incomplets…",
     },
     "zh": {
         "intro": "在此安装 OCR 语言或 Argos 离线翻译方向。语言包会提前下载，不会在识别或翻译时临时下载。",
         "refresh": "刷新", "windows_note": "显示 Windows 可用的 OCR 语言。只安装 OCR 组件，不添加键盘。",
         "install_selected": "安装所选项", "windows_settings": "Windows 设置", "tesseract_note": "勾选要下载到本地 tessdata 文件夹的语言。",
         "install_engine": "安装引擎", "easyocr_note": "勾选要预下载的 EasyOCR 模型。英语模型会作为备用模型。",
-        "rapidocr_note": "RapidOCR 共用引擎、ONNX runtime、检测器和 Chinese + English 模型。俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
+        "rapidocr_note": "RapidOCR 不需要单独的语言包。本地神经引擎内置 Chinese + English 模型；俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
         "component": "组件", "package": "语言包", "status": "状态", "argos_note": "显示所有 Argos 语言包。两个非英语语言之间需要通过英语使用两个语言包。",
         "remove_highlighted": "删除高亮项", "direction": "方向", "search": "搜索：俄语、ru、en→ru…", "language": "语言",
         "installed": "已安装", "missing": "未安装", "can_download": "可下载", "engine_missing": "未安装 {engine}", "checking": "正在检查…",
@@ -1547,8 +1767,20 @@ LANGUAGE_MANAGER_TEXT = {
         "easy_prompt": "需要先安装 EasyOCR。是否开始安装？", "argos_installed": "所选 Argos 翻译方向已安装。",
         "highlight": "请高亮已安装项。", "remove_confirm": "删除 Argos 语言包：{packages}？\n\n这些方向将无法继续离线使用。", "removed": "所选 Argos 语言包已删除。",
         "preparing": "正在准备…", "canceling": "正在取消…", "install_failed": "无法安装语言包：\n", "ready": "所选语言包已准备就绪。", "canceled": "已取消",
-        "tess_down": "Tesseract：正在下载语言…", "win_wait": "Windows OCR：正在等待安装程序…", "win_done": "Windows OCR：完成",
+        "tess_down": "Tesseract：正在下载语言…", "win_wait": "Windows OCR：正在等待管理员授权…", "win_done": "Windows OCR：完成",
+        "win_installing": "Windows OCR：正在安装 {language}（{current}/{total}）…",
+        "win_checking": "Windows OCR：正在检查 {language}…",
+        "win_verifying": "Windows OCR：正在验证 {language}…",
         "easy_down": "EasyOCR：正在下载 {language} 模型…", "easy_done": "EasyOCR：完成",
+        "ocr_section": "OCR", "translation_section": "翻译",
+        "engine_not_installed_title": "未安装 {engine}",
+        "engine_not_installed_body": "请先安装引擎。安装完成后，语言包会显示在这里。",
+        "repair_needed": "需要修复",
+        "remove_packages_confirm": "删除所选 {engine} 语言包：{packages}？",
+        "packages_removed": "已删除所选 {engine} 语言包。",
+        "remove_failed": "无法删除语言包：\n",
+        "win_removing": "Windows OCR：正在删除 {language}（{current}/{total}）…",
+        "win_rolling_back": "Windows OCR：正在取消并删除未完成的语言包…",
     },
 }
 
@@ -1578,14 +1810,17 @@ class OcrLanguageManagerDialog(QDialog):
         )
         self._install_in_progress = False
         self._cancel_requested = threading.Event()
+        self._windows_ocr_cancel_marker = ""
         self.progress_dialog = None
         self._task_success_message = ""
+        self._task_failure_key = "install_failed"
         self._argos_catalog = []
         self._argos_catalog_error = ""
         self._argos_catalog_loading = True
         self._argos_catalog_request_active = False
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
+        self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self._runtime_probe_active = False
@@ -1646,7 +1881,29 @@ class OcrLanguageManagerDialog(QDialog):
         intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
 
+        # Keep OCR engines and translation packages in two explicit visual
+        # sections.  Nested tabs preserve the fixed window size while avoiding
+        # one undifferentiated row of unrelated engines.
         self.tabs = QTabWidget(self)
+        self.tabs.setObjectName("languagePackageSections")
+        self.ocr_section_page = QWidget(self.tabs)
+        self.translation_section_page = QWidget(self.tabs)
+        ocr_section_layout = QVBoxLayout(self.ocr_section_page)
+        translation_section_layout = QVBoxLayout(self.translation_section_page)
+        for section_layout in (ocr_section_layout, translation_section_layout):
+            section_layout.setContentsMargins(0, 0, 0, 0)
+            section_layout.setSpacing(0)
+        self.ocr_tabs = QTabWidget(self.ocr_section_page)
+        self.translation_tabs = QTabWidget(self.translation_section_page)
+        self.ocr_tabs.setObjectName("ocrPackageTabs")
+        self.translation_tabs.setObjectName("translationPackageTabs")
+        ocr_section_layout.addWidget(self.ocr_tabs)
+        translation_section_layout.addWidget(self.translation_tabs)
+        self.tabs.addTab(self.ocr_section_page, language_manager_text(self.lang, "ocr_section"))
+        self.tabs.addTab(
+            self.translation_section_page,
+            language_manager_text(self.lang, "translation_section"),
+        )
         layout.addWidget(self.tabs)
 
         self.windows_table = None
@@ -1667,6 +1924,28 @@ class OcrLanguageManagerDialog(QDialog):
         layout.addLayout(bottom)
 
         self._apply_style()
+        for package_table in (
+            self.windows_table,
+            self.tesseract_table,
+            self.easyocr_table,
+            self.rapidocr_table,
+            self.argos_table,
+        ):
+            self._apply_missing_engine_card_style(package_table)
+        self._apply_package_tab_styles()
+        for package_table in (
+            self.windows_table,
+            self.tesseract_table,
+            self.easyocr_table,
+            self.rapidocr_table,
+            self.argos_table,
+        ):
+            self._apply_package_scrollbar_style(package_table)
+        # Four OCR tabs must fit without tiny scroll arrows in the fixed-size
+        # window, including at 125–150% Windows scaling.
+        self.ocr_tabs.tabBar().setUsesScrollButtons(False)
+        self.ocr_tabs.tabBar().setElideMode(Qt.ElideRight)
+        self.translation_tabs.tabBar().setUsesScrollButtons(False)
         self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
         QtCore.QTimer.singleShot(0, self._start_runtime_probe)
         QtCore.QTimer.singleShot(0, lambda: self._start_argos_catalog_refresh(True))
@@ -1715,28 +1994,38 @@ class OcrLanguageManagerDialog(QDialog):
                 background-color: #d44b55;
                 color: #ffffff;
             }
+            QToolTip {
+                background-color: #17131f;
+                color: #f7f3ff;
+                border: 1px solid #7a5fa1;
+                padding: 6px 9px;
+                font-size: 13px;
+            }
         """
         if self._is_dark_theme():
             self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; }
+                QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #111216; }
-                QLabel { color: #f4f6fb; }
+                QLabel { color: #f4f6fb; font-family: 'Segoe UI'; font-size: 13px; }
                 QTabWidget::pane { border: 1px solid #34313f; }
                 QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
                 QTabBar::tab:selected { background: #7A5FA1; }
-                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; }
+                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 7px; }
                 QTableWidget::item { color: #f4f6fb; background-color: #17181d; }
                 QTableWidget::item:alternate { background-color: #20212a; }
                 QTableWidget::item:disabled { color: #9ca0ad; }
                 QTableCornerButton::section { background: #24212e; border: 0; }
-                QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; }
-                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
+                QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
+                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 600; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #3a3645; color: #8f889c; }
                 QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
                 QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
                 QPushButton#languagePackageAction:pressed { background-color: #684d91; }
                 QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
+                QFrame#languagePackageEmptyState { background: #17181d; border: 1px solid #34313f; border-radius: 10px; }
+                QLabel#languagePackageEmptyTitle { color: #f4f6fb; font-size: 18px; font-weight: 700; }
+                QLabel#languagePackageEmptyBody { color: #aeb2bf; font-size: 13px; }
                 QLineEdit { background: #17181d; color: #f4f6fb; border: 1px solid #34313f; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
                 QScrollBar:vertical { background: #14151a; width: 12px; margin: 0; border: none; }
@@ -1751,17 +2040,21 @@ class OcrLanguageManagerDialog(QDialog):
             """)
         else:
             self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #302a3a; }
+                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #ffffff; }
-                QTableWidget { background: #ffffff; alternate-background-color: #f7f6fb; color: #202124; gridline-color: #d8d8d8; selection-background-color: #d9cdf0; selection-color: #202124; }
-                QHeaderView::section { background: #f0eef7; color: #202124; border: 0; padding: 5px; }
-                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; }
+                QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
+                QTableWidget { background: #ffffff; alternate-background-color: #f7f6fb; color: #202124; gridline-color: #d8d8d8; selection-background-color: #d9cdf0; selection-color: #202124; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #d8d2e2; border-radius: 7px; }
+                QHeaderView::section { background: #f0eef7; color: #202124; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
+                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 600; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #d8d4e2; color: #777; }
                 QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
                 QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
                 QPushButton#languagePackageAction:pressed { background-color: #684d91; }
                 QPushButton#languagePackageAction:disabled { background-color: #d8d4e2; color: #777777; }
+                QFrame#languagePackageEmptyState { background: #f7f6fb; border: 1px solid #d8d2e2; border-radius: 10px; }
+                QLabel#languagePackageEmptyTitle { color: #202124; font-size: 18px; font-weight: 700; }
+                QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
                 QLineEdit { background: #ffffff; color: #202124; border: 1px solid #cfc8df; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
                 QScrollBar:vertical { background: #f1eff5; width: 12px; margin: 0; border: none; }
@@ -1774,6 +2067,123 @@ class OcrLanguageManagerDialog(QDialog):
                 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """)
+
+    def _apply_package_tab_styles(self):
+        dark = self._is_dark_theme()
+        text = "#f4f6fb" if dark else "#202124"
+        muted = "#bcb5c8" if dark else "#625a6d"
+        base = "#1b1c22" if dark else "#f0edf5"
+        selected = "#7A5FA1"
+        self.tabs.tabBar().setStyleSheet(f"""
+            QTabBar::tab {{
+                background: {base};
+                color: {text};
+                border: none;
+                border-top-left-radius: 7px;
+                border-top-right-radius: 7px;
+                padding: 7px 17px;
+                margin-right: 3px;
+                font-family: 'Segoe UI';
+                font-size: 14px;
+                font-weight: 700;
+            }}
+            QTabBar::tab:selected {{ background: {selected}; color: #ffffff; }}
+            QTabBar::tab:hover:!selected {{ background: {'#292a32' if dark else '#e4ddec'}; }}
+        """)
+        inner_style = f"""
+            QTabBar::tab {{
+                background: transparent;
+                color: {muted};
+                border: none;
+                border-bottom: 2px solid transparent;
+                padding: 7px 9px 6px 9px;
+                margin: 0px;
+                font-family: 'Segoe UI';
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QTabBar::tab:selected {{
+                color: {text};
+                background: transparent;
+                border-bottom: 2px solid {selected};
+                font-weight: 700;
+            }}
+            QTabBar::tab:hover:!selected {{ color: {text}; }}
+        """
+        self.ocr_tabs.tabBar().setStyleSheet(inner_style)
+        self.translation_tabs.tabBar().setStyleSheet(inner_style)
+
+    def _apply_missing_engine_card_style(self, table):
+        if table is None:
+            return
+        frame = getattr(table, "_package_missing_frame", None)
+        if frame is None:
+            return
+        dark = self._is_dark_theme()
+        card = "#17181d" if dark else "#f7f6fb"
+        border = "#34313f" if dark else "#d8d2e2"
+        text = "#f4f6fb" if dark else "#202124"
+        muted = "#b7b0c2" if dark else "#675f72"
+        frame.setStyleSheet(f"""
+            QFrame#languagePackageEmptyState {{
+                background-color: {card};
+                border: 1px solid {border};
+                border-radius: 10px;
+            }}
+            QLabel#languagePackageEmptyTitle {{
+                background: transparent;
+                color: {text};
+                border: none;
+                font-family: 'Segoe UI';
+                font-size: 18px;
+                font-weight: 700;
+            }}
+            QLabel#languagePackageEmptyBody {{
+                background: transparent;
+                color: {muted};
+                border: none;
+                font-family: 'Segoe UI';
+                font-size: 13px;
+            }}
+            QPushButton#languagePackageAction {{
+                background-color: #7A5FA1;
+                color: #ffffff;
+                border: none;
+                border-radius: 7px;
+                padding: 7px 14px;
+                font-family: 'Segoe UI';
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            QPushButton#languagePackageAction:hover {{ background-color: #8B70B2; }}
+            QPushButton#languagePackageAction:pressed {{ background-color: #684d91; }}
+        """)
+
+    def _apply_package_scrollbar_style(self, table):
+        if table is None:
+            return
+        dark = self._is_dark_theme()
+        track = "#15161b" if dark else "#f1eff5"
+        handle = "#705b8d" if dark else "#9b87b6"
+        hover = "#8b70b2" if dark else "#7A5FA1"
+        vertical_style = f"""
+            QScrollBar:vertical {{ background: {track}; width: 10px; margin: 2px 1px; border: none; border-radius: 5px; }}
+            QScrollBar::handle:vertical {{ background: {handle}; min-height: 36px; border-radius: 4px; }}
+            QScrollBar::handle:vertical:hover {{ background: {hover}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; width: 0px; border: none; background: transparent; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+        """
+        horizontal_style = f"""
+            QScrollBar:horizontal {{ background: {track}; height: 10px; margin: 1px 2px; border: none; border-radius: 5px; }}
+            QScrollBar::handle:horizontal {{ background: {handle}; min-width: 36px; border-radius: 4px; }}
+            QScrollBar::handle:horizontal:hover {{ background: {hover}; }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ height: 0px; width: 0px; border: none; background: transparent; }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
+        """
+        table.verticalScrollBar().setStyleSheet(vertical_style)
+        table.verticalScrollBar().setFixedWidth(10)
+        table.horizontalScrollBar().setStyleSheet(horizontal_style)
+        table.horizontalScrollBar().setFixedHeight(10)
 
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_title_drag_widgets", ()):
@@ -1821,47 +2231,59 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _build_tabs(self):
         self.windows_table = self._add_engine_tab(
+            self.ocr_tabs,
             "Windows",
             language_manager_text(self.lang, "windows_note"),
             self._populate_windows_table,
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_windows),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_windows),
                 (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings),
             ],
         )
         self.tesseract_table = self._add_engine_tab(
+            self.ocr_tabs,
             "Tesseract",
             language_manager_text(self.lang, "tesseract_note"),
             self._populate_tesseract_table,
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract),
-                (language_manager_text(self.lang, "install_engine"), self._install_tesseract_engine),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_tesseract),
             ],
+            missing_engine="Tesseract",
+            install_engine_callback=self._install_tesseract_engine,
         )
         self.easyocr_table = self._add_engine_tab(
+            self.ocr_tabs,
             "EasyOCR",
             language_manager_text(self.lang, "easyocr_note"),
             self._populate_easyocr_table,
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr),
-                (language_manager_text(self.lang, "install_engine"), self._install_easyocr_engine),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_easyocr),
             ],
+            missing_engine=EASYOCR_ENGINE_DISPLAY,
+            install_engine_callback=self._install_easyocr_engine,
         )
         self.rapidocr_table = self._add_engine_tab(
+            self.ocr_tabs,
             "RapidOCR",
             language_manager_text(self.lang, "rapidocr_note"),
             self._populate_rapidocr_table,
-            [(language_manager_text(self.lang, "install_engine"), self._install_rapidocr_engine)],
+            [],
             header_labels=[
                 "",
                 language_manager_text(self.lang, "component"),
                 language_manager_text(self.lang, "package"),
                 language_manager_text(self.lang, "status"),
             ],
+            missing_engine=RAPIDOCR_ENGINE_DISPLAY,
+            install_engine_callback=self._install_rapidocr_engine,
         )
         self.rapidocr_table.setColumnHidden(0, True)
 
         self.argos_table = self._add_engine_tab(
+            self.translation_tabs,
             "Argos",
             language_manager_text(self.lang, "argos_note"),
             self._populate_argos_table,
@@ -1880,12 +2302,15 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _add_engine_tab(
         self,
+        target_tabs,
         title,
         note,
         populate_func,
         actions,
         header_labels=None,
         search_placeholder="",
+        missing_engine="",
+        install_engine_callback=None,
     ):
         page = QWidget(self)
         layout = QVBoxLayout(page)
@@ -1895,6 +2320,34 @@ class OcrLanguageManagerDialog(QDialog):
         note_label = QLabel(note)
         note_label.setWordWrap(True)
         layout.addWidget(note_label)
+
+        missing_frame = QFrame(page)
+        missing_frame.setObjectName("languagePackageEmptyState")
+        missing_layout = QVBoxLayout(missing_frame)
+        missing_layout.setContentsMargins(32, 24, 32, 24)
+        missing_layout.setSpacing(10)
+        missing_layout.addStretch()
+        missing_title = QLabel()
+        missing_title.setObjectName("languagePackageEmptyTitle")
+        missing_title.setAlignment(Qt.AlignCenter)
+        missing_layout.addWidget(missing_title)
+        missing_body = QLabel(language_manager_text(self.lang, "engine_not_installed_body"))
+        missing_body.setObjectName("languagePackageEmptyBody")
+        missing_body.setAlignment(Qt.AlignCenter)
+        missing_body.setWordWrap(True)
+        missing_layout.addWidget(missing_body)
+        missing_install_button = QPushButton(language_manager_text(self.lang, "install_engine"))
+        missing_install_button.setObjectName("languagePackageAction")
+        missing_install_button.setMinimumHeight(34)
+        missing_install_button.setMaximumWidth(190)
+        if install_engine_callback is not None:
+            missing_install_button.clicked.connect(install_engine_callback)
+        else:
+            missing_install_button.hide()
+        missing_layout.addWidget(missing_install_button, 0, Qt.AlignHCenter)
+        missing_layout.addStretch()
+        missing_frame.hide()
+        layout.addWidget(missing_frame, 1)
 
         filter_edit = None
         if search_placeholder:
@@ -1912,6 +2365,10 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "status"),
         ])
         table.verticalHeader().setVisible(False)
+        # Missing packages are selected with checkboxes; installed packages
+        # are selected as rows for removal.  NoSelection made the removal
+        # action impossible to use.
+        table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setAlternatingRowColors(False)
@@ -1941,7 +2398,9 @@ class OcrLanguageManagerDialog(QDialog):
             filter_edit.textChanged.connect(lambda _text, target=table: populate_func(target))
         layout.addWidget(table)
 
-        action_row = QHBoxLayout()
+        action_widget = QWidget(page)
+        action_row = QHBoxLayout(action_widget)
+        action_row.setContentsMargins(0, 0, 0, 0)
         action_row.addStretch()
         table._package_action_buttons = []
         for text, callback in actions:
@@ -1963,11 +2422,45 @@ class OcrLanguageManagerDialog(QDialog):
             button.clicked.connect(callback)
             table._package_action_buttons.append(button)
             action_row.addWidget(button)
-        layout.addLayout(action_row)
+        layout.addWidget(action_widget)
 
-        self.tabs.addTab(page, title)
+        table._package_note_label = note_label
+        table._package_action_widget = action_widget
+        table._package_missing_frame = missing_frame
+        table._package_missing_title = missing_title
+        table._package_missing_body = missing_body
+        table._package_missing_install_button = missing_install_button
+        table._package_missing_engine = str(missing_engine or "")
+        target_tabs.addTab(page, title)
         populate_func(table)
         return table
+
+    def _set_engine_missing_state(self, table, missing, engine_name=""):
+        missing = bool(missing)
+        engine_name = str(engine_name or getattr(table, "_package_missing_engine", ""))
+        frame = getattr(table, "_package_missing_frame", None)
+        if frame is None:
+            return
+        frame.setVisible(missing)
+        table.setVisible(not missing)
+        note = getattr(table, "_package_note_label", None)
+        if note is not None:
+            note.setVisible(not missing)
+        filter_edit = getattr(table, "_package_filter_edit", None)
+        if filter_edit is not None:
+            filter_edit.setVisible(not missing)
+        actions = getattr(table, "_package_action_widget", None)
+        if actions is not None:
+            actions.setVisible(not missing)
+        title = getattr(table, "_package_missing_title", None)
+        if title is not None:
+            title.setText(
+                language_manager_text(
+                    self.lang,
+                    "engine_not_installed_title",
+                    engine=engine_name,
+                )
+            )
 
     def refresh_all(self):
         self._populate_windows_table(self.windows_table)
@@ -1979,6 +2472,7 @@ class OcrLanguageManagerDialog(QDialog):
     def refresh_catalog(self):
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
+        self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self.refresh_all()
@@ -1996,6 +2490,7 @@ class OcrLanguageManagerDialog(QDialog):
         windows_payload = {
             "windows_tags": [],
             "windows_capabilities": None,
+            "windows_ready_codes": [],
         }
         try:
             windows_payload["windows_tags"] = self._available_windows_tags()
@@ -2005,6 +2500,22 @@ class OcrLanguageManagerDialog(QDialog):
             windows_payload["windows_capabilities"] = self._windows_ocr_capability_catalog()
         except Exception as exc:
             windows_payload["windows_capabilities_error"] = str(exc)
+        try:
+            import ocr
+            available_by_tag = {
+                str(tag).lower(): str(tag)
+                for tag in windows_payload["windows_tags"]
+                if str(tag).strip()
+            }
+            for language in APP_LANGUAGES:
+                matched = ocr._match_available_windows_ocr_tag(
+                    windows_ocr_tag(language.code),
+                    available_by_tag,
+                )
+                if matched and ocr._get_windows_ocr_engine(matched) is not None:
+                    windows_payload["windows_ready_codes"].append(language.code)
+        except Exception as exc:
+            windows_payload["windows_ready_error"] = str(exc)
         self._emit_runtime_probe_payload(windows_payload)
 
         easyocr_status = (False, "EasyOCR check failed")
@@ -2043,6 +2554,10 @@ class OcrLanguageManagerDialog(QDialog):
                 if isinstance(capabilities, dict) and capabilities
                 else None
             )
+            if "windows_ready_codes" in payload:
+                self._windows_ready_codes_cache = set(
+                    payload.get("windows_ready_codes") or []
+                )
         if "easyocr" in payload:
             self._easyocr_status_cache = tuple(payload.get("easyocr") or (False, ""))
         if "rapidocr" in payload:
@@ -2081,6 +2596,15 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _set_language_rows(self, table, rows):
         pending = set(getattr(table, "_pending_package_codes", set()))
+        # Healthy installed packages stay at the top.  Keep source order inside
+        # each group so language lists remain predictable and stable.
+        rows = [
+            data
+            for _source_index, data in sorted(
+                enumerate(rows),
+                key=lambda pair: (0 if pair[1].get("checked") else 1, pair[0]),
+            )
+        ]
         signal_blocker = QtCore.QSignalBlocker(table)
         table.setRowCount(len(rows))
         dark = self._is_dark_theme()
@@ -2198,6 +2722,7 @@ class OcrLanguageManagerDialog(QDialog):
         return catalog
 
     def _populate_windows_table(self, table):
+        self._set_engine_missing_state(table, False)
         available_tags = self._windows_tags_cache
         checking = available_tags is None
         available_tags = available_tags or []
@@ -2214,16 +2739,39 @@ class OcrLanguageManagerDialog(QDialog):
                 matched = ocr._match_available_windows_ocr_tag(expected, available_by_tag)
             except Exception:
                 matched = available_by_tag.get(expected.lower(), "")
-            installed = bool(matched)
+            api_installed = bool(matched)
+            engine_ready = (
+                language.code in self._windows_ready_codes_cache
+                if self._windows_ready_codes_cache is not None
+                else api_installed
+            )
             capability_state = capability_catalog.get(expected.lower(), "")
             capability_installed = capability_state.lower() == "installed"
-            installed = installed or capability_installed
             supported = not catalog_known or expected.lower() in capability_catalog
             unavailable = bool(catalog_known and not supported)
+            # Do not trust a single Windows signal.  Interrupted DISM work can
+            # report the capability as Installed before WinRT can create/use
+            # the OCR language.  Such rows are offered for repair instead of
+            # being presented as healthy packages.
+            installed = (
+                api_installed and engine_ready and capability_installed
+                if catalog_known
+                else api_installed and engine_ready
+            )
+            repair_needed = bool(
+                catalog_known
+                and supported
+                and (
+                    api_installed != capability_installed
+                    or (capability_installed and not engine_ready)
+                )
+            )
             if checking:
                 status = self._status_checking()
             elif installed:
                 status = f"{self._status_installed()} ({matched or expected})"
+            elif repair_needed:
+                status = language_manager_text(self.lang, "repair_needed")
             elif unavailable:
                 status = language_manager_text(self.lang, "unavailable")
             else:
@@ -2237,6 +2785,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "checked": installed,
                 "selectable": bool(not checking and supported and not installed),
                 "selection_invalid": unavailable,
+                "repair": repair_needed,
             })
         self._set_language_rows(table, rows)
 
@@ -2256,6 +2805,11 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _populate_tesseract_table(self, table):
         tess_cmd, data_dirs = self._tesseract_data_dirs()
+        self._set_engine_missing_state(table, not bool(tess_cmd), "Tesseract")
+        if not tess_cmd:
+            table.setRowCount(0)
+            table._pending_package_codes.clear()
+            return
         rows = []
         for language in APP_LANGUAGES:
             tess_code = tesseract_language_code(language.code)
@@ -2281,12 +2835,18 @@ class OcrLanguageManagerDialog(QDialog):
         return os.path.join(self.owner._local_easyocr_dir(), "models")
 
     def _easyocr_model_groups_for_language(self, language_code):
-        groups = []
-        for easy_code in easyocr_language_codes(language_code):
-            group = EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(easy_code, EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(language_code))
-            if group and group not in groups:
-                groups.append(group)
-        return groups
+        # EasyOCR adds English as a compatible language, but loads one
+        # recognition network chosen by the primary script (for example,
+        # cyrillic_g2 for ["ru", "en"] or zh_sim_g2 for ["ch_sim", "en"]).
+        # Requiring english_g2 as a second file made successful installs look
+        # incomplete and hid them from language selectors.
+        easy_codes = easyocr_language_codes(language_code)
+        primary_code = easy_codes[0] if easy_codes else language_code
+        group = EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(
+            primary_code,
+            EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(language_code),
+        )
+        return [group] if group else []
 
     def _easyocr_group_installed(self, group):
         model_dir = self._easyocr_model_dir()
@@ -2302,6 +2862,15 @@ class OcrLanguageManagerDialog(QDialog):
     def _populate_easyocr_table(self, table):
         checking = self._easyocr_status_cache is None
         engine_ready, _error = self._easyocr_status_cache or (False, "")
+        self._set_engine_missing_state(
+            table,
+            bool(not checking and not engine_ready),
+            EASYOCR_ENGINE_DISPLAY,
+        )
+        if not checking and not engine_ready:
+            table.setRowCount(0)
+            table._pending_package_codes.clear()
+            return
         rows = []
         for language in APP_LANGUAGES:
             groups = self._easyocr_model_groups_for_language(language.code)
@@ -2329,9 +2898,17 @@ class OcrLanguageManagerDialog(QDialog):
     def _populate_rapidocr_table(self, table):
         checking = self._rapidocr_status_cache is None
         engine_ready, _error = self._rapidocr_status_cache or (False, "")
+        self._set_engine_missing_state(
+            table,
+            bool(not checking and not engine_ready),
+            RAPIDOCR_ENGINE_DISPLAY,
+        )
+        if not checking and not engine_ready:
+            table.setRowCount(0)
+            table._pending_package_codes.clear()
+            return
         installed = self._status_installed()
         missing = self._status_missing()
-        first_use = language_manager_text(self.lang, "first_use")
         needs_engine = language_manager_text(self.lang, "engine_first")
         rows = [
             {
@@ -2359,7 +2936,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "icon": "",
                 "name": language_manager_text(self.lang, "detector"),
                 "package": "PP-OCR detector",
-                "status": self._status_checking() if checking else first_use if engine_ready else needs_engine,
+                "status": self._status_checking() if checking else installed if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -2369,7 +2946,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "icon": "",
                 "name": language_manager_text(self.lang, "recognition"),
                 "package": "Chinese + English",
-                "status": self._status_checking() if checking else first_use if engine_ready else needs_engine,
+                "status": self._status_checking() if checking else installed if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
                 "show_checkbox": False,
@@ -2386,6 +2963,7 @@ class OcrLanguageManagerDialog(QDialog):
         return f"{source_name} → {target_name}"
 
     def _populate_argos_table(self, table):
+        self._set_engine_missing_state(table, False)
         languages_by_code = {language.code: language for language in APP_LANGUAGES}
         supported = set(languages_by_code)
         rows = []
@@ -2559,6 +3137,7 @@ class OcrLanguageManagerDialog(QDialog):
             return
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
+        self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self.refresh_all()
@@ -2625,6 +3204,8 @@ class OcrLanguageManagerDialog(QDialog):
         missing = list(capabilities)
         last_error = None
         for attempt in range(max(1, int(attempts))):
+            if self._cancel_requested.is_set():
+                return missing
             try:
                 catalog = self._windows_ocr_capability_catalog()
                 last_error = None
@@ -2642,6 +3223,32 @@ class OcrLanguageManagerDialog(QDialog):
         if last_error is not None:
             raise RuntimeError(str(last_error))
         return missing
+
+    def _wait_for_windows_ocr_removal(self, capabilities, attempts=12, delay=0.75):
+        remaining = list(capabilities)
+        last_error = None
+        for attempt in range(max(1, int(attempts))):
+            if self._cancel_requested.is_set():
+                return remaining
+            try:
+                catalog = self._windows_ocr_capability_catalog()
+                remaining = [
+                    capability
+                    for capability in capabilities
+                    if catalog.get(
+                        self._windows_ocr_tag_from_capability(capability),
+                        "",
+                    ).lower() == "installed"
+                ]
+                if not remaining:
+                    return []
+            except Exception as exc:
+                last_error = exc
+            if attempt + 1 < attempts:
+                time.sleep(max(0.0, float(delay)))
+        if last_error is not None:
+            raise RuntimeError(str(last_error))
+        return remaining
 
     def _install_selected_windows(self):
         codes = self._selected_codes(self.windows_table)
@@ -2710,6 +3317,85 @@ class OcrLanguageManagerDialog(QDialog):
             success_message=language_manager_text(self.lang, "argos_installed"),
         )
 
+    def _highlighted_installed_codes(self, table):
+        rows = sorted({index.row() for index in table.selectionModel().selectedRows()})
+        codes = []
+        for row in rows:
+            item = table.item(row, 0)
+            if item is None or item.checkState() != Qt.Checked:
+                continue
+            code = item.data(Qt.UserRole)
+            if code:
+                codes.append(str(code))
+        return codes
+
+    def _confirm_package_removal(self, engine, codes):
+        if not codes:
+            QMessageBox.information(
+                self,
+                engine,
+                language_manager_text(self.lang, "highlight"),
+            )
+            return False
+        labels = ", ".join(code.upper() for code in codes)
+        msg = QMessageBox(self)
+        msg.setWindowTitle(engine)
+        msg.setText(
+            language_manager_text(
+                self.lang,
+                "remove_packages_confirm",
+                engine=engine,
+                packages=labels,
+            )
+        )
+        msg.setIcon(QMessageBox.Warning)
+        remove_btn = msg.addButton(settings_text(self.lang, "remove"), QMessageBox.DestructiveRole)
+        msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.RejectRole)
+        msg.exec_()
+        return msg.clickedButton() == remove_btn
+
+    def _remove_selected_windows(self):
+        codes = self._highlighted_installed_codes(self.windows_table)
+        if not self._confirm_package_removal("Windows OCR", codes):
+            return
+        self._run_language_task(
+            "Windows OCR",
+            codes,
+            self._remove_windows_ocr_worker,
+            success_message=language_manager_text(
+                self.lang, "packages_removed", engine="Windows OCR"
+            ),
+            failure_key="remove_failed",
+        )
+
+    def _remove_selected_tesseract(self):
+        codes = self._highlighted_installed_codes(self.tesseract_table)
+        if not self._confirm_package_removal("Tesseract", codes):
+            return
+        self._run_language_task(
+            "Tesseract",
+            codes,
+            self._remove_tesseract_worker,
+            success_message=language_manager_text(
+                self.lang, "packages_removed", engine="Tesseract"
+            ),
+            failure_key="remove_failed",
+        )
+
+    def _remove_selected_easyocr(self):
+        codes = self._highlighted_installed_codes(self.easyocr_table)
+        if not self._confirm_package_removal(EASYOCR_ENGINE_DISPLAY, codes):
+            return
+        self._run_language_task(
+            EASYOCR_ENGINE_DISPLAY,
+            codes,
+            self._remove_easyocr_worker,
+            success_message=language_manager_text(
+                self.lang, "packages_removed", engine=EASYOCR_ENGINE_DISPLAY
+            ),
+            failure_key="remove_failed",
+        )
+
     def _remove_selected_argos(self):
         highlighted = self._highlighted_codes(self.argos_table)
         installed = {
@@ -2740,6 +3426,7 @@ class OcrLanguageManagerDialog(QDialog):
             codes,
             self._remove_argos_worker,
             success_message=language_manager_text(self.lang, "removed"),
+            failure_key="remove_failed",
         )
 
     def _is_process_elevated(self):
@@ -2782,11 +3469,19 @@ class OcrLanguageManagerDialog(QDialog):
             timeout=None,
         )
 
-    def _run_language_task(self, title, codes, worker_func, success_message=""):
+    def _run_language_task(
+        self,
+        title,
+        codes,
+        worker_func,
+        success_message="",
+        failure_key="install_failed",
+    ):
         if self._install_in_progress:
             return
         self._install_in_progress = True
         self._task_success_message = str(success_message or "")
+        self._task_failure_key = str(failure_key or "install_failed")
         self._cancel_requested.clear()
         self.progress_dialog = TesseractInstallProgressDialog(
             self,
@@ -2804,6 +3499,12 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _request_install_cancel(self):
         self._cancel_requested.set()
+        marker = str(self._windows_ocr_cancel_marker or "")
+        if marker:
+            try:
+                Path(marker).touch(exist_ok=True)
+            except Exception:
+                pass
         if self.progress_dialog is not None:
             self.progress_dialog.setLabelText(language_manager_text(self.lang, "canceling"))
             self.progress_dialog.setRange(0, 0)
@@ -2830,36 +3531,48 @@ class OcrLanguageManagerDialog(QDialog):
             self.progress_dialog.setRange(0, 0)
         self.progress_dialog.bring_to_front()
 
-    def _finish_language_task(self, engine, error=""):
+    def _finish_language_task(self, engine, error="", canceled=False):
         QMetaObject.invokeMethod(
             self,
             "_on_language_task_finished",
             Qt.QueuedConnection,
             QtCore.Q_ARG(str, str(engine)),
             QtCore.Q_ARG(str, str(error)),
+            QtCore.Q_ARG(bool, bool(canceled)),
         )
 
-    @QtCore.pyqtSlot(str, str)
-    def _on_language_task_finished(self, engine, error):
+    @QtCore.pyqtSlot(str, str, bool)
+    def _on_language_task_finished(self, engine, error, canceled=False):
         self._install_in_progress = False
         if self.progress_dialog is not None:
             self.progress_dialog.hide()
             self.progress_dialog = None
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
+        self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self.refresh_all()
         self._start_runtime_probe()
         if engine == "Argos":
             self._start_argos_catalog_refresh(False)
+        if canceled:
+            self._task_success_message = ""
+            self._task_failure_key = "install_failed"
+            QMessageBox.information(
+                self,
+                engine,
+                language_manager_text(self.lang, "canceled"),
+            )
+            return
         if error:
             self._task_success_message = ""
             QMessageBox.warning(
                 self,
                 engine,
-                language_manager_text(self.lang, "install_failed") + error,
+                language_manager_text(self.lang, self._task_failure_key) + error,
             )
+            self._task_failure_key = "install_failed"
             return
         QMessageBox.information(
             self,
@@ -2867,6 +3580,7 @@ class OcrLanguageManagerDialog(QDialog):
             self._task_success_message or language_manager_text(self.lang, "ready"),
         )
         self._task_success_message = ""
+        self._task_failure_key = "install_failed"
 
     def _install_tesseract_worker(self, codes):
         try:
@@ -2886,7 +3600,7 @@ class OcrLanguageManagerDialog(QDialog):
                 raise_on_error=True,
             )
             if self._cancel_requested.is_set():
-                self._finish_language_task("Tesseract", language_manager_text(self.lang, "canceled"))
+                self._finish_language_task("Tesseract", canceled=True)
                 return
             _tess_cmd, data_dirs = self._tesseract_data_dirs()
             missing = [
@@ -2898,44 +3612,514 @@ class OcrLanguageManagerDialog(QDialog):
                 raise RuntimeError("Downloaded packages were not found: " + ", ".join(missing))
             self._finish_language_task("Tesseract")
         except Exception as exc:
-            self._finish_language_task("Tesseract", str(exc))
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Tesseract", canceled=True)
+            else:
+                self._finish_language_task("Tesseract", str(exc))
+
+    @staticmethod
+    def _powershell_literal(value):
+        return "'" + str(value).replace("'", "''") + "'"
+
+    def _windows_ocr_installer_script(
+        self,
+        codes,
+        capabilities,
+        repair_codes,
+        status_path,
+        cancel_path,
+        result_path,
+        output_dir,
+    ):
+        """Build an elevated DISM runner with observable progress and real cancellation."""
+        ps = self._powershell_literal
+        entries = ",\n".join(
+            "    [pscustomobject]@{ Code = %s; Capability = %s; ForceRepair = %s }"
+            % (
+                ps(code),
+                ps(capability),
+                "$true" if code in set(repair_codes or []) else "$false",
+            )
+            for code, capability in zip(codes, capabilities)
+        )
+        return rf"""$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$StatusPath = {ps(status_path)}
+$CancelPath = {ps(cancel_path)}
+$ResultPath = {ps(result_path)}
+$OutputDir = {ps(output_dir)}
+$Packages = @(
+{entries}
+)
+$process = $null
+$InitiallyInstalled = @{{}}
+
+function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Total, [string]$Code, [string]$Message) {{
+    $payload = @{{
+        phase = $Phase
+        percent = [Math]::Max(0, [Math]::Min(100, $Percent))
+        current = $Current
+        total = $Total
+        code = $Code
+        message = $Message
+    }} | ConvertTo-Json -Compress
+    $statusTemp = "$StatusPath.$PID.$([Guid]::NewGuid().ToString('N')).tmp"
+    try {{
+        [System.IO.File]::WriteAllText(
+            $statusTemp,
+            [string]$payload,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        $moved = $false
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {{
+            try {{
+                Move-Item -LiteralPath $statusTemp -Destination $StatusPath -Force -ErrorAction Stop
+                $moved = $true
+                break
+            }} catch {{
+                Start-Sleep -Milliseconds 30
+            }}
+        }}
+        if (-not $moved) {{ throw 'Could not publish Windows OCR status.' }}
+    }} finally {{
+        if (Test-Path -LiteralPath $statusTemp) {{
+            Remove-Item -LiteralPath $statusTemp -Force -ErrorAction SilentlyContinue
+        }}
+    }}
+}}
+
+function Test-OcrCancel {{
+    return (Test-Path -LiteralPath $CancelPath)
+}}
+
+try {{
+    $total = [Math]::Max(1, $Packages.Count)
+    Write-OcrStatus 'starting' 0 0 $total '' ''
+    for ($index = 0; $index -lt $Packages.Count; $index++) {{
+        $entry = $Packages[$index]
+        $current = $index + 1
+        if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
+
+        Write-OcrStatus 'checking' ([int](100 * $index / $total)) $current $total $entry.Code ''
+        $capability = Get-WindowsCapability -Online -Name $entry.Capability
+        $InitiallyInstalled[$entry.Capability] = ($capability.State -eq 'Installed')
+        if ($entry.ForceRepair -and $capability.State -eq 'Installed') {{
+            Write-OcrStatus 'removing' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            $repairOut = Join-Path $OutputDir ("repair_remove_" + $index + ".out")
+            $repairErr = Join-Path $OutputDir ("repair_remove_" + $index + ".err")
+            $repairArgs = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
+            $process = Start-Process -FilePath dism.exe -ArgumentList $repairArgs -PassThru -WindowStyle Hidden -RedirectStandardOutput $repairOut -RedirectStandardError $repairErr
+            while (-not $process.HasExited) {{
+                if (Test-OcrCancel) {{
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    $process.WaitForExit()
+                    throw [System.OperationCanceledException]::new('Canceled')
+                }}
+                Start-Sleep -Milliseconds 250
+                $process.Refresh()
+            }}
+            $process.WaitForExit()
+            $process.Refresh()
+            $exitCode = [int]$process.ExitCode
+            if ($exitCode -ne 0) {{
+                $details = ''
+                if (Test-Path -LiteralPath $repairErr) {{ $details = Get-Content -LiteralPath $repairErr -Raw -ErrorAction SilentlyContinue }}
+                if (-not $details -and (Test-Path -LiteralPath $repairOut)) {{ $details = Get-Content -LiteralPath $repairOut -Raw -ErrorAction SilentlyContinue }}
+                throw ("DISM repair removal exited with code " + $exitCode + ". " + $details)
+            }}
+            $capability = Get-WindowsCapability -Online -Name $entry.Capability
+        }}
+        if ($capability.State -ne 'Installed') {{
+            $stdoutPath = Join-Path $OutputDir ("dism_" + $index + ".out")
+            $stderrPath = Join-Path $OutputDir ("dism_" + $index + ".err")
+            $arguments = @('/Online', '/Add-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
+            $process = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+            while (-not $process.HasExited) {{
+                if (Test-OcrCancel) {{
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    $process.WaitForExit()
+                    throw [System.OperationCanceledException]::new('Canceled')
+                }}
+                $rawPercent = 0
+                if (Test-Path -LiteralPath $stdoutPath) {{
+                    $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+                    if ($null -ne $content) {{
+                        $matches = [regex]::Matches([string]$content, '(\d+)(?:[.,]\d+)?%')
+                        if ($matches.Count -gt 0) {{
+                            $rawPercent = [int]$matches[$matches.Count - 1].Groups[1].Value
+                        }}
+                    }}
+                }}
+                $overall = [int](((100 * $index) + $rawPercent) / $total)
+                Write-OcrStatus 'installing' $overall $current $total $entry.Code ''
+                Start-Sleep -Milliseconds 250
+                $process.Refresh()
+            }}
+            $process.WaitForExit()
+            $process.Refresh()
+            $exitCode = [int]$process.ExitCode
+            if ($exitCode -ne 0) {{
+                $details = ''
+                if (Test-Path -LiteralPath $stderrPath) {{ $details = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue }}
+                if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
+                throw ("DISM exited with code " + $exitCode + ". " + $details)
+            }}
+        }}
+
+        Write-OcrStatus 'verifying' ([int](100 * $current / $total)) $current $total $entry.Code ''
+        $capability = Get-WindowsCapability -Online -Name $entry.Capability
+        if ($capability.State -ne 'Installed') {{
+            throw ("Windows did not install " + $entry.Capability + ". State: " + $capability.State)
+        }}
+    }}
+    Set-Content -LiteralPath $ResultPath -Value 'OK' -Encoding UTF8 -Force
+    Write-OcrStatus 'done' 100 $total $total '' ''
+    exit 0
+}} catch [System.OperationCanceledException] {{
+    Write-OcrStatus 'rolling_back' 0 0 $Packages.Count '' ''
+    foreach ($entry in $Packages) {{
+        if (-not $InitiallyInstalled.ContainsKey($entry.Capability)) {{ continue }}
+        $wasInstalled = [bool]$InitiallyInstalled[$entry.Capability]
+        $currentCapability = Get-WindowsCapability -Online -Name $entry.Capability -ErrorAction SilentlyContinue
+        if ($null -eq $currentCapability) {{ continue }}
+        if ($wasInstalled -and $currentCapability.State -ne 'Installed') {{
+            $restoreArgs = @('/Online', '/Add-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
+            Start-Process -FilePath dism.exe -ArgumentList $restoreArgs -Wait -WindowStyle Hidden | Out-Null
+        }} elseif (-not $wasInstalled -and $currentCapability.State -eq 'Installed') {{
+            $rollbackArgs = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
+            Start-Process -FilePath dism.exe -ArgumentList $rollbackArgs -Wait -WindowStyle Hidden | Out-Null
+        }}
+    }}
+    Set-Content -LiteralPath $ResultPath -Value 'CANCELED' -Encoding UTF8 -Force
+    Write-OcrStatus 'canceled' 0 0 $Packages.Count '' 'Canceled'
+    exit 2
+}} catch {{
+    if ($null -ne $process -and -not $process.HasExited) {{
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $process.WaitForExit()
+    }}
+    $details = ($_ | Out-String).Trim()
+    Set-Content -LiteralPath $ResultPath -Value ("ERROR`n" + $details) -Encoding UTF8 -Force
+    Write-OcrStatus 'error' 0 0 $Packages.Count '' $details
+    exit 1
+}}
+"""
+
+    def _windows_ocr_remover_script(
+        self,
+        codes,
+        capabilities,
+        status_path,
+        cancel_path,
+        result_path,
+        output_dir,
+    ):
+        """Build an elevated, observable Windows OCR capability remover."""
+        ps = self._powershell_literal
+        entries = ",\n".join(
+            "    [pscustomobject]@{ Code = %s; Capability = %s }"
+            % (ps(code), ps(capability))
+            for code, capability in zip(codes, capabilities)
+        )
+        return rf"""$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$StatusPath = {ps(status_path)}
+$CancelPath = {ps(cancel_path)}
+$ResultPath = {ps(result_path)}
+$OutputDir = {ps(output_dir)}
+$Packages = @(
+{entries}
+)
+$process = $null
+
+function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Total, [string]$Code, [string]$Message) {{
+    $payload = @{{
+        phase = $Phase
+        percent = [Math]::Max(0, [Math]::Min(100, $Percent))
+        current = $Current
+        total = $Total
+        code = $Code
+        message = $Message
+    }} | ConvertTo-Json -Compress
+    $statusTemp = "$StatusPath.$PID.$([Guid]::NewGuid().ToString('N')).tmp"
+    try {{
+        [System.IO.File]::WriteAllText(
+            $statusTemp,
+            [string]$payload,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        $moved = $false
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {{
+            try {{
+                Move-Item -LiteralPath $statusTemp -Destination $StatusPath -Force -ErrorAction Stop
+                $moved = $true
+                break
+            }} catch {{
+                Start-Sleep -Milliseconds 30
+            }}
+        }}
+        if (-not $moved) {{ throw 'Could not publish Windows OCR status.' }}
+    }} finally {{
+        if (Test-Path -LiteralPath $statusTemp) {{
+            Remove-Item -LiteralPath $statusTemp -Force -ErrorAction SilentlyContinue
+        }}
+    }}
+}}
+
+function Test-OcrCancel {{ return (Test-Path -LiteralPath $CancelPath) }}
+
+try {{
+    $total = [Math]::Max(1, $Packages.Count)
+    for ($index = 0; $index -lt $Packages.Count; $index++) {{
+        $entry = $Packages[$index]
+        $current = $index + 1
+        if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
+        Write-OcrStatus 'checking' ([int](100 * $index / $total)) $current $total $entry.Code ''
+        $capability = Get-WindowsCapability -Online -Name $entry.Capability
+        if ($capability.State -eq 'Installed') {{
+            $stdoutPath = Join-Path $OutputDir ("remove_" + $index + ".out")
+            $stderrPath = Join-Path $OutputDir ("remove_" + $index + ".err")
+            $arguments = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
+            $process = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+            while (-not $process.HasExited) {{
+                if (Test-OcrCancel) {{
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    $process.WaitForExit()
+                    throw [System.OperationCanceledException]::new('Canceled')
+                }}
+                $rawPercent = 0
+                if (Test-Path -LiteralPath $stdoutPath) {{
+                    $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+                    if ($null -ne $content) {{
+                        $matches = [regex]::Matches([string]$content, '(\d+)(?:[\.,]\d+)?%')
+                        if ($matches.Count -gt 0) {{ $rawPercent = [int]$matches[$matches.Count - 1].Groups[1].Value }}
+                    }}
+                }}
+                $overall = [int](((100 * $index) + $rawPercent) / $total)
+                Write-OcrStatus 'removing' $overall $current $total $entry.Code ''
+                Start-Sleep -Milliseconds 250
+                $process.Refresh()
+            }}
+            $process.WaitForExit()
+            $process.Refresh()
+            $exitCode = [int]$process.ExitCode
+            if ($exitCode -ne 0) {{
+                # Some Windows builds return a stale/non-zero transport code
+                # even though DISM has already removed the capability.  The
+                # capability state is authoritative; only fail if it remains.
+                $afterRemoval = Get-WindowsCapability -Online -Name $entry.Capability
+                if ($afterRemoval.State -ne 'Installed') {{
+                    continue
+                }}
+                $details = ''
+                if (Test-Path -LiteralPath $stderrPath) {{ $details = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue }}
+                if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
+                throw ("DISM exited with code " + $exitCode + ". " + $details)
+            }}
+        }}
+        Write-OcrStatus 'verifying' ([int](100 * $current / $total)) $current $total $entry.Code ''
+        $capability = Get-WindowsCapability -Online -Name $entry.Capability
+        if ($capability.State -eq 'Installed') {{
+            throw ("Windows did not remove " + $entry.Capability)
+        }}
+    }}
+    Set-Content -LiteralPath $ResultPath -Value 'OK' -Encoding UTF8 -Force
+    Write-OcrStatus 'done' 100 $total $total '' ''
+    exit 0
+}} catch [System.OperationCanceledException] {{
+    Set-Content -LiteralPath $ResultPath -Value 'CANCELED' -Encoding UTF8 -Force
+    Write-OcrStatus 'canceled' 0 0 $Packages.Count '' 'Canceled'
+    exit 2
+}} catch {{
+    if ($null -ne $process -and -not $process.HasExited) {{
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $process.WaitForExit()
+    }}
+    $details = ($_ | Out-String).Trim()
+    Set-Content -LiteralPath $ResultPath -Value ("ERROR`n" + $details) -Encoding UTF8 -Force
+    Write-OcrStatus 'error' 0 0 $Packages.Count '' $details
+    exit 1
+}}
+"""
+
+    @staticmethod
+    def _read_windows_ocr_status(status_path):
+        try:
+            payload = Path(status_path).read_text(encoding="utf-8-sig").strip()
+            value = json.loads(payload)
+            if not isinstance(value, dict):
+                return None
+            value["percent"] = max(0, min(100, int(value.get("percent", 0))))
+            return value
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return None
+
+    def _emit_windows_ocr_status(self, status):
+        phase = str(status.get("phase", ""))
+        percent = int(status.get("percent", 0))
+        code = str(status.get("code", ""))
+        current = int(status.get("current", 0) or 0)
+        total = int(status.get("total", 0) or 0)
+        language = code.upper()
+        for item in APP_LANGUAGES:
+            if item.code == code:
+                language = item.display_name(self.lang)
+                break
+        if phase == "installing":
+            text = language_manager_text(
+                self.lang,
+                "win_installing",
+                language=language,
+                current=current,
+                total=total,
+            )
+            # DISM can buffer its first progress line.  Until a real value is
+            # available, show an active bar instead of a frozen, misleading 0%.
+            base_percent = int(100 * max(0, current - 1) / max(1, total))
+            self._emit_language_progress(text, percent, percent > base_percent)
+        elif phase == "checking":
+            text = language_manager_text(self.lang, "win_checking", language=language)
+            self._emit_language_progress(text, percent, False)
+        elif phase == "verifying":
+            text = language_manager_text(self.lang, "win_verifying", language=language)
+            self._emit_language_progress(text, percent, False)
+        elif phase == "removing":
+            text = language_manager_text(
+                self.lang,
+                "win_removing",
+                language=language,
+                current=current,
+                total=total,
+            )
+            self._emit_language_progress(text, percent, False)
+        elif phase == "rolling_back":
+            self._emit_language_progress(
+                language_manager_text(self.lang, "win_rolling_back"),
+                percent,
+                False,
+            )
+        elif phase == "canceled":
+            self._emit_language_progress(language_manager_text(self.lang, "canceled"), 0, False)
+        elif phase == "done":
+            self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
 
     def _install_windows_ocr_worker(self, codes):
-        script_path = ""
+        work_dir = ""
         try:
             capabilities = []
+            unique_codes = []
+            repair_codes = []
+            available_tags = self._available_windows_tags()
+            available_by_tag = {
+                str(tag).lower(): str(tag)
+                for tag in available_tags
+                if str(tag).strip()
+            }
+            capability_catalog = self._windows_ocr_capability_catalog()
             for code in codes:
                 capability = self._windows_ocr_capability_name(code)
                 if capability not in capabilities:
                     capabilities.append(capability)
+                    unique_codes.append(code)
+                    expected = windows_ocr_tag(code)
+                    try:
+                        import ocr
+                        actual_tag = ocr._match_available_windows_ocr_tag(
+                            expected,
+                            available_by_tag,
+                        )
+                        api_installed = bool(actual_tag)
+                        engine_ready = bool(
+                            actual_tag
+                            and ocr._get_windows_ocr_engine(actual_tag) is not None
+                        )
+                    except Exception:
+                        api_installed = expected.lower() in available_by_tag
+                        engine_ready = api_installed
+                    capability_installed = (
+                        capability_catalog.get(expected.lower(), "").lower() == "installed"
+                    )
+                    if (
+                        api_installed != capability_installed
+                        or (capability_installed and not engine_ready)
+                    ):
+                        repair_codes.append(code)
             self._emit_language_progress(
                 language_manager_text(self.lang, "win_wait"),
                 0,
                 False,
             )
-            commands = [
-                "$ErrorActionPreference = 'Stop'",
-                "$ProgressPreference = 'Continue'",
-            ]
-            for capability in capabilities:
-                commands.extend([
-                    f"$capability = Get-WindowsCapability -Online -Name '{capability}'",
-                    "if ($capability.State -ne 'Installed') {",
-                    f"    $capability = Add-WindowsCapability -Online -Name '{capability}'",
-                    "}",
-                    "if ($capability.State -ne 'Installed') {",
-                    f"    throw 'Windows did not install {capability}. State: ' + $capability.State",
-                    "}",
-                ])
-            fd, script_path = tempfile.mkstemp(prefix="clickntranslate_windows_ocr_", suffix=".ps1")
-            with os.fdopen(fd, "w", encoding="utf-8") as script:
-                script.write("\n".join(commands))
-                script.write("\n")
-            completed = self._run_powershell_script(script_path, elevated=True)
+            work_dir = tempfile.mkdtemp(prefix="clickntranslate_windows_ocr_")
+            script_path = os.path.join(work_dir, "install.ps1")
+            status_path = os.path.join(work_dir, "status.json")
+            cancel_path = os.path.join(work_dir, "cancel.request")
+            result_path = os.path.join(work_dir, "result.txt")
+            Path(script_path).write_text(
+                self._windows_ocr_installer_script(
+                    unique_codes,
+                    capabilities,
+                    repair_codes,
+                    status_path,
+                    cancel_path,
+                    result_path,
+                    work_dir,
+                ),
+                encoding="utf-8-sig",
+            )
+            self._windows_ocr_cancel_marker = cancel_path
+
+            completed_box = {}
+            process_finished = threading.Event()
+
+            def run_installer():
+                try:
+                    completed_box["completed"] = self._run_powershell_script(
+                        script_path,
+                        elevated=True,
+                    )
+                except Exception as exc:
+                    completed_box["error"] = exc
+                finally:
+                    process_finished.set()
+
+            threading.Thread(target=run_installer, daemon=True).start()
+            last_status = None
+            while not process_finished.wait(0.15):
+                if self._cancel_requested.is_set():
+                    try:
+                        Path(cancel_path).touch(exist_ok=True)
+                    except OSError:
+                        pass
+                status = self._read_windows_ocr_status(status_path)
+                if status is not None and status != last_status:
+                    last_status = status
+                    self._emit_windows_ocr_status(status)
+
+            status = self._read_windows_ocr_status(status_path)
+            if status is not None and status != last_status:
+                self._emit_windows_ocr_status(status)
+            if "error" in completed_box:
+                raise completed_box["error"]
+            completed = completed_box.get("completed")
+            if completed is None:
+                raise RuntimeError("Windows OCR installer did not return a result")
+
+            result = ""
+            try:
+                result = Path(result_path).read_text(encoding="utf-8-sig").strip()
+            except OSError:
+                pass
+            if self._cancel_requested.is_set() or result == "CANCELED" or completed.returncode == 2:
+                self._finish_language_task("Windows OCR", canceled=True)
+                return
             if completed.returncode != 0:
                 output = (completed.stdout or "").strip()
-                raise RuntimeError(output or f"PowerShell exited with code {completed.returncode}")
+                details = result[6:].strip() if result.startswith("ERROR") else result
+                raise RuntimeError(details or output or f"PowerShell exited with code {completed.returncode}")
             missing = self._wait_for_windows_ocr_capabilities(capabilities)
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Windows OCR", canceled=True)
+                return
             if missing:
                 raise RuntimeError(
                     "Windows reported that these OCR capabilities are still not installed: "
@@ -2944,21 +4128,199 @@ class OcrLanguageManagerDialog(QDialog):
             try:
                 import ocr
                 ocr._UNIVERSAL_OCR_ENGINE = None
+                ocr._OCR_ENGINE_CACHE.clear()
+                available_by_tag = {
+                    str(tag).lower(): str(tag)
+                    for tag in ocr._get_available_windows_ocr_language_tags()
+                    if str(tag).strip()
+                }
+                unusable = []
+                for code in unique_codes:
+                    actual_tag = ocr._match_available_windows_ocr_tag(
+                        windows_ocr_tag(code),
+                        available_by_tag,
+                    )
+                    if not actual_tag or ocr._get_windows_ocr_engine(actual_tag) is None:
+                        unusable.append(code)
+                if unusable:
+                    raise RuntimeError(
+                        "Windows installed the OCR capability but the recognition engine "
+                        "could not be created for: " + ", ".join(unusable)
+                    )
             except Exception:
-                pass
-            if self._cancel_requested.is_set():
-                self._finish_language_task("Windows OCR", language_manager_text(self.lang, "canceled"))
-                return
+                raise
             self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
             self._finish_language_task("Windows OCR")
         except Exception as exc:
-            self._finish_language_task("Windows OCR", str(exc))
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Windows OCR", canceled=True)
+            else:
+                self._finish_language_task("Windows OCR", str(exc))
         finally:
-            if script_path:
+            self._windows_ocr_cancel_marker = ""
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _remove_windows_ocr_worker(self, codes):
+        work_dir = ""
+        try:
+            unique_codes = []
+            capabilities = []
+            for code in codes:
+                capability = self._windows_ocr_capability_name(code)
+                if capability not in capabilities:
+                    unique_codes.append(code)
+                    capabilities.append(capability)
+            work_dir = tempfile.mkdtemp(prefix="clickntranslate_windows_ocr_remove_")
+            script_path = os.path.join(work_dir, "remove.ps1")
+            status_path = os.path.join(work_dir, "status.json")
+            cancel_path = os.path.join(work_dir, "cancel.request")
+            result_path = os.path.join(work_dir, "result.txt")
+            Path(script_path).write_text(
+                self._windows_ocr_remover_script(
+                    unique_codes,
+                    capabilities,
+                    status_path,
+                    cancel_path,
+                    result_path,
+                    work_dir,
+                ),
+                encoding="utf-8-sig",
+            )
+            self._windows_ocr_cancel_marker = cancel_path
+            completed_box = {}
+            process_finished = threading.Event()
+
+            def run_remover():
                 try:
-                    os.remove(script_path)
-                except Exception:
-                    pass
+                    completed_box["completed"] = self._run_powershell_script(
+                        script_path,
+                        elevated=True,
+                    )
+                except Exception as exc:
+                    completed_box["error"] = exc
+                finally:
+                    process_finished.set()
+
+            threading.Thread(target=run_remover, daemon=True).start()
+            last_status = None
+            while not process_finished.wait(0.15):
+                if self._cancel_requested.is_set():
+                    try:
+                        Path(cancel_path).touch(exist_ok=True)
+                    except OSError:
+                        pass
+                status = self._read_windows_ocr_status(status_path)
+                if status is not None and status != last_status:
+                    last_status = status
+                    self._emit_windows_ocr_status(status)
+            status = self._read_windows_ocr_status(status_path)
+            if status is not None and status != last_status:
+                self._emit_windows_ocr_status(status)
+            if "error" in completed_box:
+                raise completed_box["error"]
+            completed = completed_box.get("completed")
+            if completed is None:
+                raise RuntimeError("Windows OCR remover did not return a result")
+            try:
+                result = Path(result_path).read_text(encoding="utf-8-sig").strip()
+            except OSError:
+                result = ""
+            if self._cancel_requested.is_set() or result == "CANCELED" or completed.returncode == 2:
+                self._finish_language_task("Windows OCR", canceled=True)
+                return
+            transport_error = ""
+            if completed.returncode != 0:
+                details = result[6:].strip() if result.startswith("ERROR") else result
+                transport_error = (
+                    details
+                    or (completed.stdout or "").strip()
+                    or f"PowerShell exited with code {completed.returncode}"
+                )
+            # The actual Windows capability state is authoritative.  This also
+            # handles older DISM builds that report a non-zero/stale exit code
+            # after printing "The operation completed successfully".
+            remaining = self._wait_for_windows_ocr_removal(capabilities)
+            if remaining:
+                if transport_error:
+                    raise RuntimeError(transport_error)
+                raise RuntimeError(
+                    "Windows reported that these OCR capabilities are still installed: "
+                    + ", ".join(remaining)
+                )
+            try:
+                import ocr
+                ocr._UNIVERSAL_OCR_ENGINE = None
+                ocr._OCR_ENGINE_CACHE.clear()
+            except Exception:
+                pass
+            self._finish_language_task("Windows OCR")
+        except Exception as exc:
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Windows OCR", canceled=True)
+            else:
+                self._finish_language_task("Windows OCR", str(exc))
+        finally:
+            self._windows_ocr_cancel_marker = ""
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _remove_tesseract_worker(self, codes):
+        try:
+            _tess_cmd, data_dirs = self._tesseract_data_dirs()
+            if not data_dirs:
+                raise RuntimeError("Tesseract tessdata folder was not found")
+            total = max(1, len(codes))
+            for index, code in enumerate(codes, 1):
+                if self._cancel_requested.is_set():
+                    self._finish_language_task("Tesseract", canceled=True)
+                    return
+                tess_code = tesseract_language_code(code)
+                filename = f"{tess_code}.traineddata"
+                self._emit_language_progress(f"Tesseract: {filename}", int(index * 100 / total), True)
+                for data_dir in data_dirs:
+                    data_root = Path(data_dir).resolve()
+                    target = (data_root / filename).resolve()
+                    if target.parent != data_root:
+                        raise RuntimeError(f"Unsafe Tesseract package path: {target}")
+                    if target.is_file():
+                        target.unlink()
+                if self._tesseract_language_installed(tess_code, data_dirs):
+                    raise RuntimeError(f"Could not remove {filename}")
+            self._finish_language_task("Tesseract")
+        except Exception as exc:
+            self._finish_language_task("Tesseract", str(exc))
+
+    def _remove_easyocr_worker(self, codes):
+        try:
+            groups = []
+            for code in codes:
+                for group in self._easyocr_model_groups_for_language(code):
+                    if group and group not in groups:
+                        groups.append(group)
+            model_root = Path(self._easyocr_model_dir()).resolve()
+            total = max(1, len(groups))
+            for index, group in enumerate(groups, 1):
+                if self._cancel_requested.is_set():
+                    self._finish_language_task(EASYOCR_ENGINE_DISPLAY, canceled=True)
+                    return
+                self._emit_language_progress(
+                    f"{EASYOCR_ENGINE_DISPLAY}: {group}",
+                    int(index * 100 / total),
+                    True,
+                )
+                for filename in EASYOCR_MODEL_FILE_VARIANTS.get(group, (f"{group}.pth",)):
+                    target = (model_root / filename).resolve()
+                    if target.parent != model_root:
+                        raise RuntimeError(f"Unsafe EasyOCR model path: {target}")
+                    if target.is_file():
+                        target.unlink()
+            reset = getattr(self.owner, "_reset_easyocr_runtime_cache", None)
+            if callable(reset):
+                reset(clear_modules=True)
+            self._finish_language_task(EASYOCR_ENGINE_DISPLAY)
+        except Exception as exc:
+            self._finish_language_task(EASYOCR_ENGINE_DISPLAY, str(exc))
 
     def _install_easyocr_worker(self, codes):
         try:
@@ -2966,7 +4328,7 @@ class OcrLanguageManagerDialog(QDialog):
             total = max(1, len(codes))
             for index, code in enumerate(codes, 1):
                 if self._cancel_requested.is_set():
-                    self._finish_language_task("EasyOCR", language_manager_text(self.lang, "canceled"))
+                    self._finish_language_task("EasyOCR", canceled=True)
                     return
                 language = next((item for item in APP_LANGUAGES if item.code == code), None)
                 language_name = language.display_name(self.lang) if language else code.upper()
@@ -2975,12 +4337,15 @@ class OcrLanguageManagerDialog(QDialog):
                     int((index - 1) * 100 / total),
                     True,
                 )
-                if not ocr.easyocr_available(code):
+                if not ocr.easyocr_available(code, download_enabled=True):
                     raise RuntimeError(f"EasyOCR could not prepare models for {language_name}")
             self._emit_language_progress(language_manager_text(self.lang, "easy_done"), 100, True)
             self._finish_language_task("EasyOCR")
         except Exception as exc:
-            self._finish_language_task("EasyOCR", str(exc))
+            if self._cancel_requested.is_set():
+                self._finish_language_task("EasyOCR", canceled=True)
+            else:
+                self._finish_language_task("EasyOCR", str(exc))
 
     def _parse_argos_codes(self, codes):
         pairs = []
@@ -3019,11 +4384,14 @@ class OcrLanguageManagerDialog(QDialog):
                 cancel_callback=lambda: self._cancel_requested.is_set(),
             )
             if self._cancel_requested.is_set():
-                self._finish_language_task("Argos", language_manager_text(self.lang, "canceled"))
+                self._finish_language_task("Argos", canceled=True)
                 return
             self._finish_language_task("Argos")
         except Exception as exc:
-            self._finish_language_task("Argos", str(exc))
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Argos", canceled=True)
+            else:
+                self._finish_language_task("Argos", str(exc))
 
     def _remove_argos_worker(self, codes):
         try:
@@ -3164,14 +4532,29 @@ class SettingsWindow(QWidget):
         self.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         self.ocr_engine_combo = QComboBox()
-        # OCR движки: Windows, Tesseract, RapidOCR и EasyOCR
-        self.ocr_engine_combo.addItems(["Windows", "Tesseract", "RapidOCR", "EasyOCR"])
+        engine_group_color = (
+            "#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124"
+        )
+        installed_ocr_engines = {"Windows"}
+        if self._find_available_tesseract_exe():
+            installed_ocr_engines.add("Tesseract")
+        if self._rapidocr_runtime_installed():
+            installed_ocr_engines.add(RAPIDOCR_ENGINE_DISPLAY)
+        if self._local_easyocr_installed():
+            installed_ocr_engines.add(EASYOCR_ENGINE_DISPLAY)
+        _populate_grouped_ocr_combo(
+            self.ocr_engine_combo,
+            lang,
+            engine_group_color,
+            installed_engines=installed_ocr_engines,
+        )
         current_engine = self.parent.config.get("ocr_engine", "Windows")
         idx = self.ocr_engine_combo.findText(current_engine, Qt.MatchFixedString)
         if idx >= 0:
             self.ocr_engine_combo.setCurrentIndex(idx)
         else:
-             self.ocr_engine_combo.setCurrentIndex(0)
+            fallback_index = self.ocr_engine_combo.findData("Windows")
+            self.ocr_engine_combo.setCurrentIndex(max(0, fallback_index))
 
         self.ocr_engine_combo.currentTextChanged.connect(self.handle_ocr_engine_change)
         self.ocr_engine_combo.currentTextChanged.connect(lambda _text: self._sync_ocr_engine_delete_button())
@@ -3207,13 +4590,18 @@ class SettingsWindow(QWidget):
         row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignVCenter)
         row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignVCenter)
         
-        # Подсказки для OCR движков
-        ocr_tooltips = {
-            "ru": "Windows — быстрый, встроенный, зависит от языковых пакетов\nTesseract — офлайн, много языков\nRapidOCR — нейросетевой OCR с блоками текста и уверенностью\nEasyOCR — нейросетевой OCR с выбранным языком распознавания",
-            "en": "Windows — fast, built-in, depends on language packs\nTesseract — offline, many languages\nRapidOCR — neural OCR with text boxes and confidence\nEasyOCR — neural OCR with the selected recognition language"
+        # Each popup item has its own concise explanation.  Avoid one giant
+        # native tooltip covering most of the fixed settings window.
+        ocr_picker_help = {
+            "en": "Choose an OCR engine. Missing engines can be installed when selected.",
+            "ru": "Выберите OCR. Отсутствующий движок можно установить после выбора.",
+            "es": "Elige un OCR. Los motores que faltan se pueden instalar al elegirlos.",
+            "de": "OCR-Engine wählen. Fehlende Engines können danach installiert werden.",
+            "fr": "Choisissez un OCR. Un moteur manquant peut ensuite être installé.",
+            "zh": "选择 OCR；缺少的引擎可在选择后安装。",
         }
-        self.ocr_engine_combo.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
-        self.ocr_engine_label.setToolTip(ocr_tooltips.get(lang, ocr_tooltips["en"]))
+        self.ocr_engine_combo.setToolTip(ocr_picker_help.get(lang, ocr_picker_help["en"]))
+        self.ocr_engine_label.setToolTip(ocr_picker_help.get(lang, ocr_picker_help["en"]))
         self.main_layout.addLayout(row1)
         
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
@@ -3236,22 +4624,31 @@ class SettingsWindow(QWidget):
         self.translator_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         self.translator_combo = QComboBox()
-        # Порядок: Google первый, офлайн-движки рядом.
-        self.translator_combo.addItems(_translator_combo_labels(lang))
-        for option_index, (engine, name, kind) in enumerate(TRANSLATOR_ENGINE_OPTIONS):
-            self.translator_combo.setItemData(
-                option_index,
-                _translator_combo_tooltip(engine, name, kind, lang),
-                Qt.ToolTipRole,
-            )
-        # Маппинг индексов на имена движков (соответствует порядку в addItems)
-        self._translator_engines = [engine for engine, _name, _kind in TRANSLATOR_ENGINE_OPTIONS]
+        installed_translator_engines = {
+            engine
+            for engine, _name, kind in TRANSLATOR_ENGINE_OPTIONS
+            if kind == "online"
+        }
+        try:
+            import translater
+            if translater.argos_installed_translation_pairs_fast():
+                installed_translator_engines.add("argos")
+        except Exception:
+            pass
+        if self._hymt_installed():
+            installed_translator_engines.add(HYMT_ENGINE_KEY)
+        self._translator_engines = _populate_grouped_translator_combo(
+            self.translator_combo,
+            lang,
+            engine_group_color,
+            installed_engines=installed_translator_engines,
+        )
         
         current_tr = self.parent.config.get("translator_engine", "Google").lower()
         try:
             idx = self._translator_engines.index(current_tr)
         except ValueError:
-            idx = 0 # Google по умолчанию
+            idx = self._translator_engines.index("google")
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.currentIndexChanged.connect(self._on_translator_changed)
         self.translator_combo.currentIndexChanged.connect(lambda _idx: self._sync_translator_engine_delete_button())
@@ -3287,13 +4684,17 @@ class SettingsWindow(QWidget):
         row2.addWidget(self.translator_engine_label, alignment=Qt.AlignVCenter)
         row2.addWidget(self.translator_combo, alignment=Qt.AlignVCenter)
         
-        # Подсказки для переводчиков
-        tr_tooltips = {
-            "ru": "Google — быстрый, точный, нужен интернет\nArgos — офлайн, без интернета, приватный\nHy-MT — локальная LLM-модель, ставится отдельным пакетом\nMyMemory — бесплатный API, лимит 5000 симв/день\nLingva — прокси Google, более стабильный\nLibreTranslate — открытый, бесплатный",
-            "en": "Google — fast, accurate, needs internet\nArgos — offline, no internet, private\nHy-MT — local LLM model, installed as a separate package\nMyMemory — free API, 5000 chars/day limit\nLingva — Google proxy, more stable\nLibreTranslate — open source, free"
+        translator_picker_help = {
+            "en": "Online providers need internet. Installed offline providers are listed separately.",
+            "ru": "Онлайн-переводчикам нужен интернет. Установленные офлайн-пакеты показаны отдельно.",
+            "es": "Los proveedores online necesitan internet; los offline instalados aparecen aparte.",
+            "de": "Online-Anbieter benötigen Internet; installierte Offline-Anbieter stehen separat.",
+            "fr": "Les services en ligne nécessitent Internet ; les moteurs hors ligne installés sont séparés.",
+            "zh": "在线服务需要网络；已安装的离线翻译器会单独显示。",
         }
-        self.translator_combo.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
-        self.translator_engine_label.setToolTip(tr_tooltips.get(lang, tr_tooltips["en"]))
+        picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
+        self.translator_combo.setToolTip(picker_help)
+        self.translator_engine_label.setToolTip(picker_help)
         self.main_layout.addLayout(row2)
 
         # --- Подготовим кнопку обновления (перенесена в группу кнопок ниже) ---
@@ -3362,6 +4763,7 @@ class SettingsWindow(QWidget):
                 padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -3385,6 +4787,7 @@ class SettingsWindow(QWidget):
                 padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -3409,6 +4812,7 @@ class SettingsWindow(QWidget):
                 padding-bottom: 0px;
                 padding-left: 12px;
                 padding-right: 12px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -3432,7 +4836,8 @@ class SettingsWindow(QWidget):
         self.ocr_languages_btn.setToolTip(settings_text(lang, "manage_ocr_languages"))
         self.ocr_languages_btn.setStyleSheet("""
             QPushButton {
-                padding: 0px 12px;
+                padding: 0px 6px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
                 border-radius: 0px;
@@ -3441,7 +4846,7 @@ class SettingsWindow(QWidget):
             }
         """)
         self.ocr_languages_btn.setFixedHeight(action_button_height)
-        self.ocr_languages_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.ocr_languages_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         tools_row.addWidget(self.ocr_languages_btn, 1)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
@@ -3453,6 +4858,7 @@ class SettingsWindow(QWidget):
             padding-bottom: 0px;
             padding-left: 16px;
             padding-right: 16px;
+            font-family: 'Segoe UI';
             font-size: 16px;
             font-weight: bold;
             border-radius: 0px;
@@ -3460,13 +4866,13 @@ class SettingsWindow(QWidget):
         """)
         self.hotkeys_button.setFixedHeight(action_button_height)
         self.hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        tools_row.addWidget(self.hotkeys_button, 1)
 
         self.translation_history_btn = QPushButton(settings_text(lang, "translation_history_button"))
         self.translation_history_btn.clicked.connect(self.show_history_view)
         self.translation_history_btn.setStyleSheet("""
             QPushButton {
-                padding: 0px 12px;
+                padding: 0px 6px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
                 border-radius: 0px;
@@ -3475,7 +4881,7 @@ class SettingsWindow(QWidget):
             }
         """)
         self.translation_history_btn.setFixedHeight(action_button_height)
-        self.translation_history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.translation_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         tools_row.addWidget(self.translation_history_btn, 1)
 
         self.main_layout.addLayout(tools_row)
@@ -3488,22 +4894,36 @@ class SettingsWindow(QWidget):
 
         self.copy_history_btn = QPushButton(settings_text(lang, "copy_history_button"))
         self.copy_history_btn.clicked.connect(self.show_copy_history_view)
-        # Единая ячейка замыкает оба нижних угла группы.
+        # Copy history lives beside translation history in the upper tools row.
         self.copy_history_btn.setStyleSheet("""
             QPushButton {
-                padding: 0px 12px;
+                padding: 0px 6px;
+                font-family: 'Segoe UI';
                 font-size: 16px;
                 font-weight: bold;
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 8px;
-                border-top-right-radius: 0px;
-                border-bottom-right-radius: 8px;
+                border-radius: 0px;
+                border-left: 1px solid rgba(255,255,255,0.1);
+                border-right: 1px solid rgba(255,255,255,0.1);
+                border-bottom: 1px solid rgba(255,255,255,0.05);
             }
         """)
         self.copy_history_btn.setFixedHeight(action_button_height)
-        self.copy_history_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        
-        btn_row.addWidget(self.copy_history_btn, 1)
+        self.copy_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+
+        tools_row.insertWidget(1, self.copy_history_btn, 1)
+        self.hotkeys_button.setStyleSheet("""
+            QPushButton {
+                padding: 0px 16px;
+                font-family: 'Segoe UI';
+                font-size: 16px;
+                font-weight: bold;
+                border-top-left-radius: 0px;
+                border-top-right-radius: 0px;
+                border-bottom-left-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+        """)
+        btn_row.addWidget(self.hotkeys_button, 1)
         self.main_layout.addLayout(btn_row)
         self.main_layout.addSpacing(10)
         
@@ -3515,6 +4935,9 @@ class SettingsWindow(QWidget):
         self.main_layout.addStretch()
 
     def show_ocr_language_manager(self):
+        complete_guide_step = getattr(self.parent, "_complete_guide_step", None)
+        if callable(complete_guide_step):
+            complete_guide_step("language_packages")
         dialog = OcrLanguageManagerDialog(self)
         dialog.exec_()
 
@@ -3549,6 +4972,17 @@ class SettingsWindow(QWidget):
                 color: {text};
                 selection-background-color: {selection};
                 selection-color: #ffffff;
+                outline: none;
+                padding: 3px 0px;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 24px;
+                padding: 2px 8px;
+                color: {text};
+            }}
+            QComboBox QAbstractItemView::item:disabled {{
+                color: {text};
+                background-color: {popup_bg};
             }}
         """
 
@@ -3557,7 +4991,8 @@ class SettingsWindow(QWidget):
             return {
                 "surface": "#111218",
                 "card": "#181820",
-                "field": "#101117",
+                "field": "#0c0d13",
+                "field_alt": "#211a2b",
                 "text": "#f7f3ff",
                 "muted": "#aaa0b8",
                 "border": "#393243",
@@ -3571,7 +5006,8 @@ class SettingsWindow(QWidget):
         return {
             "surface": "#f6f3fa",
             "card": "#ffffff",
-            "field": "#fbfaff",
+            "field": "#f1edf6",
+            "field_alt": "#ebe2f4",
             "text": "#241d2d",
             "muted": "#756b80",
             "border": "#d5cae2",
@@ -3644,14 +5080,83 @@ class SettingsWindow(QWidget):
             QKeySequenceEdit#secondaryHotkeyInput QLineEdit:focus {{
                 border: 1px solid {colors['accent']};
             }}
-            QTextEdit#secondaryHistory {{
-                background-color: {colors['field']};
-                color: {colors['text']};
+            QScrollArea#historyScroll {{
+                background: transparent;
+                border: none;
+            }}
+            QWidget#historyScrollContent {{
+                background: transparent;
+            }}
+            QFrame#historyRecordCard {{
+                background-color: {colors['card']};
                 border: 1px solid {colors['border']};
                 border-radius: 10px;
-                padding: 8px;
-                font-size: 13px;
-                selection-background-color: {colors['accent']};
+            }}
+            QLabel#historyMeta {{
+                color: {colors['muted']};
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QLabel#historyLanguageBadge {{
+                color: {colors['accent']};
+                background-color: {colors['field']};
+                border: 1px solid {colors['soft_border']};
+                border-radius: 7px;
+                padding: 2px 7px;
+                font-size: 11px;
+                font-weight: 800;
+            }}
+            QLabel#historySectionCaption {{
+                color: {colors['muted']};
+                font-size: 10px;
+                font-weight: 800;
+                padding-left: 2px;
+            }}
+            QFrame#historyTextBlock {{
+                background-color: {colors['field']};
+                border: 1px solid {colors['border']};
+                border-radius: 8px;
+            }}
+            QFrame#historyTextBlock[translated="true"] {{
+                background-color: {colors['field_alt']};
+                border: 1px solid {colors['accent']};
+            }}
+            QLabel#historyRecordOriginal,
+            QLabel#historyRecordTranslated,
+            QLabel#historyRecordText {{
+                background: transparent;
+                color: {colors['text']};
+                border: none;
+                padding: 1px;
+                font-family: 'Segoe UI';
+                font-size: 15px;
+            }}
+            QLabel#historyRecordTranslated {{
+                font-weight: 700;
+            }}
+            QLabel#historyEmptyState {{
+                color: {colors['muted']};
+                font-size: 14px;
+                padding: 44px 12px;
+            }}
+            QPushButton#historyCopyButton,
+            QPushButton#historyDeleteButton {{
+                background: transparent;
+                border: 1px solid {colors['border']};
+                border-radius: 7px;
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+            QPushButton#historyCopyButton {{ color: {colors['accent']}; }}
+            QPushButton#historyCopyButton:hover {{
+                color: #ffffff;
+                background-color: {colors['accent']};
+            }}
+            QPushButton#historyDeleteButton {{ color: {colors['danger']}; }}
+            QPushButton#historyDeleteButton:hover {{
+                color: #ffffff;
+                background-color: {colors['danger']};
             }}
             QPushButton#secondaryBackButton {{
                 background-color: {colors['accent']};
@@ -3901,11 +5406,8 @@ class SettingsWindow(QWidget):
             self.history_count_label,
         )
 
-        self.history_text_edit = QTextEdit()
-        self.history_text_edit.setObjectName("secondaryHistory")
-        self.history_text_edit.setReadOnly(True)
-        self.history_text_edit.setFrameShape(QFrame.NoFrame)
-        shell_layout.addWidget(self.history_text_edit, 1)
+        self.history_scroll_area, self.history_cards_layout = self._create_history_scroll()
+        shell_layout.addWidget(self.history_scroll_area, 1)
         self.load_history_embedded()
 
         clear_button = QPushButton(settings_text(lang, "clear_translation_history"))
@@ -3926,61 +5428,241 @@ class SettingsWindow(QWidget):
         shell_layout.addLayout(footer)
         self._refresh_secondary_view_theme()
 
+    def _create_history_scroll(self):
+        scroll = QScrollArea()
+        scroll.setObjectName("historyScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setMinimumHeight(190)
+
+        content = QWidget()
+        content.setObjectName("historyScrollContent")
+        cards_layout = QVBoxLayout(content)
+        cards_layout.setContentsMargins(0, 0, 4, 0)
+        cards_layout.setSpacing(8)
+        scroll.setWidget(content)
+        return scroll, cards_layout
+
+    def _clear_history_cards(self, cards_layout):
+        while cards_layout.count():
+            item = cards_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            elif item.layout() is not None:
+                self.clear_nested_layout(item.layout())
+
     @staticmethod
-    def _history_safe_text(value):
-        return html.escape(str(value or "")).replace("\n", "<br>")
+    def _format_history_timestamp(value):
+        try:
+            from datetime import datetime
+            return datetime.fromisoformat(str(value or "")).strftime("%d.%m.%Y  ·  %H:%M")
+        except Exception:
+            return str(value or "")
 
-    def _render_history_records(self, records, copy_mode=False):
-        colors = self._secondary_palette()
+    @staticmethod
+    def _history_label(text, object_name):
+        label = QLabel(str(text or ""))
+        label.setObjectName(object_name)
+        label.setTextFormat(Qt.PlainText)
+        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        return label
+
+    def _add_history_field(
+        self,
+        card_layout,
+        caption,
+        text,
+        object_name,
+        record_index,
+        copy_mode,
+        field_name,
+        translated=False,
+    ):
         lang = self.parent.current_interface_language
+        if caption:
+            caption_label = QLabel(caption)
+            caption_label.setObjectName("historySectionCaption")
+            card_layout.addWidget(caption_label)
+
+        text_block = QFrame()
+        text_block.setObjectName("historyTextBlock")
+        text_block.setProperty("translated", bool(translated))
+        text_layout = QVBoxLayout(text_block)
+        text_layout.setContentsMargins(10, 8, 10, 8)
+        text_layout.setSpacing(0)
+        text_layout.addWidget(self._history_label(text, object_name))
+        card_layout.addWidget(text_block)
+
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 2)
+        action_row.setSpacing(6)
+        action_row.addStretch(1)
+        copy_button = QPushButton(history_record_text(lang, "copy"))
+        copy_button.setObjectName("historyCopyButton")
+        copy_button.setProperty("historyField", field_name)
+        copy_button.setCursor(Qt.PointingHandCursor)
+        copy_button.setMinimumHeight(28)
+        copy_button.clicked.connect(
+            lambda _checked=False, value=str(text or ""): QApplication.clipboard().setText(value)
+        )
+        delete_button = QPushButton(history_record_text(lang, "delete"))
+        delete_button.setObjectName("historyDeleteButton")
+        delete_button.setProperty("recordIndex", record_index)
+        delete_button.setProperty("historyField", field_name)
+        delete_button.setCursor(Qt.PointingHandCursor)
+        delete_button.setMinimumHeight(28)
+        delete_button.clicked.connect(
+            lambda _checked=False, index=record_index, mode=copy_mode: self._delete_history_record(mode, index)
+        )
+        action_row.addWidget(copy_button)
+        action_row.addWidget(delete_button)
+        card_layout.addLayout(action_row)
+
+    def _add_history_record_card(self, cards_layout, record, record_index, copy_mode=False):
+        if not isinstance(record, dict):
+            record = {"text": str(record or "")}
+        lang = self.parent.current_interface_language
+
+        card = QFrame()
+        card.setObjectName("historyRecordCard")
+        card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(11, 9, 11, 9)
+        card_layout.setSpacing(5)
+
+        meta_row = QHBoxLayout()
+        meta_row.setContentsMargins(0, 0, 0, 0)
+        meta_row.setSpacing(7)
+        language = str(record.get("language", "") or "").upper()
+        if language and not copy_mode:
+            language_badge = QLabel(language)
+            language_badge.setObjectName("historyLanguageBadge")
+            meta_row.addWidget(language_badge, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        meta_row.addStretch(1)
+        date_label = QLabel(self._format_history_timestamp(record.get("timestamp", "")))
+        date_label.setObjectName("historyMeta")
+        date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        meta_row.addWidget(date_label, 0, Qt.AlignRight | Qt.AlignVCenter)
+        card_layout.addLayout(meta_row)
+
+        if copy_mode:
+            self._add_history_field(
+                card_layout,
+                "",
+                record.get("text", ""),
+                "historyRecordText",
+                record_index,
+                True,
+                "text",
+            )
+        elif "original" in record or "translated" in record:
+            self._add_history_field(
+                card_layout,
+                history_record_text(lang, "original"),
+                record.get("original", ""),
+                "historyRecordOriginal",
+                record_index,
+                False,
+                "original",
+            )
+            self._add_history_field(
+                card_layout,
+                history_record_text(lang, "translated"),
+                record.get("translated", ""),
+                "historyRecordTranslated",
+                record_index,
+                False,
+                "translated",
+                translated=True,
+            )
+        else:
+            self._add_history_field(
+                card_layout,
+                "",
+                record.get("text", ""),
+                "historyRecordText",
+                record_index,
+                False,
+                "text",
+            )
+        cards_layout.addWidget(card)
+        return card
+
+    def _populate_history_cards(self, records, copy_mode=False):
+        records = records if isinstance(records, list) else []
+        cards_layout = self.copy_history_cards_layout if copy_mode else self.history_cards_layout
+        count_label = self.copy_history_count_label if copy_mode else self.history_count_label
+        self._clear_history_cards(cards_layout)
+        count_label.setText(str(len(records)))
+        cards = []
         if not records:
-            return (
-                f"<div style='color:{colors['muted']}; font-size:14px; "
-                "text-align:center; margin-top:52px;'>"
-                f"{self._history_safe_text(settings_text(lang, 'history_empty'))}</div>"
-            )
+            empty_label = QLabel(settings_text(self.parent.current_interface_language, "history_empty"))
+            empty_label.setObjectName("historyEmptyState")
+            empty_label.setAlignment(Qt.AlignCenter)
+            empty_label.setWordWrap(True)
+            cards_layout.addWidget(empty_label)
+        else:
+            for record_index, record in reversed(list(enumerate(records))):
+                cards.append(
+                    self._add_history_record_card(
+                        cards_layout,
+                        record,
+                        record_index,
+                        copy_mode,
+                    )
+                )
+        cards_layout.addStretch(1)
+        if copy_mode:
+            self.copy_history_record_cards = cards
+        else:
+            self.history_record_cards = cards
 
-        rendered = []
-        for record in reversed(records):
+    @staticmethod
+    def _write_history_records(history_file, records):
+        target = Path(history_file)
+        temporary = target.with_name(target.name + ".tmp")
+        try:
+            temporary.write_text(
+                json.dumps(records, ensure_ascii=False, indent=4),
+                encoding="utf-8",
+            )
+            os.replace(str(temporary), str(target))
+        finally:
             try:
-                from datetime import datetime
-                timestamp = record.get("timestamp", "")
-                date_text = datetime.fromisoformat(timestamp).strftime("%d.%m.%Y  ·  %H:%M")
-            except Exception:
-                date_text = str(record.get("timestamp", ""))
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
-            meta = self._history_safe_text(date_text)
-            if not copy_mode:
-                language = str(record.get("language", "")).upper()
-                if language:
-                    meta += "&nbsp;&nbsp;·&nbsp;&nbsp;" + self._history_safe_text(language)
-
+    def _delete_history_record(self, copy_mode, record_index):
+        history_file = get_data_file("copy_history.json" if copy_mode else "translation_history.json")
+        ensure_json_file(history_file, [])
+        try:
+            with open(history_file, "r", encoding="utf-8") as stream:
+                records = json.load(stream)
+            records = records if isinstance(records, list) else []
+            if 0 <= int(record_index) < len(records):
+                records.pop(int(record_index))
+                self._write_history_records(history_file, records)
             if copy_mode:
-                body = (
-                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
-                    f"{self._history_safe_text(record.get('text'))}</div>"
-                )
-            elif "original" in record and "translated" in record:
-                body = (
-                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
-                    f"{self._history_safe_text(record.get('original'))}</div>"
-                    f"<div style='color:{colors['accent']}; font-size:12px; margin:5px 0;'>→</div>"
-                    f"<div style='color:{colors['text']}; font-size:14px; font-weight:600;'>"
-                    f"{self._history_safe_text(record.get('translated'))}</div>"
-                )
+                self.load_copy_history_embedded()
             else:
-                body = (
-                    f"<div style='color:{colors['text']}; font-size:14px; margin-top:7px;'>"
-                    f"{self._history_safe_text(record.get('text'))}</div>"
-                )
-
-            rendered.append(
-                f"<div style='background-color:{colors['card']}; border:1px solid {colors['border']}; "
-                "padding:9px 11px; margin:0 0 9px 0;'>"
-                f"<div style='color:{colors['muted']}; font-size:11px; font-weight:600;'>{meta}</div>"
-                f"{body}</div>"
+                self.load_history_embedded()
+        except Exception:
+            lang = self.parent.current_interface_language
+            QMessageBox.warning(
+                self,
+                settings_text(lang, "error_title"),
+                settings_text(
+                    lang,
+                    "clear_copy_history_error" if copy_mode else "clear_translation_history_error",
+                ),
             )
-        return "".join(rendered)
 
     def load_history_embedded(self):
         history_file = get_data_file("translation_history.json")
@@ -3990,18 +5672,21 @@ class SettingsWindow(QWidget):
             with open(history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
             history = history if isinstance(history, list) else []
-            self.history_count_label.setText(str(len(history)))
-            self.history_text_edit.setHtml(self._render_history_records(history))
+            self._populate_history_cards(history)
         except Exception:
             self.history_count_label.setText("!")
-            self.history_text_edit.setPlainText(settings_text(lang, "history_error"))
+            self._clear_history_cards(self.history_cards_layout)
+            error_label = QLabel(settings_text(lang, "history_error"))
+            error_label.setObjectName("historyEmptyState")
+            error_label.setAlignment(Qt.AlignCenter)
+            self.history_cards_layout.addWidget(error_label)
+            self.history_cards_layout.addStretch(1)
 
     def clear_history(self):
         history_file = get_data_file("translation_history.json")
         ensure_json_file(history_file, [])
         try:
-            with open(history_file, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=4)
+            self._write_history_records(history_file, [])
             self.load_history_embedded()
         except Exception:
             lang = self.parent.current_interface_language
@@ -4029,11 +5714,8 @@ class SettingsWindow(QWidget):
             self.copy_history_count_label,
         )
 
-        self.copy_history_text_edit = QTextEdit()
-        self.copy_history_text_edit.setObjectName("secondaryHistory")
-        self.copy_history_text_edit.setReadOnly(True)
-        self.copy_history_text_edit.setFrameShape(QFrame.NoFrame)
-        shell_layout.addWidget(self.copy_history_text_edit, 1)
+        self.copy_history_scroll_area, self.copy_history_cards_layout = self._create_history_scroll()
+        shell_layout.addWidget(self.copy_history_scroll_area, 1)
         self.load_copy_history_embedded()
 
         clear_button = QPushButton(settings_text(lang, "clear_copy_history"))
@@ -4062,20 +5744,21 @@ class SettingsWindow(QWidget):
             with open(history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
             history = history if isinstance(history, list) else []
-            self.copy_history_count_label.setText(str(len(history)))
-            self.copy_history_text_edit.setHtml(
-                self._render_history_records(history, copy_mode=True)
-            )
+            self._populate_history_cards(history, copy_mode=True)
         except Exception:
             self.copy_history_count_label.setText("!")
-            self.copy_history_text_edit.setPlainText(settings_text(lang, "history_error"))
+            self._clear_history_cards(self.copy_history_cards_layout)
+            error_label = QLabel(settings_text(lang, "history_error"))
+            error_label.setObjectName("historyEmptyState")
+            error_label.setAlignment(Qt.AlignCenter)
+            self.copy_history_cards_layout.addWidget(error_label)
+            self.copy_history_cards_layout.addStretch(1)
 
     def clear_copy_history(self):
         history_file = get_data_file("copy_history.json")
         ensure_json_file(history_file, [])
         try:
-            with open(history_file, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=4)
+            self._write_history_records(history_file, [])
             self.load_copy_history_embedded()
         except Exception:
             lang = self.parent.current_interface_language
@@ -5388,6 +7071,13 @@ finally {
             QWidget {{
                 background-color: {theme['background']};
             }}
+            QToolTip {{
+                background-color: #17131f;
+                color: #f7f3ff;
+                border: 1px solid #7a5fa1;
+                padding: 6px 9px;
+                font-size: 13px;
+            }}
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
@@ -5426,12 +7116,12 @@ finally {
             try:
                 self.load_history_embedded()
             except RuntimeError:
-                self.history_text_edit = None
+                self.history_scroll_area = None
         elif secondary_kind == "copy_history":
             try:
                 self.load_copy_history_embedded()
             except RuntimeError:
-                self.copy_history_text_edit = None
+                self.copy_history_scroll_area = None
 
     def update_language(self):
         self.init_ui()
@@ -5654,6 +7344,15 @@ finally {
 
     def _local_rapidocr_installed(self):
         return self._rapidocr_package_present_under(self._local_rapidocr_dir())
+
+    def _rapidocr_runtime_installed(self):
+        if self._local_rapidocr_installed():
+            return True
+        try:
+            import ocr
+            return bool(ocr._native_ocr_worker_command())
+        except Exception:
+            return False
 
     def _easyocr_package_present_under(self, root_dir):
         if not root_dir or not os.path.isdir(root_dir):
@@ -5922,7 +7621,10 @@ finally {
             try:
                 idx = self._translator_engines.index(str(engine_name).lower())
             except ValueError:
-                idx = 0
+                try:
+                    idx = self._translator_engines.index("google")
+                except ValueError:
+                    idx = 0
         self.translator_combo.blockSignals(True)
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.blockSignals(False)
@@ -5934,7 +7636,7 @@ finally {
             return "google"
         idx = combo.currentIndex()
         if hasattr(self, "_translator_engines") and 0 <= idx < len(self._translator_engines):
-            return self._translator_engines[idx]
+            return self._translator_engines[idx] or "google"
         return "google"
 
     def _on_translator_changed(self, idx):
@@ -5943,6 +7645,8 @@ finally {
             value = self._translator_engines[idx]
         else:
             value = "google"
+        if not value:
+            return
         if value != HYMT_ENGINE_KEY:
             self.auto_save_setting("translator_engine", value)
             return
@@ -7500,7 +9204,7 @@ finally {
             )
 
     def clear_all_cache(self):
-        """Очистить все кэши приложения: память, диск, история."""
+        """Очистить временные кэши, не затрагивая настройки, истории и модели."""
         from PyQt5.QtCore import QTimer
         from PyQt5.QtWidgets import QApplication
         from cache_manager import clear_all_cache as cm_clear, get_cache_stats, format_size
@@ -7519,17 +9223,28 @@ finally {
             from main import get_data_file
             data_dir = os.path.dirname(get_data_file("config.json"))
             stats_before = get_cache_stats(data_dir)
-            total_before = stats_before["total_bytes"]
+            total_before = stats_before["cache_bytes"]
         except Exception:
             data_dir = None
             total_before = 0
 
         total_cleared = 0
+        ocr_logging_paused = False
 
-        # 1. Clear disk cache (history, translation cache, pycache)
+        # Windows cannot delete an open rotating log. Release it briefly so
+        # the cleanup really removes all diagnostics and OCR artifacts.
+        try:
+            import ocr
+            ocr.close_ocr_diagnostics_logging()
+            ocr_logging_paused = True
+        except Exception:
+            pass
+
+        # 1. Clear all disposable on-disk state. User settings, histories and
+        # installed engines/models are outside these explicitly scoped paths.
         if data_dir:
             try:
-                total_cleared += cm_clear(data_dir)
+                total_cleared += cm_clear(data_dir, _portable_base_dir())
             except Exception:
                 pass
 
@@ -7578,19 +9293,12 @@ finally {
         except Exception:
             pass
 
-        # 3. Clear temp files
-        try:
-            temp_dir = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "temp")
-            if os.path.exists(temp_dir):
-                for root, dirs, files in os.walk(temp_dir):
-                    for f in files:
-                        try:
-                            total_cleared += os.path.getsize(os.path.join(root, f))
-                        except Exception:
-                            pass
-                shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception:
-            pass
+        if ocr_logging_paused:
+            try:
+                import ocr
+                ocr.reopen_ocr_diagnostics_logging()
+            except Exception:
+                pass
 
         # Use real total if cache_manager gave us 0
         if total_cleared == 0:

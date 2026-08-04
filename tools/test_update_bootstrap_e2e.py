@@ -156,7 +156,7 @@ def main() -> int:
     (install / "data" / "update-e2e-marker.txt").write_text("preserved", encoding="utf-8")
     extract_v150_updater_script(updater_script)
 
-    worker = install / "app" / "OcrWorker.exe"
+    worker = install / "app" / "_internal" / "OcrWorker.exe"
     shutil.copy2(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "cmd.exe", worker)
     blocker = subprocess.Popen(
         [str(worker), "/d", "/c", "ping.exe -n 240 127.0.0.1 >nul"],
@@ -216,8 +216,8 @@ def main() -> int:
     checks = (
         ("ClicknTranslate.exe", "ClicknTranslate.exe"),
         ("app/ClicknTranslateApp.exe", "app/ClicknTranslateApp.exe"),
-        ("app/ArgosWorker.exe", "app/ArgosWorker.exe"),
-        ("app/OcrWorker.exe", "app/OcrWorker.exe"),
+        ("app/_internal/ArgosWorker.exe", "app/_internal/ArgosWorker.exe"),
+        ("app/_internal/OcrWorker.exe", "app/_internal/OcrWorker.exe"),
         ("app/_internal/base_library.zip", "app/_internal/base_library.zip"),
     )
     for installed_relative, staged_relative in checks:

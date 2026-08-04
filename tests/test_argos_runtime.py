@@ -377,8 +377,41 @@ class ArgosLanguagePairPlanTest(unittest.TestCase):
     def test_identical_languages_need_no_package(self):
         self.assertEqual(translater._plan_language_pair("en", "en", self.AVAILABLE, set()), [])
 
+    def test_fast_installed_pair_scan_includes_english_pivot_routes(self):
+        with tempfile.TemporaryDirectory() as package_root:
+            for folder, source, target in (
+                ("translate-ru_en", "ru", "en"),
+                ("translate-en_de", "en", "de"),
+            ):
+                path = Path(package_root, folder)
+                path.mkdir()
+                path.joinpath("metadata.json").write_text(
+                    json.dumps({"from_code": source, "to_code": target}),
+                    encoding="utf-8",
+                )
+            direct = translater.argos_installed_direct_pairs_fast([package_root])
+            usable = translater.argos_installed_translation_pairs_fast([package_root])
+
+        self.assertEqual(direct, {("ru", "en"), ("en", "de")})
+        self.assertIn(("ru", "de"), usable)
+        self.assertNotIn(("de", "ru"), usable)
+
 
 class ArgosPackagingTest(unittest.TestCase):
+    def test_frozen_worker_is_loaded_from_internal_folder(self):
+        with mock.patch.dict(os.environ, {"CLICKNTRANSLATE_ARGOS_WORKER": ""}, clear=False):
+            with mock.patch.object(translater.sys, "frozen", True, create=True):
+                with mock.patch.object(translater.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
+                    with mock.patch.object(
+                        translater.os.path,
+                        "isfile",
+                        side_effect=lambda path: path.endswith(r"_internal\ArgosWorker.exe"),
+                    ):
+                        self.assertEqual(
+                            translater._argos_worker_path(),
+                            r"C:\Apps\_internal\ArgosWorker.exe",
+                        )
+
     def test_spec_excludes_stanza_stack_and_keeps_argos_runtime(self):
         spec_text = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
 
@@ -387,6 +420,7 @@ class ArgosPackagingTest(unittest.TestCase):
         for required in ("argostranslate.package", "argostranslate.translate", "filelock"):
             self.assertIn(required, spec_text)
         self.assertIn("ArgosWorker", spec_text)
+        self.assertIn("'_internal/ArgosWorker.exe'", spec_text)
         self.assertIn("'argos_worker.py'", spec_text)
         for optional_ocr in ("'easyocr'", "'rapidocr'", "'rapidocr_onnxruntime'"):
             self.assertIn(optional_ocr, spec_text)
@@ -397,14 +431,16 @@ class ArgosPackagingTest(unittest.TestCase):
         qt_at = main_source.index("from PyQt5 import QtCore")
         self.assertLess(preload_at, qt_at)
 
-    def test_main_uses_background_argos_install_dialog_with_cancel(self):
+    def test_main_requires_preinstalled_argos_packages(self):
         main_source = (ROOT / "main.py").read_text(encoding="utf-8")
-        self.assertIn("TesseractInstallProgressDialog", main_source)
-        self.assertIn("translater.argos_pair_installed", main_source)
-        self.assertIn("_argos_progress_signal", main_source)
-        self.assertIn("progress_callback=lambda message, done, total", main_source)
-        self.assertIn("cancel_callback=lambda: self._argos_cancel_requested.is_set()", main_source)
-        self.assertIn("threading.Thread(target=worker, daemon=True).start()", main_source)
+        start = main_source.index("    def _start_argos_translation")
+        end = main_source.index("    @QtCore.pyqtSlot(str)\n    def _on_argos_translation_done", start)
+        implementation = main_source[start:end]
+        self.assertIn("argos_installed_translation_pairs_fast", implementation)
+        self.assertIn("install_argos_packages_hint", implementation)
+        self.assertNotIn("_confirm_argos_package_install", implementation)
+        self.assertNotIn("progress_callback", implementation)
+        self.assertIn("threading.Thread(target=worker, daemon=True).start()", implementation)
 
 
 if __name__ == "__main__":

@@ -251,6 +251,7 @@ worker_exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    contents_directory='.',
 )
 
 ocr_worker_exe = EXE(
@@ -269,12 +270,23 @@ ocr_worker_exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    contents_directory='.',
 )
+
+worker_collection = [
+    ('_internal/ArgosWorker.exe', worker_exe.name, 'EXECUTABLE'),
+    *worker_exe.dependencies,
+]
+
+ocr_worker_collection = [
+    ('_internal/OcrWorker.exe', ocr_worker_exe.name, 'EXECUTABLE'),
+    *ocr_worker_exe.dependencies,
+]
 
 coll = COLLECT(
     exe,
-    worker_exe,
-    ocr_worker_exe,
+    worker_collection,
+    ocr_worker_collection,
     a.binaries,
     a.datas,
     worker_a.binaries,

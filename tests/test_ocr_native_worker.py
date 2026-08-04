@@ -18,6 +18,19 @@ import ocr_worker  # noqa: E402
 
 
 class NativeOcrWorkerProtocolTest(unittest.TestCase):
+    def test_frozen_worker_is_loaded_from_internal_folder_with_legacy_fallback(self):
+        with mock.patch.object(ocr.sys, "frozen", True, create=True):
+            with mock.patch.object(ocr.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
+                with mock.patch.object(
+                    ocr.os.path,
+                    "isfile",
+                    side_effect=lambda path: path.endswith(r"_internal\OcrWorker.exe"),
+                ):
+                    self.assertEqual(
+                        ocr._native_ocr_worker_command(),
+                        [r"C:\Apps\_internal\OcrWorker.exe"],
+                    )
+
     def test_request_uses_png_files_and_cleans_temporary_directory(self):
         captured = {}
 
@@ -55,6 +68,38 @@ class NativeOcrWorkerProtocolTest(unittest.TestCase):
         self.assertEqual(result, ("Hello", ""))
         worker.assert_called_once()
 
+    def test_runtime_recognition_never_allows_model_downloads(self):
+        captured = {}
+
+        def fake_call(request, pil_variants=None, timeout=1800):
+            captured.update(request)
+            return {"results": [], "error": ""}
+
+        with mock.patch.object(ocr, "_call_native_ocr_worker", side_effect=fake_call):
+            ocr._recognize_with_native_ocr_worker(
+                "easyocr",
+                [],
+                "unit",
+                "session",
+                language_code="zh",
+            )
+
+        self.assertFalse(captured["allow_download"])
+
+    def test_easyocr_probe_allows_download_only_when_explicitly_requested(self):
+        requests = []
+
+        def fake_call(request, pil_variants=None, timeout=1800):
+            requests.append(dict(request))
+            return {"results": [], "error": ""}
+
+        with mock.patch.object(ocr, "_native_ocr_worker_enabled", return_value=True):
+            with mock.patch.object(ocr, "_call_native_ocr_worker", side_effect=fake_call):
+                self.assertTrue(ocr.easyocr_available("ru", download_enabled=False))
+                self.assertTrue(ocr.easyocr_available("ru", download_enabled=True))
+
+        self.assertEqual([request["allow_download"] for request in requests], [False, True])
+
     def test_worker_import_probe_does_not_initialize_qt(self):
         request = {"action": "import", "engine": "rapidocr", "root_dir": ""}
         with mock.patch.object(ocr_worker, "_configure_runtime"):
@@ -64,6 +109,30 @@ class NativeOcrWorkerProtocolTest(unittest.TestCase):
         self.assertTrue(payload["available"])
         self.assertFalse(payload["error"])
 
+    def test_worker_easyocr_defaults_to_downloads_disabled(self):
+        captured = {}
+
+        class EasyModule:
+            @staticmethod
+            def Reader(_languages, **kwargs):
+                captured.update(kwargs)
+                return object()
+
+        def fake_import(name):
+            if name == "easyocr":
+                return EasyModule
+            if name == "numpy":
+                return SimpleNamespace()
+            raise ImportError(name)
+
+        with mock.patch.object(ocr_worker.importlib, "import_module", side_effect=fake_import):
+            result = ocr_worker._recognize_easyocr(
+                {"root_dir": str(ROOT), "language_codes": ["en"], "images": []}
+            )
+
+        self.assertEqual(result, [])
+        self.assertFalse(captured["download_enabled"])
+
 
 class NativeOcrWorkerPackagingTest(unittest.TestCase):
     def test_spec_builds_non_qt_worker_and_excludes_optional_engines(self):
@@ -71,6 +140,8 @@ class NativeOcrWorkerPackagingTest(unittest.TestCase):
 
         self.assertIn("'ocr_worker.py'", spec_text)
         self.assertIn("name='OcrWorker'", spec_text)
+        self.assertIn("'_internal/OcrWorker.exe'", spec_text)
+        self.assertIn("contents_directory='.'", spec_text)
         for dynamic_dependency in ("'timeit'", "'pickletools'", "'configparser'"):
             self.assertIn(dynamic_dependency, spec_text)
         for excluded in ("'easyocr'", "'rapidocr'", "'rapidocr_onnxruntime'"):

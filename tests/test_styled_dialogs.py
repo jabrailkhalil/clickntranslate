@@ -139,6 +139,39 @@ def test_document_window_uses_saved_target_when_opened_from_settings(monkeypatch
     owner.close()
 
 
+def test_document_provider_list_groups_online_and_only_installed_offline(monkeypatch):
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "Темная"
+    monkeypatch.setattr(main.translater, "argos_installed_translation_pairs_fast", lambda: set())
+    monkeypatch.setattr(main.translater, "hymt_installed", lambda: False)
+
+    dialog = main.DocumentTranslationDialog(owner)
+    app.processEvents()
+
+    assert dialog.provider_combo.itemText(0).strip() == "Online"
+    assert not dialog.provider_combo.model().item(0).isEnabled()
+    assert dialog.provider_combo.findData("google") > 0
+    assert dialog.provider_combo.findData("argos") == -1
+    assert dialog.provider_combo.findData("hymt") == -1
+
+    monkeypatch.setattr(
+        main.translater,
+        "argos_installed_translation_pairs_fast",
+        lambda: {("en", "ru")},
+    )
+    dialog._populate_provider_combo("argos")
+    offline_header = dialog.provider_combo.findText("  Offline")
+    assert offline_header > 0
+    assert not dialog.provider_combo.model().item(offline_header).isEnabled()
+    assert dialog.provider_combo.currentData() == "argos"
+    assert dialog.provider_combo.findData("hymt") == -1
+
+    dialog.close()
+    owner.close()
+
+
 def test_faq_uses_custom_chrome_and_exposes_project_links():
     app = _app()
 

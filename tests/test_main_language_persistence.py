@@ -2,6 +2,8 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -12,10 +14,15 @@ import main  # noqa: E402
 
 
 class _LanguageHarness:
+    _available_main_translation_pairs = main.DarkThemeApp._available_main_translation_pairs
+    _main_translation_source_codes = main.DarkThemeApp._main_translation_source_codes
+    _main_translation_target_codes = main.DarkThemeApp._main_translation_target_codes
     _configured_main_translation_pair = main.DarkThemeApp._configured_main_translation_pair
     _capture_main_translation_languages = main.DarkThemeApp._capture_main_translation_languages
     _restore_main_translation_languages = main.DarkThemeApp._restore_main_translation_languages
     _save_main_translation_languages = main.DarkThemeApp._save_main_translation_languages
+    _refresh_selection_pair_hint = main.DarkThemeApp._refresh_selection_pair_hint
+    _selected_text_translation_pair = main.DarkThemeApp._selected_text_translation_pair
     update_languages = main.DarkThemeApp.update_languages
 
     def __init__(self, config, interface_language="en"):
@@ -24,6 +31,7 @@ class _LanguageHarness:
         self.source_lang = main.QComboBox()
         self.source_lang.addItems(main.LANGUAGES[interface_language])
         self.target_lang = main.QComboBox()
+        self.label = main.QLabel()
         self.save_count = 0
 
     def save_config(self):
@@ -90,6 +98,47 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             "main_translation_target_language": "ru",
         })
         self.assertEqual(identical._configured_main_translation_pair(), ("ru", "en"))
+
+    def test_selected_text_uses_exact_pair_from_main_screen(self):
+        harness = _LanguageHarness({
+            "main_translation_source_language": "ru",
+            "main_translation_target_language": "tr",
+        })
+        harness._restore_main_translation_languages()
+
+        self.assertEqual(harness._selected_text_translation_pair(), ("ru", "tr"))
+
+    def test_selection_pair_hint_exists_in_every_interface_language(self):
+        for language_code in main.INTERFACE_TEXT:
+            text = main.ui_text(language_code, "selection_pair_hint").format(
+                src="English",
+                tgt="Russian",
+                hotkey="Ctrl+Alt+Q",
+            )
+            self.assertIn("Ctrl+Alt+Q", text)
+            self.assertIn("English", text)
+            self.assertIn("Russian", text)
+
+    def test_active_guide_card_is_retranslated_immediately(self):
+        harness = SimpleNamespace(
+            current_interface_language="ru",
+            _guide_active=True,
+            _show_guide_step=mock.Mock(),
+            settings_window=None,
+        )
+        with mock.patch.object(main.QTimer, "singleShot") as single_shot:
+            main.DarkThemeApp.refresh_interface_language_ui(harness)
+
+        single_shot.assert_called_once_with(0, harness._show_guide_step)
+
+    def test_guide_explains_selected_text_language_pair(self):
+        for language_code in main.GUIDE_TEXT:
+            back_home = next(
+                body
+                for action, _title, body in main.guide_text(language_code)["steps"]
+                if action == "back_home"
+            )
+            self.assertIn("Ctrl+Alt+Q", back_home)
 
 
 if __name__ == "__main__":

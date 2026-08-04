@@ -10,6 +10,7 @@ from datetime import datetime
 from dataclasses import dataclass
 import shutil
 import time
+import re
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
@@ -52,6 +53,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 Text not recognized", "not_recognized_info": "Try:\n• Select an area with larger text\n• Make sure the text has good contrast\n• Choose a different OCR engine in settings",
         "translate": "Translate", "ocr_init_failed": "OCR initialization failed", "screen_no_text": "No text recognized on screen",
         "translation_failed": "Translation failed", "translating_screen": "Translating screen...", "fullscreen_hint": "ESC — close  |  RMB — drag",
+        "no_installed_languages": "No OCR languages installed",
+        "no_installed_translation_pairs": "No installed translation pairs",
+        "install_languages_first": "Install a language first in Settings → Language packages.",
     },
     "ru": {
         "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
@@ -71,6 +75,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 Текст не распознан", "not_recognized_info": "Попробуйте:\n• Выделить область с более крупным текстом\n• Убедиться, что текст контрастный\n• Выбрать другой OCR-движок в настройках",
         "translate": "Перевести", "ocr_init_failed": "Не удалось запустить OCR", "screen_no_text": "Текст на экране не распознан",
         "translation_failed": "Ошибка перевода", "translating_screen": "Перевод экрана...", "fullscreen_hint": "ESC — закрыть  |  ПКМ — перетащить",
+        "no_installed_languages": "Нет установленных языков OCR",
+        "no_installed_translation_pairs": "Нет установленных направлений перевода",
+        "install_languages_first": "Сначала установите язык: Настройки → Языковые пакеты.",
     },
     "es": {
         "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
@@ -87,6 +94,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 No se reconoció el texto", "not_recognized_info": "Prueba:\n• Selecciona texto más grande\n• Comprueba que tenga buen contraste\n• Elige otro motor OCR",
         "translate": "Traducir", "ocr_init_failed": "No se pudo iniciar OCR", "screen_no_text": "No se reconoció texto en la pantalla",
         "translation_failed": "Error de traducción", "translating_screen": "Traduciendo la pantalla...", "fullscreen_hint": "ESC — cerrar  |  Botón derecho — arrastrar",
+        "no_installed_languages": "No hay idiomas OCR instalados",
+        "no_installed_translation_pairs": "No hay direcciones de traducción instaladas",
+        "install_languages_first": "Instala primero un idioma en Ajustes → Paquetes de idioma.",
     },
     "de": {
         "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
@@ -103,6 +113,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 Text nicht erkannt", "not_recognized_info": "Versuche:\n• Einen Bereich mit größerem Text auswählen\n• Auf guten Kontrast achten\n• Eine andere OCR-Engine wählen",
         "translate": "Übersetzen", "ocr_init_failed": "OCR konnte nicht gestartet werden", "screen_no_text": "Auf dem Bildschirm wurde kein Text erkannt",
         "translation_failed": "Übersetzung fehlgeschlagen", "translating_screen": "Bildschirm wird übersetzt...", "fullscreen_hint": "ESC — schließen  |  Rechtsklick — ziehen",
+        "no_installed_languages": "Keine OCR-Sprachen installiert",
+        "no_installed_translation_pairs": "Keine Übersetzungsrichtungen installiert",
+        "install_languages_first": "Installiere zuerst eine Sprache unter Einstellungen → Sprachpakete.",
     },
     "fr": {
         "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
@@ -119,6 +132,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 Texte non reconnu", "not_recognized_info": "Essayez :\n• Sélectionner une zone avec un texte plus grand\n• Vérifier le contraste\n• Choisir un autre moteur OCR",
         "translate": "Traduire", "ocr_init_failed": "Impossible de démarrer l’OCR", "screen_no_text": "Aucun texte reconnu à l’écran",
         "translation_failed": "Échec de la traduction", "translating_screen": "Traduction de l’écran...", "fullscreen_hint": "ESC — fermer  |  Clic droit — déplacer",
+        "no_installed_languages": "Aucune langue OCR installée",
+        "no_installed_translation_pairs": "Aucune direction de traduction installée",
+        "install_languages_first": "Installez d’abord une langue dans Réglages → Modules de langue.",
     },
     "zh": {
         "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
@@ -135,6 +151,9 @@ OCR_UI_TEXT = {
         "not_recognized": "😔 未识别到文本", "not_recognized_info": "请尝试：\n• 选择字号更大的文本区域\n• 确保文本对比度良好\n• 在设置中选择其他 OCR 引擎",
         "translate": "翻译", "ocr_init_failed": "OCR 初始化失败", "screen_no_text": "未识别到屏幕文字",
         "translation_failed": "翻译失败", "translating_screen": "正在翻译屏幕...", "fullscreen_hint": "ESC — 关闭  |  右键 — 拖动",
+        "no_installed_languages": "未安装 OCR 语言",
+        "no_installed_translation_pairs": "未安装翻译方向",
+        "install_languages_first": "请先在设置 → 语言包中安装语言。",
     },
 }
 
@@ -212,6 +231,24 @@ def _setup_ocr_diagnostics_logging():
         file_handler._clickntranslate_ocr_file = True
         root.addHandler(file_handler)
     logging.captureWarnings(True)
+
+
+def close_ocr_diagnostics_logging():
+    """Release the rotating log so Clear cache can remove it on Windows."""
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if not getattr(handler, "_clickntranslate_ocr_file", False):
+            continue
+        root.removeHandler(handler)
+        try:
+            handler.flush()
+        finally:
+            handler.close()
+
+
+def reopen_ocr_diagnostics_logging():
+    """Restore diagnostics after a complete cache cleanup."""
+    _setup_ocr_diagnostics_logging()
 
 def debug_log(msg):
     _OCR_LOGGER.debug(str(msg))
@@ -470,6 +507,21 @@ def _prepare_tesseract_data(
             raise
     return prepared
 
+
+def _configure_installed_tesseract_data(tess_cmd, tess_lang):
+    required = [f"{code}.traineddata" for code in str(tess_lang or "").split("+") if code]
+    tess_dir = os.path.dirname(tess_cmd or "")
+    candidate_dirs = [
+        os.environ.get("TESSDATA_PREFIX", ""),
+        os.path.join(tess_dir, "tessdata"),
+        os.path.join(os.path.dirname(tess_dir), "tessdata"),
+    ]
+    for data_dir in candidate_dirs:
+        if data_dir and required and all(os.path.isfile(os.path.join(data_dir, name)) for name in required):
+            os.environ["TESSDATA_PREFIX"] = data_dir
+            return data_dir
+    return ""
+
 def _tesseract_psm_order(width, height):
     psm_order = [6]
     if height < 110:
@@ -534,7 +586,12 @@ def _recognize_tesseract_variants_with_cmd(
         return None
 
     logging.info(f"[OCR:{session_id}] Using Tesseract at: {tess_cmd}; context={context}, lang={tess_lang}")
-    _prepare_tesseract_data(tess_cmd, tess_lang, status_callback=status_callback, cancel_check=cancel_check)
+    if not _configure_installed_tesseract_data(tess_cmd, tess_lang):
+        logging.error(
+            f"[OCR:{session_id}] Tesseract language data is not installed for {tess_lang}; "
+            "use Settings > Language packages."
+        )
+        return ""
     if cancel_check and cancel_check():
         return ""
 
@@ -583,9 +640,22 @@ def _native_ocr_worker_enabled():
     return bool(getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_USE_OCR_WORKER") == "1")
 
 
+def _native_ocr_worker_path():
+    if not getattr(sys, "frozen", False):
+        return ""
+    executable_dir = os.path.dirname(sys.executable)
+    for path in (
+        os.path.join(executable_dir, "_internal", "OcrWorker.exe"),
+        os.path.join(executable_dir, "OcrWorker.exe"),
+    ):
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
 def _native_ocr_worker_command():
     if getattr(sys, "frozen", False):
-        worker_path = os.path.join(os.path.dirname(sys.executable), "OcrWorker.exe")
+        worker_path = _native_ocr_worker_path()
         return [worker_path] if os.path.isfile(worker_path) else []
     worker_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr_worker.py")
     return [sys.executable, worker_script] if os.path.isfile(worker_script) else []
@@ -641,13 +711,19 @@ def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _probe_native_ocr_worker(engine, root_dir, language_codes=None, initialize=False):
+def _probe_native_ocr_worker(
+    engine,
+    root_dir,
+    language_codes=None,
+    initialize=False,
+    allow_download=False,
+):
     request = {
         "action": "recognize" if initialize else "import",
         "engine": engine,
         "root_dir": root_dir,
         "language_codes": list(language_codes or []),
-        "allow_download": bool(initialize),
+        "allow_download": bool(allow_download),
     }
     try:
         _call_native_ocr_worker(request)
@@ -675,7 +751,9 @@ def _recognize_with_native_ocr_worker(
             "engine": engine,
             "root_dir": root_dir,
             "language_codes": language_codes,
-            "allow_download": True,
+            # Recognition must never trigger a model download. Optional OCR
+            # packages are prepared explicitly from Settings > Language packages.
+            "allow_download": False,
         },
         pil_variants=pil_variants,
     )
@@ -1135,7 +1213,7 @@ def _easyocr_model_dir():
     return model_dir
 
 
-def _get_easyocr_reader(language_code):
+def _get_easyocr_reader(language_code, download_enabled=False):
     global _EASY_OCR_IMPORT_ERROR
     language_codes = tuple(easyocr_language_codes(language_code))
     if language_codes in _EASY_OCR_READERS:
@@ -1152,7 +1230,7 @@ def _get_easyocr_reader(language_code):
             gpu=False,
             model_storage_directory=model_dir,
             user_network_directory=user_network_dir,
-            download_enabled=True,
+            download_enabled=bool(download_enabled),
             verbose=False,
         )
         _EASY_OCR_READERS[language_codes] = reader
@@ -1165,16 +1243,17 @@ def _get_easyocr_reader(language_code):
         return None
 
 
-def easyocr_available(language_code="en"):
+def easyocr_available(language_code="en", download_enabled=False):
     if _native_ocr_worker_enabled():
         available, _error = _probe_native_ocr_worker(
             "easyocr",
             _easyocr_local_root(),
             language_codes=easyocr_language_codes(language_code),
             initialize=True,
+            allow_download=download_enabled,
         )
         return available
-    return _get_easyocr_reader(language_code) is not None
+    return _get_easyocr_reader(language_code, download_enabled=download_enabled) is not None
 
 
 def easyocr_status(language_code="en"):
@@ -1368,9 +1447,156 @@ def _combo_data_to_translate_pair(data, config=None):
     source, _target = _configured_ocr_translate_pair(config, data)
     return source, default_target_for_source(source, config.get("ocr_translate_target_language"))
 
+
+_EASYOCR_MODEL_GROUP_BY_LANGUAGE = {
+    "en": "english_g2", "ru": "cyrillic_g2", "uk": "cyrillic_g2",
+    "de": "latin_g2", "fr": "latin_g2", "es": "latin_g2", "it": "latin_g2",
+    "pt": "latin_g2", "pl": "latin_g2", "tr": "latin_g2", "nl": "latin_g2",
+    "zh": "zh_sim_g2", "ch_sim": "zh_sim_g2", "ja": "japanese_g2",
+    "ko": "korean_g2", "ar": "arabic", "hi": "devanagari",
+}
+_EASYOCR_MODEL_FILE_VARIANTS = {
+    "english_g2": ("english_g2.pth",),
+    "cyrillic_g2": ("cyrillic_g2.pth", "cyrillic.pth"),
+    "latin_g2": ("latin_g2.pth", "latin.pth"),
+    "zh_sim_g2": ("zh_sim_g2.pth", "chinese_sim.pth"),
+    "japanese_g2": ("japanese_g2.pth", "japanese.pth"),
+    "korean_g2": ("korean_g2.pth", "korean.pth"),
+    "arabic": ("arabic.pth",),
+    "devanagari": ("devanagari.pth",),
+}
+
+
+def _python_package_file_present(candidate_paths, package_names):
+    for root in candidate_paths:
+        for package_name in package_names:
+            package_path = os.path.join(root, package_name)
+            if os.path.isfile(package_path + ".py") or os.path.isfile(os.path.join(package_path, "__init__.py")):
+                return True
+    return False
+
+
+def _tesseract_installed_language_codes():
+    try:
+        tess_cmd = ScreenCaptureOverlay.get_tesseract_cmd()
+    except Exception:
+        tess_cmd = None
+    if not tess_cmd or not os.path.isfile(tess_cmd):
+        return []
+    data_dirs = [
+        os.environ.get("TESSDATA_PREFIX", ""),
+        os.path.join(os.path.dirname(tess_cmd), "tessdata"),
+        os.path.join(os.path.dirname(os.path.dirname(tess_cmd)), "tessdata"),
+    ]
+    result = []
+    for language in APP_LANGUAGES:
+        filename = tesseract_language_code(language.code) + ".traineddata"
+        if any(path and os.path.isfile(os.path.join(path, filename)) for path in data_dirs):
+            result.append(language.code)
+    return result
+
+
+def _easyocr_installed_language_codes():
+    root = _easyocr_local_root()
+    if not _python_package_file_present(_easyocr_local_candidate_paths(root), ("easyocr",)):
+        return []
+    model_dir = os.path.join(root, "models")
+    if not os.path.isfile(os.path.join(model_dir, "craft_mlt_25k.pth")):
+        return []
+    result = []
+    for language in APP_LANGUAGES:
+        easy_codes = easyocr_language_codes(language.code)
+        primary_code = easy_codes[0] if easy_codes else language.code
+        group = _EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(
+            primary_code,
+            _EASYOCR_MODEL_GROUP_BY_LANGUAGE.get(language.code),
+        )
+        groups = [group] if group else []
+        installed = bool(groups) and all(
+            any(os.path.isfile(os.path.join(model_dir, filename)) for filename in _EASYOCR_MODEL_FILE_VARIANTS[group])
+            for group in groups
+        )
+        if installed:
+            result.append(language.code)
+    return result
+
+
+def _rapidocr_installed_language_codes():
+    if getattr(sys, "frozen", False):
+        bundled_worker = _native_ocr_worker_path()
+        if os.path.isfile(bundled_worker):
+            # ClicknTranslate.spec embeds RapidOCR, ONNX Runtime and the shared
+            # English/Chinese PP-OCR models in this isolated worker.
+            return [code for code in ("en", "zh") if code in APP_LANGUAGE_CODES]
+    root = _rapidocr_local_root()
+    if not _python_package_file_present(
+        _rapidocr_local_candidate_paths(root),
+        ("rapidocr", "rapidocr_onnxruntime"),
+    ):
+        return []
+    # The bundled RapidOCR recognizer is one shared Chinese + English model.
+    return [code for code in ("en", "zh") if code in APP_LANGUAGE_CODES]
+
+
+def installed_ocr_language_codes(engine=None, config=None):
+    """Return only OCR languages usable by the selected local engine."""
+    config = config or get_cached_ocr_config()
+    engine_name = str(engine or config.get("ocr_engine", "Windows")).strip().lower()
+    if engine_name in {"rapid", "rapidocr"}:
+        return _rapidocr_installed_language_codes()
+    if engine_name in {"easy", "easyocr"}:
+        return _easyocr_installed_language_codes()
+    if engine_name == "tesseract":
+        return _tesseract_installed_language_codes()
+
+    available_tags = [str(tag or "").lower() for tag in _get_available_windows_ocr_language_tags()]
+    result = []
+    for language in APP_LANGUAGES:
+        expected = windows_ocr_tag(language.code).lower()
+        primary = expected.split("-", 1)[0]
+        if any(tag == expected or tag.split("-", 1)[0] == primary for tag in available_tags):
+            result.append(language.code)
+    return result
+
+
+def _installed_argos_translation_pairs():
+    try:
+        import translater
+        return {
+            (source, target)
+            for source, target in translater.argos_installed_translation_pairs_fast()
+            if source in APP_LANGUAGE_CODES and target in APP_LANGUAGE_CODES
+        }
+    except Exception as exc:
+        logging.warning(f"Could not inspect installed Argos packages: {exc}")
+        return set()
+
+
+def _translation_targets_for_source(source_code, config=None):
+    config = config or get_cached_ocr_config()
+    engine_name = str(config.get("translator_engine", "Google")).strip().lower()
+    if engine_name == "argos":
+        pairs = _installed_argos_translation_pairs()
+        return [language.code for language in APP_LANGUAGES if (source_code, language.code) in pairs]
+    return [language.code for language in APP_LANGUAGES if language.code != source_code]
+
+
 def _ocr_translate_options_from_config(config=None):
     config = config or get_cached_ocr_config()
-    return ocr_translate_options(config.get("ocr_translate_target_language"))
+    installed_sources = set(installed_ocr_language_codes(config=config))
+    engine_name = str(config.get("translator_engine", "Google")).strip().lower()
+    if engine_name == "argos":
+        pairs = _installed_argos_translation_pairs()
+        return [
+            (source, target)
+            for source, target in sorted(pairs)
+            if source in installed_sources
+        ]
+    return [
+        pair
+        for pair in ocr_translate_options(config.get("ocr_translate_target_language"))
+        if pair[0] in installed_sources
+    ]
 
 def _find_translate_pair_index(combo, source_code, target_code=None):
     for i in range(combo.count()):
@@ -1627,6 +1853,20 @@ def _get_windows_ocr_engine(lang_tag: str):
         OcrEngine = winrt_ocr.OcrEngine
         debug_log(f"Language={Language}, OcrEngine={OcrEngine}")
         
+        # Prefer the exact installed WinRT tag before probing.  Windows exposes
+        # Simplified Chinese as zh-Hans-CN on some builds even though the DISM
+        # capability is named zh-CN.  Creating the generic tag can otherwise
+        # select the wrong regional engine or return an unusable instance.
+        available_tags = _get_available_windows_ocr_language_tags()
+        available_by_tag = {
+            str(tag).lower(): str(tag)
+            for tag in available_tags
+            if str(tag).strip()
+        }
+        matched_tag = _match_available_windows_ocr_tag(lang_tag, available_by_tag)
+        if matched_tag:
+            lang_tag = matched_tag
+
         # Check if language is supported
         debug_log(f"Checking if language {lang_tag} is supported...")
         is_supported = OcrEngine.is_language_supported(Language(lang_tag))
@@ -2888,9 +3128,17 @@ class ScreenCaptureOverlay(QWidget):
         self.lang_combo = QtWidgets.QComboBox(self)
         self.target_lang_combo = None
         self.translate_arrow_label = None
+        available_source_codes = installed_ocr_language_codes(config=config)
+        if self.mode == "translate" and str(config.get("translator_engine", "Google")).lower() == "argos":
+            available_source_codes = [
+                code for code in available_source_codes
+                if _translation_targets_for_source(code, config)
+            ]
         
         if self.mode == "copy":
             for language in APP_LANGUAGES:
+                if language.code not in available_source_codes:
+                    continue
                 self.lang_combo.addItem(
                     QtGui.QIcon(resource_path(language_icon_path(language.code))),
                     language.short_label,
@@ -2899,6 +3147,8 @@ class ScreenCaptureOverlay(QWidget):
         elif self.mode == "translate":
             # В режиме translate источник и цель выбираются отдельно прямо в OCR-оверлее.
             for language in APP_LANGUAGES:
+                if language.code not in available_source_codes:
+                    continue
                 self.lang_combo.addItem(
                     QtGui.QIcon(resource_path(language_icon_path(language.code))),
                     language.short_label,
@@ -2919,6 +3169,8 @@ class ScreenCaptureOverlay(QWidget):
             self.target_lang_combo = QtWidgets.QComboBox(self)
         else:
             for language in APP_LANGUAGES:
+                if language.code not in available_source_codes:
+                    continue
                 self.lang_combo.addItem(
                     QtGui.QIcon(resource_path(language_icon_path(language.code))),
                     language.short_label,
@@ -2926,6 +3178,10 @@ class ScreenCaptureOverlay(QWidget):
                 )
         
         # Устанавливаем индекс на основе self.current_language (сохраненного)
+        if self.lang_combo.count() == 0:
+            interface_language = config.get("interface_language", "en")
+            self.lang_combo.addItem(ocr_ui_text(interface_language, "no_installed_languages"), None)
+            self.lang_combo.setEnabled(False)
         idx = self.lang_combo.findData(self.current_language)
         default_index = idx if idx >= 0 else 0
         self.lang_combo.setCurrentIndex(default_index)
@@ -3056,19 +3312,62 @@ class ScreenCaptureOverlay(QWidget):
         self.target_lang_combo.blockSignals(True)
         try:
             self.target_lang_combo.clear()
+            target_codes = _translation_targets_for_source(source_code, get_cached_ocr_config())
             for language in APP_LANGUAGES:
-                if language.code == source_code:
+                if language.code not in target_codes:
                     continue
                 self.target_lang_combo.addItem(
                     QtGui.QIcon(resource_path(language_icon_path(language.code))),
                     language.short_label,
                     language.code,
                 )
-            idx = self.target_lang_combo.findData(target_code)
-            self.target_lang_combo.setCurrentIndex(idx if idx >= 0 else 0)
+            if self.target_lang_combo.count() == 0:
+                interface_language = get_cached_ocr_config().get("interface_language", "en")
+                self.target_lang_combo.addItem(
+                    ocr_ui_text(interface_language, "no_installed_translation_pairs"),
+                    None,
+                )
+                self.target_lang_combo.setEnabled(False)
+            else:
+                self.target_lang_combo.setEnabled(True)
+                idx = self.target_lang_combo.findData(target_code)
+                self.target_lang_combo.setCurrentIndex(idx if idx >= 0 else 0)
         finally:
             self.target_lang_combo.blockSignals(False)
         self.current_target_language = self.target_lang_combo.currentData() or default_target_for_source(source_code)
+
+    def _refresh_available_language_choices(self, config):
+        available_codes = installed_ocr_language_codes(config=config)
+        if self.mode == "translate" and str(config.get("translator_engine", "Google")).lower() == "argos":
+            available_codes = [
+                code for code in available_codes
+                if _translation_targets_for_source(code, config)
+            ]
+        current_codes = [self.lang_combo.itemData(index) for index in range(self.lang_combo.count())]
+        if current_codes == available_codes:
+            return
+        self.lang_combo.blockSignals(True)
+        try:
+            self.lang_combo.clear()
+            for language in APP_LANGUAGES:
+                if language.code not in available_codes:
+                    continue
+                self.lang_combo.addItem(
+                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    language.short_label,
+                    language.code,
+                )
+            if self.lang_combo.count() == 0:
+                interface_language = config.get("interface_language", "en")
+                self.lang_combo.addItem(
+                    ocr_ui_text(interface_language, "no_installed_languages"),
+                    None,
+                )
+                self.lang_combo.setEnabled(False)
+            else:
+                self.lang_combo.setEnabled(True)
+        finally:
+            self.lang_combo.blockSignals(False)
 
     def _current_translate_pair(self):
         source_code = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
@@ -3080,6 +3379,7 @@ class ScreenCaptureOverlay(QWidget):
     def _refresh_language_controls_from_config(self, config):
         self._updating_language_controls = True
         try:
+            self._refresh_available_language_choices(config)
             if self.mode == "translate":
                 source_code, target_code = _configured_ocr_translate_pair(config)
                 source_idx = self.lang_combo.findData(source_code)
@@ -3507,6 +3807,19 @@ class ScreenCaptureOverlay(QWidget):
                 self._selection_started_at = None
                 self.update()
                 return
+            if self.lang_combo.currentData() is None or (
+                self.mode == "translate"
+                and self.target_lang_combo is not None
+                and self.target_lang_combo.currentData() is None
+            ):
+                interface_language = get_cached_ocr_config().get("interface_language", "en")
+                QMessageBox.information(
+                    self,
+                    "Language packages",
+                    ocr_ui_text(interface_language, "install_languages_first"),
+                )
+                self.close()
+                return
             self.last_rect = rect
             logging.info(f"[OCR:{self._session_id}] Selection accepted; rect=({_rect_to_text(rect)})")
             self._ocr_in_progress = True
@@ -3719,7 +4032,7 @@ class ScreenCaptureOverlay(QWidget):
 
     @staticmethod
     def _configure_tesseract_data(tess_cmd, tess_lang):
-        _prepare_tesseract_data(tess_cmd, tess_lang)
+        return _configure_installed_tesseract_data(tess_cmd, tess_lang)
 
     # Сохраняем ссылку на данные изображения, чтобы QImage не потерял буфер
     _ocr_image_data = None
@@ -4561,6 +4874,130 @@ def warm_up():
 # Fullscreen Translate — OCR all text on screen and overlay translations
 # ============================================================
 
+def _group_screen_ocr_lines(lines_data):
+    """Return stable visual lines, merging only fragments on the same baseline.
+
+    Full-screen translation is a replacement layer, not a collection of
+    floating translation cards.  Keeping separate OCR rows separate lets each
+    translated row cover the exact source row underneath it.  Some engines do
+    split one visual row into two fragments, so those fragments are merged only
+    when they substantially overlap vertically and are separated by a small
+    horizontal gap.
+    """
+    lines = []
+    for item in lines_data or []:
+        if not isinstance(item, (list, tuple)) or len(item) < 5:
+            continue
+        try:
+            x, y, width, height = (float(item[0]), float(item[1]), float(item[2]), float(item[3]))
+        except (TypeError, ValueError):
+            continue
+        text = str(item[4] or "").strip()
+        if not text or width <= 0 or height <= 0:
+            continue
+        lines.append((x, y, width, height, text))
+    lines.sort(key=lambda item: (item[1], item[0]))
+
+    groups = []
+    for line in lines:
+        x, y, width, height, _text = line
+        best_group = None
+        best_gap = None
+        for group_index, group in enumerate(groups):
+            left = min(item[0] for item in group)
+            right = max(item[0] + item[2] for item in group)
+            top = min(item[1] for item in group)
+            bottom = max(item[1] + item[3] for item in group)
+            vertical_overlap = max(0.0, min(y + height, bottom) - max(y, top))
+            vertical_ratio = vertical_overlap / max(1.0, min(height, bottom - top))
+            horizontal_gap = max(0.0, max(left, x) - min(right, x + width))
+            same_baseline = vertical_ratio >= 0.58
+            close_fragment = horizontal_gap <= max(18.0, 1.25 * max(height, bottom - top))
+            if not (same_baseline and close_fragment):
+                continue
+            if best_gap is None or horizontal_gap < best_gap:
+                best_group = group_index
+                best_gap = horizontal_gap
+        if best_group is None:
+            groups.append([line])
+        else:
+            groups[best_group].append(line)
+
+    blocks = []
+    for group in groups:
+        min_x = min(item[0] for item in group)
+        min_y = min(item[1] for item in group)
+        max_x = max(item[0] + item[2] for item in group)
+        max_y = max(item[1] + item[3] for item in group)
+        ordered = sorted(group, key=lambda item: item[0])
+        text = " ".join(item[4] for item in ordered)
+        blocks.append((min_x, min_y, max_x - min_x, max_y - min_y, text))
+    blocks.sort(key=lambda item: (item[1], item[0]))
+    return blocks
+
+
+def _split_marked_screen_translation(translated, count):
+    marker_re = re.compile(r"\[\[\[\s*CXT(\d{4})\s*\]\]\]", re.IGNORECASE)
+    matches = list(marker_re.finditer(str(translated or "")))
+    if len(matches) != count:
+        return None
+    result = [""] * count
+    seen = set()
+    for index, match in enumerate(matches):
+        block_index = int(match.group(1))
+        if block_index < 0 or block_index >= count or block_index in seen:
+            return None
+        seen.add(block_index)
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(translated)
+        result[block_index] = str(translated[start:end]).strip()
+    if seen != set(range(count)) or any(not value for value in result):
+        return None
+    return result
+
+
+def _translate_screen_texts(texts, translate_func, source_code, target_code):
+    """Translate blocks in one request while preserving mapping; safely fall back per block."""
+    values = [str(text or "").strip() for text in texts]
+    if not values:
+        return []
+
+    def translate_chunk(chunk):
+        if len(chunk) == 1:
+            return [str(translate_func(chunk[0], source_code, target_code) or "").strip()]
+        marked = "\n".join(
+            f"[[[CXT{index:04d}]]]\n{text}"
+            for index, text in enumerate(chunk)
+        )
+        translated = translate_func(marked, source_code, target_code)
+        mapped = _split_marked_screen_translation(translated, len(chunk))
+        if mapped is not None:
+            return mapped
+        logging.warning("Fullscreen translation did not preserve block markers; retrying blocks separately")
+        return [
+            str(translate_func(text, source_code, target_code) or "").strip()
+            for text in chunk
+        ]
+
+    # Provider limits differ. Small ordered batches avoid rejecting a text-rich
+    # screen while still using far fewer network calls than one request per OCR
+    # rectangle.
+    translated_values = []
+    chunk = []
+    chunk_length = 0
+    for value in values:
+        marker_cost = 18
+        if chunk and (len(chunk) >= 24 or chunk_length + len(value) + marker_cost > 3500):
+            translated_values.extend(translate_chunk(chunk))
+            chunk = []
+            chunk_length = 0
+        chunk.append(value)
+        chunk_length += len(value) + marker_cost
+    if chunk:
+        translated_values.extend(translate_chunk(chunk))
+    return translated_values
+
+
 class FullScreenOCRWorker(QtCore.QThread):
     """OCR worker that returns text lines with bounding box positions."""
     result_ready = QtCore.pyqtSignal(list)  # list of (x, y, w, h, text)
@@ -4655,11 +5092,20 @@ class FullScreenTranslateOverlay(QWidget):
 
         # --- Комбо-бокс выбора направления перевода (как в обычном overlay) ---
         self.lang_combo = QtWidgets.QComboBox(self)
-        for source_code, target_code in _ocr_translate_options_from_config(config):
+        fullscreen_config = dict(config)
+        # Positional full-screen OCR uses Windows OCR's native line geometry.
+        fullscreen_config["ocr_engine"] = "Windows"
+        for source_code, target_code in _ocr_translate_options_from_config(fullscreen_config):
             self.lang_combo.addItem(
                 QtGui.QIcon(resource_path(language_icon_path(source_code))),
                 f"{language_short_label(source_code)} \u2192 {language_short_label(target_code)}",
                 (source_code, target_code),
+            )
+        no_language_pairs = self.lang_combo.count() == 0
+        if no_language_pairs:
+            self.lang_combo.addItem(
+                ocr_ui_text(config.get("interface_language", "en"), "no_installed_translation_pairs"),
+                None,
             )
         # Восстанавливаем последний выбор
         default_idx = _find_translate_pair_index(self.lang_combo, saved_src, saved_tgt)
@@ -4735,6 +5181,8 @@ class FullScreenTranslateOverlay(QWidget):
         self.go_button.setFixedSize(140, 48)
         self.go_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.go_button.clicked.connect(self._on_go_clicked)
+        self.go_button.setEnabled(not no_language_pairs)
+        self.lang_combo.setEnabled(not no_language_pairs)
 
         # Позиционируем элементы по центру сверху
         total_w = self.lang_combo.width() + 12 + self.go_button.width()
@@ -4800,7 +5248,7 @@ class FullScreenTranslateOverlay(QWidget):
             QtCore.QTimer.singleShot(2000, self.close)
             return
 
-        self._lines_data = lines_data
+        self._lines_data = _group_screen_ocr_lines(lines_data)
         import threading
         threading.Thread(target=self._translate_all, daemon=True).start()
 
@@ -4811,16 +5259,16 @@ class FullScreenTranslateOverlay(QWidget):
             src, tgt = self.src_lang, self.tgt_lang
             logging.info(f"FullScreenOverlay: translating {len(self._lines_data)} blocks ({src}->{tgt})")
 
-            # Batch translate: join all lines, translate once, split back
             all_texts = [item[4] for item in self._lines_data]
-            joined = "\n".join(all_texts)
-            translated = translate_text(joined, src, tgt)
+            translated_texts = _translate_screen_texts(all_texts, translate_text, src, tgt)
 
-            if translated:
-                parts = translated.split("\n")
+            if translated_texts and any(translated_texts):
+                blocks = []
                 for i, (x, y, w, h, orig) in enumerate(self._lines_data):
-                    tr = parts[i].strip() if i < len(parts) else orig
-                    self.translated_blocks.append(
+                    tr = translated_texts[i].strip() if i < len(translated_texts) else orig
+                    if not tr:
+                        tr = orig
+                    blocks.append(
                         (
                             QtCore.QRectF(
                                 x / self._ocr_scale_x,
@@ -4832,6 +5280,7 @@ class FullScreenTranslateOverlay(QWidget):
                             tr,
                         )
                     )
+                self.translated_blocks = blocks
             else:
                 config = get_cached_ocr_config()
                 lang = config.get("interface_language", "en")
@@ -4855,16 +5304,59 @@ class FullScreenTranslateOverlay(QWidget):
 
         # Screenshot as background
         painter.drawPixmap(0, 0, self.screenshot)
-        # Slight dimming
-        painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 100))
+        # Keep the original screen intact after translation.  Dimming is only
+        # useful while choosing a direction or waiting for OCR; replacement
+        # mode should look like the source words themselves were changed.
+        if self.loading or self.error_message or not self.translated_blocks:
+            painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 72))
 
         if self.loading:
             self._paint_loading(painter)
         elif self.error_message:
             self._paint_center_msg(painter, self.error_message, QtGui.QColor(80, 20, 20, 230))
         elif self.translated_blocks:
-            for rect_f, _orig, translated in self.translated_blocks:
-                self._paint_block(painter, rect_f, translated)
+            source_rects = [
+                QtCore.QRectF(block[0]).normalized()
+                for block in self.translated_blocks
+            ]
+            occupied = []
+            painted_blocks = []
+            for block_index, (rect_f, original, translated) in enumerate(self.translated_blocks):
+                layout = self._translation_block_layout(
+                    rect_f,
+                    original,
+                    translated,
+                    occupied=occupied,
+                    obstacles=[
+                        source_rect
+                        for source_index, source_rect in enumerate(source_rects)
+                        if source_index != block_index
+                    ],
+                )
+                occupied.append(layout[0])
+                painted_blocks.append((rect_f, original, translated, layout))
+
+            # Paint every replacement background first.  Text is painted in a
+            # second pass so an adjacent background can never erase glyphs that
+            # were already drawn during the same frame.
+            for rect_f, original, translated, layout in painted_blocks:
+                self._paint_block(
+                    painter,
+                    rect_f,
+                    original,
+                    translated,
+                    layout=layout,
+                    draw_text=False,
+                )
+            for rect_f, original, translated, layout in painted_blocks:
+                self._paint_block(
+                    painter,
+                    rect_f,
+                    original,
+                    translated,
+                    layout=layout,
+                    draw_background=False,
+                )
             self._paint_hint(painter)
         # else: начальный экран — комбо-бокс и кнопка видны поверх скриншота
 
@@ -4889,28 +5381,207 @@ class FullScreenTranslateOverlay(QWidget):
         painter.setPen(QtGui.QColor(220, 200, 255))
         painter.drawText(box, QtCore.Qt.AlignCenter, text)
 
-    def _paint_block(self, painter, rect_f, text):
-        pad = 3
-        # Calculate font size proportional to line height
-        line_h = rect_f.height()
-        font_size = max(8, min(int(line_h * 0.72), 40))
-        font = QtGui.QFont("Segoe UI", font_size)
-        fm = QtGui.QFontMetrics(font)
-        text_width = fm.horizontalAdvance(text) + 8
+    def _translation_block_layout(
+        self,
+        rect_f,
+        original,
+        text,
+        occupied=None,
+        obstacles=None,
+    ):
+        # Each Windows OCR result is a visual line.  Keep its translation on one
+        # line as well: wrapping a long translation inside a tiny source height
+        # created tall side cards and overlapping fragments.  The replacement
+        # may grow horizontally, but only through space where no other OCR line
+        # or translated block exists.
+        pad = 2.0
+        screen_margin = 8.0
+        bounds = QtCore.QRectF(
+            screen_margin,
+            screen_margin,
+            max(1.0, self.width() - screen_margin * 2),
+            max(1.0, self.height() - screen_margin * 2),
+        )
+        source_rect = QtCore.QRectF(rect_f).normalized()
+        source_rect = source_rect.adjusted(-pad, -pad, pad, pad).intersected(bounds)
+        if source_rect.isEmpty():
+            source_rect = QtCore.QRectF(
+                bounds.left(),
+                bounds.top(),
+                max(1.0, min(bounds.width(), rect_f.width())),
+                max(1.0, min(bounds.height(), rect_f.height())),
+            )
 
-        # Background rect — stretches to fit translated text
-        bg_w = max(rect_f.width(), text_width) + pad * 2
-        bg_rect = QtCore.QRectF(rect_f.x() - pad, rect_f.y() - pad, bg_w, rect_f.height() + pad * 2)
+        left_limit = bounds.left()
+        right_limit = bounds.right()
+        blocker_gap = 3.0
+        for blocker in list(obstacles or ()) + list(occupied or ()):
+            blocker = QtCore.QRectF(blocker).normalized().intersected(bounds)
+            if blocker.isEmpty():
+                continue
+            vertical_overlap = max(
+                0.0,
+                min(source_rect.bottom(), blocker.bottom())
+                - max(source_rect.top(), blocker.top()),
+            )
+            minimum_overlap = max(
+                2.0,
+                min(source_rect.height(), blocker.height()) * 0.35,
+            )
+            if vertical_overlap < minimum_overlap:
+                continue
+            if blocker.right() <= source_rect.left():
+                left_limit = max(left_limit, blocker.right() + blocker_gap)
+            elif blocker.left() >= source_rect.right():
+                right_limit = min(right_limit, blocker.left() - blocker_gap)
 
-        painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(QtGui.QColor(20, 15, 45, 215))
-        painter.drawRoundedRect(bg_rect, 4, 4)
+        left_limit = min(left_limit, source_rect.left())
+        right_limit = max(right_limit, source_rect.right())
+        corridor_width = max(source_rect.width(), right_limit - left_limit)
+        # Do not let one tiny OCR fragment turn into a card spanning half the
+        # screen.  A modest local expansion plus font fitting is less invasive
+        # and preserves nearby imagery that OCR did not recognize as text.
+        local_width_cap = max(
+            source_rect.width() * 2.2,
+            source_rect.width() + 160.0,
+        )
+        available_width = max(
+            source_rect.width(),
+            min(corridor_width, local_width_cap),
+        )
+        source_line_height = max(8.0, rect_f.height())
+        start_font_size = max(7, min(30, int(source_line_height * 0.72)))
+        flags = QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter | QtCore.Qt.TextSingleLine
 
-        # Text
-        draw_rect = QtCore.QRectF(rect_f.x() + 2, rect_f.y(), bg_w - pad * 2, rect_f.height())
-        painter.setFont(font)
-        painter.setPen(QtGui.QColor(240, 230, 255))
-        painter.drawText(draw_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.TextSingleLine, text)
+        chosen_font = QtGui.QFont("Segoe UI", 6)
+        required_width = source_rect.width()
+        for font_size in range(start_font_size, 5, -1):
+            font = QtGui.QFont("Segoe UI", font_size)
+            metrics = QtGui.QFontMetrics(font)
+            measured_width = metrics.horizontalAdvance(str(text or "")) + pad * 2
+            measured_height = metrics.height() + 1
+            chosen_font = font
+            required_width = measured_width
+            if (
+                measured_width <= available_width
+                and measured_height <= source_rect.height()
+            ):
+                break
+
+        required_width = min(available_width, max(source_rect.width(), required_width))
+        desired_left = source_rect.center().x() - required_width / 2.0
+        desired_left = max(left_limit, min(desired_left, right_limit - required_width))
+        bg_rect = QtCore.QRectF(
+            desired_left,
+            source_rect.top(),
+            required_width,
+            source_rect.height(),
+        ).intersected(bounds)
+
+        # Extremely long unbroken strings can still exceed the whole free
+        # corridor at 6 pt.  Condense only as a last resort, keeping the full
+        # translation visible instead of clipping or replacing it with an
+        # ellipsis.
+        available_text_width = max(1.0, bg_rect.width() - pad * 2)
+        measured_width = QtGui.QFontMetrics(chosen_font).horizontalAdvance(str(text or ""))
+        if measured_width > available_text_width:
+            stretch = max(50, min(100, int(100 * available_text_width / measured_width)))
+            chosen_font.setStretch(stretch)
+
+        draw_rect = bg_rect.adjusted(pad, 0.0, -pad, 0.0)
+        return bg_rect, draw_rect, chosen_font, flags
+
+    def _paint_block(
+        self,
+        painter,
+        rect_f,
+        original,
+        text,
+        layout=None,
+        draw_background=True,
+        draw_text=True,
+    ):
+        bg_rect, draw_rect, font, flags = layout or self._translation_block_layout(
+            rect_f, original, text
+        )
+        background, foreground = self._replacement_palette(
+            QtCore.QRectF(rect_f).normalized().adjusted(-2, -2, 2, 2)
+        )
+        if draw_background:
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(background)
+            painter.drawRect(bg_rect)
+        if draw_text:
+            painter.setFont(font)
+            painter.setPen(foreground)
+            measured_width = painter.fontMetrics().horizontalAdvance(str(text or ""))
+            if measured_width > draw_rect.width() and measured_width > 0:
+                # QFont stretch has platform-specific rounding.  A final
+                # painter transform guarantees that the last glyph remains
+                # visible instead of being clipped at the rectangle edge.
+                horizontal_scale = max(0.05, draw_rect.width() / measured_width)
+                painter.save()
+                painter.setClipRect(bg_rect)
+                painter.translate(draw_rect.left(), 0)
+                painter.scale(horizontal_scale, 1.0)
+                scaled_rect = QtCore.QRectF(
+                    0,
+                    draw_rect.top(),
+                    draw_rect.width() / horizontal_scale,
+                    draw_rect.height(),
+                )
+                painter.drawText(scaled_rect, flags, text)
+                painter.restore()
+            else:
+                painter.drawText(draw_rect, flags, text)
+
+    def _replacement_palette(self, rect_f):
+        """Estimate the source area's background and readable foreground.
+
+        Sampling the perimeter avoids most glyph pixels and gives a simple
+        local inpainting effect for white documents, dark game UI, and colored
+        menu bars without introducing detached purple cards.
+        """
+        image = self.screenshot.toImage()
+        if image.isNull():
+            return QtGui.QColor(17, 15, 31, 252), QtGui.QColor(247, 243, 255)
+        ratio = float(self.screenshot.devicePixelRatioF() or 1.0)
+        left = max(0.0, rect_f.left())
+        right = min(float(self.width() - 1), rect_f.right())
+        top = max(0.0, rect_f.top())
+        bottom = min(float(self.height() - 1), rect_f.bottom())
+        samples = []
+
+        def add_sample(x, y):
+            px = max(0, min(image.width() - 1, int(round(x * ratio))))
+            py = max(0, min(image.height() - 1, int(round(y * ratio))))
+            color = image.pixelColor(px, py)
+            samples.append((color.red(), color.green(), color.blue()))
+
+        for step in range(13):
+            fraction = step / 12.0
+            x = left + (right - left) * fraction
+            y = top + (bottom - top) * fraction
+            add_sample(x, top)
+            add_sample(x, bottom)
+            add_sample(left, y)
+            add_sample(right, y)
+        if not samples:
+            return QtGui.QColor(17, 15, 31, 252), QtGui.QColor(247, 243, 255)
+
+        def median(channel):
+            values = sorted(sample[channel] for sample in samples)
+            return values[len(values) // 2]
+
+        red, green, blue = median(0), median(1), median(2)
+        background = QtGui.QColor(red, green, blue, 252)
+        luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        foreground = (
+            QtGui.QColor(22, 22, 25)
+            if luminance >= 145
+            else QtGui.QColor(250, 248, 253)
+        )
+        return background, foreground
 
     def _paint_hint(self, painter):
         config = get_cached_ocr_config()

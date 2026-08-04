@@ -1,6 +1,10 @@
 import os
+import tempfile
 import time
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -585,6 +589,239 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             ocr._score_ocr_text_for_language("Hello world", "en"),
             ocr._score_ocr_text_for_language("Hello world", "ru"),
         )
+
+    def test_windows_language_filter_returns_only_installed_recognizers(self):
+        with mock.patch.object(
+            ocr,
+            "_get_available_windows_ocr_language_tags",
+            return_value=["en-US", "zh-Hans-CN"],
+        ):
+            self.assertEqual(
+                ocr.installed_ocr_language_codes("Windows", {}),
+                ["en", "zh"],
+            )
+
+    def test_windows_engine_uses_exact_installed_chinese_tag(self):
+        created_tags = []
+
+        class Language:
+            def __init__(self, tag):
+                self.tag = tag
+
+        class OcrEngine:
+            @staticmethod
+            def is_language_supported(_language):
+                return True
+
+            @staticmethod
+            def try_create_from_language(language):
+                created_tags.append(language.tag)
+                return object()
+
+        with mock.patch.object(ocr, "_WINRT_AVAILABLE", True):
+            with mock.patch.object(ocr, "winrt_glob", SimpleNamespace(Language=Language)):
+                with mock.patch.object(ocr, "winrt_ocr", SimpleNamespace(OcrEngine=OcrEngine)):
+                    with mock.patch.object(
+                        ocr,
+                        "_get_available_windows_ocr_language_tags",
+                        return_value=["zh-Hans-CN"],
+                    ):
+                        ocr._OCR_ENGINE_CACHE.clear()
+                        self.assertIsNotNone(ocr._get_windows_ocr_engine("zh-CN"))
+
+        self.assertEqual(created_tags, ["zh-Hans-CN"])
+
+    def test_tesseract_language_filter_reads_local_traineddata_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            exe = Path(root, "tesseract.exe")
+            exe.write_bytes(b"exe")
+            tessdata = Path(root, "tessdata")
+            tessdata.mkdir()
+            tessdata.joinpath("eng.traineddata").write_bytes(b"model")
+            tessdata.joinpath("rus.traineddata").write_bytes(b"model")
+            with mock.patch.object(ocr.ScreenCaptureOverlay, "get_tesseract_cmd", return_value=str(exe)):
+                self.assertEqual(
+                    ocr.installed_ocr_language_codes("Tesseract", {}),
+                    ["en", "ru"],
+                )
+
+    def test_easyocr_and_rapidocr_filters_match_their_real_model_families(self):
+        with tempfile.TemporaryDirectory() as root:
+            easy_root = Path(root, "easy")
+            easy_package = easy_root / "site-packages" / "easyocr"
+            easy_package.mkdir(parents=True)
+            easy_package.joinpath("__init__.py").write_text("", encoding="utf-8")
+            models = easy_root / "models"
+            models.mkdir()
+            for name in ("craft_mlt_25k.pth", "english_g2.pth", "cyrillic_g2.pth"):
+                models.joinpath(name).write_bytes(b"model")
+            with mock.patch.object(ocr, "_easyocr_local_root", return_value=str(easy_root)):
+                easy_codes = ocr.installed_ocr_language_codes("EasyOCR", {})
+            self.assertIn("en", easy_codes)
+            self.assertIn("ru", easy_codes)
+            self.assertNotIn("zh", easy_codes)
+
+            rapid_root = Path(root, "rapid")
+            rapid_package = rapid_root / "site-packages" / "rapidocr"
+            rapid_package.mkdir(parents=True)
+            rapid_package.joinpath("__init__.py").write_text("", encoding="utf-8")
+            with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)):
+                self.assertEqual(
+                    ocr.installed_ocr_language_codes("RapidOCR", {}),
+                    ["en", "zh"],
+                )
+
+    def test_frozen_build_exposes_rapidocr_bundled_in_worker(self):
+        with tempfile.TemporaryDirectory() as root:
+            app_exe = Path(root, "ClicknTranslate.exe")
+            app_exe.write_bytes(b"app")
+            internal = Path(root, "_internal")
+            internal.mkdir()
+            internal.joinpath("OcrWorker.exe").write_bytes(b"worker")
+            with mock.patch.object(ocr.sys, "frozen", True, create=True):
+                with mock.patch.object(ocr.sys, "executable", str(app_exe)):
+                    self.assertEqual(
+                        ocr.installed_ocr_language_codes("RapidOCR", {}),
+                        ["en", "zh"],
+                    )
+
+    def test_easyocr_chinese_does_not_require_separate_english_model(self):
+        with tempfile.TemporaryDirectory() as root:
+            easy_root = Path(root, "easy")
+            easy_package = easy_root / "site-packages" / "easyocr"
+            easy_package.mkdir(parents=True)
+            easy_package.joinpath("__init__.py").write_text("", encoding="utf-8")
+            models = easy_root / "models"
+            models.mkdir()
+            for name in ("craft_mlt_25k.pth", "zh_sim_g2.pth"):
+                models.joinpath(name).write_bytes(b"model")
+
+            with mock.patch.object(ocr, "_easyocr_local_root", return_value=str(easy_root)):
+                easy_codes = ocr.installed_ocr_language_codes("EasyOCR", {})
+
+            self.assertIn("zh", easy_codes)
+            self.assertNotIn("en", easy_codes)
+
+    def test_fullscreen_lines_stay_separate_and_do_not_merge_side_by_side_columns(self):
+        blocks = ocr._group_screen_ocr_lines([
+            (10, 10, 180, 20, "First line"),
+            (12, 34, 170, 20, "Second line"),
+            (320, 12, 160, 20, "Other column"),
+        ])
+        self.assertEqual(len(blocks), 3)
+        texts = {block[4] for block in blocks}
+        self.assertIn("First line", texts)
+        self.assertIn("Second line", texts)
+        self.assertIn("Other column", texts)
+
+    def test_fullscreen_only_same_baseline_fragments_become_one_visual_line(self):
+        blocks = ocr._group_screen_ocr_lines([
+            (10, 10, 80, 22, "First"),
+            (96, 11, 90, 20, "setting"),
+            (12, 38, 175, 22, "Second setting"),
+        ])
+
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[0][4], "First setting")
+        self.assertEqual(blocks[1][4], "Second setting")
+
+    def test_fullscreen_translation_mapping_falls_back_when_markers_change(self):
+        calls = []
+
+        def translate(text, source, target):
+            calls.append((text, source, target))
+            if text.startswith("[[["):
+                return "markers were removed"
+            return "T:" + text
+
+        result = ocr._translate_screen_texts(["one", "two"], translate, "en", "ru")
+        self.assertEqual(result, ["T:one", "T:two"])
+        self.assertEqual(len(calls), 3)
+
+    def test_fullscreen_translation_splits_text_rich_screen_into_safe_batches(self):
+        calls = []
+
+        def translate(text, _source, _target):
+            calls.append(text)
+            return text
+
+        values = [f"block {index}" for index in range(30)]
+        result = ocr._translate_screen_texts(values, translate, "en", "ru")
+
+        self.assertEqual(result, values)
+        self.assertEqual(len(calls), 2)
+
+    def test_fullscreen_translation_layout_stays_inside_screen(self):
+        dummy = SimpleNamespace(width=lambda: 800, height=lambda: 500)
+        bg_rect, draw_rect, font, _flags = ocr.FullScreenTranslateOverlay._translation_block_layout(
+            dummy,
+            ocr.QtCore.QRectF(740, 460, 50, 20),
+            "short",
+            "A much longer translated sentence that must wrap inside the screen.",
+        )
+        self.assertGreaterEqual(bg_rect.left(), 8)
+        self.assertGreaterEqual(bg_rect.top(), 8)
+        self.assertLessEqual(bg_rect.right(), 792)
+        self.assertLessEqual(bg_rect.bottom(), 492)
+        self.assertTrue(bg_rect.intersects(ocr.QtCore.QRectF(740, 460, 50, 20)))
+        self.assertGreater(bg_rect.width(), 50)
+        self.assertLessEqual(bg_rect.width(), 214)
+        self.assertGreater(draw_rect.width(), 0)
+        self.assertGreaterEqual(font.pointSize(), 6)
+        self.assertTrue(_flags & ocr.QtCore.Qt.TextSingleLine)
+
+    def test_fullscreen_translation_layout_never_moves_away_from_source(self):
+        dummy = SimpleNamespace(width=lambda: 800, height=lambda: 500)
+        first = ocr.QtCore.QRectF(10, 50, 330, 330)
+        second, _draw, _font, _flags = ocr.FullScreenTranslateOverlay._translation_block_layout(
+            dummy,
+            ocr.QtCore.QRectF(300, 320, 150, 30),
+            "source",
+            "translated text",
+            occupied=[first],
+        )
+
+        source = ocr.QtCore.QRectF(300, 320, 150, 30)
+        self.assertTrue(source.intersects(second))
+        self.assertLessEqual(abs(second.center().x() - source.center().x()), 2.1)
+        self.assertLessEqual(abs(second.center().y() - source.center().y()), 2.1)
+
+    def test_fullscreen_translation_expands_only_inside_free_corridor(self):
+        dummy = SimpleNamespace(width=lambda: 800, height=lambda: 500)
+        source = ocr.QtCore.QRectF(300, 100, 60, 20)
+        left_text = ocr.QtCore.QRectF(210, 98, 80, 24)
+        right_text = ocr.QtCore.QRectF(375, 98, 90, 24)
+        bg_rect, draw_rect, font, flags = ocr.FullScreenTranslateOverlay._translation_block_layout(
+            dummy,
+            source,
+            "small",
+            "A longer translated line",
+            obstacles=[left_text, right_text],
+        )
+
+        self.assertTrue(bg_rect.contains(source))
+        self.assertGreaterEqual(bg_rect.left(), left_text.right() + 2.9)
+        self.assertLessEqual(bg_rect.right(), right_text.left() - 2.9)
+        self.assertFalse(bg_rect.intersects(left_text))
+        self.assertFalse(bg_rect.intersects(right_text))
+        self.assertGreater(draw_rect.width(), 0)
+        self.assertGreaterEqual(font.pointSize(), 6)
+        self.assertTrue(flags & ocr.QtCore.Qt.TextSingleLine)
+
+    def test_fullscreen_replacement_palette_matches_local_background(self):
+        screenshot = ocr.QtGui.QPixmap(120, 60)
+        screenshot.fill(ocr.QtGui.QColor("#f4f4f4"))
+        dummy = SimpleNamespace(
+            screenshot=screenshot,
+            width=lambda: 120,
+            height=lambda: 60,
+        )
+        background, foreground = ocr.FullScreenTranslateOverlay._replacement_palette(
+            dummy,
+            ocr.QtCore.QRectF(10, 10, 80, 24),
+        )
+        self.assertGreater(background.red(), 230)
+        self.assertLess(foreground.red(), 60)
 
 
 if __name__ == "__main__":

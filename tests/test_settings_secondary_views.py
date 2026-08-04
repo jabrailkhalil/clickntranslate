@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from PyQt5.QtCore import QPoint  # noqa: E402
-from PyQt5.QtWidgets import QApplication, QWidget  # noqa: E402
+from PyQt5.QtWidgets import QApplication, QLabel, QPushButton, QWidget  # noqa: E402
 
 import settings_window as sw  # noqa: E402
 
@@ -193,11 +193,21 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.app.processEvents()
 
         self.assertEqual(self.settings.history_count_label.text(), "2")
-        self.assertEqual(self.settings.history_text_edit.objectName(), "secondaryHistory")
-        self.assertGreaterEqual(self.settings.history_text_edit.height(), 190)
-        rendered = self.settings.history_text_edit.toHtml()
+        self.assertEqual(self.settings.history_scroll_area.objectName(), "historyScroll")
+        self.assertGreaterEqual(self.settings.history_scroll_area.minimumHeight(), 190)
+        self.assertEqual(len(self.settings.history_record_cards), 2)
+        rendered = "\n".join(
+            label.text()
+            for card in self.settings.history_record_cards
+            for label in card.findChildren(QLabel)
+        )
         self.assertIn("Bom dia.", rendered)
         self.assertIn("The window is ready.", rendered)
+        for card in self.settings.history_record_cards:
+            self.assertEqual(card.objectName(), "historyRecordCard")
+            self.assertEqual(len(card.findChildren(QPushButton, "historyCopyButton")), 2)
+            self.assertEqual(len(card.findChildren(QPushButton, "historyDeleteButton")), 2)
+            self.assertEqual(len(card.findChildren(sw.QFrame, "historyTextBlock")), 2)
         self.assertNotIn("━", rendered)
         self.assertEqual(self.settings.history_clear_button.objectName(), "secondaryClearButton")
         self.assertEqual(self.settings.history_back_button.objectName(), "secondaryBackButton")
@@ -212,10 +222,35 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.app.processEvents()
 
         self.assertEqual(self.settings.copy_history_count_label.text(), "0")
-        self.assertEqual(self.settings.copy_history_text_edit.objectName(), "secondaryHistory")
+        self.assertEqual(self.settings.copy_history_scroll_area.objectName(), "historyScroll")
         self.assertEqual(self.settings.copy_history_clear_button.objectName(), "secondaryClearButton")
         self.assertEqual(self.settings.copy_history_back_button.objectName(), "secondaryBackButton")
-        self.assertIn("History is empty", self.settings.copy_history_text_edit.toPlainText())
+        empty = self.settings.copy_history_scroll_area.findChild(QLabel, "historyEmptyState")
+        self.assertIsNotNone(empty)
+        self.assertIn("History is empty", empty.text())
+
+    def test_history_card_copy_and_delete_actions_update_real_data(self):
+        self.settings.show_history_view()
+        self.app.processEvents()
+
+        with open(os.path.join(self.temp_dir, "translation_history.json"), "r", encoding="utf-8") as stream:
+            expected_latest = json.load(stream)[-1]["translated"]
+        latest_card = self.settings.history_record_cards[0]
+        translated_copy = next(
+            button
+            for button in latest_card.findChildren(QPushButton, "historyCopyButton")
+            if button.property("historyField") == "translated"
+        )
+        translated_copy.click()
+        self.assertEqual(self.app.clipboard().text(), expected_latest)
+
+        latest_card.findChild(QPushButton, "historyDeleteButton").click()
+        self.app.processEvents()
+        self.assertEqual(self.settings.history_count_label.text(), "1")
+        with open(os.path.join(self.temp_dir, "translation_history.json"), "r", encoding="utf-8") as stream:
+            remaining = json.load(stream)
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["translated"], "Bom dia.")
 
     def test_theme_refresh_restyles_the_open_history_without_losing_records(self):
         self.settings.show_history_view()
@@ -226,7 +261,12 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         style = self.settings.secondary_view_shell.styleSheet()
         self.assertIn("#f6f3fa", style)
         self.assertEqual(self.settings.history_count_label.text(), "2")
-        self.assertIn("Bom dia.", self.settings.history_text_edit.toHtml())
+        rendered = "\n".join(
+            label.text()
+            for card in self.settings.history_record_cards
+            for label in card.findChildren(QLabel)
+        )
+        self.assertIn("Bom dia.", rendered)
 
 
 if __name__ == "__main__":

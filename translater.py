@@ -192,8 +192,14 @@ def _argos_worker_path():
     """Returns the packaged non-Qt Argos worker, or an empty string."""
     if not getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
         return ""
-    path = os.path.join(os.path.dirname(sys.executable), "ArgosWorker.exe")
-    return path if os.path.isfile(path) else ""
+    executable_dir = os.path.dirname(sys.executable)
+    for path in (
+        os.path.join(executable_dir, "_internal", "ArgosWorker.exe"),
+        os.path.join(executable_dir, "ArgosWorker.exe"),
+    ):
+        if os.path.isfile(path):
+            return path
+    return ""
 
 
 def argos_runtime_available():
@@ -616,6 +622,74 @@ def _installed_pairs():
         return {(pkg.from_code, pkg.to_code) for pkg in arg_pkg.get_installed_packages()}
     except Exception:
         return set()
+
+
+def _argos_package_data_dirs():
+    """Return plausible Argos package roots without importing its native runtime."""
+    _prepare_argos_environment()
+    candidates = []
+    if arg_pkg is not None:
+        try:
+            candidates.append(os.fspath(arg_pkg.settings.package_data_dir))
+        except Exception:
+            pass
+    xdg_data = os.environ.get("XDG_DATA_HOME")
+    if xdg_data:
+        candidates.append(os.path.join(xdg_data, "argos-translate", "packages"))
+    candidates.extend([
+        os.path.join(os.path.expanduser("~"), ".local", "share", "argos-translate", "packages"),
+        os.path.join(get_portable_dir(), "argos", "data", "argos-translate", "packages"),
+    ])
+    result = []
+    seen = set()
+    for path in candidates:
+        normalized = os.path.normcase(os.path.abspath(path))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(os.path.abspath(path))
+    return result
+
+
+def argos_installed_direct_pairs_fast(package_dirs=None):
+    """Read installed Argos directions from metadata without loading CTranslate2."""
+    pairs = set()
+    roots = _argos_package_data_dirs() if package_dirs is None else package_dirs
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        try:
+            package_names = os.listdir(root)
+        except OSError:
+            continue
+        for package_name in package_names:
+            metadata_path = os.path.join(root, package_name, "metadata.json")
+            if not os.path.isfile(metadata_path):
+                continue
+            try:
+                with open(metadata_path, "r", encoding="utf-8") as metadata_file:
+                    metadata = json.load(metadata_file)
+                source = str(metadata.get("from_code") or "").strip().lower()
+                target = str(metadata.get("to_code") or "").strip().lower()
+                if source and target and source != target:
+                    pairs.add((source, target))
+            except (OSError, ValueError, TypeError):
+                continue
+    return pairs
+
+
+def argos_installed_translation_pairs_fast(package_dirs=None):
+    """Return usable direct and English-pivot routes from installed packages."""
+    direct = argos_installed_direct_pairs_fast(package_dirs=package_dirs)
+    codes = {code for pair in direct for code in pair}
+    usable = set(direct)
+    for source in codes:
+        for target in codes:
+            if source == target:
+                continue
+            if (source, "en") in direct and ("en", target) in direct:
+                usable.add((source, target))
+    return usable
 
 
 def _normalize_argos_pairs(pairs):
@@ -1309,7 +1383,7 @@ def translate_text(
             return _cache_and_return(argos_result)
         raise Exception(
             f"Argos offline translation package is not installed for {source_code}->{target_code}. "
-            "Open the main window and press Translate once to download it."
+            "Install the required direction in Settings > Language packages > Argos."
         )
 
     # Unknown engine name: use an installed offline package if there is one.

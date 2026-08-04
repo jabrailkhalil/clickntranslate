@@ -193,7 +193,9 @@ def _recognize_easyocr(request):
         gpu=False,
         model_storage_directory=model_dir,
         user_network_directory=user_network_dir,
-        download_enabled=bool(request.get("allow_download", True)),
+        # Missing flags are intentionally safe: models may be downloaded only
+        # by the explicit Language packages installation flow.
+        download_enabled=bool(request.get("allow_download", False)),
         verbose=False,
     )
     numpy = importlib.import_module("numpy")

@@ -86,6 +86,25 @@ class TestPortableLayoutHelpers(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+    def test_internal_worker_uses_application_root_for_portable_data(self):
+        temp_dir = tempfile.mkdtemp(prefix="cnt_internal_worker_layout_")
+        try:
+            internal_dir = os.path.join(temp_dir, "_internal")
+            os.makedirs(internal_dir)
+            worker_exe = os.path.join(internal_dir, "OcrWorker.exe")
+            app_exe = os.path.join(temp_dir, "ClicknTranslate.exe")
+            open(worker_exe, "w").close()
+            open(app_exe, "w").close()
+
+            with mock.patch.object(sw.sys, "frozen", True, create=True):
+                with mock.patch.object(sw.sys, "executable", worker_exe):
+                    self.assertEqual(portable_paths.portable_base_dir(), temp_dir)
+                    self.assertEqual(portable_paths.public_executable_path(), app_exe)
+                    self.assertEqual(ocr.get_portable_dir(), temp_dir)
+                    self.assertEqual(translater.get_portable_dir(), temp_dir)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def test_store_layout_uses_package_local_state(self):
         with tempfile.TemporaryDirectory(prefix="cnt_store_layout_") as local_app_data:
             family = "JabrailDigital.ClicknTranslate_test123"
@@ -232,7 +251,7 @@ class TestUpdateAssetSelection(unittest.TestCase):
     def test_private_update_feed_uses_environment_url_and_bearer_token(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"tag_name": "v1.5.2", "assets": []}
+        response.json.return_value = {"tag_name": "v1.5.3", "assets": []}
         posted = []
         dummy = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="en"),
@@ -641,7 +660,7 @@ class TestUpdaterCommands(unittest.TestCase):
             system_exe = os.path.join(system_dir, "whoami.exe")
             command_exe = os.path.join(system_dir, "cmd.exe")
             old_exe = os.path.join(app_dir, "ClicknTranslate.exe")
-            worker_exe = os.path.join(inner_dir, "OcrWorker.exe")
+            worker_exe = os.path.join(inner_dir, "_internal", "OcrWorker.exe")
             shutil.copy2(system_exe, old_exe)
             shutil.copy2(system_exe, os.path.join(inner_dir, "ClicknTranslateApp.exe"))
             shutil.copy2(command_exe, worker_exe)

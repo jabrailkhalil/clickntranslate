@@ -95,8 +95,8 @@ from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
 from document_translation import translate_document_text
 from languages import (
+    LANGUAGES as APP_LANGUAGES,
     default_target_for_source,
-    detect_language_code,
     get_language,
     language_code_from_name,
     language_display_name,
@@ -998,6 +998,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR Translate",
         "hotkey_fullscreen": "Fullscreen",
         "hotkey_selection": "Selection",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "Translator",
         "shadow_mode": "Shadow mode",
         "copy": "Copy",
@@ -1014,7 +1015,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "Downloading Argos package {pair}…",
         "argos_installing": "Installing Argos package {pair}…",
         "argos_canceling": "Canceling Argos package installation…",
-        "argos_install_cancelled": "Argos package installation was canceled."
+        "argos_install_cancelled": "Argos package installation was canceled.",
+        "install_argos_packages_hint": "Install the required Argos direction in Settings → Language packages → Argos."
     },
     "ru": {
         "title": "Click'n'Translate",
@@ -1039,6 +1041,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR перевод",
         "hotkey_fullscreen": "Экран",
         "hotkey_selection": "Выделение",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "Переводчик",
         "shadow_mode": "Режим тени",
         "copy": "Копировать",
@@ -1055,7 +1058,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "Загрузка пакета Argos {pair}…",
         "argos_installing": "Установка пакета Argos {pair}…",
         "argos_canceling": "Отмена установки пакета Argos…",
-        "argos_install_cancelled": "Установка пакета Argos отменена."
+        "argos_install_cancelled": "Установка пакета Argos отменена.",
+        "install_argos_packages_hint": "Установите нужное направление Argos: Настройки → Языковые пакеты → Argos."
     },
     "es": {
         "title": "Click'n'Translate",
@@ -1080,6 +1084,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR traducir",
         "hotkey_fullscreen": "Pantalla",
         "hotkey_selection": "Selección",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "Traductor",
         "shadow_mode": "Modo sombra",
         "copy": "Copiar",
@@ -1096,7 +1101,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "Descargando el paquete de Argos {pair}…",
         "argos_installing": "Instalando el paquete de Argos {pair}…",
         "argos_canceling": "Cancelando la instalación del paquete de Argos…",
-        "argos_install_cancelled": "Se canceló la instalación del paquete de Argos."
+        "argos_install_cancelled": "Se canceló la instalación del paquete de Argos.",
+        "install_argos_packages_hint": "Instala la dirección Argos necesaria en Ajustes → Paquetes de idioma → Argos."
     },
     "de": {
         "title": "Click'n'Translate",
@@ -1121,6 +1127,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR Übers.",
         "hotkey_fullscreen": "Bildschirm",
         "hotkey_selection": "Auswahl",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "Übersetzer",
         "shadow_mode": "Schattenmodus",
         "copy": "Kopieren",
@@ -1137,7 +1144,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "Argos-Paket {pair} wird heruntergeladen…",
         "argos_installing": "Argos-Paket {pair} wird installiert…",
         "argos_canceling": "Installation des Argos-Pakets wird abgebrochen…",
-        "argos_install_cancelled": "Die Installation des Argos-Pakets wurde abgebrochen."
+        "argos_install_cancelled": "Die Installation des Argos-Pakets wurde abgebrochen.",
+        "install_argos_packages_hint": "Installiere die benötigte Argos-Richtung unter Einstellungen → Sprachpakete → Argos."
     },
     "fr": {
         "title": "Click'n'Translate",
@@ -1162,6 +1170,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR traduire",
         "hotkey_fullscreen": "Écran",
         "hotkey_selection": "Sélection",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "Traducteur",
         "shadow_mode": "Mode ombre",
         "copy": "Copier",
@@ -1178,7 +1187,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "Téléchargement du module Argos {pair}…",
         "argos_installing": "Installation du module Argos {pair}…",
         "argos_canceling": "Annulation de l’installation du module Argos…",
-        "argos_install_cancelled": "L’installation du module Argos a été annulée."
+        "argos_install_cancelled": "L’installation du module Argos a été annulée.",
+        "install_argos_packages_hint": "Installez la direction Argos requise dans Réglages → Modules de langue → Argos."
     },
     "zh": {
         "title": "Click'n'Translate",
@@ -1203,6 +1213,7 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR 翻译",
         "hotkey_fullscreen": "全屏",
         "hotkey_selection": "选区",
+        "selection_pair_hint": "{hotkey}: {src} → {tgt}",
         "translator": "翻译器",
         "shadow_mode": "阴影模式",
         "copy": "复制",
@@ -1219,7 +1230,8 @@ INTERFACE_TEXT = {
         "argos_downloading": "正在下载 Argos 语言包 {pair}…",
         "argos_installing": "正在安装 Argos 语言包 {pair}…",
         "argos_canceling": "正在取消 Argos 语言包安装…",
-        "argos_install_cancelled": "Argos 语言包安装已取消。"
+        "argos_install_cancelled": "Argos 语言包安装已取消。",
+        "install_argos_packages_hint": "请在设置 → 语言包 → Argos 中安装所需的翻译方向。"
     }
 }
 
@@ -1545,6 +1557,15 @@ TRANSLATION_PROVIDER_OPTIONS = (
     ("libretranslate", "LibreTranslate", "online"),
 )
 
+PROVIDER_GROUP_TEXT = {
+    "en": {"online": "Online", "offline": "Offline"},
+    "ru": {"online": "Онлайн", "offline": "Офлайн"},
+    "es": {"online": "En línea", "offline": "Sin conexión"},
+    "de": {"online": "Online", "offline": "Offline"},
+    "fr": {"online": "En ligne", "offline": "Hors ligne"},
+    "zh": {"online": "在线", "offline": "离线"},
+}
+
 
 def provider_kind_text(kind, lang):
     if kind == "offline":
@@ -1720,10 +1741,11 @@ GUIDE_TEXT = {
             ("theme", "Theme", "Sun/moon switches dark and light themes."),
             ("help", "Help", "Info opens OCR, hotkeys and translator help."),
             ("settings", "Settings", "Gear opens engines, history, updates and hotkeys."),
-            ("ocr_engine", "OCR engine", "OCR: Windows is fast; Tesseract works offline."),
+            ("ocr_engine", "OCR engine", "Choose Windows, Tesseract, EasyOCR or RapidOCR. Install each engine and its languages before recognition."),
             ("translator", "Translator", "Translator: Google online; Argos and Hy-MT offline."),
+            ("language_packages", "Language packages", "Install OCR languages and Argos directions here first. Only ready languages appear in selectors."),
             ("hotkeys", "Hotkeys", "Hotkeys configure screen copy and OCR translation."),
-            ("back_home", "Back home", "Home returns to the main translator screen."),
+            ("back_home", "Back home", "Home returns to the main translator screen. Its selected language pair is also used for selected-text translation with Ctrl+Alt+Q."),
         ],
     },
     "ru": {
@@ -1737,10 +1759,11 @@ GUIDE_TEXT = {
             ("theme", "Тема", "Солнце/луна переключает темную и светлую тему."),
             ("help", "Помощь", "Информация: OCR, хоткеи и переводчики."),
             ("settings", "Настройки", "Шестеренка: движки, история, обновления и хоткеи."),
-            ("ocr_engine", "OCR-движок", "OCR: Windows быстрый, Tesseract работает офлайн."),
+            ("ocr_engine", "OCR-движок", "Выберите Windows, Tesseract, EasyOCR или RapidOCR. До распознавания установите движок и нужные языки."),
             ("translator", "Переводчик", "Переводчик: Google онлайн, Argos и Hy-MT офлайн."),
+            ("language_packages", "Языковые пакеты", "Здесь заранее ставятся языки OCR и направления Argos. В списках видны только готовые языки."),
             ("hotkeys", "Горячие клавиши", "Хоткеи: копирование экрана и OCR-перевод."),
-            ("back_home", "Назад домой", "Домик возвращает на главный экран."),
+            ("back_home", "Назад домой", "Домик возвращает на главный экран. Выбранные там языки также используются для перевода выделенного текста по Ctrl+Alt+Q."),
         ],
     },
     "es": {
@@ -1754,10 +1777,11 @@ GUIDE_TEXT = {
             ("theme", "Tema", "Sol/luna cambia entre tema oscuro y claro."),
             ("help", "Ayuda", "Info: OCR, atajos y traductores."),
             ("settings", "Ajustes", "Engranaje: motores, historial, updates y atajos."),
-            ("ocr_engine", "Motor OCR", "OCR: Windows rápido; Tesseract offline."),
+            ("ocr_engine", "Motor OCR", "Elige Windows, Tesseract, EasyOCR o RapidOCR. Instala el motor y sus idiomas antes de reconocer texto."),
             ("translator", "Traductor", "Traductor: Google online; Argos y Hy-MT offline."),
+            ("language_packages", "Paquetes de idioma", "Instala aquí idiomas OCR y direcciones Argos. Los selectores muestran solo los que están listos."),
             ("hotkeys", "Atajos", "Atajos: copia de pantalla y traducción OCR."),
-            ("back_home", "Volver", "Casa: vuelve a la pantalla principal."),
+            ("back_home", "Volver", "Vuelve a la pantalla principal. El par elegido allí también se usa para traducir texto seleccionado con Ctrl+Alt+Q."),
         ],
     },
     "de": {
@@ -1771,10 +1795,11 @@ GUIDE_TEXT = {
             ("theme", "Design", "Sonne/Mond wechselt dunkel und hell."),
             ("help", "Hilfe", "Info: OCR, Hotkeys und Übersetzer."),
             ("settings", "Einstellungen", "Zahnrad: Engines, Verlauf, Updates und Hotkeys."),
-            ("ocr_engine", "OCR-Engine", "OCR: Windows schnell; Tesseract offline."),
+            ("ocr_engine", "OCR-Engine", "Windows, Tesseract, EasyOCR oder RapidOCR wählen. Engine und Sprachen vor der Erkennung installieren."),
             ("translator", "Übersetzer", "Übersetzer: Google online; Argos/Hy-MT offline."),
+            ("language_packages", "Sprachpakete", "OCR-Sprachen und Argos-Richtungen hier vorab installieren. Nur fertige Sprachen erscheinen in Listen."),
             ("hotkeys", "Hotkeys", "Hotkeys: Bildschirmkopie und OCR."),
-            ("back_home", "Zurück", "Haus: zurück zum Hauptbildschirm."),
+            ("back_home", "Zurück", "Zurück zum Hauptbildschirm. Das dort gewählte Sprachpaar gilt auch für markierten Text mit Ctrl+Alt+Q."),
         ],
     },
     "fr": {
@@ -1788,10 +1813,11 @@ GUIDE_TEXT = {
             ("theme", "Thème", "Soleil/lune alterne sombre et clair."),
             ("help", "Aide", "Info: OCR, raccourcis et traducteurs."),
             ("settings", "Réglages", "Engrenage: moteurs, historique, mises à jour."),
-            ("ocr_engine", "Moteur OCR", "OCR: Windows rapide; Tesseract offline."),
+            ("ocr_engine", "Moteur OCR", "Choisissez Windows, Tesseract, EasyOCR ou RapidOCR. Installez le moteur et ses langues avant la reconnaissance."),
             ("translator", "Traducteur", "Traducteur: Google online; Argos/Hy-MT offline."),
+            ("language_packages", "Modules de langue", "Installez ici les langues OCR et directions Argos. Seules les langues prêtes figurent dans les listes."),
             ("hotkeys", "Raccourcis", "Raccourcis: copie écran et OCR."),
-            ("back_home", "Retour", "Maison: retour à l'écran principal."),
+            ("back_home", "Retour", "Retour à l'écran principal. La paire choisie ici sert aussi à traduire le texte sélectionné avec Ctrl+Alt+Q."),
         ],
     },
     "zh": {
@@ -1805,10 +1831,11 @@ GUIDE_TEXT = {
             ("theme", "主题", "点击太阳/月亮。这里切换深色和浅色主题。"),
             ("help", "帮助", "点击信息按钮。这里有 OCR、快捷键和翻译器说明。"),
             ("settings", "设置", "点击齿轮。引擎、历史、更新和快捷键都在这里。"),
-            ("ocr_engine", "OCR 引擎", "打开 OCR。Windows 快且内置；Tesseract 可离线下载。"),
+            ("ocr_engine", "OCR 引擎", "选择 Windows、Tesseract、EasyOCR 或 RapidOCR。识别前请先安装引擎和所需语言。"),
             ("translator", "翻译器", "打开翻译器。Google 在线；Argos 和 Hy-MT 可离线使用。"),
+            ("language_packages", "语言包", "请先在这里安装 OCR 语言和 Argos 翻译方向。下拉列表只显示已就绪的语言。"),
             ("hotkeys", "快捷键", "点击快捷键。这里设置屏幕复制和 OCR 翻译快捷键。"),
-            ("back_home", "返回主页", "点击主页图标。它会回到主翻译界面。"),
+            ("back_home", "返回主页", "返回主翻译界面。这里选择的语言对也用于 Ctrl+Alt+Q 翻译所选文本。"),
         ],
     },
 }
@@ -2363,6 +2390,64 @@ HELP_EXTRA_CONTENT = {
     ],
 }
 
+LANGUAGE_PACKAGE_HELP_CONTENT = {
+    "en": [
+        ("Language packages", [
+            "Open <span class='item-title'>Settings → Language packages</span> and install languages before OCR or offline translation. Recognition and translation never download them silently.",
+            "Windows installs optional OCR components with administrator permission and shows real progress. Tesseract and EasyOCR use separate local language models.",
+            "RapidOCR has one shared English + Chinese package; it does not support Russian. Argos packages are directional, such as RU→EN, and a non-English pair can require two directions through English.",
+            "Language selectors show only packages that are installed and usable by the chosen engine.",
+            "To remove a package, highlight its installed row and choose Remove highlighted. Shared EasyOCR models may serve several related languages.",
+        ]),
+    ],
+    "ru": [
+        ("Языковые пакеты", [
+            "Откройте <span class='item-title'>Настройки → Языковые пакеты</span> и заранее установите языки для OCR или офлайн-перевода. Во время распознавания и перевода скрытых загрузок нет.",
+            "Windows ставит дополнительные OCR-компоненты с правами администратора и показывает реальный прогресс. Tesseract и EasyOCR используют отдельные локальные модели языков.",
+            "У RapidOCR один общий пакет для английского и китайского; русский он не поддерживает. Пакеты Argos направленные, например RU→EN, а для пары без английского могут понадобиться два направления через английский.",
+            "В списках выбора показываются только установленные и готовые для выбранного движка языки.",
+            "Чтобы удалить пакет, выделите установленную строку и нажмите «Удалить выделенные». Одна общая модель EasyOCR может обслуживать несколько родственных языков.",
+        ]),
+    ],
+    "es": [
+        ("Paquetes de idioma", [
+            "Abre <span class='item-title'>Ajustes → Paquetes de idioma</span> e instala los idiomas antes del OCR o la traducción offline. No hay descargas ocultas durante el uso.",
+            "Windows instala componentes OCR opcionales con permiso de administrador y muestra el progreso real. Tesseract y EasyOCR usan modelos locales separados.",
+            "RapidOCR usa un paquete compartido de inglés + chino y no admite ruso. Los paquetes Argos tienen dirección; un par sin inglés puede necesitar dos direcciones a través del inglés.",
+            "Los selectores muestran solo idiomas instalados y utilizables por el motor elegido.",
+            "Para eliminar un paquete, resalta su fila instalada y pulsa Eliminar resaltados. Un modelo EasyOCR compartido puede servir a varios idiomas relacionados.",
+        ]),
+    ],
+    "de": [
+        ("Sprachpakete", [
+            "Unter <span class='item-title'>Einstellungen → Sprachpakete</span> Sprachen vor OCR oder Offline-Übersetzung installieren. Während der Nutzung gibt es keine versteckten Downloads.",
+            "Windows installiert optionale OCR-Komponenten mit Administratorrechten und echtem Fortschritt. Tesseract und EasyOCR verwenden getrennte lokale Sprachmodelle.",
+            "RapidOCR hat ein gemeinsames Englisch-Chinesisch-Paket und unterstützt kein Russisch. Argos-Pakete sind gerichtet; Paare ohne Englisch können zwei Richtungen über Englisch benötigen.",
+            "Auswahllisten zeigen nur installierte und für die gewählte Engine nutzbare Sprachen.",
+            "Zum Entfernen eines Pakets die installierte Zeile markieren und Markierte entfernen wählen. Ein gemeinsames EasyOCR-Modell kann mehrere verwandte Sprachen bedienen.",
+        ]),
+    ],
+    "fr": [
+        ("Modules de langue", [
+            "Ouvrez <span class='item-title'>Réglages → Modules de langue</span> et installez les langues avant l'OCR ou la traduction hors ligne. Aucun téléchargement caché pendant l'utilisation.",
+            "Windows installe les composants OCR optionnels avec autorisation administrateur et affiche la progression réelle. Tesseract et EasyOCR utilisent des modèles locaux séparés.",
+            "RapidOCR partage un module anglais + chinois et ne prend pas en charge le russe. Les modules Argos sont directionnels ; une paire sans anglais peut nécessiter deux directions via l'anglais.",
+            "Les listes affichent uniquement les langues installées et utilisables par le moteur choisi.",
+            "Pour supprimer un module, sélectionnez sa ligne installée puis Supprimer la sélection. Un modèle EasyOCR partagé peut servir plusieurs langues proches.",
+        ]),
+    ],
+    "zh": [
+        ("语言包", [
+            "请打开 <span class='item-title'>设置 → 语言包</span>，在 OCR 或离线翻译前安装所需语言。识别和翻译过程中不会静默下载。",
+            "Windows 会在获得管理员权限后安装可选 OCR 组件，并显示真实进度。Tesseract 和 EasyOCR 使用各自的本地语言模型。",
+            "RapidOCR 只有一个英语 + 中文共享包，不支持俄语。Argos 语言包有方向，例如 RU→EN；两个非英语语言之间可能需要经英语安装两个方向。",
+            "下拉列表只显示已安装且可由当前引擎使用的语言。",
+            "如需删除语言包，请高亮已安装的行并选择“删除高亮项”。一个共享的 EasyOCR 模型可能同时用于多种相关语言。",
+        ]),
+    ],
+}
+
+
 DOCUMENT_HELP_CONTENT = {
     "en": [
         ("Document translation", [
@@ -2433,6 +2518,7 @@ def help_action_text(lang, key):
 def help_text(lang):
     sections = (
         HELP_CONTENT.get(lang, HELP_CONTENT["en"])
+        + LANGUAGE_PACKAGE_HELP_CONTENT.get(lang, LANGUAGE_PACKAGE_HELP_CONTENT["en"])
         + DOCUMENT_HELP_CONTENT.get(lang, DOCUMENT_HELP_CONTENT["en"])
         + HELP_EXTRA_CONTENT.get(lang, HELP_EXTRA_CONTENT["en"])
     )
@@ -3628,7 +3714,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.provider_combo = QComboBox()
         self.provider_combo.setMinimumWidth(170)
         self._populate_provider_combo()
-        self.provider_combo.currentIndexChanged.connect(self._update_metadata)
+        self.provider_combo.currentIndexChanged.connect(self._on_document_provider_changed)
+        self.source_combo.currentIndexChanged.connect(self._on_document_source_changed)
         control_row.addWidget(self.provider_combo)
         control_row.addStretch(1)
         header_layout.addLayout(control_row)
@@ -3695,6 +3782,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         splitter.setSizes([490, 490])
         content_layout.addWidget(splitter, 1)
         layout.addWidget(content_frame, 1)
+        # Language/provider filtering also updates metadata and action state,
+        # so run it only after both editor panes and every action button exist.
+        self._refresh_document_provider_languages()
 
     def _reader_column(self, title, original):
         frame = QFrame()
@@ -3757,6 +3847,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             QDialog#documentTranslationDialog {{
                 background: transparent;
                 color: {fg};
+            }}
+            QToolTip {{
+                background-color: #17131f;
+                color: #f7f3ff;
+                border: 1px solid #7a5fa1;
+                padding: 6px 9px;
+                font-size: 13px;
             }}
             QFrame#docWindowFrame {{
                 background-color: {bg};
@@ -4287,21 +4384,58 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_busy(False)
 
     def _source_code(self):
-        if self.source_combo.currentIndex() == 0:
+        data = self.source_combo.currentData()
+        if data == "auto" or self.source_combo.currentText() == doc_text(self.lang, "auto_detect"):
             return "auto"
+        if data and get_language(str(data)) is not None:
+            return str(data)
         return language_code_from_name(self.source_combo.currentText(), self.lang)
 
     def _populate_provider_combo(self, selected_engine=None):
         selected_engine = str(selected_engine or get_cached_config().get("translator_engine", "Google")).lower()
         if selected_engine == "hy-mt":
             selected_engine = "hymt"
+        available_engines = {
+            engine
+            for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
+            if kind == "online"
+        }
+        try:
+            if translater.argos_installed_translation_pairs_fast():
+                available_engines.add("argos")
+        except Exception:
+            pass
+        try:
+            if translater.hymt_installed():
+                available_engines.add("hymt")
+        except Exception:
+            pass
+
         self.provider_combo.blockSignals(True)
         self.provider_combo.clear()
-        selected_index = 0
-        for index, (engine, _name, _kind) in enumerate(TRANSLATION_PROVIDER_OPTIONS):
-            self.provider_combo.addItem(provider_display_name(engine, self.lang, include_kind=True), engine)
-            if engine == selected_engine:
-                selected_index = index
+        groups = PROVIDER_GROUP_TEXT.get(self.lang, PROVIDER_GROUP_TEXT["en"])
+        for kind in ("online", "offline"):
+            options = [
+                option
+                for option in TRANSLATION_PROVIDER_OPTIONS
+                if option[2] == kind and option[0] in available_engines
+            ]
+            if not options:
+                continue
+            self.provider_combo.addItem(f"  {groups[kind]}", None)
+            header = self.provider_combo.model().item(self.provider_combo.count() - 1)
+            if header is not None:
+                header.setEnabled(False)
+                font = header.font()
+                font.setBold(True)
+                header.setFont(font)
+                header.setForeground(QBrush(QColor("#AFA6BE")))
+            for engine, _name, _kind in options:
+                self.provider_combo.addItem(provider_display_name(engine, self.lang), engine)
+
+        selected_index = self.provider_combo.findData(selected_engine)
+        if selected_index < 0:
+            selected_index = self.provider_combo.findData("google")
         self.provider_combo.setCurrentIndex(selected_index)
         self.provider_combo.blockSignals(False)
 
@@ -4311,6 +4445,95 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             if engine:
                 return str(engine).lower()
         return str(get_cached_config().get("translator_engine", "Google")).lower()
+
+    def _document_translation_pairs(self):
+        if self._provider_engine() == "argos":
+            try:
+                installed = translater.argos_installed_translation_pairs_fast()
+            except Exception:
+                installed = set()
+            app_codes = {language.code for language in APP_LANGUAGES}
+            return {
+                (source, target)
+                for source, target in installed
+                if source in app_codes and target in app_codes
+            }
+        return {
+            (source.code, target.code)
+            for source in APP_LANGUAGES
+            for target in APP_LANGUAGES
+            if source.code != target.code
+        }
+
+    def _refresh_document_provider_languages(self):
+        previous_source = self._source_code() if self.source_combo.count() else "auto"
+        previous_target = (
+            language_code_from_name(self.target_combo.currentText(), self.lang)
+            if self.target_combo.count() else
+            str(get_cached_config().get("main_translation_target_language", "ru") or "ru")
+        )
+        pairs = self._document_translation_pairs()
+        argos = self._provider_engine() == "argos"
+        source_codes = [
+            language.code
+            for language in APP_LANGUAGES
+            if any(source == language.code for source, _target in pairs)
+        ]
+
+        self.source_combo.blockSignals(True)
+        self.target_combo.blockSignals(True)
+        try:
+            self.source_combo.clear()
+            if not argos:
+                self.source_combo.addItem(doc_text(self.lang, "auto_detect"), "auto")
+            for code in source_codes:
+                self.source_combo.addItem(language_display_name(code, self.lang), code)
+            if previous_source == "auto" and not argos:
+                source_code = "auto"
+            elif previous_source in source_codes:
+                source_code = previous_source
+            else:
+                source_code = source_codes[0] if source_codes else ""
+            source_index = self.source_combo.findData(source_code)
+            if source_index >= 0:
+                self.source_combo.setCurrentIndex(source_index)
+
+            if argos:
+                target_codes = [
+                    language.code
+                    for language in APP_LANGUAGES
+                    if (source_code, language.code) in pairs
+                ]
+            else:
+                target_codes = [
+                    language.code
+                    for language in APP_LANGUAGES
+                    if language.code != (source_code if source_code != "auto" else "")
+                ]
+            self.target_combo.clear()
+            for code in target_codes:
+                self.target_combo.addItem(language_display_name(code, self.lang), code)
+            if previous_target not in target_codes and target_codes:
+                previous_target = target_codes[0]
+            target_index = self.target_combo.findData(previous_target)
+            if target_index >= 0:
+                self.target_combo.setCurrentIndex(target_index)
+        finally:
+            self.source_combo.blockSignals(False)
+            self.target_combo.blockSignals(False)
+
+        ready = self.source_combo.count() > 0 and self.target_combo.count() > 0
+        for attribute in ("translate_selected_button", "translate_file_button"):
+            button = getattr(self, attribute, None)
+            if button is not None:
+                button.setEnabled(ready)
+        self._update_metadata()
+
+    def _on_document_provider_changed(self):
+        self._refresh_document_provider_languages()
+
+    def _on_document_source_changed(self):
+        self._refresh_document_provider_languages()
 
     def _provider_name(self):
         return provider_display_name(self._provider_engine(), self.lang)
@@ -4568,6 +4791,42 @@ class DarkThemeApp(QMainWindow):
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
 
+    def _available_main_translation_pairs(self):
+        engine = str(self.config.get("translator_engine", "Google")).strip().lower()
+        if engine == "argos":
+            try:
+                installed = translater.argos_installed_translation_pairs_fast()
+            except Exception:
+                installed = set()
+            app_codes = {language.code for language in APP_LANGUAGES}
+            return {
+                (source, target)
+                for source, target in installed
+                if source in app_codes and target in app_codes
+            }
+        return {
+            (source.code, target.code)
+            for source in APP_LANGUAGES
+            for target in APP_LANGUAGES
+            if source.code != target.code
+        }
+
+    def _main_translation_source_codes(self):
+        pairs = self._available_main_translation_pairs()
+        return [
+            language.code
+            for language in APP_LANGUAGES
+            if any(source == language.code for source, _target in pairs)
+        ]
+
+    def _main_translation_target_codes(self, source_code):
+        pairs = self._available_main_translation_pairs()
+        return [
+            language.code
+            for language in APP_LANGUAGES
+            if (source_code, language.code) in pairs
+        ]
+
     def _configured_main_translation_pair(self):
         source_code = str(
             self.config.get(
@@ -4595,6 +4854,8 @@ class DarkThemeApp(QMainWindow):
         try:
             if source_combo is None or target_combo is None:
                 return
+            if source_combo.count() == 0 or target_combo.count() == 0:
+                return
             source_code = language_code_from_name(
                 source_combo.currentText(), self.current_interface_language
             )
@@ -4614,25 +4875,32 @@ class DarkThemeApp(QMainWindow):
 
     def _restore_main_translation_languages(self):
         source_code, target_code = self._configured_main_translation_pair()
-        source_name = language_display_name(source_code, self.current_interface_language)
-        target_name = language_display_name(target_code, self.current_interface_language)
 
         self.source_lang.blockSignals(True)
         self.target_lang.blockSignals(True)
         try:
-            self.source_lang.setCurrentText(source_name)
-            available_targets = [
-                name for name in LANGUAGES[self.current_interface_language]
-                if name != source_name
-            ]
+            source_codes = self._main_translation_source_codes()
+            self.source_lang.clear()
+            self.source_lang.addItems([
+                language_display_name(code, self.current_interface_language)
+                for code in source_codes
+            ])
+            if source_code not in source_codes and source_codes:
+                source_code = source_codes[0]
+            self.source_lang.setCurrentText(
+                language_display_name(source_code, self.current_interface_language)
+            )
+            target_codes = self._main_translation_target_codes(source_code)
             self.target_lang.clear()
-            self.target_lang.addItems(available_targets)
-            if target_name in available_targets:
-                self.target_lang.setCurrentText(target_name)
-            elif available_targets:
-                self.target_lang.setCurrentText(
-                    language_display_name(default_target_for_source(source_code), self.current_interface_language)
-                )
+            self.target_lang.addItems([
+                language_display_name(code, self.current_interface_language)
+                for code in target_codes
+            ])
+            if target_code not in target_codes and target_codes:
+                target_code = target_codes[0]
+            self.target_lang.setCurrentText(
+                language_display_name(target_code, self.current_interface_language)
+            )
         finally:
             self.source_lang.blockSignals(False)
             self.target_lang.blockSignals(False)
@@ -4641,6 +4909,36 @@ class DarkThemeApp(QMainWindow):
     def _save_main_translation_languages(self):
         self._capture_main_translation_languages()
         self.save_config()
+
+    def _refresh_selection_pair_hint(self):
+        label = getattr(self, "label", None)
+        source_combo = getattr(self, "source_lang", None)
+        target_combo = getattr(self, "target_lang", None)
+        if label is None or source_combo is None or target_combo is None:
+            return
+        try:
+            if source_combo.count() == 0 or target_combo.count() == 0:
+                label.setText("")
+                return
+            hotkey = self.config.get("translate_selection_hotkey", "") or "Ctrl+Alt+Q"
+            label.setText(
+                ui_text(self.current_interface_language, "selection_pair_hint").format(
+                    src=source_combo.currentText(),
+                    tgt=target_combo.currentText(),
+                    hotkey=hotkey,
+                )
+            )
+        except RuntimeError:
+            return
+
+    def _on_main_translation_target_changed(self, *_args):
+        self._save_main_translation_languages()
+        self._refresh_selection_pair_hint()
+
+    def _selected_text_translation_pair(self):
+        """Use the exact language pair chosen on the main translator screen."""
+        self._capture_main_translation_languages()
+        return self._configured_main_translation_pair()
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
@@ -4851,6 +5149,8 @@ class DarkThemeApp(QMainWindow):
             return getattr(settings_window, "ocr_engine_combo", None)
         if action == "translator":
             return getattr(settings_window, "translator_combo", None)
+        if action == "language_packages":
+            return getattr(settings_window, "ocr_languages_btn", None)
         if action == "hotkeys":
             return getattr(settings_window, "hotkeys_button", None)
         return None
@@ -4890,7 +5190,7 @@ class DarkThemeApp(QMainWindow):
             return
         self._guide_bubble = QFrame(self)
         self._guide_bubble.setObjectName("firstRunGuideBubble")
-        self._guide_bubble.setFixedSize(390, 168)
+        self._guide_bubble.setFixedSize(430, 190)
         self._guide_bubble.setStyleSheet("""
             QFrame#firstRunGuideBubble {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -4910,7 +5210,7 @@ class DarkThemeApp(QMainWindow):
             }
             QLabel#firstRunGuideBody {
                 color: #d8d2e8;
-                font-size: 15px;
+                font-size: 14px;
                 line-height: 1.35;
             }
             QLabel#firstRunGuideHint {
@@ -4953,7 +5253,7 @@ class DarkThemeApp(QMainWindow):
         self._guide_body = QLabel()
         self._guide_body.setObjectName("firstRunGuideBody")
         self._guide_body.setWordWrap(True)
-        self._guide_body.setMinimumHeight(66)
+        self._guide_body.setMinimumHeight(86)
         layout.addWidget(self._guide_body)
 
         bottom_row = QHBoxLayout()
@@ -5261,6 +5561,7 @@ class DarkThemeApp(QMainWindow):
     def launch_translate_selection(self):
         """Translate currently selected text: simulate Ctrl+C, read clipboard, translate, show dialog."""
         print("launch_translate_selection called")
+        source_code, target_code = self._selected_text_translation_pair()
 
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
@@ -5290,8 +5591,6 @@ class DarkThemeApp(QMainWindow):
                 lang = self.config.get("interface_language", "ru")
                 status_msg = ui_text(lang, "translating")
                 self._show_status_signal.emit(status_msg)
-                source_code = detect_language_code(text)
-                target_code = default_target_for_source(source_code)
                 print(f"[SEL] translating {source_code}->{target_code}, {len(text)} chars...")
                 from translater import translate_text
                 translated = translate_text(text, source_code, target_code)
@@ -5337,6 +5636,13 @@ class DarkThemeApp(QMainWindow):
         style_sheet = f"""
             QMainWindow {{
                 background-color: {theme['background']};
+            }}
+            QToolTip {{
+                background-color: #17131f;
+                color: #f7f3ff;
+                border: 1px solid #7a5fa1;
+                padding: 6px 9px;
+                font-size: 13px;
             }}
             QLabel {{
                 color: {theme['text_color']};
@@ -5530,6 +5836,17 @@ class DarkThemeApp(QMainWindow):
             self.close_button.setToolTip(INTERFACE_TEXT[lang]["back"])
         if hasattr(self, "tray_icon"):
             self.update_tray_menu()
+        if (
+            getattr(self, "settings_window", None) is None
+            and hasattr(self, "source_lang")
+            and hasattr(self, "target_lang")
+        ):
+            self._restore_main_translation_languages()
+            self._refresh_selection_pair_hint()
+        if getattr(self, "_guide_active", False):
+            # Repaint the current card immediately; previously it retained the
+            # old language until the user advanced to the next step.
+            QTimer.singleShot(0, self._show_guide_step)
 
     def show_interface_language_menu(self):
         menu = QMenu(self)
@@ -5882,22 +6199,10 @@ class DarkThemeApp(QMainWindow):
         translator_engine = cached_config.get("translator_engine", "Google").lower()
         ocr_engine = cached_config.get("ocr_engine", "Windows")
         
-        # Отображаем конкретный переводчик
-        translator_names = {
-            "argos": {"en": "Argos Translate (Offline)", "ru": "Argos Translate (Офлайн)", "es": "Argos Translate (sin conexión)", "de": "Argos Translate (offline)", "fr": "Argos Translate (hors ligne)", "zh": "Argos Translate（离线）"},
-            "hymt": {"en": "Hy-MT Translate (Offline)", "ru": "Hy-MT Translate (Офлайн)", "es": "Hy-MT Translate (sin conexión)", "de": "Hy-MT Translate (offline)", "fr": "Hy-MT Translate (hors ligne)", "zh": "Hy-MT Translate（离线）"},
-            "google": {"en": "Google Translate", "ru": "Google Translate", "es": "Google Translate", "de": "Google Translate", "fr": "Google Translate", "zh": "Google 翻译"},
-            "mymemory": {"en": "MyMemory Translate", "ru": "MyMemory Translate", "es": "MyMemory Translate", "de": "MyMemory Translate", "fr": "MyMemory Translate", "zh": "MyMemory 翻译"},
-            "lingva": {"en": "Lingva Translate", "ru": "Lingva Translate", "es": "Lingva Translate", "de": "Lingva Translate", "fr": "Lingva Translate", "zh": "Lingva 翻译"},
-            "libretranslate": {"en": "LibreTranslate", "ru": "LibreTranslate", "es": "LibreTranslate", "de": "LibreTranslate", "fr": "LibreTranslate", "zh": "LibreTranslate"}
-        }
-        
-        translator_info = translator_names.get(translator_engine, {"en": "Translation", "ru": "Перевод", "es": "Traducción", "de": "Übersetzung", "fr": "Traduction", "zh": "翻译"})
-        lang_label_text = translator_info.get(self.current_interface_language, translator_info["en"])
-        
-        self.label = QLabel(lang_label_text)
+        self.label = QLabel("")
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("color: #7A5FA1; font-size: 18px; font-weight: bold; margin-top: 12px; margin-bottom: 8px;")
+        self.label.setWordWrap(True)
+        self.label.setStyleSheet("color: #a98bd4; font-size: 15px; font-weight: 700; margin-top: 8px; margin-bottom: 5px;")
         self.main_layout.addWidget(self.label)
         self.main_layout.addSpacing(2)
         self.source_lang = QComboBox()
@@ -5906,8 +6211,9 @@ class DarkThemeApp(QMainWindow):
         self.target_lang = QComboBox()
         self.main_layout.addWidget(self.target_lang)
         self._restore_main_translation_languages()
+        self._refresh_selection_pair_hint()
         self.source_lang.currentIndexChanged.connect(self.update_languages)
-        self.target_lang.currentIndexChanged.connect(self._save_main_translation_languages)
+        self.target_lang.currentIndexChanged.connect(self._on_main_translation_target_changed)
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText(
             f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
@@ -5926,6 +6232,12 @@ class DarkThemeApp(QMainWindow):
         self.translate_button = QPushButton(ui_text(self.current_interface_language, "translate_button"))
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setStyleSheet("border: 2px solid #C5B3E9; border-radius: 8px; font-size: 16px; padding: 8px 0; background: none; color: #7A5FA1;")
+        has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
+        self.translate_button.setEnabled(has_translation_pair)
+        if not has_translation_pair:
+            self.translate_button.setToolTip(
+                ui_text(self.current_interface_language, "install_argos_packages_hint")
+            )
         self.main_layout.addWidget(self.translate_button)
 
         # --- Блок хоткеев (показываем всегда) ---
@@ -5989,6 +6301,9 @@ class DarkThemeApp(QMainWindow):
         self._complete_guide_step("settings")
 
     def update_languages(self):
+        if self.source_lang.count() == 0:
+            self.target_lang.clear()
+            return
         src = self.source_lang.currentText()
         source_code = language_code_from_name(src, self.current_interface_language)
         target_code = language_code_from_name(
@@ -5997,9 +6312,11 @@ class DarkThemeApp(QMainWindow):
         if target_code == source_code or get_language(target_code) is None:
             _stored_source, stored_target = self._configured_main_translation_pair()
             target_code = default_target_for_source(source_code, stored_target)
-        available_targets = LANGUAGES[self.current_interface_language][:]
-        if src in available_targets:
-            available_targets.remove(src)
+        available_target_codes = self._main_translation_target_codes(source_code)
+        available_targets = [
+            language_display_name(code, self.current_interface_language)
+            for code in available_target_codes
+        ]
         target_name = language_display_name(target_code, self.current_interface_language)
         self.target_lang.blockSignals(True)
         try:
@@ -6011,7 +6328,10 @@ class DarkThemeApp(QMainWindow):
                 self.target_lang.setCurrentIndex(0)
         finally:
             self.target_lang.blockSignals(False)
+        if hasattr(self, "translate_button"):
+            self.translate_button.setEnabled(self.target_lang.count() > 0)
         self._save_main_translation_languages()
+        self._refresh_selection_pair_hint()
 
     def clear_layout(self):
         # Удаляем все виджеты и layout'ы из main_layout
@@ -6392,24 +6712,27 @@ class DarkThemeApp(QMainWindow):
             return
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
         try:
-            package_installed = translater.argos_pair_installed(source_code, target_code)
+            package_installed = (
+                source_code,
+                target_code,
+            ) in translater.argos_installed_translation_pairs_fast()
         except Exception as exc:
             self._show_argos_translation_error(str(exc), pair_label)
             return
-        if not package_installed and not self._confirm_argos_package_install(pair_label):
+        if not package_installed:
+            self._show_argos_translation_error(
+                ui_text(self.current_interface_language, "install_argos_packages_hint"),
+                pair_label,
+            )
             return
 
         self._argos_translation_running = True
-        self._argos_install_required = not package_installed
-        self._argos_cancel_enabled = not package_installed
+        self._argos_install_required = False
+        self._argos_cancel_enabled = False
         self._argos_active_pair = pair_label
         self._argos_cancel_requested.clear()
         if hasattr(self, "translate_button"):
             self.translate_button.setEnabled(False)
-        if self._argos_install_required:
-            text_label = ui_text(self.current_interface_language, "argos_preparing").format(pair=pair_label)
-            self._show_argos_progress(text_label, determinate=False)
-
         def worker():
             try:
                 translated_text = translater.translate_text(
@@ -6417,11 +6740,6 @@ class DarkThemeApp(QMainWindow):
                     source_code,
                     target_code,
                     engine="argos",
-                    status_callback=lambda message: self._argos_status_signal.emit(str(message)),
-                    progress_callback=lambda message, done, total: self._argos_progress_signal.emit(
-                        str(message), int(done), int(total)
-                    ),
-                    cancel_callback=lambda: self._argos_cancel_requested.is_set(),
                 )
                 self._argos_translation_done_signal.emit(str(translated_text or ""))
             except translater.ArgosInstallCancelledError:

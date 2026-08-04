@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.5.1",
+    [string]$Version = "1.5.2",
     [switch]$SkipPyInstaller
 )
 
@@ -60,8 +60,8 @@ Copy-Item `
 $required = @(
     "ClicknTranslate.exe",
     "app\ClicknTranslateApp.exe",
-    "app\ArgosWorker.exe",
-    "app\OcrWorker.exe",
+    "app\_internal\ArgosWorker.exe",
+    "app\_internal\OcrWorker.exe",
     "app\_internal",
     "README.md"
 )

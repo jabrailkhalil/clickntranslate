@@ -9,6 +9,8 @@ def test_installer_uses_the_verified_launcher_release_layout():
 
     assert '#define MyAppId "{{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}"' in source
     assert 'AppId={#MyAppId}' in source
+    assert 'AppVerName={#MyAppName}' in source
+    assert 'AppVerName={#MyAppName} {#MyAppVersion}' not in source
     assert 'ClicknTranslate-v" + MyAppVersion + "-win64-stage\\ClicknTranslate' in source
     assert "ClicknTranslate-Setup-v{#MyAppVersion}-win64" in source
     assert 'Excludes: "data\\*"' in source
@@ -18,6 +20,12 @@ def test_installer_uses_the_verified_launcher_release_layout():
     assert "CloseApplications=force" in source
     assert "CloseApplicationsFilter=*.*" in source
     assert "RestartApplications=no" in source
+
+    stage_source = (ROOT / "tools" / "stage_release.ps1").read_text(encoding="utf-8")
+    assert '"app\\_internal\\ArgosWorker.exe"' in stage_source
+    assert '"app\\_internal\\OcrWorker.exe"' in stage_source
+    assert '"app\\ArgosWorker.exe"' not in stage_source
+    assert '"app\\OcrWorker.exe"' not in stage_source
 
 
 def test_legacy_update_bootstrap_runs_the_verified_inno_installer():

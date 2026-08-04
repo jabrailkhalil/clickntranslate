@@ -4,7 +4,7 @@
 
 ### The best screen translation and OCR app for Windows.
 
-[**Download for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.1-win64.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.1-win64.zip) · [Latest release](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[**Download for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.2-win64.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.2-win64.zip) · [Latest release](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 ![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
@@ -56,7 +56,7 @@ No other tool in this segment brings this much OCR choice, online and offline tr
 
 ## Get started
 
-1. Download and run the **[Windows installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.1-win64.exe)**.
+1. Download and run the **[Windows installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.2-win64.exe)**.
 2. Launch Click'n'Translate and choose your interface, OCR, and translation languages.
 3. Press `Ctrl + Alt + T`, select an area, and receive the translation.
 4. For offline translation or extra OCR engines, open **Settings → Language packages** and install only what you need.
@@ -65,11 +65,11 @@ No Python installation or account is required. Windows 10 or Windows 11 x64 is s
 
 ### Portable version
 
-Download the [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.1-win64.zip), extract it to a permanent folder, and run `ClicknTranslate.exe`. Move the folder before enabling autostart or creating shortcuts.
+Download the [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.2-win64.zip), extract it to a permanent folder, and run `ClicknTranslate.exe`. Move the folder before enabling autostart or creating shortcuts.
 
 ### Updating from an older version
 
-The updater in versions older than 1.5.0 cannot install the current release reliably. If you are upgrading from 1.4.x, close the old app and install 1.5.1 manually once. Users already on 1.5.0 can update to 1.5.1 from inside the app.
+The updater in versions older than 1.5.0 cannot install the current release reliably. If you are upgrading from 1.4.x, close the old app and install 1.5.2 manually once. Users on 1.5.0 or newer can update to 1.5.2 from inside the app.
 
 ## The best choice for everyday use
 
