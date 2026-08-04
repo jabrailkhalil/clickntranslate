@@ -23,6 +23,22 @@ internal static class ClicknTranslateLauncher
             RestoreInstallerMetadata(root);
             SyncInstalledVersion(root);
 
+            string updateMarker = Path.Combine(root, "data", ".update-in-progress");
+            if (File.Exists(updateMarker))
+            {
+                DateTime markerTime = File.GetLastWriteTimeUtc(updateMarker);
+                if (DateTime.UtcNow - markerTime < TimeSpan.FromHours(2))
+                {
+                    SilentWinFormsDialog.Show(
+                        "Click'n'Translate is finishing an update. The updated window will open automatically.",
+                        "Click'n'Translate update",
+                        MessageBoxButtons.OK
+                    );
+                    return 0;
+                }
+                try { File.Delete(updateMarker); } catch { }
+            }
+
             if (!File.Exists(innerExecutable))
             {
                 throw new FileNotFoundException("The application executable was not found.", innerExecutable);
@@ -35,17 +51,21 @@ internal static class ClicknTranslateLauncher
                 UseShellExecute = false,
                 Arguments = JoinArguments(args),
             };
-            Process.Start(startInfo);
+            Process started = Process.Start(startInfo);
+            if (started == null)
+            {
+                throw new InvalidOperationException("Windows did not start the application process.");
+            }
+            WriteUpdateAcknowledgement(args);
             return 0;
         }
         catch (Exception error)
         {
             WriteFailureLog(error);
-            MessageBox.Show(
+            SilentWinFormsDialog.Show(
                 "Click'n'Translate could not be started.\n\n" + error.Message,
                 "Click'n'Translate",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
+                MessageBoxButtons.OK
             );
             return 1;
         }
@@ -128,6 +148,35 @@ internal static class ClicknTranslateLauncher
     private static string JoinArguments(string[] args)
     {
         return string.Join(" ", args.Select(QuoteArgument));
+    }
+
+    private static void WriteUpdateAcknowledgement(string[] args)
+    {
+        string prefix = "--update-ack=";
+        string argument = args.FirstOrDefault(value => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            return;
+        }
+        string path = argument.Substring(prefix.Length).Trim().Trim('"');
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+        try
+        {
+            string directory = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            Version version = Assembly.GetExecutingAssembly().GetName().Version;
+            File.WriteAllText(path, string.Format("{0}.{1}.{2}", version.Major, version.Minor, version.Build));
+        }
+        catch (Exception error)
+        {
+            WriteFailureLog(new InvalidOperationException("Could not write the update acknowledgement.", error));
+        }
     }
 
     private static string QuoteArgument(string value)

@@ -4,7 +4,7 @@
 
 ### Лучшая программа для перевода экрана и OCR на Windows.
 
-[**Скачать для Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.2-win64.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.2-win64.zip) · [Последний релиз](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[**Скачать для Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.2-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.2-windows-portable-x64.zip) · [Последний релиз](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 ![Последний релиз](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
@@ -56,7 +56,7 @@ Click'n'Translate — лучшая универсальная программа
 
 ## Быстрый старт
 
-1. Скачайте и запустите **[установщик Windows](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-Setup-v1.5.2-win64.exe)**.
+1. Скачайте и запустите **[установщик Windows](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.2-windows-x64-installer.exe)**.
 2. Запустите Click'n'Translate и выберите язык интерфейса, OCR и перевода.
 3. Нажмите `Ctrl + Alt + T`, выделите область и получите перевод.
 4. Для офлайн-перевода или дополнительных OCR откройте **Настройки → Языковые пакеты** и установите только нужные компоненты.
@@ -65,7 +65,7 @@ Python и регистрация не нужны. Поддерживаются 6
 
 ### Portable-версия
 
-Скачайте [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/ClicknTranslate-v1.5.2-win64.zip), распакуйте в постоянную папку и запустите `ClicknTranslate.exe`. Переместите папку до включения автозапуска или создания ярлыков.
+Скачайте [portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.2-windows-portable-x64.zip), распакуйте в постоянную папку и запустите `ClicknTranslate.exe`. Переместите папку до включения автозапуска или создания ярлыков.
 
 ### Обновление со старой версии
 

@@ -5090,67 +5090,95 @@ class FullScreenTranslateOverlay(QWidget):
         self._ocr_scale_y = (self.screenshot.height() / geo.height()) if geo.height() and not self.screenshot.isNull() else 1.0
         self.setGeometry(geo)
 
-        # --- Комбо-бокс выбора направления перевода (как в обычном overlay) ---
+        # Full-screen OCR needs an installed Windows OCR language, while the
+        # translation target depends on the selected translator. Keep these as
+        # two independent controls so any valid direction can be chosen.
         self.lang_combo = QtWidgets.QComboBox(self)
+        self.target_lang_combo = QtWidgets.QComboBox(self)
+        self.translate_arrow_label = QtWidgets.QLabel("\u2192", self)
         fullscreen_config = dict(config)
         # Positional full-screen OCR uses Windows OCR's native line geometry.
         fullscreen_config["ocr_engine"] = "Windows"
-        for source_code, target_code in _ocr_translate_options_from_config(fullscreen_config):
+        available_sources = installed_ocr_language_codes(config=fullscreen_config)
+        if str(config.get("translator_engine", "Google")).strip().lower() == "argos":
+            available_sources = [
+                code for code in available_sources
+                if _translation_targets_for_source(code, config)
+            ]
+        for language in APP_LANGUAGES:
+            if language.code not in available_sources:
+                continue
             self.lang_combo.addItem(
-                QtGui.QIcon(resource_path(language_icon_path(source_code))),
-                f"{language_short_label(source_code)} \u2192 {language_short_label(target_code)}",
-                (source_code, target_code),
+                QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                language.short_label,
+                language.code,
             )
-        no_language_pairs = self.lang_combo.count() == 0
-        if no_language_pairs:
+        no_source_languages = self.lang_combo.count() == 0
+        if no_source_languages:
             self.lang_combo.addItem(
-                ocr_ui_text(config.get("interface_language", "en"), "no_installed_translation_pairs"),
+                ocr_ui_text(config.get("interface_language", "en"), "no_installed_languages"),
                 None,
             )
         # Восстанавливаем последний выбор
-        default_idx = _find_translate_pair_index(self.lang_combo, saved_src, saved_tgt)
-        if default_idx < 0:
-            default_idx = _find_translate_pair_index(self.lang_combo, saved_src)
+        default_idx = self.lang_combo.findData(saved_src)
         if default_idx < 0:
             default_idx = 0
         self.lang_combo.setCurrentIndex(default_idx)
 
-        self.lang_combo.setIconSize(QtCore.QSize(32, 32))
-        self.lang_combo.setStyleSheet("""
+        self.translate_arrow_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.translate_arrow_label.setStyleSheet("""
+            QLabel {
+                color: #d8e3f2;
+                font-size: 20px;
+                font-weight: 700;
+                background-color: rgba(22, 25, 31, 244);
+                border: 1px solid rgba(105, 123, 150, 130);
+                border-radius: 11px;
+            }
+        """)
+        combo_style = """
             QComboBox {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(60, 60, 60, 240),
-                    stop:0.5 rgba(45, 45, 45, 245),
-                    stop:1 rgba(35, 35, 35, 250));
-                color: #e8e8e8;
-                border: 1px solid rgba(80, 80, 80, 200);
-                border-radius: 8px;
-                padding: 8px 14px;
+                background-color: rgba(25, 29, 37, 248);
+                color: #f6f8fb;
+                border: 1px solid rgba(110, 130, 158, 155);
+                border-radius: 11px;
+                padding: 7px 9px;
                 font-size: 15px;
-                font-weight: 600;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: 750;
+                font-family: 'Segoe UI Semibold', 'Segoe UI', Arial, sans-serif;
             }
             QComboBox:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(75, 75, 75, 245),
-                    stop:1 rgba(45, 45, 45, 255));
-                border: 1px solid rgba(100, 100, 100, 220);
+                background-color: rgba(31, 37, 48, 252);
+                border: 1px solid rgba(145, 171, 205, 190);
             }
-            QComboBox::drop-down { border: none; width: 20px; }
-            QComboBox::down-arrow { image: none; width: 0; }
+            QComboBox::drop-down { border: none; width: 0px; }
+            QComboBox::down-arrow { image: none; width: 0px; height: 0px; }
             QComboBox QAbstractItemView {
-                background-color: rgba(40, 40, 40, 252);
-                color: #e8e8e8;
-                border: 1px solid rgba(80, 80, 80, 200);
-                border-radius: 6px;
-                padding: 4px;
-                selection-background-color: rgba(80, 130, 200, 180);
+                background-color: #11151c;
+                color: #f5f7fa;
+                border: 1px solid rgba(92, 112, 140, 210);
+                border-radius: 12px;
+                padding: 7px 3px 7px 5px;
+                selection-background-color: #365172;
                 outline: none;
             }
-            QComboBox QAbstractItemView::item { padding: 8px 12px; border-radius: 4px; margin: 2px; }
-            QComboBox QAbstractItemView::item:hover { background-color: rgba(70, 70, 70, 200); }
-        """)
-        self.lang_combo.setFixedSize(190, 48)
+            QComboBox QAbstractItemView::item {
+                min-height: 32px;
+                padding: 4px 7px;
+                border-radius: 9px;
+                margin: 2px 4px 2px 1px;
+            }
+            QComboBox QAbstractItemView::item:hover { background-color: #243044; }
+        """
+        for combo in (self.lang_combo, self.target_lang_combo):
+            combo.setIconSize(QtCore.QSize(30, 30))
+            combo.setStyleSheet(combo_style)
+            combo.view().setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+            combo.view().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            combo.view().setTextElideMode(QtCore.Qt.ElideNone)
+            combo.setFixedSize(112, 48)
+        self.translate_arrow_label.setFixedSize(32, 48)
+        self._populate_fullscreen_target_combo(saved_tgt)
 
         # --- Кнопка запуска перевода ---
         config_lang = config.get("interface_language", "en")
@@ -5181,15 +5209,26 @@ class FullScreenTranslateOverlay(QWidget):
         self.go_button.setFixedSize(140, 48)
         self.go_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.go_button.clicked.connect(self._on_go_clicked)
-        self.go_button.setEnabled(not no_language_pairs)
-        self.lang_combo.setEnabled(not no_language_pairs)
+        self.lang_combo.currentIndexChanged.connect(self._on_fullscreen_source_changed)
+        self.target_lang_combo.currentIndexChanged.connect(self._persist_fullscreen_pair)
+        controls_enabled = not no_source_languages and self.target_lang_combo.currentData() is not None
+        self.go_button.setEnabled(controls_enabled)
+        self.lang_combo.setEnabled(not no_source_languages)
+        self.target_lang_combo.setEnabled(controls_enabled)
 
         # Позиционируем элементы по центру сверху
-        total_w = self.lang_combo.width() + 12 + self.go_button.width()
+        total_w = (
+            self.lang_combo.width() + 8 + self.translate_arrow_label.width() + 8
+            + self.target_lang_combo.width() + 12 + self.go_button.width()
+        )
         start_x = (geo.width() - total_w) // 2
         top_y = 30
         self.lang_combo.move(start_x, top_y)
-        self.go_button.move(start_x + self.lang_combo.width() + 12, top_y)
+        next_x = start_x + self.lang_combo.width() + 8
+        self.translate_arrow_label.move(next_x, top_y)
+        next_x += self.translate_arrow_label.width() + 8
+        self.target_lang_combo.move(next_x, top_y)
+        self.go_button.move(next_x + self.target_lang_combo.width() + 12, top_y)
 
         logging.info(f"FullScreenOverlay: screen geo={geo}, screenshot size={self.screenshot.width()}x{self.screenshot.height()}")
 
@@ -5197,23 +5236,72 @@ class FullScreenTranslateOverlay(QWidget):
         self.raise_()
         self.activateWindow()
 
+    def _populate_fullscreen_target_combo(self, selected_target=None):
+        source_code = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
+        target_code = default_target_for_source(source_code, selected_target)
+        self.target_lang_combo.blockSignals(True)
+        try:
+            self.target_lang_combo.clear()
+            available_targets = _translation_targets_for_source(source_code, get_cached_ocr_config())
+            for language in APP_LANGUAGES:
+                if language.code not in available_targets:
+                    continue
+                self.target_lang_combo.addItem(
+                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    language.short_label,
+                    language.code,
+                )
+            if self.target_lang_combo.count() == 0:
+                interface_language = get_cached_ocr_config().get("interface_language", "en")
+                self.target_lang_combo.addItem(
+                    ocr_ui_text(interface_language, "no_installed_translation_pairs"),
+                    None,
+                )
+                self.target_lang_combo.setEnabled(False)
+            else:
+                idx = self.target_lang_combo.findData(target_code)
+                self.target_lang_combo.setCurrentIndex(idx if idx >= 0 else 0)
+                self.target_lang_combo.setEnabled(True)
+        finally:
+            self.target_lang_combo.blockSignals(False)
+
+    def _on_fullscreen_source_changed(self):
+        previous_target = self.target_lang_combo.currentData()
+        self._populate_fullscreen_target_combo(previous_target)
+        self._persist_fullscreen_pair()
+
+    def _persist_fullscreen_pair(self):
+        source_code = self.lang_combo.currentData()
+        target_code = self.target_lang_combo.currentData()
+        valid = source_code in APP_LANGUAGE_CODES and target_code in APP_LANGUAGE_CODES and source_code != target_code
+        self.go_button.setEnabled(bool(valid))
+        if valid:
+            _write_ocr_config_updates({
+                "fullscreen_translate_from": source_code,
+                "fullscreen_translate_to": target_code,
+            })
+
     def _on_go_clicked(self):
         """Запуск OCR + перевода по нажатию кнопки."""
-        lang_data = self.lang_combo.currentData()
-        self.src_lang, self.tgt_lang = _combo_data_to_translate_pair(lang_data, get_cached_ocr_config())
+        self.src_lang = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
+        self.tgt_lang = _normalize_app_language_code(
+            self.target_lang_combo.currentData(),
+            default_target_for_source(self.src_lang),
+        )
+        if self.src_lang == self.tgt_lang:
+            return
         self.ocr_language = self.src_lang
 
         # Сохраняем выбор в конфиг
         _write_ocr_config_updates({
             "fullscreen_translate_from": self.src_lang,
             "fullscreen_translate_to": self.tgt_lang,
-            "ocr_translate_source_language": self.src_lang,
-            "ocr_translate_target_language": self.tgt_lang,
-            "last_ocr_language": self.src_lang,
         })
 
         # Скрываем UI, показываем загрузку
         self.lang_combo.hide()
+        self.translate_arrow_label.hide()
+        self.target_lang_combo.hide()
         self.go_button.hide()
         self.loading = True
         self.translated_blocks.clear()

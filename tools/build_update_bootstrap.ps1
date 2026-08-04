@@ -57,11 +57,13 @@ using System.Reflection;
         /optimize+ `
         /reference:System.dll `
         /reference:System.Core.dll `
+        /reference:System.Drawing.dll `
         /reference:System.Windows.Forms.dll `
         "/win32icon:$root\icons\icon.ico" `
         "/win32manifest:$root\launcher\ClicknTranslateUpdateBootstrap.manifest" `
         "/out:$bootstrapPath" `
         "$root\launcher\ClicknTranslateUpdateBootstrap.cs" `
+        "$root\launcher\SilentWinFormsDialog.cs" `
         $versionSource
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $bootstrapPath)) {
         throw "Update bootstrap compilation failed with exit code $LASTEXITCODE."

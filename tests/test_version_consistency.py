@@ -39,5 +39,5 @@ def test_readmes_link_to_current_release_assets():
         "docs/readme/README.fr.md",
     ):
         content = _read(relative_path)
-        assert f"ClicknTranslate-Setup-v{version}-win64.exe" in content
-        assert f"ClicknTranslate-v{version}-win64.zip" in content
+        assert f"Click-n-Translate-{version}-windows-x64-installer.exe" in content
+        assert f"Click-n-Translate-{version}-windows-portable-x64.zip" in content

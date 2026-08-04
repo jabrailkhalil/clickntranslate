@@ -6925,31 +6925,51 @@ if __name__ == "__main__":
         ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), HIGH_PRIORITY_CLASS)
     except Exception:
         pass
-    # Прогрев OCR, чтобы первый запуск оверлея был быстрее
-    try:
-        from ocr import warm_up, prepare_overlay
-        import logging
-        # Логируем настройки при старте
-        config = get_cached_config()
-        logging.info("=" * 50)
-        logging.info("ClicknTranslate Started")
-        logging.info(f"OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
-        logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
-        logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
-        logging.info("=" * 50)
-        warm_up()
-        # Подготовим заранее все режимы оверлея
-        prepare_overlay("ocr")
-        prepare_overlay("copy")
-        prepare_overlay("translate")
-    except Exception:
-        pass
+    def _warm_up_after_window_is_visible():
+        try:
+            from ocr import warm_up, prepare_overlay
+            config = get_cached_config()
+            logging.info("=" * 50)
+            logging.info("ClicknTranslate Started")
+            logging.info(f"OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
+            logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
+            logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
+            logging.info("=" * 50)
+            warm_up()
+            prepare_overlay("ocr")
+            prepare_overlay("copy")
+            prepare_overlay("translate")
+        except Exception:
+            logging.exception("Background OCR warm-up failed")
     window = DarkThemeApp()
     _main_window_ref = window
-    # Всегда используем window.start_minimized, который инициализирован из config.json
-    # Проверку на повторный запуск is_already_running() убрали
-    if window.start_minimized:
+    # После обновления главное окно всегда показывается: пользователь должен
+    # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
+    show_after_update = "--show-after-update" in sys.argv
+    if window.start_minimized and not show_after_update:
         window.minimize_to_tray()
     else:
         window.show()
+        if show_after_update:
+            window.showNormal()
+            window.raise_()
+            window.activateWindow()
+    for argument in sys.argv[1:]:
+        if not argument.startswith("--update-ack="):
+            continue
+        ack_path = argument.split("=", 1)[1].strip()
+        if ack_path:
+            try:
+                ack_parent = os.path.dirname(os.path.abspath(ack_path))
+                os.makedirs(ack_parent, exist_ok=True)
+                with open(ack_path, "w", encoding="utf-8") as ack_file:
+                    ack_file.write(APP_VERSION)
+            except Exception:
+                pass
+        break
+    threading.Thread(
+        target=_warm_up_after_window_is_visible,
+        name="ClicknTranslateStartupWarmup",
+        daemon=True,
+    ).start()
     app.exec_()

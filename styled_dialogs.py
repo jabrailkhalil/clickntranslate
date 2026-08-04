@@ -515,3 +515,393 @@ class StyledMessageBox(QtWidgets.QMessageBox):
             (cls.Yes | cls.No) if buttons is None else buttons,
             cls.NoButton if defaultButton is None else defaultButton,
         )
+
+
+class SilentStyledMessageBox(QtWidgets.QDialog):
+    """A QMessageBox-compatible dialog that never asks Windows to play a sound."""
+
+    NoIcon = QtWidgets.QMessageBox.NoIcon
+    Information = QtWidgets.QMessageBox.Information
+    Warning = QtWidgets.QMessageBox.Warning
+    Critical = QtWidgets.QMessageBox.Critical
+    Question = QtWidgets.QMessageBox.Question
+
+    NoButton = QtWidgets.QMessageBox.NoButton
+    Ok = QtWidgets.QMessageBox.Ok
+    Save = QtWidgets.QMessageBox.Save
+    SaveAll = QtWidgets.QMessageBox.SaveAll
+    Open = QtWidgets.QMessageBox.Open
+    Yes = QtWidgets.QMessageBox.Yes
+    YesToAll = QtWidgets.QMessageBox.YesToAll
+    No = QtWidgets.QMessageBox.No
+    NoToAll = QtWidgets.QMessageBox.NoToAll
+    Abort = QtWidgets.QMessageBox.Abort
+    Retry = QtWidgets.QMessageBox.Retry
+    Ignore = QtWidgets.QMessageBox.Ignore
+    Close = QtWidgets.QMessageBox.Close
+    Cancel = QtWidgets.QMessageBox.Cancel
+    Discard = QtWidgets.QMessageBox.Discard
+    Help = QtWidgets.QMessageBox.Help
+    Apply = QtWidgets.QMessageBox.Apply
+    Reset = QtWidgets.QMessageBox.Reset
+    RestoreDefaults = QtWidgets.QMessageBox.RestoreDefaults
+
+    InvalidRole = QtWidgets.QMessageBox.InvalidRole
+    AcceptRole = QtWidgets.QMessageBox.AcceptRole
+    RejectRole = QtWidgets.QMessageBox.RejectRole
+    DestructiveRole = QtWidgets.QMessageBox.DestructiveRole
+    ActionRole = QtWidgets.QMessageBox.ActionRole
+    HelpRole = QtWidgets.QMessageBox.HelpRole
+    YesRole = QtWidgets.QMessageBox.YesRole
+    NoRole = QtWidgets.QMessageBox.NoRole
+    ApplyRole = QtWidgets.QMessageBox.ApplyRole
+    ResetRole = QtWidgets.QMessageBox.ResetRole
+
+    _STANDARD_BUTTONS = (
+        (Ok, "OK", AcceptRole),
+        (Save, "Save", AcceptRole),
+        (SaveAll, "Save all", AcceptRole),
+        (Open, "Open", AcceptRole),
+        (Yes, "Yes", YesRole),
+        (YesToAll, "Yes to all", YesRole),
+        (No, "No", NoRole),
+        (NoToAll, "No to all", NoRole),
+        (Abort, "Abort", RejectRole),
+        (Retry, "Retry", AcceptRole),
+        (Ignore, "Ignore", AcceptRole),
+        (Close, "Close", RejectRole),
+        (Cancel, "Cancel", RejectRole),
+        (Discard, "Discard", DestructiveRole),
+        (Help, "Help", HelpRole),
+        (Apply, "Apply", ApplyRole),
+        (Reset, "Reset", ResetRole),
+        (RestoreDefaults, "Restore defaults", ResetRole),
+    )
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._dark = _uses_dark_theme(parent)
+        self._external_stylesheet = ""
+        self._message_icon = self.NoIcon
+        self._clicked_button = None
+        self._button_roles = {}
+        self._button_standards = {}
+        self._standard_buttons = self.NoButton
+        self._text_format = QtCore.Qt.AutoText
+        self._positioned = False
+
+        self.setWindowFlags(
+            QtCore.Qt.Dialog
+            | QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.WindowSystemMenuHint
+        )
+        self.setModal(True)
+        self.setObjectName("styledMessageBox")
+        self.setMinimumWidth(500)
+        self.setMaximumWidth(650)
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(1, 1, 1, 1)
+        outer.setSpacing(0)
+        self.title_bar = _TitleBar(self)
+        outer.addWidget(self.title_bar)
+
+        body = QtWidgets.QVBoxLayout()
+        body.setContentsMargins(20, 18, 20, 16)
+        body.setSpacing(12)
+        outer.addLayout(body)
+
+        message_row = QtWidgets.QHBoxLayout()
+        message_row.setSpacing(14)
+        self.status_label = QtWidgets.QLabel(self)
+        self.status_label.setObjectName("styledMessageStatus")
+        self.status_label.setFixedSize(48, 48)
+        self.status_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.status_label.hide()
+        message_row.addWidget(self.status_label, 0, QtCore.Qt.AlignTop)
+
+        text_column = QtWidgets.QVBoxLayout()
+        text_column.setSpacing(8)
+        self.message_label = QtWidgets.QLabel(self)
+        self.message_label.setObjectName("styledMessageText")
+        self.message_label.setWordWrap(True)
+        self.message_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.message_label.setMaximumWidth(505)
+        text_column.addWidget(self.message_label)
+        self.informative_label = QtWidgets.QLabel(self)
+        self.informative_label.setObjectName("styledMessageInformation")
+        self.informative_label.setWordWrap(True)
+        self.informative_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.informative_label.setMaximumWidth(505)
+        self.informative_label.hide()
+        text_column.addWidget(self.informative_label)
+        message_row.addLayout(text_column, 1)
+        body.addLayout(message_row)
+
+        self.details_edit = QtWidgets.QPlainTextEdit(self)
+        self.details_edit.setObjectName("styledMessageDetails")
+        self.details_edit.setReadOnly(True)
+        self.details_edit.setMaximumHeight(145)
+        self.details_edit.hide()
+        body.addWidget(self.details_edit)
+
+        self.button_row = QtWidgets.QHBoxLayout()
+        self.button_row.setSpacing(8)
+        self.button_row.addStretch(1)
+        body.addLayout(self.button_row)
+        self._apply_style()
+
+    def setWindowTitle(self, title):
+        super().setWindowTitle(str(title))
+        self.title_bar.title_label.setText(str(title))
+
+    def setWindowIcon(self, icon):
+        super().setWindowIcon(icon)
+        if isinstance(icon, QtGui.QIcon) and not icon.isNull():
+            self.title_bar.icon_label.setPixmap(icon.pixmap(18, 18))
+
+    def setText(self, text):
+        self.message_label.setTextFormat(self._text_format)
+        self.message_label.setText(str(text or ""))
+
+    def text(self):
+        return self.message_label.text()
+
+    def setTextFormat(self, text_format):
+        self._text_format = text_format
+        self.message_label.setTextFormat(text_format)
+
+    def setInformativeText(self, text):
+        value = str(text or "")
+        self.informative_label.setText(value)
+        self.informative_label.setVisible(bool(value))
+
+    def informativeText(self):
+        return self.informative_label.text()
+
+    def setDetailedText(self, text):
+        value = str(text or "")
+        self.details_edit.setPlainText(value)
+        self.details_edit.setVisible(bool(value))
+
+    def detailedText(self):
+        return self.details_edit.toPlainText()
+
+    def setIcon(self, icon):
+        self._message_icon = icon
+        self._refresh_status_icon()
+
+    def icon(self):
+        return self._message_icon
+
+    def setIconPixmap(self, pixmap):
+        self._message_icon = None
+        self.status_label.setPixmap(pixmap)
+        self.status_label.setVisible(not pixmap.isNull())
+
+    def _status_color_and_glyph(self):
+        if self._message_icon == self.Question:
+            return "#2788d7", "?"
+        if self._message_icon == self.Warning:
+            return "#e7a619", "!"
+        if self._message_icon == self.Critical:
+            return "#d94a4a", "×"
+        if self._message_icon == self.Information:
+            return "#7959a0", "i"
+        return None, ""
+
+    def _status_pixmap(self, size=42):
+        color, glyph = self._status_color_and_glyph()
+        if color is None:
+            return QtGui.QPixmap()
+        ratio = max(1.0, float(self.devicePixelRatioF()))
+        pixmap = QtGui.QPixmap(int(size * ratio), int(size * ratio))
+        pixmap.setDevicePixelRatio(ratio)
+        pixmap.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(color))
+        painter.drawEllipse(QtCore.QRectF(2, 2, size - 4, size - 4))
+        font = QtGui.QFont("Segoe UI", 21, QtGui.QFont.Bold)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#ffffff"))
+        painter.drawText(QtCore.QRectF(0, 0, size, size), QtCore.Qt.AlignCenter, glyph)
+        painter.end()
+        return pixmap
+
+    def _refresh_status_icon(self):
+        pixmap = self._status_pixmap()
+        self.status_label.setPixmap(pixmap)
+        self.status_label.setVisible(not pixmap.isNull())
+
+    def _clear_buttons(self):
+        for button in list(self._button_roles):
+            self.button_row.removeWidget(button)
+            button.deleteLater()
+        self._button_roles.clear()
+        self._button_standards.clear()
+        self._clicked_button = None
+
+    def addButton(self, button_or_text, role=None):
+        if isinstance(button_or_text, QtWidgets.QAbstractButton):
+            button = button_or_text
+            actual_role = self.ActionRole if role is None else role
+        elif role is None and isinstance(button_or_text, int):
+            standard = button_or_text
+            label, actual_role = self._standard_button_details(standard)
+            button = QtWidgets.QPushButton(label, self)
+            self._button_standards[button] = standard
+        else:
+            button = QtWidgets.QPushButton(str(button_or_text), self)
+            actual_role = self.ActionRole if role is None else role
+        self._button_roles[button] = actual_role
+        button.clicked.connect(lambda _checked=False, current=button: self._button_clicked(current))
+        self.button_row.addWidget(button)
+        return button
+
+    def _standard_button_details(self, standard):
+        for value, label, role in self._STANDARD_BUTTONS:
+            if value == standard:
+                return label, role
+        return "OK", self.AcceptRole
+
+    def setStandardButtons(self, buttons):
+        self._clear_buttons()
+        self._standard_buttons = buttons
+        for standard, _label, _role in self._STANDARD_BUTTONS:
+            if buttons & standard:
+                self.addButton(standard)
+
+    def standardButtons(self):
+        return self._standard_buttons
+
+    def setDefaultButton(self, button):
+        if isinstance(button, int):
+            button = self.button(button)
+        if isinstance(button, QtWidgets.QPushButton):
+            button.setDefault(True)
+            button.setFocus(QtCore.Qt.OtherFocusReason)
+
+    def setEscapeButton(self, button):
+        self._escape_button = self.button(button) if isinstance(button, int) else button
+
+    def button(self, standard):
+        for button, value in self._button_standards.items():
+            if value == standard:
+                return button
+        return None
+
+    def clickedButton(self):
+        return self._clicked_button
+
+    def buttonRole(self, button):
+        return self._button_roles.get(button, self.InvalidRole)
+
+    def standardButton(self, button):
+        return self._button_standards.get(button, self.NoButton)
+
+    def _button_clicked(self, button):
+        self._clicked_button = button
+        standard = self._button_standards.get(button, self.NoButton)
+        role = self._button_roles.get(button, self.InvalidRole)
+        result = standard if standard != self.NoButton else QtWidgets.QDialog.Accepted
+        if role in (self.RejectRole, self.NoRole):
+            result = standard if standard != self.NoButton else QtWidgets.QDialog.Rejected
+        self.done(result)
+
+    def setStyleSheet(self, style):
+        self._external_stylesheet = str(style or "")
+        if re.search(r"QMessageBox\s*\{[^}]*background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white)", self._external_stylesheet, re.I | re.S):
+            self._dark = False
+        elif re.search(r"QMessageBox\s*\{[^}]*background(?:-color)?\s*:\s*(?:#(?:0[0-9a-f]{5}|1[0-9a-f]{5}|2[0-9a-f]{5})|black)", self._external_stylesheet, re.I | re.S):
+            self._dark = True
+        self._apply_style()
+
+    def _apply_style(self):
+        dark = self._dark
+        background = "#101114" if dark else "#f8f8fb"
+        panel = "#17181d" if dark else "#ffffff"
+        text = "#f5f5f7" if dark else "#17171a"
+        muted = "#b8b8c2" if dark else "#55545e"
+        border = "#33313c" if dark else "#d7d3df"
+        button = "#211f28" if dark else "#ffffff"
+        button_hover = "#322d3d" if dark else "#eee9f5"
+        qss = f"""
+            QDialog#styledMessageBox {{ background: {background}; color: {text}; border: 1px solid {border}; }}
+            QFrame#styledMessageTitleBar {{ background: #151515; border: none; border-bottom: 1px solid #29292d; }}
+            QLabel#styledMessageTitle {{ color: #f7f7f7; background: transparent; border: none; font-size: 13px; font-weight: 600; }}
+            QLabel#styledMessageAppIcon {{ background: transparent; border: none; }}
+            QToolButton#styledMessageClose {{ color: #eeeeee; background: transparent; border: none; border-radius: 4px; font-size: 22px; }}
+            QToolButton#styledMessageClose:hover {{ color: #ffffff; background: #c42b1c; }}
+            QLabel#styledMessageText {{ color: {text}; font-size: 13px; background: transparent; }}
+            QLabel#styledMessageInformation {{ color: {muted}; font-size: 12px; background: transparent; }}
+            QPlainTextEdit#styledMessageDetails {{ color: {muted}; background: {panel}; border: 1px solid {border}; border-radius: 5px; padding: 7px; }}
+            QDialog#styledMessageBox QPushButton {{ min-width: 92px; min-height: 34px; padding: 0 14px; color: {text}; background: {button}; border: 1px solid #8060a8; border-radius: 5px; font-size: 13px; font-weight: 500; }}
+            QDialog#styledMessageBox QPushButton:hover {{ background: {button_hover}; border-color: #a985d2; }}
+            QDialog#styledMessageBox QPushButton:pressed {{ background: #735397; color: #ffffff; }}
+            QDialog#styledMessageBox QPushButton:default {{ background: #7959a0; color: #ffffff; border-color: #a985d2; }}
+        """
+        super().setStyleSheet((self._external_stylesheet + "\n" + qss).strip())
+
+    def _center_on_owner(self):
+        parent = self.parentWidget()
+        if parent is not None and parent.isVisible():
+            available = QtWidgets.QApplication.desktop().availableGeometry(parent)
+            center = parent.mapToGlobal(parent.rect().center())
+        else:
+            app = QtWidgets.QApplication.instance()
+            active = app.activeWindow() if app is not None else None
+            if active is not None and active is not self and active.isVisible():
+                available = QtWidgets.QApplication.desktop().availableGeometry(active)
+                center = active.mapToGlobal(active.rect().center())
+            else:
+                available = QtWidgets.QApplication.desktop().availableGeometry(self)
+                center = available.center()
+        frame = self.frameGeometry()
+        frame.moveCenter(center)
+        x = max(available.left(), min(frame.left(), available.right() - frame.width() + 1))
+        y = max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1))
+        self.move(x, y)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.adjustSize()
+        if self.width() < self.minimumWidth():
+            self.resize(self.minimumWidth(), self.height())
+        if not self._positioned:
+            self._positioned = True
+            QtCore.QTimer.singleShot(0, self._center_on_owner)
+
+    @classmethod
+    def _run_standard(cls, parent, title, text, icon, buttons, default_button):
+        box = cls(parent)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setIcon(icon)
+        box.setStandardButtons(buttons)
+        if default_button not in (cls.NoButton, None):
+            box.setDefaultButton(default_button)
+        return box.exec_()
+
+    @classmethod
+    def information(cls, parent, title, text, buttons=None, defaultButton=None):
+        return cls._run_standard(parent, title, text, cls.Information, cls.Ok if buttons is None else buttons, cls.NoButton if defaultButton is None else defaultButton)
+
+    @classmethod
+    def warning(cls, parent, title, text, buttons=None, defaultButton=None):
+        return cls._run_standard(parent, title, text, cls.Warning, cls.Ok if buttons is None else buttons, cls.NoButton if defaultButton is None else defaultButton)
+
+    @classmethod
+    def critical(cls, parent, title, text, buttons=None, defaultButton=None):
+        return cls._run_standard(parent, title, text, cls.Critical, cls.Ok if buttons is None else buttons, cls.NoButton if defaultButton is None else defaultButton)
+
+    @classmethod
+    def question(cls, parent, title, text, buttons=None, defaultButton=None):
+        return cls._run_standard(parent, title, text, cls.Question, (cls.Yes | cls.No) if buttons is None else buttons, cls.NoButton if defaultButton is None else defaultButton)
+
+
+# All application modules import this public name.  Keeping the legacy class
+# above makes old pickles/tests harmless while the actual UI uses only QDialog,
+# never QMessageBox (which can trigger the Windows notification sound).
+StyledMessageBox = SilentStyledMessageBox

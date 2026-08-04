@@ -51,19 +51,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Launcher build failed with exit code $LASTEXITCODE."
 }
 
-Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageRoot -Force
-Copy-Item `
-    -LiteralPath (Join-Path $repoRoot "installer\windows\CreateShortcut.bat") `
-    -Destination $packageRoot `
-    -Force
+& (Join-Path $PSScriptRoot "build_apply_updater.ps1") `
+    -Version ($Version + ".0") `
+    -OutputPath (Join-Path $innerRoot "_internal\ClicknTranslateUpdater.exe")
+if ($LASTEXITCODE -ne 0) {
+    throw "Updater build failed with exit code $LASTEXITCODE."
+}
 
 $required = @(
     "ClicknTranslate.exe",
     "app\ClicknTranslateApp.exe",
     "app\_internal\ArgosWorker.exe",
     "app\_internal\OcrWorker.exe",
+    "app\_internal\ClicknTranslateUpdater.exe",
     "app\_internal",
-    "README.md"
+    "app"
 )
 foreach ($relativePath in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $packageRoot $relativePath))) {

@@ -141,7 +141,8 @@ internal static class ClicknTranslateUpdateBootstrap
         {
             FileName = launcherPath,
             WorkingDirectory = appDirectory,
-            UseShellExecute = false
+            UseShellExecute = false,
+            Arguments = "--show-after-update"
         });
         ScheduleCleanup(Path.GetDirectoryName(setupPath));
         return 0;
@@ -275,11 +276,10 @@ internal static class ClicknTranslateUpdateBootstrap
 
     private static void ShowFailure(string message)
     {
-        MessageBox.Show(
+        SilentWinFormsDialog.Show(
             "The update could not be installed.\n\n" + message,
             "Click'n'Translate update",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error
+            MessageBoxButtons.OK
         );
     }
 }

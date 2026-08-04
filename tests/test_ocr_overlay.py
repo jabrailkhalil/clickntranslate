@@ -56,6 +56,34 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         finally:
             overlay.deleteLater()
 
+    def test_fullscreen_overlay_remembers_independent_chinese_to_english_pair(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "zh",
+            "fullscreen_translate_to": "en",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "zh"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates") as save_pair:
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                self.assertEqual(overlay.lang_combo.currentData(), "zh")
+                self.assertEqual(overlay.target_lang_combo.currentData(), "en")
+                self.assertIsNotNone(overlay.translate_arrow_label)
+
+                with mock.patch.object(overlay, "_start_ocr"):
+                    overlay._on_go_clicked()
+
+                self.assertEqual((overlay.src_lang, overlay.tgt_lang), ("zh", "en"))
+                save_pair.assert_called_with({
+                    "fullscreen_translate_from": "zh",
+                    "fullscreen_translate_to": "en",
+                })
+            finally:
+                overlay.close()
+                overlay.deleteLater()
+
     def test_copy_overlay_does_not_offer_auto_language(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
         try:

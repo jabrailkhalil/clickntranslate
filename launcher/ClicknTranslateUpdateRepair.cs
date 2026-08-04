@@ -52,13 +52,12 @@ internal static class ClicknTranslateUpdateRepair
 
             if (!silent)
             {
-                DialogResult result = MessageBox.Show(
+                DialogResult result = SilentWinFormsDialog.Show(
                     "This one-time repair will download and install Click'n'Translate " + RepairBuildInfo.DisplayVersion + ".\n\n" +
                     "Settings, histories, OCR packages, translation models and uninstall information will be kept.\n\n" +
                     "The download is about 200 MB. Continue?",
                     "Click'n'Translate update repair",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Information
+                    MessageBoxButtons.YesNo
                 );
                 if (result != DialogResult.Yes)
                 {
@@ -84,11 +83,10 @@ internal static class ClicknTranslateUpdateRepair
 
             if (!silent)
             {
-                MessageBox.Show(
+                SilentWinFormsDialog.Show(
                     "Click'n'Translate " + RepairBuildInfo.DisplayVersion + " is installed and has been started.",
                     "Click'n'Translate update repair",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
+                    MessageBoxButtons.OK
                 );
             }
             return 0;
@@ -98,11 +96,10 @@ internal static class ClicknTranslateUpdateRepair
             WriteFailureLog(error);
             if (!silent)
             {
-                MessageBox.Show(
+                SilentWinFormsDialog.Show(
                     "The update could not be installed. The previous version was restored.\n\n" + error.Message,
                     "Click'n'Translate update repair",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
+                    MessageBoxButtons.OK
                 );
             }
             return 1;

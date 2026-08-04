@@ -7,6 +7,7 @@ exercises both the portable ZIP updater script and an installed-copy update.
 from __future__ import annotations
 
 import atexit
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -24,7 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD_ROOT = (ROOT / "build").resolve()
 OLD_STAGE = ROOT / "releases" / "ClicknTranslate-v1.5.1-win64-stage" / "ClicknTranslate"
 NEW_STAGE = ROOT / "releases" / "ClicknTranslate-v1.5.2-win64-stage" / "ClicknTranslate"
-NEW_ZIP = ROOT / "releases" / "ClicknTranslate-v1.5.2-win64.zip"
+NEW_ZIP = ROOT / "releases" / "Click-n-Translate-1.5.2-windows-portable-x64.zip"
+UPDATER = NEW_STAGE / "app" / "_internal" / "ClicknTranslateUpdater.exe"
 ISS = ROOT / "installer" / "ClicknTranslate.iss"
 ISCC = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 
@@ -131,25 +133,40 @@ def assert_new_payload(install: Path) -> None:
         raise RuntimeError("Updated launcher does not report version 1.5.2")
 
 
-def extract_current_zip_updater(destination: Path) -> None:
-    source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
-    function_start = source.index("    def _launch_zip_updater")
-    function_end = source.index("    @QtCore.pyqtSlot()", function_start)
-    function_source = source[function_start:function_end]
-    match = re.search(r'(?ms)^\s{8}script = r"""(.*?)^"""\s*$', function_source)
-    if not match:
-        raise RuntimeError("Could not extract the current ZIP updater script")
-    destination.write_text(match.group(1), encoding="utf-8")
+def encoded(value: str | Path) -> str:
+    return base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+
+
+def run_update_helper(mode: str, install: Path, package: Path) -> None:
+    runner_dir = install.parent / ("runner-" + mode)
+    runner_dir.mkdir(exist_ok=True)
+    runner = runner_dir / "ClicknTranslateUpdater.exe"
+    shutil.copy2(UPDATER, runner)
+    result = subprocess.run(
+        [
+            str(runner),
+            "--mode", mode,
+            "--app-dir", encoded(install),
+            "--package", encoded(package),
+            "--exe", encoded("ClicknTranslate.exe"),
+            "--version", "1.5.2",
+            "--pid", "2147483000",
+        ],
+        cwd=tempfile.gettempdir(),
+        timeout=240,
+    )
+    if result.returncode != 0:
+        log_path = Path(tempfile.gettempdir()) / "clickntranslate_update.log"
+        log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+        raise RuntimeError(f"Update helper failed with {result.returncode}: {log[-5000:]}")
 
 
 def run_portable_update(test_root: Path) -> None:
     install = test_root / "portable-install"
     update_zip = test_root / NEW_ZIP.name
-    updater_script = test_root / "portable-updater.ps1"
     shutil.copytree(OLD_STAGE, install)
     shutil.copy2(NEW_ZIP, update_zip)
     write_user_markers(install)
-    extract_current_zip_updater(updater_script)
 
     worker = install / "app" / "_internal" / "OcrWorker.exe"
     shutil.copy2(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "cmd.exe", worker)
@@ -160,31 +177,7 @@ def run_portable_update(test_root: Path) -> None:
     )
     atexit.register(terminate_process_tree, blocker.pid)
 
-    result = subprocess.run(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(updater_script),
-            "-AppDir",
-            str(install),
-            "-ZipPath",
-            str(update_zip),
-            "-TargetPid",
-            "2147483000",
-            "-ExeName",
-            "ClicknTranslate.exe",
-        ],
-        cwd=tempfile.gettempdir(),
-        capture_output=True,
-        text=True,
-        timeout=180,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Portable updater failed: {result.stdout!r} {result.stderr!r}")
+    run_update_helper("zip", install, update_zip)
 
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
@@ -278,7 +271,9 @@ def run_installed_update(test_root: Path) -> None:
         if not processes_from_install(install):
             raise RuntimeError("Disposable installed 1.5.1 copy did not start")
 
-        run_setup(new_setup, install, update=True)
+        update_package = test_root / "new-test-setup.exe"
+        shutil.copy2(new_setup, update_package)
+        run_update_helper("setup", install, update_package)
         assert_new_payload(install)
         assert_user_markers(install)
         subprocess.Popen([str(install / "ClicknTranslate.exe")], cwd=install)
@@ -294,11 +289,11 @@ def run_installed_update(test_root: Path) -> None:
 
 
 def main() -> int:
-    if not OLD_STAGE.is_dir() or not NEW_STAGE.is_dir() or not NEW_ZIP.is_file():
+    if not OLD_STAGE.is_dir() or not NEW_STAGE.is_dir() or not NEW_ZIP.is_file() or not UPDATER.is_file():
         raise RuntimeError("The 1.5.1 and 1.5.2 release artifacts are required")
     if not ISCC.is_file():
         raise FileNotFoundError(ISCC)
-    test_root = BUILD_ROOT / "update-e2e-151-to-152"
+    test_root = BUILD_ROOT / "update-e2e-151-to-152-v3"
     safe_remove_tree(test_root)
     test_root.mkdir(parents=True)
     run_portable_update(test_root)

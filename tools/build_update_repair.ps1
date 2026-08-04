@@ -76,6 +76,7 @@ internal static class RepairBuildInfo
         "/win32manifest:$root\launcher\ClicknTranslateUpdateRepair.manifest" `
         "/out:$OutputPath" `
         "$root\launcher\ClicknTranslateUpdateRepair.cs" `
+        "$root\launcher\SilentWinFormsDialog.cs" `
         $versionSource `
         $buildInfoSource
 

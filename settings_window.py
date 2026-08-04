@@ -13,6 +13,8 @@ import platform
 import re
 import time
 import ctypes
+import logging
+import base64
 from pathlib import Path
 from urllib.parse import urlparse
 try:
@@ -81,6 +83,8 @@ INNO_UNINSTALL_KEY = (
     r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
     r"\{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}_is1"
 )
+
+logger = logging.getLogger("clickntranslate.settings")
 MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
@@ -778,6 +782,12 @@ class TesseractInstallProgressDialog(QDialog):
 
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
+        self.close_button.setToolTip(text)
+
+    def setCancellationPending(self, text):
+        self.cancel_button.setText(text)
+        self.cancel_button.setEnabled(False)
+        self.close_button.setEnabled(False)
         self.close_button.setToolTip(text)
 
     def setLabelText(self, text):
@@ -1783,6 +1793,60 @@ LANGUAGE_MANAGER_TEXT = {
         "win_rolling_back": "Windows OCR：正在取消并删除未完成的语言包…",
     },
 }
+
+
+WINDOWS_OCR_RUNTIME_TEXT = {
+    "en": {
+        "win_cancel_pending": "Cancel requested. Windows is safely finishing the current component; this can take several minutes.",
+        "win_still_working": "Windows Update is still working. Do not turn off the PC.",
+        "win_error_policy": "Windows Update policy blocked this OCR package. Open Windows settings or contact the system administrator (0x800f0954).",
+        "win_error_source": "Windows could not download the OCR package. Check Windows Update, the internet connection, and free disk space, then try again.",
+        "win_error_service": "Windows component servicing is busy or needs a restart. Restart Windows and try again.",
+        "win_error_generic": "Windows could not finish the OCR package operation. Install pending Windows updates, restart the PC, and try again.",
+    },
+    "ru": {
+        "win_cancel_pending": "Отмена запрошена. Windows безопасно завершает текущий компонент — это может занять несколько минут.",
+        "win_still_working": "Центр обновления Windows продолжает работу. Не выключайте компьютер.",
+        "win_error_policy": "Политика Центра обновления Windows заблокировала OCR-пакет. Откройте настройки Windows или обратитесь к администратору (0x800f0954).",
+        "win_error_source": "Windows не смогла скачать OCR-пакет. Проверьте Центр обновления, интернет и свободное место, затем повторите попытку.",
+        "win_error_service": "Система обслуживания компонентов Windows занята или требуется перезагрузка. Перезагрузите Windows и повторите попытку.",
+        "win_error_generic": "Windows не смогла завершить операцию с OCR-пакетом. Установите ожидающие обновления Windows, перезагрузите компьютер и повторите попытку.",
+    },
+    "es": {
+        "win_cancel_pending": "Cancelación solicitada. Windows está terminando de forma segura el componente actual; puede tardar varios minutos.",
+        "win_still_working": "Windows Update sigue trabajando. No apagues el equipo.",
+        "win_error_policy": "La directiva de Windows Update bloqueó este paquete OCR. Abre Configuración de Windows o contacta con el administrador (0x800f0954).",
+        "win_error_source": "Windows no pudo descargar el paquete OCR. Comprueba Windows Update, Internet y el espacio libre y vuelve a intentarlo.",
+        "win_error_service": "El servicio de componentes de Windows está ocupado o necesita reiniciarse. Reinicia Windows y vuelve a intentarlo.",
+        "win_error_generic": "Windows no pudo finalizar la operación del paquete OCR. Instala las actualizaciones pendientes, reinicia el equipo y vuelve a intentarlo.",
+    },
+    "de": {
+        "win_cancel_pending": "Abbruch angefordert. Windows schließt die aktuelle Komponente sicher ab; dies kann einige Minuten dauern.",
+        "win_still_working": "Windows Update arbeitet weiter. Schalten Sie den PC nicht aus.",
+        "win_error_policy": "Eine Windows-Update-Richtlinie hat dieses OCR-Paket blockiert. Öffnen Sie die Windows-Einstellungen oder wenden Sie sich an den Administrator (0x800f0954).",
+        "win_error_source": "Windows konnte das OCR-Paket nicht laden. Prüfen Sie Windows Update, Internet und freien Speicherplatz und versuchen Sie es erneut.",
+        "win_error_service": "Die Windows-Komponentenwartung ist beschäftigt oder benötigt einen Neustart. Starten Sie Windows neu und versuchen Sie es erneut.",
+        "win_error_generic": "Windows konnte den OCR-Paketvorgang nicht abschließen. Installieren Sie ausstehende Updates, starten Sie den PC neu und versuchen Sie es erneut.",
+    },
+    "fr": {
+        "win_cancel_pending": "Annulation demandée. Windows termine le composant actuel en toute sécurité ; cela peut prendre plusieurs minutes.",
+        "win_still_working": "Windows Update continue de travailler. N’éteignez pas le PC.",
+        "win_error_policy": "La stratégie Windows Update a bloqué ce module OCR. Ouvrez les paramètres Windows ou contactez l’administrateur (0x800f0954).",
+        "win_error_source": "Windows n’a pas pu télécharger le module OCR. Vérifiez Windows Update, Internet et l’espace libre, puis réessayez.",
+        "win_error_service": "La maintenance des composants Windows est occupée ou nécessite un redémarrage. Redémarrez Windows puis réessayez.",
+        "win_error_generic": "Windows n’a pas pu terminer l’opération du module OCR. Installez les mises à jour en attente, redémarrez le PC puis réessayez.",
+    },
+    "zh": {
+        "win_cancel_pending": "已请求取消。Windows 正在安全完成当前组件，这可能需要几分钟。",
+        "win_still_working": "Windows 更新仍在工作，请勿关闭电脑。",
+        "win_error_policy": "Windows 更新策略阻止了此 OCR 包。请打开 Windows 设置或联系系统管理员 (0x800f0954)。",
+        "win_error_source": "Windows 无法下载 OCR 包。请检查 Windows 更新、网络连接和可用磁盘空间，然后重试。",
+        "win_error_service": "Windows 组件服务正忙或需要重启。请重启 Windows 后重试。",
+        "win_error_generic": "Windows 无法完成 OCR 包操作。请安装待处理的 Windows 更新，重启电脑后重试。",
+    },
+}
+for _runtime_lang, _runtime_values in WINDOWS_OCR_RUNTIME_TEXT.items():
+    LANGUAGE_MANAGER_TEXT.setdefault(_runtime_lang, {}).update(_runtime_values)
 
 
 def language_manager_text(lang, key, **values):
@@ -3498,6 +3562,8 @@ class OcrLanguageManagerDialog(QDialog):
         threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
 
     def _request_install_cancel(self):
+        if self._cancel_requested.is_set():
+            return
         self._cancel_requested.set()
         marker = str(self._windows_ocr_cancel_marker or "")
         if marker:
@@ -3506,8 +3572,13 @@ class OcrLanguageManagerDialog(QDialog):
             except Exception:
                 pass
         if self.progress_dialog is not None:
-            self.progress_dialog.setLabelText(language_manager_text(self.lang, "canceling"))
+            self.progress_dialog.setLabelText(
+                language_manager_text(self.lang, "win_cancel_pending")
+            )
             self.progress_dialog.setRange(0, 0)
+            self.progress_dialog.setCancellationPending(
+                language_manager_text(self.lang, "canceling")
+            )
 
     def _emit_language_progress(self, text, percent=0, determinate=True):
         QMetaObject.invokeMethod(
@@ -3653,6 +3724,7 @@ $Packages = @(
 )
 $process = $null
 $InitiallyInstalled = @{{}}
+$StartedAt = [DateTime]::UtcNow
 
 function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Total, [string]$Code, [string]$Message) {{
     $payload = @{{
@@ -3662,6 +3734,7 @@ function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Tot
         total = $Total
         code = $Code
         message = $Message
+        elapsed = [int]([DateTime]::UtcNow - $StartedAt).TotalSeconds
     }} | ConvertTo-Json -Compress
     $statusTemp = "$StatusPath.$PID.$([Guid]::NewGuid().ToString('N')).tmp"
     try {{
@@ -3711,9 +3784,7 @@ try {{
             $process = Start-Process -FilePath dism.exe -ArgumentList $repairArgs -PassThru -WindowStyle Hidden -RedirectStandardOutput $repairOut -RedirectStandardError $repairErr
             while (-not $process.HasExited) {{
                 if (Test-OcrCancel) {{
-                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-                    $process.WaitForExit()
-                    throw [System.OperationCanceledException]::new('Canceled')
+                    Write-OcrStatus 'cancel_pending' ([int](100 * $index / $total)) $current $total $entry.Code ''
                 }}
                 Start-Sleep -Milliseconds 250
                 $process.Refresh()
@@ -3727,6 +3798,7 @@ try {{
                 if (-not $details -and (Test-Path -LiteralPath $repairOut)) {{ $details = Get-Content -LiteralPath $repairOut -Raw -ErrorAction SilentlyContinue }}
                 throw ("DISM repair removal exited with code " + $exitCode + ". " + $details)
             }}
+            if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
             $capability = Get-WindowsCapability -Online -Name $entry.Capability
         }}
         if ($capability.State -ne 'Installed') {{
@@ -3735,11 +3807,6 @@ try {{
             $arguments = @('/Online', '/Add-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
             $process = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
             while (-not $process.HasExited) {{
-                if (Test-OcrCancel) {{
-                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-                    $process.WaitForExit()
-                    throw [System.OperationCanceledException]::new('Canceled')
-                }}
                 $rawPercent = 0
                 if (Test-Path -LiteralPath $stdoutPath) {{
                     $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
@@ -3751,7 +3818,11 @@ try {{
                     }}
                 }}
                 $overall = [int](((100 * $index) + $rawPercent) / $total)
-                Write-OcrStatus 'installing' $overall $current $total $entry.Code ''
+                if (Test-OcrCancel) {{
+                    Write-OcrStatus 'cancel_pending' $overall $current $total $entry.Code ''
+                }} else {{
+                    Write-OcrStatus 'installing' $overall $current $total $entry.Code ''
+                }}
                 Start-Sleep -Milliseconds 250
                 $process.Refresh()
             }}
@@ -3764,6 +3835,7 @@ try {{
                 if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
                 throw ("DISM exited with code " + $exitCode + ". " + $details)
             }}
+            if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
         }}
 
         Write-OcrStatus 'verifying' ([int](100 * $current / $total)) $current $total $entry.Code ''
@@ -3794,10 +3866,6 @@ try {{
     Write-OcrStatus 'canceled' 0 0 $Packages.Count '' 'Canceled'
     exit 2
 }} catch {{
-    if ($null -ne $process -and -not $process.HasExited) {{
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        $process.WaitForExit()
-    }}
     $details = ($_ | Out-String).Trim()
     Set-Content -LiteralPath $ResultPath -Value ("ERROR`n" + $details) -Encoding UTF8 -Force
     Write-OcrStatus 'error' 0 0 $Packages.Count '' $details
@@ -3831,6 +3899,7 @@ $Packages = @(
 {entries}
 )
 $process = $null
+$StartedAt = [DateTime]::UtcNow
 
 function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Total, [string]$Code, [string]$Message) {{
     $payload = @{{
@@ -3840,6 +3909,7 @@ function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Tot
         total = $Total
         code = $Code
         message = $Message
+        elapsed = [int]([DateTime]::UtcNow - $StartedAt).TotalSeconds
     }} | ConvertTo-Json -Compress
     $statusTemp = "$StatusPath.$PID.$([Guid]::NewGuid().ToString('N')).tmp"
     try {{
@@ -3882,11 +3952,6 @@ try {{
             $arguments = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
             $process = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
             while (-not $process.HasExited) {{
-                if (Test-OcrCancel) {{
-                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-                    $process.WaitForExit()
-                    throw [System.OperationCanceledException]::new('Canceled')
-                }}
                 $rawPercent = 0
                 if (Test-Path -LiteralPath $stdoutPath) {{
                     $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
@@ -3896,7 +3961,11 @@ try {{
                     }}
                 }}
                 $overall = [int](((100 * $index) + $rawPercent) / $total)
-                Write-OcrStatus 'removing' $overall $current $total $entry.Code ''
+                if (Test-OcrCancel) {{
+                    Write-OcrStatus 'cancel_pending' $overall $current $total $entry.Code ''
+                }} else {{
+                    Write-OcrStatus 'removing' $overall $current $total $entry.Code ''
+                }}
                 Start-Sleep -Milliseconds 250
                 $process.Refresh()
             }}
@@ -3916,6 +3985,7 @@ try {{
                 if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
                 throw ("DISM exited with code " + $exitCode + ". " + $details)
             }}
+            if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
         }}
         Write-OcrStatus 'verifying' ([int](100 * $current / $total)) $current $total $entry.Code ''
         $capability = Get-WindowsCapability -Online -Name $entry.Capability
@@ -3931,10 +4001,6 @@ try {{
     Write-OcrStatus 'canceled' 0 0 $Packages.Count '' 'Canceled'
     exit 2
 }} catch {{
-    if ($null -ne $process -and -not $process.HasExited) {{
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        $process.WaitForExit()
-    }}
     $details = ($_ | Out-String).Trim()
     Set-Content -LiteralPath $ResultPath -Value ("ERROR`n" + $details) -Encoding UTF8 -Force
     Write-OcrStatus 'error' 0 0 $Packages.Count '' $details
@@ -3960,6 +4026,8 @@ try {{
         code = str(status.get("code", ""))
         current = int(status.get("current", 0) or 0)
         total = int(status.get("total", 0) or 0)
+        elapsed = max(0, int(status.get("elapsed", 0) or 0))
+        elapsed_text = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
         language = code.upper()
         for item in APP_LANGUAGES:
             if item.code == code:
@@ -3976,13 +4044,23 @@ try {{
             # DISM can buffer its first progress line.  Until a real value is
             # available, show an active bar instead of a frozen, misleading 0%.
             base_percent = int(100 * max(0, current - 1) / max(1, total))
-            self._emit_language_progress(text, percent, percent > base_percent)
+            self._emit_language_progress(
+                f"{text}\n{elapsed_text}",
+                percent,
+                percent > base_percent,
+            )
         elif phase == "checking":
             text = language_manager_text(self.lang, "win_checking", language=language)
-            self._emit_language_progress(text, percent, False)
+            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
+        elif phase == "cancel_pending":
+            self._emit_language_progress(
+                f"{language_manager_text(self.lang, 'win_cancel_pending')}\n{elapsed_text}",
+                percent,
+                False,
+            )
         elif phase == "verifying":
             text = language_manager_text(self.lang, "win_verifying", language=language)
-            self._emit_language_progress(text, percent, False)
+            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
         elif phase == "removing":
             text = language_manager_text(
                 self.lang,
@@ -3991,10 +4069,10 @@ try {{
                 current=current,
                 total=total,
             )
-            self._emit_language_progress(text, percent, False)
+            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
         elif phase == "rolling_back":
             self._emit_language_progress(
-                language_manager_text(self.lang, "win_rolling_back"),
+                f"{language_manager_text(self.lang, 'win_rolling_back')}\n{elapsed_text}",
                 percent,
                 False,
             )
@@ -4002,6 +4080,18 @@ try {{
             self._emit_language_progress(language_manager_text(self.lang, "canceled"), 0, False)
         elif phase == "done":
             self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
+
+    def _friendly_windows_ocr_error(self, error):
+        raw = str(error or "").strip()
+        logger.error("Windows OCR servicing failed: %s", raw)
+        lowered = raw.lower()
+        if "0x800f0954" in lowered:
+            return language_manager_text(self.lang, "win_error_policy")
+        if any(code in lowered for code in ("0x800f081f", "0x800f0906", "0x802440", "incompleteread")):
+            return language_manager_text(self.lang, "win_error_source")
+        if any(code in lowered for code in ("0x800f0922", "0x800f0831", "0x800f0988", "restart")):
+            return language_manager_text(self.lang, "win_error_service")
+        return language_manager_text(self.lang, "win_error_generic")
 
     def _install_windows_ocr_worker(self, codes):
         work_dir = ""
@@ -4155,7 +4245,10 @@ try {{
             if self._cancel_requested.is_set():
                 self._finish_language_task("Windows OCR", canceled=True)
             else:
-                self._finish_language_task("Windows OCR", str(exc))
+                self._finish_language_task(
+                    "Windows OCR",
+                    self._friendly_windows_ocr_error(exc),
+                )
         finally:
             self._windows_ocr_cancel_marker = ""
             if work_dir:
@@ -4259,7 +4352,10 @@ try {{
             if self._cancel_requested.is_set():
                 self._finish_language_task("Windows OCR", canceled=True)
             else:
-                self._finish_language_task("Windows OCR", str(exc))
+                self._finish_language_task(
+                    "Windows OCR",
+                    self._friendly_windows_ocr_error(exc),
+                )
         finally:
             self._windows_ocr_cancel_marker = ""
             if work_dir:
@@ -6146,10 +6242,11 @@ class SettingsWindow(QWidget):
             setup_assets = []
             for asset in assets:
                 name = (asset.get("name") or "").lower()
+                compact_name = name.replace("-", "").replace("_", "")
                 if (
                     name.endswith(".exe")
-                    and "clickntranslate" in name
-                    and "setup" in name
+                    and "clickntranslate" in compact_name
+                    and ("setup" in name or "installer" in name)
                     and (asset.get("browser_download_url") or asset.get("url"))
                 ):
                     setup_assets.append(asset)
@@ -6157,6 +6254,7 @@ class SettingsWindow(QWidget):
                 return sorted(
                     setup_assets,
                     key=lambda asset: (
+                        "installer" in (asset.get("name") or "").lower(),
                         "win64" in (asset.get("name") or "").lower(),
                         "x64" in (asset.get("name") or "").lower(),
                     ),
@@ -6264,34 +6362,119 @@ class SettingsWindow(QWidget):
             return ""
         return digest.hexdigest().lower()
 
-    def _download_file(self, url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
-        headers = _update_request_headers(url)
-        with requests.get(url, stream=True, timeout=timeout, headers=headers) as r:
-            r.raise_for_status()
-            try:
-                total_bytes = int((r.headers.get("Content-Length") or "0").strip() or "0")
-            except Exception:
-                total_bytes = 0
-            downloaded_bytes = 0
+    def _download_file(
+        self,
+        url,
+        destination_path,
+        timeout=120,
+        progress_callback=None,
+        cancel_callback=None,
+        max_attempts=5,
+    ):
+        """Download atomically with retry and HTTP Range resume support."""
+        partial_path = destination_path + ".part"
+        last_error = None
+        for attempt in range(1, max(1, int(max_attempts)) + 1):
             if cancel_callback and cancel_callback():
-                raise UpdateCancelledError("Обновление отменено пользователем.")
-            if progress_callback:
+                raise UpdateCancelledError("Update canceled by the user.")
+
+            try:
+                downloaded_bytes = os.path.getsize(partial_path)
+            except OSError:
+                downloaded_bytes = 0
+
+            headers = _update_request_headers(url)
+            if downloaded_bytes > 0:
+                headers["Range"] = f"bytes={downloaded_bytes}-"
+
+            try:
+                with requests.get(
+                    url,
+                    stream=True,
+                    timeout=(20, timeout),
+                    headers=headers,
+                ) as response:
+                    response.raise_for_status()
+                    resumed = downloaded_bytes > 0 and getattr(response, "status_code", 200) == 206
+                    if downloaded_bytes > 0 and not resumed:
+                        downloaded_bytes = 0
+                        try:
+                            os.remove(partial_path)
+                        except OSError:
+                            pass
+
+                    content_range = response.headers.get("Content-Range") or ""
+                    range_match = re.search(r"/(\d+)$", content_range)
+                    if range_match:
+                        total_bytes = int(range_match.group(1))
+                    else:
+                        try:
+                            remaining = int(
+                                (response.headers.get("Content-Length") or "0").strip()
+                                or "0"
+                            )
+                        except (TypeError, ValueError):
+                            remaining = 0
+                        total_bytes = downloaded_bytes + remaining if remaining else 0
+
+                    if progress_callback:
+                        try:
+                            progress_callback(downloaded_bytes, total_bytes)
+                        except Exception:
+                            pass
+
+                    with open(partial_path, "ab" if resumed else "wb") as output:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if cancel_callback and cancel_callback():
+                                raise UpdateCancelledError("Update canceled by the user.")
+                            if not chunk:
+                                continue
+                            output.write(chunk)
+                            downloaded_bytes += len(chunk)
+                            if progress_callback:
+                                try:
+                                    progress_callback(downloaded_bytes, total_bytes)
+                                except Exception:
+                                    pass
+                        output.flush()
+                        os.fsync(output.fileno())
+
+                    if total_bytes and downloaded_bytes != total_bytes:
+                        raise IOError(
+                            f"Incomplete download: received {downloaded_bytes} of {total_bytes} bytes"
+                        )
+                    if downloaded_bytes <= 0:
+                        raise IOError("The server returned an empty update file")
+
+                os.replace(partial_path, destination_path)
+                return
+            except UpdateCancelledError:
                 try:
-                    progress_callback(downloaded_bytes, total_bytes)
-                except Exception:
+                    os.remove(partial_path)
+                except OSError:
                     pass
-            with open(destination_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                raise
+            except Exception as error:
+                last_error = error
+                logger.warning(
+                    "Update download attempt %s/%s failed for %s: %s",
+                    attempt,
+                    max_attempts,
+                    url,
+                    error,
+                )
+                if attempt >= max_attempts:
+                    break
+                for _step in range(attempt * 4):
                     if cancel_callback and cancel_callback():
-                        raise UpdateCancelledError("Обновление отменено пользователем.")
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_bytes += len(chunk)
-                        if progress_callback:
-                            try:
-                                progress_callback(downloaded_bytes, total_bytes)
-                            except Exception:
-                                pass
+                        try:
+                            os.remove(partial_path)
+                        except OSError:
+                            pass
+                        raise UpdateCancelledError("Update canceled by the user.")
+                    time.sleep(0.25)
+
+        raise RuntimeError("The update download was interrupted repeatedly.") from last_error
 
     def _download_and_prepare_update(self, asset_url, asset_name, latest_version, checksum_url=""):
         temp_dir = None
@@ -6377,10 +6560,11 @@ class SettingsWindow(QWidget):
             self._update_phase = "preparing"
             _emit_stage_text(stage_prepare)
             self._update_phase = "applying"
-            if package_kind == ".exe":
-                ok, err = self._launch_setup_updater(package_path, latest_version)
-            else:
-                ok, err = self._launch_zip_updater(package_path)
+            ok, err = self._launch_apply_updater(
+                package_path,
+                package_kind,
+                latest_version,
+            )
             if not ok:
                 raise RuntimeError(err or "Updater launch failed")
 
@@ -6417,6 +6601,67 @@ class SettingsWindow(QWidget):
                 Qt.QueuedConnection,
                 QtCore.Q_ARG(str, str(e))
             )
+
+    def _launch_apply_updater(self, package_path, package_kind, latest_version):
+        if portable_paths.is_windows_packaged():
+            return False, "Microsoft Store manages updates for this package"
+        if not getattr(sys, "frozen", False):
+            return False, "Auto-update is available only in a packaged app"
+
+        helper_candidates = [
+            resource_path("ClicknTranslateUpdater.exe"),
+            os.path.join(_frozen_executable_dir(), "_internal", "ClicknTranslateUpdater.exe"),
+            os.path.join(_frozen_executable_dir(), "ClicknTranslateUpdater.exe"),
+        ]
+        helper_source = next(
+            (candidate for candidate in helper_candidates if os.path.isfile(candidate)),
+            "",
+        )
+        if not helper_source:
+            return False, "The verified update helper is missing"
+
+        app_dir = _portable_base_dir()
+        exe_name = os.path.basename(_public_executable_path())
+        helper_dir = tempfile.mkdtemp(prefix="clickntranslate_update_runner_")
+        helper_path = os.path.join(helper_dir, "ClicknTranslateUpdater.exe")
+        try:
+            shutil.copy2(helper_source, helper_path)
+        except Exception as error:
+            shutil.rmtree(helper_dir, ignore_errors=True)
+            return False, f"Could not prepare the update helper: {error}"
+
+        def _encoded(value):
+            return base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+
+        arguments = [
+            "--mode", "setup" if package_kind == ".exe" else "zip",
+            "--app-dir", _encoded(app_dir),
+            "--package", _encoded(package_path),
+            "--exe", _encoded(exe_name),
+            "--version", str(latest_version),
+            "--pid", str(os.getpid()),
+        ]
+        try:
+            requires_elevation = self._install_dir_requires_elevation(app_dir)
+            if requires_elevation:
+                ok, error = self._launch_elevated_process(
+                    helper_path,
+                    arguments,
+                    tempfile.gettempdir(),
+                )
+                if not ok:
+                    shutil.rmtree(helper_dir, ignore_errors=True)
+                    return False, f"Windows did not start the update helper: {error}"
+            else:
+                subprocess.Popen(
+                    [helper_path, *arguments],
+                    cwd=tempfile.gettempdir(),
+                    close_fds=True,
+                )
+            return True, None
+        except Exception as error:
+            shutil.rmtree(helper_dir, ignore_errors=True)
+            return False, f"Could not start the update helper: {error}"
 
     def _powershell_launch_candidates(self):
         system_root = os.environ.get("SystemRoot") or r"C:\Windows"
@@ -6618,7 +6863,7 @@ try {
     }
 
     Clear-PyInstallerEnv
-    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
+    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir -ArgumentList '--show-after-update'
     Write-UpdateLog "Updated installed copy started successfully"
 }
 catch {
@@ -6628,7 +6873,7 @@ catch {
         $fallbackExe = Join-Path $AppDir $ExeName
         if (Test-Path -LiteralPath $fallbackExe) {
             Clear-PyInstallerEnv
-            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir
+            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir -ArgumentList '--show-after-update'
         }
     } catch {}
     Show-UpdateError $message
@@ -6885,7 +7130,7 @@ try {
 
     Write-UpdateLog "Starting updated executable: $targetExe"
     Clear-PyInstallerEnv
-    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir
+    Start-Process -FilePath $targetExe -WorkingDirectory $AppDir -ArgumentList '--show-after-update'
     Write-UpdateLog "Updated executable started"
     $updateApplied = $true
 }
@@ -6916,7 +7161,7 @@ catch {
         if (Test-Path -LiteralPath $fallbackExe) {
             Write-UpdateLog "Launching fallback executable after updater failure: $fallbackExe"
             Clear-PyInstallerEnv
-            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir
+            Start-Process -FilePath $fallbackExe -WorkingDirectory $AppDir -ArgumentList '--show-after-update'
         }
     } catch {}
 }
@@ -7007,11 +7252,69 @@ finally {
             self._update_progress = None
 
         lang = self.parent.current_interface_language
+        friendly_error = self._friendly_update_error(error_text, lang)
         QMessageBox.warning(
             self,
             update_text(lang, "error_title"),
-            update_text(lang, "install_failed", error=str(error_text)),
+            friendly_error,
         )
+
+    def _friendly_update_error(self, error_text, lang=None):
+        raw = str(error_text or "").strip()
+        logger.error("Update failed: %s", raw)
+        language = lang or getattr(
+            getattr(self, "parent", None),
+            "current_interface_language",
+            "en",
+        )
+        messages = {
+            "en": {
+                "network": "The download was interrupted. Check the connection and click Update again — the app will resume safely.",
+                "checksum": "The downloaded update was incomplete or damaged. It was not installed; click Update to download it again.",
+                "permission": "Windows blocked access to the application folder. Close other copies of Click'n'Translate and approve the administrator prompt, then try again.",
+                "generic": "The update could not be installed. Your current version was kept. Close other copies of the app and try Update again.",
+            },
+            "ru": {
+                "network": "Загрузка прервалась. Проверьте интернет и снова нажмите «Обновление» — программа безопасно продолжит загрузку.",
+                "checksum": "Обновление скачалось не полностью или было повреждено. Оно не установлено; нажмите «Обновление», чтобы скачать заново.",
+                "permission": "Windows запретила доступ к папке программы. Закройте другие копии Click'n'Translate, подтвердите запрос администратора и повторите попытку.",
+                "generic": "Не удалось установить обновление. Текущая версия сохранена. Закройте другие копии программы и снова нажмите «Обновление».",
+            },
+            "es": {
+                "network": "La descarga se interrumpió. Comprueba Internet y pulsa Actualizar de nuevo; la aplicación continuará de forma segura.",
+                "checksum": "La actualización descargada está incompleta o dañada. No se instaló; pulsa Actualizar para descargarla otra vez.",
+                "permission": "Windows bloqueó el acceso a la carpeta. Cierra otras copias de Click'n'Translate, acepta el permiso de administrador e inténtalo de nuevo.",
+                "generic": "No se pudo instalar la actualización. Se conservó la versión actual. Cierra otras copias e inténtalo de nuevo.",
+            },
+            "de": {
+                "network": "Der Download wurde unterbrochen. Prüfen Sie das Internet und klicken Sie erneut auf Update; die App setzt sicher fort.",
+                "checksum": "Das Update wurde unvollständig oder beschädigt geladen und nicht installiert. Klicken Sie erneut auf Update.",
+                "permission": "Windows hat den Zugriff auf den Programmordner blockiert. Schließen Sie weitere App-Kopien, bestätigen Sie die Administratorabfrage und versuchen Sie es erneut.",
+                "generic": "Das Update konnte nicht installiert werden. Die aktuelle Version blieb erhalten. Schließen Sie weitere App-Kopien und versuchen Sie es erneut.",
+            },
+            "fr": {
+                "network": "Le téléchargement a été interrompu. Vérifiez Internet puis cliquez de nouveau sur Mettre à jour ; l’application reprendra en sécurité.",
+                "checksum": "La mise à jour téléchargée est incomplète ou endommagée. Elle n’a pas été installée ; relancez la mise à jour.",
+                "permission": "Windows a bloqué l’accès au dossier. Fermez les autres copies, acceptez la demande administrateur puis réessayez.",
+                "generic": "La mise à jour n’a pas pu être installée. La version actuelle a été conservée. Fermez les autres copies puis réessayez.",
+            },
+            "zh": {
+                "network": "下载已中断。请检查网络并再次点击“更新”，程序会安全地继续下载。",
+                "checksum": "下载的更新不完整或已损坏，因此未安装。请再次点击“更新”重新下载。",
+                "permission": "Windows 阻止访问程序文件夹。请关闭其他 Click'n'Translate 实例，确认管理员提示后重试。",
+                "generic": "无法安装更新，当前版本已保留。请关闭其他程序实例后再次点击“更新”。",
+            },
+        }
+        lowered = raw.lower()
+        if any(token in lowered for token in ("incompleteread", "connection", "timeout", "interrupted repeatedly", "download")):
+            key = "network"
+        elif any(token in lowered for token in ("checksum", "sha256", "not a valid", "not a zip", "damaged")):
+            key = "checksum"
+        elif any(token in lowered for token in ("access is denied", "permission", "winerror 5", "administrator")):
+            key = "permission"
+        else:
+            key = "generic"
+        return messages.get(language, messages["en"])[key]
 
     @pyqtSlot(str)
     def _on_update_ready_to_restart(self, latest_version):

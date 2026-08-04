@@ -331,6 +331,26 @@ class TestUpdateAssetSelection(unittest.TestCase):
 
         self.assertEqual(selected["name"], "ClicknTranslate-Setup-v1.5.2-win64.exe")
 
+    def test_installed_copy_prefers_full_installer_over_legacy_setup_bridge(self):
+        assets = [
+            {
+                "name": "ClicknTranslate-Setup-v1.5.2-win64.exe",
+                "browser_download_url": "https://example.com/bridge.exe",
+            },
+            {
+                "name": "Click-n-Translate-1.5.2-windows-x64-installer.exe",
+                "browser_download_url": "https://example.com/full.exe",
+            },
+        ]
+
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=True):
+            selected = sw.SettingsWindow._pick_update_asset(types.SimpleNamespace(), assets)
+
+        self.assertEqual(
+            selected["name"],
+            "Click-n-Translate-1.5.2-windows-x64-installer.exe",
+        )
+
     def test_portable_copy_ignores_legacy_bootstrap_asset(self):
         assets = [
             {
@@ -920,7 +940,8 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
             def _check_update_cancel_requested(self):
                 return None
 
-            def _launch_zip_updater(self, _zip_path):
+            def _launch_apply_updater(self, _package_path, package_kind, version):
+                self.apply_call = (package_kind, version)
                 return True, None
 
             def _cleanup_update_temp_dir(self):
@@ -943,6 +964,7 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 )
 
         self.assertEqual(dummy.download_calls, 1)
+        self.assertEqual(dummy.apply_call, (".zip", "1.3.4"))
         self.assertIn("_on_update_ready_to_restart", invoke_calls)
 
     def test_installed_copy_downloads_and_launches_setup_package(self):
@@ -952,7 +974,7 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 self._update_cancel_requested = threading.Event()
                 self._update_phase = "idle"
                 self._update_temp_dir = ""
-                self.setup_calls = []
+                self.apply_calls = []
 
             def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
                 Path(destination_path).write_bytes(b"MZ" + b"setup")
@@ -962,8 +984,8 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
             def _check_update_cancel_requested(self):
                 return None
 
-            def _launch_setup_updater(self, setup_path, version):
-                self.setup_calls.append((setup_path, version))
+            def _launch_apply_updater(self, setup_path, package_kind, version):
+                self.apply_calls.append((setup_path, package_kind, version))
                 return True, None
 
             def _cleanup_update_temp_dir(self):
@@ -982,9 +1004,9 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 "1.5.2",
             )
 
-        self.assertEqual(len(dummy.setup_calls), 1)
-        self.assertTrue(dummy.setup_calls[0][0].endswith(".exe"))
-        self.assertEqual(dummy.setup_calls[0][1], "1.5.2")
+        self.assertEqual(len(dummy.apply_calls), 1)
+        self.assertTrue(dummy.apply_calls[0][0].endswith(".exe"))
+        self.assertEqual(dummy.apply_calls[0][1:], (".exe", "1.5.2"))
         self.assertIn("_on_update_ready_to_restart", invoke_calls)
 
     def test_download_prepare_failure_reports_error(self):
@@ -1004,7 +1026,7 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
             def _check_update_cancel_requested(self):
                 return None
 
-            def _launch_zip_updater(self, _zip_path):
+            def _launch_apply_updater(self, _package_path, _package_kind, _version):
                 return False, "Updater launch failed"
 
             def _cleanup_update_temp_dir(self):
