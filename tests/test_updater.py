@@ -251,7 +251,7 @@ class TestUpdateAssetSelection(unittest.TestCase):
     def test_private_update_feed_uses_environment_url_and_bearer_token(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"tag_name": "v1.5.3", "assets": []}
+        response.json.return_value = {"tag_name": "v9.9.9", "assets": []}
         posted = []
         dummy = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="en"),
@@ -349,6 +349,36 @@ class TestUpdateAssetSelection(unittest.TestCase):
         self.assertEqual(
             selected["name"],
             "Click-n-Translate-1.5.2-windows-x64-installer.exe",
+        )
+
+    def test_release_153_assets_route_installed_and_portable_copies_correctly(self):
+        assets = [
+            {
+                "name": "Click-n-Translate-1.5.3-windows-portable-x64.zip",
+                "browser_download_url": "https://example.com/portable.zip",
+            },
+            {
+                "name": "Click-n-Translate-1.5.3-windows-x64-installer.exe",
+                "browser_download_url": "https://example.com/full.exe",
+            },
+            {
+                "name": "ClicknTranslate-Setup-v1.5.3-win64.exe",
+                "browser_download_url": "https://example.com/bridge.exe",
+            },
+        ]
+
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=True):
+            installed = sw.SettingsWindow._pick_update_asset(types.SimpleNamespace(), assets)
+        with mock.patch("settings_window._is_inno_installed_copy", return_value=False):
+            portable = sw.SettingsWindow._pick_update_asset(types.SimpleNamespace(), assets)
+
+        self.assertEqual(
+            installed["name"],
+            "Click-n-Translate-1.5.3-windows-x64-installer.exe",
+        )
+        self.assertEqual(
+            portable["name"],
+            "Click-n-Translate-1.5.3-windows-portable-x64.zip",
         )
 
     def test_portable_copy_ignores_legacy_bootstrap_asset(self):

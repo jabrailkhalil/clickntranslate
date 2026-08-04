@@ -5055,6 +5055,8 @@ class FullScreenOCRWorker(QtCore.QThread):
 class FullScreenTranslateOverlay(QWidget):
     """Overlay that translates all visible text on screen and shows translations at original positions."""
 
+    _translation_result_ready = QtCore.pyqtSignal(int, object, str)
+
     def __init__(self):
         super().__init__()
         self.setWindowIcon(QtGui.QIcon(resource_path("icons/icon.ico")))
@@ -5066,18 +5068,25 @@ class FullScreenTranslateOverlay(QWidget):
         self.error_message = None
         self._lines_data = []
         self.ocr_worker = None
+        self._ocr_workers = set()
+        self._translation_run_id = 0
         self._is_dragging = False
         self._drag_offset = QtCore.QPoint()
+        self._translation_result_ready.connect(self._apply_translation_result)
+        self._rerun_timer = QtCore.QTimer(self)
+        self._rerun_timer.setSingleShot(True)
+        self._rerun_timer.setInterval(180)
+        self._rerun_timer.timeout.connect(self._restart_translation_from_controls)
 
         # Read config
         config = get_cached_ocr_config()
         saved_src = _normalize_app_language_code(
-            config.get("ocr_translate_source_language") or config.get("fullscreen_translate_from"),
+            config.get("fullscreen_translate_from") or config.get("ocr_translate_source_language"),
             "en",
         )
         saved_tgt = default_target_for_source(
             saved_src,
-            config.get("ocr_translate_target_language") or config.get("fullscreen_translate_to"),
+            config.get("fullscreen_translate_to") or config.get("ocr_translate_target_language"),
         )
 
         # Capture screenshot from the screen where cursor is
@@ -5180,46 +5189,16 @@ class FullScreenTranslateOverlay(QWidget):
         self.translate_arrow_label.setFixedSize(32, 48)
         self._populate_fullscreen_target_combo(saved_tgt)
 
-        # --- Кнопка запуска перевода ---
-        config_lang = config.get("interface_language", "en")
-        go_text = ocr_ui_text(config_lang, "translate")
-        self.go_button = QtWidgets.QPushButton(go_text, self)
-        self.go_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(90, 70, 160, 240),
-                    stop:1 rgba(60, 45, 120, 250));
-                color: #ffffff;
-                border: 1px solid rgba(120, 100, 180, 200);
-                border-radius: 8px;
-                padding: 8px 20px;
-                font-size: 15px;
-                font-weight: 700;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(110, 90, 180, 250),
-                    stop:1 rgba(80, 60, 140, 255));
-            }
-            QPushButton:pressed {
-                background: rgba(50, 35, 100, 250);
-            }
-        """)
-        self.go_button.setFixedSize(140, 48)
-        self.go_button.setCursor(QtCore.Qt.PointingHandCursor)
-        self.go_button.clicked.connect(self._on_go_clicked)
         self.lang_combo.currentIndexChanged.connect(self._on_fullscreen_source_changed)
-        self.target_lang_combo.currentIndexChanged.connect(self._persist_fullscreen_pair)
+        self.target_lang_combo.currentIndexChanged.connect(self._on_fullscreen_target_changed)
         controls_enabled = not no_source_languages and self.target_lang_combo.currentData() is not None
-        self.go_button.setEnabled(controls_enabled)
         self.lang_combo.setEnabled(not no_source_languages)
         self.target_lang_combo.setEnabled(controls_enabled)
 
         # Позиционируем элементы по центру сверху
         total_w = (
             self.lang_combo.width() + 8 + self.translate_arrow_label.width() + 8
-            + self.target_lang_combo.width() + 12 + self.go_button.width()
+            + self.target_lang_combo.width()
         )
         start_x = (geo.width() - total_w) // 2
         top_y = 30
@@ -5228,13 +5207,14 @@ class FullScreenTranslateOverlay(QWidget):
         self.translate_arrow_label.move(next_x, top_y)
         next_x += self.translate_arrow_label.width() + 8
         self.target_lang_combo.move(next_x, top_y)
-        self.go_button.move(next_x + self.target_lang_combo.width() + 12, top_y)
 
         logging.info(f"FullScreenOverlay: screen geo={geo}, screenshot size={self.screenshot.width()}x{self.screenshot.height()}")
 
         self.show()
         self.raise_()
         self.activateWindow()
+        if controls_enabled:
+            QtCore.QTimer.singleShot(0, self._restart_translation_from_controls)
 
     def _populate_fullscreen_target_combo(self, selected_target=None):
         source_code = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
@@ -5268,21 +5248,27 @@ class FullScreenTranslateOverlay(QWidget):
     def _on_fullscreen_source_changed(self):
         previous_target = self.target_lang_combo.currentData()
         self._populate_fullscreen_target_combo(previous_target)
-        self._persist_fullscreen_pair()
+        self._on_fullscreen_target_changed()
+
+    def _on_fullscreen_target_changed(self):
+        if self._persist_fullscreen_pair():
+            self._rerun_timer.start()
 
     def _persist_fullscreen_pair(self):
         source_code = self.lang_combo.currentData()
         target_code = self.target_lang_combo.currentData()
         valid = source_code in APP_LANGUAGE_CODES and target_code in APP_LANGUAGE_CODES and source_code != target_code
-        self.go_button.setEnabled(bool(valid))
         if valid:
             _write_ocr_config_updates({
                 "fullscreen_translate_from": source_code,
                 "fullscreen_translate_to": target_code,
             })
+        return bool(valid)
 
-    def _on_go_clicked(self):
-        """Запуск OCR + перевода по нажатию кнопки."""
+    def _restart_translation_from_controls(self):
+        """Immediately rerun OCR and translation for the selected direction."""
+        if not self._persist_fullscreen_pair():
+            return
         self.src_lang = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
         self.tgt_lang = _normalize_app_language_code(
             self.target_lang_combo.currentData(),
@@ -5291,68 +5277,91 @@ class FullScreenTranslateOverlay(QWidget):
         if self.src_lang == self.tgt_lang:
             return
         self.ocr_language = self.src_lang
-
-        # Сохраняем выбор в конфиг
-        _write_ocr_config_updates({
-            "fullscreen_translate_from": self.src_lang,
-            "fullscreen_translate_to": self.tgt_lang,
-        })
-
-        # Скрываем UI, показываем загрузку
-        self.lang_combo.hide()
-        self.translate_arrow_label.hide()
-        self.target_lang_combo.hide()
-        self.go_button.hide()
+        self._translation_run_id += 1
+        run_id = self._translation_run_id
         self.loading = True
         self.translated_blocks.clear()
         self.error_message = None
         self.update()
 
         logging.info(f"FullScreenOverlay: starting OCR ({self.src_lang}->{self.tgt_lang})")
-        self._start_ocr()
+        self._start_ocr(run_id, self.src_lang, self.tgt_lang)
 
-    def _start_ocr(self):
+    def _start_ocr(self, run_id, source_code, target_code):
         qimage = self.screenshot.toImage()
         bitmap = qimage_to_softwarebitmap(qimage)
         if bitmap is None:
+            if run_id != self._translation_run_id:
+                return
             self.loading = False
             lang = get_cached_ocr_config().get("interface_language", "en")
             self.error_message = ocr_ui_text(lang, "ocr_init_failed")
             self.update()
             return
 
-        self.ocr_worker = FullScreenOCRWorker(bitmap, self.ocr_language)
-        self.ocr_worker.result_ready.connect(self._on_ocr_complete)
-        self.ocr_worker.start()
+        worker = FullScreenOCRWorker(bitmap, source_code)
+        worker.translation_run_id = run_id
+        worker.translation_source_code = source_code
+        worker.translation_target_code = target_code
+        self.ocr_worker = worker
+        self._ocr_workers.add(worker)
+        worker.result_ready.connect(self._on_fullscreen_ocr_result)
+        worker.finished.connect(self._release_finished_ocr_worker)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
 
-    def _on_ocr_complete(self, lines_data):
+    @QtCore.pyqtSlot(object)
+    def _on_fullscreen_ocr_result(self, lines):
+        worker = self.sender()
+        if worker is None:
+            return
+        self._on_ocr_complete(
+            lines,
+            int(getattr(worker, "translation_run_id", -1)),
+            str(getattr(worker, "translation_source_code", "")),
+            str(getattr(worker, "translation_target_code", "")),
+        )
+
+    @QtCore.pyqtSlot()
+    def _release_finished_ocr_worker(self):
+        worker = self.sender()
+        if worker is None:
+            return
+        self._ocr_workers.discard(worker)
+
+    def _on_ocr_complete(self, lines_data, run_id, source_code, target_code):
+        if run_id != self._translation_run_id:
+            return
         if not lines_data:
             self.loading = False
             config = get_cached_ocr_config()
             lang = config.get("interface_language", "en")
             self.error_message = ocr_ui_text(lang, "screen_no_text")
             self.update()
-            # Auto-close after 2 seconds
-            QtCore.QTimer.singleShot(2000, self.close)
             return
 
         self._lines_data = _group_screen_ocr_lines(lines_data)
         import threading
-        threading.Thread(target=self._translate_all, daemon=True).start()
+        threading.Thread(
+            target=self._translate_all,
+            args=(run_id, list(self._lines_data), source_code, target_code),
+            daemon=True,
+        ).start()
 
-    def _translate_all(self):
+    def _translate_all(self, run_id, lines_data, source_code, target_code):
+        blocks = []
+        error_message = ""
         try:
             from translater import translate_text
 
-            src, tgt = self.src_lang, self.tgt_lang
-            logging.info(f"FullScreenOverlay: translating {len(self._lines_data)} blocks ({src}->{tgt})")
+            src, tgt = source_code, target_code
+            logging.info(f"FullScreenOverlay: translating {len(lines_data)} blocks ({src}->{tgt})")
 
-            all_texts = [item[4] for item in self._lines_data]
+            all_texts = [item[4] for item in lines_data]
             translated_texts = _translate_screen_texts(all_texts, translate_text, src, tgt)
 
             if translated_texts and any(translated_texts):
-                blocks = []
-                for i, (x, y, w, h, orig) in enumerate(self._lines_data):
+                for i, (x, y, w, h, orig) in enumerate(lines_data):
                     tr = translated_texts[i].strip() if i < len(translated_texts) else orig
                     if not tr:
                         tr = orig
@@ -5368,19 +5377,22 @@ class FullScreenTranslateOverlay(QWidget):
                             tr,
                         )
                     )
-                self.translated_blocks = blocks
             else:
                 config = get_cached_ocr_config()
                 lang = config.get("interface_language", "en")
-                self.error_message = ocr_ui_text(lang, "translation_failed")
+                error_message = ocr_ui_text(lang, "translation_failed")
         except Exception as e:
-            self.error_message = str(e)
+            error_message = str(e)
 
+        self._translation_result_ready.emit(run_id, blocks, error_message)
+
+    @QtCore.pyqtSlot(int, object, str)
+    def _apply_translation_result(self, run_id, blocks, error_message):
+        if run_id != self._translation_run_id:
+            return
+        self.translated_blocks = list(blocks or [])
+        self.error_message = str(error_message or "") or None
         self.loading = False
-        QtCore.QMetaObject.invokeMethod(self, "_refresh", QtCore.Qt.QueuedConnection)
-
-    @QtCore.pyqtSlot()
-    def _refresh(self):
         self.update()
 
     # ---- painting --------------------------------------------------
@@ -5710,6 +5722,13 @@ class FullScreenTranslateOverlay(QWidget):
 
     def closeEvent(self, event):
         global _fullscreen_overlay_ref
+        self._translation_run_id += 1
+        self._rerun_timer.stop()
+        for worker in list(self._ocr_workers):
+            try:
+                worker.requestInterruption()
+            except RuntimeError:
+                pass
         _fullscreen_overlay_ref = None
         super().closeEvent(event)
         self.deleteLater()

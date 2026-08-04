@@ -107,7 +107,7 @@ class TestUpdateRepair(unittest.TestCase):
         source = (ROOT / "tools" / "build_update_repair.ps1").read_text(encoding="utf-8")
         repair_source = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
         repair_manifest = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
-        self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.2/", source)
+        self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.3/", source)
         self.assertNotIn("SHA256_PENDING", source)
         self.assertIn("1E6594368FEA3771259AB3384DDDC26F343A8AA7F489AAEB9EAF40AC57650488", source)
         self.assertIn("ClicknTranslateUpdateRepair.manifest", source)

@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QApplication, QAbstractItemView, QWidget  # noqa: E4
 import argos_worker  # noqa: E402
 import ocr  # noqa: E402
 import translater  # noqa: E402
-from settings_window import OcrLanguageManagerDialog  # noqa: E402
+from settings_window import OcrLanguageManagerDialog, TesseractInstallProgressDialog  # noqa: E402
 from languages import LANGUAGES  # noqa: E402
 
 
@@ -84,6 +84,32 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.addCleanup(timer_patch.stop)
         timer_patch.start()
         self.dialog = OcrLanguageManagerDialog(self.owner)
+
+    def test_package_install_can_continue_in_background_without_canceling(self):
+        self.dialog._install_in_progress = True
+        canceled = mock.Mock()
+        progress = TesseractInstallProgressDialog(
+            self.dialog,
+            title="Windows OCR",
+            in_progress_attr="_install_in_progress",
+            cancel_callback=canceled,
+        )
+        self.dialog.progress_dialog = progress
+        self.dialog.show()
+        progress.show()
+        self.app.processEvents()
+
+        self.dialog.reject()
+
+        self.assertFalse(progress.isVisible())
+        self.assertFalse(self.dialog.isVisible())
+        self.assertTrue(progress._user_minimized)
+        self.assertTrue(self.dialog._install_in_progress)
+        self.assertEqual(self.dialog.windowModality(), Qt.NonModal)
+        canceled.assert_not_called()
+        self.dialog._install_in_progress = False
+        self.dialog.progress_dialog = None
+        progress.close()
 
     def tearDown(self):
         self.dialog.close()
@@ -429,7 +455,9 @@ class LanguagePackageDialogTest(unittest.TestCase):
                         with mock.patch.object(self.dialog, "_finish_language_task") as finish:
                             self.dialog._install_windows_ocr_worker(["de"])
         self.assertIn("Get-WindowsCapability", captured["text"])
-        self.assertIn("/Add-Capability", captured["text"])
+        self.assertIn("Language.Basic~~~de-DE~0.0.1.0", captured["text"])
+        self.assertIn("Add-WindowsCapability -Online -Name $entry.BasicCapability", captured["text"])
+        self.assertIn("Add-WindowsCapability -Online -Name $entry.Capability", captured["text"])
         self.assertNotIn("Stop-Process -Id $process.Id", captured["text"])
         self.assertIn("Write-OcrStatus 'cancel_pending'", captured["text"])
         self.assertIn("elapsed =", captured["text"])
@@ -438,10 +466,27 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertIn("/Remove-Capability", captured["text"])
         self.assertIn("[System.IO.File]::WriteAllText", captured["text"])
         self.assertIn("Move-Item -LiteralPath $statusTemp", captured["text"])
-        self.assertIn("'(\\d+)(?:[.,]\\d+)?%'", captured["text"])
-        self.assertNotIn("'(\\\\d+)", captured["text"])
+        self.assertNotIn("[regex]::Matches", captured["text"])
+        self.assertNotIn("progressMatches", captured["text"])
         self.assertNotIn("Set-Content -LiteralPath $StatusPath", captured["text"])
         finish.assert_called_once_with("Windows OCR")
+
+    def test_windows_install_status_never_presents_a_fake_percentage(self):
+        with mock.patch.object(self.dialog, "_emit_language_progress") as emit:
+            self.dialog._emit_windows_ocr_status({
+                "phase": "installing",
+                "percent": 33,
+                "current": 1,
+                "total": 1,
+                "code": "zh",
+                "elapsed": 125,
+            })
+
+        message, value, determinate = emit.call_args.args
+        self.assertNotIn("33%", message)
+        self.assertIn("02:05", message)
+        self.assertEqual(value, 33)
+        self.assertFalse(determinate)
 
     def test_windows_remove_script_is_observable_and_cancelable(self):
         script = self.dialog._windows_ocr_remover_script(

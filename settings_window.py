@@ -756,18 +756,31 @@ class TesseractInstallProgressDialog(QDialog):
         body.setSpacing(10)
         self.message_label = QLabel("")
         self.message_label.setAlignment(Qt.AlignCenter)
+        self.message_label.setWordWrap(True)
         body.addWidget(self.message_label)
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setRange(0, 100)
         body.addWidget(self.progress_bar)
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row.addStretch()
+        self.background_button = QPushButton("Continue in background")
+        self.background_button.clicked.connect(self._continue_in_background)
+        action_row.addWidget(self.background_button)
         self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
         self.cancel_button.clicked.connect(self.reject)
-        body.addWidget(self.cancel_button, alignment=Qt.AlignRight)
+        action_row.addWidget(self.cancel_button)
+        body.addLayout(action_row)
         frame_layout.addLayout(body)
 
     def _minimize_to_taskbar(self):
         self._user_minimized = True
         self.showMinimized()
+
+    def _continue_in_background(self):
+        """Keep the worker running without repeatedly raising this window."""
+        self._user_minimized = True
+        self.hide()
 
     def bring_to_front(self):
         _bring_progress_dialog_to_front(self)
@@ -783,6 +796,9 @@ class TesseractInstallProgressDialog(QDialog):
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
         self.close_button.setToolTip(text)
+
+    def setBackgroundButtonText(self, text):
+        self.background_button.setText(text)
 
     def setCancellationPending(self, text):
         self.cancel_button.setText(text)
@@ -1797,6 +1813,10 @@ LANGUAGE_MANAGER_TEXT = {
 
 WINDOWS_OCR_RUNTIME_TEXT = {
     "en": {
+        "continue_background": "Continue in background",
+        "win_background_info": "Windows Update can take several minutes. You can keep using the app or continue the installation in the background.",
+        "win_installing_basic": "Windows is preparing {language} ({current}/{total}). This required language component may take several minutes.",
+        "win_installing": "Windows Update is downloading and installing OCR for {language} ({current}/{total}). This may take several minutes.",
         "win_cancel_pending": "Cancel requested. Windows is safely finishing the current component; this can take several minutes.",
         "win_still_working": "Windows Update is still working. Do not turn off the PC.",
         "win_error_policy": "Windows Update policy blocked this OCR package. Open Windows settings or contact the system administrator (0x800f0954).",
@@ -1805,6 +1825,10 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_generic": "Windows could not finish the OCR package operation. Install pending Windows updates, restart the PC, and try again.",
     },
     "ru": {
+        "continue_background": "Продолжить в фоне",
+        "win_background_info": "Центру обновления Windows может потребоваться несколько минут. Можно продолжить пользоваться программой или отправить установку в фон.",
+        "win_installing_basic": "Windows подготавливает язык {language} ({current}/{total}). Установка обязательного компонента может занять несколько минут.",
+        "win_installing": "Центр обновления Windows загружает и устанавливает OCR для языка {language} ({current}/{total}). Это может занять несколько минут.",
         "win_cancel_pending": "Отмена запрошена. Windows безопасно завершает текущий компонент — это может занять несколько минут.",
         "win_still_working": "Центр обновления Windows продолжает работу. Не выключайте компьютер.",
         "win_error_policy": "Политика Центра обновления Windows заблокировала OCR-пакет. Откройте настройки Windows или обратитесь к администратору (0x800f0954).",
@@ -1813,6 +1837,10 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_generic": "Windows не смогла завершить операцию с OCR-пакетом. Установите ожидающие обновления Windows, перезагрузите компьютер и повторите попытку.",
     },
     "es": {
+        "continue_background": "Continuar en segundo plano",
+        "win_background_info": "Windows Update puede tardar varios minutos. Puedes seguir usando la aplicación o continuar la instalación en segundo plano.",
+        "win_installing_basic": "Windows está preparando {language} ({current}/{total}). Este componente obligatorio puede tardar varios minutos.",
+        "win_installing": "Windows Update está descargando e instalando OCR para {language} ({current}/{total}). Puede tardar varios minutos.",
         "win_cancel_pending": "Cancelación solicitada. Windows está terminando de forma segura el componente actual; puede tardar varios minutos.",
         "win_still_working": "Windows Update sigue trabajando. No apagues el equipo.",
         "win_error_policy": "La directiva de Windows Update bloqueó este paquete OCR. Abre Configuración de Windows o contacta con el administrador (0x800f0954).",
@@ -1821,6 +1849,10 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_generic": "Windows no pudo finalizar la operación del paquete OCR. Instala las actualizaciones pendientes, reinicia el equipo y vuelve a intentarlo.",
     },
     "de": {
+        "continue_background": "Im Hintergrund fortsetzen",
+        "win_background_info": "Windows Update kann mehrere Minuten benötigen. Sie können die App weiter verwenden oder die Installation im Hintergrund fortsetzen.",
+        "win_installing_basic": "Windows bereitet {language} vor ({current}/{total}). Diese erforderliche Komponente kann mehrere Minuten dauern.",
+        "win_installing": "Windows Update lädt OCR für {language} herunter und installiert es ({current}/{total}). Dies kann mehrere Minuten dauern.",
         "win_cancel_pending": "Abbruch angefordert. Windows schließt die aktuelle Komponente sicher ab; dies kann einige Minuten dauern.",
         "win_still_working": "Windows Update arbeitet weiter. Schalten Sie den PC nicht aus.",
         "win_error_policy": "Eine Windows-Update-Richtlinie hat dieses OCR-Paket blockiert. Öffnen Sie die Windows-Einstellungen oder wenden Sie sich an den Administrator (0x800f0954).",
@@ -1829,6 +1861,10 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_generic": "Windows konnte den OCR-Paketvorgang nicht abschließen. Installieren Sie ausstehende Updates, starten Sie den PC neu und versuchen Sie es erneut.",
     },
     "fr": {
+        "continue_background": "Continuer en arrière-plan",
+        "win_background_info": "Windows Update peut prendre plusieurs minutes. Vous pouvez continuer à utiliser l’application ou poursuivre l’installation en arrière-plan.",
+        "win_installing_basic": "Windows prépare {language} ({current}/{total}). Ce composant requis peut prendre plusieurs minutes.",
+        "win_installing": "Windows Update télécharge et installe OCR pour {language} ({current}/{total}). Cela peut prendre plusieurs minutes.",
         "win_cancel_pending": "Annulation demandée. Windows termine le composant actuel en toute sécurité ; cela peut prendre plusieurs minutes.",
         "win_still_working": "Windows Update continue de travailler. N’éteignez pas le PC.",
         "win_error_policy": "La stratégie Windows Update a bloqué ce module OCR. Ouvrez les paramètres Windows ou contactez l’administrateur (0x800f0954).",
@@ -1837,6 +1873,10 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_generic": "Windows n’a pas pu terminer l’opération du module OCR. Installez les mises à jour en attente, redémarrez le PC puis réessayez.",
     },
     "zh": {
+        "continue_background": "在后台继续",
+        "win_background_info": "Windows 更新可能需要几分钟。你可以继续使用应用，或让安装在后台继续。",
+        "win_installing_basic": "Windows 正在准备 {language}（{current}/{total}）。安装必需的语言组件可能需要几分钟。",
+        "win_installing": "Windows 更新正在下载并安装 {language} 的 OCR（{current}/{total}）。这可能需要几分钟。",
         "win_cancel_pending": "已请求取消。Windows 正在安全完成当前组件，这可能需要几分钟。",
         "win_still_working": "Windows 更新仍在工作，请勿关闭电脑。",
         "win_error_policy": "Windows 更新策略阻止了此 OCR 包。请打开 Windows 设置或联系系统管理员 (0x800f0954)。",
@@ -1895,6 +1935,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setObjectName("languageManagerDialog")
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setWindowModality(Qt.NonModal)
         self.setFixedSize(640, 558)
 
         root_layout = QVBoxLayout(self)
@@ -3321,7 +3362,11 @@ class OcrLanguageManagerDialog(QDialog):
             return
         msg = QMessageBox(self)
         msg.setWindowTitle("Windows OCR")
-        msg.setText(language_manager_text(self.lang, "win_confirm"))
+        msg.setText(
+            language_manager_text(self.lang, "win_confirm")
+            + "\n\n"
+            + language_manager_text(self.lang, "win_background_info")
+        )
         msg.setIcon(QMessageBox.Question)
         yes_btn = msg.addButton(settings_text(self.lang, "install"), QMessageBox.YesRole)
         msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.NoRole)
@@ -3554,12 +3599,26 @@ class OcrLanguageManagerDialog(QDialog):
             cancel_callback=self._request_install_cancel,
         )
         self.progress_dialog.setCancelButtonText(settings_text(self.lang, "cancel"))
+        self.progress_dialog.setBackgroundButtonText(
+            language_manager_text(self.lang, "continue_background")
+        )
         self.progress_dialog.setLabelText(language_manager_text(self.lang, "preparing"))
         self.progress_dialog.setRange(0, 0)
         self.progress_dialog.show()
         self.progress_dialog.center_on_owner()
         self.progress_dialog.bring_to_front()
         threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
+
+    def reject(self):
+        # Closing the package manager must not terminate an active Windows
+        # servicing task. Keep the dialog object alive and let the user work
+        # in the main window while the background worker finishes.
+        if self._install_in_progress:
+            if self.progress_dialog is not None:
+                self.progress_dialog._continue_in_background()
+            self.hide()
+            return
+        super().reject()
 
     def _request_install_cancel(self):
         if self._cancel_requested.is_set():
@@ -3627,6 +3686,10 @@ class OcrLanguageManagerDialog(QDialog):
         self._start_runtime_probe()
         if engine == "Argos":
             self._start_argos_catalog_refresh(False)
+        if not self.isVisible():
+            self.show()
+            self.raise_()
+            self.activateWindow()
         if canceled:
             self._task_success_message = ""
             self._task_failure_key = "install_failed"
@@ -3702,12 +3765,13 @@ class OcrLanguageManagerDialog(QDialog):
         result_path,
         output_dir,
     ):
-        """Build an elevated DISM runner with observable progress and real cancellation."""
+        """Build an elevated Windows capability installer with observable phases."""
         ps = self._powershell_literal
         entries = ",\n".join(
-            "    [pscustomobject]@{ Code = %s; Capability = %s; ForceRepair = %s }"
+            "    [pscustomobject]@{ Code = %s; BasicCapability = %s; Capability = %s; ForceRepair = %s }"
             % (
                 ps(code),
+                ps(f"Language.Basic~~~{windows_ocr_tag(code)}~0.0.1.0"),
                 ps(capability),
                 "$true" if code in set(repair_codes or []) else "$false",
             )
@@ -3801,40 +3865,24 @@ try {{
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
             $capability = Get-WindowsCapability -Online -Name $entry.Capability
         }}
+        $basic = Get-WindowsCapability -Online -Name $entry.BasicCapability -ErrorAction SilentlyContinue
+        if ($null -eq $basic) {{
+            throw ("Windows does not offer the required capability " + $entry.BasicCapability)
+        }}
+        $InitiallyInstalled[$entry.BasicCapability] = ($basic.State -eq 'Installed')
+        if ($basic.State -ne 'Installed') {{
+            Write-OcrStatus 'installing_basic' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            $null = Add-WindowsCapability -Online -Name $entry.BasicCapability -ErrorAction Stop
+            if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
+            $basic = Get-WindowsCapability -Online -Name $entry.BasicCapability
+            if ($basic.State -ne 'Installed') {{
+                throw ("Windows did not install " + $entry.BasicCapability + ". State: " + $basic.State)
+            }}
+        }}
+
         if ($capability.State -ne 'Installed') {{
-            $stdoutPath = Join-Path $OutputDir ("dism_" + $index + ".out")
-            $stderrPath = Join-Path $OutputDir ("dism_" + $index + ".err")
-            $arguments = @('/Online', '/Add-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
-            $process = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-            while (-not $process.HasExited) {{
-                $rawPercent = 0
-                if (Test-Path -LiteralPath $stdoutPath) {{
-                    $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
-                    if ($null -ne $content) {{
-                        $matches = [regex]::Matches([string]$content, '(\d+)(?:[.,]\d+)?%')
-                        if ($matches.Count -gt 0) {{
-                            $rawPercent = [int]$matches[$matches.Count - 1].Groups[1].Value
-                        }}
-                    }}
-                }}
-                $overall = [int](((100 * $index) + $rawPercent) / $total)
-                if (Test-OcrCancel) {{
-                    Write-OcrStatus 'cancel_pending' $overall $current $total $entry.Code ''
-                }} else {{
-                    Write-OcrStatus 'installing' $overall $current $total $entry.Code ''
-                }}
-                Start-Sleep -Milliseconds 250
-                $process.Refresh()
-            }}
-            $process.WaitForExit()
-            $process.Refresh()
-            $exitCode = [int]$process.ExitCode
-            if ($exitCode -ne 0) {{
-                $details = ''
-                if (Test-Path -LiteralPath $stderrPath) {{ $details = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue }}
-                if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
-                throw ("DISM exited with code " + $exitCode + ". " + $details)
-            }}
+            Write-OcrStatus 'installing' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            $null = Add-WindowsCapability -Online -Name $entry.Capability -ErrorAction Stop
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
         }}
 
@@ -3850,16 +3898,16 @@ try {{
 }} catch [System.OperationCanceledException] {{
     Write-OcrStatus 'rolling_back' 0 0 $Packages.Count '' ''
     foreach ($entry in $Packages) {{
-        if (-not $InitiallyInstalled.ContainsKey($entry.Capability)) {{ continue }}
-        $wasInstalled = [bool]$InitiallyInstalled[$entry.Capability]
-        $currentCapability = Get-WindowsCapability -Online -Name $entry.Capability -ErrorAction SilentlyContinue
-        if ($null -eq $currentCapability) {{ continue }}
-        if ($wasInstalled -and $currentCapability.State -ne 'Installed') {{
-            $restoreArgs = @('/Online', '/Add-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
-            Start-Process -FilePath dism.exe -ArgumentList $restoreArgs -Wait -WindowStyle Hidden | Out-Null
-        }} elseif (-not $wasInstalled -and $currentCapability.State -eq 'Installed') {{
-            $rollbackArgs = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
-            Start-Process -FilePath dism.exe -ArgumentList $rollbackArgs -Wait -WindowStyle Hidden | Out-Null
+        foreach ($capabilityName in @($entry.Capability, $entry.BasicCapability)) {{
+            if (-not $InitiallyInstalled.ContainsKey($capabilityName)) {{ continue }}
+            $wasInstalled = [bool]$InitiallyInstalled[$capabilityName]
+            $currentCapability = Get-WindowsCapability -Online -Name $capabilityName -ErrorAction SilentlyContinue
+            if ($null -eq $currentCapability) {{ continue }}
+            if ($wasInstalled -and $currentCapability.State -ne 'Installed') {{
+                $null = Add-WindowsCapability -Online -Name $capabilityName -ErrorAction SilentlyContinue
+            }} elseif (-not $wasInstalled -and $currentCapability.State -eq 'Installed') {{
+                $null = Remove-WindowsCapability -Online -Name $capabilityName -ErrorAction SilentlyContinue
+            }}
         }}
     }}
     Set-Content -LiteralPath $ResultPath -Value 'CANCELED' -Encoding UTF8 -Force
@@ -4033,21 +4081,18 @@ try {{
             if item.code == code:
                 language = item.display_name(self.lang)
                 break
-        if phase == "installing":
+        if phase in {"installing", "installing_basic"}:
             text = language_manager_text(
                 self.lang,
-                "win_installing",
+                "win_installing_basic" if phase == "installing_basic" else "win_installing",
                 language=language,
                 current=current,
                 total=total,
             )
-            # DISM can buffer its first progress line.  Until a real value is
-            # available, show an active bar instead of a frozen, misleading 0%.
-            base_percent = int(100 * max(0, current - 1) / max(1, total))
             self._emit_language_progress(
                 f"{text}\n{elapsed_text}",
                 percent,
-                percent > base_percent,
+                False,
             )
         elif phase == "checking":
             text = language_manager_text(self.lang, "win_checking", language=language)
@@ -4174,6 +4219,8 @@ try {{
 
             threading.Thread(target=run_installer, daemon=True).start()
             last_status = None
+            started_at = time.monotonic()
+            last_elapsed = -1
             while not process_finished.wait(0.15):
                 if self._cancel_requested.is_set():
                     try:
@@ -4181,9 +4228,13 @@ try {{
                     except OSError:
                         pass
                 status = self._read_windows_ocr_status(status_path)
-                if status is not None and status != last_status:
-                    last_status = status
-                    self._emit_windows_ocr_status(status)
+                if status is not None:
+                    elapsed = int(time.monotonic() - started_at)
+                    status["elapsed"] = max(elapsed, int(status.get("elapsed", 0) or 0))
+                    if status != last_status or elapsed != last_elapsed:
+                        last_status = dict(status)
+                        last_elapsed = elapsed
+                        self._emit_windows_ocr_status(status)
 
             status = self._read_windows_ocr_status(status_path)
             if status is not None and status != last_status:
@@ -4555,6 +4606,7 @@ class SettingsWindow(QWidget):
         self._hymt_install_phase = "idle"
         self._hymt_temp_dir = ""
         self._hymt_cancel_requested = threading.Event()
+        self._language_manager_dialog = None
         self.rapidocr_progress = None
         self.easyocr_progress = None
         self.hymt_progress = None
@@ -5034,8 +5086,18 @@ class SettingsWindow(QWidget):
         complete_guide_step = getattr(self.parent, "_complete_guide_step", None)
         if callable(complete_guide_step):
             complete_guide_step("language_packages")
-        dialog = OcrLanguageManagerDialog(self)
-        dialog.exec_()
+        dialog = self._language_manager_dialog
+        if dialog is None:
+            dialog = OcrLanguageManagerDialog(self)
+            self._language_manager_dialog = dialog
+        else:
+            dialog.refresh_all()
+            dialog._start_runtime_probe()
+            if dialog.argos_table.isVisible():
+                dialog._start_argos_catalog_refresh(False)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"

@@ -60,26 +60,58 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         config = {
             "interface_language": "en",
             "translator_engine": "Google",
+            "ocr_translate_source_language": "en",
+            "ocr_translate_target_language": "ru",
             "fullscreen_translate_from": "zh",
             "fullscreen_translate_to": "en",
         }
         with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
                 mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "zh"]), \
-                mock.patch.object(ocr, "_write_ocr_config_updates") as save_pair:
+                mock.patch.object(ocr, "_write_ocr_config_updates") as save_pair, \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot") as single_shot:
             overlay = ocr.FullScreenTranslateOverlay()
             try:
                 self.assertEqual(overlay.lang_combo.currentData(), "zh")
                 self.assertEqual(overlay.target_lang_combo.currentData(), "en")
                 self.assertIsNotNone(overlay.translate_arrow_label)
+                self.assertFalse(hasattr(overlay, "go_button"))
+                single_shot.assert_called_once()
 
-                with mock.patch.object(overlay, "_start_ocr"):
-                    overlay._on_go_clicked()
+                with mock.patch.object(overlay, "_start_ocr") as start_ocr:
+                    overlay._restart_translation_from_controls()
 
                 self.assertEqual((overlay.src_lang, overlay.tgt_lang), ("zh", "en"))
+                start_ocr.assert_called_once_with(1, "zh", "en")
                 save_pair.assert_called_with({
                     "fullscreen_translate_from": "zh",
                     "fullscreen_translate_to": "en",
                 })
+            finally:
+                overlay.close()
+                overlay.deleteLater()
+
+    def test_fullscreen_language_change_is_saved_and_schedules_rerun(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "zh"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates") as save_pair, \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot"):
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                target_index = overlay.target_lang_combo.findData("es")
+                self.assertGreaterEqual(target_index, 0)
+                with mock.patch.object(overlay._rerun_timer, "start") as start_timer:
+                    overlay.target_lang_combo.setCurrentIndex(target_index)
+                save_pair.assert_called_with({
+                    "fullscreen_translate_from": "en",
+                    "fullscreen_translate_to": "es",
+                })
+                start_timer.assert_called_once_with()
             finally:
                 overlay.close()
                 overlay.deleteLater()

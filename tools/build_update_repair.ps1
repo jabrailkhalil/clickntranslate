@@ -1,7 +1,7 @@
 param(
-    [string]$Version = "1.5.2.0",
+    [string]$Version = "1.5.3.0",
     [string]$OutputPath = "",
-    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.2/ClicknTranslate-v1.5.2-win64.zip",
+    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.3/ClicknTranslate-v1.5.3-win64.zip",
     [string]$PackageSha256 = "1E6594368FEA3771259AB3384DDDC26F343A8AA7F489AAEB9EAF40AC57650488"
 )
 
