@@ -711,6 +711,33 @@ app-wide via `install_tooltip_style()` so unstyled windows match too, plus `tool
 which wraps anything longer than 44 characters into a fixed 320px block and leaves short labels
 compact. Applied at all 45 `setToolTip` call sites.
 
+### 11c. The 1.5.5 release
+
+Built on **Python 3.12.10** in `.venv312` (the spec now enforces this). Same procedure as §10,
+with the version strings bumped to 1.5.5.
+
+Verification specific to the 1.5.4 defects:
+
+- **VC runtime is now one consistent set** in the shipped bundle:
+  `MSVCP140.dll`, `MSVCP140_1.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll` all
+  **14.51.36247.0** (1.5.4 shipped 14.27 / 14.51 / 14.38 / 14.38).
+- **`ArgosWorker.exe` runs**: exit 0, returns the full **100-package** Argos catalog. Previously
+  an instant segfault.
+- **Frozen interpreter is `python312.dll`** (1.5.4 shipped `python311.dll`).
+- **All 26 `EASYOCR_PIP_PACKAGES` pins resolve** under 3.12 via `pip install --dry-run --report`,
+  including the `scipy==1.18.0` that could not resolve on 3.11.
+- Full suite: **289 passed** (up from 286; +3 new tests for the Tesseract retry and tooltips).
+
+Artifacts:
+
+| Asset | Size | SHA-256 |
+| --- | --- | --- |
+| `Click-n-Translate-1.5.5-windows-x64-installer.exe` | 125.2 MB | `8B1C51AC978438D85DF20A3A8DF2C0A0E3468395FF1DB7EBD445E87407558D0C` |
+| `Click-n-Translate-1.5.5-windows-portable-x64.zip` | 198.0 MB | `8745500C5CE076D25133083EDAA286629F22998DCE8FFB508B8704AED4DD00AA` |
+| `ClicknTranslate-Setup-v1.5.5-win64.exe` | 89,600 B | network downloader |
+
+Git: commit **`1980bf3`** on `main`, annotated tag **`v1.5.5`**.
+
 ---
 
 ## 12. If you are picking this up next
@@ -723,7 +750,13 @@ Things that will bite you if you do not know them:
 1. **The working directory has no `.git`.** Commit from a clone (§11.2). The two trees differ only
    by line endings (LF locally, CRLF in a checkout with `core.autocrlf=true`) — a naive byte diff
    reports ~57 false positives, so always normalize newlines before comparing.
-2. **Never build a release on Python 3.13** (§9). Use `.venv311`. `.venv` (3.13) is for tests only.
+2. **Build releases with Python 3.12 only — use `.venv312`.** Not 3.13 (`rapidocr-onnxruntime`
+   will not resolve) and not 3.11 (the runtime OCR engine installs break, §11b(b)). The spec now
+   enforces this by reading `EASYOCR_PYTHON_VERSION`, so a wrong interpreter fails the build
+   instead of shipping. `.venv` (3.13) is for running tests only; `.venv311` is dead — delete it.
+2b. **Do not trust the build machine's PATH.** The spec pins the VC runtime to System32 and
+   asserts a single version, because a stray `MSVCP140.dll` on PATH silently broke 1.5.4
+   (§11b(a)). If that assertion ever fires, do not work around it — find the stray DLL.
 3. **Rename the Inno output before building the network setup** (§10, step 5) or you will overwrite
    a 126 MB installer with a 90 KB downloader that has the same filename.
 4. **`tools/build_update_repair.ps1` carries a pinned SHA-256** of the portable zip. It must be
