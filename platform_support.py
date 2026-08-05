@@ -176,6 +176,62 @@ def missing_clipboard_helper():
     return "" if (shutil.which("xclip") or shutil.which("xsel")) else "xclip"
 
 
+#: Clipboard helpers, most specific first. Each reads the text from stdin and
+#: keeps owning the selection after this process is gone.
+_CLIPBOARD_HELPERS = (
+    ("wl-copy", ["wl-copy", "--type", "text/plain;charset=utf-8"]),
+    ("xclip", ["xclip", "-selection", "clipboard", "-i"]),
+    ("xsel", ["xsel", "--clipboard", "--input"]),
+)
+
+
+def _copy_with_helper(text):
+    """Hand text to a clipboard helper that outlives this process."""
+    for name, command in _CLIPBOARD_HELPERS:
+        if not shutil.which(name):
+            continue
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                # Detach so the helper keeps the selection after we exit.
+                start_new_session=True,
+            )
+            process.communicate(input=str(text).encode("utf-8"), timeout=5)
+            # The helper forks and keeps the selection; a non-zero exit means it
+            # could not reach the display server, so try the next one.
+            if process.returncode == 0:
+                return True
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return False
+
+
+def copy_text(text):
+    """Put text on the clipboard so it survives this process exiting.
+
+    Windows keeps clipboard contents in the system; X11 and Wayland keep them in
+    the client that set them, so text copied by the short-lived capture overlay
+    would vanish the moment it closes unless a clipboard manager happens to be
+    running. Handing the text to wl-copy/xclip avoids depending on one.
+
+    Returns True when the text was copied. A clipboard failure must never break
+    a translation, so this reports rather than raises.
+    """
+    if IS_LINUX and _copy_with_helper(text):
+        return True
+    try:
+        import pyperclip
+
+        pyperclip.copy(text)
+        return True
+    except Exception as exc:
+        print(f"Could not copy to the clipboard: {exc}")
+        return False
+
+
 # --- OCR engines --------------------------------------------------------------
 
 #: Engines offered on each platform. "windows" is the WinRT engine and only
@@ -218,6 +274,27 @@ def tesseract_install_hint():
         if shutil.which(manager):
             return hint
     return TESSERACT_INSTALL_HINTS[0][1]
+
+
+#: How a user installs a specific Python version. The optional OCR engines are
+#: pip-installed at runtime and then imported by the frozen worker, so the
+#: interpreter has to match this build's version exactly.
+PYTHON_INSTALL_HINTS = (
+    ("apt-get", "sudo apt install python{version} python{version}-venv"),
+    ("dnf", "sudo dnf install python{version}"),
+    ("pacman", "sudo pacman -S python"),
+    ("zypper", "sudo zypper install python{version_nodot}"),
+)
+
+
+def python_install_hint(version):
+    """Install command for a given Python version, e.g. "3.12"."""
+    version = str(version or "")
+    for manager, hint in PYTHON_INSTALL_HINTS:
+        if shutil.which(manager):
+            return hint.format(version=version, version_nodot=version.replace(".", ""))
+    template = PYTHON_INSTALL_HINTS[0][1]
+    return template.format(version=version, version_nodot=version.replace(".", ""))
 
 
 # --- updates ------------------------------------------------------------------

@@ -8144,7 +8144,11 @@ finally {
     def _find_hymt_runner_under(self, root_dir):
         if not root_dir or not os.path.isdir(root_dir):
             return ""
-        candidates = ("hymt.exe", "llama-cli.exe", "llama-run.exe", "main.exe")
+        # Imported lazily like every other translater use here, so the Argos
+        # runtime is not pulled into the settings window.
+        import translater
+
+        candidates = translater.hymt_runner_names()
         for name in candidates:
             direct_path = os.path.join(root_dir, name)
             if os.path.isfile(direct_path):
@@ -8196,6 +8200,31 @@ finally {
             return self._translator_engines[idx] or "google"
         return "google"
 
+    def _show_manual_hymt_hint(self, lang):
+        """Explain how to supply a llama.cpp runner where we cannot ship one."""
+        import translater
+
+        target_dir = os.path.join(_portable_base_dir(), "translators", "hymt")
+        runner_names = ", ".join(translater.hymt_runner_names())
+        is_ru = lang == "ru"
+        message = (
+            "Автоматическая установка Hy-MT доступна только в Windows.\n\n"
+            f"Положите модель {HYMT_MODEL_FILE} и исполняемый файл llama.cpp "
+            f"({runner_names}) в папку:\n{target_dir}"
+            if is_ru
+            else
+            "The automatic Hy-MT download is available on Windows only.\n\n"
+            f"Put the {HYMT_MODEL_FILE} model and a llama.cpp runner "
+            f"({runner_names}) in:\n{target_dir}"
+        )
+        msg = QMessageBox(self)
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
+        msg.setText(message)
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        msg.exec_()
+
     def _on_translator_changed(self, idx):
         # Сохраняем имя движка из списка
         if hasattr(self, '_translator_engines') and 0 <= idx < len(self._translator_engines):
@@ -8214,6 +8243,16 @@ finally {
             return
 
         lang = self.parent.current_interface_language
+        if not platform_support.IS_WINDOWS:
+            # The pinned llama.cpp archive is the Windows build, so instead of
+            # downloading something that cannot run, explain how to supply a
+            # local runner. Hy-MT still works once one is in place.
+            self._show_manual_hymt_hint(lang)
+            fallback = self.previous_translator_engine or "google"
+            self._set_translator_combo_silently(fallback)
+            self.auto_save_setting("translator_engine", fallback)
+            return
+
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
         msg.setText(engine_text(lang, "hymt_prompt"))
@@ -8563,7 +8602,11 @@ finally {
         py_launcher = shutil.which("py")
         if py_launcher:
             candidates.append([py_launcher, f"-{required}"])
-        for name in ("python", "python3"):
+        # Distributions install versioned interpreters (python3.12), so probe the
+        # exact one first: the plain python3 is often a different minor version,
+        # and these wheels are imported by the frozen worker, so the ABI has to
+        # match exactly.
+        for name in (f"python{required}", "python", "python3"):
             found = shutil.which(name)
             if found:
                 candidates.append([found])
@@ -8583,12 +8626,28 @@ finally {
                 return candidate
             except Exception:
                 continue
+        if platform_support.IS_LINUX:
+            # Windows falls back to a downloadable embedded interpreter; on Linux
+            # the distribution provides one, so name the package to install.
+            raise RuntimeError(
+                f"Python {required} with pip was not found. {engine_name} needs an interpreter "
+                f"matching this build. Install it with your package manager "
+                f"({platform_support.python_install_hint(required)}), or place the "
+                f"{engine_name} packages in {package_dir or self._local_rapidocr_dir()}."
+            )
         raise RuntimeError(
             f"Python {required} with pip was not found. Install Python {required} or manually place "
             f"{engine_name} packages into {package_dir or self._local_rapidocr_dir()}."
         )
 
     def _portable_pip_bootstrap_plan(self, is_x64=True):
+        if platform_support.IS_LINUX:
+            # The bootstrap downloads the Windows embedded distribution; there is
+            # no equivalent to ship for Linux.
+            raise RuntimeError(
+                "The bundled Python bootstrap is Windows-only. Install a matching "
+                "python3 from your package manager instead."
+            )
         if not is_x64:
             raise RuntimeError("Automatic OCR engine installation supports Windows x64 only.")
         return {
@@ -9254,6 +9313,15 @@ finally {
         threading.Thread(target=self._install_hymt_worker, daemon=True).start()
 
     def _get_hymt_download_plan(self, is_x64=True):
+        if not platform_support.IS_WINDOWS:
+            # The pinned llama.cpp archive and its checksum are the Windows x64
+            # build. Rather than ship an unverified binary for another system,
+            # Linux users point the app at their own llama.cpp (see
+            # _show_linux_hymt_hint).
+            raise RuntimeError(
+                "The automatic Hy-MT download is available on Windows only. "
+                "Place a llama.cpp runner and the GGUF model in translators/hymt."
+            )
         if not is_x64:
             raise RuntimeError("Автоматическая установка Hy-MT поддерживает только Windows x64.")
         return {

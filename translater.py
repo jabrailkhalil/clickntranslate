@@ -286,10 +286,16 @@ def _find_hymt_model_under(root_dir):
     return ""
 
 
+def hymt_runner_names():
+    """llama.cpp runner file names for this platform."""
+    stems = ("hymt", "llama-cli", "llama-run", "main")
+    return tuple(platform_support.executable_name(stem).lower() for stem in stems)
+
+
 def _find_hymt_runner_under(root_dir):
     if not root_dir or not os.path.isdir(root_dir):
         return ""
-    candidates = ("hymt.exe", "llama-cli.exe", "llama-run.exe", "main.exe")
+    candidates = hymt_runner_names()
     for name in candidates:
         direct_path = os.path.join(root_dir, name)
         if os.path.isfile(direct_path):

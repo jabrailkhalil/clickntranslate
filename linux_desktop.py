@@ -115,11 +115,33 @@ def install_desktop_entry(executable, icon_source=""):
 
 
 def install_icon(icon_source, size="256x256"):
-    """Copy a PNG icon into the hicolor theme so the launcher can show it."""
+    """Put an icon into the hicolor theme so the launcher can show it.
+
+    The repository ships a Windows .ico; icon themes need a PNG, so one is
+    converted on the way in.
+    """
     target_dir = platform_support.icons_dir(size)
     os.makedirs(target_dir, exist_ok=True)
     target = os.path.join(target_dir, f"{ICON_NAME}.png")
-    shutil.copyfile(icon_source, target)
+
+    if os.path.splitext(icon_source)[1].lower() == ".png":
+        shutil.copyfile(icon_source, target)
+        return target
+
+    from PIL import Image
+
+    with Image.open(icon_source) as image:
+        # An .ico holds several sizes; take the largest one.
+        if getattr(image, "n_frames", 1) > 1:
+            best, best_area = image, 0
+            for index in range(image.n_frames):
+                image.seek(index)
+                area = image.width * image.height
+                if area > best_area:
+                    best, best_area = image.copy(), area
+            image = best
+        pixels = int(size.split("x")[0])
+        image.convert("RGBA").resize((pixels, pixels), Image.LANCZOS).save(target, "PNG")
     return target
 
 

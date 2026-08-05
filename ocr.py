@@ -4825,7 +4825,7 @@ class ScreenCaptureOverlay(QWidget):
 
                     show_translation_dialog(dialog_parent, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
                     if auto_copy:
-                        pyperclip.copy(translated_text)
+                        platform_support.copy_text(translated_text)
                         save_copy_history(translated_text)
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
@@ -4834,7 +4834,7 @@ class ScreenCaptureOverlay(QWidget):
                 try:
                     # Ленивый импорт для избежания циклического импорта
                     from main import save_copy_history
-                    pyperclip.copy(text)
+                    platform_support.copy_text(text)
                     save_copy_history(text)
                     logging.info(
                         f"[OCR:{session_id}] Recognized text copied; len={len(text)}, "

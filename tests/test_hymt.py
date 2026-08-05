@@ -8,11 +8,13 @@ from types import SimpleNamespace
 from unittest import mock
 
 import cache_manager
+import platform_support
 import settings_window as sw
 import translater
 
 
 class TestHyMTInstallerHelpers(unittest.TestCase):
+    @unittest.skipUnless(platform_support.IS_WINDOWS, "the pinned llama.cpp archive is the Windows build")
     def test_get_hymt_download_plan_uses_working_official_artifacts(self):
         dummy = object()
 
@@ -34,7 +36,7 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
             os.makedirs(model_dir, exist_ok=True)
             os.makedirs(bin_dir, exist_ok=True)
             model_path = os.path.join(model_dir, "HY-MT1.5-1.8B-Q4_K_M.gguf")
-            runner_path = os.path.join(bin_dir, "llama-cli.exe")
+            runner_path = os.path.join(bin_dir, platform_support.executable_name("llama-cli"))
             with open(model_path, "wb") as f:
                 f.write(b"gguf")
             with open(runner_path, "wb") as f:
@@ -78,7 +80,7 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
                 def _download_file(self, url, destination_path, **_kwargs):
                     if url == "runtime":
                         with zipfile.ZipFile(destination_path, "w") as zf:
-                            zf.writestr("llama-cli.exe", b"exe")
+                            zf.writestr(platform_support.executable_name("llama-cli"), b"exe")
                     elif url == "model":
                         with open(destination_path, "wb") as f:
                             f.write(b"gguf")
@@ -103,7 +105,11 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
                 sw.SettingsWindow._install_hymt_worker(dummy)
 
             self.assertTrue(os.path.isfile(os.path.join(final_dir, sw.HYMT_MODEL_FILE)))
-            self.assertTrue(sw.SettingsWindow._find_hymt_runner_under(dummy, final_dir).endswith("llama-cli.exe"))
+            self.assertTrue(
+                sw.SettingsWindow._find_hymt_runner_under(dummy, final_dir).endswith(
+                    platform_support.executable_name("llama-cli")
+                )
+            )
             self.assertTrue(os.path.isfile(os.path.join(final_dir, "NOTICE.txt")))
             self.assertIn("_on_hymt_install_ready", invoke_calls)
         finally:

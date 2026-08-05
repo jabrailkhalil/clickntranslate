@@ -4,6 +4,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+import pytest
 from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -11,6 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import platform_support  # noqa: E402
 import settings_window as sw  # noqa: E402
 
 
@@ -21,6 +23,9 @@ def test_easyocr_install_is_pinned_to_cpu_packages():
     assert sw.EASYOCR_EXTRA_INDEX_URL == "https://download.pytorch.org/whl/cpu"
 
 
+@pytest.mark.skipif(
+    not platform_support.IS_WINDOWS, reason="the embedded Python bootstrap is Windows-only"
+)
 def test_portable_bootstrap_plan_uses_verified_official_downloads():
     plan = sw.SettingsWindow._portable_pip_bootstrap_plan(SimpleNamespace(), is_x64=True)
 

@@ -840,8 +840,8 @@ Porting surfaced three defects that were not Linux-specific. All three are cover
   instance keeps running.
 * Tesseract 4.1.1 is found on `PATH`, and `--list-langs` reports `eng`/`osd`/`rus`, which the
   app maps to `en`/`ru`.
-* **The full test suite passes on both systems**: Linux 340 passed / 27 skipped, Windows 357
-  passed / 10 skipped. The skips are the mechanism that does not exist on that system (AF_UNIX
+* **The full test suite passes on both systems**: Linux 369 passed / 29 skipped, Windows 387
+  passed / 11 skipped. The skips are the mechanism that does not exist on that system (AF_UNIX
   sockets and the XDG entries on Windows; the Windows OCR tab, Startup shortcut, MSIX layout and
   UAC elevation on Linux).
 
@@ -861,6 +861,34 @@ commands. The tarball keeps the Windows-style portable layout: data sits next to
 Updates are check-only off Windows: `check_for_updates` announces the version and opens the
 release page rather than replacing the running app, because the C#/WinForms updater helpers do
 not exist here.
+
+### 13.3c Desktop details handled after the first commit
+
+The first pass made the app build and run; these are the platform behaviours that decide
+whether it is actually usable on a Linux desktop:
+
+* **No tray, no disappearing app.** `QSystemTrayIcon.isSystemTrayAvailable()` is false on GNOME
+  without the AppIndicator extension and on plenty of window managers. Minimizing now goes to
+  the taskbar and closing exits, instead of hiding the window into a tray that does not exist.
+* **Clipboard ownership.** X11/Wayland keep the clipboard inside the process that set it, and
+  the capture overlay is a short-lived subprocess, so copied text used to depend on a clipboard
+  manager being installed. `platform_support.copy_text()` hands the text to `wl-copy`/`xclip`/
+  `xsel` in a detached process; every `pyperclip.copy` call site now goes through it (on Windows
+  it still ends up in pyperclip, unchanged).
+* **Selection translation** reads the PRIMARY selection instead of simulating Ctrl+C, so it
+  needs no key injection and does not overwrite the clipboard.
+* **Hy-MT** keeps working from a user-supplied llama.cpp runner (`hymt`, `llama-cli`,
+  `llama-run`, `main` — no `.exe`), but the automatic download stays Windows-only: the pinned
+  archive and its SHA-256 are the Windows x64 build, and shipping an unverified Linux binary
+  instead would be worse than explaining where to put one.
+* **EasyOCR/RapidOCR** need an interpreter matching the frozen build's version, so the installer
+  now probes `python3.<minor>` before the generic `python3` (distributions ship versioned
+  binaries) and, when it finds nothing, names the package to install instead of falling back to
+  the Windows embedded-Python bootstrap.
+* **High-DPI and the launcher icon.** The exe manifest that gives Windows per-monitor DPI
+  awareness has no Linux equivalent, so Qt scaling is enabled explicitly before the
+  QApplication exists, `setDesktopFileName` ties the window to its `.desktop` entry, and the
+  entry is installed on first run and rewritten whenever the executable moves (a new AppImage).
 
 ### 13.4 Not verified — needs a real desktop session
 

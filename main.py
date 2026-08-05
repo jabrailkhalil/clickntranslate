@@ -3144,7 +3144,7 @@ class TranslationResultDialog(QDialog):
             """)
 
     def _copy_result(self):
-        pyperclip.copy(self.translated_text)
+        platform_support.copy_text(self.translated_text)
         self.status_label.setText(self.text["copied"])
         self.copy_button.setText(self.text["copy_again"])
 
@@ -5099,6 +5099,15 @@ class DarkThemeApp(QMainWindow):
         self.update_tray_menu()
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
         self.tray_icon.show()
+        # GNOME has no tray unless an AppIndicator extension is installed, and
+        # some window managers have none at all. Without this check the window
+        # would hide into a tray that does not exist.
+        self.tray_available = bool(QSystemTrayIcon.isSystemTrayAvailable())
+        if not self.tray_available:
+            logging.warning("No system tray on this desktop; the window will stay visible.")
+
+    def has_tray(self):
+        return bool(getattr(self, "tray_available", True))
 
     def update_tray_menu(self):
         lang = self.current_interface_language
@@ -5122,6 +5131,11 @@ class DarkThemeApp(QMainWindow):
 
     def show_window_from_tray(self, force_show=False):
         if self.isVisible() and not force_show:
+            if not self.has_tray():
+                # Nothing to hide into: raise the window instead of losing it.
+                self.raise_()
+                self.activateWindow()
+                return
             self.hide()
             return
         self.setWindowState(Qt.WindowNoState)
@@ -5661,7 +5675,7 @@ class DarkThemeApp(QMainWindow):
                         ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
                     time.sleep(0.35)
                     # Clear clipboard, then Ctrl+C to capture selection
-                    pyperclip.copy("")
+                    platform_support.copy_text("")
                     simulate_copy()
                     time.sleep(0.25)
                     text = pyperclip.paste()
@@ -5710,7 +5724,7 @@ class DarkThemeApp(QMainWindow):
         try:
             show_translation_dialog(self, translated, auto_copy=auto_copy, lang=lang, theme=theme)
             if auto_copy:
-                pyperclip.copy(translated)
+                platform_support.copy_text(translated)
                 save_copy_history(translated)
         except Exception as e:
             print(f"Error showing translation dialog: {e}")
@@ -6622,12 +6636,16 @@ class DarkThemeApp(QMainWindow):
         dialog.exec_()
 
     def closeEvent(self, event):
-        if not self.force_quit:
+        if not self.force_quit and self.has_tray():
             # Сворачиваем в трей вместо закрытия
             event.ignore()
             self.hide()
             # Опционально: показать уведомление при первом сворачивании (можно добавить позже)
             return
+        if not self.force_quit and not self.has_tray():
+            # Без трея прятать окно некуда: закрытие означает выход, иначе
+            # процесс остался бы работать без единого способа его вернуть.
+            self.force_quit = True
 
         # Если force_quit=True, то выполняем полноценный выход
         try:
@@ -6784,7 +6802,7 @@ class DarkThemeApp(QMainWindow):
         lang = config.get("interface_language", "ru")
         theme = config.get("theme", "Темная")
         if auto_copy:
-            pyperclip.copy(translated_text)
+            platform_support.copy_text(translated_text)
             try:
                 if config.get("copy_history", False):
                     save_copy_history(translated_text)
@@ -6892,9 +6910,41 @@ class DarkThemeApp(QMainWindow):
                 )
 
     def minimize_to_tray(self):
+        if not self.has_tray():
+            # Hiding without a tray icon would leave no way to bring the app
+            # back, so minimize to the taskbar instead.
+            self.showMinimized()
+            return
         self.hide()
 
 _translation_result_dialogs = []
+
+
+def _install_linux_desktop_entry(window):
+    """Put the app in the application menu on first run.
+
+    An AppImage or an extracted tarball is not registered with the desktop, so
+    without this there is no launcher icon and no right-click capture actions.
+    The entry is rewritten whenever the executable path changes, which is what
+    happens when the user downloads a new AppImage.
+    """
+    try:
+        import linux_desktop
+
+        executable = portable_paths.public_executable_path()
+        entry_path = linux_desktop.application_entry_path()
+        expected = linux_desktop.desktop_entry_text(executable)
+        try:
+            with open(entry_path, encoding="utf-8") as handle:
+                if handle.read() == expected:
+                    return
+        except OSError:
+            pass
+        linux_desktop.install_desktop_entry(executable, resource_path("icons/icon.ico"))
+        logging.info(f"Desktop entry installed: {entry_path}")
+    except Exception:
+        # Desktop integration is a convenience; never let it stop startup.
+        logging.exception("Could not install the desktop entry")
 
 
 def _forget_translation_result_dialog(dialog):
@@ -6918,7 +6968,7 @@ def _live_translation_result_dialogs():
 # --- Универсальный диалог перевода ---
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная'):
     if auto_copy:
-        pyperclip.copy(translated_text)
+        platform_support.copy_text(translated_text)
     _translation_result_dialogs[:] = _live_translation_result_dialogs()
     dialog = TranslationResultDialog(
         parent,
@@ -7031,7 +7081,19 @@ if __name__ == "__main__":
             start_minimized = config.get("start_minimized", False)
     except Exception:
         pass
+    if platform_support.IS_LINUX:
+        # Windows gets per-monitor DPI awareness from the exe manifest. Qt on
+        # Linux has to be told before the application exists, or the UI renders
+        # unscaled on HiDPI screens. Capture already derives its own scale from
+        # the pixmap's devicePixelRatio, so the overlays stay aligned.
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
     app = QApplication([])
+    if platform_support.IS_LINUX:
+        # Lets the desktop match this window to its .desktop entry, which is
+        # what gives the dock and the window switcher the right icon.
+        app.setDesktopFileName(platform_support.DESKTOP_ENTRY_NAME.replace(".desktop", ""))
     install_qt_exception_guard()
     # Windows that do not set their own stylesheet would otherwise show the
     # system tooltip, which does not match the rest of the app.
@@ -7069,6 +7131,8 @@ if __name__ == "__main__":
             logging.exception("Background OCR warm-up failed")
     window = DarkThemeApp()
     _main_window_ref = window
+    if platform_support.IS_LINUX:
+        _install_linux_desktop_entry(window)
     # После обновления главное окно всегда показывается: пользователь должен
     # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
     show_after_update = "--show-after-update" in sys.argv

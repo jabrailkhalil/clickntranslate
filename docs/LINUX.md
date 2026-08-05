@@ -79,6 +79,52 @@ C#; none of that ports. On Linux the app reports that a new version exists and
 links to the release page. Update by downloading the new AppImage or through
 whatever installed the app.
 
+### The tray
+
+Qt only has a tray where the desktop provides one. GNOME needs the AppIndicator
+extension; some window managers have none at all. When there is no tray the app
+keeps the window reachable instead of hiding into nothing: minimizing goes to
+the taskbar, and closing the window exits rather than leaving an invisible
+process behind.
+
+### The clipboard
+
+X11 and Wayland keep clipboard contents inside the process that set them, so
+text copied by the capture overlay — which exits as soon as it is done — would
+disappear unless a clipboard manager happens to be running. The app therefore
+hands the text to `wl-copy` (Wayland) or `xclip`/`xsel` (X11), which keep owning
+the selection afterwards. Install one if copying seems to do nothing:
+
+```bash
+sudo apt install wl-clipboard   # Wayland
+sudo apt install xclip          # X11
+```
+
+"Translate selection" needs no key simulation here: the highlighted text is
+already in the PRIMARY selection, so the app reads it directly and never touches
+your clipboard.
+
+### Local translation and OCR engines
+
+* **Hy-MT** — the automatic download is the pinned Windows llama.cpp build, so
+  it is not offered here. Put a llama.cpp runner (`llama-cli`, `llama-run`,
+  `hymt` or `main`) together with the GGUF model in `translators/hymt` and the
+  engine works exactly as on Windows.
+* **EasyOCR / RapidOCR** — installed at runtime with pip and then imported by
+  the frozen worker, so they need a `python3` of the same version this build
+  was made with. The app looks for the versioned interpreter first
+  (`python3.12` before `python3`) and names the package to install if it is
+  missing.
+
+### Display scaling and the launcher icon
+
+Windows gets per-monitor DPI awareness from its exe manifest, which does not
+exist here, so the app enables Qt's high-DPI scaling itself. It also registers
+its `.desktop` entry on first run — and again whenever the executable moves,
+which is what happens when you download a new AppImage — so the launcher, the
+dock and the window switcher show the right icon and the right-click capture
+actions.
+
 ### Where data lives
 
 A tarball extracted into a writable directory stays portable — config, caches and
@@ -131,8 +177,8 @@ Checked in Ubuntu 22.04 (WSL2, headless):
 * **the AppImage runs** (157 MB): it starts, keeps its data in
   `~/.local/share/clickntranslate` because the AppImage mount is read-only, and
   accepts a shortcut command from a second launch,
-* the test suite passes: 340 passed, 27 skipped on Linux; 357 passed,
-  10 skipped on Windows.
+* the test suite passes: 369 passed, 29 skipped on Linux; 387 passed,
+  11 skipped on Windows.
 
 Not yet verified, because it needs a real desktop session: screen capture on
 X11 and Wayland, the selection overlays, the tray icon, and the desktop

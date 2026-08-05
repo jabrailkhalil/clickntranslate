@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import main  # noqa: E402
+import platform_support  # noqa: E402
 
 
 class TranslationResultUiTest(unittest.TestCase):
@@ -54,7 +55,7 @@ class TranslationResultUiTest(unittest.TestCase):
             lang="ru",
             theme="Темная",
         )
-        with mock.patch.object(main.pyperclip, "copy") as copy:
+        with mock.patch.object(platform_support, "copy_text") as copy:
             dialog.copy_button.click()
         copy.assert_called_once_with("кореец → Coreano")
         self.assertEqual(dialog.status_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT["ru"]["copied"])
@@ -70,7 +71,7 @@ class TranslationResultUiTest(unittest.TestCase):
         dialog = mock.Mock()
         dialog.isVisible.return_value = True
         main._translation_result_dialogs.clear()
-        with mock.patch.object(main.pyperclip, "copy") as copy:
+        with mock.patch.object(platform_support, "copy_text") as copy:
             with mock.patch.object(main, "TranslationResultDialog", return_value=dialog) as dialog_class:
                 result = main.show_translation_dialog(
                     None,
