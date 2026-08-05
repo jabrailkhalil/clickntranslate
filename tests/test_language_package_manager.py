@@ -456,8 +456,16 @@ class LanguagePackageDialogTest(unittest.TestCase):
                             self.dialog._install_windows_ocr_worker(["de"])
         self.assertIn("Get-WindowsCapability", captured["text"])
         self.assertIn("Language.Basic~~~de-DE~0.0.1.0", captured["text"])
-        self.assertIn("Add-WindowsCapability -Online -Name $entry.BasicCapability", captured["text"])
-        self.assertIn("Add-WindowsCapability -Online -Name $entry.Capability", captured["text"])
+        # Both capabilities go through dism.exe so the download reports real
+        # progress and stays cancelable; Add-WindowsCapability blocks silently
+        # for minutes and must not be used for the install path.
+        self.assertIn("/Add-Capability", captured["text"])
+        self.assertIn("-Name $entry.BasicCapability -Phase 'installing_basic'", captured["text"])
+        self.assertIn("-Name $entry.Capability -Phase 'installing'", captured["text"])
+        self.assertNotIn("Add-WindowsCapability -Online -Name $entry.BasicCapability", captured["text"])
+        self.assertNotIn("Add-WindowsCapability -Online -Name $entry.Capability", captured["text"])
+        # Real percentage parsed out of the dism.exe transcript.
+        self.assertIn("[regex]::Matches", captured["text"])
         self.assertNotIn("Stop-Process -Id $process.Id", captured["text"])
         self.assertIn("Write-OcrStatus 'cancel_pending'", captured["text"])
         self.assertIn("elapsed =", captured["text"])
@@ -466,12 +474,29 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertIn("/Remove-Capability", captured["text"])
         self.assertIn("[System.IO.File]::WriteAllText", captured["text"])
         self.assertIn("Move-Item -LiteralPath $statusTemp", captured["text"])
-        self.assertNotIn("[regex]::Matches", captured["text"])
         self.assertNotIn("progressMatches", captured["text"])
         self.assertNotIn("Set-Content -LiteralPath $StatusPath", captured["text"])
         finish.assert_called_once_with("Windows OCR")
 
-    def test_windows_install_status_never_presents_a_fake_percentage(self):
+    def test_windows_installer_treats_restart_exit_code_as_success(self):
+        script = self.dialog._windows_ocr_installer_script(
+            ["de"],
+            [self.dialog._windows_ocr_capability_name("de")],
+            [],
+            "status.json",
+            "cancel.request",
+            "result.txt",
+            "output",
+        )
+        # dism returns 3010 when the work succeeded but Windows wants a restart.
+        self.assertIn("$exitCode -ne 0 -and $exitCode -ne 3010", script)
+        # A non-zero code is only fatal when the capability really is missing.
+        self.assertIn("if ($state -eq 'Installed') { return }", script)
+
+    def test_windows_install_status_shows_real_dism_progress_and_elapsed_time(self):
+        # The percentage originates in dism.exe's own transcript, so the dialog
+        # drives a determinate bar.  The number still must not be duplicated
+        # into the label text.
         with mock.patch.object(self.dialog, "_emit_language_progress") as emit:
             self.dialog._emit_windows_ocr_status({
                 "phase": "installing",
@@ -486,7 +511,55 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertNotIn("33%", message)
         self.assertIn("02:05", message)
         self.assertEqual(value, 33)
-        self.assertFalse(determinate)
+        self.assertTrue(determinate)
+
+    def test_windows_install_reports_success_when_winrt_lags_behind(self):
+        # Windows says the capability is installed but WinRT has not refreshed
+        # yet.  That is a slow registration, not a failed install, and it must
+        # never be reported to the user as an error.
+        completed = SimpleNamespace(returncode=0, stdout="")
+        self.dialog._windows_capabilities_cache = {"de-de": "NotPresent"}
+        with mock.patch.object(self.dialog, "_run_powershell_script", return_value=completed):
+            with mock.patch.object(
+                self.dialog,
+                "_windows_ocr_capability_catalog",
+                return_value={"de-de": "Installed"},
+            ):
+                with mock.patch.object(ocr, "_get_available_windows_ocr_language_tags", return_value=[]):
+                    with mock.patch.object(ocr, "_get_windows_ocr_engine", return_value=None):
+                        with mock.patch.object(
+                            self.dialog, "_wait_for_windows_ocr_engines", return_value=["de"]
+                        ):
+                            with mock.patch.object(self.dialog, "_finish_language_task") as finish:
+                                self.dialog._install_windows_ocr_worker(["de"])
+
+        finish.assert_called_once_with("Windows OCR")
+        self.assertIn("restart", self.dialog._task_success_message.lower())
+
+    def test_wait_for_windows_ocr_engines_gives_up_without_raising(self):
+        with mock.patch.object(ocr, "_get_available_windows_ocr_language_tags", return_value=[]):
+            with mock.patch.object(ocr, "_get_windows_ocr_engine", return_value=None):
+                with mock.patch.object(self.dialog, "_emit_language_progress"):
+                    pending = self.dialog._wait_for_windows_ocr_engines(
+                        ["de"], timeout=0.0, delay=0.0
+                    )
+        self.assertEqual(pending, ["de"])
+
+    def test_wait_for_windows_ocr_engines_clears_stale_engine_cache(self):
+        ocr._OCR_ENGINE_CACHE["de-DE"] = object()
+        ocr._UNIVERSAL_OCR_ENGINE = object()
+        try:
+            with mock.patch.object(ocr, "_get_available_windows_ocr_language_tags", return_value=["de-DE"]):
+                with mock.patch.object(ocr, "_get_windows_ocr_engine", return_value=object()):
+                    pending = self.dialog._wait_for_windows_ocr_engines(
+                        ["de"], timeout=0.0, delay=0.0
+                    )
+            self.assertEqual(pending, [])
+            self.assertEqual(ocr._OCR_ENGINE_CACHE, {})
+            self.assertIsNone(ocr._UNIVERSAL_OCR_ENGINE)
+        finally:
+            ocr._OCR_ENGINE_CACHE.clear()
+            ocr._UNIVERSAL_OCR_ENGINE = None
 
     def test_windows_remove_script_is_observable_and_cancelable(self):
         script = self.dialog._windows_ocr_remover_script(

@@ -116,6 +116,102 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 overlay.close()
                 overlay.deleteLater()
 
+    def test_fullscreen_ocr_result_signal_connects_to_the_overlay_slot(self):
+        # Regression: `pyqtSignal(list)` compiles to `result_ready(QVariantList)`
+        # and refuses to connect to the `@pyqtSlot(object)` receiver.  The
+        # TypeError escaped into the Qt exception guard, so the overlay stayed
+        # on "Translating screen..." forever.
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "ru"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates"), \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot"):
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                worker = ocr.FullScreenOCRWorker(object(), "en")
+                worker.translation_run_id = 7
+                worker.translation_source_code = "en"
+                worker.translation_target_code = "ru"
+                overlay._translation_run_id = 7
+                overlay.ocr_worker = worker
+
+                # Must not raise: this is the exact connection made by _start_ocr.
+                worker.result_ready.connect(overlay._on_fullscreen_ocr_result)
+
+                received = []
+                with mock.patch.object(
+                    overlay,
+                    "_on_ocr_complete",
+                    side_effect=lambda *args: received.append(args),
+                ):
+                    worker.result_ready.emit([(1.0, 2.0, 3.0, 4.0, "hello")])
+
+                self.assertEqual(len(received), 1)
+                lines, run_id, source_code, target_code = received[0]
+                self.assertEqual(run_id, 7)
+                self.assertEqual((source_code, target_code), ("en", "ru"))
+                # The payload must survive untouched, tuples included.
+                self.assertEqual(lines, [(1.0, 2.0, 3.0, 4.0, "hello")])
+                self.assertIsInstance(lines[0], tuple)
+            finally:
+                overlay.close()
+                overlay.deleteLater()
+
+    def test_fullscreen_start_ocr_failure_leaves_a_visible_error(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "ru"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates"), \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot"):
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                with mock.patch.object(overlay, "_start_ocr", side_effect=TypeError("boom")):
+                    overlay._restart_translation_from_controls()
+
+                self.assertFalse(overlay.loading)
+                self.assertEqual(
+                    overlay.error_message,
+                    ocr.ocr_ui_text("en", "ocr_init_failed"),
+                )
+            finally:
+                overlay.close()
+                overlay.deleteLater()
+
+    def test_fullscreen_ocr_without_text_stops_loading(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "ru"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates"), \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot"):
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                overlay._translation_run_id = 3
+                overlay.loading = True
+                overlay._on_ocr_complete([], 3, "en", "ru")
+                self.assertFalse(overlay.loading)
+                self.assertEqual(
+                    overlay.error_message,
+                    ocr.ocr_ui_text("en", "screen_no_text"),
+                )
+            finally:
+                overlay.close()
+                overlay.deleteLater()
+
     def test_copy_overlay_does_not_offer_auto_language(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
         try:

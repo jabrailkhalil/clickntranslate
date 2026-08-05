@@ -17,6 +17,7 @@ build.py
 # Virtual environments
 venv/
 .venv/
+.venv*/
 .env
 
 # IDE / editor settings
@@ -79,7 +80,7 @@ data/**/*.log
 
 !build_release.bat
 !installer/windows/CreateShortcut.bat
-!tools/build_msix.ps1
-!tools/build_launcher.ps1
-!tools/build_update_repair.ps1
-!tools/stage_release.ps1
+# Every release build script must be tracked.  Whitelisting them one by one is
+# how tools/build_apply_updater.ps1 came to be missing from the repo even though
+# tools/stage_release.ps1 requires it, which broke release staging outright.
+!tools/*.ps1

@@ -88,13 +88,243 @@ internal static class ClicknTranslateApplyUpdate
         }
     }
 
+    /// <summary>
+    /// The application's shared palette.  Windows Forms draws its stock chrome
+    /// with the system theme, which clashes badly with the dark app, so every
+    /// surface in this window is painted from these values instead.
+    /// </summary>
+    internal static class Palette
+    {
+        internal static readonly Color Background = Color.FromArgb(16, 17, 20);      // #101114
+        internal static readonly Color TitleBar = Color.FromArgb(21, 21, 21);        // #151515
+        internal static readonly Color TitleBarLine = Color.FromArgb(41, 41, 45);    // #29292d
+        internal static readonly Color Border = Color.FromArgb(51, 49, 60);          // #33313c
+        internal static readonly Color Text = Color.FromArgb(245, 245, 247);         // #f5f5f7
+        internal static readonly Color Muted = Color.FromArgb(184, 184, 194);        // #b8b8c2
+        internal static readonly Color Accent = Color.FromArgb(121, 89, 160);        // #7959a0
+        internal static readonly Color AccentLight = Color.FromArgb(169, 133, 210);  // #a985d2
+        internal static readonly Color AccentText = Color.FromArgb(197, 179, 233);   // #c5b3e9
+        internal static readonly Color Track = Color.FromArgb(33, 31, 40);           // #211f28
+        internal static readonly Color ButtonHover = Color.FromArgb(50, 45, 61);     // #322d3d
+        internal static readonly Color Danger = Color.FromArgb(196, 43, 28);         // #c42b1c
+        internal static readonly Color DangerText = Color.FromArgb(217, 74, 74);     // #d94a4a
+    }
+
+    /// <summary>
+    /// Progress bar drawn in the app's accent colour.  The stock WinForms
+    /// ProgressBar ignores BackColor/ForeColor on themed Windows and renders a
+    /// green system bar on the dark panel, which is what made the old updater
+    /// window look out of place.
+    /// </summary>
+    internal sealed class AccentProgressBar : Control
+    {
+        private readonly System.Windows.Forms.Timer animation;
+        private int marqueeOffset;
+        private bool indeterminate = true;
+        private int currentValue;
+
+        internal AccentProgressBar()
+        {
+            SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint |
+                ControlStyles.ResizeRedraw,
+                true
+            );
+            animation = new System.Windows.Forms.Timer();
+            animation.Interval = 33;
+            animation.Tick += delegate
+            {
+                marqueeOffset = (marqueeOffset + 6) % Math.Max(1, Width + 220);
+                Invalidate();
+            };
+            animation.Start();
+        }
+
+        internal bool Indeterminate
+        {
+            get { return indeterminate; }
+            set
+            {
+                if (indeterminate == value)
+                {
+                    return;
+                }
+                indeterminate = value;
+                if (indeterminate)
+                {
+                    animation.Start();
+                }
+                else
+                {
+                    animation.Stop();
+                }
+                Invalidate();
+            }
+        }
+
+        internal int Value
+        {
+            get { return currentValue; }
+            set
+            {
+                int clamped = Math.Max(0, Math.Min(100, value));
+                if (currentValue == clamped)
+                {
+                    return;
+                }
+                currentValue = clamped;
+                Invalidate();
+            }
+        }
+
+        internal Color FillColor = Palette.Accent;
+        internal Color FillHighlight = Palette.AccentLight;
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            System.Drawing.Drawing2D.GraphicsState state = e.Graphics.Save();
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            Rectangle bounds = new Rectangle(0, 0, Width, Height);
+            using (System.Drawing.Drawing2D.GraphicsPath track = RoundedRect(bounds, Height / 2))
+            using (SolidBrush trackBrush = new SolidBrush(Palette.Track))
+            using (Pen trackPen = new Pen(Palette.Border))
+            {
+                e.Graphics.FillPath(trackBrush, track);
+                e.Graphics.DrawPath(trackPen, track);
+                e.Graphics.SetClip(track);
+            }
+
+            if (indeterminate)
+            {
+                int sweepWidth = 180;
+                int x = marqueeOffset - sweepWidth;
+                Rectangle sweep = new Rectangle(x, 0, sweepWidth, Height);
+                if (sweep.Width > 0)
+                {
+                    using (System.Drawing.Drawing2D.LinearGradientBrush brush =
+                        new System.Drawing.Drawing2D.LinearGradientBrush(
+                            sweep, Color.FromArgb(0, FillColor), FillHighlight,
+                            System.Drawing.Drawing2D.LinearGradientMode.Horizontal))
+                    {
+                        System.Drawing.Drawing2D.ColorBlend blend = new System.Drawing.Drawing2D.ColorBlend();
+                        blend.Colors = new Color[] { Color.FromArgb(0, FillColor), FillHighlight, Color.FromArgb(0, FillColor) };
+                        blend.Positions = new float[] { 0f, 0.5f, 1f };
+                        brush.InterpolationColors = blend;
+                        e.Graphics.FillRectangle(brush, sweep);
+                    }
+                }
+            }
+            else if (currentValue > 0)
+            {
+                int fillWidth = Math.Max(Height, (int)Math.Round(Width * (currentValue / 100.0)));
+                Rectangle fill = new Rectangle(0, 0, fillWidth, Height);
+                using (System.Drawing.Drawing2D.LinearGradientBrush brush =
+                    new System.Drawing.Drawing2D.LinearGradientBrush(
+                        fill, FillColor, FillHighlight,
+                        System.Drawing.Drawing2D.LinearGradientMode.Horizontal))
+                {
+                    e.Graphics.FillRectangle(brush, fill);
+                }
+            }
+
+            e.Graphics.Restore(state);
+        }
+
+        internal static System.Drawing.Drawing2D.GraphicsPath RoundedRect(Rectangle bounds, int radius)
+        {
+            System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath();
+            int diameter = Math.Max(1, radius * 2);
+            if (diameter >= bounds.Width || diameter >= bounds.Height)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+            Rectangle arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
+            path.AddArc(arc, 180, 90);
+            arc.X = bounds.Right - diameter - 1;
+            path.AddArc(arc, 270, 90);
+            arc.Y = bounds.Bottom - diameter - 1;
+            path.AddArc(arc, 0, 90);
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                animation.Stop();
+                animation.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>Flat, app-styled button; WinForms' FlatStyle still draws a system border.</summary>
+    internal sealed class AccentButton : Button
+    {
+        private bool hovered;
+
+        internal AccentButton()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            BackColor = Palette.Track;
+            ForeColor = Palette.Text;
+            Cursor = Cursors.Hand;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            hovered = true;
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            hovered = false;
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.Clear(Palette.Background);
+            Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+            Color face = Enabled ? (hovered ? Palette.ButtonHover : Palette.Track) : Palette.Background;
+            Color edge = Enabled ? (hovered ? Palette.AccentLight : Palette.Accent) : Palette.Border;
+            Color label = Enabled ? Palette.Text : Color.FromArgb(108, 108, 120);
+            using (System.Drawing.Drawing2D.GraphicsPath path = AccentProgressBar.RoundedRect(bounds, 6))
+            using (SolidBrush brush = new SolidBrush(face))
+            using (Pen pen = new Pen(edge))
+            {
+                e.Graphics.FillPath(brush, path);
+                e.Graphics.DrawPath(pen, path);
+            }
+            TextRenderer.DrawText(
+                e.Graphics, Text, Font, bounds, label,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter
+            );
+        }
+    }
+
     internal sealed class UpdateWindow : Form
     {
+        private const int TitleBarHeight = 40;
+
         private readonly UpdateRequest request;
         private readonly Label status;
         private readonly Label detail;
-        private readonly ProgressBar progress;
-        private readonly Button closeButton;
+        private readonly AccentProgressBar progress;
+        private readonly AccentButton closeButton;
         internal bool Succeeded { get; private set; }
 
         internal UpdateWindow(UpdateRequest request)
@@ -102,79 +332,304 @@ internal static class ClicknTranslateApplyUpdate
             this.request = request;
             Text = "Click'n'Translate update";
             StartPosition = FormStartPosition.CenterScreen;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MinimizeBox = true;
+            // The system title bar is drawn with the OS theme and cannot be
+            // tinted, so the window is frameless and every part of the chrome
+            // is drawn here with the app's own palette.
+            FormBorderStyle = FormBorderStyle.None;
             MaximizeBox = false;
             ShowInTaskbar = true;
-            BackColor = Color.FromArgb(16, 17, 20);
-            ForeColor = Color.FromArgb(245, 245, 247);
-            ClientSize = new Size(570, 230);
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
-            Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+            BackColor = Palette.Background;
+            ForeColor = Palette.Text;
+            ClientSize = new Size(580, 268);
+            Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point);
+            DoubleBuffered = true;
+            try
+            {
+                Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+            }
+            catch
+            {
+                // A missing icon must never stop an update from installing.
+            }
+
+            // The manifest declares PerMonitorV2, so Windows hands this process
+            // real pixels and .NET Framework WinForms does not rescale for us.
+            // Every fixed dimension therefore goes through S(), and text lives
+            // in auto-sizing labels so nothing can ever be clipped.
+            scale = GetDpiScale();
+            ClientSize = new Size(S(580), S(292));
+
+            // Body first, then the title bar: docked controls stack in reverse
+            // z-order, and the bar has to end up above the content.
+            TableLayoutPanel body = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Palette.Background,
+                ColumnCount = 1,
+                RowCount = 5,
+                Padding = new Padding(S(26), S(22), S(26), S(18)),
+            };
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            for (int row = 0; row < 5; row++)
+            {
+                body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            }
+            Controls.Add(body);
+
+            int textWidth = S(580) - S(52);
 
             Label title = new Label
             {
                 Text = "Updating Click'n'Translate",
-                AutoSize = false,
-                Location = new Point(24, 22),
-                Size = new Size(522, 28),
-                Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold, GraphicsUnit.Point),
-                ForeColor = Color.FromArgb(197, 179, 233),
+                AutoSize = true,
+                MaximumSize = new Size(textWidth, 0),
+                Font = new Font("Segoe UI Semibold", 14F, FontStyle.Regular, GraphicsUnit.Point),
+                ForeColor = Palette.AccentText,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 0, 0, S(12)),
             };
-            Controls.Add(title);
+            body.Controls.Add(title, 0, 0);
 
             status = new Label
             {
                 Text = "Preparing the verified update…",
-                AutoSize = false,
-                Location = new Point(24, 64),
-                Size = new Size(522, 42),
-                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = true,
+                MaximumSize = new Size(textWidth, 0),
+                // Reserve two lines so the bar and the button keep their place
+                // as the phase messages change length.
+                MinimumSize = new Size(textWidth, S(38)),
+                ForeColor = Palette.Text,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 0, 0, S(14)),
             };
-            Controls.Add(status);
+            body.Controls.Add(status, 0, 1);
 
-            progress = new ProgressBar
+            progress = new AccentProgressBar
             {
-                Location = new Point(24, 112),
-                Size = new Size(522, 22),
-                Style = ProgressBarStyle.Marquee,
-                MarqueeAnimationSpeed = 28,
+                Height = S(10),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, S(14)),
             };
-            Controls.Add(progress);
+            body.Controls.Add(progress, 0, 2);
 
             detail = new Label
             {
                 Text = "Keep this window open. The app will restart automatically.",
-                AutoSize = false,
-                Location = new Point(24, 145),
-                Size = new Size(522, 34),
-                ForeColor = Color.FromArgb(184, 184, 194),
+                AutoSize = true,
+                MaximumSize = new Size(textWidth, 0),
+                MinimumSize = new Size(textWidth, S(34)),
+                ForeColor = Palette.Muted,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point),
+                Margin = new Padding(0, 0, 0, S(18)),
             };
-            Controls.Add(detail);
+            body.Controls.Add(detail, 0, 3);
 
-            closeButton = new Button
+            closeButton = new AccentButton
             {
                 Text = "Close",
                 Enabled = false,
-                Location = new Point(434, 184),
-                Size = new Size(112, 34),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(33, 31, 40),
-                ForeColor = Color.White,
-                UseVisualStyleBackColor = false,
+                Size = new Size(S(114), S(34)),
+                Anchor = AnchorStyles.Right,
+                Margin = new Padding(0),
             };
-            closeButton.FlatAppearance.BorderColor = Color.FromArgb(128, 96, 168);
             closeButton.Click += delegate { Close(); };
-            Controls.Add(closeButton);
+            body.Controls.Add(closeButton, 0, 4);
+
+            BuildTitleBar();
 
             FormClosing += OnFormClosing;
             Shown += delegate
             {
+                ApplyRoundedCorners();
                 BackgroundWorker worker = new BackgroundWorker();
                 worker.DoWork += delegate { ApplyUpdate(); };
                 worker.RunWorkerCompleted += OnCompleted;
                 worker.RunWorkerAsync();
             };
+        }
+
+        private float scale = 1F;
+
+        private static float GetDpiScale()
+        {
+            try
+            {
+                using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
+                {
+                    return graphics.DpiX / 96F;
+                }
+            }
+            catch
+            {
+                return 1F;
+            }
+        }
+
+        private int S(int value)
+        {
+            return (int)Math.Round(value * scale);
+        }
+
+        private void BuildTitleBar()
+        {
+            int barHeight = S(TitleBarHeight);
+            Panel bar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = barHeight,
+                BackColor = Palette.TitleBar,
+            };
+            bar.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                using (Pen pen = new Pen(Palette.TitleBarLine))
+                {
+                    e.Graphics.DrawLine(pen, 0, bar.Height - 1, bar.Width, bar.Height - 1);
+                }
+                if (Icon != null)
+                {
+                    int glyph = S(16);
+                    using (Icon small = new Icon(Icon, glyph, glyph))
+                    {
+                        e.Graphics.DrawIcon(small, new Rectangle(S(12), (barHeight - glyph) / 2, glyph, glyph));
+                    }
+                }
+            };
+            bar.MouseDown += delegate(object sender, MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    DragWindow();
+                }
+            };
+            Controls.Add(bar);
+
+            int buttonWidth = S(46);
+
+            Label caption = new Label
+            {
+                Text = "Click'n'Translate update",
+                AutoSize = false,
+                Location = new Point(S(38), 0),
+                Size = new Size(ClientSize.Width - S(38) - buttonWidth * 2, barHeight - 1),
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.FromArgb(247, 247, 247),
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point),
+            };
+            caption.MouseDown += delegate(object sender, MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    DragWindow();
+                }
+            };
+            bar.Controls.Add(caption);
+
+            minimizeButton = new CaptionButton("–", Palette.ButtonHover);
+            minimizeButton.Location = new Point(ClientSize.Width - buttonWidth * 2, 0);
+            minimizeButton.Size = new Size(buttonWidth, barHeight - 1);
+            minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            minimizeButton.Click += delegate { WindowState = FormWindowState.Minimized; };
+            bar.Controls.Add(minimizeButton);
+
+            titleCloseButton = new CaptionButton("✕", Palette.Danger);
+            titleCloseButton.Location = new Point(ClientSize.Width - buttonWidth, 0);
+            titleCloseButton.Size = new Size(buttonWidth, barHeight - 1);
+            titleCloseButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            titleCloseButton.Click += delegate { Close(); };
+            bar.Controls.Add(titleCloseButton);
+        }
+
+        private CaptionButton minimizeButton;
+        private CaptionButton titleCloseButton;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr handle, int message, int wparam, int lparam);
+
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr handle, int attribute, ref int value, int size);
+
+        private void DragWindow()
+        {
+            // Hand the drag to Windows so snapping and multi-monitor behaviour
+            // stay exactly as users expect from a normal title bar.
+            ReleaseCapture();
+            SendMessage(Handle, 0xA1 /* WM_NCLBUTTONDOWN */, 2 /* HTCAPTION */, 0);
+        }
+
+        private void ApplyRoundedCorners()
+        {
+            try
+            {
+                // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
+                // Silently ignored before Windows 11.
+                int preference = 2;
+                DwmSetWindowAttribute(Handle, 33, ref preference, sizeof(int));
+            }
+            catch
+            {
+                // Cosmetic only.
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using (Pen pen = new Pen(Palette.Border))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            }
+        }
+
+        /// <summary>Minimise/close glyph button matching the app's dialog chrome.</summary>
+        internal sealed class CaptionButton : Control
+        {
+            private readonly string glyph;
+            private readonly Color hoverColor;
+            private bool hovered;
+
+            internal CaptionButton(string glyph, Color hoverColor)
+            {
+                this.glyph = glyph;
+                this.hoverColor = hoverColor;
+                SetStyle(
+                    ControlStyles.AllPaintingInWmPaint |
+                    ControlStyles.OptimizedDoubleBuffer |
+                    ControlStyles.UserPaint,
+                    true
+                );
+                BackColor = Palette.TitleBar;
+                ForeColor = Color.FromArgb(238, 238, 238);
+                Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
+            }
+
+            protected override void OnMouseEnter(EventArgs e)
+            {
+                hovered = true;
+                Invalidate();
+                base.OnMouseEnter(e);
+            }
+
+            protected override void OnMouseLeave(EventArgs e)
+            {
+                hovered = false;
+                Invalidate();
+                base.OnMouseLeave(e);
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                e.Graphics.Clear(hovered ? hoverColor : Palette.TitleBar);
+                TextRenderer.DrawText(
+                    e.Graphics, glyph, Font, ClientRectangle,
+                    hovered ? Color.White : ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter
+                );
+            }
         }
 
         private void SetStatus(string value, string detailValue)
@@ -196,7 +651,7 @@ internal static class ClicknTranslateApplyUpdate
             if (eventArgs.Error == null)
             {
                 Succeeded = true;
-                progress.Style = ProgressBarStyle.Continuous;
+                progress.Indeterminate = false;
                 progress.Value = 100;
                 status.Text = "Update complete";
                 detail.Text = "The updated application is open.";
@@ -207,10 +662,13 @@ internal static class ClicknTranslateApplyUpdate
             }
 
             WriteLog("Updater failed: " + eventArgs.Error);
-            progress.Style = ProgressBarStyle.Continuous;
-            progress.Value = 0;
+            progress.Indeterminate = false;
+            progress.Value = 100;
+            progress.FillColor = Palette.Danger;
+            progress.FillHighlight = Palette.DangerText;
+            progress.Invalidate();
             status.Text = "The update could not be installed";
-            status.ForeColor = Color.FromArgb(239, 93, 101);
+            status.ForeColor = Palette.DangerText;
             detail.Text = "The previous version was restored. Close other copies of the app and run Update again.";
             closeButton.Enabled = true;
         }

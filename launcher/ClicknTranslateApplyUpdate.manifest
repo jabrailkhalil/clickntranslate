@@ -3,13 +3,16 @@
   <assemblyIdentity
     version="1.5.4.0"
     processorArchitecture="amd64"
-    name="JabrailDigital.ClicknTranslate.UpdateRepair"
+    name="JabrailDigital.ClicknTranslate.ApplyUpdate"
     type="win32" />
-  <description>Click'n'Translate Update Repair</description>
+  <description>Click'n'Translate update installer</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- The app elevates this helper itself when the install directory
+             needs it, so requesting administrator here would add a second,
+             pointless UAC prompt for portable installs. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

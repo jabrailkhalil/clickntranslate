@@ -5000,7 +5000,12 @@ def _translate_screen_texts(texts, translate_func, source_code, target_code):
 
 class FullScreenOCRWorker(QtCore.QThread):
     """OCR worker that returns text lines with bounding box positions."""
-    result_ready = QtCore.pyqtSignal(list)  # list of (x, y, w, h, text)
+
+    # Must stay `object` (PyQt_PyObject).  `pyqtSignal(list)` compiles to
+    # `result_ready(QVariantList)`, which refuses to connect to the
+    # `@pyqtSlot(object)` receiver and would also flatten the (x, y, w, h, text)
+    # tuples through QVariant.
+    result_ready = QtCore.pyqtSignal(object)  # list of (x, y, w, h, text)
 
     def __init__(self, bitmap, language_code="ru", parent=None):
         super().__init__(parent)
@@ -5285,18 +5290,30 @@ class FullScreenTranslateOverlay(QWidget):
         self.update()
 
         logging.info(f"FullScreenOverlay: starting OCR ({self.src_lang}->{self.tgt_lang})")
-        self._start_ocr(run_id, self.src_lang, self.tgt_lang)
+        try:
+            self._start_ocr(run_id, self.src_lang, self.tgt_lang)
+        except Exception:
+            # Anything that stops the OCR worker from starting must surface as a
+            # visible error.  Qt swallows slot exceptions through the app-wide
+            # guard, which previously left the overlay showing "Translating
+            # screen..." forever.
+            logging.exception("FullScreenOverlay: could not start screen OCR")
+            self._fail_translation(run_id, "ocr_init_failed")
+
+    def _fail_translation(self, run_id, message_key):
+        """Leave the overlay in a readable failed state instead of loading forever."""
+        if run_id != self._translation_run_id:
+            return
+        self.loading = False
+        lang = get_cached_ocr_config().get("interface_language", "en")
+        self.error_message = ocr_ui_text(lang, message_key)
+        self.update()
 
     def _start_ocr(self, run_id, source_code, target_code):
         qimage = self.screenshot.toImage()
         bitmap = qimage_to_softwarebitmap(qimage)
         if bitmap is None:
-            if run_id != self._translation_run_id:
-                return
-            self.loading = False
-            lang = get_cached_ocr_config().get("interface_language", "en")
-            self.error_message = ocr_ui_text(lang, "ocr_init_failed")
-            self.update()
+            self._fail_translation(run_id, "ocr_init_failed")
             return
 
         worker = FullScreenOCRWorker(bitmap, source_code)
@@ -5312,7 +5329,7 @@ class FullScreenTranslateOverlay(QWidget):
 
     @QtCore.pyqtSlot(object)
     def _on_fullscreen_ocr_result(self, lines):
-        worker = self.sender()
+        worker = self.sender() or self.ocr_worker
         if worker is None:
             return
         self._on_ocr_complete(
@@ -5333,20 +5350,20 @@ class FullScreenTranslateOverlay(QWidget):
         if run_id != self._translation_run_id:
             return
         if not lines_data:
-            self.loading = False
-            config = get_cached_ocr_config()
-            lang = config.get("interface_language", "en")
-            self.error_message = ocr_ui_text(lang, "screen_no_text")
-            self.update()
+            self._fail_translation(run_id, "screen_no_text")
             return
 
-        self._lines_data = _group_screen_ocr_lines(lines_data)
-        import threading
-        threading.Thread(
-            target=self._translate_all,
-            args=(run_id, list(self._lines_data), source_code, target_code),
-            daemon=True,
-        ).start()
+        try:
+            self._lines_data = _group_screen_ocr_lines(lines_data)
+            import threading
+            threading.Thread(
+                target=self._translate_all,
+                args=(run_id, list(self._lines_data), source_code, target_code),
+                daemon=True,
+            ).start()
+        except Exception:
+            logging.exception("FullScreenOverlay: could not start screen translation")
+            self._fail_translation(run_id, "translation_failed")
 
     def _translate_all(self, run_id, lines_data, source_code, target_code):
         blocks = []

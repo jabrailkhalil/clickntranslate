@@ -1819,6 +1819,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Windows Update is downloading and installing OCR for {language} ({current}/{total}). This may take several minutes.",
         "win_cancel_pending": "Cancel requested. Windows is safely finishing the current component; this can take several minutes.",
         "win_still_working": "Windows Update is still working. Do not turn off the PC.",
+        "win_registering": "Windows is registering the new OCR language. This can take a moment…",
+        "win_installed_pending_restart": "Windows finished installing the OCR package. {languages} is not available to the app yet — restart Click'n'Translate, or Windows if it still does not appear.",
         "win_error_policy": "Windows Update policy blocked this OCR package. Open Windows settings or contact the system administrator (0x800f0954).",
         "win_error_source": "Windows could not download the OCR package. Check Windows Update, the internet connection, and free disk space, then try again.",
         "win_error_service": "Windows component servicing is busy or needs a restart. Restart Windows and try again.",
@@ -1831,6 +1833,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Центр обновления Windows загружает и устанавливает OCR для языка {language} ({current}/{total}). Это может занять несколько минут.",
         "win_cancel_pending": "Отмена запрошена. Windows безопасно завершает текущий компонент — это может занять несколько минут.",
         "win_still_working": "Центр обновления Windows продолжает работу. Не выключайте компьютер.",
+        "win_registering": "Windows регистрирует новый язык OCR. Это может занять некоторое время…",
+        "win_installed_pending_restart": "Windows установила OCR-пакет. Язык {languages} пока недоступен приложению — перезапустите Click'n'Translate, а если язык не появится, перезагрузите Windows.",
         "win_error_policy": "Политика Центра обновления Windows заблокировала OCR-пакет. Откройте настройки Windows или обратитесь к администратору (0x800f0954).",
         "win_error_source": "Windows не смогла скачать OCR-пакет. Проверьте Центр обновления, интернет и свободное место, затем повторите попытку.",
         "win_error_service": "Система обслуживания компонентов Windows занята или требуется перезагрузка. Перезагрузите Windows и повторите попытку.",
@@ -1843,6 +1847,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Windows Update está descargando e instalando OCR para {language} ({current}/{total}). Puede tardar varios minutos.",
         "win_cancel_pending": "Cancelación solicitada. Windows está terminando de forma segura el componente actual; puede tardar varios minutos.",
         "win_still_working": "Windows Update sigue trabajando. No apagues el equipo.",
+        "win_registering": "Windows está registrando el nuevo idioma de OCR. Puede tardar un momento…",
+        "win_installed_pending_restart": "Windows terminó de instalar el paquete OCR. {languages} aún no está disponible en la aplicación: reinicia Click'n'Translate y, si sigue sin aparecer, reinicia Windows.",
         "win_error_policy": "La directiva de Windows Update bloqueó este paquete OCR. Abre Configuración de Windows o contacta con el administrador (0x800f0954).",
         "win_error_source": "Windows no pudo descargar el paquete OCR. Comprueba Windows Update, Internet y el espacio libre y vuelve a intentarlo.",
         "win_error_service": "El servicio de componentes de Windows está ocupado o necesita reiniciarse. Reinicia Windows y vuelve a intentarlo.",
@@ -1855,6 +1861,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Windows Update lädt OCR für {language} herunter und installiert es ({current}/{total}). Dies kann mehrere Minuten dauern.",
         "win_cancel_pending": "Abbruch angefordert. Windows schließt die aktuelle Komponente sicher ab; dies kann einige Minuten dauern.",
         "win_still_working": "Windows Update arbeitet weiter. Schalten Sie den PC nicht aus.",
+        "win_registering": "Windows registriert die neue OCR-Sprache. Das kann einen Moment dauern…",
+        "win_installed_pending_restart": "Windows hat das OCR-Paket installiert. {languages} steht der App noch nicht zur Verfügung – starten Sie Click'n'Translate neu, und falls es weiterhin fehlt, Windows.",
         "win_error_policy": "Eine Windows-Update-Richtlinie hat dieses OCR-Paket blockiert. Öffnen Sie die Windows-Einstellungen oder wenden Sie sich an den Administrator (0x800f0954).",
         "win_error_source": "Windows konnte das OCR-Paket nicht laden. Prüfen Sie Windows Update, Internet und freien Speicherplatz und versuchen Sie es erneut.",
         "win_error_service": "Die Windows-Komponentenwartung ist beschäftigt oder benötigt einen Neustart. Starten Sie Windows neu und versuchen Sie es erneut.",
@@ -1867,6 +1875,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Windows Update télécharge et installe OCR pour {language} ({current}/{total}). Cela peut prendre plusieurs minutes.",
         "win_cancel_pending": "Annulation demandée. Windows termine le composant actuel en toute sécurité ; cela peut prendre plusieurs minutes.",
         "win_still_working": "Windows Update continue de travailler. N’éteignez pas le PC.",
+        "win_registering": "Windows enregistre la nouvelle langue OCR. Cela peut prendre un moment…",
+        "win_installed_pending_restart": "Windows a terminé l’installation du module OCR. {languages} n’est pas encore disponible dans l’application : redémarrez Click'n'Translate, puis Windows si la langue reste absente.",
         "win_error_policy": "La stratégie Windows Update a bloqué ce module OCR. Ouvrez les paramètres Windows ou contactez l’administrateur (0x800f0954).",
         "win_error_source": "Windows n’a pas pu télécharger le module OCR. Vérifiez Windows Update, Internet et l’espace libre, puis réessayez.",
         "win_error_service": "La maintenance des composants Windows est occupée ou nécessite un redémarrage. Redémarrez Windows puis réessayez.",
@@ -1879,6 +1889,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installing": "Windows 更新正在下载并安装 {language} 的 OCR（{current}/{total}）。这可能需要几分钟。",
         "win_cancel_pending": "已请求取消。Windows 正在安全完成当前组件，这可能需要几分钟。",
         "win_still_working": "Windows 更新仍在工作，请勿关闭电脑。",
+        "win_registering": "Windows 正在注册新的 OCR 语言，请稍候…",
+        "win_installed_pending_restart": "Windows 已完成 OCR 包的安装。应用暂时还看不到 {languages}，请重启 Click'n'Translate；若仍未出现，请重启 Windows。",
         "win_error_policy": "Windows 更新策略阻止了此 OCR 包。请打开 Windows 设置或联系系统管理员 (0x800f0954)。",
         "win_error_source": "Windows 无法下载 OCR 包。请检查 Windows 更新、网络连接和可用磁盘空间，然后重试。",
         "win_error_service": "Windows 组件服务正忙或需要重启。请重启 Windows 后重试。",
@@ -2773,6 +2785,12 @@ class OcrLanguageManagerDialog(QDialog):
     def _language_name(self, language):
         return language.display_name(self.lang)
 
+    def _language_display_name(self, code):
+        for language in APP_LANGUAGES:
+            if language.code == code:
+                return language.display_name(self.lang)
+        return str(code).upper()
+
     def _status_installed(self):
         return language_manager_text(self.lang, "installed")
 
@@ -3304,11 +3322,21 @@ class OcrLanguageManagerDialog(QDialog):
     def _windows_ocr_tag_from_capability(capability):
         return str(capability).split("~~~", 1)[1].rsplit("~", 1)[0].lower()
 
-    def _wait_for_windows_ocr_capabilities(self, capabilities, attempts=12, delay=0.75):
-        """Wait for DISM state propagation after the elevated installer exits."""
+    def _wait_for_windows_ocr_capabilities(self, capabilities, attempts=12, delay=0.75, timeout=None):
+        """Wait for DISM state propagation after the elevated installer exits.
+
+        Measured behaviour: `Get-WindowsCapability` reports `Installed` on the
+        very first poll once servicing returns, so this normally exits after one
+        round.  The retry budget only covers a servicing stack that is still
+        busy, and it reports progress so a slow machine never looks frozen.
+        """
         missing = list(capabilities)
         last_error = None
-        for attempt in range(max(1, int(attempts))):
+        deadline = None
+        if timeout is not None:
+            deadline = time.monotonic() + max(0.0, float(timeout))
+        attempt = 0
+        while True:
             if self._cancel_requested.is_set():
                 return missing
             try:
@@ -3323,11 +3351,66 @@ class OcrLanguageManagerDialog(QDialog):
                     return []
             except Exception as exc:
                 last_error = exc
-            if attempt + 1 < attempts:
-                time.sleep(max(0.0, float(delay)))
+            attempt += 1
+            if deadline is not None:
+                if time.monotonic() >= deadline:
+                    break
+            elif attempt >= max(1, int(attempts)):
+                break
+            self._emit_language_progress(
+                language_manager_text(self.lang, "win_registering"),
+                100,
+                False,
+            )
+            time.sleep(max(0.0, float(delay)))
         if last_error is not None:
             raise RuntimeError(str(last_error))
         return missing
+
+    def _wait_for_windows_ocr_engines(self, codes, timeout=90.0, delay=2.0):
+        """Wait until WinRT can actually build a recognizer for the new languages.
+
+        `OcrEngine.AvailableRecognizerLanguages` does refresh inside a running
+        process, but not necessarily in the same instant the capability flips to
+        `Installed`.  Probing once turned successful installs into errors, so
+        poll instead and return whatever is still unusable when time runs out.
+        """
+        pending = [str(code) for code in codes]
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while True:
+            try:
+                import ocr
+
+                # The engine objects are cached per language tag; drop them so a
+                # freshly installed language is not masked by an earlier miss.
+                ocr._UNIVERSAL_OCR_ENGINE = None
+                ocr._OCR_ENGINE_CACHE.clear()
+                available_by_tag = {
+                    str(tag).lower(): str(tag)
+                    for tag in ocr._get_available_windows_ocr_language_tags()
+                    if str(tag).strip()
+                }
+                still_pending = []
+                for code in pending:
+                    actual_tag = ocr._match_available_windows_ocr_tag(
+                        windows_ocr_tag(code),
+                        available_by_tag,
+                    )
+                    if not actual_tag or ocr._get_windows_ocr_engine(actual_tag) is None:
+                        still_pending.append(code)
+                pending = still_pending
+            except Exception:
+                logger.exception("Could not probe Windows OCR recognizer availability")
+            if not pending or self._cancel_requested.is_set():
+                return pending
+            if time.monotonic() >= deadline:
+                return pending
+            self._emit_language_progress(
+                language_manager_text(self.lang, "win_registering"),
+                100,
+                False,
+            )
+            time.sleep(max(0.0, float(delay)))
 
     def _wait_for_windows_ocr_removal(self, capabilities, attempts=12, delay=0.75):
         remaining = list(capabilities)
@@ -3829,6 +3912,69 @@ function Test-OcrCancel {{
     return (Test-Path -LiteralPath $CancelPath)
 }}
 
+function Install-OcrCapability {{
+    param(
+        [string]$Name,
+        [string]$Phase,
+        [int]$Index,
+        [int]$Current,
+        [int]$Total,
+        [string]$Code,
+        [int]$Slot,
+        [int]$SlotCount,
+        [int]$StepIndex
+    )
+    # Add-WindowsCapability is a blocking call that reports no progress at all.
+    # A Feature on Demand that still has to be downloaded from Windows Update
+    # can take eight minutes or more, so driving dism.exe directly and reading
+    # its percentage is the only way to show the user real progress and to keep
+    # Cancel responsive while the work runs.
+    $stdoutPath = Join-Path $OutputDir ("add_" + $StepIndex + ".out")
+    $stderrPath = Join-Path $OutputDir ("add_" + $StepIndex + ".err")
+    Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    $arguments = @('/Online', '/Add-Capability', ("/CapabilityName:" + $Name), '/NoRestart', '/English')
+    $proc = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    $lastOverall = -1
+    while (-not $proc.HasExited) {{
+        $rawPercent = 0
+        if (Test-Path -LiteralPath $stdoutPath) {{
+            $content = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+            if ($null -ne $content) {{
+                $found = [regex]::Matches([string]$content, '(\d+)(?:[\.,]\d+)?%')
+                if ($found.Count -gt 0) {{ $rawPercent = [int]$found[$found.Count - 1].Groups[1].Value }}
+            }}
+        }}
+        $stepPercent = (($Slot * 100) + $rawPercent) / [Math]::Max(1, $SlotCount)
+        $overall = [int](((100 * $Index) + $stepPercent) / $Total)
+        if (Test-OcrCancel) {{
+            Write-OcrStatus 'cancel_pending' $overall $Current $Total $Code ''
+        }} elseif ($overall -ne $lastOverall) {{
+            Write-OcrStatus $Phase $overall $Current $Total $Code ''
+            $lastOverall = $overall
+        }} else {{
+            # Windows can sit on the same percentage for minutes.  Re-publishing
+            # keeps the elapsed clock in the dialog ticking so the install still
+            # looks alive.
+            Write-OcrStatus $Phase $overall $Current $Total $Code ''
+        }}
+        Start-Sleep -Milliseconds 250
+        $proc.Refresh()
+    }}
+    $proc.WaitForExit()
+    $proc.Refresh()
+    $exitCode = [int]$proc.ExitCode
+    # 0 = done, 3010 = done but Windows wants a restart.  Anything else is only
+    # a real failure when the capability did not actually reach Installed.
+    if ($exitCode -ne 0 -and $exitCode -ne 3010) {{
+        $state = (Get-WindowsCapability -Online -Name $Name).State
+        if ($state -eq 'Installed') {{ return }}
+        $details = ''
+        if (Test-Path -LiteralPath $stderrPath) {{ $details = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue }}
+        if (-not $details -and (Test-Path -LiteralPath $stdoutPath)) {{ $details = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue }}
+        throw ("DISM exited with code " + $exitCode + " for " + $Name + ". " + $details)
+    }}
+}}
+
 try {{
     $total = [Math]::Max(1, $Packages.Count)
     Write-OcrStatus 'starting' 0 0 $total '' ''
@@ -3872,7 +4018,7 @@ try {{
         $InitiallyInstalled[$entry.BasicCapability] = ($basic.State -eq 'Installed')
         if ($basic.State -ne 'Installed') {{
             Write-OcrStatus 'installing_basic' ([int](100 * $index / $total)) $current $total $entry.Code ''
-            $null = Add-WindowsCapability -Online -Name $entry.BasicCapability -ErrorAction Stop
+            Install-OcrCapability -Name $entry.BasicCapability -Phase 'installing_basic' -Index $index -Current $current -Total $total -Code $entry.Code -Slot 0 -SlotCount 2 -StepIndex ($index * 2)
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
             $basic = Get-WindowsCapability -Online -Name $entry.BasicCapability
             if ($basic.State -ne 'Installed') {{
@@ -3882,7 +4028,7 @@ try {{
 
         if ($capability.State -ne 'Installed') {{
             Write-OcrStatus 'installing' ([int](100 * $index / $total)) $current $total $entry.Code ''
-            $null = Add-WindowsCapability -Online -Name $entry.Capability -ErrorAction Stop
+            Install-OcrCapability -Name $entry.Capability -Phase 'installing' -Index $index -Current $current -Total $total -Code $entry.Code -Slot 1 -SlotCount 2 -StepIndex (($index * 2) + 1)
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
         }}
 
@@ -4076,11 +4222,7 @@ try {{
         total = int(status.get("total", 0) or 0)
         elapsed = max(0, int(status.get("elapsed", 0) or 0))
         elapsed_text = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
-        language = code.upper()
-        for item in APP_LANGUAGES:
-            if item.code == code:
-                language = item.display_name(self.lang)
-                break
+        language = self._language_display_name(code) if code else code.upper()
         if phase in {"installing", "installing_basic"}:
             text = language_manager_text(
                 self.lang,
@@ -4089,10 +4231,12 @@ try {{
                 current=current,
                 total=total,
             )
+            # The percentage now comes straight from dism.exe, so it is safe to
+            # drive a real progress bar instead of an endless marquee.
             self._emit_language_progress(
                 f"{text}\n{elapsed_text}",
                 percent,
-                False,
+                True,
             )
         elif phase == "checking":
             text = language_manager_text(self.lang, "win_checking", language=language)
@@ -4114,7 +4258,8 @@ try {{
                 current=current,
                 total=total,
             )
-            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
+            # Also a real dism.exe percentage.
+            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, True)
         elif phase == "rolling_back":
             self._emit_language_progress(
                 f"{language_manager_text(self.lang, 'win_rolling_back')}\n{elapsed_text}",
@@ -4257,7 +4402,16 @@ try {{
                 output = (completed.stdout or "").strip()
                 details = result[6:].strip() if result.startswith("ERROR") else result
                 raise RuntimeError(details or output or f"PowerShell exited with code {completed.returncode}")
-            missing = self._wait_for_windows_ocr_capabilities(capabilities)
+            self._emit_language_progress(
+                language_manager_text(self.lang, "win_registering"),
+                100,
+                False,
+            )
+            # Each probe spawns PowerShell and costs 1-3 s, so poll gently; the
+            # state is normally already correct on the very first round.
+            missing = self._wait_for_windows_ocr_capabilities(
+                capabilities, delay=2.0, timeout=120.0
+            )
             if self._cancel_requested.is_set():
                 self._finish_language_task("Windows OCR", canceled=True)
                 return
@@ -4266,30 +4420,28 @@ try {{
                     "Windows reported that these OCR capabilities are still not installed: "
                     + ", ".join(missing)
                 )
-            try:
-                import ocr
-                ocr._UNIVERSAL_OCR_ENGINE = None
-                ocr._OCR_ENGINE_CACHE.clear()
-                available_by_tag = {
-                    str(tag).lower(): str(tag)
-                    for tag in ocr._get_available_windows_ocr_language_tags()
-                    if str(tag).strip()
-                }
-                unusable = []
-                for code in unique_codes:
-                    actual_tag = ocr._match_available_windows_ocr_tag(
-                        windows_ocr_tag(code),
-                        available_by_tag,
-                    )
-                    if not actual_tag or ocr._get_windows_ocr_engine(actual_tag) is None:
-                        unusable.append(code)
-                if unusable:
-                    raise RuntimeError(
-                        "Windows installed the OCR capability but the recognition engine "
-                        "could not be created for: " + ", ".join(unusable)
-                    )
-            except Exception:
-                raise
+            # Windows says the capability is installed.  The recognizer usually
+            # becomes usable within seconds, but never treat a lagging WinRT
+            # refresh as a failed install - the package is on disk either way.
+            pending = self._wait_for_windows_ocr_engines(unique_codes)
+            if self._cancel_requested.is_set():
+                self._finish_language_task("Windows OCR", canceled=True)
+                return
+            if pending:
+                logger.warning(
+                    "Windows OCR capabilities installed but not yet exposed by WinRT: %s",
+                    ", ".join(pending),
+                )
+                self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
+                self._task_success_message = language_manager_text(
+                    self.lang,
+                    "win_installed_pending_restart",
+                    languages=", ".join(
+                        self._language_display_name(code) for code in pending
+                    ),
+                )
+                self._finish_language_task("Windows OCR")
+                return
             self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
             self._finish_language_task("Windows OCR")
         except Exception as exc:
