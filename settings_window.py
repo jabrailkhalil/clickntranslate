@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
 from PyQt5 import QtCore, QtGui
-from styled_dialogs import StyledMessageBox
+from styled_dialogs import StyledMessageBox, TOOLTIP_QSS, tooltip_text
 
 QMessageBox = StyledMessageBox
 from app_version import APP_VERSION
@@ -576,13 +576,13 @@ class UpdateProgressDialog(QDialog):
         title_row.addStretch()
         self._minimize_button = QToolButton(self)
         self._minimize_button.setText("-")
-        self._minimize_button.setToolTip(settings_text(self._lang, "minimize"))
+        self._minimize_button.setToolTip(tooltip_text(settings_text(self._lang, "minimize")))
         self._minimize_button.setFixedSize(28, 24)
         self._minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self._minimize_button)
         self._close_button = QToolButton(self)
         self._close_button.setText("x")
-        self._close_button.setToolTip(settings_text(self._lang, "cancel"))
+        self._close_button.setToolTip(tooltip_text(settings_text(self._lang, "cancel")))
         self._close_button.setFixedSize(28, 24)
         self._close_button.clicked.connect(self.reject)
         title_row.addWidget(self._close_button)
@@ -626,7 +626,7 @@ class UpdateProgressDialog(QDialog):
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
         if hasattr(self, "_close_button"):
-            self._close_button.setToolTip(text)
+            self._close_button.setToolTip(tooltip_text(text))
 
     def setLabelText(self, text):
         self.message_label.setText(text)
@@ -739,13 +739,13 @@ class TesseractInstallProgressDialog(QDialog):
         title_row.addStretch()
         self.minimize_button = QToolButton(self)
         self.minimize_button.setText("–")
-        self.minimize_button.setToolTip(settings_text(self._lang, "minimize"))
+        self.minimize_button.setToolTip(tooltip_text(settings_text(self._lang, "minimize")))
         self.minimize_button.setFixedSize(28, 24)
         self.minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self.minimize_button)
         self.close_button = QToolButton(self)
         self.close_button.setText("×")
-        self.close_button.setToolTip(settings_text(self._lang, "cancel"))
+        self.close_button.setToolTip(tooltip_text(settings_text(self._lang, "cancel")))
         self.close_button.setFixedSize(28, 24)
         self.close_button.clicked.connect(self.reject)
         title_row.addWidget(self.close_button)
@@ -795,7 +795,7 @@ class TesseractInstallProgressDialog(QDialog):
 
     def setCancelButtonText(self, text):
         self.cancel_button.setText(text)
-        self.close_button.setToolTip(text)
+        self.close_button.setToolTip(tooltip_text(text))
 
     def setBackgroundButtonText(self, text):
         self.background_button.setText(text)
@@ -804,7 +804,7 @@ class TesseractInstallProgressDialog(QDialog):
         self.cancel_button.setText(text)
         self.cancel_button.setEnabled(False)
         self.close_button.setEnabled(False)
-        self.close_button.setToolTip(text)
+        self.close_button.setToolTip(tooltip_text(text))
 
     def setLabelText(self, text):
         self.message_label.setText(text)
@@ -2111,14 +2111,7 @@ class OcrLanguageManagerDialog(QDialog):
                 background-color: #d44b55;
                 color: #ffffff;
             }
-            QToolTip {
-                background-color: #17131f;
-                color: #f7f3ff;
-                border: 1px solid #7a5fa1;
-                padding: 6px 9px;
-                font-size: 13px;
-            }
-        """
+        """ + TOOLTIP_QSS
         if self._is_dark_theme():
             self.setStyleSheet(chrome_style + """
                 QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
@@ -4866,7 +4859,7 @@ class SettingsWindow(QWidget):
         self.ocr_engine_delete_btn.setObjectName("ocrEngineDeleteButton")
         self.ocr_engine_delete_btn.setText("×")
         self.ocr_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.ocr_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_tesseract"))
+        self.ocr_engine_delete_btn.setToolTip(tooltip_text(settings_text(lang, "remove_local_tesseract")))
         self.ocr_engine_delete_btn.clicked.connect(self.remove_ocr_engine)
         self.ocr_engine_delete_btn.setStyleSheet("""
             QToolButton#ocrEngineDeleteButton {
@@ -4900,8 +4893,8 @@ class SettingsWindow(QWidget):
             "fr": "Choisissez un OCR. Un moteur manquant peut ensuite être installé.",
             "zh": "选择 OCR；缺少的引擎可在选择后安装。",
         }
-        self.ocr_engine_combo.setToolTip(ocr_picker_help.get(lang, ocr_picker_help["en"]))
-        self.ocr_engine_label.setToolTip(ocr_picker_help.get(lang, ocr_picker_help["en"]))
+        self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
+        self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
         self.main_layout.addLayout(row1)
         
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
@@ -4960,7 +4953,7 @@ class SettingsWindow(QWidget):
         self.translator_engine_delete_btn.setObjectName("translatorEngineDeleteButton")
         self.translator_engine_delete_btn.setText("×")
         self.translator_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.translator_engine_delete_btn.setToolTip(settings_text(lang, "remove_local_hymt"))
+        self.translator_engine_delete_btn.setToolTip(tooltip_text(settings_text(lang, "remove_local_hymt")))
         self.translator_engine_delete_btn.clicked.connect(self.remove_hymt_engine)
         self.translator_engine_delete_btn.setStyleSheet("""
             QToolButton#translatorEngineDeleteButton {
@@ -4993,8 +4986,8 @@ class SettingsWindow(QWidget):
             "zh": "在线服务需要网络；已安装的离线翻译器会单独显示。",
         }
         picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
-        self.translator_combo.setToolTip(picker_help)
-        self.translator_engine_label.setToolTip(picker_help)
+        self.translator_combo.setToolTip(tooltip_text(picker_help))
+        self.translator_engine_label.setToolTip(tooltip_text(picker_help))
         self.main_layout.addLayout(row2)
 
         # --- Подготовим кнопку обновления (перенесена в группу кнопок ниже) ---
@@ -5133,7 +5126,7 @@ class SettingsWindow(QWidget):
 
         self.ocr_languages_btn = QPushButton(settings_text(lang, "ocr_language_packs"))
         self.ocr_languages_btn.clicked.connect(self.show_ocr_language_manager)
-        self.ocr_languages_btn.setToolTip(settings_text(lang, "manage_ocr_languages"))
+        self.ocr_languages_btn.setToolTip(tooltip_text(settings_text(lang, "manage_ocr_languages")))
         self.ocr_languages_btn.setStyleSheet("""
             QPushButton {
                 padding: 0px 6px;
@@ -7588,13 +7581,7 @@ finally {
             QWidget {{
                 background-color: {theme['background']};
             }}
-            QToolTip {{
-                background-color: #17131f;
-                color: #f7f3ff;
-                border: 1px solid #7a5fa1;
-                padding: 6px 9px;
-                font-size: 13px;
-            }}
+            {TOOLTIP_QSS}
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
@@ -7683,19 +7670,19 @@ finally {
                 bool(self._find_local_tesseract_exe())
                 and not self._tesseract_install_in_progress
             )
-            button.setToolTip(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_tesseract"))
+            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_tesseract")))
         elif current_engine == RAPIDOCR_ENGINE_DISPLAY:
             show_button = (
                 self._local_rapidocr_installed()
                 and not self._rapidocr_install_in_progress
             )
-            button.setToolTip(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_rapidocr"))
+            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_rapidocr")))
         elif current_engine == EASYOCR_ENGINE_DISPLAY:
             show_button = (
                 self._local_easyocr_installed()
                 and not self._easyocr_install_in_progress
             )
-            button.setToolTip(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_easyocr"))
+            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_easyocr")))
         previous_state = bool(combo.property("engineDeleteVisible"))
         combo.setProperty("engineDeleteVisible", show_button)
         if previous_state != show_button:

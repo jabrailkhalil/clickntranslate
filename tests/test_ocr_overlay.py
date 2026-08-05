@@ -212,6 +212,93 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 overlay.close()
                 overlay.deleteLater()
 
+    def test_tesseract_download_retries_a_transient_failure(self):
+        # A dropped connection used to fail the whole install and the only cure
+        # was for the user to guess that retrying would work.
+        import requests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tessdata = Path(tmp) / "tessdata"
+            tessdata.mkdir()
+            tess_cmd = str(Path(tmp) / "tesseract.exe")
+
+            payload = b"x" * 2048
+            attempts = []
+
+            class _Response:
+                def __init__(self, fail):
+                    self.fail = fail
+                    self.headers = {"Content-Length": str(len(payload))}
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+
+                def raise_for_status(self):
+                    if self.fail:
+                        raise requests.ConnectionError("connection reset")
+
+                def iter_content(self, chunk_size=1):
+                    yield payload
+
+            def fake_get(url, **kwargs):
+                attempts.append(url)
+                return _Response(fail=len(attempts) == 1)
+
+            with mock.patch.object(requests, "get", side_effect=fake_get), \
+                    mock.patch.object(ocr.time, "sleep"):
+                prepared = ocr._prepare_tesseract_data(
+                    tess_cmd, "eng", raise_on_error=True
+                )
+
+            self.assertEqual(len(attempts), 2, "the failed download should be retried once")
+            self.assertEqual(len(prepared), 1)
+            self.assertTrue((tessdata / "eng.traineddata").is_file())
+            self.assertEqual((tessdata / "eng.traineddata").read_bytes(), payload)
+            self.assertFalse(list(tessdata.glob("*.tmp")))
+
+    def test_tesseract_download_gives_up_after_the_retry_budget(self):
+        import requests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tessdata = Path(tmp) / "tessdata"
+            tessdata.mkdir()
+            tess_cmd = str(Path(tmp) / "tesseract.exe")
+            attempts = []
+
+            def always_fail(url, **kwargs):
+                attempts.append(url)
+                raise requests.ConnectionError("connection reset")
+
+            with mock.patch.object(requests, "get", side_effect=always_fail), \
+                    mock.patch.object(ocr.time, "sleep"):
+                with self.assertRaises(Exception):
+                    ocr._prepare_tesseract_data(tess_cmd, "eng", raise_on_error=True)
+
+            self.assertEqual(len(attempts), ocr._TESSDATA_DOWNLOAD_ATTEMPTS)
+
+    def test_tooltips_share_one_style_and_long_text_wraps(self):
+        import styled_dialogs
+
+        # Short labels stay compact; only long text becomes a fixed-width block.
+        self.assertEqual(styled_dialogs.tooltip_text("Close"), "Close")
+        long_text = "Choose an OCR engine. Missing engines can be installed when selected."
+        wrapped = styled_dialogs.tooltip_text(long_text)
+        self.assertTrue(wrapped.startswith("<qt>"))
+        self.assertIn(f"width:{styled_dialogs.TOOLTIP_WRAP_WIDTH}px", wrapped)
+        self.assertIn("border-radius", styled_dialogs.TOOLTIP_QSS)
+
+        # The stylesheet must live in exactly one place.
+        for module_name in ("main", "settings_window"):
+            source = Path(ocr.__file__).with_name(f"{module_name}.py").read_text(encoding="utf-8")
+            self.assertNotIn(
+                "background-color: #17131f;",
+                source,
+                f"{module_name}.py still inlines its own QToolTip block",
+            )
+
     def test_copy_overlay_does_not_offer_auto_language(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
         try:

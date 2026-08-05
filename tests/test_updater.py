@@ -354,15 +354,15 @@ class TestUpdateAssetSelection(unittest.TestCase):
     def test_release_153_assets_route_installed_and_portable_copies_correctly(self):
         assets = [
             {
-                "name": "Click-n-Translate-1.5.4-windows-portable-x64.zip",
+                "name": "Click-n-Translate-1.5.5-windows-portable-x64.zip",
                 "browser_download_url": "https://example.com/portable.zip",
             },
             {
-                "name": "Click-n-Translate-1.5.4-windows-x64-installer.exe",
+                "name": "Click-n-Translate-1.5.5-windows-x64-installer.exe",
                 "browser_download_url": "https://example.com/full.exe",
             },
             {
-                "name": "ClicknTranslate-Setup-v1.5.4-win64.exe",
+                "name": "ClicknTranslate-Setup-v1.5.5-win64.exe",
                 "browser_download_url": "https://example.com/bridge.exe",
             },
         ]
@@ -374,11 +374,11 @@ class TestUpdateAssetSelection(unittest.TestCase):
 
         self.assertEqual(
             installed["name"],
-            "Click-n-Translate-1.5.4-windows-x64-installer.exe",
+            "Click-n-Translate-1.5.5-windows-x64-installer.exe",
         )
         self.assertEqual(
             portable["name"],
-            "Click-n-Translate-1.5.4-windows-portable-x64.zip",
+            "Click-n-Translate-1.5.5-windows-portable-x64.zip",
         )
 
     def test_portable_copy_ignores_legacy_bootstrap_asset(self):

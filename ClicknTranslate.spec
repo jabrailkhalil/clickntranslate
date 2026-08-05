@@ -1,5 +1,34 @@
 # -*- mode: python ; coding: utf-8 -*-
+import re as _re
+import sys as _sys
+
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+
+
+# The optional OCR engines are pip-installed at runtime into a private folder and
+# then imported by the frozen OcrWorker, so their wheels must match this build's
+# Python ABI.  settings_window pins that dependency set (and ships a matching
+# embedded interpreter as a fallback), which means the build interpreter has to
+# be the same series as EASYOCR_PYTHON_VERSION.
+#
+# Building 1.5.4 on 3.11 instead of 3.12 shipped an app that asked pip for
+# packages requiring >= 3.12, so EasyOCR and RapidOCR installs failed outright
+# with "Could not find a version that satisfies the requirement scipy==1.18.0".
+# Fail the build instead of shipping that again.
+_settings_source = open('settings_window.py', encoding='utf-8').read()
+_engine_python = _re.search(
+    r'EASYOCR_PYTHON_VERSION\s*=\s*"(\d+)\.(\d+)\.\d+"', _settings_source
+)
+if _engine_python:
+    _required = (int(_engine_python.group(1)), int(_engine_python.group(2)))
+    if _sys.version_info[:2] != _required:
+        raise SystemExit(
+            'Build Python %d.%d does not match EASYOCR_PYTHON_VERSION %d.%d. '
+            'The runtime OCR engine wheels would not be importable by the frozen '
+            'workers. Build with Python %d.%d.'
+            % (_sys.version_info[0], _sys.version_info[1], _required[0], _required[1],
+               _required[0], _required[1])
+        )
 
 
 gui_datas = [('icons', 'icons')]
@@ -210,6 +239,76 @@ ocr_worker_a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+import os as _os
+
+
+# PyInstaller resolves DLL dependencies with the Windows search order, which
+# includes PATH.  Any tool on the build machine's PATH that ships its own Visual
+# C++ runtime therefore wins over the system one.  On one build machine an old
+# AdoptOpenJDK on PATH supplied MSVCP140.dll 14.27 while MSVCP140_1.dll, which it
+# does not ship, still came from System32 at 14.51.  MSVCP140_1.dll is an
+# extension of MSVCP140.dll and the two must come from the same redistributable,
+# so the mismatch made ArgosWorker.exe die instantly with an access violation
+# (0xC0000005) inside MSVCP140.dll before Python could report anything.
+#
+# Pin the whole runtime to the System32 copies so the bundle is always a single
+# consistent set, whatever happens to be on PATH.
+_VCRUNTIME_DLLS = {
+    'msvcp140.dll',
+    'msvcp140_1.dll',
+    'msvcp140_2.dll',
+    'vcruntime140.dll',
+    'vcruntime140_1.dll',
+    'concrt140.dll',
+}
+_SYSTEM32 = _os.path.join(_os.environ.get('SystemRoot', r'C:\Windows'), 'System32')
+
+
+def _pin_system_vcruntime(binaries):
+    pinned = []
+    for entry in binaries:
+        destination, source = entry[0], entry[1]
+        base = _os.path.basename(destination)
+        if base.lower() in _VCRUNTIME_DLLS:
+            system_copy = _os.path.join(_SYSTEM32, base)
+            if _os.path.isfile(system_copy):
+                entry = (destination, system_copy) + tuple(entry[2:])
+        pinned.append(entry)
+    return pinned
+
+
+def _assert_consistent_vcruntime(*binary_lists):
+    """Fail the build rather than ship a runtime mix that crashes at startup."""
+    try:
+        from PyInstaller.utils.win32.versioninfo import read_version_info_from_executable
+    except Exception:
+        return
+    versions = {}
+    for binaries in binary_lists:
+        for entry in binaries:
+            base = _os.path.basename(entry[0])
+            if base.lower() not in _VCRUNTIME_DLLS:
+                continue
+            try:
+                info = read_version_info_from_executable(entry[1])
+                fixed = getattr(info, 'ffi', None)
+                version = (fixed.fileVersionMS, fixed.fileVersionLS) if fixed else None
+            except Exception:
+                continue
+            if version is not None:
+                versions.setdefault(version, set()).add(base)
+    if len(versions) > 1:
+        raise SystemExit(
+            'Inconsistent Visual C++ runtime DLLs collected: %s. '
+            'They must all come from the same redistributable.' % versions
+        )
+
+
+a.binaries = _pin_system_vcruntime(a.binaries)
+worker_a.binaries = _pin_system_vcruntime(worker_a.binaries)
+ocr_worker_a.binaries = _pin_system_vcruntime(ocr_worker_a.binaries)
+_assert_consistent_vcruntime(a.binaries, worker_a.binaries, ocr_worker_a.binaries)
 
 pyz = PYZ(a.pure)
 worker_pyz = PYZ(worker_a.pure)

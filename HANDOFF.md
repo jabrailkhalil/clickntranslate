@@ -628,6 +628,91 @@ Release URL: <https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.5
 
 ---
 
+## 11b. 1.5.4 shipped broken — three defects and their root causes
+
+After 1.5.4 went out, three problems were reported against the installed build at
+`D:\Soft\workstation\ClicknTranslate`. **Two were caused by how 1.5.4 was built, not by the
+source changes.** Both are build-environment traps that are now guarded against in the spec.
+
+### (a) ArgosWorker.exe crashed instantly — 0xC0000005
+
+Symptom: "Could not load package list: Argos offline worker failed: exit code 3221225477" and
+Argos offline translation dead. Reproduced by running the worker directly: instant segfault, no
+stderr at all, i.e. a native crash before Python could report anything.
+
+Windows Error Reporting named the faulting module:
+
+```
+Faulting module name: MSVCP140.dll, version: 14.27.29016.0
+Exception code: 0xc0000005
+```
+
+The bundle contained a **mismatched Visual C++ runtime**:
+
+| DLL | shipped version |
+| --- | --- |
+| MSVCP140.dll | 14.27.29016.0 |
+| MSVCP140_1.dll | 14.51.36247.0 |
+| VCRUNTIME140.dll | 14.38.33126.1 |
+
+`MSVCP140_1.dll` is an extension of `MSVCP140.dll`; the two must come from the same
+redistributable. Cause: **PyInstaller resolves DLL dependencies using the Windows search order,
+which includes `PATH`.** This build machine has
+`C:\Program Files\AdoptOpenJDK\jdk-17.0.0.20-hotspot\bin` on PATH, and it ships its own
+`MSVCP140.dll` 14.27 — which won over System32's 14.51. `MSVCP140_1.dll` is not in the JDK
+folder, so that one still came from System32. Result: a runtime pair that cannot work together.
+
+Proven by copying System32's consistent 14.51 set over the build output: the worker went from
+instant segfault to `exit 0` returning the full Argos package catalog.
+
+**Fix:** `ClicknTranslate.spec` now rewrites every `msvcp140*/vcruntime140*/concrt140` entry to
+the System32 copy (`_pin_system_vcruntime`), and `_assert_consistent_vcruntime` fails the build
+outright if more than one runtime version is still collected.
+
+### (b) EasyOCR / RapidOCR installs failed — wrong build Python
+
+Symptom: `ERROR: Could not find a version that satisfies the requirement scipy==1.18.0
+(from versions: … 1.17.1)`, with pip downloading **cp311** wheels.
+
+`settings_window._find_rapidocr_install_python_command` deliberately looks for a system Python
+matching **the frozen app's own version**, because those wheels get imported by the frozen
+`OcrWorker`, so the ABI must match. 1.5.4 was built on **Python 3.11**, so it went looking for
+3.11 — but `EASYOCR_PIP_PACKAGES` pins `scipy==1.18.0` and `numpy==2.5.1`, which require
+Python >= 3.12, and the embedded fallback interpreter is `EASYOCR_PYTHON_VERSION = "3.12.10"`.
+
+So the whole engine-install mechanism is designed around **Python 3.12**, and building on 3.11
+broke it. (3.11 was chosen only because `rapidocr-onnxruntime==1.4.4` requires < 3.13 — but 3.12
+satisfies that too and is the correct choice.)
+
+**Fix:** the spec now reads `EASYOCR_PYTHON_VERSION` out of `settings_window.py` and **refuses to
+build** unless the build interpreter is that same series. `.venv312` is the build environment
+from now on; `.venv311` should be considered dead.
+
+### (c) Tesseract language install failed, then worked on retry
+
+`ocr._prepare_tesseract_data` downloaded each `*.traineddata` with a single `requests.get`
+against `github.com/tesseract-ocr/tessdata` — tens of megabytes with **no retry**, so any
+transient drop failed the whole install. That is exactly the reported "failed, tried again, it
+worked".
+
+**Fix:** bounded retry (`_TESSDATA_DOWNLOAD_ATTEMPTS = 3`) with linear backoff, treating a
+truncated transfer as retryable, cancellation still honoured, plus a localized `tess_retrying`
+status in all six languages. Covered by two new tests.
+
+### (d) Tooltips (this one was a genuine UI issue, not a build problem)
+
+The same `QToolTip` block was pasted into four different stylesheets, so any widget outside those
+four fell back to the system tooltip. There were no rounded corners, and long tooltips ran off
+the screen because **Qt only word-wraps a tooltip when the text looks like rich text**
+(`QTipLabel` does `setWordWrap(Qt::mightBeRichText(text))`).
+
+**Fix:** one shared `TOOLTIP_QSS` in `styled_dialogs.py` (now with `border-radius`), applied
+app-wide via `install_tooltip_style()` so unstyled windows match too, plus `tooltip_text()`,
+which wraps anything longer than 44 characters into a fixed 320px block and leaves short labels
+compact. Applied at all 45 `setToolTip` call sites.
+
+---
+
 ## 12. If you are picking this up next
 
 **State right now:** 1.5.4 is fully released. `main` is at `c84a010`, tag `v1.5.4` points at it,

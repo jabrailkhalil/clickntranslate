@@ -84,7 +84,14 @@ try:
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPen, QBrush, QPolygonF
 except Exception:
     _show_dependency_error()
-from styled_dialogs import NativeDialogFrameFilter, StyledMessageBox, install_qt_exception_guard
+from styled_dialogs import (
+    NativeDialogFrameFilter,
+    StyledMessageBox,
+    TOOLTIP_QSS,
+    install_qt_exception_guard,
+    install_tooltip_style,
+    tooltip_text,
+)
 
 QMessageBox = StyledMessageBox
 from settings_window import SettingsWindow, TesseractInstallProgressDialog
@@ -3047,7 +3054,7 @@ class TranslationResultDialog(QDialog):
         self.title_close_button.setObjectName("translationResultTitleClose")
         self.title_close_button.setText("×")
         self.title_close_button.setFixedSize(32, 32)
-        self.title_close_button.setToolTip(ui_text(self.lang, "close"))
+        self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.title_close_button.clicked.connect(self.accept)
         header.addWidget(self.title_close_button, alignment=Qt.AlignTop)
         layout.addLayout(header)
@@ -3653,7 +3660,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_minimize_button = QToolButton(self)
         self.doc_minimize_button.setObjectName("docWindowButton")
         self.doc_minimize_button.setText("−")
-        self.doc_minimize_button.setToolTip(ui_text(self.lang, "minimize"))
+        self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
         self.doc_minimize_button.setFixedSize(34, 32)
         self.doc_minimize_button.clicked.connect(self.showMinimized)
         header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignTop)
@@ -3661,7 +3668,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_close_button = QToolButton(self)
         self.doc_close_button.setObjectName("docWindowClose")
         self.doc_close_button.setText("×")
-        self.doc_close_button.setToolTip(ui_text(self.lang, "close"))
+        self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.doc_close_button.setFixedSize(34, 32)
         self.doc_close_button.clicked.connect(self.close)
         header_top.addWidget(self.doc_close_button, alignment=Qt.AlignTop)
@@ -3848,13 +3855,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 background: transparent;
                 color: {fg};
             }}
-            QToolTip {{
-                background-color: #17131f;
-                color: #f7f3ff;
-                border: 1px solid #7a5fa1;
-                padding: 6px 9px;
-                font-size: 13px;
-            }}
+            {TOOLTIP_QSS}
             QFrame#docWindowFrame {{
                 background-color: {bg};
                 border: 1px solid {border};
@@ -4080,8 +4081,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.header_title.setText(doc_text(self.lang, "title"))
         self.header_subtitle.setText(doc_text(self.lang, "drop_hint"))
-        self.doc_minimize_button.setToolTip(ui_text(self.lang, "minimize"))
-        self.doc_close_button.setToolTip(ui_text(self.lang, "close"))
+        self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
+        self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
         self.remove_button.setText(doc_text(self.lang, "remove_file"))
         self.translate_file_button.setText(doc_text(self.lang, "translate_file"))
@@ -5004,20 +5005,20 @@ class DarkThemeApp(QMainWindow):
 
         self.theme_button = QPushButton(self)
         self.update_theme_icon()
-        self.theme_button.setToolTip(ui_text(self.current_interface_language, "theme"))
+        self.theme_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "theme")))
         self.theme_button.setStyleSheet("background-color: transparent; border: none;")
         self.theme_button.setGeometry(50, 5, 30, 30)
         self.theme_button.clicked.connect(self.toggle_theme)
 
         self.minimize_button = QPushButton(self)
         self.minimize_button.setText("‒")
-        self.minimize_button.setToolTip(ui_text(self.current_interface_language, "minimize"))
+        self.minimize_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "minimize")))
         self.minimize_button.setStyleSheet("background-color: transparent; border: none;")
         self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
         self.minimize_button.clicked.connect(self.showMinimized)
 
         self.document_button = QPushButton(self)
-        self.document_button.setToolTip(doc_text(self.current_interface_language, "title"))
+        self.document_button.setToolTip(tooltip_text(doc_text(self.current_interface_language, "title")))
         self.document_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -5035,21 +5036,21 @@ class DarkThemeApp(QMainWindow):
 
         # Кнопка помощи (FAQ)
         self.help_button = QPushButton(self)
-        self.help_button.setToolTip(ui_text(self.current_interface_language, "help"))
+        self.help_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "help")))
         self.help_button.setStyleSheet("background-color: transparent; border: none;")
         self.help_button.setGeometry(self.width() - 155, 5, 30, 30)
         self.help_button.clicked.connect(self.show_help_dialog)
         self.update_help_icon()
 
         self.settings_button = QPushButton(self)
-        self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['settings'])
+        self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
         self.settings_button.setStyleSheet("background-color: transparent; border: none;")
         self.settings_button.setGeometry(self.width() - 120, 5, 30, 30)
         self.settings_button.clicked.connect(self.show_settings)
 
         self.close_button = QPushButton(self)
         self.close_button.setText("×")
-        self.close_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['back'])
+        self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
         self.close_button.setStyleSheet("background-color: transparent; border: none;")
         self.close_button.setGeometry(self.width() - 40, 5, 30, 30)
         self.close_button.clicked.connect(self.close)
@@ -5059,7 +5060,7 @@ class DarkThemeApp(QMainWindow):
 
     def create_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
-        self.tray_icon.setToolTip("Click'n'Translate")
+        self.tray_icon.setToolTip(tooltip_text("Click'n'Translate"))
         self.update_tray_menu()
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
         self.tray_icon.show()
@@ -5637,13 +5638,7 @@ class DarkThemeApp(QMainWindow):
             QMainWindow {{
                 background-color: {theme['background']};
             }}
-            QToolTip {{
-                background-color: #17131f;
-                color: #f7f3ff;
-                border: 1px solid #7a5fa1;
-                padding: 6px 9px;
-                font-size: 13px;
-            }}
+            {TOOLTIP_QSS}
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
@@ -5765,17 +5760,17 @@ class DarkThemeApp(QMainWindow):
             if self.settings_window is None:
                 if self.current_theme == "Темная":
                     self.settings_button.setIcon(QIcon(resource_path("icons/settings_light.png")))
-                    self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['settings'])
+                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
                 else:
                     self.settings_button.setIcon(QIcon(resource_path("icons/settings_dark.png")))
-                    self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['settings'])
+                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
             else:
                 if self.current_theme == "Темная":
                     self.settings_button.setIcon(QIcon(resource_path("icons/light_home.png")))
-                    self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['back'])
+                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
                 else:
                     self.settings_button.setIcon(QIcon(resource_path("icons/dark_home.png")))
-                    self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['back'])
+                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
 
     def update_theme_icon(self):
         icon_path = resource_path("icons/sun.png") if self.current_theme == "Темная" else resource_path("icons/moon.png")
@@ -5813,7 +5808,7 @@ class DarkThemeApp(QMainWindow):
         option = get_interface_language_option(self.current_interface_language)
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
         self.flag_button.setIconSize(QSize(24, 24))
-        self.flag_button.setToolTip(ui_text(self.current_interface_language, "choose_interface_language"))
+        self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
 
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
@@ -5822,18 +5817,18 @@ class DarkThemeApp(QMainWindow):
         if hasattr(self, "flag_button"):
             self.update_interface_language_button()
         if hasattr(self, "theme_button"):
-            self.theme_button.setToolTip(ui_text(lang, "theme"))
+            self.theme_button.setToolTip(tooltip_text(ui_text(lang, "theme")))
         if hasattr(self, "minimize_button"):
-            self.minimize_button.setToolTip(ui_text(lang, "minimize"))
+            self.minimize_button.setToolTip(tooltip_text(ui_text(lang, "minimize")))
         if hasattr(self, "help_button"):
-            self.help_button.setToolTip(ui_text(lang, "help"))
+            self.help_button.setToolTip(tooltip_text(ui_text(lang, "help")))
         if hasattr(self, "document_button"):
-            self.document_button.setToolTip(doc_text(lang, "title"))
+            self.document_button.setToolTip(tooltip_text(doc_text(lang, "title")))
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
-            self.settings_button.setToolTip(INTERFACE_TEXT[lang][key])
+            self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang][key]))
         if hasattr(self, "close_button"):
-            self.close_button.setToolTip(INTERFACE_TEXT[lang]["back"])
+            self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang]["back"]))
         if hasattr(self, "tray_icon"):
             self.update_tray_menu()
         if (
@@ -5949,7 +5944,7 @@ class DarkThemeApp(QMainWindow):
         title_close.setObjectName("helpTitleClose")
         title_close.setText("×")
         title_close.setFixedSize(34, 34)
-        title_close.setToolTip(help_action_text(lang, "close"))
+        title_close.setToolTip(tooltip_text(help_action_text(lang, "close")))
         title_close.clicked.connect(dialog.accept)
         title_row.addWidget(title_close, alignment=Qt.AlignTop)
         layout.addLayout(title_row)
@@ -6170,7 +6165,7 @@ class DarkThemeApp(QMainWindow):
             self.settings_button.setIcon(QIcon(resource_path("icons/dark_home.png")))
         else:
             self.settings_button.setIcon(QIcon(resource_path("icons/light_home.png")))
-        self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['back'])
+        self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -6182,7 +6177,7 @@ class DarkThemeApp(QMainWindow):
             self.settings_button.setIcon(QIcon(resource_path("icons/settings_light.png")))
         else:
             self.settings_button.setIcon(QIcon(resource_path("icons/settings_dark.png")))
-        self.settings_button.setToolTip(INTERFACE_TEXT[self.current_interface_language]['settings'])
+        self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -6218,7 +6213,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setPlaceholderText(
             f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
         )
-        self.text_input.setToolTip(doc_text(self.current_interface_language, "main_file_tooltip"))
+        self.text_input.setToolTip(tooltip_text(doc_text(self.current_interface_language, "main_file_tooltip")))
         self.text_input.setMinimumHeight(45)
         self.text_input.setMaximumHeight(70)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -6236,7 +6231,9 @@ class DarkThemeApp(QMainWindow):
         self.translate_button.setEnabled(has_translation_pair)
         if not has_translation_pair:
             self.translate_button.setToolTip(
-                ui_text(self.current_interface_language, "install_argos_packages_hint")
+                tooltip_text(
+                    ui_text(self.current_interface_language, "install_argos_packages_hint")
+                )
             )
         self.main_layout.addWidget(self.translate_button)
 
@@ -6910,6 +6907,9 @@ if __name__ == "__main__":
         pass
     app = QApplication([])
     install_qt_exception_guard()
+    # Windows that do not set their own stylesheet would otherwise show the
+    # system tooltip, which does not match the rest of the app.
+    install_tooltip_style(app)
     _native_dialog_frame_filter = NativeDialogFrameFilter(app)
     app.installEventFilter(_native_dialog_frame_filter)
     app.setQuitOnLastWindowClosed(False)

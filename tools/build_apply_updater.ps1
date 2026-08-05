@@ -1,12 +1,12 @@
 param(
-    [string]$Version = "1.5.4.0",
+    [string]$Version = "1.5.5.0",
     [string]$OutputPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-    throw "Version must contain four numeric parts, for example 1.5.4.0."
+    throw "Version must contain four numeric parts, for example 1.5.5.0."
 }
 
 $root = Split-Path -Parent $PSScriptRoot

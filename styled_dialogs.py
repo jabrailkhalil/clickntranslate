@@ -12,6 +12,56 @@ from pathlib import Path
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
+# One definition for every tooltip in the application.  It used to be pasted
+# into four separate stylesheets, so any widget outside those four got the
+# system default instead and the popups did not match each other.
+TOOLTIP_QSS = """
+    QToolTip {
+        background-color: #17131f;
+        color: #f7f3ff;
+        border: 1px solid #7a5fa1;
+        border-radius: 8px;
+        padding: 7px 11px;
+        font-family: 'Segoe UI';
+        font-size: 13px;
+        opacity: 245;
+    }
+"""
+
+# Qt only word-wraps a tooltip when the text looks like rich text
+# (QTipLabel does `setWordWrap(Qt::mightBeRichText(text))`).  A long plain
+# string is therefore laid out on one endless line and runs off the screen,
+# which is why the engine-picker hint was clipped.  Anything longer than this
+# gets wrapped to a fixed width; short labels stay snug so "Close" does not
+# become a 320px box.
+TOOLTIP_WRAP_THRESHOLD = 44
+TOOLTIP_WRAP_WIDTH = 320
+
+
+def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
+    """Return tooltip markup that wraps consistently at a readable width."""
+    value = str(text or "")
+    if not value:
+        return ""
+    if len(value) <= TOOLTIP_WRAP_THRESHOLD and "\n" not in value:
+        return value
+    import html as _html
+
+    escaped = _html.escape(value).replace("\n", "<br>")
+    return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
+
+
+def install_tooltip_style(app=None) -> None:
+    """Apply the shared tooltip look to every window, including unstyled ones."""
+    app = app or QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    existing = app.styleSheet() or ""
+    if "QToolTip" in existing:
+        return
+    app.setStyleSheet(existing + TOOLTIP_QSS)
+
+
 def install_qt_exception_guard() -> None:
     """Log uncaught Qt callback errors instead of letting PyQt abort the GUI."""
     if getattr(sys.excepthook, "_clickntranslate_qt_guard", False):

@@ -37,7 +37,7 @@ APP_LANGUAGE_CODES = {language.code for language in APP_LANGUAGES}
 OCR_UI_TEXT = {
     "en": {
         "tess_download_data": "Tesseract: downloading {language} language data...", "tess_downloading": "Tesseract: downloading {language}... {percent}%",
-        "tess_ready": "Tesseract: {language} language data is ready", "recognizing": "Recognizing text...",
+        "tess_ready": "Tesseract: {language} language data is ready", "tess_retrying": "Tesseract: retrying {language} download ({attempt}/{total})...", "recognizing": "Recognizing text...",
         "win_missing_title": "Windows OCR pack missing", "win_unavailable": "Windows OCR is not available right now.",
         "win_components": "Windows OCR components failed to load. The app can continue with Tesseract if it is installed.",
         "win_unsupported": "Windows OCR does not support: {language} ({tag}).",
@@ -59,7 +59,7 @@ OCR_UI_TEXT = {
     },
     "ru": {
         "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
-        "tess_ready": "Tesseract: пакет {language} готов", "recognizing": "Распознаю текст...",
+        "tess_ready": "Tesseract: пакет {language} готов", "tess_retrying": "Tesseract: повторная загрузка {language} ({attempt}/{total})...", "recognizing": "Распознаю текст...",
         "win_missing_title": "Пакет Windows OCR не найден", "win_unavailable": "Windows OCR сейчас недоступен.",
         "win_components": "Компоненты Windows OCR не загрузились. Можно продолжить через Tesseract, если он установлен.",
         "win_unsupported": "Windows OCR не поддерживает язык: {language} ({tag}).",
@@ -81,7 +81,7 @@ OCR_UI_TEXT = {
     },
     "es": {
         "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
-        "tess_ready": "Tesseract: los datos de {language} están listos", "recognizing": "Reconociendo texto...",
+        "tess_ready": "Tesseract: los datos de {language} están listos", "tess_retrying": "Tesseract: reintentando la descarga de {language} ({attempt}/{total})...", "recognizing": "Reconociendo texto...",
         "win_missing_title": "Falta el paquete de Windows OCR", "win_unavailable": "Windows OCR no está disponible ahora.",
         "win_components": "No se pudieron cargar los componentes de Windows OCR. La aplicación puede continuar con Tesseract si está instalado.",
         "win_unsupported": "Windows OCR no admite: {language} ({tag}).", "win_pack": "Probablemente no está instalado el paquete de idioma de Windows OCR. Puedes abrir la configuración de idioma de Windows y añadir el idioma necesario.",
@@ -100,7 +100,7 @@ OCR_UI_TEXT = {
     },
     "de": {
         "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
-        "tess_ready": "Tesseract: Sprachdaten für {language} sind bereit", "recognizing": "Text wird erkannt...",
+        "tess_ready": "Tesseract: Sprachdaten für {language} sind bereit", "tess_retrying": "Tesseract: {language} wird erneut geladen ({attempt}/{total})...", "recognizing": "Text wird erkannt...",
         "win_missing_title": "Windows-OCR-Paket fehlt", "win_unavailable": "Windows OCR ist momentan nicht verfügbar.",
         "win_components": "Windows-OCR-Komponenten konnten nicht geladen werden. Die App kann mit Tesseract fortfahren, wenn es installiert ist.",
         "win_unsupported": "Windows OCR unterstützt {language} ({tag}) nicht.", "win_pack": "Das Windows-OCR-Sprachpaket ist wahrscheinlich nicht installiert. Öffne die Windows-Spracheinstellungen und füge die benötigte Sprache hinzu.",
@@ -119,7 +119,7 @@ OCR_UI_TEXT = {
     },
     "fr": {
         "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
-        "tess_ready": "Tesseract : les données de {language} sont prêtes", "recognizing": "Reconnaissance du texte...",
+        "tess_ready": "Tesseract : les données de {language} sont prêtes", "tess_retrying": "Tesseract : nouvelle tentative de téléchargement de {language} ({attempt}/{total})...", "recognizing": "Reconnaissance du texte...",
         "win_missing_title": "Module Windows OCR manquant", "win_unavailable": "Windows OCR n’est pas disponible actuellement.",
         "win_components": "Les composants Windows OCR n’ont pas pu être chargés. L’application peut continuer avec Tesseract s’il est installé.",
         "win_unsupported": "Windows OCR ne prend pas en charge : {language} ({tag}).", "win_pack": "Le module de langue Windows OCR n’est probablement pas installé. Ouvrez les paramètres de langue de Windows et ajoutez la langue requise.",
@@ -138,7 +138,7 @@ OCR_UI_TEXT = {
     },
     "zh": {
         "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
-        "tess_ready": "Tesseract：{language} 语言数据已就绪", "recognizing": "正在识别文本...",
+        "tess_ready": "Tesseract：{language} 语言数据已就绪", "tess_retrying": "Tesseract：正在重试下载 {language}（{attempt}/{total}）…", "recognizing": "正在识别文本...",
         "win_missing_title": "缺少 Windows OCR 语言包", "win_unavailable": "Windows OCR 当前不可用。",
         "win_components": "Windows OCR 组件加载失败。如果已安装 Tesseract，应用可以继续使用它。",
         "win_unsupported": "Windows OCR 不支持：{language}（{tag}）。", "win_pack": "可能尚未安装 Windows OCR 语言包。你可以打开 Windows 语言设置并添加所需语言。",
@@ -400,6 +400,12 @@ def _tesseract_language_display_name(tess_code, interface_language=None):
     return tess_code
 
 
+# Language data comes straight from the tessdata repository on GitHub and is
+# tens of megabytes, so a dropped connection is common enough to retry.
+_TESSDATA_DOWNLOAD_ATTEMPTS = 3
+_TESSDATA_RETRY_DELAY_SECONDS = 2
+
+
 def _prepare_tesseract_data(
     tess_cmd,
     tess_lang,
@@ -446,50 +452,84 @@ def _prepare_tesseract_data(
                 status_callback(status_text)
             logging.info(f"Downloading {fname} into {tessdata_dir} ...")
             tmp_path = target_path + ".tmp"
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-            downloaded = 0
-            with requests.get(url, timeout=180, stream=True) as r:
-                r.raise_for_status()
+            # These files are tens of megabytes straight from GitHub, so a single
+            # dropped connection used to fail the whole install and the user had
+            # to guess that simply retrying would work.  Retry transient network
+            # failures here instead.
+            canceled = False
+            for attempt in range(_TESSDATA_DOWNLOAD_ATTEMPTS):
                 try:
-                    total = int((r.headers.get("Content-Length") or "0").strip() or "0")
-                except Exception:
-                    total = 0
-                with open(tmp_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        if cancel_check and cancel_check():
-                            try:
-                                f.close()
-                            except Exception:
-                                pass
-                            try:
-                                os.remove(tmp_path)
-                            except Exception:
-                                pass
-                            return prepared
-                        if not chunk:
-                            continue
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if status_callback and total > 0:
-                            percent = int(downloaded * 100 / max(total, 1))
-                            status_callback(
-                                ocr_ui_text(
-                                    interface_language,
-                                    "tess_downloading",
-                                    language=display_name,
-                                    percent=percent,
-                                )
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                downloaded = 0
+                total = 0
+                try:
+                    with requests.get(url, timeout=180, stream=True) as r:
+                        r.raise_for_status()
+                        try:
+                            total = int((r.headers.get("Content-Length") or "0").strip() or "0")
+                        except Exception:
+                            total = 0
+                        with open(tmp_path, "wb") as f:
+                            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                if cancel_check and cancel_check():
+                                    canceled = True
+                                    break
+                                if not chunk:
+                                    continue
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                if status_callback and total > 0:
+                                    percent = int(downloaded * 100 / max(total, 1))
+                                    status_callback(
+                                        ocr_ui_text(
+                                            interface_language,
+                                            "tess_downloading",
+                                            language=display_name,
+                                            percent=percent,
+                                        )
+                                    )
+                    if canceled:
+                        break
+                    # A truncated transfer is the common failure mode and is
+                    # worth another attempt rather than an immediate error.
+                    if total and downloaded != total:
+                        raise RuntimeError(
+                            f"Incomplete Tesseract package {fname}: "
+                            f"received {downloaded} of {total} bytes."
+                        )
+                    if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) <= 0:
+                        raise RuntimeError(f"Downloaded Tesseract package {fname} is empty.")
+                    break
+                except Exception as attempt_error:
+                    if cancel_check and cancel_check():
+                        canceled = True
+                        break
+                    if attempt + 1 >= _TESSDATA_DOWNLOAD_ATTEMPTS:
+                        raise
+                    delay = _TESSDATA_RETRY_DELAY_SECONDS * (attempt + 1)
+                    logging.warning(
+                        f"Tesseract package {fname} download attempt {attempt + 1} failed "
+                        f"({attempt_error}); retrying in {delay}s"
+                    )
+                    if status_callback:
+                        status_callback(
+                            ocr_ui_text(
+                                interface_language,
+                                "tess_retrying",
+                                language=display_name,
+                                attempt=attempt + 2,
+                                total=_TESSDATA_DOWNLOAD_ATTEMPTS,
                             )
-            if total and downloaded != total:
-                raise RuntimeError(
-                    f"Incomplete Tesseract package {fname}: "
-                    f"received {downloaded} of {total} bytes."
-                )
-            if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) <= 0:
-                raise RuntimeError(f"Downloaded Tesseract package {fname} is empty.")
+                        )
+                    time.sleep(delay)
+            if canceled:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                return prepared
             os.replace(tmp_path, target_path)
             tmp_path = ""
             prepared.append(target_path)
