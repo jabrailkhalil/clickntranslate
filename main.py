@@ -6920,7 +6920,7 @@ class DarkThemeApp(QMainWindow):
 _translation_result_dialogs = []
 
 
-def _install_linux_desktop_entry(window):
+def _install_linux_desktop_entry():
     """Put the app in the application menu on first run.
 
     An AppImage or an extracted tarball is not registered with the desktop, so
@@ -7124,15 +7124,29 @@ if __name__ == "__main__":
             logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
             logging.info("=" * 50)
             warm_up()
-            prepare_overlay("ocr")
-            prepare_overlay("copy")
-            prepare_overlay("translate")
+
+            def _prepare_overlays():
+                for mode in ("ocr", "copy", "translate"):
+                    prepare_overlay(mode)
+
+            if platform_support.IS_LINUX:
+                # Overlays are QWidgets, and Qt only allows widgets to be created
+                # on the GUI thread. Windows tolerates it, X11 does not — it warns
+                # about timers started off-thread and can misbehave later — so the
+                # creation is handed back to the GUI thread through the same
+                # dispatcher the shortcut commands use.
+                hotkey_dispatcher.triggered.emit(_prepare_overlays)
+            else:
+                _prepare_overlays()
         except Exception:
             logging.exception("Background OCR warm-up failed")
+    if platform_support.IS_LINUX:
+        # Before the window: the first run opens a modal welcome dialog, and the
+        # launcher entry should not wait for the user to dismiss it.
+        _install_linux_desktop_entry()
+
     window = DarkThemeApp()
     _main_window_ref = window
-    if platform_support.IS_LINUX:
-        _install_linux_desktop_entry(window)
     # После обновления главное окно всегда показывается: пользователь должен
     # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
     show_after_update = "--show-after-update" in sys.argv

@@ -29,7 +29,7 @@ class DesktopEntryInstallTest(unittest.TestCase):
     def test_entry_is_written_on_first_run(self):
         with mock.patch.object(main.portable_paths, "public_executable_path", return_value="/opt/cnt"):
             with mock.patch.object(linux_desktop, "install_icon") as install_icon:
-                main._install_linux_desktop_entry(object())
+                main._install_linux_desktop_entry()
 
         path = linux_desktop.application_entry_path()
         self.assertTrue(os.path.isfile(path))
@@ -40,9 +40,9 @@ class DesktopEntryInstallTest(unittest.TestCase):
     def test_unchanged_entry_is_not_rewritten(self):
         with mock.patch.object(main.portable_paths, "public_executable_path", return_value="/opt/cnt"):
             with mock.patch.object(linux_desktop, "install_icon"):
-                main._install_linux_desktop_entry(object())
+                main._install_linux_desktop_entry()
                 with mock.patch.object(linux_desktop, "install_desktop_entry") as install:
-                    main._install_linux_desktop_entry(object())
+                    main._install_linux_desktop_entry()
 
         install.assert_not_called()
 
@@ -50,9 +50,9 @@ class DesktopEntryInstallTest(unittest.TestCase):
         """A new AppImage lives at a new path; the launcher must follow it."""
         with mock.patch.object(linux_desktop, "install_icon"):
             with mock.patch.object(main.portable_paths, "public_executable_path", return_value="/opt/old.AppImage"):
-                main._install_linux_desktop_entry(object())
+                main._install_linux_desktop_entry()
             with mock.patch.object(main.portable_paths, "public_executable_path", return_value="/opt/new.AppImage"):
-                main._install_linux_desktop_entry(object())
+                main._install_linux_desktop_entry()
 
         with open(linux_desktop.application_entry_path(), encoding="utf-8") as handle:
             content = handle.read()
@@ -61,7 +61,7 @@ class DesktopEntryInstallTest(unittest.TestCase):
 
     def test_a_failure_never_stops_startup(self):
         with mock.patch.object(main.portable_paths, "public_executable_path", side_effect=OSError("no path")):
-            main._install_linux_desktop_entry(object())  # must not raise
+            main._install_linux_desktop_entry()  # must not raise
 
 
 class IconConversionTest(unittest.TestCase):
@@ -108,6 +108,17 @@ class TrayFallbackTest(unittest.TestCase):
 
         self.assertIn("self.has_tray()", body)
         self.assertIn("self.force_quit = True", body)
+
+
+class StartupOrderTest(unittest.TestCase):
+    def test_desktop_entry_is_installed_before_the_window(self):
+        """The first run opens a modal welcome dialog; the launcher entry must
+        not wait for the user to dismiss it."""
+        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        install_at = source.index("_install_linux_desktop_entry()")
+        window_at = source.index("window = DarkThemeApp()")
+
+        self.assertLess(install_at, window_at)
 
 
 if __name__ == "__main__":

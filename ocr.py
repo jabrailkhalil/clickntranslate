@@ -1972,7 +1972,11 @@ def _get_windows_ocr_engine(lang_tag: str):
     
     if not _WINRT_AVAILABLE:
         debug_log(f"FAILED: WinRT not available. Error was: {_WINRT_ERROR}")
-        logging.error("WinRT modules are not available")
+        if platform_support.supports_windows_ocr():
+            logging.error("WinRT modules are not available")
+        else:
+            # WinRT is a Windows API; its absence elsewhere is normal, not a fault.
+            logging.debug("WinRT is not available on this platform; another OCR engine is used")
         return None
     
     try:
@@ -2079,7 +2083,11 @@ def _get_universal_ocr_engine():
     
     if not _WINRT_AVAILABLE:
         debug_log(f"FAILED: WinRT not available. Error was: {_WINRT_ERROR}")
-        logging.error("WinRT modules are not available")
+        if platform_support.supports_windows_ocr():
+            logging.error("WinRT modules are not available")
+        else:
+            # WinRT is a Windows API; its absence elsewhere is normal, not a fault.
+            logging.debug("WinRT is not available on this platform; another OCR engine is used")
         return None
     
     try:

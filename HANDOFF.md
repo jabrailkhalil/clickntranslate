@@ -840,7 +840,7 @@ Porting surfaced three defects that were not Linux-specific. All three are cover
   instance keeps running.
 * Tesseract 4.1.1 is found on `PATH`, and `--list-langs` reports `eng`/`osd`/`rus`, which the
   app maps to `en`/`ru`.
-* **The full test suite passes on both systems**: Linux 369 passed / 29 skipped, Windows 387
+* **The full test suite passes on both systems**: Linux 370 passed / 29 skipped, Windows 388
   passed / 11 skipped. The skips are the mechanism that does not exist on that system (AF_UNIX
   sockets and the XDG entries on Windows; the Windows OCR tab, Startup shortcut, MSIX layout and
   UAC elevation on Linux).
@@ -889,6 +889,24 @@ whether it is actually usable on a Linux desktop:
   awareness has no Linux equivalent, so Qt scaling is enabled explicitly before the
   QApplication exists, `setDesktopFileName` ties the window to its `.desktop` entry, and the
   entry is installed on first run and rewritten whenever the executable moves (a new AppImage).
+
+### 13.3d Two things the headless verification got wrong at first
+
+Worth knowing, because both made a broken check look green:
+
+1. **The first run blocks on a modal dialog.** `DarkThemeApp.__init__` shows `WelcomeDialog`
+   with `exec_()` when `show_update_info` is true, so a headless run sits there forever with
+   nobody to click it. The IPC thread keeps answering commands from that state, so
+   `clickntranslate --ocr` returned 0 while nothing happened behind it — the socket replied,
+   but `_main_window_ref` was still None. Verify past the first run by seeding
+   `show_update_info: false`, which is the state the app spends its life in.
+   The desktop entry install was moved ahead of the window for the same reason.
+2. **Widgets were being created off the GUI thread.** The startup warm-up thread called
+   `prepare_overlay()` for all three modes, which constructs QWidgets. Windows tolerates it;
+   X11 printed `QBasicTimer::start: QBasicTimer can only be used with threads started with
+   QThread` and would eventually misbehave. On Linux the creation now hops back to the GUI
+   thread through the same dispatcher the shortcut commands use. Windows keeps its shipped
+   behaviour.
 
 ### 13.4 Not verified — needs a real desktop session
 

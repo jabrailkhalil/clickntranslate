@@ -177,12 +177,23 @@ Checked in Ubuntu 22.04 (WSL2, headless):
 * **the AppImage runs** (157 MB): it starts, keeps its data in
   `~/.local/share/clickntranslate` because the AppImage mount is read-only, and
   accepts a shortcut command from a second launch,
-* the test suite passes: 369 passed, 29 skipped on Linux; 387 passed,
+* the test suite passes: 370 passed, 29 skipped on Linux; 388 passed,
   11 skipped on Windows.
 
-Not yet verified, because it needs a real desktop session: screen capture on
-X11 and Wayland, the selection overlays, the tray icon, and the desktop
-shortcut bindings.
+Past the first run (the welcome dialog is modal and needs a person to dismiss
+it), a headless run also shows:
+
+* the `.desktop` entry and the converted PNG icon appearing in
+  `~/.local/share`, with `Exec` pointing at the running executable,
+* all three capture overlays constructed on the GUI thread — Qt only allows
+  widgets there, and X11 complains where Windows silently tolerated it,
+* `clickntranslate --translate` from a second launch logging
+  "Shortcut command received: translate" in the running instance, which then
+  opens the overlay.
+
+Not yet verified, because it needs a real desktop session: the actual pixels of
+a screen grab on X11 and Wayland, the tray icon, and the desktop shortcut
+bindings.
 
 On GNOME the tray icon needs the AppIndicator extension — the same requirement
 NormCap documents.
