@@ -115,11 +115,11 @@ your clipboard.
   it is not offered here. Put a llama.cpp runner (`llama-cli`, `llama-run`,
   `hymt` or `main`) together with the GGUF model in `translators/hymt` and the
   engine works exactly as on Windows.
-* **EasyOCR / RapidOCR** — installed at runtime with pip and then imported by
-  the frozen worker, so they need a `python3` of the same version this build
-  was made with. The app looks for the versioned interpreter first
-  (`python3.12` before `python3`) and names the package to install if it is
-  missing.
+* **RapidOCR** — bundled into the `OcrWorker`, so it needs nothing installed.
+* **EasyOCR** — installed at runtime with pip and then imported by the frozen
+  worker, so it needs a `python3` of the same version this build was made with.
+  The app looks for the versioned interpreter first (`python3.12` before
+  `python3`) and names the package to install if it is missing.
 
 ### Display scaling and the launcher icon
 
