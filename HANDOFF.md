@@ -775,3 +775,102 @@ Worth doing but not required:
 
 Side effect of the OCR investigation: this machine gained Spanish, French and Italian Windows OCR
 languages. Remove them from Settings → Language packages → Windows OCR if unwanted.
+
+---
+
+## 13. The Linux port (in progress)
+
+Started after 1.5.5. **Windows behaviour is unchanged** — every Windows path still runs the same
+code, and the Windows suite stays green (344 passed, 10 skipped; the skips are the AF_UNIX socket
+tests, which only apply to Linux).
+
+### 13.1 Design decisions and why
+
+These follow what the closest comparable Linux apps do, not invention:
+
+| Decision | Rationale |
+| --- | --- |
+| **No in-app global hotkeys.** The user binds `clickntranslate --ocr` etc. in their desktop settings | X11 grabs collide with the desktop and Wayland forbids them. NormCap has an ADR for exactly this; Flameshot asks users to bind `flameshot gui` |
+| **Capture via xdg-desktop-portal on Wayland**, Qt on X11, with `grim`/`gnome-screenshot`/`spectacle` fallbacks | Flameshot ≥12 and NormCap both use the portal; the helpers cover compositors whose portal is missing |
+| **AppImage + tarball**, Flatpak deferred | NormCap now prefers Flatpak, but it has no runtime-installed engines. Ours pip-installs EasyOCR/RapidOCR through a *system* Python and downloads Argos models — a Flatpak sandbox breaks both |
+| **No self-update**, only a version check | The updater is C#/WinForms + Inno + exe replacement. Linux packages are updated by whatever installed them |
+
+### 13.2 New modules
+
+* `platform_support.py` — the only place that asks which OS this is. XDG dirs, executable
+  suffixes, `no_window_kwargs()` (the STARTUPINFO/CREATE_NO_WINDOW pair), which OCR engines
+  exist, `supports_in_app_update()`.
+* `single_instance.py` — AF_UNIX socket in `$XDG_RUNTIME_DIR`, `0600`. Second launches send a
+  command and exit; the running instance dispatches it through the existing hotkey dispatcher,
+  so the UI thread handling is identical to Windows. Reclaims a socket left by a crash.
+* `linux_capture.py` — portal → helper → clear error, and crops a whole-desktop grab to the
+  requested screen.
+* `linux_desktop.py` — `.desktop` entries (with right-click actions for the capture commands),
+  hicolor icon install, autostart in `~/.config/autostart`.
+* `ClicknTranslate-linux.spec`, `requirements-linux.txt`, `tools/setup_linux_env.sh`,
+  `tools/build_linux_release.sh`, `docs/LINUX.md`.
+
+`ocr.py` gained `grab_screen_pixmap()`; all four `grabWindow` call sites now go through it.
+
+### 13.2b Behaviour fixes that also apply to Windows
+
+Porting surfaced three defects that were not Linux-specific. All three are covered by tests:
+
+1. **Tesseract languages now come from `tesseract --list-langs`**, with the old directory scan
+   kept as a fallback. The scan only looked next to the binary, which is right for the portable
+   Windows install but finds nothing for a distribution package
+   (`/usr/share/tesseract-ocr/4.00/tessdata`).
+2. **`ocr.usable_ocr_engine()`** maps a configured engine that does not exist on this platform
+   onto the platform default, and logs it. Without it a `config.json` written on Windows sent
+   the Linux app down the WinRT path and it reported a missing engine.
+3. **A saved OCR language that is not installed no longer leaves the selector unselected.**
+   The overlay fell through to a modal "install a language pack" dialog with `currentData()`
+   returning `None`; it now falls back to the first installed language. This is also what made
+   the headless test run hang — a modal dialog with nobody to click it.
+
+### 13.3 Verified in Ubuntu 22.04 (WSL2, headless)
+
+* **The packaged `ArgosWorker` translates offline** — ru→en returned "Hello, world! How are you
+  today?" with no torch and no onnxruntime in the bundle. The stanza/minisbd stubs and the
+  in-house sentence splitter are platform-independent, so the 1.5.x Argos fix ports as is.
+* The PyInstaller Linux build produces all three executables (465 MB onedir).
+* The GUI binary starts, writes its portable `data/config.json` next to the binary, and creates
+  the command socket.
+* A second launch with `--ocr` / `--translate` delivers the command and exits 0 while the first
+  instance keeps running.
+* Tesseract 4.1.1 is found on `PATH`, and `--list-langs` reports `eng`/`osd`/`rus`, which the
+  app maps to `en`/`ru`.
+* **The full test suite passes on both systems**: Linux 340 passed / 27 skipped, Windows 357
+  passed / 10 skipped. The skips are the mechanism that does not exist on that system (AF_UNIX
+  sockets and the XDG entries on Windows; the Windows OCR tab, Startup shortcut, MSIX layout and
+  UAC elevation on Linux).
+
+### 13.3b Artifacts
+
+`tools/build_linux_release.sh` produces both, and both were built and smoke-tested:
+
+| Artifact | Size |
+| --- | --- |
+| `Click-n-Translate-1.5.5-linux-x86_64.AppImage` | 157 MB |
+| `Click-n-Translate-1.5.5-linux-x86_64.tar.gz` | 156 MB |
+
+The AppImage starts, keeps its data in `~/.local/share/clickntranslate` (its own mount is
+read-only, which `portable_paths._linux_portable_base_dir` detects), and answers shortcut
+commands. The tarball keeps the Windows-style portable layout: data sits next to the binary.
+
+Updates are check-only off Windows: `check_for_updates` announces the version and opens the
+release page rather than replacing the running app, because the C#/WinForms updater helpers do
+not exist here.
+
+### 13.4 Not verified — needs a real desktop session
+
+Screen capture on X11 and Wayland, the selection overlay, the tray icon, and the desktop
+shortcut bindings. WSL2 on Windows 10 has no WSLg, so there is no display to test against.
+The Wayland portal path in particular is written against the spec and reviewed, not run.
+
+### 13.5 Build environment note
+
+`.venv312` is required for **Windows** releases (`EASYOCR_PYTHON_VERSION`). The Linux spec does
+not enforce a version yet — the WSL environment is Python 3.10. Before shipping a Linux build
+that must support runtime EasyOCR/RapidOCR installs, decide which interpreter the Linux engine
+installer targets and add the same guard to `ClicknTranslate-linux.spec`.

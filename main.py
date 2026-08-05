@@ -11,6 +11,7 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", category=UserWarning, module=r"pkg_resources")
 import subprocess
+import shutil
 import ctypes
 import asyncio
 import threading
@@ -96,6 +97,7 @@ from styled_dialogs import (
 QMessageBox = StyledMessageBox
 from settings_window import SettingsWindow, TesseractInstallProgressDialog
 from app_version import APP_VERSION
+import platform_support
 import portable_paths
 from document_parser import DocumentParseError, format_file_size, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
@@ -143,7 +145,7 @@ DEFAULT_CONFIG = {
     "show_update_info": True,  # Показывать Welcome окно при первом запуске
     "first_run_guide_completed": False,
     "first_run_guide_pending": False,
-    "ocr_engine": "Windows",
+    "ocr_engine": platform_support.default_ocr_engine(),
     "translator_engine": "Google",
     "allow_online_provider_fallback": False,
     "copy_history": False,
@@ -4722,22 +4724,30 @@ class DarkThemeApp(QMainWindow):
         except Exception:
             pass
 
-        # Слушатели для горячих клавиш копирования и перевода (значения берутся из настроек)
-        copy_hotkey = self.config.get("copy_hotkey", "")
+        # Слушатели для горячих клавиш копирования и перевода (значения берутся из настроек).
+        # На Linux глобальные хоткеи не регистрируются: X11-захват конфликтует с
+        # рабочим столом, а Wayland их вовсе запрещает. Пользователь назначает
+        # команды (clickntranslate --ocr и т.д.) в настройках своей среды —
+        # см. single_instance.py.
+        copy_hotkey = "" if platform_support.IS_LINUX else self.config.get("copy_hotkey", "")
         if copy_hotkey:
             self.copy_hotkey_thread = HotkeyListenerThread(copy_hotkey, self.launch_copy, hotkey_id=1)
             self.copy_hotkey_thread.start()
-        translate_hotkey = self.config.get("translate_hotkey", "")
+        translate_hotkey = "" if platform_support.IS_LINUX else self.config.get("translate_hotkey", "")
         if translate_hotkey:
             self.translate_hotkey_thread = HotkeyListenerThread(translate_hotkey, self.launch_translate, hotkey_id=2)
             self.translate_hotkey_thread.start()
 
-        fullscreen_translate_hotkey = self.config.get("fullscreen_translate_hotkey", "")
+        fullscreen_translate_hotkey = (
+            "" if platform_support.IS_LINUX else self.config.get("fullscreen_translate_hotkey", "")
+        )
         if fullscreen_translate_hotkey:
             self.fullscreen_translate_hotkey_thread = HotkeyListenerThread(fullscreen_translate_hotkey, self.launch_fullscreen_translate, hotkey_id=3)
             self.fullscreen_translate_hotkey_thread.start()
 
-        translate_selection_hotkey = self.config.get("translate_selection_hotkey", "")
+        translate_selection_hotkey = (
+            "" if platform_support.IS_LINUX else self.config.get("translate_selection_hotkey", "")
+        )
         if translate_selection_hotkey:
             self.translate_selection_hotkey_thread = HotkeyListenerThread(translate_selection_hotkey, self.launch_translate_selection, hotkey_id=4)
             self.translate_selection_hotkey_thread.start()
@@ -4943,6 +4953,21 @@ class DarkThemeApp(QMainWindow):
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
+        if platform_support.IS_LINUX:
+            import linux_desktop
+
+            enabled = linux_desktop.autostart_enabled()
+            if not enabled and repair_stale and self.config.get("autostart"):
+                # The entry points at a path that moved (a new AppImage, say);
+                # rewrite it for the current executable.
+                enabled = linux_desktop.set_autostart(
+                    True, portable_paths.public_executable_path()
+                )
+            self.autostart = enabled
+            self.config["autostart"] = enabled
+            self.config["autostart_backend"] = "xdg_autostart"
+            return enabled
+
         if portable_paths.is_windows_packaged():
             enabled = _read_store_autostart_state()
             self.autostart = enabled
@@ -4972,6 +4997,16 @@ class DarkThemeApp(QMainWindow):
 
     def set_autostart(self, enable: bool):
         try:
+            if platform_support.IS_LINUX:
+                import linux_desktop
+
+                actual = linux_desktop.set_autostart(
+                    bool(enable), portable_paths.public_executable_path()
+                )
+                self.autostart = bool(actual)
+                self.config["autostart"] = self.autostart
+                self.config["autostart_backend"] = "xdg_autostart"
+                return self.autostart
             if portable_paths.is_windows_packaged():
                 actual = _write_store_autostart_state(bool(enable))
                 self.autostart = bool(actual)
@@ -5453,6 +5488,29 @@ class DarkThemeApp(QMainWindow):
             # В режиме разработки запускаем python-скрипт
             subprocess.Popen([sys.executable, script_or_exe, *args])
 
+    def handle_shortcut_command(self, command):
+        """Run a command sent by a desktop shortcut through the command socket.
+
+        Linux has no in-app global hotkeys (see single_instance.py), so the user
+        binds `clickntranslate --ocr` and friends in their desktop environment.
+        The command arrives on the socket thread and is handed to the UI thread
+        through the same dispatcher the Windows hotkey listeners use.
+        """
+        actions = {
+            "show": lambda: _show_running_instance(),
+            "ocr": self.launch_ocr,
+            "copy": self.launch_copy,
+            "translate": self.launch_translate,
+            "fullscreen": self.launch_fullscreen_translate,
+            "selection": self.launch_translate_selection,
+        }
+        callback = actions.get(str(command or "").strip())
+        if callback is None:
+            logging.warning(f"Ignoring unknown shortcut command: {command!r}")
+            return
+        logging.info(f"Shortcut command received: {command}")
+        hotkey_dispatcher.triggered.emit(callback)
+
     def launch_ocr(self):
         print("launch_ocr called")
         if hasattr(self, "source_lang"):
@@ -5559,6 +5617,30 @@ class DarkThemeApp(QMainWindow):
     def _on_hide_status(self):
         self._status_label.hide()
 
+    def _read_primary_selection(self):
+        """Text currently highlighted anywhere on a Linux desktop.
+
+        Qt reads the PRIMARY selection directly; `xclip`/`xsel` are only used
+        when Qt returns nothing, which happens for XWayland clients.
+        """
+        try:
+            clipboard = QApplication.clipboard()
+            text = clipboard.text(clipboard.Selection)
+            if text and text.strip():
+                return text
+        except Exception:
+            pass
+        for command in (["xclip", "-o", "-selection", "primary"], ["xsel", "-p"]):
+            if not shutil.which(command[0]):
+                continue
+            try:
+                completed = subprocess.run(command, capture_output=True, text=True, timeout=3)
+                if completed.returncode == 0 and completed.stdout.strip():
+                    return completed.stdout
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+        return ""
+
     def launch_translate_selection(self):
         """Translate currently selected text: simulate Ctrl+C, read clipboard, translate, show dialog."""
         print("launch_translate_selection called")
@@ -5567,19 +5649,29 @@ class DarkThemeApp(QMainWindow):
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
             try:
-                # Release all modifier keys first
-                KEYEVENTF_KEYUP = 0x0002
-                for vk in (0x11, 0x12, 0x10, 0x5B, 0x5C):
-                    ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
-                time.sleep(0.35)
-                # Clear clipboard, then Ctrl+C to capture selection
-                pyperclip.copy("")
-                simulate_copy()
-                time.sleep(0.25)
-                text = pyperclip.paste()
+                if platform_support.IS_LINUX:
+                    # X11 and Wayland keep the highlighted text in the PRIMARY
+                    # selection, so it can be read directly — no key simulation,
+                    # and nothing is written to the user's clipboard.
+                    text = self._read_primary_selection()
+                else:
+                    # Release all modifier keys first
+                    KEYEVENTF_KEYUP = 0x0002
+                    for vk in (0x11, 0x12, 0x10, 0x5B, 0x5C):
+                        ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+                    time.sleep(0.35)
+                    # Clear clipboard, then Ctrl+C to capture selection
+                    pyperclip.copy("")
+                    simulate_copy()
+                    time.sleep(0.25)
+                    text = pyperclip.paste()
                 if not text or not text.strip():
                     time.sleep(0.3)
-                    text = pyperclip.paste()
+                    text = (
+                        self._read_primary_selection()
+                        if platform_support.IS_LINUX
+                        else pyperclip.paste()
+                    )
                 if not text or not text.strip():
                     lang = self.config.get("interface_language", "ru")
                     no_text = ui_text(lang, "no_text_selected")
@@ -5624,6 +5716,8 @@ class DarkThemeApp(QMainWindow):
             print(f"Error showing translation dialog: {e}")
 
     def restart_hotkey_listener(self):
+        if platform_support.IS_LINUX:
+            return  # shortcuts are bound in the desktop environment, not here
         self.hotkey_thread = HotkeyListenerThread(self.config.get("ocr_hotkeys", "Ctrl+O"), self.launch_ocr)
         self.hotkey_thread.start()
 
@@ -6192,7 +6286,7 @@ class DarkThemeApp(QMainWindow):
         # Получаем конфиг один раз для всей функции
         cached_config = get_cached_config()
         translator_engine = cached_config.get("translator_engine", "Google").lower()
-        ocr_engine = cached_config.get("ocr_engine", "Windows")
+        ocr_engine = cached_config.get("ocr_engine", platform_support.default_ocr_engine())
         
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignCenter)
@@ -6857,6 +6951,38 @@ if __name__ == "__main__":
         run_screen_capture(mode="ocr" if mode_arg == "ocr" else mode_arg)
         sys.exit(0)
 
+    # --- Linux: команды рабочего стола вместо глобальных хоткеев ------------
+    # Пользователь назначает `clickntranslate --ocr` (и т.д.) в настройках своей
+    # среды; такой запуск передаёт команду уже работающему экземпляру.
+    _requested_shortcut_action = ""
+    for _argument in sys.argv[1:]:
+        _candidate = _argument[2:] if _argument.startswith("--") else ""
+        if _candidate in platform_support.SHORTCUT_ACTIONS:
+            _requested_shortcut_action = _candidate
+            break
+
+    _command_server = None
+    if platform_support.IS_LINUX:
+        import single_instance
+
+        if single_instance.send_command(_requested_shortcut_action or "show"):
+            sys.exit(0)  # уже запущен: команда доставлена
+
+        def _dispatch_shortcut_command(command):
+            window = _main_window_ref
+            if window is None:
+                return
+            try:
+                window.handle_shortcut_command(command)
+            except Exception:
+                logging.exception(f"Shortcut command failed: {command}")
+
+        _command_server = single_instance.CommandServer(_dispatch_shortcut_command)
+        if not _command_server.bind():
+            # Сокет занят живым экземпляром, который не ответил на команду.
+            sys.exit(0)
+        _command_server.start()
+
     # Single instance через Windows mutex
     def is_already_running():
         """Проверить через mutex, запущен ли уже экземпляр программы."""
@@ -6967,9 +7093,20 @@ if __name__ == "__main__":
             except Exception:
                 pass
         break
+    # Первый запуск из ярлыка рабочего стола: экземпляра ещё не было, поэтому
+    # действие выполняем сами, как только окно готово.
+    if _requested_shortcut_action:
+        QTimer.singleShot(
+            0, lambda: window.handle_shortcut_command(_requested_shortcut_action)
+        )
+
     threading.Thread(
         target=_warm_up_after_window_is_visible,
         name="ClicknTranslateStartupWarmup",
         daemon=True,
     ).start()
-    app.exec_()
+    try:
+        app.exec_()
+    finally:
+        if _command_server is not None:
+            _command_server.stop()

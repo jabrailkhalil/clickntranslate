@@ -15,21 +15,24 @@ from PIL import Image  # noqa: E402
 
 import ocr  # noqa: E402
 import ocr_worker  # noqa: E402
+import platform_support  # noqa: E402
 
 
 class NativeOcrWorkerProtocolTest(unittest.TestCase):
     def test_frozen_worker_is_loaded_from_internal_folder_with_legacy_fallback(self):
+        # The helper carries a .exe suffix on Windows and none elsewhere.
+        app_dir = os.path.abspath(os.sep + "Apps")
+        expected = os.path.join(app_dir, "_internal", platform_support.executable_name("OcrWorker"))
+        app_executable = os.path.join(app_dir, platform_support.executable_name("ClicknTranslate"))
+
         with mock.patch.object(ocr.sys, "frozen", True, create=True):
-            with mock.patch.object(ocr.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
+            with mock.patch.object(ocr.sys, "executable", app_executable):
                 with mock.patch.object(
                     ocr.os.path,
                     "isfile",
-                    side_effect=lambda path: path.endswith(r"_internal\OcrWorker.exe"),
+                    side_effect=lambda path: path == expected,
                 ):
-                    self.assertEqual(
-                        ocr._native_ocr_worker_command(),
-                        [r"C:\Apps\_internal\OcrWorker.exe"],
-                    )
+                    self.assertEqual(ocr._native_ocr_worker_command(), [expected])
 
     def test_request_uses_png_files_and_cleans_temporary_directory(self):
         captured = {}

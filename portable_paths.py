@@ -1,6 +1,8 @@
 import os
 import sys
 
+import platform_support
+
 
 APPMODEL_ERROR_NO_PACKAGE = 15700
 ERROR_INSUFFICIENT_BUFFER = 122
@@ -11,6 +13,36 @@ PACKAGE_FAMILY_ENV = "CLICKNTRANSLATE_PACKAGE_FAMILY"
 PUBLIC_EXE_NAME = "ClicknTranslate.exe"
 APP_DIR_NAME = "app"
 INTERNAL_DIR_NAME = "_internal"
+
+#: Linux keeps user data under XDG instead of next to the binary, because the
+#: AppImage runtime is a read-only mount and system installs are not writable.
+LINUX_DATA_DIR_NAME = "clickntranslate"
+
+
+def linux_user_data_dir():
+    return os.path.join(platform_support.xdg_data_home(), LINUX_DATA_DIR_NAME)
+
+
+def _is_writable_dir(path):
+    return bool(path) and os.path.isdir(path) and os.access(path, os.W_OK)
+
+
+def _linux_portable_base_dir():
+    """Where the Linux build keeps config, caches and downloaded models.
+
+    A tarball extracted into a writable folder stays portable — data lives next
+    to the binary, exactly like the Windows build. An AppImage or a system-wide
+    install falls back to the XDG data directory.
+    """
+    if platform_support.is_appimage():
+        return linux_user_data_dir()
+    if getattr(sys, "frozen", False):
+        if is_internal_worker_layout():
+            root = _internal_worker_portable_root()
+        else:
+            root = frozen_executable_dir()
+        return root if _is_writable_dir(root) else linux_user_data_dir()
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
 
 
 def frozen_executable_dir():
@@ -92,6 +124,8 @@ def _internal_worker_portable_root():
 
 
 def portable_base_dir():
+    if platform_support.IS_LINUX:
+        return _linux_portable_base_dir()
     if is_windows_packaged():
         return packaged_data_dir()
     if getattr(sys, "frozen", False):
@@ -104,6 +138,19 @@ def portable_base_dir():
 
 
 def public_executable_path():
+    """Path a shortcut or autostart entry should launch."""
+    if platform_support.IS_LINUX:
+        appimage = platform_support.appimage_path()
+        if appimage:
+            return os.path.abspath(appimage)
+        if getattr(sys, "frozen", False):
+            if is_internal_worker_layout():
+                launcher = os.path.join(
+                    _internal_worker_portable_root(), platform_support.LINUX_BINARY_NAME
+                )
+                return os.path.abspath(launcher if os.path.isfile(launcher) else sys.executable)
+            return os.path.abspath(sys.executable)
+        return os.path.abspath(sys.argv[0])
     if getattr(sys, "frozen", False):
         if is_internal_worker_layout():
             root = _internal_worker_portable_root()

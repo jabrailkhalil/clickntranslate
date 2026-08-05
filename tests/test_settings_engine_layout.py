@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import platform_support  # noqa: E402
 from PyQt5.QtCore import QPoint, Qt  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QComboBox, QStyle, QStyleOptionComboBox, QWidget  # noqa: E402
 
@@ -63,7 +64,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             if ocr_combo.itemData(index)
         ]
         self.assertEqual(ocr_values[:2], ["Tesseract", "EasyOCR"])
-        self.assertEqual(ocr_values[2:], ["Windows", "RapidOCR"])
+        expected_tail = ["Windows", "RapidOCR"] if platform_support.supports_windows_ocr() else ["RapidOCR"]
+        self.assertEqual(ocr_values[2:], expected_tail)
         tesseract_index = ocr_combo.findData("Tesseract")
         self.assertIn("classic OCR", ocr_combo.itemData(tesseract_index, Qt.ToolTipRole))
 
@@ -98,7 +100,10 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertEqual(settings._current_translator_engine_from_combo(), "argos")
             self.assertEqual(settings.ocr_engine_combo.itemText(0).strip(), "Offline")
             self.assertFalse(settings.ocr_engine_combo.model().item(0).isEnabled())
-            self.assertGreater(settings.ocr_engine_combo.findData("Windows"), 0)
+            if platform_support.supports_windows_ocr():
+                self.assertGreater(settings.ocr_engine_combo.findData("Windows"), 0)
+            else:
+                self.assertEqual(settings.ocr_engine_combo.findData("Windows"), -1)
 
             ocr_label = self._rect_in_settings(settings, settings.ocr_engine_label)
             ocr_combo = self._rect_in_settings(settings, settings.ocr_engine_combo)

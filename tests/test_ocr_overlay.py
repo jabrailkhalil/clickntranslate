@@ -12,12 +12,29 @@ from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtWidgets import QApplication
 
 import ocr
+import platform_support
 
 
 class TestScreenCaptureOverlayWindowing(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        # An overlay whose language combo has no entries shows a modal "install a
+        # language pack" dialog, which blocks a headless run forever. That is the
+        # right behaviour for a user, but these tests are about the overlay
+        # itself, so a machine (or a leftover config) without installed OCR
+        # languages gets a deterministic pair instead.
+        # Patching the Tesseract lookup rather than installed_ocr_language_codes
+        # keeps the EasyOCR/RapidOCR filter tests running against the real thing.
+        self._language_patch = None
+        if not ocr.installed_ocr_language_codes():
+            self._language_patch = mock.patch.object(
+                ocr, "_tesseract_installed_language_codes", return_value=["en", "ru"]
+            )
+            self._language_patch.start()
+            self.addCleanup(self._language_patch.stop)
 
     def test_overlay_is_tool_topmost_and_frameless(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
@@ -833,6 +850,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             ocr._score_ocr_text_for_language("Hello world", "ru"),
         )
 
+    @unittest.skipUnless(platform_support.supports_windows_ocr(), "Windows OCR only exists on Windows")
     def test_windows_language_filter_returns_only_installed_recognizers(self):
         with mock.patch.object(
             ocr,
@@ -844,6 +862,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 ["en", "zh"],
             )
 
+    @unittest.skipUnless(platform_support.supports_windows_ocr(), "Windows OCR only exists on Windows")
     def test_windows_engine_uses_exact_installed_chinese_tag(self):
         created_tags = []
 
@@ -916,11 +935,11 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
 
     def test_frozen_build_exposes_rapidocr_bundled_in_worker(self):
         with tempfile.TemporaryDirectory() as root:
-            app_exe = Path(root, "ClicknTranslate.exe")
+            app_exe = Path(root, platform_support.executable_name("ClicknTranslate"))
             app_exe.write_bytes(b"app")
             internal = Path(root, "_internal")
             internal.mkdir()
-            internal.joinpath("OcrWorker.exe").write_bytes(b"worker")
+            internal.joinpath(platform_support.executable_name("OcrWorker")).write_bytes(b"worker")
             with mock.patch.object(ocr.sys, "frozen", True, create=True):
                 with mock.patch.object(ocr.sys, "executable", str(app_exe)):
                     self.assertEqual(

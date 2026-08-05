@@ -14,6 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt5.QtWidgets import QApplication
 
 import ocr
+import platform_support
 import portable_paths
 import settings_window as sw
 import translater
@@ -51,6 +52,10 @@ class TestConfigCacheInvalidation(unittest.TestCase):
         self.assertEqual(called, [True])
 
 
+# These cover the Windows install layouts: the launcher executable beside the
+# app folder, the _internal helper folder and the MSIX package data directory.
+# The Linux layout is covered by test_platform_support.LinuxPortableBaseDirTest.
+@unittest.skipUnless(platform_support.IS_WINDOWS, "Windows portable/MSIX layouts")
 class TestPortableLayoutHelpers(unittest.TestCase):
     def test_launcher_layout_uses_parent_as_portable_base(self):
         temp_dir = tempfile.mkdtemp(prefix="cnt_portable_layout_")
@@ -579,6 +584,7 @@ class TestUpdaterCommands(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("packaged app", err)
 
+    @unittest.skipUnless(platform_support.IS_WINDOWS, "UAC elevation is a Windows concept")
     def test_install_dir_permission_probe_requests_elevation_on_access_denied(self):
         with tempfile.TemporaryDirectory(prefix="updater_permission_probe_") as app_dir:
             with mock.patch("settings_window.os.open", side_effect=PermissionError(13, "denied")):

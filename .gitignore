@@ -13,6 +13,7 @@ releases/
 build.py
 *.spec
 !ClicknTranslate.spec
+!ClicknTranslate-linux.spec
 
 # Virtual environments
 venv/
@@ -84,3 +85,5 @@ data/**/*.log
 # how tools/build_apply_updater.ps1 came to be missing from the repo even though
 # tools/stage_release.ps1 requires it, which broke release staging outright.
 !tools/*.ps1
+# The Linux build scripts are covered by the same rule.
+!tools/*.sh

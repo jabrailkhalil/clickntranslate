@@ -10,6 +10,7 @@ import time
 import types
 import zipfile
 from languages import language_english_name, translator_api_code
+import platform_support
 import portable_paths
 
 # Optional Argos Translate (offline). main.py preloads its native runtime before
@@ -193,9 +194,10 @@ def _argos_worker_path():
     if not getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
         return ""
     executable_dir = os.path.dirname(sys.executable)
+    worker_name = platform_support.executable_name("ArgosWorker")
     for path in (
-        os.path.join(executable_dir, "_internal", "ArgosWorker.exe"),
-        os.path.join(executable_dir, "ArgosWorker.exe"),
+        os.path.join(executable_dir, "_internal", worker_name),
+        os.path.join(executable_dir, worker_name),
     ):
         if os.path.isfile(path):
             return path

@@ -34,6 +34,7 @@ from styled_dialogs import StyledMessageBox, TOOLTIP_QSS, tooltip_text
 
 QMessageBox = StyledMessageBox
 from app_version import APP_VERSION
+import platform_support
 import portable_paths
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -330,7 +331,11 @@ def _populate_grouped_ocr_combo(
     combo.addItem(f"  {groups['offline']}", None)
     _configure_engine_group_header(combo, 0, foreground)
     installed = {str(engine).lower() for engine in (installed_engines or ())}
+    # The WinRT engine only exists on Windows; other systems start at Tesseract,
+    # which their distribution packages.
     engines = ("Windows", "Tesseract", "RapidOCR", "EasyOCR")
+    if not platform_support.supports_windows_ocr():
+        engines = tuple(engine for engine in engines if engine.lower() != "windows")
     engines = [
         engine
         for _index, engine in sorted(
@@ -2340,17 +2345,20 @@ class OcrLanguageManagerDialog(QDialog):
             QtCore.QTimer.singleShot(0, self._center_on_owner)
 
     def _build_tabs(self):
-        self.windows_table = self._add_engine_tab(
-            self.ocr_tabs,
-            "Windows",
-            language_manager_text(self.lang, "windows_note"),
-            self._populate_windows_table,
-            [
-                (language_manager_text(self.lang, "install_selected"), self._install_selected_windows),
-                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_windows),
-                (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings),
-            ],
-        )
+        # The Windows OCR tab drives Windows Features on Demand through elevated
+        # PowerShell; there is no such engine or mechanism on other systems.
+        if platform_support.supports_windows_ocr():
+            self.windows_table = self._add_engine_tab(
+                self.ocr_tabs,
+                "Windows",
+                language_manager_text(self.lang, "windows_note"),
+                self._populate_windows_table,
+                [
+                    (language_manager_text(self.lang, "install_selected"), self._install_selected_windows),
+                    (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_windows),
+                    (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings),
+                ],
+            )
         self.tesseract_table = self._add_engine_tab(
             self.ocr_tabs,
             "Tesseract",
@@ -2573,7 +2581,8 @@ class OcrLanguageManagerDialog(QDialog):
             )
 
     def refresh_all(self):
-        self._populate_windows_table(self.windows_table)
+        if self.windows_table is not None:
+            self._populate_windows_table(self.windows_table)
         self._populate_tesseract_table(self.tesseract_table)
         self._populate_easyocr_table(self.easyocr_table)
         self._populate_rapidocr_table(self.rapidocr_table)
@@ -4828,7 +4837,7 @@ class SettingsWindow(QWidget):
         engine_group_color = (
             "#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124"
         )
-        installed_ocr_engines = {"Windows"}
+        installed_ocr_engines = {"Windows"} if platform_support.supports_windows_ocr() else set()
         if self._find_available_tesseract_exe():
             installed_ocr_engines.add("Tesseract")
         if self._rapidocr_runtime_installed():
@@ -4841,12 +4850,13 @@ class SettingsWindow(QWidget):
             engine_group_color,
             installed_engines=installed_ocr_engines,
         )
-        current_engine = self.parent.config.get("ocr_engine", "Windows")
+        default_engine = platform_support.default_ocr_engine()
+        current_engine = self.parent.config.get("ocr_engine", default_engine)
         idx = self.ocr_engine_combo.findText(current_engine, Qt.MatchFixedString)
         if idx >= 0:
             self.ocr_engine_combo.setCurrentIndex(idx)
         else:
-            fallback_index = self.ocr_engine_combo.findData("Windows")
+            fallback_index = self.ocr_engine_combo.findData(default_engine)
             self.ocr_engine_combo.setCurrentIndex(max(0, fallback_index))
 
         self.ocr_engine_combo.currentTextChanged.connect(self.handle_ocr_engine_change)
@@ -6403,6 +6413,23 @@ class SettingsWindow(QWidget):
                 webbrowser.open(GITHUB_RELEASES_PAGE)
             return
 
+        if status == "ready" and not platform_support.supports_in_app_update():
+            # Only the Windows build ships the helpers that replace the running
+            # app. Elsewhere the new version is announced and the user updates
+            # through whatever installed it (a new AppImage, their package
+            # manager), which is what Linux desktop apps do.
+            msg = QMessageBox(self)
+            msg.setWindowTitle(update_text(lang, "available_title"))
+            msg.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            open_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
+            msg.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
+            msg.exec_()
+            if msg.clickedButton() == open_btn:
+                webbrowser.open(GITHUB_RELEASES_PAGE)
+            return
+
         if status == "ready":
             asset_name = payload.get("asset_name") or f"ClicknTranslate-v{latest_version}.zip"
             asset_url = payload.get("asset_url")
@@ -7949,12 +7976,21 @@ finally {
             self.save_ocr_engine(text)
             return
 
-        self.previous_ocr_engine = self.parent.config.get("ocr_engine", "Windows")
+        default_engine = platform_support.default_ocr_engine()
+        self.previous_ocr_engine = self.parent.config.get("ocr_engine", default_engine)
         if self._find_available_tesseract_exe():
             self.save_ocr_engine("Tesseract")
             return
 
         lang = self.parent.current_interface_language
+        if platform_support.IS_LINUX:
+            # Linux distributions package Tesseract, so the app points at the
+            # package manager instead of downloading an installer.
+            self._show_linux_tesseract_hint(lang)
+            self._set_ocr_combo_silently(self.previous_ocr_engine or default_engine)
+            self.save_ocr_engine(self.previous_ocr_engine or default_engine)
+            return
+
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
         msg.setText(engine_text(lang, "tesseract_prompt"))
@@ -7968,11 +8004,28 @@ finally {
             self.start_tesseract_install()
             return
 
-        self._set_ocr_combo_silently(self.previous_ocr_engine or "Windows")
-        self.save_ocr_engine(self.previous_ocr_engine or "Windows")
+        self._set_ocr_combo_silently(self.previous_ocr_engine or default_engine)
+        self.save_ocr_engine(self.previous_ocr_engine or default_engine)
+
+    def _show_linux_tesseract_hint(self, lang):
+        """Tell a Linux user which package provides Tesseract."""
+        command = platform_support.tesseract_install_hint()
+        is_ru = lang == "ru"
+        message = (
+            f"Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}"
+            if is_ru
+            else f"Tesseract is not installed. Install it with your package manager:\n\n{command}"
+        )
+        msg = QMessageBox(self)
+        msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
+        msg.setText(message)
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
+        msg.exec_()
 
     def _handle_easyocr_engine_change(self):
-        self.previous_ocr_engine = self.parent.config.get("ocr_engine", "Windows")
+        self.previous_ocr_engine = self.parent.config.get("ocr_engine", platform_support.default_ocr_engine())
         self._reset_easyocr_runtime_cache()
         available, error = self._easyocr_importable_status()
         if available:
@@ -7999,7 +8052,7 @@ finally {
         self.save_ocr_engine(self.previous_ocr_engine or "Windows")
 
     def _handle_rapidocr_engine_change(self):
-        self.previous_ocr_engine = self.parent.config.get("ocr_engine", "Windows")
+        self.previous_ocr_engine = self.parent.config.get("ocr_engine", platform_support.default_ocr_engine())
         self._reset_rapidocr_runtime_cache()
         available, error = self._rapidocr_importable_status()
         if available:
@@ -9901,7 +9954,7 @@ finally {
             "show_update_info": False,
             "first_run_guide_completed": False,
             "first_run_guide_pending": False,
-            "ocr_engine": "Windows",
+            "ocr_engine": platform_support.default_ocr_engine(),
             "copy_translated_text": False,
             "freeze_screen_on_ocr": False,
             "debug_ocr_artifacts": False,

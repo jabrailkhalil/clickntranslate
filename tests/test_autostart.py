@@ -5,8 +5,12 @@ import unittest
 from unittest import mock
 
 import main
+import platform_support
 
 
+# The Startup folder shortcut and the MSIX StartupTask are Windows mechanisms;
+# Linux autostart lives in linux_desktop and is covered by test_linux_desktop.py.
+@unittest.skipUnless(platform_support.IS_WINDOWS, "Windows autostart mechanisms")
 class TestStartupShortcutAutostart(unittest.TestCase):
     def test_autostart_shortcut_lifecycle_uses_startup_folder(self):
         with tempfile.TemporaryDirectory() as temp_dir:

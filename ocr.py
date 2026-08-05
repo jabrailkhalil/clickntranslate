@@ -30,6 +30,7 @@ from languages import (
     tesseract_language_code,
     windows_ocr_tag,
 )
+import platform_support
 import portable_paths
 
 APP_LANGUAGE_CODES = {language.code for language in APP_LANGUAGES}
@@ -684,9 +685,10 @@ def _native_ocr_worker_path():
     if not getattr(sys, "frozen", False):
         return ""
     executable_dir = os.path.dirname(sys.executable)
+    worker_name = platform_support.executable_name("OcrWorker")
     for path in (
-        os.path.join(executable_dir, "_internal", "OcrWorker.exe"),
-        os.path.join(executable_dir, "OcrWorker.exe"),
+        os.path.join(executable_dir, "_internal", worker_name),
+        os.path.join(executable_dir, worker_name),
     ):
         if os.path.isfile(path):
             return path
@@ -1516,6 +1518,35 @@ def _python_package_file_present(candidate_paths, package_names):
     return False
 
 
+def _tesseract_reported_languages(tess_cmd):
+    """Language codes Tesseract itself reports.
+
+    A distribution package keeps its tessdata somewhere the app cannot guess
+    (`/usr/share/tesseract-ocr/<version>/tessdata` on Debian), so asking the
+    binary is the only portable way to enumerate languages. The directory scan
+    below still covers the portable Windows install, where tessdata sits next to
+    the executable.
+    """
+    if not tess_cmd:
+        return set()
+    try:
+        completed = subprocess.run(
+            [tess_cmd, "--list-langs"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            **platform_support.no_window_kwargs(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        logging.debug(f"tesseract --list-langs failed: {exc}")
+        return set()
+    if completed.returncode != 0:
+        return set()
+    # The first line is a header such as "List of available languages (3):".
+    lines = (completed.stdout or "").splitlines()
+    return {line.strip() for line in lines[1:] if line.strip()}
+
+
 def _tesseract_installed_language_codes():
     try:
         tess_cmd = ScreenCaptureOverlay.get_tesseract_cmd()
@@ -1523,6 +1554,7 @@ def _tesseract_installed_language_codes():
         tess_cmd = None
     if not tess_cmd or not os.path.isfile(tess_cmd):
         return []
+    reported = _tesseract_reported_languages(tess_cmd)
     data_dirs = [
         os.environ.get("TESSDATA_PREFIX", ""),
         os.path.join(os.path.dirname(tess_cmd), "tessdata"),
@@ -1530,7 +1562,11 @@ def _tesseract_installed_language_codes():
     ]
     result = []
     for language in APP_LANGUAGES:
-        filename = tesseract_language_code(language.code) + ".traineddata"
+        code = tesseract_language_code(language.code)
+        if code in reported:
+            result.append(language.code)
+            continue
+        filename = code + ".traineddata"
         if any(path and os.path.isfile(os.path.join(path, filename)) for path in data_dirs):
             result.append(language.code)
     return result
@@ -1581,7 +1617,9 @@ def _rapidocr_installed_language_codes():
 def installed_ocr_language_codes(engine=None, config=None):
     """Return only OCR languages usable by the selected local engine."""
     config = config or get_cached_ocr_config()
-    engine_name = str(engine or config.get("ocr_engine", "Windows")).strip().lower()
+    engine_name = usable_ocr_engine(
+        engine or config.get("ocr_engine", platform_support.default_ocr_engine())
+    ).strip().lower()
     if engine_name in {"rapid", "rapidocr"}:
         return _rapidocr_installed_language_codes()
     if engine_name in {"easy", "easyocr"}:
@@ -1848,6 +1886,57 @@ async def run_ocr_with_engine(bitmap, engine):
         import traceback
         debug_log(traceback.format_exc())
         return None
+
+def usable_ocr_engine(engine):
+    """Map a configured engine onto one that exists on this platform.
+
+    A config written on Windows names the WinRT engine, which no other system
+    has. Without this the OCR flow would take the Windows path and report a
+    missing engine instead of simply using the platform default.
+    """
+    name = str(engine or "").strip()
+    if name.lower() in platform_support.available_ocr_engines():
+        return name
+    default = platform_support.default_ocr_engine()
+    if name:
+        logging.info(f"OCR engine {name!r} is not available on this platform; using {default}.")
+    return default
+
+
+def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
+    """Grab (part of) `screen`.
+
+    Windows and X11 read the root window through Qt. Wayland refuses that, so
+    linux_capture routes the grab through the desktop portal or a compositor
+    helper, and the result is cropped to the requested rectangle here.
+    """
+    if screen is None:
+        return QtGui.QPixmap()
+    wants_region = width > 0 and height > 0
+    if platform_support.IS_LINUX and platform_support.is_wayland():
+        import linux_capture
+
+        try:
+            pixmap = linux_capture.grab_screen(screen)
+        except linux_capture.CaptureError as exc:
+            # Never raise into a Qt callback: an escaping exception is what left
+            # the 1.5.4 full-screen overlay spinning forever. Callers already
+            # handle a null pixmap and report it.
+            logging.error(f"Screen capture is unavailable: {exc}")
+            return QtGui.QPixmap()
+        if pixmap.isNull() or not wants_region:
+            return pixmap
+        ratio = pixmap.width() / max(1, screen.geometry().width())
+        return pixmap.copy(
+            int(round(x * ratio)),
+            int(round(y * ratio)),
+            int(round(width * ratio)),
+            int(round(height * ratio)),
+        )
+    if wants_region:
+        return screen.grabWindow(0, x, y, width, height)
+    return screen.grabWindow(0)
+
 
 def load_image_from_pil(pil_image):
     # Используем предзагруженные winrt модули
@@ -3423,6 +3512,12 @@ class ScreenCaptureOverlay(QWidget):
             if self.mode == "translate":
                 source_code, target_code = _configured_ocr_translate_pair(config)
                 source_idx = self.lang_combo.findData(source_code)
+                if source_idx < 0 and self.lang_combo.count():
+                    # The saved language is not installed for this engine (a
+                    # config carried over from another machine, or a language
+                    # pack that was removed). Fall back to the first installed
+                    # one instead of leaving the control unselected.
+                    source_idx = 0
                 if source_idx >= 0:
                     self.lang_combo.setCurrentIndex(source_idx)
                 self.current_language = self.lang_combo.currentData() or source_code
@@ -3434,6 +3529,8 @@ class ScreenCaptureOverlay(QWidget):
                     "ru",
                 )
                 idx = self.lang_combo.findData(language_code)
+                if idx < 0 and self.lang_combo.count():
+                    idx = 0  # saved language is not installed for this engine
                 if idx >= 0:
                     self.lang_combo.setCurrentIndex(idx)
                 self.current_language = self.lang_combo.currentData() or language_code
@@ -3466,13 +3563,13 @@ class ScreenCaptureOverlay(QWidget):
             drawn_any = False
             target_screen = self._active_screen or self._get_active_screen()
             if target_screen is not None:
-                shot = target_screen.grabWindow(0)
+                shot = grab_screen_pixmap(target_screen)
                 logging.debug(
                     f"[OCR:{session_id}] Frozen grab attempt full screen; screen={_screen_to_text(target_screen)}, "
                     f"shot_null={shot.isNull()}, shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
                 )
                 if shot.isNull():
-                    shot = target_screen.grabWindow(0, 0, 0, screen_rect.width(), screen_rect.height())
+                    shot = grab_screen_pixmap(target_screen, 0, 0, screen_rect.width(), screen_rect.height())
                     logging.debug(
                         f"[OCR:{session_id}] Frozen grab retry; shot_null={shot.isNull()}, "
                         f"shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
@@ -3911,7 +4008,9 @@ class ScreenCaptureOverlay(QWidget):
     @staticmethod
     def get_ocr_engine():
         """Return selected OCR engine from config.json."""
-        return get_cached_ocr_config().get("ocr_engine", "Windows")
+        return usable_ocr_engine(
+            get_cached_ocr_config().get("ocr_engine", platform_support.default_ocr_engine())
+        )
 
     # Кэш пути к Tesseract
     _tesseract_cmd_cache = None
@@ -4119,8 +4218,8 @@ class ScreenCaptureOverlay(QWidget):
             if attempt_rect.width() <= 0 or attempt_rect.height() <= 0:
                 continue
             started = time.perf_counter()
-            pixmap = target_screen.grabWindow(
-                0,
+            pixmap = grab_screen_pixmap(
+                target_screen,
                 attempt_rect.x(),
                 attempt_rect.y(),
                 attempt_rect.width(),
@@ -5139,7 +5238,7 @@ class FullScreenTranslateOverlay(QWidget):
         target_screen = QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
         geo = target_screen.geometry()
 
-        self.screenshot = target_screen.grabWindow(0, 0, 0, geo.width(), geo.height())
+        self.screenshot = grab_screen_pixmap(target_screen, 0, 0, geo.width(), geo.height())
         self._ocr_scale_x = (self.screenshot.width() / geo.width()) if geo.width() and not self.screenshot.isNull() else 1.0
         self._ocr_scale_y = (self.screenshot.height() / geo.height()) if geo.height() and not self.screenshot.isNull() else 1.0
         self.setGeometry(geo)

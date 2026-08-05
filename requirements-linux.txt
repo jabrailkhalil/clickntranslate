@@ -1,0 +1,26 @@
+# Linux runtime dependencies.
+#
+# The Windows requirements file pulls the WinRT namespaces used by Windows OCR;
+# none of them exist on Linux, where OCR is Tesseract (a distribution package,
+# not a pip one) plus the optional RapidOCR/EasyOCR engines the app installs at
+# runtime into its own directory.
+#
+# Install with tools/setup_linux_env.sh — argostranslate must go in with
+# --no-deps, because its dependency tree drags in stanza and therefore torch
+# (~2 GB) purely for sentence splitting, which translater.py replaces with its
+# own splitter.
+
+PyQt5~=5.15.11
+Pillow
+pyperclip
+pytesseract
+requests
+psutil
+pypdf
+setuptools<81
+numpy
+
+# Argos Translate runtime (installed with --no-deps, see above).
+ctranslate2
+sentencepiece
+packaging

@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import cache_manager  # noqa: E402
+import platform_support  # noqa: E402
 import translater  # noqa: E402
 
 
@@ -399,18 +400,20 @@ class ArgosLanguagePairPlanTest(unittest.TestCase):
 
 class ArgosPackagingTest(unittest.TestCase):
     def test_frozen_worker_is_loaded_from_internal_folder(self):
+        # The helper carries a .exe suffix on Windows and none elsewhere.
+        app_dir = os.path.abspath(os.sep + "Apps")
+        expected = os.path.join(app_dir, "_internal", platform_support.executable_name("ArgosWorker"))
+        app_executable = os.path.join(app_dir, platform_support.executable_name("ClicknTranslate"))
+
         with mock.patch.dict(os.environ, {"CLICKNTRANSLATE_ARGOS_WORKER": ""}, clear=False):
             with mock.patch.object(translater.sys, "frozen", True, create=True):
-                with mock.patch.object(translater.sys, "executable", r"C:\Apps\ClicknTranslate.exe"):
+                with mock.patch.object(translater.sys, "executable", app_executable):
                     with mock.patch.object(
                         translater.os.path,
                         "isfile",
-                        side_effect=lambda path: path.endswith(r"_internal\ArgosWorker.exe"),
+                        side_effect=lambda path: path == expected,
                     ):
-                        self.assertEqual(
-                            translater._argos_worker_path(),
-                            r"C:\Apps\_internal\ArgosWorker.exe",
-                        )
+                        self.assertEqual(translater._argos_worker_path(), expected)
 
     def test_spec_excludes_stanza_stack_and_keeps_argos_runtime(self):
         spec_text = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
