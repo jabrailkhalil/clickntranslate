@@ -69,8 +69,13 @@ sudo dnf install tesseract tesseract-langpack-rus  # Fedora
 sudo pacman -S tesseract tesseract-data-rus        # Arch
 ```
 
-RapidOCR and EasyOCR work the same way as on Windows, through the separate
-`OcrWorker` process.
+RapidOCR is bundled into the `OcrWorker`, so it works on first launch without
+installing anything, exactly as on Windows. EasyOCR stays an optional runtime
+install because of its torch payload.
+
+Tesseract data is found wherever your distribution keeps it — Debian's
+`/usr/share/tesseract-ocr/<version>/tessdata`, `/usr/share/tessdata` on Fedora
+and Arch, or whatever the binary itself reports.
 
 ### Updates
 
@@ -147,6 +152,21 @@ Note that `argostranslate` is installed with `--no-deps`: its dependency tree
 pulls in stanza and therefore torch (~2 GB) only for sentence splitting, which
 `translater.py` does itself.
 
+## Checking a build
+
+`tools/functional_check.py` drives every feature against the real thing — live
+translation providers, the installed Tesseract, the Argos model, the command
+socket, the clipboard, the desktop files, and the packaged workers — and prints
+a pass/fail matrix:
+
+```bash
+python tools/functional_check.py --frozen dist/clickntranslate
+python tools/functional_check.py --offline     # skip the live providers
+```
+
+It runs on both systems and skips whatever this machine does not have, so a
+skip means "not installed here", never "not checked".
+
 ## Behaviour shared with Windows that the port improved
 
 Three fixes came out of porting and apply to both systems:
@@ -161,6 +181,11 @@ Three fixes came out of porting and apply to both systems:
 * **A saved OCR language that is not installed no longer leaves the language
   selector empty** — it falls back to the first installed language rather than
   showing "install a language pack" with no way forward.
+* **Tesseract data is located properly.** The app only looked beside the
+  binary, which is right for the portable Windows install but finds nothing for
+  a distribution package — so the default Linux engine refused to run at all.
+  It now also scans the standard system locations and, failing that, trusts a
+  binary that reports the language itself.
 
 ## Verified so far
 
@@ -177,8 +202,9 @@ Checked in Ubuntu 22.04 (WSL2, headless):
 * **the AppImage runs** (157 MB): it starts, keeps its data in
   `~/.local/share/clickntranslate` because the AppImage mount is read-only, and
   accepts a shortcut command from a second launch,
-* the test suite passes: 370 passed, 29 skipped on Linux; 388 passed,
-  11 skipped on Windows.
+* the test suite passes: 375 passed, 29 skipped on Linux; 393 passed,
+  11 skipped on Windows,
+* the functional sweep passes: 51 checks on Linux, 34 on Windows, no failures.
 
 Past the first run (the welcome dialog is modal and needs a person to dismiss
 it), a headless run also shows:

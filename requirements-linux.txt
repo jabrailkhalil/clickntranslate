@@ -24,3 +24,8 @@ numpy
 ctranslate2
 sentencepiece
 packaging
+
+# Bundled into the OCR worker so RapidOCR works on first launch, exactly as in
+# the Windows build. The pin matches ClicknTranslate.spec's expectations and
+# requires Python < 3.13.
+rapidocr-onnxruntime==1.4.4

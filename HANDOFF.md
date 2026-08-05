@@ -840,7 +840,7 @@ Porting surfaced three defects that were not Linux-specific. All three are cover
   instance keeps running.
 * Tesseract 4.1.1 is found on `PATH`, and `--list-langs` reports `eng`/`osd`/`rus`, which the
   app maps to `en`/`ru`.
-* **The full test suite passes on both systems**: Linux 370 passed / 29 skipped, Windows 388
+* **The full test suite passes on both systems**: Linux 375 passed / 29 skipped, Windows 393
   passed / 11 skipped. The skips are the mechanism that does not exist on that system (AF_UNIX
   sockets and the XDG entries on Windows; the Windows OCR tab, Startup shortcut, MSIX layout and
   UAC elevation on Linux).
@@ -907,6 +907,34 @@ Worth knowing, because both made a broken check look green:
    QThread` and would eventually misbehave. On Linux the creation now hops back to the GUI
    thread through the same dispatcher the shortcut commands use. Windows keeps its shipped
    behaviour.
+
+### 13.3e Functional sweep — `tools/functional_check.py`
+
+A new harness drives every feature against the real thing (live providers, the installed
+Tesseract, the Argos model, the command socket, the clipboard, the desktop files, the packaged
+workers) and prints a pass/fail matrix. Skips mean "not present on this machine", never
+"not checked".
+
+    python tools/functional_check.py --frozen dist/clickntranslate
+
+Results: **Linux 51 passed / 0 failed / 7 skipped**, **Windows 34 passed / 0 failed / 6 skipped**.
+
+It immediately found a blocking Linux bug the unit suite could not:
+
+**Tesseract — the default Linux engine — could not run at all.**
+`_configure_installed_tesseract_data()` only looked for tessdata beside the binary
+(`/usr/bin/tessdata`, `/usr/tessdata`), which is correct for the portable Windows install and
+finds nothing for a distribution package (`/usr/share/tesseract-ocr/4.00/tessdata` on Debian).
+It returned "", and `_recognize_tesseract_variants_with_cmd` treats that as "language data not
+installed" and refuses to run — so OCR silently produced nothing while the `tesseract` CLI read
+the same image perfectly. Fixed by scanning the standard system locations and, failing that,
+trusting a binary whose `--list-langs` already reports the language. Five regression tests in
+`tests/test_platform_ocr_gating.py`.
+
+Also closed: **RapidOCR is now bundled into the Linux OcrWorker** (`requirements-linux.txt` pins
+`rapidocr-onnxruntime==1.4.4`), matching Windows, where it works on first launch without a
+runtime install. Verified by sending a real image to the packaged worker and comparing the text.
+The build grows to ~700 MB unpacked, 255 MB as an AppImage.
 
 ### 13.4 Not verified — needs a real desktop session
 

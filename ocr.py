@@ -549,6 +549,31 @@ def _prepare_tesseract_data(
     return prepared
 
 
+def _system_tessdata_dirs():
+    """Where a distribution package keeps its tessdata.
+
+    Debian uses /usr/share/tesseract-ocr/<version>/tessdata, Fedora and Arch use
+    /usr/share/tessdata, and Homebrew and /usr/local builds have their own. None
+    of these sit next to the binary, which is the only place the portable
+    Windows layout has to look.
+    """
+    if platform_support.IS_WINDOWS:
+        return []
+    import glob
+
+    directories = []
+    for pattern in (
+        "/usr/share/tesseract-ocr/*/tessdata",
+        "/usr/share/tessdata",
+        "/usr/local/share/tessdata",
+        "/usr/local/share/tesseract-ocr/*/tessdata",
+        "/opt/homebrew/share/tessdata",
+        "/var/lib/flatpak/exports/share/tessdata",
+    ):
+        directories.extend(sorted(glob.glob(pattern), reverse=True))
+    return directories
+
+
 def _configure_installed_tesseract_data(tess_cmd, tess_lang):
     required = [f"{code}.traineddata" for code in str(tess_lang or "").split("+") if code]
     tess_dir = os.path.dirname(tess_cmd or "")
@@ -556,11 +581,19 @@ def _configure_installed_tesseract_data(tess_cmd, tess_lang):
         os.environ.get("TESSDATA_PREFIX", ""),
         os.path.join(tess_dir, "tessdata"),
         os.path.join(os.path.dirname(tess_dir), "tessdata"),
+        *_system_tessdata_dirs(),
     ]
     for data_dir in candidate_dirs:
         if data_dir and required and all(os.path.isfile(os.path.join(data_dir, name)) for name in required):
             os.environ["TESSDATA_PREFIX"] = data_dir
             return data_dir
+
+    # A packaged Tesseract may keep its data somewhere none of those patterns
+    # cover. If the binary itself reports the languages it can already find
+    # them, and forcing TESSDATA_PREFIX would only break that.
+    codes = {code for code in str(tess_lang or "").split("+") if code}
+    if codes and codes <= _tesseract_reported_languages(tess_cmd):
+        return os.environ.get("TESSDATA_PREFIX", "") or str(tess_dir or "tesseract")
     return ""
 
 def _tesseract_psm_order(width, height):
