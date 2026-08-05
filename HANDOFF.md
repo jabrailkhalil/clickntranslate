@@ -1,16 +1,21 @@
-# Click'n'Translate — 1.5.3 hotfix handoff
+# Click'n'Translate — 1.5.4 hotfix handoff
 
-> **Purpose of this file.** A running, self-contained log of the 1.5.3 hotfix work so any
+> **Purpose of this file.** A running, self-contained log of the hotfix work so any
 > other agent (Codex, Claude, a human) can pick the work up mid-flight without re-deriving
 > anything. Keep appending to it. Do not delete history — mark items done instead.
 
-**Last updated:** 2026-08-05 — all three reported issues fixed and verified; release staged but
-**not published** (see §8).
+**Last updated:** 2026-08-05 — **1.5.4 released.** All three reported issues fixed and verified,
+version bumped, committed, tagged `v1.5.4`, and published to GitHub. See **§11** for the release
+record and **§12** for what a follow-up agent should know.
 **Working directory:** `D:\1python_projects\clickntranslate-main`
-**Repo is NOT a git repository** (`git status` → `fatal: not a git repository`). There is no
-version control safety net, so make backup copies before risky edits.
-**Version in tree:** `app_version.py` → `APP_VERSION = "1.5.3"` (already bumped by a previous
-agent; 1.5.2 is the last *published* release). README/build scripts already reference 1.5.3.
+**Version in tree:** `app_version.py` → `APP_VERSION = "1.5.4"`.
+
+> **Important — the working directory is still NOT a git repository.**
+> The commit and tag were made from a clean clone at
+> `<scratchpad>\cnt-remote` (see §11.2), *not* from `D:\1python_projects\clickntranslate-main`.
+> The two trees are content-identical apart from line endings. If you edit the working directory
+> you must re-sync into a clone before committing. Consider running `git init` + `git remote add`
+> in the working directory to remove this trap.
 
 ---
 
@@ -406,9 +411,8 @@ Verified: the helper compiles and runs.
 - `preview_update_window.ps1`, `update_window_1.png` — sandboxed preview + screenshot of the
   redesigned window (creates a fake install tree in temp; never touches a real installation)
 
-## 8. Status
+## 8. Status of the engineering work (all done)
 
-**Done**
 - [x] Issue #1 — full-screen translation fixed and verified end to end.
 - [x] Issue #2 — OCR language install: real progress, responsive cancel, tolerant verification.
       Validated by a full 989 s live install (§3.4).
@@ -417,34 +421,9 @@ Verified: the helper compiles and runs.
 - [x] `.gitignore` root cause fixed (§9b).
 - [x] Full test suite: **286 passed, 8 subtests passed** (`.venv`, Python 3.13).
 - [x] `py_compile` clean on `ocr.py`, `settings_window.py`, `main.py`, `translater.py`.
-- [x] PyInstaller build (Python 3.11) + `stage_release.ps1 -SkipPyInstaller -Version 1.5.3`
-      completed. Staged package verified — all five required artifacts present:
 
-      ClicknTranslate.exe                              87,040 bytes  v1.5.3.0
-      app\ClicknTranslateApp.exe                   11,255,439 bytes
-      app\_internal\ArgosWorker.exe                 9,951,334 bytes
-      app\_internal\OcrWorker.exe                   7,778,907 bytes
-      app\_internal\ClicknTranslateUpdater.exe        104,960 bytes  v1.5.3.0
-      total package: 480.0 MB
-
-- [x] Portable ZIP built (not published):
-      `releases\Click-n-Translate-1.5.3-windows-portable-x64.zip`
-      201.3 MB, sha256 `84e9b6ba5ceee57c271eae8de6fe08047d4638ab9d250dfbedc7c5a68cd43660`
-      (This digest is for *this local build*. If the release is rebuilt, recompute it and update
-      `tools/build_update_repair.ps1 -PackageSha256`.)
-
-**Not done — needs the maintainer**
-- [ ] **Installer `.exe` cannot be built on this machine: Inno Setup (`ISCC.exe`) is not
-      installed.** The READMEs link to `Click-n-Translate-1.5.3-windows-x64-installer.exe`, and
-      `tools/build_update_bootstrap.ps1` requires the Setup executable as its input, so the
-      release asset set is incomplete without it.
-- [ ] **Publishing the GitHub release was deliberately NOT done.** `gh` is authenticated as
-      `jabrailkhalil` with `repo` scope, so it is technically possible — but publishing v1.5.3
-      pushes this build to every existing 1.5.x user through the in-app updater. That is an
-      outward-facing, hard-to-reverse action and needs an explicit decision, especially with the
-      installer asset missing.
-- [ ] The tree is **not a git repository**, so none of these changes are committed anywhere.
-      `git init` + an initial commit is worth doing before anything else.
+*(The 1.5.3 build/staging figures that used to live here are superseded by the 1.5.4
+release record in §11. Inno Setup, previously missing, was installed — see §11.1.)*
 
 ## 9. Build environment constraint — **the release must not be built on Python 3.13**
 
@@ -477,19 +456,204 @@ which is almost certainly why `build_apply_updater.ps1` was absent from the repo
 `stage_release.ps1` still required it. Replaced the four name-by-name exceptions with
 `!tools/*.ps1`, and added `.venv*/` to the virtualenv rule.
 
-## 10. Release procedure (not yet run)
+## 10. Release procedure — the exact sequence that produced 1.5.4
+
+Run every step from `D:\1python_projects\clickntranslate-main`. Order matters where noted.
 
 ```powershell
-# 1. full build + stage (runs PyInstaller, launcher, and the new apply-updater build)
-powershell -ExecutionPolicy Bypass -File tools\stage_release.ps1 -Version 1.5.3
+# 0. Bump the version everywhere first (see §11.3 for the full file list), then:
 
-# 2. portable bootstrap zip (needs the Inno Setup .exe to exist first)
-powershell -ExecutionPolicy Bypass -File tools\build_update_bootstrap.ps1 -Version 1.5.3
+# 1. PyInstaller MUST run on Python <= 3.12 (see §9). app_version.py is baked in here,
+#    so always rebuild after a version bump.
+.\.venv311\Scripts\python.exe -m PyInstaller ClicknTranslate.spec --clean --noconfirm
+
+# 2. Stage: copies dist, builds the launcher and the apply-update helper.
+.\tools\stage_release.ps1 -Version 1.5.4 -SkipPyInstaller
+
+# 3. Portable zip. Must include the base directory: the published zips all have a
+#    top-level ClicknTranslate\ folder (verified against 1.5.3 with an HTTP range request).
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory(
+  (Resolve-Path 'releases\ClicknTranslate-v1.5.4-win64-stage\ClicknTranslate'),
+  (Join-Path (Get-Location) 'releases\Click-n-Translate-1.5.4-windows-portable-x64.zip'),
+  [System.IO.Compression.CompressionLevel]::Optimal, $true)
+
+# 4. Inno Setup installer (~2.7 min at lzma2/ultra64).
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\ClicknTranslate.iss
+
+# 5. RENAME BEFORE STEP 6. Inno writes ClicknTranslate-Setup-v<ver>-win64.exe, which is
+#    exactly the filename the network setup wants to write in step 6. Renaming first is
+#    what frees the name; skipping this silently overwrites the 126 MB installer with the
+#    90 KB downloader.
+Move-Item releases\ClicknTranslate-Setup-v1.5.4-win64.exe `
+          releases\Click-n-Translate-1.5.4-windows-x64-installer.exe
+
+# 6. Network setup: a ~90 KB downloader that pulls the full installer. It embeds the
+#    installer's final download URL and SHA-256, so compute the hash after step 5.
+#    The URL is deterministic, so this does not require uploading first.
+.\tools\build_network_setup.ps1 -Version 1.5.4 `
+  -SetupUrl 'https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.5.4/Click-n-Translate-1.5.4-windows-x64-installer.exe' `
+  -SetupSha256 '<sha256 of the renamed installer>'
+
+# 7. Commit + tag from a clone (see §11.2), then publish as a DRAFT first,
+#    verify the assets, and only then flip it live.
+gh release create v1.5.4 --repo jabrailkhalil/clickntranslate `
+  --title "Click'n'Translate 1.5.4" --notes-file notes.md --draft `
+  releases\Click-n-Translate-1.5.4-windows-x64-installer.exe `
+  releases\Click-n-Translate-1.5.4-windows-portable-x64.zip `
+  releases\ClicknTranslate-Setup-v1.5.4-win64.exe
+gh release edit v1.5.4 --repo jabrailkhalil/clickntranslate --draft=false --latest
 ```
 
-Notes for whoever runs this:
-- `tools/build_update_repair.ps1` has **hardcoded defaults** for `-PackageUrl` and
-  `-PackageSha256` pointing at the v1.5.3 zip. The SHA must be updated to the real published
-  artifact's digest, or passed explicitly.
-- `installer/ClicknTranslate.iss` builds the Setup executable (Inno Setup, not run here).
-- Publishing to GitHub releases has **not** been done and needs the maintainer's credentials.
+Notes:
+- `tools/build_update_repair.ps1` embeds `-PackageUrl` and `-PackageSha256`. **Update the SHA to
+  the new portable zip's digest on every release** or the repair tool will refuse the download.
+  `tests/test_update_repair.py` enforces that the placeholder is gone and the digest is 64 hex
+  characters, so a forgotten update fails the suite rather than shipping silently.
+- `tools/build_update_bootstrap.ps1` was **not** used for 1.5.4; no bootstrap zip has been
+  attached to a release since 1.5.2, and the updater explicitly skips assets containing
+  "bootstrap".
+
+---
+
+## 11. The 1.5.4 release record
+
+### 11.1 Toolchain change made on this machine
+
+**Inno Setup 6.7.3 was installed** via `winget install --id JRSoftware.InnoSetup`. winget ran
+unelevated, so it landed **per-user**:
+
+```
+C:\Users\admin\AppData\Local\Programs\Inno Setup 6\ISCC.exe
+```
+
+Not in `Program Files` — scripts that probe only `%ProgramFiles%`/`%ProgramFiles(x86)%` will not
+find it. This is what previously blocked building the installer asset.
+
+### 11.2 Git — how the commit was actually made
+
+The working directory is **not** a git repository, so committing directly was impossible.
+Procedure used:
+
+1. `git clone https://github.com/jabrailkhalil/clickntranslate.git` into the scratchpad
+   (`<scratchpad>\cnt-remote`).
+2. Compared both trees. **82 files looked different, but 57 of those were line endings only** —
+   the working directory is LF, the git checkout is CRLF because `core.autocrlf=true` globally.
+   After newline normalization the real diff was exactly **28 files** (25 modified + 3 new),
+   matching the edits made. No unexpected divergence from `main`.
+3. Copied those 28 files into the clone, `git add -A`, committed, pushed `main`, tagged, pushed
+   the tag.
+
+Result:
+- commit **`c84a010`** — "Fix full-screen translation and Windows OCR installs, release 1.5.4"
+  (28 files changed, 1567 insertions, 156 deletions), pushed to `main` (`9d0ff13..c84a010`).
+- annotated tag **`v1.5.4`** → `c84a010`, pushed.
+
+If you repeat this, remember the clone is the source of truth for git; the working directory has
+no `.git`.
+
+### 11.3 Files touched by the version bump (1.5.3 → 1.5.4)
+
+`app_version.py`, `installer/ClicknTranslate.iss`,
+`installer/windows/ClicknTranslate.exe.manifest`, and the three launcher manifests
+(`ClicknTranslateApplyUpdate`, `ClicknTranslateUpdateBootstrap`, `ClicknTranslateUpdateRepair`),
+all seven `tools/*.ps1` version defaults, `README.md` + the four `docs/readme/README.*.md`, and
+the version assertions in `tests/test_version_consistency.py`, `tests/test_updater.py`,
+`tests/test_update_repair.py`.
+
+`tests/test_version_consistency.py` is the guard — it asserts the exact version string in every
+one of those files, so a missed spot fails the suite.
+
+**Deliberately left at their historical versions:** `store/microsoft-store/*` documents the 1.5.0
+Microsoft Store submission and certification run; it is a record of that event, not a value that
+tracks the current release. `tools/test_update_152_to_153_e2e.py` is a manual harness for the
+1.5.2→1.5.3 upgrade path and is not collected by pytest (`pytest.ini` sets `testpaths = tests`).
+
+### 11.4 Released artifacts
+
+| Asset | Size | SHA-256 |
+| --- | --- | --- |
+| `Click-n-Translate-1.5.4-windows-x64-installer.exe` | 132,567,117 (126.4 MB) | `D87CD7C5983E9676033A98D511761FB4452DEAC209703F61CD796AE7F3263B53` |
+| `Click-n-Translate-1.5.4-windows-portable-x64.zip` | 211,060,766 (201.3 MB) | `0301C383576B091DE94176269FF9178BFE19CB4419C63EE16A5F26BAB5D90432` |
+| `ClicknTranslate-Setup-v1.5.4-win64.exe` | 89,600 | (network downloader) |
+
+The three names match v1.5.3's asset set exactly, which matters: `SettingsWindow._pick_update_asset`
+scores asset names to decide what an installed copy vs a portable copy downloads.
+
+Staged package contents (all verified present by `stage_release.ps1`'s own `$required` check):
+
+```
+ClicknTranslate.exe                              87,040  v1.5.4.0
+app\ClicknTranslateApp.exe                   11,255,439
+app\_internal\ArgosWorker.exe                 9,951,334
+app\_internal\OcrWorker.exe                   7,778,907
+app\_internal\ClicknTranslateUpdater.exe        104,960  v1.5.4.0
+```
+
+### 11.5 Extra fix folded into this release
+
+`tools/build_update_repair.ps1` defaulted to
+`.../releases/download/v<ver>/ClicknTranslate-v<ver>-win64.zip`. **No release has ever published
+an asset with that name**, so the repair tool would have downloaded a 404. It now points at
+`Click-n-Translate-<ver>-windows-portable-x64.zip` with that file's real digest, and both
+`tests/test_version_consistency.py` and `tests/test_update_repair.py` were updated to enforce the
+corrected convention.
+
+### 11.6 Post-publish verification (all green)
+
+The release was created as a **draft**, verified, and only then flipped live — so it was never
+visible to the in-app updater in a half-uploaded state.
+
+1. **Asset integrity.** GitHub's reported `digest` for each uploaded asset was compared against the
+   locally computed SHA-256. Both large assets matched byte-for-byte; all three report
+   `state=uploaded` with the exact expected byte counts.
+2. **Release state.** `tag=v1.5.4  draft=false  target=main`, marked **Latest**, published
+   2026-08-05T07:15:22Z.
+3. **Public URLs resolve.** HTTP range requests returned `206` with the correct total size for:
+   - `…/releases/latest/download/Click-n-Translate-1.5.4-windows-x64-installer.exe` → 132,567,117
+   - `…/releases/latest/download/Click-n-Translate-1.5.4-windows-portable-x64.zip` → 211,060,766
+   - `…/releases/download/v1.5.4/Click-n-Translate-1.5.4-windows-x64-installer.exe` → 132,567,117
+     (this exact URL is compiled into the network setup)
+   - `…/releases/download/v1.5.4/ClicknTranslate-Setup-v1.5.4-win64.exe` → 89,600
+
+   The first two are the links the READMEs use, so the download buttons work.
+4. **The real updater logic was run against the live release JSON.**
+   `SettingsWindow._pick_update_asset` on the actual published payload selects:
+   - installed copy → `Click-n-Translate-1.5.4-windows-x64-installer.exe`
+   - portable copy → `Click-n-Translate-1.5.4-windows-portable-x64.zip`
+
+   So existing 1.5.x users get the correct artifact for their install type.
+
+Release URL: <https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.5.4>
+
+---
+
+## 12. If you are picking this up next
+
+**State right now:** 1.5.4 is fully released. `main` is at `c84a010`, tag `v1.5.4` points at it,
+and all three assets are published and verified. Nothing is half-finished.
+
+Things that will bite you if you do not know them:
+
+1. **The working directory has no `.git`.** Commit from a clone (§11.2). The two trees differ only
+   by line endings (LF locally, CRLF in a checkout with `core.autocrlf=true`) — a naive byte diff
+   reports ~57 false positives, so always normalize newlines before comparing.
+2. **Never build a release on Python 3.13** (§9). Use `.venv311`. `.venv` (3.13) is for tests only.
+3. **Rename the Inno output before building the network setup** (§10, step 5) or you will overwrite
+   a 126 MB installer with a 90 KB downloader that has the same filename.
+4. **`tools/build_update_repair.ps1` carries a pinned SHA-256** of the portable zip. It must be
+   recomputed every release. The test suite catches a stale placeholder but cannot catch a digest
+   that is merely wrong, so update it whenever the zip is rebuilt.
+5. **Inno Setup is installed per-user** at `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`, not in
+   Program Files (§11.1).
+6. **Publish as a draft first**, verify assets, then `gh release edit --draft=false --latest`.
+   Publishing immediately pushes the build to every existing user through the in-app updater.
+
+Worth doing but not required:
+- `git init` the working directory and wire up the remote, to remove trap #1 permanently.
+- Consider a `.gitattributes` with `* text=auto` so line endings stop being a source of noise.
+- `tools/test_update_152_to_153_e2e.py` is now two releases stale; if the upgrade path is still
+  worth exercising, it needs porting to 1.5.3 → 1.5.4.
+
+Side effect of the OCR investigation: this machine gained Spanish, French and Italian Windows OCR
+languages. Remove them from Settings → Language packages → Windows OCR if unwanted.
