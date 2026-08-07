@@ -10,11 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import platform_support  # noqa: E402
-from PyQt5.QtCore import QPoint, Qt  # noqa: E402
+from PyQt5.QtCore import QEvent, QPoint, Qt  # noqa: E402
+from PyQt5.QtGui import QFontMetrics, QMouseEvent  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QComboBox, QStyle, QStyleOptionComboBox, QWidget  # noqa: E402
 
+import main  # noqa: E402
 from settings_window import (  # noqa: E402
     SettingsWindow,
+    settings_text,
     _populate_grouped_ocr_combo,
     _populate_grouped_translator_combo,
 )
@@ -107,29 +110,22 @@ class SettingsEngineLayoutTest(unittest.TestCase):
 
             ocr_label = self._rect_in_settings(settings, settings.ocr_engine_label)
             ocr_combo = self._rect_in_settings(settings, settings.ocr_engine_combo)
-            ocr_delete = self._rect_in_settings(settings, settings.ocr_engine_delete_btn)
             tr_label = self._rect_in_settings(settings, settings.translator_engine_label)
             tr_combo = self._rect_in_settings(settings, settings.translator_combo)
-            tr_delete = self._rect_in_settings(settings, settings.translator_engine_delete_btn)
 
             self.assertEqual(ocr_label[1] + ocr_label[3] / 2, ocr_combo[1] + ocr_combo[3] / 2)
-            self.assertEqual(ocr_combo[1] + ocr_combo[3] / 2, ocr_delete[1] + ocr_delete[3] / 2)
             self.assertEqual(tr_label[1] + tr_label[3] / 2, tr_combo[1] + tr_combo[3] / 2)
-            self.assertEqual(tr_combo[1] + tr_combo[3] / 2, tr_delete[1] + tr_delete[3] / 2)
             self.assertEqual(ocr_combo[0], tr_combo[0])
-            self.assertEqual(ocr_combo[2], 160)
-            self.assertEqual(tr_combo[2], 160)
-            self.assertEqual(ocr_delete[0], tr_delete[0])
-            self.assertGreaterEqual(ocr_delete[0], ocr_combo[0] + ocr_combo[2] - 30)
-            self.assertLessEqual(ocr_delete[0] + ocr_delete[2], ocr_combo[0] + ocr_combo[2])
-            self.assertIs(settings.ocr_engine_delete_btn.parentWidget(), settings.ocr_engine_combo)
-            self.assertIs(settings.translator_engine_delete_btn.parentWidget(), settings.translator_combo)
+            self.assertEqual(ocr_combo[2], 180)
+            self.assertEqual(tr_combo[2], 180)
             self.assertTrue(settings.ocr_engine_label.alignment() & Qt.AlignVCenter)
             self.assertTrue(settings.translator_engine_label.alignment() & Qt.AlignVCenter)
-            self.assertEqual(settings.ocr_engine_delete_btn.size().width(), 16)
-            self.assertEqual(settings.ocr_engine_delete_btn.size().height(), 16)
-            self.assertTrue(settings.ocr_engine_combo.property("engineDeleteVisible"))
-            self.assertFalse(settings.translator_combo.property("engineDeleteVisible"))
+            # Engines are removed from their own tab in Language packages now.
+            # The pickers carry no × of their own, so nothing sits over the
+            # chevron and the combo needs no property to hide it.
+            self.assertFalse(hasattr(settings, "ocr_engine_delete_btn"))
+            self.assertFalse(hasattr(settings, "translator_engine_delete_btn"))
+            self.assertIsNone(settings.ocr_engine_combo.property("engineDeleteVisible"))
 
             ocr_option = QStyleOptionComboBox()
             tr_option = QStyleOptionComboBox()
@@ -148,7 +144,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 settings.translator_combo,
             )
             self.assertEqual(ocr_section, tr_section)
-            self.assertEqual(ocr_section.width(), 31)
+            # 24px is the drop-down width in _engine_combo_style; it was 31
+            # while that area was a bordered divider with no arrow in it.
+            self.assertEqual(ocr_section.width(), 24)
 
             action_rows = (
                 (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
@@ -177,6 +175,246 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 action_rects[0][-1][0] + action_rects[0][-1][2],
             )
 
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def _result_window_settings(self, lang="en", theme="Темная", hidden=()):
+        parent = _SettingsParent()
+        parent.current_interface_language = lang
+        parent.current_theme = theme
+        parent.config["result_window_hidden_modes"] = list(hidden)
+        parent.setFixedSize(700, 400)
+        settings = SettingsWindow(parent)
+        settings.setFixedSize(690, 390)
+        parent.show()
+        settings.show()
+        self.app.processEvents()
+        return parent, settings
+
+    def test_result_window_toggles_align_with_the_engine_rows(self):
+        parent, settings = self._result_window_settings()
+        control = settings.result_window_control
+
+        ocr = self._rect_in_settings(settings, settings.ocr_engine_combo)
+        translator = self._rect_in_settings(settings, settings.translator_combo)
+        result = self._rect_in_settings(settings, control)
+        # All three pickers are drop-downs now, so this one is exactly as wide
+        # as an engine combo and the right column lines up.
+        self.assertEqual(result[2], settings.ocr_engine_combo.width())
+        self.assertEqual(result[3], settings.ocr_engine_combo.height())
+        self.assertEqual(ocr[0] + ocr[2], result[0] + result[2])
+        self.assertEqual(translator[0] + translator[2], result[0] + result[2])
+        label = self._rect_in_settings(settings, settings.result_window_label)
+        self.assertEqual(label[1] + label[3] / 2, result[1] + result[3] / 2)
+        self.assertTrue(settings.result_window_label.alignment() & Qt.AlignVCenter)
+        # It sits directly below the translator row and shares that row with
+        # the next checkbox, so the left column no longer has a blank gap.
+        self.assertGreater(result[1], translator[1])
+        copy_translated = self._rect_in_settings(settings, settings.copy_translated_checkbox)
+        self.assertLessEqual(
+            abs((result[1] + result[3] / 2) -
+                (copy_translated[1] + copy_translated[3] / 2)),
+            3,
+        )
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_the_three_modes_are_rows_in_the_dropdown(self):
+        """The row used to be three inline buttons. It is a drop-down now, and
+        the three actions stay independent switches rather than one choice."""
+        parent, settings = self._result_window_settings()
+        control = settings.result_window_control
+
+        self.assertIsInstance(control, QComboBox)
+        # Screen-area OCR and plain copy never open a result window, so they
+        # must not be offered here; only these three modes actually show one.
+        # The extra row is the header that says what the list is for.
+        self.assertEqual(control.count(), len(main.RESULT_WINDOW_MODES) + 1)
+        header = control.model().item(0)
+        self.assertEqual(header.text(), settings_text("en", "result_window_modes_header"))
+        self.assertFalse(header.isEnabled())
+        self.assertIsNone(header.data(Qt.UserRole))
+
+        for mode in main.RESULT_WINDOW_MODES:
+            item = control._item(mode)
+            self.assertIsNotNone(item, mode)
+            # Rows spell the action out; "Text"/"Area"/"Main" only survive in
+            # the closed summary, where there is no room for more.
+            self.assertEqual(item.text(), settings_text("en", f"result_window_row_{mode}"))
+            self.assertEqual(
+                item.toolTip(), settings_text("en", f"result_window_mode_{mode}_tooltip")
+            )
+            # Every row carries its own indicator, so several can be on at once.
+            self.assertFalse(item.icon().isNull(), mode)
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_the_closed_dropdown_summarises_what_is_on(self):
+        parent, settings = self._result_window_settings()
+        control = settings.result_window_control
+
+        self.assertEqual(control.summary_text(), settings_text("en", "result_window_summary_all"))
+
+        control.toggle_mode("area")
+        two_names = ", ".join((settings_text("en", "result_window_mode_selection"),
+                               settings_text("en", "result_window_mode_main")))
+        # Whether both names fit a 180px control depends on the font, so the
+        # summary is the names when they fit and a count when they do not.
+        # Either way it fits, and the tooltip always spells the names out.
+        summary = control.summary_text()
+        fits = QFontMetrics(control.font()).horizontalAdvance(two_names) <= control.available_text_width()
+        self.assertEqual(
+            summary,
+            two_names if fits
+            else settings_text("en", "result_window_summary_count").format(count=2, total=3),
+        )
+        # The tooltip is not width-bound, so it names the actions in full.
+        long_names = ", ".join((settings_text("en", "result_window_row_selection"),
+                                settings_text("en", "result_window_row_main")))
+        self.assertEqual(control.detail_text(), long_names)
+        self.assertIn(long_names, control.toolTip())
+
+        for mode in main.RESULT_WINDOW_MODES:
+            control.set_mode_checked(mode, False)
+        self.assertEqual(control.summary_text(), settings_text("en", "result_window_summary_none"))
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_a_ticked_row_means_show_and_saves_the_inverse_hidden_modes(self):
+        parent, settings = self._result_window_settings()
+        control = settings.result_window_control
+        self.assertEqual(control.checked_modes(), main.RESULT_WINDOW_MODES)
+
+        control.toggle_mode("selection")
+        self.assertEqual(parent.config["result_window_hidden_modes"], ["selection"])
+
+        control.toggle_mode("main")
+        self.assertEqual(
+            parent.config["result_window_hidden_modes"], ["selection", "main"]
+        )
+
+        control.toggle_mode("selection")
+        self.assertEqual(parent.config["result_window_hidden_modes"], ["main"])
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_every_language_says_what_the_row_controls(self):
+        """"Show:" and one-word rows did not say show what, or after what."""
+        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+            parent, settings = self._result_window_settings(lang=lang)
+            control = settings.result_window_control
+
+            header = settings_text(lang, "result_window_modes_header")
+            self.assertTrue(header, lang)
+            self.assertEqual(control.model().item(0).text(), header)
+            for mode in main.RESULT_WINDOW_MODES:
+                row = settings_text(lang, f"result_window_row_{mode}")
+                short = settings_text(lang, f"result_window_mode_{mode}")
+                self.assertTrue(row, (lang, mode))
+                # A row says more than the abbreviation in the closed control.
+                self.assertGreater(len(row), len(short), (lang, mode, row))
+                self.assertEqual(control._item(mode).text(), row)
+            # The label names the setting and still fits its own column.
+            label = settings.result_window_label
+            self.assertLessEqual(
+                QFontMetrics(label.font()).horizontalAdvance(label.text()),
+                label.width(),
+                (lang, label.text()),
+            )
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_the_copy_checkbox_label_is_never_clipped(self):
+        """It shares its line with the Show-window picker, so anything past the
+        box is drawn over by that control — which is what happened to the longer
+        languages while the box was a flat 260px."""
+        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+            parent, settings = self._result_window_settings(lang=lang)
+            box = settings.copy_translated_checkbox
+            self.assertGreaterEqual(box.width(), box.sizeHint().width(), (lang, box.text()))
+            # Its own text must not be the thing that needs the room: the label
+            # dropped "automatically", which was only ever restating the point.
+            for word in ("automatically", "сразу", "automaticamente", "automatisch",
+                         "automatiquement", "自动"):
+                self.assertNotIn(word, box.text().lower(), (lang, box.text()))
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_the_rows_are_repainted_for_the_light_theme(self):
+        """The ticks are pixmaps, so a theme switch has to redraw them rather
+        than restyle them."""
+        parent, settings = self._result_window_settings(hidden=("area",))
+        control = settings.result_window_control
+        # An unticked box is the one that carries the theme: a ticked one is
+        # accent-filled in both palettes.
+        before = control._item("area").icon().pixmap(18, 18).toImage()
+
+        parent.current_theme = "Светлая"
+        settings.apply_theme()
+        self.app.processEvents()
+
+        self.assertFalse(control._dark)
+        after = control._item("area").icon().pixmap(18, 18).toImage()
+        self.assertNotEqual(before, after)
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_saved_modes_are_restored_when_the_screen_reopens(self):
+        parent, settings = self._result_window_settings(hidden=("area", "main"))
+        control = settings.result_window_control
+        states = {
+            mode: control.is_mode_checked(mode) for mode in main.RESULT_WINDOW_MODES
+        }
+        self.assertEqual(states, {"selection": True, "area": False, "main": False})
+        settings.close()
+        parent.close()
+        self.app.processEvents()
+
+    def test_the_summary_fits_the_closed_control_in_every_language(self):
+        """The window cannot grow, so the summary has to fit at its widest."""
+        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+            parent, settings = self._result_window_settings(lang=lang)
+            label = settings.result_window_label
+            control = settings.result_window_control
+            metrics = QFontMetrics(control.font())
+            usable = control.available_text_width()
+            # Every combination the user can reach, including the ones whose
+            # names are too long and have to collapse to a count.
+            for bits in range(1 << len(main.RESULT_WINDOW_MODES)):
+                on = [mode for index, mode in enumerate(main.RESULT_WINDOW_MODES)
+                      if bits & (1 << index)]
+                control.set_checked_modes(on)
+                summary = control.summary_text()
+                self.assertTrue(summary, (lang, on))
+                self.assertLessEqual(
+                    metrics.horizontalAdvance(summary), usable, (lang, on, summary)
+                )
+            self.assertLessEqual(
+                QFontMetrics(label.font()).horizontalAdvance(label.text()),
+                label.width(),
+                (lang, label.text())
+            )
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_the_new_row_does_not_push_content_out_of_the_fixed_window(self):
+        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+            parent, settings = self._result_window_settings(lang=lang)
+            lowest = max(
+                child.mapTo(settings, child.rect().bottomLeft()).y()
+                for child in settings.findChildren(QWidget)
+                if child.isVisible()
+            )
+            self.assertLessEqual(lowest, settings.height(), lang)
             settings.close()
             parent.close()
             self.app.processEvents()

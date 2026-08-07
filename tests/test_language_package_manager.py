@@ -19,7 +19,12 @@ import argos_worker  # noqa: E402
 import ocr  # noqa: E402
 import platform_support  # noqa: E402
 import translater  # noqa: E402
-from settings_window import OcrLanguageManagerDialog, TesseractInstallProgressDialog  # noqa: E402
+from settings_window import (  # noqa: E402
+    OcrLanguageManagerDialog,
+    TesseractInstallProgressDialog,
+    engine_text,
+    language_manager_text,
+)
 from languages import LANGUAGES  # noqa: E402
 
 
@@ -45,6 +50,24 @@ class _ManagerOwner(QWidget):
         self._tesseract_install_in_progress = False
         self._easyocr_install_in_progress = False
         self._rapidocr_install_in_progress = False
+        self._hymt_install_in_progress = False
+        self.hymt_present = False
+        self.hymt_installs = 0
+        self.hymt_removals = 0
+
+    def _hymt_installed(self):
+        return self.hymt_present
+
+    def _local_hymt_dir(self):
+        return str(ROOT / "translators" / "hymt")
+
+    def start_hymt_install(self, progress_owner=None):
+        self.hymt_installs += 1
+        self.last_progress_owner = progress_owner
+
+    def remove_hymt_engine(self):
+        self.hymt_removals += 1
+        self.hymt_present = False
 
     def _find_available_tesseract_exe(self):
         return self.tesseract_path
@@ -128,6 +151,28 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.dialog.progress_dialog = None
         progress.close()
 
+    def test_back_button_route_also_keeps_the_install_in_background(self):
+        self.dialog._install_in_progress = True
+        progress = TesseractInstallProgressDialog(
+            self.dialog,
+            title="Windows OCR",
+            in_progress_attr="_install_in_progress",
+        )
+        self.dialog.progress_dialog = progress
+        self.dialog.show()
+        progress.show()
+        self.app.processEvents()
+
+        self.dialog.accept()
+
+        self.assertFalse(progress.isVisible())
+        self.assertFalse(self.dialog.isVisible())
+        self.assertTrue(progress._user_minimized)
+        self.assertTrue(self.dialog._install_in_progress)
+        self.dialog._install_in_progress = False
+        self.dialog.progress_dialog = None
+        progress.close()
+
     def tearDown(self):
         self.dialog.close()
         self.owner.close()
@@ -151,7 +196,9 @@ class LanguagePackageDialogTest(unittest.TestCase):
         if platform_support.supports_windows_ocr():
             expected_ocr_titles.insert(0, "Windows")
         self.assertEqual(ocr_titles, expected_ocr_titles)
-        self.assertEqual(translation_titles, ["Argos"])
+        # Hy-MT is a translator you install and remove, so it has a tab of its
+        # own here; that used to be possible only from the × in the picker.
+        self.assertEqual(translation_titles, ["Hy-MT", "Argos"])
         self.assertEqual(self.dialog.rapidocr_table.rowCount(), 4)
         packages = {
             self.dialog.rapidocr_table.item(row, 2).text()
@@ -964,6 +1011,253 @@ class ArgosPackageManagerApiTest(unittest.TestCase):
         self.assertFalse(catalog["error"])
         self.assertEqual(installed["installed"], [["en", "de"]])
         self.assertEqual(removed["removed"], [["en", "de"]])
+
+
+class EngineRemovalPlacementTest(unittest.TestCase):
+    """Removing an engine used to be a 16px × inside the picker in Settings.
+
+    It lives on the engine's own tab now, opposite the note, next to where the
+    engine is installed — including Hy-MT, which had no tab at all and could
+    therefore only be removed from that ×.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        self.parent = _AppParent()
+        self.owner = _ManagerOwner(self.parent)
+        timer_patch = mock.patch("settings_window.QtCore.QTimer.singleShot")
+        self.addCleanup(timer_patch.stop)
+        timer_patch.start()
+        self.dialog = OcrLanguageManagerDialog(self.owner)
+
+    def tearDown(self):
+        self.dialog.close()
+        self.owner.close()
+        self.parent.close()
+
+    def _removable(self):
+        return {
+            "tesseract": self.dialog.tesseract_table,
+            "easyocr": self.dialog.easyocr_table,
+            "rapidocr": self.dialog.rapidocr_table,
+            "hymt": self.dialog.hymt_table,
+        }
+
+    def test_every_installable_engine_can_be_removed_from_its_tab(self):
+        for name, table in self._removable().items():
+            button = getattr(table, "_package_remove_engine_button", None)
+            self.assertIsNotNone(button, name)
+            self.assertTrue(button.text().strip(), name)
+            # Its own sheet: a rule in the dialog's stylesheet is outranked by
+            # the settings window this dialog is a child of.
+            self.assertIn("languagePackageEngineRemove", button.styleSheet(), name)
+
+    def test_engines_that_cannot_be_removed_have_no_button(self):
+        """Windows OCR belongs to the OS and Argos is per-direction."""
+        for name in ("windows_table", "argos_table"):
+            table = getattr(self.dialog, name, None)
+            if table is None:
+                continue
+            self.assertIsNone(getattr(table, "_package_remove_engine_button", None), name)
+
+    def test_the_button_hides_while_the_engine_is_missing(self):
+        table = self.dialog.hymt_table
+        button = table._package_remove_engine_button
+        self.dialog.show()
+        self.app.processEvents()
+
+        # isHidden, not isVisible: this page belongs to a tab that is not the
+        # current one, so nothing on it is on screen either way.
+        self.owner.hymt_present = False
+        self.dialog._populate_hymt_table(table)
+        self.assertTrue(button.isHidden(), "nothing to remove yet")
+
+        self.owner.hymt_present = True
+        self.dialog._populate_hymt_table(table)
+        self.app.processEvents()
+        self.assertFalse(button.isHidden())
+
+    def test_removal_goes_through_the_owner(self):
+        """The confirmation and the deletion live in SettingsWindow; the dialog
+        only routes to them."""
+        self.owner.hymt_present = True
+        self.dialog._remove_hymt_engine()
+        self.assertEqual(self.owner.hymt_removals, 1)
+
+    def test_the_hymt_tab_lists_what_the_engine_is_made_of(self):
+        self.owner.hymt_present = True
+        self.dialog._populate_hymt_table(self.dialog.hymt_table)
+        rows = [
+            self.dialog.hymt_table.item(row, 2).text()
+            for row in range(self.dialog.hymt_table.rowCount())
+        ]
+        self.assertIn("Hy-MT", rows)
+        self.assertIn("hymt", rows)
+
+    def test_installing_hymt_goes_through_the_owner(self):
+        self.owner.hymt_present = False
+        self.dialog._install_hymt_engine()
+        self.assertEqual(self.owner.hymt_installs, 1)
+
+
+class _SettingsParent(QWidget):
+    def __init__(self, lang="ru"):
+        super().__init__()
+        self.current_interface_language = lang
+        self.current_theme = "Темная"
+        self.config = {"autostart": False, "start_minimized": False,
+                       "ocr_engine": "Windows", "translator_engine": "google"}
+        self.start_minimized = False
+        self.autostart = False
+
+    def save_config(self):
+        pass
+
+    def set_autostart(self, value):
+        return bool(value)
+
+
+class LanguageManagerFollowsInterfaceLanguageTest(unittest.TestCase):
+    """The dialog builds all of its text once, from the language it was created
+    with, and it is kept alive between openings — so switching the interface
+    language used to leave it in the old one until the app restarted."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from settings_window import SettingsWindow
+
+        self.parent = _SettingsParent("ru")
+        probe = mock.patch.object(OcrLanguageManagerDialog, "_start_runtime_probe")
+        catalog = mock.patch.object(OcrLanguageManagerDialog, "_start_argos_catalog_refresh")
+        tesseract = mock.patch.object(SettingsWindow, "_find_local_tesseract_exe",
+                                      return_value="tesseract.exe")
+        for patch in (probe, catalog, tesseract):
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.settings = SettingsWindow(self.parent)
+
+    def tearDown(self):
+        dialog = self.settings._language_manager_dialog
+        if dialog is not None:
+            dialog.close()
+        self.settings.close()
+        self.parent.close()
+        self.app.processEvents()
+
+    def test_switching_while_it_is_open_rebuilds_it_in_the_new_language(self):
+        self.settings.show_ocr_language_manager()
+        first = self.settings._language_manager_dialog
+        self.assertEqual(first.lang, "ru")
+        russian_title = first.title_label.text()
+
+        self.parent.current_interface_language = "es"
+        self.settings.update_language()
+        self.app.processEvents()
+
+        second = self.settings._language_manager_dialog
+        self.assertIsNotNone(second)
+        self.assertEqual(second.lang, "es")
+        self.assertNotEqual(second.title_label.text(), russian_title)
+        self.assertTrue(second.isVisible(), "it was open, so it stays open")
+
+    def test_the_open_tab_survives_the_rebuild(self):
+        self.settings.show_ocr_language_manager()
+        opened = self.settings._language_manager_dialog
+        opened.tabs.setCurrentIndex(1)
+        opened.translation_tabs.setCurrentIndex(1)
+
+        self.parent.current_interface_language = "de"
+        self.settings.update_language()
+        self.app.processEvents()
+
+        rebuilt = self.settings._language_manager_dialog
+        self.assertEqual(rebuilt.tabs.currentIndex(), 1)
+        self.assertEqual(rebuilt.translation_tabs.currentIndex(), 1)
+
+    def test_a_closed_dialog_is_rebuilt_when_it_is_opened_again(self):
+        self.settings.show_ocr_language_manager()
+        self.settings._language_manager_dialog.close()
+
+        self.parent.current_interface_language = "fr"
+        self.settings.update_language()
+        self.app.processEvents()
+        self.settings.show_ocr_language_manager()
+
+        self.assertEqual(self.settings._language_manager_dialog.lang, "fr")
+
+    def test_an_install_in_progress_is_never_pulled_out_from_under_the_user(self):
+        """That window owns the progress dialog and the worker's cancel flag."""
+        self.settings.show_ocr_language_manager()
+        busy = self.settings._language_manager_dialog
+        busy._install_in_progress = True
+
+        self.parent.current_interface_language = "es"
+        self.settings.update_language()
+        self.app.processEvents()
+
+        self.assertIs(self.settings._language_manager_dialog, busy)
+        self.assertEqual(busy.lang, "ru")
+
+        # Opening Language packages again while that task is still alive must
+        # not let the cached-dialog language check destroy its worker state.
+        self.settings.show_ocr_language_manager()
+        self.assertIs(self.settings._language_manager_dialog, busy)
+        self.assertEqual(busy.lang, "ru")
+
+        # It is replaced the next time it is opened instead.
+        busy._install_in_progress = False
+        busy.close()
+        self.settings.show_ocr_language_manager()
+        self.assertEqual(self.settings._language_manager_dialog.lang, "es")
+
+    def test_reopening_a_busy_manager_does_not_start_a_second_servicing_query(self):
+        self.settings.show_ocr_language_manager()
+        busy = self.settings._language_manager_dialog
+        busy._install_in_progress = True
+        busy.hide()
+
+        with mock.patch.object(busy, "refresh_all") as refresh, mock.patch.object(
+            busy, "_start_runtime_probe"
+        ) as runtime_probe:
+            self.settings.show_ocr_language_manager()
+
+        refresh.assert_not_called()
+        runtime_probe.assert_not_called()
+        self.assertTrue(busy.isVisible())
+
+    def test_settings_button_carries_quiet_background_status(self):
+        self.settings.set_language_package_task_status(
+            "Windows OCR: installing Russian", percent=37, kind="running"
+        )
+        self.assertTrue(
+            self.settings.ocr_languages_btn.text().startswith(
+                language_manager_text("ru", "task_packages_short")
+            )
+        )
+        self.assertIn(
+            language_manager_text("ru", "task_installing_short"),
+            self.settings.ocr_languages_btn.text(),
+        )
+        self.assertNotIn("37%", self.settings.ocr_languages_btn.text())
+        self.assertIn("installing Russian", self.settings.ocr_languages_btn.toolTip())
+
+        self.settings.set_language_package_task_status(
+            "Windows OCR: ready", percent=100, kind="done"
+        )
+        self.assertIn(engine_text("ru", "done"), self.settings.ocr_languages_btn.text())
+        self.assertNotIn("✓", self.settings.ocr_languages_btn.text())
+        self.assertTrue(self.settings.ocr_languages_btn.property("packageTaskDone"))
+
+        self.settings.show_ocr_language_manager()
+        self.assertNotIn(engine_text("ru", "done"), self.settings.ocr_languages_btn.text())
+        self.assertEqual(self.settings._language_package_task_state["kind"], "idle")
+        self.assertFalse(self.settings.ocr_languages_btn.property("packageTaskDone"))
 
 
 if __name__ == "__main__":

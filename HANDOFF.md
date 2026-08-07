@@ -936,6 +936,56 @@ Also closed: **RapidOCR is now bundled into the Linux OcrWorker** (`requirements
 runtime install. Verified by sending a real image to the packaged worker and comparing the text.
 The build grows to ~700 MB unpacked, 255 MB as an AppImage.
 
+### 13.3f A build that exited 0 and produced an unusable exe
+
+Reported symptom: `dist\ClicknTranslate\ClicknTranslate.exe` opened
+"Failed to execute script 'pyiboot01_bootstrap' … Failed to setup PYZ archive reader!".
+PyInstaller had reported success and the suite was green.
+
+**What the evidence showed** (PyInstaller 6.20.0, Python 3.12.10, Windows 10.0.19045):
+
+| Artifact | State |
+| --- | --- |
+| `build\ClicknTranslate\PYZ-00/01/02.pyz` | all three valid, `50 59 5A 00` magic |
+| `build\ClicknTranslate\ClicknTranslate.pkg` | **valid** — PYZ magic at offset 178,943, no zero runs |
+| GUI exe (build and dist, same bytes) | embedded `PYZ.pyz` had its **first 1,048,576 bytes zeroed** |
+| `ArgosWorker.exe`, `OcrWorker.exe` | both fine, and both run |
+
+The corruption was **zeroed in place, not shifted**: `embedded[1 MiB:] == PYZ-00.pyz[1 MiB:]`
+byte for byte, and the zeroed region starts at the PYZ entry's offset inside the appended
+archive, not at any file or section boundary.
+
+So the standalone archive was correct and the copy inside the executable was not: the damage
+happened while the archive was being appended, after which PyInstaller still exited 0.
+
+**Not the cause** (each checked, not assumed):
+- *UPX, the icon, the manifest* — a minimal spec reproducing all three (`icon` + `manifest` +
+  `upx=True`, PYZ > 1 MiB) built clean.
+- *Several EXE/PYZ in one spec* — the two worker executables in the same spec were never
+  affected, and their PYZs are built by the same code.
+- *A poisoned build cache* — the cached `.pkg` on disk was intact; the exe built from it was not.
+
+**Reproducibility: none.** Rebuilding from the same spec, cache and toolchain produced a clean
+executable, verified by reading the embedded archive back and by launching the app.
+
+That leaves something touching the file between the write and the append — a running copy of
+the app (one build in that session already died with `WinError 32` on `ArgosWorker.exe`), an
+interrupted previous build, or the on-access scanner. Windows Defender is the active
+antivirus on this machine and `C:\Users\Home-PC\Desktop\clickntranslate` is not excluded;
+excluding the working tree is worth doing before a release build.
+
+**The durable fix — the build now verifies its own output.** Both specs end with
+`_verify_frozen_executables()`, which opens each shipped executable, extracts its embedded
+PYZ and fails the build unless the payload starts with the `PYZ\0` magic. It names the file
+and the number of leading zero bytes, and says what usually causes it. Proven both ways: it
+accepts the real build and rejects the same build with a mebibyte zeroed at the PYZ entry.
+Covered by `tests/test_build_integrity.py`.
+
+**Also worth fixing: the smoke test that called the broken build healthy.** It only asked
+whether the process was still alive after 8 seconds — and a PyInstaller bootstrap failure
+keeps the process alive behind a modal error box. A smoke test has to inspect the window
+titles (or drive the app), never just liveness.
+
 ### 13.4 Not verified — needs a real desktop session
 
 Screen capture on X11 and Wayland, the selection overlay, the tray icon, and the desktop
@@ -948,3 +998,284 @@ The Wayland portal path in particular is written against the spec and reviewed, 
 not enforce a version yet — the WSL environment is Python 3.10. Before shipping a Linux build
 that must support runtime EasyOCR/RapidOCR installs, decide which interpreter the Linux engine
 installer targets and add the same guard to `ClicknTranslate-linux.spec`.
+
+---
+
+## 14. The settings window is a fixed size — read this before styling it
+
+`SettingsWindow` and `OcrLanguageManagerDialog` are both fixed-size windows. Nothing can be
+solved by giving a control more room: there is none. Two rounds of styling were spent
+learning that, so it is written down here.
+
+### 14.1 The drop-down fields have no outline, deliberately
+
+The three pickers on the right (OCR / Translate / Show window) draw **no border**. Do not
+add one back.
+
+A 1px CSS border cannot render evenly here. Measured on the real display, `QComboBox.grab()`
+in the focused state:
+
+| display scaling | device pixel ratio | what Qt drew |
+|---|---|---|
+| 100% | 2.0 | 2 solid device px per edge |
+| 125% | 2.5 | 2 solid px **plus a half-lit third row** (`#604e78` instead of `#a985d2`) |
+| 150% | 3.0 | 3 solid px plus a partial row |
+
+The half-lit row lands on one edge only, so that edge reads thicker and softer than the other
+three — the field looks crooked. Painting the stroke on the device-pixel grid (whole device
+pixels, rect snapped with `round(v * dpr) / dpr`) did fix the measurement, but the user's
+verdict on the result was still "the outline is bad, delete it", so it is gone.
+
+What replaces it, in `_engine_combo_style()`:
+
+- the field reads as a field from its own darker fill (`#17181d` on dark, `#ffffff` on light)
+  against the window;
+- hover, focus and open lift that fill (`#221f2c` / `#f2eef8`) instead of drawing a line;
+- `border: 1px solid transparent` stays in the rule — **not** `border: none` — so the box
+  model keeps its 1px ring and the text does not shift by a pixel between states.
+
+Locked in by `tests/test_settings_appearance.py::DropDownFrameTest`: the field must be one
+flat colour from its first row of pixels to its last, no rule may contain a coloured border,
+and opening the list must still change the fill.
+
+### 14.2 Things that are already correct, so do not "fix" them
+
+- **Field margins are symmetric** (`margin-left`/`margin-right: 3px`). They were 6/0, which
+  put the box flush against the widget edge.
+- **The lists open below the field**, 3px clear of it (`DropDownCombo.showPopup`). Qt's
+  default lines the current row up with the closed control, so a long list covered the field.
+- **The package tables snap to whole rows** (`_snap_table_to_whole_rows`). Measure only while
+  the table is uncapped, once the layout has settled — measuring a capped table and capping it
+  again shaves a row off on every pass.
+- **Tab bars carry their own font** (`_apply_tab_bar_font`). A tab bar measures its tabs with
+  the widget font and paints them with the stylesheet font; with the size declared only in the
+  stylesheet, every tab was sized for the 6pt default and the labels ran over each other.
+
+### 14.3 A NameError in a paint handler kills the process
+
+`main.py` imports names *from* `PyQt5.QtGui`; it does not import the module. A `QtGui.QPainter`
+reference inside `paintEvent` therefore raises `NameError`, and PyQt turns an exception in a
+virtual method into `qFatal` — the process aborts with no traceback and no output at all. If a
+window dies silently right after a paint-related change, that is the first thing to check.
+
+### 14.4 Engines are installed and removed in Language packages, not in the picker
+
+The OCR and Translate pickers used to carry a 16px `×` that removed the selected
+engine. It is gone. Each engine's tab in Language packages now has a **Remove engine**
+button at the top right, opposite the note, where installing it already lived:
+
+| tab | install | remove |
+|---|---|---|
+| Windows | Windows Features on Demand | — (belongs to the OS) |
+| Tesseract / EasyOCR / RapidOCR | empty-state card | top-right button |
+| Hy-MT | empty-state card | top-right button |
+| Argos | per direction, in the table | — (per direction) |
+
+Hy-MT had no tab at all, which is why the `×` could not simply be deleted: removing it
+would have left Hy-MT with no way to be uninstalled. It has its own tab in the
+Translation section now, listing the engine and its local model.
+
+Two things that will catch you here:
+
+- **The dialog's own stylesheet loses to the settings window's.** `OcrLanguageManagerDialog`
+  is a child of `SettingsWindow`, and an ancestor's more specific selector wins over an
+  ID rule set on the dialog. Buttons inside the tabs therefore carry their own stylesheet
+  (`_engine_remove_button_style`), the same way the Install/Remove-language buttons always
+  have.
+- **`_populate_hymt_table` probes the owner defensively** (`getattr(self.owner, "_hymt_installed", None)`).
+  A stub owner that lacks a probe means "not installed", not a crash while the dialog is
+  being built.
+
+### 14.5 Labels are sized from their own text, not from a fixed number
+
+"Copy translated text automatically" was clipped in Russian and Spanish: the check box was
+a flat `min-width: 260px` and shares its row with the Show-window picker, so the overflow was
+drawn over by that control. The word "automatically" is gone from all six languages (it only
+restated what the setting does), and the box is now sized from `sizeHint()` in
+`_fit_copy_translated_checkbox`, called from `apply_theme` — the theme sets the font it is
+measured with, so it cannot be worked out at construction time. 260px stays as a floor so
+the English window is unchanged. Covered by
+`test_the_copy_checkbox_label_is_never_clipped`.
+
+### 14.6 The package manager is kept alive between openings — retranslate it
+
+`SettingsWindow._language_manager_dialog` caches `OcrLanguageManagerDialog`, and that dialog
+builds every string once, from `self.lang` captured in its constructor. Switching the
+interface language therefore left it in the old language until the app restarted — the
+settings window went Spanish while the packages window stayed Russian.
+
+`update_language()` now calls `_relanguage_language_manager()`, which throws the dialog away
+and builds a new one when the language no longer matches. It keeps the open section and
+engine tab and the window's geometry, so the user lands where they were. `show_ocr_language_manager()`
+does the same check before reusing a cached dialog.
+
+The one exception: **an install in progress is never swapped out** — that dialog owns the
+progress window and the worker's cancel flag. It is left alone and replaced the next time it
+is opened. Covered by `LanguageManagerFollowsInterfaceLanguageTest`.
+
+If you add another long-lived dialog, it needs the same treatment; everything else in the app
+is built per-open and picks the language up for free.
+
+---
+
+## 15. Windows OCR installs: what the numbers mean
+
+Installing a Windows OCR language is `dism.exe /Online /Add-Capability` against a Feature on
+Demand that Windows Update has to fetch. Two properties of that mechanism drive the whole
+design:
+
+1. **Microsoft promises no ETA.** Its OCR and PowerToys documentation says installation may
+   take several minutes; measured DISM runs on this machine sat on one component percentage
+   for several minutes and took as long as 16.5 minutes for one language.
+2. **CBS.log has two different signals, neither is an ETA.**
+   `%windir%\Logs\CBS\CBS.log` gets
+   `DownloadProgress: [ 49 / 100 ]` written every couple of seconds while the payload comes
+   down. Whether that file is still growing is how you tell "slow" from "wedged" — it is the
+   diagnostic used here. Log growth only proves the service is responding: Windows can repeat
+   the same `94 / 100` line for ten minutes. Only a changed download/DISM percentage is actual
+   progress. The CBS value is scoped from the start of the current component and presented as
+   **Windows Update download**, never as the remaining time or whole-job progress.
+
+### 15.1 What the installer script reports
+
+`_windows_ocr_installer_script` runs elevated, so it can read CBS.log. Its status JSON now
+carries three fields beyond the percentage:
+
+| field | meaning |
+|---|---|
+| `download` | last `DownloadProgress: [n / 100]` from CBS.log, or `-1` when unknown |
+| `quiet` | seconds since either dism's component percentage or the download percentage changed |
+| `restart` | dism answered 3010 — installed, but Windows wants a reboot |
+
+Only the tail of the log is read (64 KB, `FileShare::ReadWrite`, seek from the end) and only
+every ~2 s (`$tick % 8`), while the loop itself keeps spinning at 250 ms so Cancel stays
+responsive. Reading it whole every tick would cost more than the install.
+
+### 15.2 What the user sees
+
+- **Before starting:** the realistic expectation — 5–20 minutes per language, the percentage
+  will sit still, it is Windows Update doing it, and it keeps going in the background because
+  the work belongs to a Windows service.
+- **While running:** `Language N/M`, one of four stages (check, Basic, OCR, verify), elapsed
+  time, Windows Update's named download percentage (when available), and whether Windows is
+  still responding. The bar is explicitly the percentage of the **current DISM component**.
+  There is no synthetic whole-job percentage: Basic and OCR do not
+  take equal time, so the former 50/50 calculation produced convincing but false values such
+  as 33%. The dialog states that Windows Update controls the remaining time.
+- **After 5 minutes without changed progress** (`WINDOWS_OCR_QUIET_WARNING_SECONDS`): a line
+  says that Windows is still responding but the download may be stalled, and offers the two
+  honest choices: keep waiting in the background or cancel safely. Repeated identical CBS lines
+  no longer reset this timer.
+- **On 3010:** the language is reported as pending a restart instead of ready, because the OCR
+  engine will not see it until the machine reboots.
+
+The Windows OCR progress dialog reserves its final 560 px layout and a five-line message area
+before the first frame. It therefore neither clips the stall explanation nor jumps from a small
+window to a large one when installation begins. Other installers retain dynamic sizing.
+
+Covered by `tests/test_windows_ocr_progress.py`.
+
+### 15.3 "Restart Windows and try again" was usually wrong
+
+A failure whose text merely contained the word **restart** was reported as
+`win_error_service` — "Windows component servicing is busy or needs a restart. Restart
+Windows and try again." A user hit it on a machine with **no pending reboot at all**: CBS
+`RebootPending`, CBS `PackagesPending` and WU `RebootRequired` were all absent. The advice
+sent them to reboot for nothing.
+
+Three changes:
+
+1. **The advice is checked against the machine.** `_windows_reboot_pending()` reads those three
+   registry keys directly (no extra DISM session) and picks between `win_error_restart` and
+   the new `win_error_busy`, which says to wait a minute and retry and that no restart is
+   needed. `0x800f0902` (another servicing operation is running) maps here too.
+2. **The raw text goes behind Details** in the failure dialog, and stays in the log
+   (`_last_task_error_details`). Before this, diagnosing a failure meant reading
+   `C:\Windows\Logs\DISM\dism.log` by hand — which is how this one was found.
+3. **Our own queries and the full elevated servicing run are serialised.** `dism.log` showed three `Get-WindowsCapability`
+   sessions against the online image inside the same second — the package tab, the runtime
+   probe and the post-install verification all asking at once. Overlapping sessions on the
+   online image are a cause of "servicing is busy", so every query now goes through the
+   module-level `_WINDOWS_SERVICING_LOCK`; the elevated installer/remover holds that same lock
+   until it exits. Reopening Language packages during a running install skips refresh/probe
+   calls rather than queueing another DISM session.
+
+When triaging one of these, note that `dism.log` records **every** DISM session including our
+read-only probes. If there is no `Add-Capability` entry near the failure, the install never
+reached dism and the fault is earlier — in the elevated script, in elevation itself, or in a
+query that threw.
+
+### 15.4 The generated PowerShell must be parsed by PowerShell in tests
+
+The install failure in §15.3 turned out to be **our bug, not Windows'**. The restart-pending
+line was written into the installer script as:
+
+```
+$resultText = if ($Script:RestartRequired) { 'OK_RESTART' } else { 'OK' }
+```
+
+These scripts are built with f-strings, where a literal brace has to be **doubled**. A single
+one is not a Python error — `{ 'OK_RESTART' }` is a perfectly valid f-string expression — so it
+was evaluated and spliced in bare:
+
+```
+$resultText = if ($Script:RestartRequired) OK_RESTART else OK
+```
+
+PowerShell rejected the file with `MissingStatementBlock` before running a line of it, which is
+why `dism.log` showed no `Add-Capability` anywhere near the failure.
+
+Two guards now:
+
+1. `tests/test_windows_ocr_progress.py::GeneratedPowerShellParsesTest` writes every generated
+   script to a temp file and runs
+   `[System.Management.Automation.Language.Parser]::ParseFile` over it (Windows only; the
+   brace-balance check runs everywhere). Verified to fail on the broken line and pass on the
+   fixed one.
+2. The error mapper no longer treats a parse error as a Windows state — `ParserError`,
+   `MissingStatementBlock` and friends map to the generic message, and the reboot heuristic
+   matches `restart` / `reboot` as **whole words**, so the string `OK_RESTART` inside a quoted
+   line is not a verdict about the machine.
+
+**When editing these scripts, remember every literal `{` and `}` must be doubled.** The tests
+will catch it now, but the failure mode is silent at the Python level.
+
+### 15.5 Background work stays visible without a notification sound
+
+"Continue in background", the title-bar close button and the package manager's Back button
+now all preserve the same running task. The package manager shows a persistent one-line state
+and a localized **Show** button that restores the original progress window. If the manager is
+closed, the Settings **Language packages** button carries the localized word **Installing**,
+then a green localized **Done** on success or `!` on failure; its tooltip has the full status.
+Opening Language packages acknowledges and clears **Done** (the failure marker remains visible).
+A raw component value
+such as `58%` is deliberately not placed on that button because it looks like whole-job progress.
+
+This deliberately does not use a Windows toast: those can play the system notification sound,
+and Click'n'Translate is required to remain silent. Completion is visible on the normal route
+back to the package manager without stealing focus. Covered by
+`BackgroundProgressCanBeReopenedTest`, the two package-manager close-route tests and the
+settings-button status test.
+
+### 15.6 One package mutation at a time
+
+While any package install/removal is active, every install/remove/engine action and **Refresh**
+is temporarily disabled. Tabs, tables and checkboxes stay usable, so the user can prepare the
+next selection without losing it. **Show** restores the existing progress dialog. A second call
+that gets through programmatically restores the first task and returns; it is never silently
+queued, because an automatic follow-up minutes later could unexpectedly trigger another UAC
+prompt. Controls return to their previous enabled state when the task finishes.
+
+## 16. Fixed-window text must not be one compressible rich-text label
+
+The Settings action occupies one third of a 700 px window. While a task badge is present it uses
+the localized short base (`Packages`, `Пакеты`, etc.); the full `Language packages` label returns
+when idle. This prevents `Language packages · Installing` from losing its first/last letters.
+
+The four hotkeys on the main screen are separate caption/value label pairs, each sized from its
+real font metrics, given a 22 px text height, and given 5 px of trailing glyph room. That last
+margin is intentional: `horizontalAdvance()` excludes the anti-aliased right edge of a bold
+final `C`, `F`, `T` or `Q`, so an exactly-sized label visibly shaves the letter. Do not recombine
+them into one rich-text QLabel
+with `&nbsp;`: the layout can compress that label to make room for the OCR/translator name and Qt
+then clips individual shortcut characters without any ellipsis or warning.

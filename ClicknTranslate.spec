@@ -397,3 +397,67 @@ coll = COLLECT(
     upx_exclude=[],
     name='ClicknTranslate',
 )
+
+
+# One build produced a GUI executable whose embedded PYZ had its first mebibyte
+# overwritten with zeros. Every standalone artifact on disk was intact — the
+# PYZ file, the PKG archive — so the damage happened while the archive was
+# being appended to the executable, and PyInstaller still exited 0. The app
+# then died at startup with "Failed to setup PYZ archive reader!".
+#
+# A packaging failure that survives a green build must not reach a user, so the
+# build now reads its own output back and refuses to finish if an executable
+# cannot serve its archive.
+def _verify_frozen_executables(dist_root):
+    from PyInstaller.archive.readers import CArchiveReader
+
+    executables = [
+        _os.path.join(dist_root, 'ClicknTranslate.exe'),
+        _os.path.join(dist_root, '_internal', 'ArgosWorker.exe'),
+        _os.path.join(dist_root, '_internal', 'OcrWorker.exe'),
+    ]
+
+    problems = []
+    for path in executables:
+        if not _os.path.isfile(path):
+            problems.append(f'{_os.path.basename(path)}: missing from the build')
+            continue
+        try:
+            reader = CArchiveReader(path)
+        except Exception as exc:
+            problems.append(f'{_os.path.basename(path)}: unreadable archive ({exc})')
+            continue
+
+        entries = [name for name in reader.toc if name.endswith('.pyz')]
+        if not entries:
+            problems.append(f'{_os.path.basename(path)}: no PYZ archive embedded')
+            continue
+
+        for entry in entries:
+            try:
+                payload = reader.extract(entry)
+                payload = payload[1] if isinstance(payload, tuple) else payload
+            except Exception as exc:
+                problems.append(f'{_os.path.basename(path)}: cannot extract {entry} ({exc})')
+                continue
+            # The reader validates the magic itself, but check explicitly so a
+            # zero-filled payload is named for what it is.
+            if not payload.startswith(b'PYZ\0'):
+                zeros = len(payload) - len(payload.lstrip(b'\0'))
+                problems.append(
+                    f'{_os.path.basename(path)}: {entry} is corrupt — '
+                    f'{zeros:,} leading zero bytes of {len(payload):,}'
+                )
+
+    if problems:
+        raise SystemExit(
+            'Build produced unusable executables:\n  ' + '\n  '.join(problems)
+            + '\n\nThe archive is appended to the executable after it is written, so this is '
+              'usually another process touching the file: a running copy of the app, an '
+              'interrupted previous build, or an on-access virus scanner. Close any running '
+              'instance and rebuild with --clean.'
+        )
+    print(f'Verified embedded archives in {len(executables)} executables.')
+
+
+_verify_frozen_executables(_os.path.join(DISTPATH, 'ClicknTranslate'))

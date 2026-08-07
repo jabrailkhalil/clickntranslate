@@ -119,6 +119,29 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             self.assertIn("English", text)
             self.assertIn("Russian", text)
 
+    def test_main_hotkey_pairs_keep_every_character_visible(self):
+        sequences = ("Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q")
+        keys = ("hotkey_copy", "hotkey_ocr_translate", "hotkey_fullscreen", "hotkey_selection")
+        for language_code in main.INTERFACE_TEXT:
+            pairs = [
+                main.DarkThemeApp._create_main_hotkey_pair(
+                    main.ui_text(language_code, key), sequence
+                )
+                for key, sequence in zip(keys, sequences)
+            ]
+            for pair, sequence in zip(pairs, sequences):
+                required = (
+                    pair.caption_label.sizeHint().width()
+                    + pair.value_label.sizeHint().width()
+                    + pair.layout().spacing()
+                    + pair.trailing_glyph_room
+                )
+                self.assertGreaterEqual(pair.width(), required, language_code)
+                self.assertEqual(pair.value_label.text(), sequence)
+
+            for pair in pairs:
+                pair.close()
+
     def test_active_guide_card_is_retranslated_immediately(self):
         harness = SimpleNamespace(
             current_interface_language="ru",
@@ -139,6 +162,40 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 if action == "back_home"
             )
             self.assertIn("Ctrl+Alt+Q", back_home)
+
+    def test_guide_explains_result_window_picker_in_every_language(self):
+        for language_code in main.GUIDE_TEXT:
+            actions = [
+                action
+                for action, _title, _body in main.guide_text(language_code)["steps"]
+            ]
+            self.assertIn("result_window", actions)
+            self.assertLess(actions.index("translator"), actions.index("result_window"))
+            self.assertLess(actions.index("result_window"), actions.index("language_packages"))
+
+    def test_lower_settings_guide_card_stays_above_action_buttons(self):
+        host = main.QWidget()
+        host.resize(700, 400)
+        host._guide_waiting_action = "language_packages"
+        host._guide_bubble = main.QFrame(host)
+        host._guide_bubble.setFixedSize(430, 190)
+        buttons = []
+        for index in range(3):
+            button = main.QPushButton(host)
+            button.setGeometry(5 + index * 225, 278, 225, 36)
+            button.show()
+            buttons.append(button)
+        target = buttons[0]
+        host.show()
+        self.app.processEvents()
+
+        main.DarkThemeApp._position_guide_bubble(host, target)
+
+        self.assertLess(host._guide_bubble.geometry().bottom(), target.geometry().top())
+        for button in buttons:
+            self.assertFalse(host._guide_bubble.geometry().intersects(button.geometry()))
+        host.close()
+        self.app.processEvents()
 
 
 if __name__ == "__main__":

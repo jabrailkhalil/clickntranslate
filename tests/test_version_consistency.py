@@ -16,7 +16,7 @@ def test_release_version_is_synchronized_everywhere():
     version = match.group(1)
     four_part = version + ".0"
 
-    assert version == "1.5.5"
+    assert version == "1.5.6"
     assert f'#define MyAppVersion "{version}"' in _read("installer/ClicknTranslate.iss")
     assert f'version="{four_part}"' in _read("installer/windows/ClicknTranslate.exe.manifest")
     assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateRepair.manifest")
@@ -38,7 +38,7 @@ def test_release_version_is_synchronized_everywhere():
 
 
 def test_readmes_link_to_current_release_assets():
-    version = "1.5.5"
+    version = "1.5.6"
     for relative_path in (
         "README.md",
         "docs/readme/README.ru.md",

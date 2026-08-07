@@ -29,8 +29,14 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
-from PyQt5 import QtCore, QtGui
-from styled_dialogs import StyledMessageBox, TOOLTIP_QSS, tooltip_text
+from PyQt5 import QtCore, QtGui, QtWidgets
+from styled_dialogs import (
+    StyledMessageBox,
+    TOOLTIP_QSS,
+    accent_check_pixmap,
+    install_accent_controls,
+    tooltip_text,
+)
 
 QMessageBox = StyledMessageBox
 from app_version import APP_VERSION
@@ -86,6 +92,10 @@ INNO_UNINSTALL_KEY = (
 )
 
 logger = logging.getLogger("clickntranslate.settings")
+# Windows component servicing takes one caller at a time. Two DISM sessions on
+# the online image answer each other with "servicing is busy", so every query
+# this app makes goes through here rather than racing the others.
+_WINDOWS_SERVICING_LOCK = threading.Lock()
 MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
@@ -317,6 +327,224 @@ def _populate_grouped_translator_combo(
                 Qt.ToolTipRole,
             )
     return engines_by_index
+
+
+class DropDownCombo(QComboBox):
+    """Combo whose list opens under the field instead of on top of it.
+
+    Qt lines the current row up with the closed control, so the list lands one
+    pixel into the field and eats the coloured outline along that edge — and
+    with a long list it can cover the field completely. Dropping it below,
+    clear of the border, is what every other drop-down in this window does.
+    """
+
+    POPUP_GAP = 3
+
+    def showPopup(self):
+        super().showPopup()
+        popup = self.view().window()
+        if popup is None:
+            return
+        top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
+        below = top_left.y() + self.height() + self.POPUP_GAP
+        screen = self._available_screen_rect()
+        if below + popup.height() > screen.bottom():
+            # No room underneath: sit above the field, still clear of it.
+            above = top_left.y() - popup.height() - self.POPUP_GAP
+            below = above if above >= screen.top() else screen.bottom() - popup.height()
+        x = min(top_left.x(), screen.right() - popup.width())
+        popup.move(max(screen.left(), x), below)
+
+    def _available_screen_rect(self):
+        handle = self.window().windowHandle()
+        screen = handle.screen() if handle is not None else None
+        if screen is None:
+            screen = QtWidgets.QApplication.primaryScreen()
+        return screen.availableGeometry()
+
+
+class ResultWindowModeCombo(DropDownCombo):
+    """Drop-down that turns the result window on or off per action.
+
+    The three actions — translating selected text, a screen area, or pressing
+    Translate — are independent switches, not one choice, so an ordinary
+    drop-down cannot express them: picking "Area" would have to mean the other
+    two are off. This keeps the drop-down shape asked for while staying honest
+    about the setting: every row in the list has its own check box, the list
+    stays open while several are toggled, and the closed control summarises
+    what is on.
+    """
+
+    modes_changed = QtCore.pyqtSignal()
+
+    ROW_HEIGHT = 28
+
+    def __init__(self, modes, labels, summaries, dark=True, parent=None,
+                 short_labels=None, header="", header_color="#f4f6fb"):
+        super().__init__(parent)
+        self._modes = tuple(modes)
+        self._summaries = dict(summaries)
+        self._dark = bool(dark)
+        self._help = ""
+        # The closed control has 180px to work with, so it names the modes with
+        # the short words; the list itself has room to spell them out.
+        self._short = dict(short_labels or labels)
+        self._checked = {mode: True for mode in self._modes}
+        self.setModel(QtGui.QStandardItemModel(0, 1, self))
+        self.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+
+        if header:
+            # "Show:" alone does not say show what, or after what. A disabled
+            # first row says it where it is needed, the same way the engine
+            # combos label their Online/Offline groups.
+            head = QtGui.QStandardItem(header)
+            head.setFlags(Qt.NoItemFlags)
+            head_font = head.font()
+            head_font.setBold(True)
+            head.setFont(head_font)
+            head.setForeground(QBrush(QColor(header_color)))
+            head.setSizeHint(QtCore.QSize(0, self.ROW_HEIGHT))
+            self.model().appendRow(head)
+
+        for mode in self._modes:
+            item = QtGui.QStandardItem(labels[mode])
+            item.setData(mode, Qt.UserRole)
+            item.setFlags(Qt.ItemIsEnabled)
+            # Rows are a tick plus a short word; without this they collapse to
+            # the text height and the three of them look cramped together.
+            item.setSizeHint(QtCore.QSize(0, self.ROW_HEIGHT))
+            self.model().appendRow(item)
+
+        self._refresh_icons()
+        # Toggle on press instead of letting the view "select" a row, so the
+        # list stays open and no row ever looks like the chosen one.
+        self.view().pressed.connect(self._toggle_pressed)
+
+    # --- state ---------------------------------------------------------------
+
+    def _item(self, mode):
+        for row in range(self.model().rowCount()):
+            item = self.model().item(row)
+            if item.data(Qt.UserRole) == mode:
+                return item
+        return None
+
+    def is_mode_checked(self, mode):
+        return bool(self._checked.get(mode, False))
+
+    def checked_modes(self):
+        return tuple(mode for mode in self._modes if self._checked.get(mode))
+
+    def set_checked_modes(self, modes):
+        wanted = set(modes)
+        self._checked = {mode: mode in wanted for mode in self._modes}
+        self._refresh_icons()
+        self._refresh_text()
+
+    def set_mode_checked(self, mode, checked):
+        if mode not in self._checked:
+            return
+        self._checked[mode] = bool(checked)
+        self._refresh_icons()
+        self._refresh_text()
+        self.modes_changed.emit()
+
+    def toggle_mode(self, mode):
+        self.set_mode_checked(mode, not self.is_mode_checked(mode))
+
+    def _toggle_pressed(self, index):
+        item = self.model().itemFromIndex(index)
+        if item is not None:
+            self.toggle_mode(item.data(Qt.UserRole))
+
+    def _refresh_icons(self):
+        # The tick is an icon rather than Qt's own check indicator: a stylesheet
+        # on the combo makes Qt paint the popup itself, and its indicator would
+        # be the platform's white square regardless of the window's style.
+        for mode in self._modes:
+            item = self._item(mode)
+            if item is None:
+                continue
+            checked = self._checked.get(mode, False)
+            item.setIcon(QIcon(accent_check_pixmap(checked, self._dark)))
+            state = self._summaries.get("on" if checked else "off", "")
+            item.setData(f"{item.text()} — {state}" if state else item.text(),
+                         Qt.AccessibleDescriptionRole)
+
+    # --- appearance ----------------------------------------------------------
+
+    def available_text_width(self):
+        """Room for the summary once padding and the chevron are taken out."""
+        return max(40, self.width() - 42)
+
+    def summary_text(self):
+        checked = self.checked_modes()
+        if len(checked) == len(self._modes):
+            return self._summaries["all"]
+        if not checked:
+            return self._summaries["none"]
+
+        names = ", ".join(self._short.get(mode, mode) for mode in checked)
+        # The window cannot grow, so fall back to a count when the names would
+        # be clipped — which happens in the longer languages.
+        if QtGui.QFontMetrics(self.font()).horizontalAdvance(names) <= self.available_text_width():
+            return names
+        return self._summaries["count"].format(count=len(checked), total=len(self._modes))
+
+    def detail_text(self):
+        """The full list of what is on — never abbreviated to a count."""
+        checked = self.checked_modes()
+        if not checked:
+            return self._summaries["none"]
+        return ", ".join(
+            item.text() for item in (self._item(mode) for mode in checked)
+            if item is not None
+        )
+
+    def set_help_text(self, text):
+        self._help = str(text or "")
+        self._refresh_text()
+
+    def set_dark(self, dark):
+        """Follow a theme switch: the row indicators are painted pixmaps."""
+        dark = bool(dark)
+        if dark != self._dark:
+            self._dark = dark
+            self._refresh_icons()
+
+    def _refresh_text(self):
+        # The closed control may only have room for "2 of 3", so the tooltip and
+        # the screen reader always spell out which actions are on.
+        detail = self.detail_text()
+        self.setAccessibleDescription(f"{self._help}. {detail}" if self._help else detail)
+        if self._help:
+            self.setToolTip(tooltip_text(f"{self._help}\n{detail}"))
+        self.update()
+
+    def showPopup(self):
+        # Without this the popup is only as wide as the closed control, which
+        # clips the longer localized labels.
+        view = self.view()
+        widest = max(
+            (QtGui.QFontMetrics(view.font()).horizontalAdvance(self.model().item(row).text())
+             for row in range(self.model().rowCount())),
+            default=0,
+        )
+        view.setMinimumWidth(max(self.width(), widest + 56))
+        super().showPopup()
+
+    def paintEvent(self, event):
+        # The combo would otherwise show whichever row is "current"; it has to
+        # show the summary instead.
+        painter = QtWidgets.QStylePainter(self)
+        painter.setPen(self.palette().color(QtGui.QPalette.Text))
+        option = QtWidgets.QStyleOptionComboBox()
+        self.initStyleOption(option)
+        option.currentText = self.summary_text()
+        option.currentIcon = QtGui.QIcon()
+        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
+        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        painter.end()
 
 
 def _populate_grouped_ocr_combo(
@@ -694,6 +922,7 @@ class UpdateProgressDialog(QDialog):
 
 class TesseractInstallProgressDialog(QDialog):
     canceled = QtCore.pyqtSignal()
+    backgrounded = QtCore.pyqtSignal(str)
 
     def __init__(
         self,
@@ -708,6 +937,7 @@ class TesseractInstallProgressDialog(QDialog):
         self._owner = owner
         self._anchor_owner = transient_owner or owner
         self._title = title
+        self._stable_windows_layout = str(title) == "Windows OCR"
         self._in_progress_attr = in_progress_attr
         self._cancel_callback = cancel_callback
         self._drag_position = None
@@ -778,14 +1008,37 @@ class TesseractInstallProgressDialog(QDialog):
         body.addLayout(action_row)
         frame_layout.addLayout(body)
 
+        # Windows OCR grows from a one-line "Preparing" message to several
+        # lines of real Windows Update / DISM detail.  Reserving that space on
+        # the first frame prevents the dialog from visibly jumping in size as
+        # soon as servicing starts.  Other engine installers keep their compact
+        # dynamically-sized dialog.
+        if self._stable_windows_layout:
+            self.setFixedWidth(560)
+            self.message_label.setFixedHeight(172)
+            self.adjustSize()
+            self.setFixedSize(560, max(340, self.sizeHint().height()))
+
     def _minimize_to_taskbar(self):
         self._user_minimized = True
+        self.backgrounded.emit(self.message_label.text())
         self.showMinimized()
 
     def _continue_in_background(self):
         """Keep the worker running without repeatedly raising this window."""
         self._user_minimized = True
+        self.backgrounded.emit(self.message_label.text())
         self.hide()
+
+    def restore_from_background(self):
+        """Return a deliberately hidden/minimized task to the foreground."""
+        self._user_minimized = False
+        if self.isMinimized():
+            self.showNormal()
+        else:
+            self.show()
+        self.center_on_owner()
+        self.bring_to_front()
 
     def bring_to_front(self):
         _bring_progress_dialog_to_front(self)
@@ -813,6 +1066,15 @@ class TesseractInstallProgressDialog(QDialog):
 
     def setLabelText(self, text):
         self.message_label.setText(text)
+        if self._stable_windows_layout:
+            return
+        # The Windows OCR message grows a line when Windows Update goes
+        # quiet. A word-wrapped label does not report the height it needs
+        # unless it is asked at the width it actually has, so the dialog
+        # would clip the extra line instead of growing for it.
+        width = max(1, self.message_label.width())
+        self.message_label.setMinimumHeight(self.message_label.heightForWidth(width))
+        self.adjustSize()
 
     def setRange(self, minimum, maximum):
         self.progress_bar.setRange(minimum, maximum)
@@ -923,7 +1185,7 @@ SETTINGS_TEXT = {
         "error_title": "Error",
         "clear_translation_history_error": "Could not clear translation history.",
         "clear_copy_history_error": "Could not clear copy history.",
-        "copy_translated_text": "Copy translated text automatically",
+        "copy_translated_text": "Copy translated text",
         "freeze_screen_on_ocr": "Freeze screen during OCR",
         "fullscreen_translate_hotkey": "Fullscreen Translate Hotkey:",
         "fullscreen_from": "From:",
@@ -938,6 +1200,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "Copy history",
         "fullscreen_translate_label": "Fullscreen Translate:",
         "selection_translate_label": "Selection Translate:",
+        "result_window_label": "Show window:",
+        "result_window_mode_selection": "Text",
+        "result_window_mode_area": "Area",
+        "result_window_mode_main": "Main",
+        "result_window_modes_header": "Show the window after:",
+        "result_window_row_selection": "Translating selected text",
+        "result_window_row_area": "Translating a screen area",
+        "result_window_row_main": "Pressing Translate",
+        "result_window_summary_all": "All",
+        "result_window_summary_none": "Never",
+        "result_window_summary_on": "shown",
+        "result_window_summary_off": "hidden",
+        "result_window_summary_count": "{count} of {total}",
+        "result_window_tooltip": "Tick the actions that should open the translation window. Unticked actions copy the translation straight to the clipboard.",
+        "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
+        "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
+        "result_window_mode_main_tooltip": "Show the result window after pressing Translate.",
         "copy_hotkey_label": "Copy Selected Hotkey:",
         "translate_hotkey_label": "Translate Hotkey:",
         "remove_local_tesseract": "Remove local Tesseract",
@@ -986,7 +1265,7 @@ SETTINGS_TEXT = {
         "error_title": "Ошибка",
         "clear_translation_history_error": "Не удалось очистить историю переводов.",
         "clear_copy_history_error": "Не удалось очистить историю копирований.",
-        "copy_translated_text": "Копировать сразу переведённый текст",
+        "copy_translated_text": "Копировать переведённый текст",
         "freeze_screen_on_ocr": "Заморозить экран при OCR",
         "fullscreen_translate_hotkey": "Горячая клавиша для перевода всего экрана",
         "fullscreen_from": "С:",
@@ -1001,6 +1280,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "История копирований",
         "fullscreen_translate_label": "Перевод всего экрана",
         "selection_translate_label": "Перевод выделенного текста",
+        "result_window_label": "Показывать окно:",
+        "result_window_mode_selection": "Текст",
+        "result_window_mode_area": "Зона",
+        "result_window_mode_main": "Кнопка",
+        "result_window_modes_header": "Показывать окно после:",
+        "result_window_row_selection": "Перевода выделенного текста",
+        "result_window_row_area": "Перевода области экрана",
+        "result_window_row_main": "Нажатия кнопки «Перевести»",
+        "result_window_summary_all": "Все",
+        "result_window_summary_none": "Никогда",
+        "result_window_summary_on": "показывать",
+        "result_window_summary_off": "скрывать",
+        "result_window_summary_count": "{count} из {total}",
+        "result_window_tooltip": "Отметьте действия, после которых открывать окно перевода. Остальные действия сразу копируют перевод в буфер.",
+        "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
+        "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
+        "result_window_mode_main_tooltip": "Показывать окно после нажатия кнопки «Перевести».",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
         "remove_local_tesseract": "Удалить локальный Tesseract",
@@ -1048,7 +1344,7 @@ SETTINGS_TEXT = {
         "error_title": "Error",
         "clear_translation_history_error": "No se pudo borrar el historial de traducciones.",
         "clear_copy_history_error": "No se pudo borrar el historial de copias.",
-        "copy_translated_text": "Copiar automaticamente el texto traducido",
+        "copy_translated_text": "Copiar el texto traducido",
         "freeze_screen_on_ocr": "Congelar pantalla durante OCR",
         "fullscreen_translate_hotkey": "Atajo de traduccion de pantalla:",
         "fullscreen_from": "De:",
@@ -1063,6 +1359,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "Historial de copias",
         "fullscreen_translate_label": "Traduccion de pantalla:",
         "selection_translate_label": "Traduccion de seleccion:",
+        "result_window_label": "Mostrar ventana:",
+        "result_window_mode_selection": "Texto",
+        "result_window_mode_area": "Área",
+        "result_window_mode_main": "Botón",
+        "result_window_modes_header": "Mostrar la ventana tras:",
+        "result_window_row_selection": "Traducir texto seleccionado",
+        "result_window_row_area": "Traducir un área de la pantalla",
+        "result_window_row_main": "Pulsar Traducir",
+        "result_window_summary_all": "Todas",
+        "result_window_summary_none": "Nunca",
+        "result_window_summary_on": "mostrar",
+        "result_window_summary_off": "ocultar",
+        "result_window_summary_count": "{count} de {total}",
+        "result_window_tooltip": "Marca las acciones que abren la ventana de traducción. Las demás copian la traducción directamente al portapapeles.",
+        "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
+        "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
+        "result_window_mode_main_tooltip": "Mostrar la ventana al pulsar Traducir.",
         "copy_hotkey_label": "Atajo para copiar seleccion:",
         "translate_hotkey_label": "Atajo de traduccion:",
         "remove_local_tesseract": "Eliminar Tesseract local",
@@ -1110,7 +1423,7 @@ SETTINGS_TEXT = {
         "error_title": "Fehler",
         "clear_translation_history_error": "Der Übersetzungsverlauf konnte nicht gelöscht werden.",
         "clear_copy_history_error": "Der Kopierverlauf konnte nicht gelöscht werden.",
-        "copy_translated_text": "Ubersetzten Text automatisch kopieren",
+        "copy_translated_text": "Ubersetzten Text kopieren",
         "freeze_screen_on_ocr": "Bildschirm wahrend OCR einfrieren",
         "fullscreen_translate_hotkey": "Tastenkurzel fur Bildschirmubersetzung:",
         "fullscreen_from": "Von:",
@@ -1125,6 +1438,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "Kopierverlauf",
         "fullscreen_translate_label": "Bildschirmubersetzung:",
         "selection_translate_label": "Auswahlubersetzung:",
+        "result_window_label": "Fenster zeigen:",
+        "result_window_mode_selection": "Text",
+        "result_window_mode_area": "Zone",
+        "result_window_mode_main": "Knopf",
+        "result_window_modes_header": "Fenster anzeigen nach:",
+        "result_window_row_selection": "Übersetzen von markiertem Text",
+        "result_window_row_area": "Übersetzen eines Bildschirmbereichs",
+        "result_window_row_main": "Klick auf Übersetzen",
+        "result_window_summary_all": "Alle",
+        "result_window_summary_none": "Nie",
+        "result_window_summary_on": "anzeigen",
+        "result_window_summary_off": "ausblenden",
+        "result_window_summary_count": "{count} von {total}",
+        "result_window_tooltip": "Haken Sie die Aktionen an, die das Übersetzungsfenster öffnen sollen. Andere Aktionen kopieren die Übersetzung direkt.",
+        "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
+        "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
+        "result_window_mode_main_tooltip": "Fenster nach einem Klick auf Übersetzen zeigen.",
         "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
         "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
@@ -1172,7 +1502,7 @@ SETTINGS_TEXT = {
         "error_title": "Erreur",
         "clear_translation_history_error": "Impossible d’effacer l’historique des traductions.",
         "clear_copy_history_error": "Impossible d’effacer l’historique des copies.",
-        "copy_translated_text": "Copier automatiquement le texte traduit",
+        "copy_translated_text": "Copier le texte traduit",
         "freeze_screen_on_ocr": "Figer l'ecran pendant l'OCR",
         "fullscreen_translate_hotkey": "Raccourci traduction plein ecran :",
         "fullscreen_from": "De :",
@@ -1187,6 +1517,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "Historique des copies",
         "fullscreen_translate_label": "Traduction plein ecran :",
         "selection_translate_label": "Traduction de selection :",
+        "result_window_label": "Afficher fenêtre :",
+        "result_window_mode_selection": "Texte",
+        "result_window_mode_area": "Zone",
+        "result_window_mode_main": "Bouton",
+        "result_window_modes_header": "Afficher la fenêtre après :",
+        "result_window_row_selection": "Traduction du texte sélectionné",
+        "result_window_row_area": "Traduction d’une zone de l’écran",
+        "result_window_row_main": "Clic sur Traduire",
+        "result_window_summary_all": "Toutes",
+        "result_window_summary_none": "Jamais",
+        "result_window_summary_on": "afficher",
+        "result_window_summary_off": "masquer",
+        "result_window_summary_count": "{count} sur {total}",
+        "result_window_tooltip": "Cochez les actions qui ouvrent la fenêtre de traduction. Les autres copient directement la traduction dans le presse-papiers.",
+        "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
+        "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
+        "result_window_mode_main_tooltip": "Afficher la fenêtre après avoir cliqué sur Traduire.",
         "copy_hotkey_label": "Raccourci de copie :",
         "translate_hotkey_label": "Raccourci de traduction :",
         "remove_local_tesseract": "Supprimer Tesseract local",
@@ -1234,7 +1581,7 @@ SETTINGS_TEXT = {
         "error_title": "错误",
         "clear_translation_history_error": "无法清除翻译历史。",
         "clear_copy_history_error": "无法清除复制历史。",
-        "copy_translated_text": "自动复制翻译文本",
+        "copy_translated_text": "复制翻译文本",
         "freeze_screen_on_ocr": "OCR 时冻结屏幕",
         "fullscreen_translate_hotkey": "全屏翻译快捷键：",
         "fullscreen_from": "从：",
@@ -1249,6 +1596,23 @@ SETTINGS_TEXT = {
         "copy_history_button": "复制历史",
         "fullscreen_translate_label": "全屏翻译：",
         "selection_translate_label": "选中文本翻译：",
+        "result_window_label": "显示窗口：",
+        "result_window_mode_selection": "文本",
+        "result_window_mode_area": "区域",
+        "result_window_mode_main": "按钮",
+        "result_window_modes_header": "在以下操作后显示窗口：",
+        "result_window_row_selection": "翻译选中的文本",
+        "result_window_row_area": "翻译屏幕区域",
+        "result_window_row_main": "点击“翻译”按钮",
+        "result_window_summary_all": "全部",
+        "result_window_summary_none": "从不",
+        "result_window_summary_on": "显示",
+        "result_window_summary_off": "隐藏",
+        "result_window_summary_count": "{count}/{total}",
+        "result_window_tooltip": "勾选需要打开翻译窗口的操作。未勾选的操作会直接把译文复制到剪贴板。",
+        "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
+        "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
+        "result_window_mode_main_tooltip": "点击“翻译”后显示窗口。",
         "copy_hotkey_label": "复制选区快捷键：",
         "translate_hotkey_label": "翻译快捷键：",
         "remove_local_tesseract": "删除本地 Tesseract",
@@ -1314,6 +1678,11 @@ UPDATE_TEXT = {
         "cancelled": "Update canceled. Temporary files were removed.",
         "install_failed": "Failed to install update:\n{error}",
         "restart_ready": "Update V{version} is ready.\nRestarting the app...", "restarting": "Restarting...",
+        "launch_title": "Update available",
+        "launch_prompt": "Version V{latest} is out. You have V{current}.",
+        "launch_update": "Update now",
+        "launch_skip": "Skip this version",
+        "launch_later": "Later",
     },
     "ru": {
         "store_updates": "Обновления этой версии устанавливает Microsoft Store. Откройте Библиотеку Microsoft Store и нажмите «Получить обновления».",
@@ -1334,6 +1703,11 @@ UPDATE_TEXT = {
         "cancelled": "Обновление отменено. Временные файлы удалены.",
         "install_failed": "Не удалось установить обновление:\n{error}",
         "restart_ready": "Обновление до V{version} готово.\nПерезапуск приложения...", "restarting": "Перезапуск...",
+        "launch_title": "Доступно обновление",
+        "launch_prompt": "Вышла версия V{latest}. У вас V{current}.",
+        "launch_update": "Обновить",
+        "launch_skip": "Пропустить эту версию",
+        "launch_later": "Позже",
     },
     "es": {
         "store_updates": "Las actualizaciones de esta versión se instalan desde Microsoft Store. Abre la Biblioteca de Microsoft Store y selecciona Obtener actualizaciones.",
@@ -1354,6 +1728,11 @@ UPDATE_TEXT = {
         "cancelled": "Actualización cancelada. Se eliminaron los archivos temporales.",
         "install_failed": "No se pudo instalar la actualización:\n{error}",
         "restart_ready": "La actualización V{version} está lista.\nReiniciando la aplicación...", "restarting": "Reiniciando...",
+        "launch_title": "Actualización disponible",
+        "launch_prompt": "Ya está la versión V{latest}. Tienes la V{current}.",
+        "launch_update": "Actualizar",
+        "launch_skip": "Omitir esta versión",
+        "launch_later": "Más tarde",
     },
     "de": {
         "store_updates": "Updates für diese Version werden über den Microsoft Store installiert. Öffne die Bibliothek im Microsoft Store und wähle Updates abrufen.",
@@ -1374,6 +1753,11 @@ UPDATE_TEXT = {
         "cancelled": "Update abgebrochen. Temporäre Dateien wurden entfernt.",
         "install_failed": "Update konnte nicht installiert werden:\n{error}",
         "restart_ready": "Update V{version} ist bereit.\nDie App wird neu gestartet...", "restarting": "Neustart...",
+        "launch_title": "Update verfügbar",
+        "launch_prompt": "Version V{latest} ist da. Sie haben V{current}.",
+        "launch_update": "Jetzt aktualisieren",
+        "launch_skip": "Diese Version überspringen",
+        "launch_later": "Später",
     },
     "fr": {
         "store_updates": "Les mises à jour de cette version sont installées par le Microsoft Store. Ouvrez la Bibliothèque du Microsoft Store et choisissez Obtenir les mises à jour.",
@@ -1394,6 +1778,11 @@ UPDATE_TEXT = {
         "cancelled": "Mise à jour annulée. Les fichiers temporaires ont été supprimés.",
         "install_failed": "Impossible d’installer la mise à jour :\n{error}",
         "restart_ready": "La mise à jour V{version} est prête.\nRedémarrage de l’application...", "restarting": "Redémarrage...",
+        "launch_title": "Mise à jour disponible",
+        "launch_prompt": "La version V{latest} est sortie. Vous avez la V{current}.",
+        "launch_update": "Mettre à jour",
+        "launch_skip": "Ignorer cette version",
+        "launch_later": "Plus tard",
     },
     "zh": {
         "store_updates": "此版本由 Microsoft Store 提供更新。请打开 Microsoft Store 的“库”，然后选择“获取更新”。",
@@ -1413,6 +1802,11 @@ UPDATE_TEXT = {
         "stage_checksum": "正在下载校验和...", "stage_verify": "正在验证校验和...", "stage_prepare": "正在准备更新...",
         "cancelled": "更新已取消，临时文件已删除。", "install_failed": "无法安装更新：\n{error}",
         "restart_ready": "更新 V{version} 已准备好。\n正在重启应用...", "restarting": "正在重启...",
+        "launch_title": "有可用更新",
+        "launch_prompt": "V{latest} 已发布，您当前是 V{current}。",
+        "launch_update": "立即更新",
+        "launch_skip": "跳过此版本",
+        "launch_later": "稍后",
     },
 }
 
@@ -1626,6 +2020,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Refresh", "windows_note": "Shows OCR languages available in Windows. Install only OCR without adding a keyboard.",
         "install_selected": "Install selected", "windows_settings": "Windows settings", "tesseract_note": "Tick languages to download into the local tessdata folder.",
         "install_engine": "Install engine", "easyocr_note": "Tick languages to predownload EasyOCR models. English is added as a fallback.",
+        "remove_engine": "Remove engine",
+        "remove_engine_tooltip": "Delete the installed {engine} engine from this computer.",
+        "hymt_note": "Hy-MT is one local translation model, not per-language packages. Install it here and it appears in the translator list.",
+        "translation_engine": "Translation engine", "local_model": "Local model",
         "rapidocr_note": "RapidOCR has no separate language packages. Its local neural engine includes one Chinese + English model. For Russian use Windows OCR, Tesseract, or EasyOCR.",
         "component": "Component", "package": "Package", "status": "Status", "argos_note": "All available Argos packages are shown. Non-English pairs use two packages through English.",
         "remove_highlighted": "Remove highlighted", "direction": "Direction", "search": "Search: Russian, ru, en→ru…", "language": "Language",
@@ -1658,6 +2056,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Обновить", "windows_note": "Показаны OCR-языки Windows. Можно установить только OCR без добавления клавиатуры.",
         "install_selected": "Установить выбранные", "windows_settings": "Настройки Windows", "tesseract_note": "Отметьте языки для загрузки в локальную папку tessdata.",
         "install_engine": "Установить движок", "easyocr_note": "Отметьте языки для загрузки моделей EasyOCR. Английский добавляется как резервный.",
+        "remove_engine": "Удалить движок",
+        "remove_engine_tooltip": "Удалить установленный движок {engine} с этого компьютера.",
+        "hymt_note": "Hy-MT — одна локальная модель перевода, а не пакеты по языкам. Установите её здесь, и она появится в списке переводчиков.",
+        "translation_engine": "Движок перевода", "local_model": "Локальная модель",
         "rapidocr_note": "Для RapidOCR не нужны отдельные языковые пакеты. Локальный нейросетевой движок включает одну модель Chinese + English. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
         "component": "Компонент", "package": "Пакет", "status": "Статус", "argos_note": "Показаны все пакеты Argos. Неанглийские пары используют два пакета через английский.",
         "remove_highlighted": "Удалить выделенные", "direction": "Направление", "search": "Поиск: русский, ru, en→ru…", "language": "Язык",
@@ -1690,6 +2092,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Actualizar", "windows_note": "Muestra los idiomas OCR de Windows. Instala solo OCR sin añadir un teclado.",
         "install_selected": "Instalar seleccionados", "windows_settings": "Configuración de Windows", "tesseract_note": "Marca idiomas para descargarlos en la carpeta tessdata local.",
         "install_engine": "Instalar motor", "easyocr_note": "Marca idiomas para descargar modelos EasyOCR. Se añade inglés como reserva.",
+        "remove_engine": "Eliminar motor",
+        "remove_engine_tooltip": "Eliminar el motor {engine} instalado en este equipo.",
+        "hymt_note": "Hy-MT es un único modelo local de traducción, no paquetes por idioma. Instálalo aquí y aparecerá en la lista de traductores.",
+        "translation_engine": "Motor de traducción", "local_model": "Modelo local",
         "rapidocr_note": "RapidOCR no usa paquetes de idioma separados. Su motor neuronal local incluye un modelo Chinese + English. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
         "component": "Componente", "package": "Paquete", "status": "Estado", "argos_note": "Se muestran todos los paquetes Argos. Los pares sin inglés usan dos paquetes a través del inglés.",
         "remove_highlighted": "Eliminar resaltados", "direction": "Dirección", "search": "Buscar: ruso, ru, en→ru…", "language": "Idioma",
@@ -1722,6 +2128,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Aktualisieren", "windows_note": "Zeigt Windows-OCR-Sprachen. Installiert nur OCR ohne zusätzliche Tastatur.",
         "install_selected": "Ausgewählte installieren", "windows_settings": "Windows-Einstellungen", "tesseract_note": "Markiere Sprachen für den lokalen tessdata-Ordner.",
         "install_engine": "Engine installieren", "easyocr_note": "Markiere Sprachen für EasyOCR-Modelle. Englisch wird als Reserve ergänzt.",
+        "remove_engine": "Engine entfernen",
+        "remove_engine_tooltip": "Die installierte {engine}-Engine von diesem Rechner löschen.",
+        "hymt_note": "Hy-MT ist ein einzelnes lokales Übersetzungsmodell, keine Sprachpakete. Hier installieren, dann erscheint es in der Übersetzerliste.",
+        "translation_engine": "Übersetzungs-Engine", "local_model": "Lokales Modell",
         "rapidocr_note": "RapidOCR benötigt keine separaten Sprachpakete. Die lokale neuronale Engine enthält ein Chinese + English-Modell. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
         "component": "Komponente", "package": "Paket", "status": "Status", "argos_note": "Alle Argos-Pakete werden angezeigt. Nicht englische Paare verwenden zwei Pakete über Englisch.",
         "remove_highlighted": "Markierte entfernen", "direction": "Richtung", "search": "Suchen: Russisch, ru, en→ru…", "language": "Sprache",
@@ -1754,6 +2164,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "Actualiser", "windows_note": "Affiche les langues OCR Windows. Installe uniquement OCR sans ajouter de clavier.",
         "install_selected": "Installer la sélection", "windows_settings": "Paramètres Windows", "tesseract_note": "Cochez les langues à placer dans le dossier tessdata local.",
         "install_engine": "Installer le moteur", "easyocr_note": "Cochez les langues pour les modèles EasyOCR. L’anglais est ajouté en secours.",
+        "remove_engine": "Supprimer le moteur",
+        "remove_engine_tooltip": "Supprimer le moteur {engine} installé sur cet ordinateur.",
+        "hymt_note": "Hy-MT est un seul modèle de traduction local, pas des modules par langue. Installez-le ici et il apparaît dans la liste des traducteurs.",
+        "translation_engine": "Moteur de traduction", "local_model": "Modèle local",
         "rapidocr_note": "RapidOCR n’utilise pas de modules de langue séparés. Son moteur neuronal local inclut un modèle Chinese + English. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
         "component": "Composant", "package": "Module", "status": "État", "argos_note": "Tous les modules Argos sont affichés. Les paires sans anglais utilisent deux modules via l’anglais.",
         "remove_highlighted": "Supprimer la sélection", "direction": "Direction", "search": "Rechercher : russe, ru, en→ru…", "language": "Langue",
@@ -1786,6 +2200,10 @@ LANGUAGE_MANAGER_TEXT = {
         "refresh": "刷新", "windows_note": "显示 Windows 可用的 OCR 语言。只安装 OCR 组件，不添加键盘。",
         "install_selected": "安装所选项", "windows_settings": "Windows 设置", "tesseract_note": "勾选要下载到本地 tessdata 文件夹的语言。",
         "install_engine": "安装引擎", "easyocr_note": "勾选要预下载的 EasyOCR 模型。英语模型会作为备用模型。",
+        "remove_engine": "卸载引擎",
+        "remove_engine_tooltip": "从这台电脑上删除已安装的 {engine} 引擎。",
+        "hymt_note": "Hy-MT 是一个本地翻译模型，而不是按语言划分的语言包。在这里安装后，它会出现在翻译器列表中。",
+        "translation_engine": "翻译引擎", "local_model": "本地模型",
         "rapidocr_note": "RapidOCR 不需要单独的语言包。本地神经引擎内置 Chinese + English 模型；俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
         "component": "组件", "package": "语言包", "status": "状态", "argos_note": "显示所有 Argos 语言包。两个非英语语言之间需要通过英语使用两个语言包。",
         "remove_highlighted": "删除高亮项", "direction": "方向", "search": "搜索：俄语、ru、en→ru…", "language": "语言",
@@ -1819,7 +2237,17 @@ LANGUAGE_MANAGER_TEXT = {
 WINDOWS_OCR_RUNTIME_TEXT = {
     "en": {
         "continue_background": "Continue in background",
-        "win_background_info": "Windows Update can take several minutes. You can keep using the app or continue the installation in the background.",
+        "show_progress": "Show",
+        "task_installing_short": "Installing",
+        "task_packages_short": "Packages",
+        "task_busy_help": "Another package operation is running. Your selections are preserved; open its progress or wait for it to finish.",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "Step {stage}/4 · Language {current}/{total}",
+        "win_time_unknown": "Windows Update controls the remaining time; an exact finish time is not available.",
+        "win_activity_recent": "Windows is responding",
+        "win_background_info": "Windows downloads the language from Windows Update. Expect 5-20 minutes per language, and expect the percentage to sit still for minutes at a time — that is normal, not a freeze. The work runs as a Windows service, so it continues if you send it to the background, and this window reports the result.",
+        "win_download_stage": "Windows Update: {percent}% downloaded",
+        "win_quiet": "No progress for {minutes} min. Windows is still responding, but its download may be stalled. You can keep waiting in the background or cancel safely.",
         "win_installing_basic": "Windows is preparing {language} ({current}/{total}). This required language component may take several minutes.",
         "win_installing": "Windows Update is downloading and installing OCR for {language} ({current}/{total}). This may take several minutes.",
         "win_cancel_pending": "Cancel requested. Windows is safely finishing the current component; this can take several minutes.",
@@ -1828,12 +2256,23 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows finished installing the OCR package. {languages} is not available to the app yet — restart Click'n'Translate, or Windows if it still does not appear.",
         "win_error_policy": "Windows Update policy blocked this OCR package. Open Windows settings or contact the system administrator (0x800f0954).",
         "win_error_source": "Windows could not download the OCR package. Check Windows Update, the internet connection, and free disk space, then try again.",
-        "win_error_service": "Windows component servicing is busy or needs a restart. Restart Windows and try again.",
+        "win_error_restart": "Windows needs a restart before it can install components. Restart the PC and try again.",
+        "win_error_busy": "Windows component servicing is busy — usually Windows Update or another install is running. Wait a minute and try again; no restart is needed.",
         "win_error_generic": "Windows could not finish the OCR package operation. Install pending Windows updates, restart the PC, and try again.",
     },
     "ru": {
         "continue_background": "Продолжить в фоне",
-        "win_background_info": "Центру обновления Windows может потребоваться несколько минут. Можно продолжить пользоваться программой или отправить установку в фон.",
+        "show_progress": "Открыть",
+        "task_installing_short": "Установка",
+        "task_packages_short": "Пакеты",
+        "task_busy_help": "Уже выполняется другая операция с пакетами. Выбранные галочки сохранены — откройте её прогресс или дождитесь завершения.",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "Этап {stage}/4 · Язык {current}/{total}",
+        "win_time_unknown": "Оставшееся время определяет Центр обновления Windows; точное время завершения неизвестно.",
+        "win_activity_recent": "Windows отвечает",
+        "win_background_info": "Язык скачивает Центр обновления Windows. На один язык обычно уходит 5-20 минут, и проценты подолгу стоят на месте — это нормально, а не зависание. Установку выполняет служба Windows, поэтому она продолжится в фоне, а окно покажет результат.",
+        "win_download_stage": "Центр обновления Windows: скачано {percent}%",
+        "win_quiet": "Нет прогресса {minutes} мин. Windows отвечает, но загрузка могла остановиться. Можно продолжить ожидание в фоне или безопасно отменить.",
         "win_installing_basic": "Windows подготавливает язык {language} ({current}/{total}). Установка обязательного компонента может занять несколько минут.",
         "win_installing": "Центр обновления Windows загружает и устанавливает OCR для языка {language} ({current}/{total}). Это может занять несколько минут.",
         "win_cancel_pending": "Отмена запрошена. Windows безопасно завершает текущий компонент — это может занять несколько минут.",
@@ -1842,12 +2281,23 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows установила OCR-пакет. Язык {languages} пока недоступен приложению — перезапустите Click'n'Translate, а если язык не появится, перезагрузите Windows.",
         "win_error_policy": "Политика Центра обновления Windows заблокировала OCR-пакет. Откройте настройки Windows или обратитесь к администратору (0x800f0954).",
         "win_error_source": "Windows не смогла скачать OCR-пакет. Проверьте Центр обновления, интернет и свободное место, затем повторите попытку.",
-        "win_error_service": "Система обслуживания компонентов Windows занята или требуется перезагрузка. Перезагрузите Windows и повторите попытку.",
+        "win_error_restart": "Windows требуется перезагрузка, прежде чем устанавливать компоненты. Перезагрузите компьютер и повторите попытку.",
+        "win_error_busy": "Система обслуживания компонентов Windows занята — обычно это работающий Центр обновления или другая установка. Подождите минуту и повторите попытку, перезагрузка не нужна.",
         "win_error_generic": "Windows не смогла завершить операцию с OCR-пакетом. Установите ожидающие обновления Windows, перезагрузите компьютер и повторите попытку.",
     },
     "es": {
         "continue_background": "Continuar en segundo plano",
-        "win_background_info": "Windows Update puede tardar varios minutos. Puedes seguir usando la aplicación o continuar la instalación en segundo plano.",
+        "show_progress": "Ver",
+        "task_installing_short": "Instalando",
+        "task_packages_short": "Paquetes",
+        "task_busy_help": "Ya hay otra operación de paquetes en curso. La selección se conserva; abre su progreso o espera a que termine.",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "Paso {stage}/4 · Idioma {current}/{total}",
+        "win_time_unknown": "Windows Update controla el tiempo restante; no se puede calcular una hora exacta de finalización.",
+        "win_activity_recent": "Windows está respondiendo",
+        "win_background_info": "Windows Update descarga el idioma. Cuenta con 5-20 minutos por idioma, y el porcentaje puede quedarse quieto durante minutos: es normal, no está bloqueado. Lo ejecuta un servicio de Windows, así que continúa en segundo plano y esta ventana te dará el resultado.",
+        "win_download_stage": "Windows Update: {percent}% descargado",
+        "win_quiet": "Sin progreso desde hace {minutes} min. Windows sigue respondiendo, pero la descarga puede haberse detenido. Puedes esperar en segundo plano o cancelar de forma segura.",
         "win_installing_basic": "Windows está preparando {language} ({current}/{total}). Este componente obligatorio puede tardar varios minutos.",
         "win_installing": "Windows Update está descargando e instalando OCR para {language} ({current}/{total}). Puede tardar varios minutos.",
         "win_cancel_pending": "Cancelación solicitada. Windows está terminando de forma segura el componente actual; puede tardar varios minutos.",
@@ -1856,12 +2306,23 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows terminó de instalar el paquete OCR. {languages} aún no está disponible en la aplicación: reinicia Click'n'Translate y, si sigue sin aparecer, reinicia Windows.",
         "win_error_policy": "La directiva de Windows Update bloqueó este paquete OCR. Abre Configuración de Windows o contacta con el administrador (0x800f0954).",
         "win_error_source": "Windows no pudo descargar el paquete OCR. Comprueba Windows Update, Internet y el espacio libre y vuelve a intentarlo.",
-        "win_error_service": "El servicio de componentes de Windows está ocupado o necesita reiniciarse. Reinicia Windows y vuelve a intentarlo.",
+        "win_error_restart": "Windows necesita reiniciarse antes de instalar componentes. Reinicia el equipo y vuelve a intentarlo.",
+        "win_error_busy": "El servicio de componentes de Windows está ocupado, normalmente por Windows Update u otra instalación. Espera un minuto y reinténtalo; no hace falta reiniciar.",
         "win_error_generic": "Windows no pudo finalizar la operación del paquete OCR. Instala las actualizaciones pendientes, reinicia el equipo y vuelve a intentarlo.",
     },
     "de": {
         "continue_background": "Im Hintergrund fortsetzen",
-        "win_background_info": "Windows Update kann mehrere Minuten benötigen. Sie können die App weiter verwenden oder die Installation im Hintergrund fortsetzen.",
+        "show_progress": "Öffnen",
+        "task_installing_short": "Installation",
+        "task_packages_short": "Pakete",
+        "task_busy_help": "Ein anderer Paketvorgang läuft bereits. Die Auswahl bleibt erhalten; öffnen Sie den Fortschritt oder warten Sie auf den Abschluss.",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "Schritt {stage}/4 · Sprache {current}/{total}",
+        "win_time_unknown": "Die Restzeit wird von Windows Update bestimmt; eine genaue Endzeit ist nicht verfügbar.",
+        "win_activity_recent": "Windows antwortet",
+        "win_background_info": "Windows Update lädt die Sprache herunter. Rechnen Sie mit 5-20 Minuten pro Sprache, und damit, dass die Prozentzahl minutenlang stehen bleibt — das ist normal und kein Hänger. Die Arbeit erledigt ein Windows-Dienst, sie läuft also im Hintergrund weiter, und dieses Fenster meldet das Ergebnis.",
+        "win_download_stage": "Windows Update: {percent}% geladen",
+        "win_quiet": "Seit {minutes} Min. kein Fortschritt. Windows antwortet noch, der Download könnte jedoch feststecken. Sie können im Hintergrund weiter warten oder sicher abbrechen.",
         "win_installing_basic": "Windows bereitet {language} vor ({current}/{total}). Diese erforderliche Komponente kann mehrere Minuten dauern.",
         "win_installing": "Windows Update lädt OCR für {language} herunter und installiert es ({current}/{total}). Dies kann mehrere Minuten dauern.",
         "win_cancel_pending": "Abbruch angefordert. Windows schließt die aktuelle Komponente sicher ab; dies kann einige Minuten dauern.",
@@ -1870,12 +2331,23 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows hat das OCR-Paket installiert. {languages} steht der App noch nicht zur Verfügung – starten Sie Click'n'Translate neu, und falls es weiterhin fehlt, Windows.",
         "win_error_policy": "Eine Windows-Update-Richtlinie hat dieses OCR-Paket blockiert. Öffnen Sie die Windows-Einstellungen oder wenden Sie sich an den Administrator (0x800f0954).",
         "win_error_source": "Windows konnte das OCR-Paket nicht laden. Prüfen Sie Windows Update, Internet und freien Speicherplatz und versuchen Sie es erneut.",
-        "win_error_service": "Die Windows-Komponentenwartung ist beschäftigt oder benötigt einen Neustart. Starten Sie Windows neu und versuchen Sie es erneut.",
+        "win_error_restart": "Windows benötigt einen Neustart, bevor Komponenten installiert werden können. Starten Sie den PC neu und versuchen Sie es erneut.",
+        "win_error_busy": "Die Windows-Komponentenwartung ist beschäftigt — meist läuft Windows Update oder eine andere Installation. Warten Sie eine Minute und versuchen Sie es erneut; ein Neustart ist nicht nötig.",
         "win_error_generic": "Windows konnte den OCR-Paketvorgang nicht abschließen. Installieren Sie ausstehende Updates, starten Sie den PC neu und versuchen Sie es erneut.",
     },
     "fr": {
         "continue_background": "Continuer en arrière-plan",
-        "win_background_info": "Windows Update peut prendre plusieurs minutes. Vous pouvez continuer à utiliser l’application ou poursuivre l’installation en arrière-plan.",
+        "show_progress": "Afficher",
+        "task_installing_short": "Installation",
+        "task_packages_short": "Modules",
+        "task_busy_help": "Une autre opération de paquet est déjà en cours. Votre sélection est conservée ; affichez sa progression ou attendez la fin.",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "Étape {stage}/4 · Langue {current}/{total}",
+        "win_time_unknown": "Windows Update détermine le temps restant ; aucune heure de fin exacte n’est disponible.",
+        "win_activity_recent": "Windows répond",
+        "win_background_info": "Windows Update télécharge la langue. Comptez 5 à 20 minutes par langue, et un pourcentage qui reste figé plusieurs minutes : c'est normal, ce n'est pas bloqué. Le travail est fait par un service Windows : il continue en arrière-plan et cette fenêtre annoncera le résultat.",
+        "win_download_stage": "Windows Update : {percent}% téléchargés",
+        "win_quiet": "Aucune progression depuis {minutes} min. Windows répond encore, mais le téléchargement peut être bloqué. Vous pouvez attendre en arrière-plan ou annuler sans risque.",
         "win_installing_basic": "Windows prépare {language} ({current}/{total}). Ce composant requis peut prendre plusieurs minutes.",
         "win_installing": "Windows Update télécharge et installe OCR pour {language} ({current}/{total}). Cela peut prendre plusieurs minutes.",
         "win_cancel_pending": "Annulation demandée. Windows termine le composant actuel en toute sécurité ; cela peut prendre plusieurs minutes.",
@@ -1884,12 +2356,23 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows a terminé l’installation du module OCR. {languages} n’est pas encore disponible dans l’application : redémarrez Click'n'Translate, puis Windows si la langue reste absente.",
         "win_error_policy": "La stratégie Windows Update a bloqué ce module OCR. Ouvrez les paramètres Windows ou contactez l’administrateur (0x800f0954).",
         "win_error_source": "Windows n’a pas pu télécharger le module OCR. Vérifiez Windows Update, Internet et l’espace libre, puis réessayez.",
-        "win_error_service": "La maintenance des composants Windows est occupée ou nécessite un redémarrage. Redémarrez Windows puis réessayez.",
+        "win_error_restart": "Windows doit redémarrer avant de pouvoir installer des composants. Redémarrez le PC puis réessayez.",
+        "win_error_busy": "La maintenance des composants Windows est occupée — généralement Windows Update ou une autre installation. Attendez une minute et réessayez ; aucun redémarrage n'est nécessaire.",
         "win_error_generic": "Windows n’a pas pu terminer l’opération du module OCR. Installez les mises à jour en attente, redémarrez le PC puis réessayez.",
     },
     "zh": {
         "continue_background": "在后台继续",
-        "win_background_info": "Windows 更新可能需要几分钟。你可以继续使用应用，或让安装在后台继续。",
+        "show_progress": "查看",
+        "task_installing_short": "安装中",
+        "task_packages_short": "语言包",
+        "task_busy_help": "已有另一个软件包操作正在进行。所选项目会保留；请查看其进度或等待完成。",
+        "win_component_short": "DISM {percent}%",
+        "win_stage": "步骤 {stage}/4 · 语言 {current}/{total}",
+        "win_time_unknown": "剩余时间由 Windows 更新决定，无法提供准确的完成时间。",
+        "win_activity_recent": "Windows 正在响应",
+        "win_background_info": "语言包由 Windows 更新下载。每种语言通常需要 5-20 分钟，进度百分比可能几分钟停在同一个数字上，这是正常现象，并非卡死。安装由 Windows 服务执行，转入后台也会继续，完成后本窗口会给出结果。",
+        "win_download_stage": "Windows 更新：已下载 {percent}%",
+        "win_quiet": "已有 {minutes} 分钟没有进展。Windows 仍有响应，但下载可能已停滞。您可以在后台继续等待，也可以安全取消。",
         "win_installing_basic": "Windows 正在准备 {language}（{current}/{total}）。安装必需的语言组件可能需要几分钟。",
         "win_installing": "Windows 更新正在下载并安装 {language} 的 OCR（{current}/{total}）。这可能需要几分钟。",
         "win_cancel_pending": "已请求取消。Windows 正在安全完成当前组件，这可能需要几分钟。",
@@ -1898,7 +2381,8 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_installed_pending_restart": "Windows 已完成 OCR 包的安装。应用暂时还看不到 {languages}，请重启 Click'n'Translate；若仍未出现，请重启 Windows。",
         "win_error_policy": "Windows 更新策略阻止了此 OCR 包。请打开 Windows 设置或联系系统管理员 (0x800f0954)。",
         "win_error_source": "Windows 无法下载 OCR 包。请检查 Windows 更新、网络连接和可用磁盘空间，然后重试。",
-        "win_error_service": "Windows 组件服务正忙或需要重启。请重启 Windows 后重试。",
+        "win_error_restart": "Windows 需要先重启才能安装组件。请重启电脑后重试。",
+        "win_error_busy": "Windows 组件服务正忙，通常是 Windows 更新或其他安装正在进行。请等待一分钟后重试，不需要重启。",
         "win_error_generic": "Windows 无法完成 OCR 包操作。请安装待处理的 Windows 更新，重启电脑后重试。",
     },
 }
@@ -1930,11 +2414,13 @@ class OcrLanguageManagerDialog(QDialog):
             getattr(owner, "current_interface_language", "en"),
         )
         self._install_in_progress = False
+        self._active_language_task_title = ""
         self._cancel_requested = threading.Event()
         self._windows_ocr_cancel_marker = ""
         self.progress_dialog = None
         self._task_success_message = ""
         self._task_failure_key = "install_failed"
+        self._last_task_error_details = ""
         self._argos_catalog = []
         self._argos_catalog_error = ""
         self._argos_catalog_loading = True
@@ -2032,10 +2518,27 @@ class OcrLanguageManagerDialog(QDialog):
         self.tesseract_table = None
         self.easyocr_table = None
         self.rapidocr_table = None
+        self.hymt_table = None
         self.argos_table = None
         self._build_tabs()
 
         bottom = QHBoxLayout()
+        # Where a backgrounded install reports itself. Sending the progress
+        # window away should not mean losing sight of the work, and it should
+        # not cost another window either.
+        self.task_status_label = QLabel("")
+        self.task_status_label.setObjectName("languagePackageTaskStatus")
+        self.task_status_label.setWordWrap(False)
+        self.task_status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.task_status_label.hide()
+        bottom.addWidget(self.task_status_label, 1)
+        self.task_show_button = QPushButton(
+            language_manager_text(self.lang, "show_progress")
+        )
+        self.task_show_button.setObjectName("languagePackageTaskShow")
+        self.task_show_button.clicked.connect(self._restore_task_progress)
+        self.task_show_button.hide()
+        bottom.addWidget(self.task_show_button)
         bottom.addStretch()
         self.refresh_btn = QPushButton(language_manager_text(self.lang, "refresh"))
         self.refresh_btn.clicked.connect(self.refresh_catalog)
@@ -2138,6 +2641,10 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
                 QPushButton#languagePackageAction:pressed { background-color: #684d91; }
                 QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
+                QPushButton#languagePackageEngineRemove { background-color: transparent; color: #e0879a; border: 1px solid #6b3f4c; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
+                QPushButton#languagePackageEngineRemove:hover { background-color: #462b33; color: #ffd7de; }
+                QPushButton#languagePackageEngineRemove:pressed { background-color: #5a343e; }
+                QPushButton#languagePackageEngineRemove:disabled { color: #8f889c; border-color: #3a3645; }
                 QFrame#languagePackageEmptyState { background: #17181d; border: 1px solid #34313f; border-radius: 10px; }
                 QLabel#languagePackageEmptyTitle { color: #f4f6fb; font-size: 18px; font-weight: 700; }
                 QLabel#languagePackageEmptyBody { color: #aeb2bf; font-size: 13px; }
@@ -2167,6 +2674,10 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
                 QPushButton#languagePackageAction:pressed { background-color: #684d91; }
                 QPushButton#languagePackageAction:disabled { background-color: #d8d4e2; color: #777777; }
+                QPushButton#languagePackageEngineRemove { background-color: transparent; color: #b03a52; border: 1px solid #e2b7c0; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
+                QPushButton#languagePackageEngineRemove:hover { background-color: #fbe9ed; color: #8f2a40; }
+                QPushButton#languagePackageEngineRemove:pressed { background-color: #f3d7de; }
+                QPushButton#languagePackageEngineRemove:disabled { color: #a39aad; border-color: #e6e1ec; }
                 QFrame#languagePackageEmptyState { background: #f7f6fb; border: 1px solid #d8d2e2; border-radius: 10px; }
                 QLabel#languagePackageEmptyTitle { color: #202124; font-size: 18px; font-weight: 700; }
                 QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
@@ -2189,6 +2700,14 @@ class OcrLanguageManagerDialog(QDialog):
         muted = "#bcb5c8" if dark else "#625a6d"
         base = "#1b1c22" if dark else "#f0edf5"
         selected = "#7A5FA1"
+        # A tab bar measures its tabs with its own font but paints them with the
+        # stylesheet font. Declaring the font only in the stylesheet left every
+        # tab sized for a 6pt default and painted at 14px, so the labels ran
+        # over each other. Set the font on the bar and the two agree.
+        self._apply_tab_bar_font(self.tabs.tabBar(), 14, bold=True)
+        for inner in (self.ocr_tabs, self.translation_tabs):
+            self._apply_tab_bar_font(inner.tabBar(), 13, bold=True)
+
         self.tabs.tabBar().setStyleSheet(f"""
             QTabBar::tab {{
                 background: {base};
@@ -2198,35 +2717,38 @@ class OcrLanguageManagerDialog(QDialog):
                 border-top-right-radius: 7px;
                 padding: 7px 17px;
                 margin-right: 3px;
-                font-family: 'Segoe UI';
-                font-size: 14px;
-                font-weight: 700;
             }}
             QTabBar::tab:selected {{ background: {selected}; color: #ffffff; }}
             QTabBar::tab:hover:!selected {{ background: {'#292a32' if dark else '#e4ddec'}; }}
         """)
+        # Weight stays put between states: a bolder selected tab would be wider
+        # than the space the bar measured for it, which is the same clipping in
+        # a smaller form.
         inner_style = f"""
             QTabBar::tab {{
                 background: transparent;
                 color: {muted};
                 border: none;
                 border-bottom: 2px solid transparent;
-                padding: 7px 9px 6px 9px;
+                padding: 7px 12px 6px 12px;
                 margin: 0px;
-                font-family: 'Segoe UI';
-                font-size: 13px;
-                font-weight: 600;
             }}
             QTabBar::tab:selected {{
                 color: {text};
                 background: transparent;
                 border-bottom: 2px solid {selected};
-                font-weight: 700;
             }}
             QTabBar::tab:hover:!selected {{ color: {text}; }}
         """
         self.ocr_tabs.tabBar().setStyleSheet(inner_style)
         self.translation_tabs.tabBar().setStyleSheet(inner_style)
+
+    @staticmethod
+    def _apply_tab_bar_font(tab_bar, pixel_size, bold=False):
+        font = QtGui.QFont("Segoe UI")
+        font.setPixelSize(pixel_size)
+        font.setBold(bold)
+        tab_bar.setFont(font)
 
     def _apply_missing_engine_card_style(self, table):
         if table is None:
@@ -2314,6 +2836,31 @@ class OcrLanguageManagerDialog(QDialog):
                 return True
         return super().eventFilter(obj, event)
 
+    _MAX_WIDGET_HEIGHT = 16777215
+
+    @classmethod
+    def _snap_table_to_whole_rows(cls, table):
+        """Let the table show whole rows only.
+
+        The window is a fixed size, so whatever height is left over lands the
+        last row half-drawn against the bottom border, which reads as a drawing
+        glitch rather than as "scroll for more".
+
+        Only ever measured while the table is uncapped: measuring a capped table
+        and capping it again shaves a row off on every pass. QTableView owns its
+        viewport margins for its headers, so those are not free for this.
+        """
+        if table.rowCount() <= 0 or table.maximumHeight() < cls._MAX_WIDGET_HEIGHT:
+            return
+        row_height = table.rowHeight(0) or table.verticalHeader().defaultSectionSize()
+        chrome = table.horizontalHeader().height() + 2 * table.frameWidth()
+        if table.horizontalScrollBar().isVisible():
+            chrome += table.horizontalScrollBar().height()
+        available = table.height() - chrome
+        if row_height <= 0 or available < row_height:
+            return
+        table.setMaximumHeight((available // row_height) * row_height + chrome)
+
     def _center_on_owner(self):
         owner_window = None
         try:
@@ -2343,6 +2890,26 @@ class OcrLanguageManagerDialog(QDialog):
             self._centered_once = True
             self._center_on_owner()
             QtCore.QTimer.singleShot(0, self._center_on_owner)
+        # After the first idle turn the layout is final, which is the only point
+        # at which a table's height means anything.
+        QtCore.QTimer.singleShot(0, self._snap_visible_table)
+        for tab_widget in (self.tabs, self.ocr_tabs, self.translation_tabs):
+            try:
+                tab_widget.currentChanged.disconnect(self._on_tab_changed)
+            except TypeError:
+                pass
+            tab_widget.currentChanged.connect(self._on_tab_changed)
+
+    def _on_tab_changed(self, _index):
+        # A page is laid out when it is first shown, so its table can only be
+        # measured after switching to it.
+        QtCore.QTimer.singleShot(0, self._snap_visible_table)
+
+    def _snap_visible_table(self):
+        for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
+                      self.rapidocr_table, self.argos_table):
+            if table is not None and table.isVisible():
+                self._snap_table_to_whole_rows(table)
 
     def _build_tabs(self):
         # The Windows OCR tab drives Windows Features on Demand through elevated
@@ -2370,6 +2937,7 @@ class OcrLanguageManagerDialog(QDialog):
             ],
             missing_engine="Tesseract",
             install_engine_callback=self._install_tesseract_engine,
+            remove_engine_callback=self._remove_tesseract_engine,
         )
         self.easyocr_table = self._add_engine_tab(
             self.ocr_tabs,
@@ -2382,6 +2950,7 @@ class OcrLanguageManagerDialog(QDialog):
             ],
             missing_engine=EASYOCR_ENGINE_DISPLAY,
             install_engine_callback=self._install_easyocr_engine,
+            remove_engine_callback=self._remove_easyocr_engine,
         )
         self.rapidocr_table = self._add_engine_tab(
             self.ocr_tabs,
@@ -2397,8 +2966,27 @@ class OcrLanguageManagerDialog(QDialog):
             ],
             missing_engine=RAPIDOCR_ENGINE_DISPLAY,
             install_engine_callback=self._install_rapidocr_engine,
+            remove_engine_callback=self._remove_rapidocr_engine,
         )
         self.rapidocr_table.setColumnHidden(0, True)
+
+        self.hymt_table = self._add_engine_tab(
+            self.translation_tabs,
+            HYMT_ENGINE_DISPLAY,
+            language_manager_text(self.lang, "hymt_note"),
+            self._populate_hymt_table,
+            [],
+            header_labels=[
+                "",
+                language_manager_text(self.lang, "component"),
+                language_manager_text(self.lang, "package"),
+                language_manager_text(self.lang, "status"),
+            ],
+            missing_engine=HYMT_ENGINE_DISPLAY,
+            install_engine_callback=self._install_hymt_engine,
+            remove_engine_callback=self._remove_hymt_engine,
+        )
+        self.hymt_table.setColumnHidden(0, True)
 
         self.argos_table = self._add_engine_tab(
             self.translation_tabs,
@@ -2418,6 +3006,39 @@ class OcrLanguageManagerDialog(QDialog):
             search_placeholder=language_manager_text(self.lang, "search"),
         )
 
+    def _engine_remove_button_style(self):
+        """Its own sheet: a rule in the dialog's stylesheet is outranked by the
+        settings window this dialog is a child of, and the button came out
+        looking like an ordinary action."""
+        dark = self._is_dark_theme()
+        text = "#e0879a" if dark else "#b03a52"
+        border = "#6b3f4c" if dark else "#e2b7c0"
+        hover_bg = "#462b33" if dark else "#fbe9ed"
+        hover_text = "#ffd7de" if dark else "#8f2a40"
+        pressed = "#5a343e" if dark else "#f3d7de"
+        muted = "#8f889c" if dark else "#a39aad"
+        muted_border = "#3a3645" if dark else "#e6e1ec"
+        return f"""
+            QPushButton#languagePackageEngineRemove {{
+                background-color: transparent;
+                color: {text};
+                border: 1px solid {border};
+                border-radius: 7px;
+                padding: 5px 12px;
+                font-size: 12px;
+                font-weight: 700;
+            }}
+            QPushButton#languagePackageEngineRemove:hover {{
+                background-color: {hover_bg};
+                color: {hover_text};
+            }}
+            QPushButton#languagePackageEngineRemove:pressed {{ background-color: {pressed}; }}
+            QPushButton#languagePackageEngineRemove:disabled {{
+                color: {muted};
+                border-color: {muted_border};
+            }}
+        """
+
     def _add_engine_tab(
         self,
         target_tabs,
@@ -2429,6 +3050,7 @@ class OcrLanguageManagerDialog(QDialog):
         search_placeholder="",
         missing_engine="",
         install_engine_callback=None,
+        remove_engine_callback=None,
     ):
         page = QWidget(self)
         layout = QVBoxLayout(page)
@@ -2437,7 +3059,27 @@ class OcrLanguageManagerDialog(QDialog):
 
         note_label = QLabel(note)
         note_label.setWordWrap(True)
-        layout.addWidget(note_label)
+
+        # Removing an engine used to be a small × inside the picker in Settings,
+        # which is not where anyone looks for it. It belongs on the engine's own
+        # tab, opposite the note, next to everything else about that engine.
+        remove_engine_button = None
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(10)
+        header_row.addWidget(note_label, 1)
+        if remove_engine_callback is not None:
+            remove_engine_button = QPushButton(language_manager_text(self.lang, "remove_engine"))
+            remove_engine_button.setObjectName("languagePackageEngineRemove")
+            remove_engine_button.setCursor(Qt.PointingHandCursor)
+            remove_engine_button.setMinimumHeight(30)
+            remove_engine_button.setToolTip(
+                tooltip_text(language_manager_text(self.lang, "remove_engine_tooltip", engine=title))
+            )
+            remove_engine_button.setStyleSheet(self._engine_remove_button_style())
+            remove_engine_button.clicked.connect(remove_engine_callback)
+            header_row.addWidget(remove_engine_button, 0, Qt.AlignTop | Qt.AlignRight)
+        layout.addLayout(header_row)
 
         missing_frame = QFrame(page)
         missing_frame.setObjectName("languagePackageEmptyState")
@@ -2543,6 +3185,7 @@ class OcrLanguageManagerDialog(QDialog):
         layout.addWidget(action_widget)
 
         table._package_note_label = note_label
+        table._package_remove_engine_button = remove_engine_button
         table._package_action_widget = action_widget
         table._package_missing_frame = missing_frame
         table._package_missing_title = missing_title
@@ -2570,6 +3213,11 @@ class OcrLanguageManagerDialog(QDialog):
         actions = getattr(table, "_package_action_widget", None)
         if actions is not None:
             actions.setVisible(not missing)
+        # Nothing to remove while the engine is missing: that state offers
+        # Install engine in the middle of the page instead.
+        remove_engine = getattr(table, "_package_remove_engine_button", None)
+        if remove_engine is not None:
+            remove_engine.setVisible(not missing)
         title = getattr(table, "_package_missing_title", None)
         if title is not None:
             title.setText(
@@ -2586,6 +3234,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._populate_tesseract_table(self.tesseract_table)
         self._populate_easyocr_table(self.easyocr_table)
         self._populate_rapidocr_table(self.rapidocr_table)
+        self._populate_hymt_table(self.hymt_table)
         self._populate_argos_table(self.argos_table)
 
     def refresh_catalog(self):
@@ -2826,16 +3475,22 @@ class OcrLanguageManagerDialog(QDialog):
             "Where-Object { $_.Name -like 'Language.OCR~~~*' } | "
             "ForEach-Object { '{0}|{1}' -f $_.Name,$_.State }"
         )
-        completed = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=create_no_window,
-            timeout=30,
-        )
+        # One at a time. Every one of these opens a DISM session against the
+        # online image, and the tab, the runtime probe and the post-install
+        # verification all ask at once — dism.log showed three sessions inside
+        # the same second. Overlapping sessions are what makes Windows answer
+        # "servicing is busy", and each one costs a PowerShell start-up anyway.
+        with _WINDOWS_SERVICING_LOCK:
+            completed = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=create_no_window,
+                timeout=30,
+            )
         if completed.returncode != 0:
             raise RuntimeError((completed.stdout or "").strip() or "Could not query Windows OCR capabilities")
         catalog = {}
@@ -3079,6 +3734,50 @@ class OcrLanguageManagerDialog(QDialog):
         ]
         self._set_language_rows(table, rows)
 
+    def _hymt_package_name(self):
+        locate = getattr(self.owner, "_local_hymt_dir", None)
+        folder = locate() if callable(locate) else ""
+        return os.path.basename(str(folder).rstrip("\\/")) or "hymt"
+
+    def _populate_hymt_table(self, table):
+        """Hy-MT ships as one local model, so the table lists what it is made of
+        rather than languages to tick."""
+        if table is None:
+            return
+        # An owner without the probe (a stub, a partially built window) means
+        # "not installed" rather than a crash while the dialog is opening.
+        probe = getattr(self.owner, "_hymt_installed", None)
+        installed = bool(probe()) if callable(probe) else False
+        self._set_engine_missing_state(table, not installed, HYMT_ENGINE_DISPLAY)
+        if not installed:
+            table.setRowCount(0)
+            table._pending_package_codes.clear()
+            return
+        status = self._status_installed()
+        rows = [
+            {
+                "code": "hymt-engine",
+                "icon": "",
+                "name": language_manager_text(self.lang, "translation_engine"),
+                "package": "Hy-MT",
+                "status": status,
+                "checked": True,
+                "selectable": False,
+                "show_checkbox": False,
+            },
+            {
+                "code": "hymt-model",
+                "icon": "",
+                "name": language_manager_text(self.lang, "local_model"),
+                "package": self._hymt_package_name(),
+                "status": status,
+                "checked": True,
+                "selectable": False,
+                "show_checkbox": False,
+            },
+        ]
+        self._set_language_rows(table, rows)
+
     def _argos_direction_name(self, source_code, target_code):
         by_code = {language.code: language for language in APP_LANGUAGES}
         source = by_code.get(source_code)
@@ -3267,6 +3966,41 @@ class OcrLanguageManagerDialog(QDialog):
         self._rapidocr_status_cache = None
         self.refresh_all()
         self._start_runtime_probe()
+
+    def _remove_engine(self, remove_method, in_progress_attr):
+        """Run the owner's removal, then show the result on this page.
+
+        The confirmation, the deletion and the engine-selector fallback all live
+        in SettingsWindow already; this only routes to them and refreshes.
+        """
+        remover = getattr(self.owner, remove_method, None)
+        if remover is None:
+            return
+        remover()
+        QtCore.QTimer.singleShot(400, lambda: self._refresh_after_owner_install(in_progress_attr))
+
+    def _remove_tesseract_engine(self):
+        self._remove_engine("remove_tesseract_engine", "_tesseract_install_in_progress")
+
+    def _remove_easyocr_engine(self):
+        self._remove_engine("remove_easyocr_engine", "_easyocr_install_in_progress")
+
+    def _remove_rapidocr_engine(self):
+        self._remove_engine("remove_rapidocr_engine", "_rapidocr_install_in_progress")
+
+    def _remove_hymt_engine(self):
+        self._remove_engine("remove_hymt_engine", "_hymt_install_in_progress")
+
+    def _install_hymt_engine(self):
+        if self.owner._hymt_installed():
+            QMessageBox.information(
+                self,
+                HYMT_ENGINE_DISPLAY,
+                language_manager_text(self.lang, "already", engine=HYMT_ENGINE_DISPLAY),
+            )
+            return
+        self.owner.start_hymt_install()
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_hymt_install_in_progress"))
 
     def _install_tesseract_engine(self):
         if self.owner._find_available_tesseract_exe():
@@ -3672,8 +4406,14 @@ class OcrLanguageManagerDialog(QDialog):
         failure_key="install_failed",
     ):
         if self._install_in_progress:
+            # A second servicing/download operation must never be queued behind
+            # the user's back. Bring the existing work back instead; checkbox
+            # selections in every table remain untouched for a later click.
+            self._restore_task_progress()
             return
         self._install_in_progress = True
+        self._active_language_task_title = str(title or "")
+        self._set_package_actions_busy(True)
         self._task_success_message = str(success_message or "")
         self._task_failure_key = str(failure_key or "install_failed")
         self._cancel_requested.clear()
@@ -3689,10 +4429,48 @@ class OcrLanguageManagerDialog(QDialog):
         )
         self.progress_dialog.setLabelText(language_manager_text(self.lang, "preparing"))
         self.progress_dialog.setRange(0, 0)
+        self.progress_dialog.backgrounded.connect(
+            lambda text, name=title: self._on_task_backgrounded(name, text)
+        )
+        self._clear_task_status()
+        self._publish_owner_task_status(
+            f"{title}: {language_manager_text(self.lang, 'preparing')}",
+            kind="running",
+        )
         self.progress_dialog.show()
         self.progress_dialog.center_on_owner()
         self.progress_dialog.bring_to_front()
         threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
+
+    def _set_package_actions_busy(self, busy):
+        """Allow one package mutation at a time without discarding selections."""
+        busy = bool(busy)
+        help_text = language_manager_text(self.lang, "task_busy_help")
+        buttons = [
+            button
+            for button in self.findChildren(QPushButton)
+            if button.objectName() in {
+                "languagePackageAction",
+                "languagePackageEngineRemove",
+            }
+        ]
+        refresh = getattr(self, "refresh_btn", None)
+        if refresh is not None:
+            buttons.append(refresh)
+        for button in buttons:
+            if busy:
+                if button.property("packageBusyWasEnabled") is None:
+                    button.setProperty("packageBusyWasEnabled", bool(button.isEnabled()))
+                    button.setProperty("packageBusyOldToolTip", button.toolTip())
+                button.setEnabled(False)
+                button.setToolTip(tooltip_text(help_text))
+            else:
+                was_enabled = button.property("packageBusyWasEnabled")
+                if was_enabled is not None:
+                    button.setEnabled(bool(was_enabled))
+                    button.setToolTip(str(button.property("packageBusyOldToolTip") or ""))
+                    button.setProperty("packageBusyWasEnabled", None)
+                    button.setProperty("packageBusyOldToolTip", None)
 
     def reject(self):
         # Closing the package manager must not terminate an active Windows
@@ -3704,6 +4482,17 @@ class OcrLanguageManagerDialog(QDialog):
             self.hide()
             return
         super().reject()
+
+    def accept(self):
+        # The visible Back button calls accept(), while the title-bar close
+        # button calls reject(). Both routes must mean the same thing during a
+        # long Windows servicing operation: keep it running in the background.
+        if self._install_in_progress:
+            if self.progress_dialog is not None:
+                self.progress_dialog._continue_in_background()
+            self.hide()
+            return
+        super().accept()
 
     def _request_install_cancel(self):
         if self._cancel_requested.is_set():
@@ -3744,9 +4533,88 @@ class OcrLanguageManagerDialog(QDialog):
             self.progress_dialog.setValue(percent)
         else:
             self.progress_dialog.setRange(0, 0)
-        self.progress_dialog.bring_to_front()
+        if getattr(self.progress_dialog, "_user_minimized", False):
+            # Sent to the background: the window stays away, and this line in
+            # the package manager carries the same information instead.
+            self._show_task_status(text, percent if determinate else None)
+        else:
+            self._publish_owner_task_status(
+                text,
+                percent if determinate else None,
+                kind="running",
+            )
+            self.progress_dialog.bring_to_front()
+
+    def _on_task_backgrounded(self, engine, text):
+        self._show_task_status(f"{engine}: {text}", kind="running")
+        if getattr(self, "task_show_button", None) is not None:
+            self.task_show_button.show()
+
+    def _restore_task_progress(self):
+        dialog = self.progress_dialog
+        if dialog is None or not self._install_in_progress:
+            return
+        if getattr(self, "task_show_button", None) is not None:
+            self.task_show_button.hide()
+        dialog.restore_from_background()
+
+    def _publish_owner_task_status(self, text, percent=None, kind="running"):
+        publish = getattr(self.owner, "set_language_package_task_status", None)
+        if callable(publish):
+            publish(text, percent=percent, kind=kind)
+
+    def _show_task_status(self, text, percent=None, kind="running"):
+        """One line at the bottom of the package manager, no window involved."""
+        label = getattr(self, "task_status_label", None)
+        if label is None:
+            return
+        # The dialog's message is written over several lines. Windows exposes
+        # several unrelated percentages, so its compact line names the current
+        # component instead of making that number look like whole-job progress.
+        parts = [piece.strip() for piece in str(text or "").splitlines() if piece.strip()]
+        if self._active_language_task_title == "Windows OCR" and kind == "running":
+            summary = parts[0] if parts else language_manager_text(self.lang, "task_installing_short")
+            if percent is not None:
+                component = language_manager_text(
+                    self.lang, "win_component_short", percent=int(percent)
+                )
+                summary = f"{summary} · {component}"
+        else:
+            summary = " · ".join(parts[:2])
+            if percent is not None:
+                summary = f"{summary} · {int(percent)}%" if summary else f"{int(percent)}%"
+        colors = {
+            "running": "#c5b3e9" if self._is_dark_theme() else "#5f4a88",
+            "done": "#8fd39b" if self._is_dark_theme() else "#2f7d43",
+            "failed": "#e0879a" if self._is_dark_theme() else "#b03a52",
+        }
+        label.setStyleSheet(
+            f"color: {colors.get(kind, colors['running'])}; font-size: 12px; font-weight: 600;"
+        )
+        metrics = QtGui.QFontMetrics(label.font())
+        # Before the first show Qt reports the label's tiny sizeHint width. Use
+        # the real minimum space it receives in the fixed manager layout, or a
+        # useful status can be shortened to "Component …" before it appears.
+        label.setText(metrics.elidedText(summary, Qt.ElideRight, max(320, label.width())))
+        full_detail = str(text or summary).strip()
+        if kind == "running":
+            full_detail = f"{full_detail}\n\n{language_manager_text(self.lang, 'task_busy_help')}"
+        label.setToolTip(tooltip_text(full_detail))
+        label.setVisible(bool(summary))
+        self._publish_owner_task_status(summary, percent=percent, kind=kind)
+
+    def _clear_task_status(self):
+        label = getattr(self, "task_status_label", None)
+        if label is not None:
+            label.clear()
+            label.hide()
+        button = getattr(self, "task_show_button", None)
+        if button is not None:
+            button.hide()
 
     def _finish_language_task(self, engine, error="", canceled=False):
+        if not error:
+            self._last_task_error_details = ""
         QMetaObject.invokeMethod(
             self,
             "_on_language_task_finished",
@@ -3759,9 +4627,17 @@ class OcrLanguageManagerDialog(QDialog):
     @QtCore.pyqtSlot(str, str, bool)
     def _on_language_task_finished(self, engine, error, canceled=False):
         self._install_in_progress = False
+        self._set_package_actions_busy(False)
+        self._active_language_task_title = ""
+        # Whoever sent the work to the background asked not to be interrupted by
+        # it, and that has to hold for the result too — it is reported on the
+        # status line instead of in a window.
+        backgrounded = bool(getattr(self.progress_dialog, "_user_minimized", False))
         if self.progress_dialog is not None:
             self.progress_dialog.hide()
             self.progress_dialog = None
+        if getattr(self, "task_show_button", None) is not None:
+            self.task_show_button.hide()
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
         self._windows_ready_codes_cache = None
@@ -3771,33 +4647,51 @@ class OcrLanguageManagerDialog(QDialog):
         self._start_runtime_probe()
         if engine == "Argos":
             self._start_argos_catalog_refresh(False)
-        if not self.isVisible():
+        if not self.isVisible() and not backgrounded:
             self.show()
             self.raise_()
             self.activateWindow()
         if canceled:
             self._task_success_message = ""
             self._task_failure_key = "install_failed"
-            QMessageBox.information(
-                self,
-                engine,
-                language_manager_text(self.lang, "canceled"),
-            )
+            message = language_manager_text(self.lang, "canceled")
+            if backgrounded:
+                self._show_task_status(f"{engine}: {message}", kind="running")
+                self._publish_owner_task_status(f"{engine}: {message}", kind="idle")
+                return
+            self._publish_owner_task_status(f"{engine}: {message}", kind="idle")
+            QMessageBox.information(self, engine, message)
             return
         if error:
             self._task_success_message = ""
-            QMessageBox.warning(
-                self,
-                engine,
-                language_manager_text(self.lang, self._task_failure_key) + error,
-            )
+            if backgrounded:
+                details = str(self._last_task_error_details or "").strip()
+                self._show_task_status(f"{engine}: {error}", kind="failed")
+                if details:
+                    self.task_status_label.setToolTip(tooltip_text(details))
+                self._task_failure_key = "install_failed"
+                self._last_task_error_details = ""
+                return
+            self._publish_owner_task_status(f"{engine}: {error}", kind="failed")
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle(engine)
+            box.setText(language_manager_text(self.lang, self._task_failure_key) + error)
+            # What Windows actually said, behind Details. Without it a failure
+            # is a dead end for the user and for anyone reading a bug report.
+            details = str(self._last_task_error_details or "").strip()
+            if details:
+                box.setDetailedText(details)
+            box.exec_()
             self._task_failure_key = "install_failed"
+            self._last_task_error_details = ""
             return
-        QMessageBox.information(
-            self,
-            engine,
-            self._task_success_message or language_manager_text(self.lang, "ready"),
-        )
+        message = self._task_success_message or language_manager_text(self.lang, "ready")
+        if backgrounded:
+            self._show_task_status(f"{engine}: {message}", kind="done")
+        else:
+            self._publish_owner_task_status(f"{engine}: {message}", 100, kind="done")
+            QMessageBox.information(self, engine, message)
         self._task_success_message = ""
         self._task_failure_key = "install_failed"
 
@@ -3874,6 +4768,50 @@ $Packages = @(
 $process = $null
 $InitiallyInstalled = @{{}}
 $StartedAt = [DateTime]::UtcNow
+$Script:DownloadPercent = -1
+$Script:QuietSeconds = 0
+$Script:RestartRequired = $false
+$CbsLogPath = Join-Path $env:windir 'Logs\CBS\CBS.log'
+
+function Read-CbsDownloadProgress {{
+    # CBS writes "DownloadProgress: [ 49 / 100 ]" every couple of seconds while
+    # Windows Update pulls the payload. That is the one signal that says the
+    # install is alive when dism.exe has been showing the same number for
+    # minutes. Reading it needs administrator rights, which this script has.
+    param([long]$LastLength)
+    $result = [pscustomobject]@{{ Length = $LastLength; Percent = $Script:DownloadPercent }}
+    try {{
+        $info = Get-Item -LiteralPath $CbsLogPath -Force -ErrorAction Stop
+    }} catch {{
+        return $result
+    }}
+    $result.Length = $info.Length
+    if ($info.Length -le $LastLength) {{ return $result }}
+    try {{
+        $stream = [System.IO.File]::Open(
+            $CbsLogPath,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::ReadWrite
+        )
+    }} catch {{
+        return $result
+    }}
+    try {{
+        $window = [Math]::Min(65536, $info.Length)
+        $null = $stream.Seek(-$window, [System.IO.SeekOrigin]::End)
+        $buffer = New-Object byte[] $window
+        $read = $stream.Read($buffer, 0, $window)
+        $tail = [System.Text.Encoding]::UTF8.GetString($buffer, 0, $read)
+    }} finally {{
+        $stream.Dispose()
+    }}
+    $matches = [regex]::Matches($tail, 'DownloadProgress:\s*\[\s*(\d+)\s*/\s*100\s*\]')
+    if ($matches.Count -gt 0) {{
+        $result.Percent = [int]$matches[$matches.Count - 1].Groups[1].Value
+    }}
+    return $result
+}}
 
 function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Total, [string]$Code, [string]$Message) {{
     $payload = @{{
@@ -3884,6 +4822,12 @@ function Write-OcrStatus([string]$Phase, [int]$Percent, [int]$Current, [int]$Tot
         code = $Code
         message = $Message
         elapsed = [int]([DateTime]::UtcNow - $StartedAt).TotalSeconds
+        # What Windows is doing underneath dism.exe. Its console percentage can
+        # sit on one number for many minutes while the payload downloads, so
+        # these say whether anything is still moving.
+        download = $Script:DownloadPercent
+        quiet = $Script:QuietSeconds
+        restart = $Script:RestartRequired
     }} | ConvertTo-Json -Compress
     $statusTemp = "$StatusPath.$PID.$([Guid]::NewGuid().ToString('N')).tmp"
     try {{
@@ -3936,7 +4880,14 @@ function Install-OcrCapability {{
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     $arguments = @('/Online', '/Add-Capability', ("/CapabilityName:" + $Name), '/NoRestart', '/English')
     $proc = Start-Process -FilePath dism.exe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-    $lastOverall = -1
+    $lastComponentPercent = -1
+    # DownloadProgress values belong to the component currently being added.
+    # Do not carry 100% (or another stale value) over from the previous FOD.
+    $Script:DownloadPercent = -1
+    $cbsLength = 0
+    try {{ $cbsLength = (Get-Item -LiteralPath $CbsLogPath -Force).Length }} catch {{}}
+    $tick = 0
+    $lastMovement = [DateTime]::UtcNow
     while (-not $proc.HasExited) {{
         $rawPercent = 0
         if (Test-Path -LiteralPath $stdoutPath) {{
@@ -3946,18 +4897,36 @@ function Install-OcrCapability {{
                 if ($found.Count -gt 0) {{ $rawPercent = [int]$found[$found.Count - 1].Groups[1].Value }}
             }}
         }}
-        $stepPercent = (($Slot * 100) + $rawPercent) / [Math]::Max(1, $SlotCount)
-        $overall = [int](((100 * $Index) + $stepPercent) / $Total)
+        # Windows can sit on one percentage for many minutes while the payload
+        # comes down. Whether CBS.log is still growing is the difference between
+        # "slow" and "wedged", and it is what the dialog reports to the user.
+        # Read it every ~2 s, not every tick: the loop spins four times a second
+        # to keep Cancel responsive, and that log runs to tens of megabytes.
+        $tick = $tick + 1
+        if (($tick % 8) -eq 1) {{
+            $previousDownload = $Script:DownloadPercent
+            $cbs = Read-CbsDownloadProgress -LastLength $cbsLength
+            # CBS repeats the exact same DownloadProgress line every two
+            # seconds even when Windows Update is stuck. Log growth proves the
+            # service is alive, not that the download moved; only changed
+            # percentages reset the no-progress timer.
+            $moved = ($rawPercent -ne $lastComponentPercent) -or ($cbs.Percent -ne $previousDownload)
+            $cbsLength = $cbs.Length
+            $Script:DownloadPercent = $cbs.Percent
+            if ($moved) {{ $lastMovement = [DateTime]::UtcNow }}
+            $Script:QuietSeconds = [int]([DateTime]::UtcNow - $lastMovement).TotalSeconds
+        }} elseif ($rawPercent -ne $lastComponentPercent) {{
+            $lastMovement = [DateTime]::UtcNow
+            $Script:QuietSeconds = 0
+        }}
+
         if (Test-OcrCancel) {{
-            Write-OcrStatus 'cancel_pending' $overall $Current $Total $Code ''
-        }} elseif ($overall -ne $lastOverall) {{
-            Write-OcrStatus $Phase $overall $Current $Total $Code ''
-            $lastOverall = $overall
+            Write-OcrStatus 'cancel_pending' $rawPercent $Current $Total $Code ''
         }} else {{
-            # Windows can sit on the same percentage for minutes.  Re-publishing
-            # keeps the elapsed clock in the dialog ticking so the install still
-            # looks alive.
-            Write-OcrStatus $Phase $overall $Current $Total $Code ''
+            # Re-published every tick even when nothing changed, so the elapsed
+            # clock keeps ticking and the install still looks alive.
+            Write-OcrStatus $Phase $rawPercent $Current $Total $Code ''
+            $lastComponentPercent = $rawPercent
         }}
         Start-Sleep -Milliseconds 250
         $proc.Refresh()
@@ -3967,6 +4936,7 @@ function Install-OcrCapability {{
     $exitCode = [int]$proc.ExitCode
     # 0 = done, 3010 = done but Windows wants a restart.  Anything else is only
     # a real failure when the capability did not actually reach Installed.
+    if ($exitCode -eq 3010) {{ $Script:RestartRequired = $true }}
     if ($exitCode -ne 0 -and $exitCode -ne 3010) {{
         $state = (Get-WindowsCapability -Online -Name $Name).State
         if ($state -eq 'Installed') {{ return }}
@@ -3985,18 +4955,18 @@ try {{
         $current = $index + 1
         if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
 
-        Write-OcrStatus 'checking' ([int](100 * $index / $total)) $current $total $entry.Code ''
+        Write-OcrStatus 'checking' 0 $current $total $entry.Code ''
         $capability = Get-WindowsCapability -Online -Name $entry.Capability
         $InitiallyInstalled[$entry.Capability] = ($capability.State -eq 'Installed')
         if ($entry.ForceRepair -and $capability.State -eq 'Installed') {{
-            Write-OcrStatus 'removing' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            Write-OcrStatus 'removing' 0 $current $total $entry.Code ''
             $repairOut = Join-Path $OutputDir ("repair_remove_" + $index + ".out")
             $repairErr = Join-Path $OutputDir ("repair_remove_" + $index + ".err")
             $repairArgs = @('/Online', '/Remove-Capability', ("/CapabilityName:" + $entry.Capability), '/NoRestart', '/English')
             $process = Start-Process -FilePath dism.exe -ArgumentList $repairArgs -PassThru -WindowStyle Hidden -RedirectStandardOutput $repairOut -RedirectStandardError $repairErr
             while (-not $process.HasExited) {{
                 if (Test-OcrCancel) {{
-                    Write-OcrStatus 'cancel_pending' ([int](100 * $index / $total)) $current $total $entry.Code ''
+                    Write-OcrStatus 'cancel_pending' 0 $current $total $entry.Code ''
                 }}
                 Start-Sleep -Milliseconds 250
                 $process.Refresh()
@@ -4019,7 +4989,7 @@ try {{
         }}
         $InitiallyInstalled[$entry.BasicCapability] = ($basic.State -eq 'Installed')
         if ($basic.State -ne 'Installed') {{
-            Write-OcrStatus 'installing_basic' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            Write-OcrStatus 'installing_basic' 0 $current $total $entry.Code ''
             Install-OcrCapability -Name $entry.BasicCapability -Phase 'installing_basic' -Index $index -Current $current -Total $total -Code $entry.Code -Slot 0 -SlotCount 2 -StepIndex ($index * 2)
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
             $basic = Get-WindowsCapability -Online -Name $entry.BasicCapability
@@ -4029,18 +4999,22 @@ try {{
         }}
 
         if ($capability.State -ne 'Installed') {{
-            Write-OcrStatus 'installing' ([int](100 * $index / $total)) $current $total $entry.Code ''
+            Write-OcrStatus 'installing' 0 $current $total $entry.Code ''
             Install-OcrCapability -Name $entry.Capability -Phase 'installing' -Index $index -Current $current -Total $total -Code $entry.Code -Slot 1 -SlotCount 2 -StepIndex (($index * 2) + 1)
             if (Test-OcrCancel) {{ throw [System.OperationCanceledException]::new('Canceled') }}
         }}
 
-        Write-OcrStatus 'verifying' ([int](100 * $current / $total)) $current $total $entry.Code ''
+        Write-OcrStatus 'verifying' 100 $current $total $entry.Code ''
         $capability = Get-WindowsCapability -Online -Name $entry.Capability
         if ($capability.State -ne 'Installed') {{
             throw ("Windows did not install " + $entry.Capability + ". State: " + $capability.State)
         }}
     }}
-    Set-Content -LiteralPath $ResultPath -Value 'OK' -Encoding UTF8 -Force
+    # A restart-pending install is finished as far as Windows is concerned,
+    # but the OCR engine will not see the language until the machine reboots,
+    # so the app has to say so rather than claim it is ready.
+    $resultText = if ($Script:RestartRequired) {{ 'OK_RESTART' }} else {{ 'OK' }}
+    Set-Content -LiteralPath $ResultPath -Value $resultText -Encoding UTF8 -Force
     Write-OcrStatus 'done' 100 $total $total '' ''
     exit 0
 }} catch [System.OperationCanceledException] {{
@@ -4156,11 +5130,10 @@ try {{
                         if ($matches.Count -gt 0) {{ $rawPercent = [int]$matches[$matches.Count - 1].Groups[1].Value }}
                     }}
                 }}
-                $overall = [int](((100 * $index) + $rawPercent) / $total)
                 if (Test-OcrCancel) {{
-                    Write-OcrStatus 'cancel_pending' $overall $current $total $entry.Code ''
+                    Write-OcrStatus 'cancel_pending' $rawPercent $current $total $entry.Code ''
                 }} else {{
-                    Write-OcrStatus 'removing' $overall $current $total $entry.Code ''
+                    Write-OcrStatus 'removing' $rawPercent $current $total $entry.Code ''
                 }}
                 Start-Sleep -Milliseconds 250
                 $process.Refresh()
@@ -4216,6 +5189,53 @@ try {{
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             return None
 
+    # Windows Update routinely holds one percentage for minutes at a time, so a
+    # pause only becomes worth mentioning well past that.
+    WINDOWS_OCR_QUIET_WARNING_SECONDS = 300
+
+    def _windows_ocr_detail_lines(self, status, elapsed_text):
+        """The second and third lines of the installer message.
+
+        dism.exe's own number stops moving long before anything is wrong. The
+        status heartbeat says whether the elevated installer and Windows
+        servicing are still responding. Only the current component's DISM
+        percentage is shown in the bar; there is no invented whole-job ETA.
+        """
+        quiet = max(0, int(status.get("quiet", 0) or 0))
+        pieces = [elapsed_text]
+        download_value = status.get("download", -1)
+        download = -1 if download_value is None else int(download_value)
+        if 0 <= download <= 100:
+            pieces.append(
+                language_manager_text(self.lang, "win_download_stage", percent=download)
+            )
+        if quiet < self.WINDOWS_OCR_QUIET_WARNING_SECONDS:
+            pieces.append(language_manager_text(self.lang, "win_activity_recent"))
+        lines = [" · ".join(pieces)]
+        if quiet >= self.WINDOWS_OCR_QUIET_WARNING_SECONDS:
+            lines.append(
+                language_manager_text(self.lang, "win_quiet", minutes=quiet // 60)
+            )
+        return lines
+
+    def _windows_ocr_stage_line(self, phase, current, total):
+        stages = {
+            "checking": 1,
+            "installing_basic": 2,
+            "installing": 3,
+            "verifying": 4,
+        }
+        stage = stages.get(str(phase))
+        if stage is None:
+            return ""
+        return language_manager_text(
+            self.lang,
+            "win_stage",
+            stage=stage,
+            current=max(1, int(current or 1)),
+            total=max(1, int(total or 1)),
+        )
+
     def _emit_windows_ocr_status(self, status):
         phase = str(status.get("phase", ""))
         percent = int(status.get("percent", 0))
@@ -4225,6 +5245,7 @@ try {{
         elapsed = max(0, int(status.get("elapsed", 0) or 0))
         elapsed_text = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
         language = self._language_display_name(code) if code else code.upper()
+        stage_line = self._windows_ocr_stage_line(phase, current, total)
         if phase in {"installing", "installing_basic"}:
             text = language_manager_text(
                 self.lang,
@@ -4236,13 +5257,19 @@ try {{
             # The percentage now comes straight from dism.exe, so it is safe to
             # drive a real progress bar instead of an endless marquee.
             self._emit_language_progress(
-                f"{text}\n{elapsed_text}",
+                "\n".join(
+                    [stage_line, text]
+                    + self._windows_ocr_detail_lines(status, elapsed_text)
+                    + [language_manager_text(self.lang, "win_time_unknown")]
+                ),
                 percent,
                 True,
             )
         elif phase == "checking":
             text = language_manager_text(self.lang, "win_checking", language=language)
-            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
+            self._emit_language_progress(
+                f"{stage_line}\n{text}\n{elapsed_text}", percent, False
+            )
         elif phase == "cancel_pending":
             self._emit_language_progress(
                 f"{language_manager_text(self.lang, 'win_cancel_pending')}\n{elapsed_text}",
@@ -4251,7 +5278,9 @@ try {{
             )
         elif phase == "verifying":
             text = language_manager_text(self.lang, "win_verifying", language=language)
-            self._emit_language_progress(f"{text}\n{elapsed_text}", percent, False)
+            self._emit_language_progress(
+                f"{stage_line}\n{text}\n{elapsed_text}", percent, False
+            )
         elif phase == "removing":
             text = language_manager_text(
                 self.lang,
@@ -4273,16 +5302,58 @@ try {{
         elif phase == "done":
             self._emit_language_progress(language_manager_text(self.lang, "win_done"), 100, True)
 
+    @staticmethod
+    def _windows_reboot_pending():
+        """Whether Windows itself says a restart is owed.
+
+        Telling someone to reboot when Windows is not asking for one sends them
+        away for five minutes to fix nothing. These are the keys the servicing
+        stack sets, read directly rather than through another DISM session.
+        """
+        if sys.platform != "win32":
+            return False
+        try:
+            import winreg
+        except ImportError:
+            return False
+        keys = (
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\PackagesPending",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
+        )
+        for path in keys:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path):
+                    return True
+            except OSError:
+                continue
+        return False
+
     def _friendly_windows_ocr_error(self, error):
         raw = str(error or "").strip()
         logger.error("Windows OCR servicing failed: %s", raw)
+        self._last_task_error_details = raw
         lowered = raw.lower()
         if "0x800f0954" in lowered:
             return language_manager_text(self.lang, "win_error_policy")
         if any(code in lowered for code in ("0x800f081f", "0x800f0906", "0x802440", "incompleteread")):
             return language_manager_text(self.lang, "win_error_source")
-        if any(code in lowered for code in ("0x800f0922", "0x800f0831", "0x800f0988", "restart")):
-            return language_manager_text(self.lang, "win_error_service")
+        # A broken script is a bug here, not a Windows state. It used to be
+        # reported as a busy servicing stack, because the parser error quoted the
+        # line containing "OK_RESTART" and a bare "restart" match was enough.
+        if any(marker in lowered for marker in (
+            "parsererror", "missingstatementblock", "is not recognized as the name",
+            "unexpected token", "commandnotfoundexception",
+        )):
+            return language_manager_text(self.lang, "win_error_generic")
+        # Ask Windows whether a reboot is owed instead of reading tea leaves in
+        # the message — and match whole words, so "OK_RESTART" is not a verdict.
+        servicing_codes = ("0x800f0922", "0x800f0831", "0x800f0988", "0x800f0902", "already running")
+        asks_for_reboot = re.search(r"\b(restart|reboot)\b", lowered) is not None
+        if any(code in lowered for code in servicing_codes) or asks_for_reboot:
+            if self._windows_reboot_pending():
+                return language_manager_text(self.lang, "win_error_restart")
+            return language_manager_text(self.lang, "win_error_busy")
         return language_manager_text(self.lang, "win_error_generic")
 
     def _install_windows_ocr_worker(self, codes):
@@ -4355,10 +5426,16 @@ try {{
 
             def run_installer():
                 try:
-                    completed_box["completed"] = self._run_powershell_script(
-                        script_path,
-                        elevated=True,
-                    )
+                    # Keep every query made by this process away from the
+                    # online image until the elevated servicing session exits.
+                    # Locking only the catalog queries was not enough: opening
+                    # the package window again could start a second DISM
+                    # session while Add-Capability was still running.
+                    with _WINDOWS_SERVICING_LOCK:
+                        completed_box["completed"] = self._run_powershell_script(
+                            script_path,
+                            elevated=True,
+                        )
                 except Exception as exc:
                     completed_box["error"] = exc
                 finally:
@@ -4429,6 +5506,11 @@ try {{
             if self._cancel_requested.is_set():
                 self._finish_language_task("Windows OCR", canceled=True)
                 return
+            if result == "OK_RESTART" and not pending:
+                # DISM answered 3010: the package is in place, but Windows wants
+                # a reboot before it counts as serviced. Saying "ready" here
+                # would be a promise the OCR engine may not keep until then.
+                pending = list(unique_codes)
             if pending:
                 logger.warning(
                     "Windows OCR capabilities installed but not yet exposed by WinRT: %s",
@@ -4491,10 +5573,11 @@ try {{
 
             def run_remover():
                 try:
-                    completed_box["completed"] = self._run_powershell_script(
-                        script_path,
-                        elevated=True,
-                    )
+                    with _WINDOWS_SERVICING_LOCK:
+                        completed_box["completed"] = self._run_powershell_script(
+                            script_path,
+                            elevated=True,
+                        )
                 except Exception as exc:
                     completed_box["error"] = exc
                 finally:
@@ -4761,6 +5844,11 @@ class SettingsWindow(QWidget):
         self._hymt_temp_dir = ""
         self._hymt_cancel_requested = threading.Event()
         self._language_manager_dialog = None
+        self._language_package_task_state = {
+            "text": "",
+            "percent": None,
+            "kind": "idle",
+        }
         self.rapidocr_progress = None
         self.easyocr_progress = None
         self.hymt_progress = None
@@ -4809,7 +5897,7 @@ class SettingsWindow(QWidget):
 
         margin_top_val = "-12px" if self.parent.current_theme == "Темная" else "-6px"
         fixed_height = 38
-        engine_combo_width = 160
+        engine_combo_width = 180
         engine_control_height = 32
         action_button_height = 36
         
@@ -4833,7 +5921,9 @@ class SettingsWindow(QWidget):
         self.ocr_engine_label.setFixedHeight(engine_control_height)
         self.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
-        self.ocr_engine_combo = QComboBox()
+        # Same drop-down behaviour as the other two pickers: the list opens
+        # below the field instead of covering it.
+        self.ocr_engine_combo = DropDownCombo()
         engine_group_color = (
             "#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124"
         )
@@ -4860,35 +5950,9 @@ class SettingsWindow(QWidget):
             self.ocr_engine_combo.setCurrentIndex(max(0, fallback_index))
 
         self.ocr_engine_combo.currentTextChanged.connect(self.handle_ocr_engine_change)
-        self.ocr_engine_combo.currentTextChanged.connect(lambda _text: self._sync_ocr_engine_delete_button())
-        self.ocr_engine_combo.setStyleSheet(self._engine_combo_style())
+        self._apply_engine_combo_style(self.ocr_engine_combo)
         self.ocr_engine_combo.setFixedWidth(engine_combo_width)
         self.ocr_engine_combo.setFixedHeight(engine_control_height)
-        self.ocr_engine_combo.installEventFilter(self)
-        self.ocr_engine_delete_btn = QToolButton(self.ocr_engine_combo)
-        self.ocr_engine_delete_btn.setObjectName("ocrEngineDeleteButton")
-        self.ocr_engine_delete_btn.setText("×")
-        self.ocr_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.ocr_engine_delete_btn.setToolTip(tooltip_text(settings_text(lang, "remove_local_tesseract")))
-        self.ocr_engine_delete_btn.clicked.connect(self.remove_ocr_engine)
-        self.ocr_engine_delete_btn.setStyleSheet("""
-            QToolButton#ocrEngineDeleteButton {
-                background-color: rgba(212, 68, 68, 0.88);
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 0px;
-                margin: 0px;
-            }
-            QToolButton#ocrEngineDeleteButton:hover {
-                background-color: #e15454;
-            }
-        """)
-        self._sync_ocr_engine_delete_button()
-        QtCore.QTimer.singleShot(0, self._sync_ocr_engine_delete_button)
-
         # Все три правых элемента имеют высоту 32 px и один вертикальный центр.
         row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignVCenter)
         row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignVCenter)
@@ -4926,7 +5990,7 @@ class SettingsWindow(QWidget):
         self.translator_engine_label.setFixedHeight(engine_control_height)
         self.translator_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        self.translator_combo = QComboBox()
+        self.translator_combo = DropDownCombo()
         installed_translator_engines = {
             engine
             for engine, _name, kind in TRANSLATOR_ENGINE_OPTIONS
@@ -4955,35 +6019,9 @@ class SettingsWindow(QWidget):
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.currentIndexChanged.connect(self._on_translator_changed)
         self.translator_combo.currentIndexChanged.connect(lambda _idx: self._sync_translator_engine_delete_button())
-        self.translator_combo.setStyleSheet(self._engine_combo_style())
+        self._apply_engine_combo_style(self.translator_combo)
         self.translator_combo.setFixedWidth(engine_combo_width)
         self.translator_combo.setFixedHeight(engine_control_height)
-        self.translator_combo.installEventFilter(self)
-        self.translator_engine_delete_btn = QToolButton(self.translator_combo)
-        self.translator_engine_delete_btn.setObjectName("translatorEngineDeleteButton")
-        self.translator_engine_delete_btn.setText("×")
-        self.translator_engine_delete_btn.setCursor(Qt.PointingHandCursor)
-        self.translator_engine_delete_btn.setToolTip(tooltip_text(settings_text(lang, "remove_local_hymt")))
-        self.translator_engine_delete_btn.clicked.connect(self.remove_hymt_engine)
-        self.translator_engine_delete_btn.setStyleSheet("""
-            QToolButton#translatorEngineDeleteButton {
-                background-color: rgba(212, 68, 68, 0.88);
-                color: #ffffff;
-                border: none;
-                border-radius: 8px;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 0px;
-                margin: 0px;
-            }
-            QToolButton#translatorEngineDeleteButton:hover {
-                background-color: #e15454;
-            }
-        """)
-        self._sync_translator_engine_delete_button()
-        QtCore.QTimer.singleShot(0, self._sync_translator_engine_delete_button)
-        
-        # Выравниваем
         row2.addWidget(self.translator_engine_label, alignment=Qt.AlignVCenter)
         row2.addWidget(self.translator_combo, alignment=Qt.AlignVCenter)
         
@@ -5005,14 +6043,104 @@ class SettingsWindow(QWidget):
 
         # --- Остальные чекбоксы (start_minimized уже добавлен выше) ---
 
-        # Остальные чекбоксы
+        # --- СТРОКА 3: автокопирование + поведение окна результата ---
+        # Не оставляем пустую строку в левой колонке: третий основной чекбокс
+        # продолжает последовательность, а управление результатом остаётся
+        # выровнено с OCR и переводчиком справа.
+        row3 = QHBoxLayout()
+        row3.setContentsMargins(0, 0, 0, 0)
+        row3.setSpacing(8)
         self.copy_translated_checkbox = QCheckBox(settings_text(lang, "copy_translated_text"))
         self.copy_translated_checkbox.setChecked(self.parent.config.get("copy_translated_text", False))
-        self.copy_translated_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_translated_text", state))
-        self.copy_translated_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.copy_translated_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("copy_translated_text", state)
+        )
+        # No min-width here: this row shares its line with the Show-window
+        # picker, and a fixed 260px clipped the longer languages against it.
+        # The width is set from the box's own size hint once the theme's font is
+        # in place — see _fit_copy_translated_checkbox.
+        self.copy_translated_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
         self.copy_translated_checkbox.setFixedHeight(fixed_height)
-        self.main_layout.addWidget(self.copy_translated_checkbox, alignment=Qt.AlignLeft)
+        row3.addWidget(self.copy_translated_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        row3.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
+        self.result_window_label = QLabel(settings_text(lang, "result_window_label"))
+        self.result_window_label.setStyleSheet("margin:0; padding:0;")
+        result_label_font = self.result_window_label.font()
+        result_label_font.setPixelSize(16)
+        self.result_window_label.setFont(result_label_font)
+        # This label names what the drop-down controls, so it is longer than
+        # "OCR:" and sizes itself; the row is right-aligned, so the extra width
+        # grows into the empty middle of the window and the columns still line
+        # up with the two engine rows.
+        self.result_window_label.setFixedWidth(
+            max(80, QtGui.QFontMetrics(result_label_font).horizontalAdvance(
+                self.result_window_label.text()) + 4)
+        )
+        self.result_window_label.setFixedHeight(engine_control_height)
+        self.result_window_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        # Ленивый импорт для избежания циклического импорта
+        from main import RESULT_WINDOW_MODES, result_window_hidden_modes
+
+        hidden_modes = set(result_window_hidden_modes(self.parent.config))
+        # A drop-down keeps this row consistent with the two engine pickers
+        # above it. The three actions are independent switches, so each row in
+        # the list carries its own check box rather than being a single choice.
+        self.result_window_control = ResultWindowModeCombo(
+            RESULT_WINDOW_MODES,
+            {mode: settings_text(lang, f"result_window_row_{mode}")
+             for mode in RESULT_WINDOW_MODES},
+            {
+                "all": settings_text(lang, "result_window_summary_all"),
+                "none": settings_text(lang, "result_window_summary_none"),
+                "on": settings_text(lang, "result_window_summary_on"),
+                "off": settings_text(lang, "result_window_summary_off"),
+                "count": settings_text(lang, "result_window_summary_count"),
+            },
+            dark=self.parent.current_theme != "Светлая",
+            short_labels={mode: settings_text(lang, f"result_window_mode_{mode}")
+                          for mode in RESULT_WINDOW_MODES},
+            header=settings_text(lang, "result_window_modes_header"),
+            header_color="#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124",
+        )
+        self.result_window_control.setObjectName("resultWindowModes")
+        self.result_window_control.setFixedSize(engine_combo_width, engine_control_height)
+        self.result_window_control.setCursor(Qt.PointingHandCursor)
+        for mode in RESULT_WINDOW_MODES:
+            item = self.result_window_control._item(mode)
+            if item is not None:
+                item.setToolTip(settings_text(lang, f"result_window_mode_{mode}_tooltip"))
+        # Checked means exactly what it looks like: this action SHOWS the
+        # window. The persisted setting stores the inverse for backwards
+        # compatibility with existing configurations.
+        self.result_window_control.set_checked_modes(
+            [mode for mode in RESULT_WINDOW_MODES if mode not in hidden_modes]
+        )
+        self.result_window_control.modes_changed.connect(self._save_result_window_modes)
+        self.result_window_control.installEventFilter(self)
+
+        self._apply_engine_combo_style(self.result_window_control)
+        # The popup is a top-level widget of its own, so it misses the sweep
+        # install_accent_controls() does over this window — and apply_theme()
+        # runs before this control exists. Style it here, at its source.
+        install_accent_controls(
+            self.result_window_control.view(),
+            dark=self.parent.current_theme != "Светлая",
+        )
+        self.result_window_control.setAccessibleName(settings_text(lang, "result_window_label"))
+        # Sets both the tooltip and the accessible description, and keeps the
+        # list of enabled actions in them as the rows are toggled.
+        self.result_window_control.set_help_text(settings_text(lang, "result_window_tooltip"))
+        self.result_window_label.setToolTip(tooltip_text(settings_text(lang, "result_window_tooltip")))
+
+        row3.addWidget(self.result_window_label, alignment=Qt.AlignVCenter)
+        row3.addWidget(self.result_window_control, alignment=Qt.AlignVCenter)
+        self.main_layout.addLayout(row3)
+
+        # Остальные чекбоксы
         self.copy_history_checkbox = QCheckBox(settings_text(lang, "copy_history"))
         self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", False))
         self.copy_history_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_history", state))
@@ -5147,9 +6275,13 @@ class SettingsWindow(QWidget):
                 border-right: 1px solid rgba(255,255,255,0.1);
                 border-bottom: 1px solid rgba(255,255,255,0.05);
             }
+            QPushButton[packageTaskDone="true"] {
+                color: #59c879;
+            }
         """)
         self.ocr_languages_btn.setFixedHeight(action_button_height)
         self.ocr_languages_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._apply_language_package_task_status()
         tools_row.addWidget(self.ocr_languages_btn, 1)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
@@ -5237,15 +6369,87 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(version_label)
         self.main_layout.addStretch()
 
+    def set_language_package_task_status(self, text="", percent=None, kind="running"):
+        """Keep a background package job visible after its dialog is hidden.
+
+        A system notification would reintroduce the Windows notification sound
+        that this app deliberately avoids. The settings button is always the
+        route back to the package manager, so it carries the quiet persistent
+        state instead.
+        """
+        self._language_package_task_state = {
+            "text": str(text or ""),
+            "percent": None if percent is None else max(0, min(100, int(percent))),
+            "kind": str(kind or "idle"),
+        }
+        self._apply_language_package_task_status()
+
+    def _apply_language_package_task_status(self):
+        button = getattr(self, "ocr_languages_btn", None)
+        if button is None:
+            return
+        lang = getattr(self.parent, "current_interface_language", "en")
+        base = settings_text(lang, "ocr_language_packs")
+        state = dict(getattr(self, "_language_package_task_state", {}) or {})
+        kind = state.get("kind", "idle")
+        if kind in {"running", "done", "failed"}:
+            # The normal label fills almost the whole one-third-width button.
+            # Status text used to push its first/last letters outside the fixed
+            # window, so active badges use a deliberately short localized base.
+            base = language_manager_text(lang, "task_packages_short")
+        if kind == "running":
+            # A package task can expose a download percentage and a separate
+            # DISM component percentage. Neither is whole-job progress, so the
+            # Settings button advertises the state, not a misleading number.
+            suffix = " · " + language_manager_text(lang, "task_installing_short")
+        elif kind == "done":
+            suffix = " · " + engine_text(lang, "done")
+        elif kind == "failed":
+            suffix = " · !"
+        else:
+            suffix = ""
+        button.setText(base + suffix)
+        button.setProperty("packageTaskDone", kind == "done")
+        # Dynamic Qt properties do not automatically trigger a stylesheet
+        # recalculation.
+        button.style().unpolish(button)
+        button.style().polish(button)
+        help_text = settings_text(lang, "manage_ocr_languages")
+        detail = str(state.get("text") or "").strip()
+        button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
+        button.setAccessibleDescription(detail or help_text)
+
     def show_ocr_language_manager(self):
+        # Completion is an unread badge until the user follows it. Opening the
+        # package manager acknowledges it; ongoing and failed work remains
+        # visible until it is actually resolved.
+        state = dict(getattr(self, "_language_package_task_state", {}) or {})
+        if state.get("kind") == "done":
+            self.set_language_package_task_status(kind="idle")
         complete_guide_step = getattr(self.parent, "_complete_guide_step", None)
         if callable(complete_guide_step):
             complete_guide_step("language_packages")
         dialog = self._language_manager_dialog
+        # Its text is built once, from the language it was created with, so a
+        # dialog from before a language switch has to be replaced rather than
+        # reused.
+        if dialog is not None:
+            try:
+                stale = dialog.lang != getattr(self.parent, "current_interface_language", "en")
+            except RuntimeError:
+                stale = True
+            if stale and not getattr(dialog, "_install_in_progress", False):
+                try:
+                    dialog.close()
+                    dialog.deleteLater()
+                except RuntimeError:
+                    pass
+                dialog = None
+                self._language_manager_dialog = None
         if dialog is None:
             dialog = OcrLanguageManagerDialog(self)
             self._language_manager_dialog = dialog
-        else:
+        elif not getattr(dialog, "_install_in_progress", False):
             dialog.refresh_all()
             dialog._start_runtime_probe()
             if dialog.argos_table.isVisible():
@@ -5254,31 +6458,73 @@ class SettingsWindow(QWidget):
         dialog.raise_()
         dialog.activateWindow()
 
+    def _fit_copy_translated_checkbox(self):
+        """Give the box room for its own label.
+
+        It shares a row with the Show-window picker, so anything past its width
+        is drawn over by that control — which is how "Копировать сразу
+        переведённый текст" ended up cut off. 260px is kept as a floor so the
+        English window looks exactly as it did.
+        """
+        box = getattr(self, "copy_translated_checkbox", None)
+        if box is None:
+            return
+        try:
+            box.setMinimumWidth(max(260, box.sizeHint().width()))
+        except RuntimeError:
+            pass
+
+    def _apply_engine_combo_style(self, combo):
+        if combo is not None:
+            combo.setStyleSheet(self._engine_combo_style())
+
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
         bg = "#17181d" if is_dark else "#ffffff"
+        # Hover/focus lifts the fill instead of drawing an outline.
+        bg_lit = "#221f2c" if is_dark else "#f2eef8"
         text = "#f4f6fb" if is_dark else "#202124"
         border = "#34313f" if is_dark else "#cfc8df"
         popup_bg = "#20212a" if is_dark else "#ffffff"
         selection = "#5f4a88" if is_dark else "#d9cdf0"
+        hover = "#a985d2" if is_dark else "#8f7ab8"
+        # Qt fills the box instead of mitering CSS borders into a triangle, and a
+        # styled drop-down suppresses the platform arrow, so the chevron is a
+        # real image. Forward slashes: a stylesheet url() treats \\ as an escape.
+        arrow_icon = resource_path(
+            "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
+        ).replace("\\", "/")
         return f"""
             QComboBox {{
-                margin-left: 6px;
-                padding-left: 6px;
-                padding-right: 30px;
+                margin-left: 3px;
+                margin-right: 3px;
+                padding-left: 10px;
+                padding-right: 26px;
                 background-color: {bg};
                 color: {text};
-                border: 1px solid {border};
-                border-radius: 4px;
+                /* No outline, by request. A hairline never rendered evenly here:
+                   at fractional display scaling a 1px border is 2.5 device
+                   pixels, so one edge came out thicker and softer than the rest
+                   and the field looked crooked. The window is a fixed size, so
+                   the field cannot simply be given more room either. It reads as
+                   a field from its own darker fill; hover and focus change that
+                   fill instead of drawing a line. Transparent rather than none:
+                   the box model keeps the 1px ring so nothing shifts by a pixel
+                   when the state changes. */
+                border: 1px solid transparent;
+                border-radius: 6px;
+                font-size: 15px;
+            }}
+            QComboBox:hover, QComboBox:focus, QComboBox:on {{
+                background-color: {bg_lit};
             }}
             QComboBox::drop-down {{
-                width: 30px;
-                border-left: 1px solid {border};
-            }}
-            QComboBox[engineDeleteVisible="true"]::down-arrow {{
-                image: none;
-                width: 0px;
-                height: 0px;
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 24px;
+                border: none;
+                background: transparent;
+                image: url({arrow_icon});
             }}
             QComboBox QAbstractItemView {{
                 background-color: {popup_bg};
@@ -5286,6 +6532,8 @@ class SettingsWindow(QWidget):
                 selection-background-color: {selection};
                 selection-color: #ffffff;
                 outline: none;
+                border: 1px solid {border};
+                border-radius: 6px;
                 padding: 3px 0px;
             }}
             QComboBox QAbstractItemView::item {{
@@ -7616,10 +8864,17 @@ finally {
             QCheckBox {{
                 color: {theme['text_color']};
                 font-size: 16px;
+                spacing: 10px;
             }}
             QCheckBox::indicator {{
+                /* Only the size is set here. Colouring the indicator through
+                   the stylesheet would replace the platform rendering and take
+                   the check mark with it, so AccentControlStyle paints it. */
                 width: 20px;
                 height: 20px;
+            }}
+            QCheckBox:disabled {{
+                color: rgba(244, 246, 251, 110);
             }}
             QPushButton {{
                 background-color: {theme['background']};
@@ -7633,13 +8888,33 @@ finally {
             }}
         """
         self.setStyleSheet(style)
+        install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
+        # The theme sets the font this box is measured with, so its width can
+        # only be worked out here.
+        self._fit_copy_translated_checkbox()
         for combo_name in ("ocr_engine_combo", "translator_combo"):
             combo = getattr(self, combo_name, None)
             if combo is not None:
                 try:
-                    combo.setStyleSheet(self._engine_combo_style())
+                    self._apply_engine_combo_style(combo)
                 except RuntimeError:
                     pass
+        result_control = getattr(self, "result_window_control", None)
+        if result_control is not None:
+            try:
+                # Same styling as the engine pickers: the three rows now live in
+                # a drop-down, so they must not drift apart visually.
+                self._apply_engine_combo_style(result_control)
+                # The row ticks are painted pixmaps, so they have to be redrawn
+                # for the new palette rather than restyled.
+                result_control.set_dark(self.parent.current_theme != "Светлая")
+                # The popup is its own top-level widget and misses the sweep
+                # install_accent_controls does over this window.
+                install_accent_controls(
+                    result_control.view(), dark=self.parent.current_theme != "Светлая"
+                )
+            except RuntimeError:
+                pass
 
         self._refresh_secondary_view_theme()
         secondary_kind = getattr(self, "_secondary_view_kind", None)
@@ -7656,102 +8931,71 @@ finally {
 
     def update_language(self):
         self.init_ui()
+        # The package manager builds all of its text once, from the language it
+        # was created with, and it is kept alive between openings — so without
+        # this it stays in the old language until the app restarts.
+        self._relanguage_language_manager()
+
+    def _relanguage_language_manager(self):
+        dialog = getattr(self, "_language_manager_dialog", None)
+        if dialog is None:
+            return
+        current = getattr(self.parent, "current_interface_language", "en")
+        try:
+            if dialog.lang == current:
+                return
+            # Never pull the window out from under a running install: it owns
+            # the progress dialog and the worker's cancel flag. It will be
+            # rebuilt the next time it is opened instead.
+            if getattr(dialog, "_install_in_progress", False):
+                return
+            was_visible = dialog.isVisible()
+            sections = (
+                dialog.tabs.currentIndex(),
+                dialog.ocr_tabs.currentIndex(),
+                dialog.translation_tabs.currentIndex(),
+            )
+            geometry = dialog.geometry()
+            dialog.close()
+            dialog.deleteLater()
+        except RuntimeError:
+            self._language_manager_dialog = None
+            return
+        self._language_manager_dialog = None
+        if not was_visible:
+            return
+
+        fresh = OcrLanguageManagerDialog(self)
+        self._language_manager_dialog = fresh
+        # Put the user back on the tab they were reading, where they left it.
+        fresh.tabs.setCurrentIndex(sections[0])
+        fresh.ocr_tabs.setCurrentIndex(sections[1])
+        fresh.translation_tabs.setCurrentIndex(sections[2])
+        fresh.show()
+        fresh.setGeometry(geometry)
+        fresh.raise_()
+        fresh.activateWindow()
 
     def eventFilter(self, obj, event):
-        if obj is getattr(self, "ocr_engine_combo", None) and event.type() in (
-            QtCore.QEvent.Resize,
-            QtCore.QEvent.Show,
-            QtCore.QEvent.EnabledChange,
-        ):
-            self._sync_ocr_engine_delete_button()
-        if obj is getattr(self, "translator_combo", None) and event.type() in (
-            QtCore.QEvent.Resize,
-            QtCore.QEvent.Show,
-            QtCore.QEvent.EnabledChange,
-        ):
-            self._sync_translator_engine_delete_button()
+        # It used to keep the pickers' × buttons positioned. Those are gone —
+        # engines are removed from their own tab in Language packages now — but
+        # the filter stays installed so a future watcher has somewhere to live.
         return super().eventFilter(obj, event)
 
-    def _position_ocr_engine_delete_button(self):
-        combo = getattr(self, "ocr_engine_combo", None)
-        button = getattr(self, "ocr_engine_delete_btn", None)
-        if combo is None or button is None:
+    def _save_result_window_modes(self, *_args):
+        control = getattr(self, "result_window_control", None)
+        if control is None:
             return
-        button_size = 16
-        delete_section_width = 30
-        button.setFixedSize(button_size, button_size)
-        x_pos = combo.width() - delete_section_width + (delete_section_width - button_size) // 2
-        y_pos = (combo.height() - button_size) // 2
-        button.move(max(0, x_pos), max(0, y_pos))
-        button.raise_()
+        # Storage remains "hidden modes" for compatibility, while the screen
+        # presents the friendlier inverse: a ticked row means SHOW the window.
+        from main import RESULT_WINDOW_MODES
 
-    def _sync_ocr_engine_delete_button(self):
-        button = getattr(self, "ocr_engine_delete_btn", None)
-        combo = getattr(self, "ocr_engine_combo", None)
-        if button is None or combo is None:
-            return
-        current_engine = combo.currentText()
-        show_button = False
-        if current_engine == "Tesseract":
-            show_button = (
-                bool(self._find_local_tesseract_exe())
-                and not self._tesseract_install_in_progress
-            )
-            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_tesseract")))
-        elif current_engine == RAPIDOCR_ENGINE_DISPLAY:
-            show_button = (
-                self._local_rapidocr_installed()
-                and not self._rapidocr_install_in_progress
-            )
-            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_rapidocr")))
-        elif current_engine == EASYOCR_ENGINE_DISPLAY:
-            show_button = (
-                self._local_easyocr_installed()
-                and not self._easyocr_install_in_progress
-            )
-            button.setToolTip(tooltip_text(settings_text(getattr(self.parent, "current_interface_language", "en"), "remove_local_easyocr")))
-        previous_state = bool(combo.property("engineDeleteVisible"))
-        combo.setProperty("engineDeleteVisible", show_button)
-        if previous_state != show_button:
-            combo.style().unpolish(combo)
-            combo.style().polish(combo)
-            combo.update()
-        self._position_ocr_engine_delete_button()
-        button.setVisible(show_button)
-        button.setEnabled(show_button)
-
-    def _position_translator_engine_delete_button(self):
-        combo = getattr(self, "translator_combo", None)
-        button = getattr(self, "translator_engine_delete_btn", None)
-        if combo is None or button is None:
-            return
-        button_size = 16
-        delete_section_width = 30
-        button.setFixedSize(button_size, button_size)
-        x_pos = combo.width() - delete_section_width + (delete_section_width - button_size) // 2
-        y_pos = (combo.height() - button_size) // 2
-        button.move(max(0, x_pos), max(0, y_pos))
-        button.raise_()
-
-    def _sync_translator_engine_delete_button(self):
-        button = getattr(self, "translator_engine_delete_btn", None)
-        combo = getattr(self, "translator_combo", None)
-        if button is None or combo is None:
-            return
-        show_button = (
-            self._current_translator_engine_from_combo() == HYMT_ENGINE_KEY
-            and self._hymt_installed()
-            and not self._hymt_install_in_progress
-        )
-        previous_state = bool(combo.property("engineDeleteVisible"))
-        combo.setProperty("engineDeleteVisible", show_button)
-        if previous_state != show_button:
-            combo.style().unpolish(combo)
-            combo.style().polish(combo)
-            combo.update()
-        self._position_translator_engine_delete_button()
-        button.setVisible(show_button)
-        button.setEnabled(show_button)
+        checked = set(control.checked_modes())
+        hidden_modes = [mode for mode in RESULT_WINDOW_MODES if mode not in checked]
+        self.auto_save_setting("result_window_hidden_modes", hidden_modes)
+        complete_guide_step = getattr(self.parent, "_complete_guide_step", None)
+        if callable(complete_guide_step):
+            complete_guide_step("result_window")
 
     def _restore_settings_view(self):
         try:
@@ -7963,7 +9207,6 @@ finally {
         self.ocr_engine_combo.blockSignals(True)
         self.ocr_engine_combo.setCurrentText(engine_name)
         self.ocr_engine_combo.blockSignals(False)
-        self._sync_ocr_engine_delete_button()
 
     def handle_ocr_engine_change(self, text):
         if text == RAPIDOCR_ENGINE_DISPLAY:
@@ -8189,7 +9432,6 @@ finally {
         self.translator_combo.blockSignals(True)
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.blockSignals(False)
-        self._sync_translator_engine_delete_button()
 
     def _current_translator_engine_from_combo(self):
         combo = getattr(self, "translator_combo", None)
@@ -8288,7 +9530,6 @@ finally {
         self._tesseract_temp_dir = ""
         self._tesseract_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
-        self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
         threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
@@ -8503,7 +9744,6 @@ finally {
         self._tesseract_cancel_requested.clear()
         self._tesseract_progress_owner = None
         self.ocr_engine_combo.setEnabled(True)
-        self._sync_ocr_engine_delete_button()
         self._restore_parent_topmost_after_tesseract_install()
 
     @QtCore.pyqtSlot(str)
@@ -8517,7 +9757,6 @@ finally {
         self._reset_tesseract_runtime_cache()
         self._set_ocr_combo_silently("Tesseract")
         self.save_ocr_engine("Tesseract")
-        self._sync_ocr_engine_delete_button()
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -8770,7 +10009,6 @@ finally {
         self._rapidocr_install_process = None
         self._rapidocr_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
-        self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_rapidocr_progress(
             engine_text(lang, "preparing", engine="RapidOCR"),
@@ -8965,7 +10203,6 @@ finally {
         self._rapidocr_progress_owner = None
         if hasattr(self, "ocr_engine_combo"):
             self.ocr_engine_combo.setEnabled(True)
-        self._sync_ocr_engine_delete_button()
         self._restore_parent_topmost_after_tesseract_install()
 
     @QtCore.pyqtSlot()
@@ -8976,7 +10213,6 @@ finally {
         self._reset_rapidocr_runtime_cache(clear_modules=True)
         self._set_ocr_combo_silently(RAPIDOCR_ENGINE_DISPLAY)
         self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
-        self._sync_ocr_engine_delete_button()
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -9044,7 +10280,6 @@ finally {
         self._easyocr_install_process = None
         self._easyocr_progress_owner = progress_owner
         self.ocr_engine_combo.setEnabled(False)
-        self._sync_ocr_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_easyocr_progress(
             engine_text(lang, "preparing", engine="EasyOCR"),
@@ -9241,7 +10476,6 @@ finally {
         self._easyocr_progress_owner = None
         if hasattr(self, "ocr_engine_combo"):
             self.ocr_engine_combo.setEnabled(True)
-        self._sync_ocr_engine_delete_button()
         self._restore_parent_topmost_after_tesseract_install()
 
     @QtCore.pyqtSlot()
@@ -9252,7 +10486,6 @@ finally {
         self._reset_easyocr_runtime_cache(clear_modules=True)
         self._set_ocr_combo_silently(EASYOCR_ENGINE_DISPLAY)
         self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
-        self._sync_ocr_engine_delete_button()
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -9304,7 +10537,6 @@ finally {
         self._hymt_cancel_requested.clear()
         self._hymt_temp_dir = ""
         self.translator_combo.setEnabled(False)
-        self._sync_translator_engine_delete_button()
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_hymt_progress(
             engine_text(lang, "preparing", engine="Hy-MT"),
@@ -9608,7 +10840,6 @@ finally {
         self._hymt_cancel_requested.clear()
         if hasattr(self, "translator_combo"):
             self.translator_combo.setEnabled(True)
-        self._sync_translator_engine_delete_button()
         self._restore_parent_topmost_after_tesseract_install()
 
     @QtCore.pyqtSlot()
@@ -9619,7 +10850,6 @@ finally {
         self._reset_hymt_runtime_cache()
         self._set_translator_combo_silently(HYMT_ENGINE_KEY)
         self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
-        self._sync_translator_engine_delete_button()
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -9664,7 +10894,6 @@ finally {
             return
         hymt_dir = self._local_hymt_dir()
         if not os.path.isdir(hymt_dir):
-            self._sync_translator_engine_delete_button()
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Hy-MT"))
@@ -9684,14 +10913,12 @@ finally {
             if self.parent.config.get("translator_engine", "").lower() == HYMT_ENGINE_KEY:
                 self._set_translator_combo_silently("google")
                 self.auto_save_setting("translator_engine", "google")
-            self._sync_translator_engine_delete_button()
             QMessageBox.information(
                 self,
                 HYMT_ENGINE_DISPLAY,
                 engine_text(lang, "removed", engine="Hy-MT"),
             )
         except Exception as e:
-            self._sync_translator_engine_delete_button()
             QMessageBox.warning(
                 self,
                 engine_text(lang, "error_title", engine="Hy-MT"),
@@ -9715,7 +10942,6 @@ finally {
             return
         rapidocr_dir = self._local_rapidocr_dir()
         if not os.path.isdir(rapidocr_dir):
-            self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="RapidOCR"))
@@ -9734,14 +10960,12 @@ finally {
             if self.parent.config.get("ocr_engine") == RAPIDOCR_ENGINE_DISPLAY:
                 self._set_ocr_combo_silently("Windows")
                 self.save_ocr_engine("Windows")
-            self._sync_ocr_engine_delete_button()
             QMessageBox.information(
                 self,
                 RAPIDOCR_ENGINE_DISPLAY,
                 engine_text(lang, "removed", engine="RapidOCR"),
             )
         except Exception as e:
-            self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
                 engine_text(lang, "error_title", engine="RapidOCR"),
@@ -9755,7 +10979,6 @@ finally {
             return
         easyocr_dir = self._local_easyocr_dir()
         if not os.path.isdir(easyocr_dir):
-            self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="EasyOCR"))
@@ -9774,14 +10997,12 @@ finally {
             if self.parent.config.get("ocr_engine") == EASYOCR_ENGINE_DISPLAY:
                 self._set_ocr_combo_silently("Windows")
                 self.save_ocr_engine("Windows")
-            self._sync_ocr_engine_delete_button()
             QMessageBox.information(
                 self,
                 EASYOCR_ENGINE_DISPLAY,
                 engine_text(lang, "removed", engine="EasyOCR"),
             )
         except Exception as e:
-            self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
                 engine_text(lang, "error_title", engine="EasyOCR"),
@@ -9795,7 +11016,6 @@ finally {
             return
         tesseract_dir = self._local_tesseract_dir()
         if not os.path.isdir(tesseract_dir):
-            self._sync_ocr_engine_delete_button()
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Tesseract"))
@@ -9814,14 +11034,12 @@ finally {
             if self.parent.config.get("ocr_engine") == "Tesseract":
                 self._set_ocr_combo_silently("Windows")
                 self.save_ocr_engine("Windows")
-            self._sync_ocr_engine_delete_button()
             QMessageBox.information(
                 self,
                 "Tesseract",
                 engine_text(lang, "removed", engine="Tesseract"),
             )
         except Exception as e:
-            self._sync_ocr_engine_delete_button()
             QMessageBox.warning(
                 self,
                 engine_text(lang, "error_title", engine="Tesseract"),
@@ -10035,7 +11253,8 @@ finally {
             "ocr_translate_target_language": "ru",
             "no_screen_dimming": False,
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
-            "translate_selection_hotkey": "Ctrl+Alt+Q"
+            "translate_selection_hotkey": "Ctrl+Alt+Q",
+            "result_window_hidden_modes": []
         }
         # Save to disk
         config_path = get_data_file("config.json")

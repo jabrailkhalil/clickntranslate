@@ -286,3 +286,58 @@ coll = COLLECT(
     upx_exclude=[],
     name='clickntranslate',
 )
+
+
+# The archive is appended to each executable after it is written, and a Windows
+# build once produced a GUI executable whose embedded PYZ began with a mebibyte
+# of zeros while every artifact on disk was intact — PyInstaller still exited 0
+# and the app died at startup. Read the output back rather than trusting the
+# exit code. See the same check in ClicknTranslate.spec.
+def _verify_frozen_executables(dist_root):
+    from PyInstaller.archive.readers import CArchiveReader
+
+    executables = [
+        _os.path.join(dist_root, 'clickntranslate'),
+        _os.path.join(dist_root, '_internal', 'ArgosWorker'),
+        _os.path.join(dist_root, '_internal', 'OcrWorker'),
+    ]
+
+    problems = []
+    for path in executables:
+        if not _os.path.isfile(path):
+            problems.append(f'{_os.path.basename(path)}: missing from the build')
+            continue
+        try:
+            reader = CArchiveReader(path)
+        except Exception as exc:
+            problems.append(f'{_os.path.basename(path)}: unreadable archive ({exc})')
+            continue
+
+        entries = [name for name in reader.toc if name.endswith('.pyz')]
+        if not entries:
+            problems.append(f'{_os.path.basename(path)}: no PYZ archive embedded')
+            continue
+
+        for entry in entries:
+            try:
+                payload = reader.extract(entry)
+                payload = payload[1] if isinstance(payload, tuple) else payload
+            except Exception as exc:
+                problems.append(f'{_os.path.basename(path)}: cannot extract {entry} ({exc})')
+                continue
+            if not payload.startswith(b'PYZ\0'):
+                zeros = len(payload) - len(payload.lstrip(b'\0'))
+                problems.append(
+                    f'{_os.path.basename(path)}: {entry} is corrupt — '
+                    f'{zeros:,} leading zero bytes of {len(payload):,}'
+                )
+
+    if problems:
+        raise SystemExit(
+            'Build produced unusable executables:\n  ' + '\n  '.join(problems)
+            + '\n\nClose any running instance and rebuild with --clean.'
+        )
+    print(f'Verified embedded archives in {len(executables)} executables.')
+
+
+_verify_frozen_executables(_os.path.join(DISTPATH, 'clickntranslate'))

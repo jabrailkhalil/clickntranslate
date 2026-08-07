@@ -135,6 +135,189 @@ def _uses_dark_theme(widget=None) -> bool:
     return True
 
 
+#: The accent used by every purple control in the application.
+ACCENT = "#7a5fa1"
+ACCENT_LIGHT = "#c5b3e9"
+ACCENT_HOVER = "#a985d2"
+
+
+class AccentControlStyle(QtWidgets.QProxyStyle):
+    """Paints check boxes in the application's palette.
+
+    Qt draws the platform's own indicator, which on Windows is a bright white
+    square — the lightest thing on a dark purple window, and the first thing the
+    eye lands on. A stylesheet cannot fix it: styling ``QCheckBox::indicator``
+    with colours replaces the native rendering entirely, and the check mark
+    disappears with it unless an image file is supplied. Painting the indicator
+    here keeps the mark, needs no image assets, and applies to every check box
+    under the widget the style is installed on.
+    """
+
+    def __init__(self, dark: bool = True):
+        # Never pass QApplication.style() here: QProxyStyle takes ownership of
+        # the style it is given and would delete the application's own, which
+        # crashes the process the next time anything paints. With no argument
+        # the proxy defers to the application style without owning it.
+        super().__init__()
+        self.dark = bool(dark)
+
+    def _draw_chevron(self, option, painter):
+        """The drop-down marker for combo boxes.
+
+        A stylesheet that touches ``QComboBox::drop-down`` suppresses the
+        platform arrow, and QSS cannot draw a triangle from borders the way CSS
+        does — it fills the box instead. So the chevron is painted here.
+        """
+        rect = QtCore.QRectF(option.rect)
+        size = min(rect.width(), rect.height()) * 0.5
+        center = rect.center()
+        half = size / 2.0
+        enabled = bool(option.state & QtWidgets.QStyle.State_Enabled)
+
+        color = QtGui.QColor(ACCENT_LIGHT if self.dark else "#6c5b8c")
+        if not enabled:
+            color.setAlpha(110)
+
+        pen = QtGui.QPen(color, max(1.6, size * 0.22))
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setJoinStyle(QtCore.Qt.RoundJoin)
+
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(pen)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        path = QtGui.QPainterPath()
+        path.moveTo(center.x() - half, center.y() - half * 0.45)
+        path.lineTo(center.x(), center.y() + half * 0.55)
+        path.lineTo(center.x() + half, center.y() - half * 0.45)
+        painter.drawPath(path)
+        painter.restore()
+
+    def _colors(self, option):
+        state = option.state
+        enabled = bool(state & QtWidgets.QStyle.State_Enabled)
+        hovered = bool(state & QtWidgets.QStyle.State_MouseOver)
+        checked = bool(state & QtWidgets.QStyle.State_On)
+        partially = bool(state & QtWidgets.QStyle.State_NoChange)
+
+        if self.dark:
+            empty, border = QtGui.QColor("#17181d"), QtGui.QColor("#4b415d")
+        else:
+            empty, border = QtGui.QColor("#ffffff"), QtGui.QColor("#c9bdd8")
+
+        if checked or partially:
+            fill = QtGui.QColor(ACCENT)
+            border = QtGui.QColor(ACCENT_HOVER)
+        else:
+            fill = empty
+            if hovered:
+                border = QtGui.QColor(ACCENT_HOVER)
+
+        if not enabled:
+            fill.setAlpha(110)
+            border.setAlpha(110)
+        return fill, border, checked, partially
+
+    #: Check boxes in a list row are a different primitive from a stand-alone
+    #: check box, and a checkable drop-down uses the list one.
+    _CHECK_ELEMENTS = tuple(
+        element for element in (
+            getattr(QtWidgets.QStyle, "PE_IndicatorCheckBox", None),
+            getattr(QtWidgets.QStyle, "PE_IndicatorViewItemCheck", None),
+            getattr(QtWidgets.QStyle, "PE_IndicatorItemViewItemCheck", None),
+        )
+        if element is not None
+    )
+
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
+            self._draw_chevron(option, painter)
+            return
+        if element not in self._CHECK_ELEMENTS:
+            super().drawPrimitive(element, option, painter, widget)
+            return
+
+        fill, border, checked, partially = self._colors(option)
+        rect = QtCore.QRectF(option.rect).adjusted(1.5, 1.5, -1.5, -1.5)
+        radius = max(3.0, rect.height() * 0.22)
+
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(QtGui.QPen(border, 1.6))
+        painter.setBrush(QtGui.QBrush(fill))
+        painter.drawRoundedRect(rect, radius, radius)
+
+        if checked:
+            mark = QtGui.QPainterPath()
+            # Proportional so the mark stays centred at any DPI.
+            mark.moveTo(rect.left() + rect.width() * 0.24, rect.top() + rect.height() * 0.52)
+            mark.lineTo(rect.left() + rect.width() * 0.43, rect.top() + rect.height() * 0.72)
+            mark.lineTo(rect.left() + rect.width() * 0.78, rect.top() + rect.height() * 0.29)
+            pen = QtGui.QPen(QtGui.QColor("#ffffff"), max(1.8, rect.height() * 0.14))
+            pen.setCapStyle(QtCore.Qt.RoundCap)
+            pen.setJoinStyle(QtCore.Qt.RoundJoin)
+            painter.setPen(pen)
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawPath(mark)
+        elif partially:
+            painter.setPen(QtGui.QPen(QtGui.QColor("#ffffff"), max(1.8, rect.height() * 0.14)))
+            painter.drawLine(
+                QtCore.QPointF(rect.left() + rect.width() * 0.26, rect.center().y()),
+                QtCore.QPointF(rect.right() - rect.width() * 0.26, rect.center().y()),
+            )
+        painter.restore()
+
+
+def accent_check_pixmap(checked: bool, dark: bool = True, size: int = 18) -> QtGui.QPixmap:
+    """A check box indicator as a pixmap, for rows in a drop-down list.
+
+    A stylesheet on a combo box makes Qt paint the popup itself, so a proxy
+    style never gets to draw the row indicators. Handing the row an icon keeps
+    the same look under our own control.
+    """
+    ratio = QtWidgets.QApplication.instance().devicePixelRatio() if QtWidgets.QApplication.instance() else 1.0
+    ratio = max(1.0, float(ratio))
+    pixmap = QtGui.QPixmap(int(size * ratio), int(size * ratio))
+    pixmap.setDevicePixelRatio(ratio)
+    pixmap.fill(QtCore.Qt.transparent)
+
+    option = QtWidgets.QStyleOptionButton()
+    option.rect = QtCore.QRect(0, 0, size, size)
+    option.state = QtWidgets.QStyle.State_Enabled
+    option.state |= QtWidgets.QStyle.State_On if checked else QtWidgets.QStyle.State_Off
+
+    painter = QtGui.QPainter(pixmap)
+    try:
+        AccentControlStyle(dark).drawPrimitive(
+            QtWidgets.QStyle.PE_IndicatorCheckBox, option, painter, None
+        )
+    finally:
+        painter.end()
+    return pixmap
+
+
+def install_accent_controls(widget, dark: bool = True) -> None:
+    """Use the accent-painted controls for `widget` and everything inside it."""
+    if widget is None:
+        return
+    try:
+        style = AccentControlStyle(dark)
+        # setStyle() does not take ownership, so the proxy has to be kept alive
+        # by something: parent it to the widget and hold a reference as well.
+        style.setParent(widget)
+        widget._accent_control_style = style
+        widget.setStyle(style)
+        for child in widget.findChildren(QtWidgets.QCheckBox):
+            child.setStyle(style)
+        # Drop-down popups are separate top-level widgets, so the check boxes on
+        # checkable rows would otherwise keep the platform's white squares.
+        for view in widget.findChildren(QtWidgets.QAbstractItemView):
+            view.setStyle(style)
+    except Exception:
+        # Styling must never break a window that is otherwise fine.
+        logging.getLogger("clickntranslate.style").debug("accent controls unavailable", exc_info=True)
+
+
 def apply_dark_native_frame(widget, enabled: bool = True) -> None:
     """Ask Windows to render a native Qt dialog frame with a dark title bar."""
     if os.name != "nt" or widget is None:

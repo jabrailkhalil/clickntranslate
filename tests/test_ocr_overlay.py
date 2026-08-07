@@ -1086,5 +1086,72 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         self.assertLess(foreground.red(), 60)
 
 
+class TestAreaTranslateResultWindow(unittest.TestCase):
+    """The 'area' entry of the result-window mode list."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    class _Overlay:
+        mode = "translate"
+        _session_id = "test"
+        _handle_ocr_result_inner = ocr.ScreenCaptureOverlay._handle_ocr_result_inner
+
+        def __init__(self):
+            self.closed = False
+
+        def _current_translate_pair(self):
+            return ("en", "ru")
+
+        def hide(self):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    def _run(self, hidden_modes):
+        import main
+
+        overlay = self._Overlay()
+        config = {
+            "theme": "Темная",
+            "interface_language": "en",
+            "copy_translated_text": False,
+            "result_window_hidden_modes": hidden_modes,
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch("translater.translate_text", return_value="Привет мир"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "show_translation_dialog") as dialog, \
+                mock.patch.object(main, "save_copy_history") as copy_history, \
+                mock.patch.object(ocr, "save_translation_history") as translation_history:
+            overlay._handle_ocr_result_inner("Hello world")
+        return overlay, copy, dialog, copy_history, translation_history
+
+    def test_listing_area_copies_instead_of_opening_the_window(self):
+        overlay, copy, dialog, copy_history, translation_history = self._run(["area"])
+
+        dialog.assert_not_called()
+        copy.assert_called_once_with("Привет мир")
+        copy_history.assert_called_once_with("Привет мир")
+        # Suppressing the window must not lose the translation history row.
+        translation_history.assert_called_once_with("Hello world", "Привет мир", "ru")
+        self.assertTrue(overlay.closed)
+
+    def test_not_listing_area_leaves_the_window_untouched(self):
+        overlay, copy, dialog, _copy_history, translation_history = self._run(
+            ["selection", "main"]
+        )
+
+        dialog.assert_called_once()
+        self.assertEqual(dialog.call_args.kwargs["source_text"], "Hello world")
+        self.assertEqual(dialog.call_args.kwargs["source_lang"], "en")
+        self.assertEqual(dialog.call_args.kwargs["target_lang"], "ru")
+        copy.assert_not_called()
+        translation_history.assert_called_once()
+        self.assertTrue(overlay.closed)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

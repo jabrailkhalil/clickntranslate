@@ -4848,7 +4848,18 @@ class ScreenCaptureOverlay(QWidget):
                     lang = config.get("interface_language", "ru")
                     auto_copy = config.get("copy_translated_text", True)
                     # Ленивый импорт для избежания циклического импорта
-                    from main import show_translation_dialog, save_copy_history
+                    from main import (
+                        result_window_hidden_for,
+                        show_translation_dialog,
+                        save_copy_history,
+                    )
+
+                    if result_window_hidden_for(config, "area"):
+                        platform_support.copy_text(translated_text)
+                        save_copy_history(translated_text)
+                        save_translation_history(text, translated_text, target_code)
+                        self.close()
+                        return
 
                     # Скрываем оверлей ПЕРЕД показом диалога, чтобы:
                     # 1) Пользователь видел исходный контент за диалогом
@@ -4864,7 +4875,16 @@ class ScreenCaptureOverlay(QWidget):
                                 dialog_parent = widget
                                 break
 
-                    show_translation_dialog(dialog_parent, translated_text, auto_copy=auto_copy, lang=lang, theme=theme)
+                    show_translation_dialog(
+                        dialog_parent,
+                        translated_text,
+                        auto_copy=auto_copy,
+                        lang=lang,
+                        theme=theme,
+                        source_text=text,
+                        source_lang=source_code,
+                        target_lang=target_code,
+                    )
                     if auto_copy:
                         platform_support.copy_text(translated_text)
                         save_copy_history(translated_text)
