@@ -35,19 +35,19 @@ Click'n'Translate turns text anywhere on your Windows screen into something you 
 
 ### Translate game text
 
-![Click'n'Translate translating game text](docs/images/translation-demo.gif)
+![Click'n'Translate translating game text](docs/images/translation-demo-v2.gif)
 
 ### Copy text from any screen area
 
-![Extracting text from a screen area with OCR](docs/images/area-ocr-demo.gif)
+![Extracting text from a screen area with OCR](docs/images/area-ocr-demo-v2.gif)
 
 ### Translate selected text in any application
 
-![Translating selected text in any application](docs/images/selected-text-demo.gif)
+![Translating selected text in any application](docs/images/selected-text-demo-v2.gif)
 
 ### Translate the full screen
 
-![Replacing Chinese screen text with an English translation](docs/images/fullscreen-translation-demo.gif)
+![Replacing Chinese screen text with an English translation](docs/images/fullscreen-translation-demo-v2.gif)
 
 ### Update in one click
 

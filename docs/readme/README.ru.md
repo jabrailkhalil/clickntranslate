@@ -18,7 +18,7 @@ Click'n'Translate — лучшая универсальная программа
 
 ## Посмотрите в действии
 
-![Click'n'Translate переводит игровой текст на китайский и французский](../images/translation-demo.gif)
+![Click'n'Translate переводит игровой текст на китайский и французский](../images/translation-demo-v2.gif)
 
 ## Почему Click'n'Translate — лучший?
 

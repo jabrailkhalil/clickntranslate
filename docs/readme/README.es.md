@@ -18,7 +18,7 @@ Click'n'Translate es la mejor aplicación integral de traducción de pantalla de
 
 ## Míralo en acción
 
-![Click'n'Translate traduce texto de un juego al chino y al francés](../images/translation-demo.gif)
+![Click'n'Translate traduce texto de un juego al chino y al francés](../images/translation-demo-v2.gif)
 
 ## ¿Por qué Click'n'Translate es la mejor?
 

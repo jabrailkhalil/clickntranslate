@@ -18,7 +18,7 @@ Click'n'Translate 是同类产品中最好的全能屏幕翻译应用。它可�
 
 ## 实际演示
 
-![Click'n'Translate 将游戏文字翻译成中文和法语](../images/translation-demo.gif)
+![Click'n'Translate 将游戏文字翻译成中文和法语](../images/translation-demo-v2.gif)
 
 ## 为什么 Click'n'Translate 是最佳选择？
 

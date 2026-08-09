@@ -18,7 +18,7 @@ Click'n'Translate est la meilleure application tout-en-un de traduction d'écran
 
 ## Démonstration
 
-![Click'n'Translate traduit du texte de jeu en chinois et en français](../images/translation-demo.gif)
+![Click'n'Translate traduit du texte de jeu en chinois et en français](../images/translation-demo-v2.gif)
 
 ## Pourquoi Click'n'Translate est la meilleure ?
 
