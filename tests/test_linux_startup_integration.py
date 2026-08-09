@@ -98,7 +98,7 @@ class TrayFallbackTest(unittest.TestCase):
         body = source[minimize_at:minimize_at + 400]
 
         self.assertIn("if not self.has_tray():", body)
-        self.assertIn("showMinimized()", body)
+        self.assertIn("minimize_to_taskbar()", body)
         self.assertLess(body.index("has_tray"), body.index("self.hide()"))
 
     def test_closing_without_a_tray_quits_instead_of_vanishing(self):

@@ -59,6 +59,27 @@ print("REASON=" + translater.argos_unavailable_reason())
 
 
 class ArgosRuntimeTest(unittest.TestCase):
+    def test_argos_startup_does_not_import_installed_spacy(self):
+        script = "\n".join(
+            [
+                f"import sys; sys.path.insert(0, {str(ROOT)!r})",
+                "import translater",
+                "assert translater._ensure_argos_available(), translater.argos_unavailable_reason()",
+                "print('SPACY_LOADED=' + str('spacy' in sys.modules))",
+            ]
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("SPACY_LOADED=False", result.stdout)
+
     def test_argos_imports_without_torch_stanza_or_spacy(self):
         script = FROZEN_ENVIRONMENT_SCRIPT.replace("__PROJECT_ROOT__", str(ROOT))
         env = dict(os.environ)

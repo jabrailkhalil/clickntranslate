@@ -432,5 +432,72 @@ class LanguagePackageTabsTest(unittest.TestCase):
             self.app.processEvents()
 
 
+class PopupFrameTest(unittest.TestCase):
+    """The list is a window of its own, and its frame is not the list.
+
+    On Linux that frame kept the platform default and showed as white bands down
+    both sides of the drop-down. Windows never showed it because the frame there
+    happens to match the list colour.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _settings(self, theme="Темная"):
+        parent = _Parent(theme)
+        parent.config["result_window_hidden_modes"] = []
+        with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"):
+            settings = SettingsWindow(parent)
+        settings.show()
+        self.app.processEvents()
+        return parent, settings
+
+    def test_every_picker_knows_its_popup_colour(self):
+        for theme, expected in (("Темная", "#20212a"), ("Светлая", "#ffffff")):
+            parent, settings = self._settings(theme)
+            try:
+                for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
+                    combo = getattr(settings, name)
+                    self.assertEqual(combo._popup_background, expected, (theme, name))
+            finally:
+                settings.close()
+                parent.close()
+                self.app.processEvents()
+
+    def test_the_frame_is_painted_when_the_list_opens(self):
+        parent, settings = self._settings()
+        try:
+            combo = settings.translator_combo
+            combo.showPopup()
+            self.app.processEvents()
+            popup = combo.view().window()
+
+            self.assertIn("#20212a", popup.styleSheet())
+            self.assertTrue(popup.autoFillBackground())
+            combo.hidePopup()
+            self.app.processEvents()
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_the_frame_follows_a_theme_change(self):
+        parent, settings = self._settings()
+        try:
+            combo = settings.ocr_engine_combo
+            self.assertEqual(combo._popup_background, "#20212a")
+
+            parent.current_theme = "Светлая"
+            settings.apply_theme()
+            self.app.processEvents()
+
+            self.assertEqual(combo._popup_background, "#ffffff")
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+
 if __name__ == "__main__":
     unittest.main()

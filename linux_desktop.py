@@ -15,9 +15,11 @@ import platform_support
 APP_NAME = "Click'n'Translate"
 ICON_NAME = "clickntranslate"
 COMMENT = "Recognize text on screen and translate it"
+LEGACY_DESKTOP_ENTRY_NAME = "clickntranslate.desktop"
 
 #: Right-click actions on the launcher icon, mirroring the Windows hotkeys.
 DESKTOP_ACTIONS = (
+    ("Toggle", "Show or hide Click'n'Translate", "toggle"),
     ("Capture", "Capture text", "ocr"),
     ("Copy", "Copy text from screen", "copy"),
     ("Translate", "Translate text on screen", "translate"),
@@ -31,6 +33,19 @@ def autostart_path():
 
 def application_entry_path():
     return os.path.join(platform_support.applications_dir(), platform_support.DESKTOP_ENTRY_NAME)
+
+
+def _legacy_entry_path(directory):
+    return os.path.join(directory, LEGACY_DESKTOP_ENTRY_NAME)
+
+
+def _remove_file(path):
+    try:
+        if os.path.isfile(path) or os.path.islink(path):
+            os.unlink(path)
+    except OSError:
+        return False
+    return not os.path.exists(path)
 
 
 def _escape(value):
@@ -52,11 +67,16 @@ def desktop_entry_text(executable, autostart=False, include_actions=True):
         "[Desktop Entry]",
         "Type=Application",
         f"Name={APP_NAME}",
+        "GenericName=Screen translator",
         f"Comment={COMMENT}",
         f"Exec={_exec_value(executable)}",
         f"Icon={ICON_NAME}",
         "Terminal=false",
-        "Categories=Utility;Office;Translation;",
+        # Keep one freedesktop main category.  Multiple main categories make
+        # some menus show the application twice, and Translation is specified
+        # as a development subcategory rather than a general-language tool.
+        "Categories=Utility;Qt;",
+        "Keywords=translation;translator;OCR;screen;capture;text;",
         "StartupNotify=false",
         "StartupWMClass=ClicknTranslate",
     ]
@@ -89,26 +109,27 @@ def set_autostart(enabled, executable):
     """Create or remove the autostart entry. Returns the resulting state."""
     path = autostart_path()
     if not enabled:
-        try:
-            if os.path.exists(path):
-                os.unlink(path)
-        except OSError:
-            return autostart_enabled()
-        return False
+        _remove_file(path)
+        _remove_file(_legacy_entry_path(platform_support.autostart_dir()))
+        return autostart_enabled()
     try:
         _write_entry(path, desktop_entry_text(executable, autostart=True, include_actions=False))
+        _remove_file(_legacy_entry_path(platform_support.autostart_dir()))
     except OSError:
         return False
     return True
 
 
 def autostart_enabled():
-    return os.path.isfile(autostart_path())
+    return os.path.isfile(autostart_path()) or os.path.isfile(
+        _legacy_entry_path(platform_support.autostart_dir())
+    )
 
 
 def install_desktop_entry(executable, icon_source=""):
     """Add the app to the application menu. Returns the entry path."""
     path = _write_entry(application_entry_path(), desktop_entry_text(executable))
+    _remove_file(_legacy_entry_path(platform_support.applications_dir()))
     if icon_source and os.path.isfile(icon_source):
         install_icon(icon_source)
     return path
@@ -146,9 +167,10 @@ def install_icon(icon_source, size="256x256"):
 
 
 def remove_desktop_entry():
-    for path in (application_entry_path(), autostart_path()):
-        try:
-            if os.path.exists(path):
-                os.unlink(path)
-        except OSError:
-            pass
+    for path in (
+        application_entry_path(),
+        autostart_path(),
+        _legacy_entry_path(platform_support.applications_dir()),
+        _legacy_entry_path(platform_support.autostart_dir()),
+    ):
+        _remove_file(path)

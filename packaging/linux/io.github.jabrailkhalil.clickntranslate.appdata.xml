@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jabrailkhalil.clickntranslate</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>Click'n'Translate</name>
+  <summary>Recognize and translate text anywhere on your screen</summary>
+  <description>
+    <p>
+      Click'n'Translate combines screen capture, OCR, online and offline
+      translation, document translation, language packages, and local history
+      in one desktop application.
+    </p>
+    <p>
+      Capture an area, translate the full screen, copy text that cannot be
+      selected, or translate the current selection without interrupting your
+      workflow.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.jabrailkhalil.clickntranslate.desktop</launchable>
+  <provides>
+    <binary>clickntranslate</binary>
+  </provides>
+  <developer_name>Jabrail Digital</developer_name>
+  <url type="homepage">https://github.com/jabrailkhalil/clickntranslate</url>
+  <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
+  <url type="contact">https://t.me/jabrail_digital</url>
+  <releases>
+    <release version="1.5.7" date="2026-08-10">
+      <description>
+        <p>Faster OCR startup, reliable system OCR discovery, and window toggle shortcuts.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

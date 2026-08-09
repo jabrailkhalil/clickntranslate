@@ -142,8 +142,15 @@ def _ensure_argos_available():
     # process. Make that optional import behave exactly like the frozen build,
     # where torch is excluded, then restore the import table afterwards.
     previous_torch = sys.modules.get("torch", _MODULE_NOT_LOADED)
+    previous_spacy = sys.modules.get("spacy", _MODULE_NOT_LOADED)
     if previous_torch is _MODULE_NOT_LOADED:
         sys.modules["torch"] = None
+    if previous_spacy is _MODULE_NOT_LOADED:
+        # argostranslate.sbd imports SpaCy even when the configured splitter is
+        # MiniSBD.  Click'n'Translate replaces every sentencizer below, so
+        # loading SpaCy here only adds hundreds of milliseconds to source/Linux
+        # startup and cannot affect translation quality.
+        sys.modules["spacy"] = None
     try:
         import argostranslate.package as loaded_pkg
         import argostranslate.translate as loaded_tr
@@ -155,6 +162,8 @@ def _ensure_argos_available():
     finally:
         if previous_torch is _MODULE_NOT_LOADED:
             sys.modules.pop("torch", None)
+        if previous_spacy is _MODULE_NOT_LOADED:
+            sys.modules.pop("spacy", None)
     _install_sentence_splitter(loaded_tr)
     arg_pkg = loaded_pkg
     arg_tr = loaded_tr

@@ -20,6 +20,10 @@ class DesktopEntryTest(unittest.TestCase):
         for key in ("Type=Application", "Name=", "Exec=/opt/clickntranslate", "Icon=clickntranslate", "Terminal=false"):
             self.assertIn(key, text)
 
+        self.assertIn("GenericName=Screen translator", text)
+        self.assertIn("Categories=Utility;Qt;", text)
+        self.assertIn("Keywords=translation;translator;OCR;screen;capture;text;", text)
+
     def test_paths_with_spaces_are_quoted(self):
         text = linux_desktop.desktop_entry_text("/home/a b/clickntranslate")
         self.assertIn('Exec="/home/a b/clickntranslate"', text)
@@ -27,7 +31,8 @@ class DesktopEntryTest(unittest.TestCase):
     def test_actions_cover_the_capture_commands(self):
         text = linux_desktop.desktop_entry_text("/opt/clickntranslate")
 
-        self.assertIn("Actions=Capture;Copy;Translate;Fullscreen;", text)
+        self.assertIn("Actions=Toggle;Capture;Copy;Translate;Fullscreen;", text)
+        self.assertIn("Exec=/opt/clickntranslate --toggle", text)
         self.assertIn("[Desktop Action Capture]", text)
         self.assertIn("Exec=/opt/clickntranslate --ocr", text)
         self.assertIn("Exec=/opt/clickntranslate --fullscreen", text)
@@ -78,6 +83,20 @@ class AutostartTest(unittest.TestCase):
         self.assertTrue(linux_desktop.set_autostart(True, "/opt/clickntranslate"))
         self.assertTrue(linux_desktop.autostart_enabled())
 
+    def test_enabling_migrates_the_old_short_name(self):
+        os.makedirs(platform_support.autostart_dir(), exist_ok=True)
+        legacy = os.path.join(
+            platform_support.autostart_dir(),
+            linux_desktop.LEGACY_DESKTOP_ENTRY_NAME,
+        )
+        with open(legacy, "w", encoding="utf-8") as handle:
+            handle.write("[Desktop Entry]\n")
+
+        self.assertTrue(linux_desktop.autostart_enabled())
+        self.assertTrue(linux_desktop.set_autostart(True, "/opt/clickntranslate"))
+        self.assertFalse(os.path.exists(legacy))
+        self.assertTrue(os.path.isfile(linux_desktop.autostart_path()))
+
     def test_disabling_when_absent_is_harmless(self):
         self.assertFalse(linux_desktop.set_autostart(False, "/opt/clickntranslate"))
 
@@ -99,6 +118,18 @@ class ApplicationEntryTest(unittest.TestCase):
 
         self.assertTrue(os.path.isfile(path))
         self.assertEqual(path, os.path.join(self.temp_dir, "applications", platform_support.DESKTOP_ENTRY_NAME))
+
+    def test_install_removes_the_legacy_menu_entry(self):
+        applications = os.path.join(self.temp_dir, "applications")
+        os.makedirs(applications, exist_ok=True)
+        legacy = os.path.join(applications, linux_desktop.LEGACY_DESKTOP_ENTRY_NAME)
+        with open(legacy, "w", encoding="utf-8") as handle:
+            handle.write("[Desktop Entry]\n")
+
+        linux_desktop.install_desktop_entry("/opt/clickntranslate")
+
+        self.assertFalse(os.path.exists(legacy))
+        self.assertTrue(os.path.isfile(linux_desktop.application_entry_path()))
 
     def test_icon_is_copied_into_the_hicolor_theme(self):
         source = os.path.join(self.temp_dir, "icon.png")

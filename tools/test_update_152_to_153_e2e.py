@@ -1,7 +1,9 @@
-"""End-to-end update checks for Click'n'Translate 1.5.2 -> 1.5.3.
+"""End-to-end update checks for two Click'n'Translate Windows releases.
 
 The test uses only disposable directories and a disposable Inno AppId.  It
 exercises both the portable ZIP updater script and an installed-copy update.
+The historical 1.5.2 -> 1.5.3 defaults can be overridden with CNT_OLD_VERSION,
+CNT_NEW_VERSION, CNT_OLD_STAGE, CNT_NEW_STAGE, and CNT_NEW_ZIP.
 """
 
 from __future__ import annotations
@@ -23,9 +25,20 @@ import psutil
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_ROOT = (ROOT / "build").resolve()
-OLD_STAGE = ROOT / "releases" / "ClicknTranslate-v1.5.2-win64-stage" / "ClicknTranslate"
-NEW_STAGE = ROOT / "releases" / "ClicknTranslate-v1.5.3-win64-stage" / "ClicknTranslate"
-NEW_ZIP = ROOT / "releases" / "Click-n-Translate-1.5.3-windows-portable-x64.zip"
+OLD_VERSION = os.environ.get("CNT_OLD_VERSION", "1.5.2")
+NEW_VERSION = os.environ.get("CNT_NEW_VERSION", "1.5.3")
+OLD_STAGE = Path(os.environ.get(
+    "CNT_OLD_STAGE",
+    ROOT / "releases" / f"ClicknTranslate-v{OLD_VERSION}-win64-stage" / "ClicknTranslate",
+))
+NEW_STAGE = Path(os.environ.get(
+    "CNT_NEW_STAGE",
+    ROOT / "releases" / f"ClicknTranslate-v{NEW_VERSION}-win64-stage" / "ClicknTranslate",
+))
+NEW_ZIP = Path(os.environ.get(
+    "CNT_NEW_ZIP",
+    ROOT / "releases" / f"Click-n-Translate-{NEW_VERSION}-windows-portable-x64.zip",
+))
 UPDATER = NEW_STAGE / "app" / "_internal" / "ClicknTranslateUpdater.exe"
 ISS = ROOT / "installer" / "ClicknTranslate.iss"
 ISCC = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe"
@@ -128,9 +141,9 @@ def assert_new_payload(install: Path) -> None:
         actual = install / relative
         expected = NEW_STAGE / relative
         if not actual.is_file() or sha256(actual) != sha256(expected):
-            raise RuntimeError(f"Installed file differs from the 1.5.3 stage: {relative}")
-    if not file_version(install / "ClicknTranslate.exe").startswith("1.5.3."):
-        raise RuntimeError("Updated launcher does not report version 1.5.3")
+            raise RuntimeError(f"Installed file differs from the {NEW_VERSION} stage: {relative}")
+    if not file_version(install / "ClicknTranslate.exe").startswith(f"{NEW_VERSION}."):
+        raise RuntimeError(f"Updated launcher does not report version {NEW_VERSION}")
 
 
 def encoded(value: str | Path) -> str:
@@ -149,7 +162,7 @@ def run_update_helper(mode: str, install: Path, package: Path) -> None:
             "--app-dir", encoded(install),
             "--package", encoded(package),
             "--exe", encoded("ClicknTranslate.exe"),
-            "--version", "1.5.3",
+            "--version", NEW_VERSION,
             "--pid", "2147483000",
         ],
         cwd=tempfile.gettempdir(),
@@ -189,14 +202,14 @@ def run_portable_update(test_root: Path) -> None:
             pass
         time.sleep(0.5)
     else:
-        raise RuntimeError("Portable updater did not install and start 1.5.3")
+        raise RuntimeError(f"Portable updater did not install and start {NEW_VERSION}")
 
     assert_user_markers(install)
     if blocker.poll() is None:
         raise RuntimeError("Portable updater left the locked OCR worker running")
     atexit.unregister(terminate_process_tree)
     stop_install_processes(install)
-    print("PORTABLE_UPDATE_152_TO_153=OK")
+    print(f"PORTABLE_UPDATE_{OLD_VERSION}_TO_{NEW_VERSION}=OK")
 
 
 def compile_test_setup(version: str, source: Path, output: Path, app_id: str) -> Path:
@@ -259,8 +272,8 @@ def run_installed_update(test_root: Path) -> None:
     install = test_root / "installed-copy"
     setup_root = test_root / "setups"
     app_id = str(uuid.uuid4()).upper()
-    old_setup = compile_test_setup("1.5.2", OLD_STAGE, setup_root / "old", app_id)
-    new_setup = compile_test_setup("1.5.3", NEW_STAGE, setup_root / "new", app_id)
+    old_setup = compile_test_setup(OLD_VERSION, OLD_STAGE, setup_root / "old", app_id)
+    new_setup = compile_test_setup(NEW_VERSION, NEW_STAGE, setup_root / "new", app_id)
     try:
         run_setup(old_setup, install)
         write_user_markers(install)
@@ -269,7 +282,7 @@ def run_installed_update(test_root: Path) -> None:
         while time.monotonic() < deadline and not processes_from_install(install):
             time.sleep(0.25)
         if not processes_from_install(install):
-            raise RuntimeError("Disposable installed 1.5.2 copy did not start")
+            raise RuntimeError(f"Disposable installed {OLD_VERSION} copy did not start")
 
         update_package = test_root / "new-test-setup.exe"
         shutil.copy2(new_setup, update_package)
@@ -281,8 +294,8 @@ def run_installed_update(test_root: Path) -> None:
         while time.monotonic() < deadline and not processes_from_install(install):
             time.sleep(0.25)
         if not processes_from_install(install):
-            raise RuntimeError("Updated installed 1.5.3 copy did not start")
-        print("INSTALLED_UPDATE_152_TO_153=OK")
+            raise RuntimeError(f"Updated installed {NEW_VERSION} copy did not start")
+        print(f"INSTALLED_UPDATE_{OLD_VERSION}_TO_{NEW_VERSION}=OK")
     finally:
         stop_install_processes(install)
         uninstall_test_copy(install)
@@ -290,10 +303,10 @@ def run_installed_update(test_root: Path) -> None:
 
 def main() -> int:
     if not OLD_STAGE.is_dir() or not NEW_STAGE.is_dir() or not NEW_ZIP.is_file() or not UPDATER.is_file():
-        raise RuntimeError("The 1.5.2 and 1.5.3 release artifacts are required")
+        raise RuntimeError(f"The {OLD_VERSION} and {NEW_VERSION} release artifacts are required")
     if not ISCC.is_file():
         raise FileNotFoundError(ISCC)
-    test_root = BUILD_ROOT / "update-e2e-152-to-153"
+    test_root = BUILD_ROOT / f"update-e2e-{OLD_VERSION}-to-{NEW_VERSION}"
     safe_remove_tree(test_root)
     test_root.mkdir(parents=True)
     run_portable_update(test_root)

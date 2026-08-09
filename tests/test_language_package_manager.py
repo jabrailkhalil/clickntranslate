@@ -1260,5 +1260,67 @@ class LanguageManagerFollowsInterfaceLanguageTest(unittest.TestCase):
         self.assertFalse(self.settings.ocr_languages_btn.property("packageTaskDone"))
 
 
+class EasyOcrRequirementsTest(unittest.TestCase):
+    """The pinned dependency tree is resolved for the interpreter the Windows
+    installer downloads. A distribution's Python is whatever it ships — 3.10 on
+    Ubuntu 22.04 — and the install died there before touching the disk:
+    "No matching distribution found for scipy==1.18.0"."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from settings_window import SettingsWindow
+
+        self.parent = _AppParent()
+        self.parent.config = {"autostart": False, "start_minimized": False,
+                              "ocr_engine": "Tesseract", "translator_engine": "google"}
+        self.parent.start_minimized = False
+        self.parent.autostart = False
+        self.parent.save_config = lambda: None
+        self.parent.set_autostart = lambda value: bool(value)
+        with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"):
+            self.settings = SettingsWindow(self.parent)
+
+    def tearDown(self):
+        self.settings.close()
+        self.parent.close()
+
+    def test_the_pinned_tree_is_used_for_the_interpreter_it_was_resolved_for(self):
+        import settings_window as sw
+
+        with mock.patch.object(sw.SettingsWindow, "_pip_target_python_version", return_value=(3, 13)):
+            self.assertEqual(
+                self.settings._easyocr_requirements(["python"]), sw.EASYOCR_PIP_PACKAGES
+            )
+
+    def test_an_older_interpreter_gets_requirements_pip_can_resolve(self):
+        import settings_window as sw
+
+        with mock.patch.object(sw.SettingsWindow, "_pip_target_python_version", return_value=(3, 10)):
+            requirements = self.settings._easyocr_requirements(["python3"])
+
+        self.assertEqual(requirements, sw.EASYOCR_PIP_PACKAGES_ANY_PYTHON)
+        # The pin that could not be satisfied must not be in there.
+        self.assertFalse([item for item in requirements if item.startswith("scipy==")])
+        # EasyOCR itself stays pinned: that one we do control.
+        self.assertIn("easyocr==1.7.2", requirements)
+
+    def test_an_unreadable_interpreter_is_treated_as_old(self):
+        """Guessing the newer tree would fail the install; the resolved set works
+        on both."""
+        import settings_window as sw
+
+        with mock.patch.object(sw.SettingsWindow, "_pip_target_python_version", return_value=(0, 0)):
+            self.assertEqual(
+                self.settings._easyocr_requirements([]), sw.EASYOCR_PIP_PACKAGES_ANY_PYTHON
+            )
+
+    def test_the_version_probe_reads_the_running_interpreter(self):
+        version = self.settings._pip_target_python_version([sys.executable])
+        self.assertEqual(version, sys.version_info[:2])
+
+
 if __name__ == "__main__":
     unittest.main()

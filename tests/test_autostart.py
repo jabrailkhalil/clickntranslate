@@ -12,6 +12,94 @@ import platform_support
 # Linux autostart lives in linux_desktop and is covered by test_linux_desktop.py.
 @unittest.skipUnless(platform_support.IS_WINDOWS, "Windows autostart mechanisms")
 class TestStartupShortcutAutostart(unittest.TestCase):
+    def test_background_probe_accepts_the_current_shortcut_without_rewriting_it(self):
+        current = main._current_autostart_shortcut_info()
+        with mock.patch("main._read_autostart_shortcut", return_value=current), \
+             mock.patch("main._write_autostart_command") as write:
+            enabled = main.DarkThemeApp._probe_portable_windows_autostart(False, None)
+
+        self.assertTrue(enabled)
+        write.assert_not_called()
+
+    def test_background_probe_repairs_a_legacy_enabled_configuration(self):
+        current = main._current_autostart_shortcut_info()
+        with mock.patch(
+            "main._read_autostart_shortcut",
+            side_effect=[None, current],
+        ), mock.patch("main._write_autostart_command") as write:
+            enabled = main.DarkThemeApp._probe_portable_windows_autostart(
+                True,
+                "legacy_registry",
+            )
+
+        self.assertTrue(enabled)
+        write.assert_called_once_with(True)
+
+    def test_deferred_probe_applies_on_dispatcher_without_blocking_the_caller(self):
+        saved = []
+        dummy = types.SimpleNamespace(
+            _autostart_sync_pending=True,
+            _autostart_probe_stored_value=False,
+            _autostart_probe_stored_backend=main.AUTOSTART_BACKEND,
+            config={"autostart": False, "autostart_backend": main.AUTOSTART_BACKEND},
+            autostart=False,
+            _probe_portable_windows_autostart=lambda *_args: True,
+            save_config=lambda: saved.append(True),
+        )
+
+        class ImmediateThread:
+            def __init__(self, target, **_kwargs):
+                self.target = target
+
+            def start(self):
+                self.target()
+
+        dispatcher = types.SimpleNamespace(
+            triggered=types.SimpleNamespace(emit=lambda callback: callback())
+        )
+        with mock.patch("main.threading.Thread", ImmediateThread), mock.patch(
+            "main.hotkey_dispatcher",
+            dispatcher,
+        ):
+            main.DarkThemeApp._start_deferred_autostart_sync(dummy)
+
+        self.assertFalse(dummy._autostart_sync_pending)
+        self.assertTrue(dummy.autostart)
+        self.assertTrue(dummy.config["autostart"])
+        self.assertEqual(saved, [True])
+
+    def test_deferred_probe_does_not_overwrite_a_new_user_choice(self):
+        saved = []
+        dummy = types.SimpleNamespace(
+            _autostart_sync_pending=True,
+            _autostart_probe_stored_value=False,
+            _autostart_probe_stored_backend=main.AUTOSTART_BACKEND,
+            config={"autostart": True, "autostart_backend": main.AUTOSTART_BACKEND},
+            autostart=True,
+            _probe_portable_windows_autostart=lambda *_args: False,
+            save_config=lambda: saved.append(True),
+        )
+
+        class ImmediateThread:
+            def __init__(self, target, **_kwargs):
+                self.target = target
+
+            def start(self):
+                self.target()
+
+        dispatcher = types.SimpleNamespace(
+            triggered=types.SimpleNamespace(emit=lambda callback: callback())
+        )
+        with mock.patch("main.threading.Thread", ImmediateThread), mock.patch(
+            "main.hotkey_dispatcher",
+            dispatcher,
+        ):
+            main.DarkThemeApp._start_deferred_autostart_sync(dummy)
+
+        self.assertTrue(dummy.autostart)
+        self.assertTrue(dummy.config["autostart"])
+        self.assertEqual(saved, [])
+
     def test_autostart_shortcut_lifecycle_uses_startup_folder(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with mock.patch.dict(os.environ, {"APPDATA": temp_dir}):

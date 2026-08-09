@@ -96,6 +96,7 @@ from styled_dialogs import (
 
 QMessageBox = StyledMessageBox
 from settings_window import (
+    DropDownCombo,
     GITHUB_RELEASES_PAGE,
     SettingsWindow,
     TesseractInstallProgressDialog,
@@ -164,6 +165,7 @@ DEFAULT_CONFIG = {
     "no_screen_dimming": False,
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": "Ctrl+Alt+Q",
+    "toggle_window_hotkey": "Ctrl+Alt+M",
     # Modes whose result window is suppressed; the translation is copied instead.
     # Empty by default: every action shows the window until the user turns one
     # off. A tuple, not a list: DEFAULT_CONFIG is shallow-copied in several
@@ -3786,7 +3788,12 @@ class WelcomeDialog(QDialog):
         animation.setEndValue(30)
         animation.setDuration(1050)
         animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
-        animation.setLoopCount(-1)
+        # Bounded, not endless. A blurred drop shadow is re-rendered in software
+        # on every frame of the animation: measured at 10% of a core for as long
+        # as this dialog stayed open on Linux, where it is the only thing on
+        # screen. Eight cycles is long enough to catch the eye and then stop.
+        animation.setLoopCount(8)
+        animation.finished.connect(lambda: self.flag_button.setGraphicsEffect(None))
         animation.start()
         self._animations.append(animation)
 
@@ -5109,6 +5116,10 @@ class DarkThemeApp(QMainWindow):
 
         self.hotkeys_mode = False
         self.force_quit = False
+        # The toggle shortcut returns the window to the same place it came
+        # from.  The title-bar button uses the taskbar; shadow mode and Close
+        # use the tray when one is available.
+        self._window_hide_destination = "taskbar"
         self._guide_active = False
         self._guide_step_index = 0
         self._guide_effect_widget = None
@@ -5132,6 +5143,8 @@ class DarkThemeApp(QMainWindow):
             hotkey_dispatcher.triggered.connect(self._invoke_callback_safely)
         except Exception:
             pass
+        if getattr(self, "_autostart_sync_pending", False):
+            QTimer.singleShot(0, self._start_deferred_autostart_sync)
 
         # Подписка на ошибки регистрации хоткеев
         try:
@@ -5167,6 +5180,17 @@ class DarkThemeApp(QMainWindow):
             self.translate_selection_hotkey_thread = HotkeyListenerThread(translate_selection_hotkey, self.launch_translate_selection, hotkey_id=4)
             self.translate_selection_hotkey_thread.start()
 
+        toggle_window_hotkey = (
+            "" if platform_support.IS_LINUX else self.config.get("toggle_window_hotkey", "")
+        )
+        if toggle_window_hotkey:
+            self.toggle_window_hotkey_thread = HotkeyListenerThread(
+                toggle_window_hotkey,
+                self.toggle_window_visibility,
+                hotkey_id=5,
+            )
+            self.toggle_window_hotkey_thread.start()
+
         self.HotkeyListenerThread = HotkeyListenerThread
 
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
@@ -5192,7 +5216,19 @@ class DarkThemeApp(QMainWindow):
         self.config["interface_language"] = self.current_interface_language
         stored_autostart = self.config.get("autostart", DEFAULT_CONFIG["autostart"])
         stored_autostart_backend = self.config.get("autostart_backend")
-        self.autostart = self.sync_autostart_state(repair_stale=True)
+        self._autostart_sync_pending = bool(
+            platform_support.IS_WINDOWS and not portable_paths.is_windows_packaged()
+        )
+        if self._autostart_sync_pending:
+            # Reading a .lnk through WScript.Shell starts PowerShell.  Use the
+            # persisted value for first paint and verify/repair the real
+            # shortcut immediately afterwards without blocking the GUI.
+            self._autostart_probe_stored_value = bool(stored_autostart)
+            self._autostart_probe_stored_backend = stored_autostart_backend
+            self.autostart = bool(stored_autostart)
+            self.config["autostart_backend"] = AUTOSTART_BACKEND
+        else:
+            self.autostart = self.sync_autostart_state(repair_stale=True)
         self.translation_mode = self.config.get("translation_mode", LANGUAGES[self.current_interface_language][0])
         self.start_minimized = self.config.get("start_minimized", DEFAULT_CONFIG["start_minimized"])
         if (
@@ -5202,6 +5238,77 @@ class DarkThemeApp(QMainWindow):
             or bool(migrated_keys)
         ):
             self.save_config()
+
+    @staticmethod
+    def _probe_portable_windows_autostart(stored_autostart, stored_backend):
+        """Resolve the real shortcut state without touching Qt or app config."""
+        shortcut_info = _read_autostart_shortcut()
+        if shortcut_info and _autostart_shortcut_matches_current(shortcut_info):
+            return True
+
+        should_repair = bool(
+            (shortcut_info and getattr(sys, "frozen", False))
+            or (
+                not shortcut_info
+                and stored_autostart
+                and stored_backend != AUTOSTART_BACKEND
+            )
+        )
+        if not should_repair:
+            return False
+
+        try:
+            _write_autostart_command(True)
+            return _autostart_shortcut_matches_current(_read_autostart_shortcut())
+        except Exception:
+            logging.exception("Could not repair the portable Windows autostart shortcut")
+            return False
+
+    def _start_deferred_autostart_sync(self):
+        if not getattr(self, "_autostart_sync_pending", False):
+            return
+        self._autostart_sync_pending = False
+        stored_autostart = bool(
+            getattr(
+                self,
+                "_autostart_probe_stored_value",
+                self.config.get("autostart", False),
+            )
+        )
+        stored_backend = getattr(
+            self,
+            "_autostart_probe_stored_backend",
+            self.config.get("autostart_backend"),
+        )
+
+        def worker():
+            enabled = self._probe_portable_windows_autostart(
+                stored_autostart,
+                stored_backend,
+            )
+
+            def apply_result():
+                # Do not overwrite a choice the user made while the shortcut
+                # probe was running in the background.
+                if bool(self.config.get("autostart", False)) != stored_autostart:
+                    return
+                changed = (
+                    bool(self.config.get("autostart", False)) != bool(enabled)
+                    or self.config.get("autostart_backend") != AUTOSTART_BACKEND
+                )
+                self.autostart = bool(enabled)
+                self.config["autostart"] = self.autostart
+                self.config["autostart_backend"] = AUTOSTART_BACKEND
+                if changed:
+                    self.save_config()
+
+            hotkey_dispatcher.triggered.emit(apply_result)
+
+        threading.Thread(
+            target=worker,
+            name="ClicknTranslate-autostart-probe",
+            daemon=True,
+        ).start()
 
     def save_config(self):
         self._capture_main_translation_languages()
@@ -5492,7 +5599,7 @@ class DarkThemeApp(QMainWindow):
         self.minimize_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "minimize")))
         self.minimize_button.setStyleSheet("background-color: transparent; border: none;")
         self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
-        self.minimize_button.clicked.connect(self.showMinimized)
+        self.minimize_button.clicked.connect(self.minimize_to_taskbar)
 
         self.document_button = QPushButton(self)
         self.document_button.setToolTip(tooltip_text(doc_text(self.current_interface_language, "title")))
@@ -5578,6 +5685,7 @@ class DarkThemeApp(QMainWindow):
                 self.raise_()
                 self.activateWindow()
                 return
+            self._window_hide_destination = "tray"
             self.hide()
             return
         self.setWindowState(Qt.WindowNoState)
@@ -5595,6 +5703,26 @@ class DarkThemeApp(QMainWindow):
             except Exception:
                 pass
         QTimer.singleShot(250, self._maybe_start_first_run_guide)
+
+    def minimize_to_taskbar(self):
+        """Minimize normally and remember where the toggle key should return."""
+        self._window_hide_destination = "taskbar"
+        self.showMinimized()
+
+    def toggle_window_visibility(self):
+        """Restore the app, or hide it back to its last destination.
+
+        A window restored from the tray goes back to the tray.  A window
+        restored from the taskbar minimizes back to the taskbar.  This avoids
+        a surprising switch of behaviour every time the global hotkey is used.
+        """
+        if not self.isVisible() or bool(self.windowState() & Qt.WindowMinimized):
+            self.show_window_from_tray(force_show=True)
+            return
+        if self._window_hide_destination == "tray" and self.has_tray():
+            self.hide()
+            return
+        self.minimize_to_taskbar()
 
     def _maybe_check_updates_on_launch(self):
         """Ask the releases feed once per start, and stay quiet unless there is
@@ -5908,23 +6036,11 @@ class DarkThemeApp(QMainWindow):
         if action in ("ocr_engine", "translator"):
             target.installEventFilter(self)
 
-        glow = QGraphicsDropShadowEffect(target)
-        glow.setOffset(0, 0)
-        glow.setColor(QColor(197, 179, 233, 230))
-        glow.setBlurRadius(20)
-        target.setGraphicsEffect(glow)
-
-        animation = QtCore.QPropertyAnimation(glow, b"blurRadius", self)
-        animation.setStartValue(12)
-        animation.setEndValue(34)
-        animation.setDuration(900)
-        animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
-        animation.setLoopCount(-1)
-        animation.start()
-        self._guide_target_animation = animation
-
-        # The glow alone was ambiguous: on a dark window it reads as styling
-        # rather than as "this control". Dimming everything else says it plainly.
+        # No glow here any more. It was a blurred drop shadow animated in a
+        # forever loop, re-rendered in software on every frame for as long as the
+        # guide was on screen — and since the spotlight dims everything around
+        # the target, the glow it used to draw is not even visible. The ring the
+        # spotlight paints does the same job for the cost of a stroked rectangle.
         self._spotlight_guide_target(target)
 
     def _spotlight_guide_target(self, target):
@@ -6070,6 +6186,7 @@ class DarkThemeApp(QMainWindow):
         """
         actions = {
             "show": lambda: _show_running_instance(),
+            "toggle": self.toggle_window_visibility,
             "ocr": self.launch_ocr,
             "copy": self.launch_copy,
             "translate": self.launch_translate,
@@ -6206,7 +6323,13 @@ class DarkThemeApp(QMainWindow):
             if not shutil.which(command[0]):
                 continue
             try:
-                completed = subprocess.run(command, capture_output=True, text=True, timeout=3)
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                    env=platform_support.system_subprocess_env(),
+                )
                 if completed.returncode == 0 and completed.stdout.strip():
                     return completed.stdout
             except (OSError, subprocess.TimeoutExpired):
@@ -6368,6 +6491,32 @@ class DarkThemeApp(QMainWindow):
                 background-color: {theme['item_selected_background']};
                 color: {theme['item_selected_color']};
             }}
+            QComboBox QAbstractItemView QScrollBar:vertical {{
+                background: {scrollbar_bg};
+                width: 10px;
+                margin: 3px 2px;
+                border: none;
+                border-radius: 5px;
+            }}
+            QComboBox QAbstractItemView QScrollBar::handle:vertical {{
+                background: {scrollbar_handle};
+                min-height: 32px;
+                border: none;
+                border-radius: 4px;
+            }}
+            QComboBox QAbstractItemView QScrollBar::handle:vertical:hover {{
+                background: {scrollbar_handle_hover};
+            }}
+            QComboBox QAbstractItemView QScrollBar::add-line:vertical,
+            QComboBox QAbstractItemView QScrollBar::sub-line:vertical {{
+                height: 0;
+                border: none;
+                background: transparent;
+            }}
+            QComboBox QAbstractItemView QScrollBar::add-page:vertical,
+            QComboBox QAbstractItemView QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
             QPushButton {{
                 background-color: {theme['button_background']};
                 color: {theme['text_color']};
@@ -6405,6 +6554,11 @@ class DarkThemeApp(QMainWindow):
             }}
         """
         self.setStyleSheet(style_sheet)
+        popup_background = theme['button_background']
+        for combo_name in ("source_lang", "target_lang"):
+            combo = getattr(self, combo_name, None)
+            if isinstance(combo, DropDownCombo):
+                combo.set_popup_background(popup_background)
         if hasattr(self, "title_bar"):
             header_bg = "#c0c0c0" if self.current_theme == "Светлая" else theme['button_background']
             self.title_bar.setStyleSheet(
@@ -6953,10 +7107,12 @@ class DarkThemeApp(QMainWindow):
         self.label.setStyleSheet("color: #a98bd4; font-size: 15px; font-weight: 700; margin-top: 8px; margin-bottom: 5px;")
         self.main_layout.addWidget(self.label)
         self.main_layout.addSpacing(2)
-        self.source_lang = QComboBox()
+        self.source_lang = DropDownCombo()
+        self.source_lang.setMaxVisibleItems(9)
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
         self.main_layout.addWidget(self.source_lang)
-        self.target_lang = QComboBox()
+        self.target_lang = DropDownCombo()
+        self.target_lang.setMaxVisibleItems(9)
         self.main_layout.addWidget(self.target_lang)
         self._restore_main_translation_languages()
         self._refresh_selection_pair_hint()
@@ -7288,6 +7444,7 @@ class DarkThemeApp(QMainWindow):
         if not self.force_quit and self.has_tray():
             # Сворачиваем в трей вместо закрытия
             event.ignore()
+            self._window_hide_destination = "tray"
             self.hide()
             # Опционально: показать уведомление при первом сворачивании (можно добавить позже)
             return
@@ -7327,6 +7484,12 @@ class DarkThemeApp(QMainWindow):
                 self.translate_selection_hotkey_thread.join(timeout=0.5)
         except Exception as e:
             print(f"Error stopping selection hotkey thread: {e}")
+        try:
+            if hasattr(self, "toggle_window_hotkey_thread") and self.toggle_window_hotkey_thread is not None:
+                self.toggle_window_hotkey_thread.stop()
+                self.toggle_window_hotkey_thread.join(timeout=0.5)
+        except Exception as e:
+            print(f"Error stopping window toggle hotkey thread: {e}")
         self.save_config()
         self.tray_icon.hide()  # Убираем иконку из трея
         event.accept()
@@ -7598,8 +7761,9 @@ class DarkThemeApp(QMainWindow):
         if not self.has_tray():
             # Hiding without a tray icon would leave no way to bring the app
             # back, so minimize to the taskbar instead.
-            self.showMinimized()
+            self.minimize_to_taskbar()
             return
+        self._window_hide_destination = "tray"
         self.hide()
 
 _translation_result_dialogs = []
@@ -7675,6 +7839,43 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
     dialog.raise_()
     dialog.activateWindow()
     return dialog
+
+def _prepare_ocr_overlays_on_gui_thread():
+    """Create cached OCR widgets only from QApplication's owning thread."""
+    app = QApplication.instance()
+    if app is None:
+        return
+    if QtCore.QThread.currentThread() != app.thread():
+        logging.error("Refusing to prepare OCR overlays outside the GUI thread")
+        return
+
+    from ocr import prepare_overlay
+
+    for mode in ("ocr", "copy", "translate"):
+        prepare_overlay(mode)
+
+
+def _warm_up_ocr_after_window_is_visible():
+    """Warm native OCR in the background, then queue all QWidget work to Qt."""
+    try:
+        from ocr import warm_up
+
+        config = get_cached_config()
+        logging.info("=" * 50)
+        logging.info("ClicknTranslate Started")
+        logging.info(f"OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
+        logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
+        logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
+        logging.info("=" * 50)
+        warm_up()
+
+        # Qt widgets are never safe to construct in a Python worker thread.
+        # The dispatcher receiver belongs to the main window, so AutoConnection
+        # queues this callback to QApplication's thread on every platform.
+        hotkey_dispatcher.triggered.emit(_prepare_ocr_overlays_on_gui_thread)
+    except Exception:
+        logging.exception("Background OCR warm-up failed")
+
 
 if __name__ == "__main__":
     # ONNX Runtime and torch can fail to initialize after Qt on Windows. The
@@ -7802,33 +8003,6 @@ if __name__ == "__main__":
         ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), HIGH_PRIORITY_CLASS)
     except Exception:
         pass
-    def _warm_up_after_window_is_visible():
-        try:
-            from ocr import warm_up, prepare_overlay
-            config = get_cached_config()
-            logging.info("=" * 50)
-            logging.info("ClicknTranslate Started")
-            logging.info(f"OCR Engine: {config.get('ocr_engine', 'Windows').upper()}")
-            logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
-            logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
-            logging.info("=" * 50)
-            warm_up()
-
-            def _prepare_overlays():
-                for mode in ("ocr", "copy", "translate"):
-                    prepare_overlay(mode)
-
-            if platform_support.IS_LINUX:
-                # Overlays are QWidgets, and Qt only allows widgets to be created
-                # on the GUI thread. Windows tolerates it, X11 does not — it warns
-                # about timers started off-thread and can misbehave later — so the
-                # creation is handed back to the GUI thread through the same
-                # dispatcher the shortcut commands use.
-                hotkey_dispatcher.triggered.emit(_prepare_overlays)
-            else:
-                _prepare_overlays()
-        except Exception:
-            logging.exception("Background OCR warm-up failed")
     if platform_support.IS_LINUX:
         # Before the window: the first run opens a modal welcome dialog, and the
         # launcher entry should not wait for the user to dismiss it.
@@ -7868,7 +8042,7 @@ if __name__ == "__main__":
         )
 
     threading.Thread(
-        target=_warm_up_after_window_is_visible,
+        target=_warm_up_ocr_after_window_is_visible,
         name="ClicknTranslateStartupWarmup",
         daemon=True,
     ).start()

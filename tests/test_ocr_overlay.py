@@ -36,6 +36,34 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             self._language_patch.start()
             self.addCleanup(self._language_patch.stop)
 
+    def test_pytesseract_uses_the_system_environment_on_linux(self):
+        original = mock.Mock(return_value={"stdin": object()})
+        fake = SimpleNamespace(pytesseract=SimpleNamespace(subprocess_args=original))
+        with mock.patch.object(platform_support, "IS_LINUX", True):
+            with mock.patch.object(
+                platform_support,
+                "system_subprocess_env",
+                return_value={"LD_LIBRARY_PATH": "/system"},
+            ):
+                ocr._configure_pytesseract_system_environment(fake)
+                kwargs = fake.pytesseract.subprocess_args(True)
+
+        self.assertEqual(kwargs["env"], {"LD_LIBRARY_PATH": "/system"})
+        self.assertIn("stdin", kwargs)
+        self.assertTrue(fake.pytesseract.subprocess_args._clickntranslate_system_env)
+
+    def test_qt_icon_cache_decodes_each_asset_only_once(self):
+        ocr._QT_ICON_CACHE.clear()
+        self.addCleanup(ocr._QT_ICON_CACHE.clear)
+        decoded_icon = object()
+        with mock.patch.object(ocr.QtGui, "QIcon", return_value=decoded_icon) as qicon:
+            first = ocr._cached_qt_icon(r"icons\American_flag.png")
+            second = ocr._cached_qt_icon("icons/American_flag.png")
+
+        self.assertIs(first, decoded_icon)
+        self.assertIs(second, decoded_icon)
+        qicon.assert_called_once()
+
     def test_overlay_is_tool_topmost_and_frameless(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
         try:
@@ -44,6 +72,41 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             self.assertTrue(flags & Qt.WindowStaysOnTopHint)
             self.assertTrue(flags & Qt.FramelessWindowHint)
         finally:
+            overlay.deleteLater()
+
+    def test_prepare_overlay_refuses_to_create_qwidgets_in_a_python_worker(self):
+        previous = ocr._OVERLAY_POOL.get("ocr")
+        ocr._OVERLAY_POOL["ocr"] = None
+        result = []
+        try:
+            with mock.patch.object(ocr, "ScreenCaptureOverlay") as constructor:
+                import threading
+
+                worker = threading.Thread(
+                    target=lambda: result.append(ocr.prepare_overlay("ocr")),
+                    name="OverlayPreparationRegressionProbe",
+                )
+                worker.start()
+                worker.join(timeout=3)
+
+                self.assertFalse(worker.is_alive())
+                self.assertEqual(result, [False])
+                constructor.assert_not_called()
+                self.assertIsNone(ocr._OVERLAY_POOL["ocr"])
+        finally:
+            ocr._OVERLAY_POOL["ocr"] = previous
+
+    def test_delayed_topmost_retry_does_not_steal_combo_popup_focus(self):
+        overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
+        original_combo = overlay.lang_combo
+        popup = SimpleNamespace(isVisible=lambda: True)
+        overlay.lang_combo = SimpleNamespace(view=lambda: popup)
+        try:
+            with mock.patch.object(overlay, "raise_") as raise_window:
+                overlay._force_topmost()
+            raise_window.assert_not_called()
+        finally:
+            overlay.lang_combo = original_combo
             overlay.deleteLater()
 
     def test_translate_combo_data_keeps_configured_target(self):
@@ -130,6 +193,50 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 })
                 start_timer.assert_called_once_with()
             finally:
+                overlay.close()
+                overlay.deleteLater()
+
+    def test_fullscreen_language_switch_keeps_only_the_latest_pending_ocr(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "zh"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates"), \
+                mock.patch.object(ocr.QtCore.QTimer, "singleShot"):
+            overlay = ocr.FullScreenTranslateOverlay()
+            try:
+                active_worker = mock.Mock()
+                overlay._ocr_workers.add(active_worker)
+
+                with mock.patch.object(overlay._rerun_timer, "start"):
+                    overlay.target_lang_combo.setCurrentIndex(
+                        overlay.target_lang_combo.findData("es")
+                    )
+                    overlay._restart_translation_from_controls()
+                    overlay.target_lang_combo.setCurrentIndex(
+                        overlay.target_lang_combo.findData("de")
+                    )
+                    overlay._restart_translation_from_controls()
+
+                active_worker.requestInterruption.assert_called()
+                self.assertEqual(overlay._pending_translation_pair, ("en", "de"))
+
+                overlay._ocr_workers.clear()
+                with mock.patch.object(overlay, "_start_ocr") as start_ocr:
+                    overlay._start_pending_fullscreen_ocr()
+
+                start_ocr.assert_called_once_with(
+                    overlay._translation_run_id,
+                    "en",
+                    "de",
+                )
+                self.assertIsNone(overlay._pending_translation_pair)
+            finally:
+                overlay._ocr_workers.clear()
                 overlay.close()
                 overlay.deleteLater()
 

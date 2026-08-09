@@ -988,9 +988,12 @@ titles (or drive the app), never just liveness.
 
 ### 13.4 Not verified — needs a real desktop session
 
-Screen capture on X11 and Wayland, the selection overlay, the tray icon, and the desktop
-shortcut bindings. WSL2 on Windows 10 has no WSLg, so there is no display to test against.
-The Wayland portal path in particular is written against the spec and reviewed, not run.
+**Correction (see §17): this WSL2 does have WSLg** — WSL 2.7.11 with WSLg 1.0.73.2 on Windows 10
+19045, `DISPLAY=:0`, `WAYLAND_DISPLAY=wayland-0`. The Linux GUI runs and appears on the Windows
+desktop, so the app itself can be driven. What still cannot be tested here is **screen capture**:
+WSLg has no xdg-desktop-portal and no `grim`/`gnome-screenshot`/`spectacle`, and an X11 client on
+Xwayland gets a black root window. The selection overlay and the portal path therefore still need
+a real Linux desktop.
 
 ### 13.5 Build environment note
 
@@ -1279,3 +1282,361 @@ final `C`, `F`, `T` or `Q`, so an exactly-sized label visibly shaves the letter.
 them into one rich-text QLabel
 with `&nbsp;`: the layout can compress that label to make room for the OCR/translator name and Qt
 then clips individual shortcut characters without any ellipsis or warning.
+
+---
+
+## 16. The Linux release — built and verified (1.5.6)
+
+`tools/build_linux_release.sh` produced all three artifacts on Ubuntu 22.04 (WSL2), x86_64,
+Python 3.10.12, PyInstaller 6.21:
+
+| Artifact | Size |
+| --- | --- |
+| `Click-n-Translate-1.5.6-linux-x86_64.AppImage` | 255 MB |
+| `Click-n-Translate-1.5.6-linux-x86_64.tar.gz` | 253 MB |
+| `Click-n-Translate-1.5.6-linux-x86_64.sha256` | both checksums |
+
+They are in `releases/`, and the checksums were re-verified after copying to the Windows side.
+Release notes: `releases/v1.5.6-linux-notes.md`.
+
+### 16.1 What was verified
+
+* **Unit suite on Linux** — 501 passed, 30 skipped (the skips are Windows-only tests: Windows OCR,
+  the servicing lock, the update flow).
+* **`tools/functional_check.py --frozen dist/clickntranslate --offline`** — 47 passed, 0 failed,
+  11 skipped. Including:
+  * the **packaged ArgosWorker translating offline**: `Привет, мир! Как дела сегодня?` →
+    `Hello, world! How are you today?`, with no torch and no onnxruntime in the bundle;
+  * the packaged worker **installing** `ru→en` on request (it survived a transient
+    `URLError(TimeoutError)` and retried);
+  * **bundled RapidOCR** reading text from an image at similarity 1.00;
+  * the command socket, autostart entry, `.desktop` install and capture-action entries.
+* **The AppImage itself** — starts, creates `clickntranslate.sock`, and a second launch with
+  `--ocr` delivers the command and exits 0 while the first instance keeps running. That is the
+  mechanism every Linux shortcut depends on.
+* **Build integrity** — the spec's `_verify_frozen_executables` reported
+  "Verified embedded archives in 3 executables", so the 1.5.4-class PYZ corruption is ruled out
+  for this build.
+
+### 16.2 Still needs a real desktop session
+
+Screen capture on X11 and Wayland, the selection overlay, the tray icon, and desktop shortcut
+binding. WSL2 on Windows 10 has no WSLg, so there is no display to test against — the Wayland
+portal path in particular is written against the spec and reviewed, not run.
+
+### 16.3 A trap in the functional check, now fixed
+
+`packaged argos worker translates` reported **FAIL** on a machine with no language package
+installed. The worker answers `{"result": null, "error": ""}` in that case — no error, no text —
+and the check only skipped when `error` was set. A missing prerequisite is a skip, not a failure;
+otherwise every fresh build machine shows a red line that means nothing. Fixed in
+`tools/functional_check.py`.
+
+### 16.4 Two things to know about driving WSL from this repo
+
+* **`pkill -f clickntranslate` kills your own shell.** `-f` matches whole command lines, and the
+  repo path contains the word. Use `pkill -x clickntranslate`.
+* **Background jobs started with `wsl.exe -- bash -lc '... &'` die with the session.** Use
+  `setsid nohup ... < /dev/null &`, or run the command synchronously.
+
+---
+
+## 17. Running the Linux build on a real display — three defects it found
+
+**This WSL does have WSLg** (WSL 2.7.11, WSLg 1.0.73.2, Windows 10 19045): `DISPLAY=:0`,
+`WAYLAND_DISPLAY=wayland-0`, and a Linux window appears on the Windows desktop. §13.4 said
+otherwise; that note is now corrected. Launch it with
+`.tmp/run_linux_gui.sh` (copy into WSL, `tr -d '\r'` first).
+
+Running the shipped AppImage on that display found three things no headless run could.
+
+### 17.1 The AppImage could not start at all
+
+```
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+```
+
+`ldd` on the bundled `libqxcb.so` showed six unresolved sonames: `libxcb-icccm.so.4`,
+`libxcb-image.so.0`, `libxcb-keysyms.so.1`, `libxcb-render-util.so.0`, `libxcb-shape.so.0`,
+`libxcb-xinerama.so.0`. PyInstaller follows the dependencies of the *executable*, not of a plugin
+it merely copies, so nothing pulled them in — and the build machine did not have them either, so
+there was nothing to copy.
+
+Fixed in three places: `ClicknTranslate-linux.spec` resolves them from `ldconfig -p` and bundles
+them, **failing the build with the apt line if any are missing** (shipping without them produces
+an AppImage that cannot open a window, and nothing else reports it); `tools/setup_linux_env.sh`
+installs them; `libxcb-util1` and `libxkbcommon-x11-0` are included for the same reason.
+
+### 17.2 White bands down both sides of every drop-down
+
+The list is styled through the combo's stylesheet, but Qt wraps it in a **window of its own**, and
+on Linux that frame keeps the platform default — white. `DropDownCombo.set_popup_background()`
+paints it, and `_apply_engine_combo_style` sets it per theme. Windows never showed this because
+the frame there already matches the list.
+
+### 17.3 EasyOCR could not install: pins for the wrong interpreter
+
+```
+ERROR: Could not find a version that satisfies the requirement scipy==1.18.0
+       (from versions: 1.7.2 ... 1.15.3)
+```
+
+`EASYOCR_PIP_PACKAGES` is an exact tree resolved for the Python **the Windows installer
+downloads** (3.13). On Linux the installer uses the distribution's interpreter — 3.10 on Ubuntu
+22.04 — where most of those pins have no wheel, so pip refused before installing anything. This
+was latent on Windows too: a system Python older than 3.13 would have failed the same way.
+
+`_easyocr_requirements()` now asks the target interpreter for its version
+(`_pip_target_python_version`) and returns the pinned tree only when it is at least the version
+the tree was resolved for. Otherwise it uses `EASYOCR_PIP_PACKAGES_ANY_PYTHON`: EasyOCR itself
+pinned, the rest left to pip. `--only-binary=:all:` still applies, so it stays wheels-only.
+
+### 17.4 Capture still cannot be tested here, and now says so
+
+WSLg has no `xdg-desktop-portal` and none of `grim`/`gnome-screenshot`/`spectacle`, and an X11
+client on Xwayland gets a **black root window**: `grabWindow(0)` returned a full-size 2560x1440
+image with exactly one colour in it. The app used to hand that on as a screenshot, so OCR
+answered "no text found" — the wrong answer to the wrong question. `linux_capture.looks_blank()`
+now catches an all-black grab and raises with `blank_grab_message()`, which names the portal
+package and the X11 way out. Only black counts, so a plain coloured desktop is not mistaken for a
+failure.
+
+Real capture, the selection overlay and the tray still need a Linux desktop with a portal.
+
+---
+
+## 18. "It lags" on Linux — what was measured
+
+Same window, same code, measured on both sides rather than guessed at.
+
+| Measurement | Windows | Linux (WSLg) |
+| --- | --- | --- |
+| Painting the settings window (60 frames, off-screen) | 2.1 ms/frame | **0.9 ms/frame** |
+| Idle CPU, nothing open | 0.0% of a core | 0.0% of a core |
+| Idle CPU, welcome/News dialog open | (not open) | **9.8% of a core** → 0.0% after the fix |
+| Resident memory | 116 MB | 262 MB (frozen build) |
+
+**Our painting is not the problem** — it is twice as fast under WSLg as on Windows, because it is
+plain CPU rasterisation either way and the machine has 16 cores.
+
+### 18.1 The one real defect: an endless blur animation
+
+`WelcomeDialog._pulse_flag_button` animated a `QGraphicsDropShadowEffect` with
+`setLoopCount(-1)`. A blurred drop shadow is re-rendered in software on **every frame**, forever,
+for as long as that dialog stayed open — 9.8% of a core, on the window the user sees first. On
+Windows the same code costs little enough to disappear into the noise, which is why it survived
+this long.
+
+The pulse now runs eight cycles and then removes the effect. The guide's target glow was the same
+construct and is gone entirely: the spotlight added in §14 dims everything around the target, so
+the glow it drew was not even visible, and the spotlight's ring is a stroked rectangle rather than
+a blur. Locked in by `IdleCostTest` — no endless animation may drive a `QGraphicsDropShadowEffect`.
+
+### 18.2 What is genuinely WSL, and cannot be fixed here
+
+WSLg composites through Weston and ships frames to Windows over RDP, with input travelling back
+the same way, and Qt has no GPU there. That latency is inherent to running a Linux GUI inside WSL
+and does not exist on a real Linux desktop. It also cannot be measured from inside the process:
+`repaint()` under xcb queues to the X server and returns, so app-side timers report ~0 ms while
+the frame is still in flight.
+
+Also worth knowing: `--appimage-extract-and-run` unpacks 255 MB into `/tmp` **on every launch**.
+That is start-up cost, not lag. A normal AppImage run mounts through FUSE and starts immediately;
+the extracted `dist/clickntranslate/clickntranslate` starts instantly too.
+
+### 18.3 Hotkeys cannot be tested under WSLg
+
+By design there are no in-app global hotkeys on Linux (§13.1) — the user binds a command in their
+desktop's shortcut settings. WSLg has no desktop and no shortcut UI, so there is nothing to bind
+them in. The mechanism a shortcut would use is testable directly, and works:
+
+```
+/root/cnt/dist/clickntranslate/clickntranslate --ocr     # delivers to the running instance, exits 0
+```
+
+---
+
+## 19. Testing on a real Linux desktop, and the four bugs it found
+
+WSLg alone is not a desktop: no compositor of the kind apps expect, no portal, and an X11 client
+sees an empty root. A **nested X server** is: `Xephyr` gives a genuine X11 root window that owns
+every window inside it, and `openbox` on top makes it a desktop with focus, decorations and key
+bindings. It runs in a window on the Windows desktop and needs no VM.
+
+```
+apt-get install -y xserver-xephyr openbox x11-utils xdotool x11-xserver-utils
+```
+
+`.tmp/linux_desktop.sh` starts it: Xephyr on `:7`, openbox with `Ctrl+Alt+O/C/T` bound to
+`clickntranslate --ocr/--copy/--translate`, and the app inside. This is the first environment
+where the Linux build could actually be exercised.
+
+### 19.1 EasyOCR installed but could not be imported
+
+`No module named 'pickletools'`, then `timeit`, then `unittest.mock`. EasyOCR and torch are
+installed **at runtime**, so PyInstaller never analyses them and bundles only the stdlib that our
+own code imports. torch reaches for whatever it likes.
+
+Both specs now call `_stdlib_hiddenimports()`, which expands every standard-library package into
+its submodules (502 modules) and hands them to the OCR worker. Naming them one per rebuild does
+not converge — each round costs eight minutes and a 1.3 GB install to reproduce. Verified by
+asking the frozen worker to import the real installation: `{"available": true, "error": ""}`.
+
+### 19.2 The selection overlay was a black rectangle
+
+The overlay is translucent, and translucency only works where a compositing manager runs. GNOME
+and KDE composite; openbox, i3 and a bare XFCE do not, and there the user would drag a selection
+box across a solid black screen. Flameshot and NormCap both select on a frozen screenshot for
+this reason, so `ScreenCaptureOverlay._freeze_required()` now returns True on Linux whatever the
+"freeze screen" setting says. Windows keeps the setting.
+
+### 19.3 Capture asked the environment instead of Qt
+
+`WAYLAND_DISPLAY` is exported by the WSLg session and by every Wayland login, including for
+processes that talk X11 — every Xwayland app is one. Capture read that variable, decided it was
+on Wayland, went to the portal, found none, and failed **on a display where the plain X11 grab
+works**. `grab_screen()` now asks Qt which platform it actually connected to: on `xcb` it grabs
+the root first and only falls back to the portal if that comes back empty.
+
+### 19.4 A black desktop is not a failed capture
+
+The blank-grab guard from §17.4 was too eager: openbox draws no wallpaper and the app hides
+itself before capturing, so the grab is legitimately all black and capture was refused. An
+all-black grab is now logged with the explanation and **returned** — the portal is tried first,
+and if there is none, a dark screenshot is a better answer than an error. OCR finding no text
+says the same thing without inventing a cause.
+
+### 19.5 Verified on that desktop
+
+* the app opens its window and runs at 0.0% idle CPU;
+* `Ctrl+Alt+O`, bound in the window manager exactly as a user would bind it in GNOME or KDE,
+  launches `clickntranslate --ocr`, which hands the command to the running instance and exits;
+* the running instance opens its capture overlay with a **frozen background** captured through
+  the app's own path (`Frozen background captured; size=1600x900`);
+* the screenshot of that desktop, taken with the app's own capture code, contains the overlay and
+  its language picker;
+* EasyOCR imports in the frozen worker.
+
+### 19.6 Two ways to waste half an hour here
+
+* **Two builds at once.** Starting a rebuild while another is running leaves `dist/` half from
+  each, and the binary keeps its old timestamp while the log says the build finished. Poll the
+  binary's mtime, not the log, and never `pgrep -f build_linux_release` — that matches the shell
+  running the check.
+* **`&&` chains in a backgrounded WSL command.** `rsync && grep && build &` silently skips the
+  build when the grep finds nothing.
+
+---
+
+## 20. Real Wayland portal and Linux package completion (2026-08-09)
+
+WSLg itself has no usable Screenshot portal, so a nested Sway compositor was started with its
+own user D-Bus session, PipeWire and `xdg-desktop-portal-wlr`. This is a real 1280×720 Wayland
+output using Qt's `wayland` platform plugin, not `offscreen` and not mocked DBus.
+
+That run found two defects in `linux_capture.capture_with_portal()` which no unit test or helper
+fallback exposed:
+
+1. `QDBusConnection.connect()` only accepts a bound `QObject` method decorated as a Qt slot. The
+   old nested Python callback raised `TypeError` as soon as a real portal was present.
+2. The portal's Response signature is exactly `uint, a{sv}` (`"uint", "QVariantMap"` in PyQt),
+   not signed `int`. Also, wlroots can emit Response before the Screenshot method returns, so the
+   listener must be connected to the deterministic request path **before** making the call.
+
+After the fix, both a direct portal probe and the packaged application's real `--ocr` flow
+received a non-empty 1280×720 image. The frozen app accepted `--show` and `--ocr` from a second
+process, logged `qt platform=wayland, portal=True`, captured the frozen background and displayed
+the overlay.
+
+The AppImage packaging was also completed:
+
+* AppStream metadata is installed and passes `appstreamcli validate --pedantic`;
+* the launcher uses the lower-case reverse-DNS desktop ID
+  `io.github.jabrailkhalil.clickntranslate.desktop`;
+* installing the launcher or autostart entry removes the old short-name `.desktop` file, so an
+  upgrade cannot leave duplicate menu entries;
+* desktop categories now use one main category (`Utility`) plus `Qt`, avoiding duplicate menu
+  placement, with search keywords for translation, OCR, capture and text.
+
+`.tmp/linux_wayland_test.sh` recreates the Wayland test. It also runs the packaged binary after
+the capture probe. `.tmp/linux_desktop.sh` and `.tmp/nested_full_check.sh` cover the separate X11
+desktop.
+
+There is no Hyper-V, VirtualBox or VMware VM configured on this machine (`Get-VM` is empty and no
+VM hypervisor tooling is installed). Xephyr and Sway exercise the genuine X11 and Wayland
+protocols, but tray/permission UX on a full GNOME or KDE installation still needs a short manual
+pass on that target desktop.
+
+Final local verification for this tree: Windows 561 passed / 11 skipped; Linux 538 passed / 34
+skipped; frozen functional sweep 54 passed / 0 failed / 4 optional skips. The extracted X11
+binary reached its command socket in 187 ms and a visible window in 402 ms, then used 0.2% CPU
+over a ten-second idle sample (248 MB resident in the WSL build).
+
+---
+
+## 21. Release 1.5.7 — Windows and Linux completion (2026-08-10)
+
+Version 1.5.7 is the first release built and checked from the same tree for both
+Windows and Linux.
+
+### 21.1 User-facing changes
+
+* `Ctrl+Alt+M` is the new configurable show/hide shortcut. A window minimized
+  to the taskbar returns to the taskbar; a window hidden in the tray returns to
+  the tray. Linux exposes the same action as `--toggle` and in its desktop menu.
+* The settings hotkey page has five complete rows and reset restores the new
+  default along with the existing four shortcuts.
+* The source and target language lists on the main screen show nine complete
+  rows, use a branded selection and a thin draggable scrollbar. A local
+  `QProxyStyle` disables GTK's native menu popup because Qt documents that GTK
+  ignores `maxVisibleItems` and adds its own large scroller buttons.
+* Linux system helpers no longer inherit PyInstaller/AppImage library paths.
+  That prevents the bundled `libstdc++` from breaking the host Tesseract and
+  clipboard/screenshot tools.
+
+### 21.2 Reproducible Linux packaging
+
+AppStream validation is now local and deterministic:
+`appstreamcli validate --no-net` runs before `appimagetool --no-appstream`.
+The metadata remains inside the AppImage, but a slow external project URL can
+no longer fail a release build.
+
+### 21.3 Real GNOME VM verification
+
+A dedicated Ubuntu 24.04 Hyper-V VM ran the AppImage through FUSE in its normal
+GNOME Wayland session. Verified there:
+
+* main window startup and one running application instance;
+* `--toggle` hides the visible window completely and restores it at the same
+  size and position;
+* first-invocation OCR, RU/EN language switching, real region capture and exact
+  Tesseract recognition of `Hello world OCR test`;
+* installed `eng`/`rus` discovery from the host Tesseract;
+* the final nine-row language popup, complete last row, application-coloured
+  selection and scrollbar drag from the first languages to the final Hindi row.
+
+### 21.4 Final verification
+
+| Layer | Result |
+| --- | --- |
+| Windows source suite | 568 passed, 11 platform/optional skips, 8 subtests |
+| Linux source suite | 545 passed, 34 platform/optional skips, 8 subtests |
+| Windows frozen functional sweep | 34 passed, 0 failed, 6 optional skips |
+| Linux frozen functional sweep | 56 passed, 0 failed, 3 optional skips |
+| Windows updater E2E | portable and installed 1.5.6 -> 1.5.7 passed |
+| Updater safety | user data preserved; locked OCR worker stopped; app restarted |
+| AppStream | local no-network validation passed |
+
+The updater E2E uses a disposable copy of the public 1.5.6 portable release and
+a disposable Inno AppId. It verifies the shipped 1.5.7 ZIP and new
+`app/_internal` layout, not a mocked payload.
+
+### 21.5 Release artifacts
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Click-n-Translate-1.5.7-windows-portable-x64.zip` | 204702413 | `5d82079cff4c3068f34ed33264e5c6eed384f899f4e8ddd1aa5f31388a048b71` |
+| `Click-n-Translate-1.5.7-windows-x64-installer.exe` | 128419533 | `f03b42e3405243ed6885a5d259143c3ecc985b2e1add28b30260897dc2edabff` |
+| `ClicknTranslate-Setup-v1.5.7-win64.exe` | 89600 | `5962954b918484f2793bb659dcc81455de861c43d4262a5b356dc913cd54510c` |
+| `Click-n-Translate-1.5.7-linux-x86_64.AppImage` | 273876160 | `794c86e08cb41a4c69eed082c72ffaeaa57818399c9e5fcdbb2a4c9299990846` |
+| `Click-n-Translate-1.5.7-linux-x86_64.tar.gz` | 271678168 | `64bda9af63dbee7426fcfddcf2266bf16327ff7da747af96caaee187ba588675` |

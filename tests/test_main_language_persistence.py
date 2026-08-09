@@ -13,6 +13,16 @@ sys.path.insert(0, str(ROOT))
 import main  # noqa: E402
 
 
+def test_main_language_popup_uses_the_app_scrollbar_style():
+    source = Path(main.__file__).read_text(encoding="utf-8")
+    assert "self.source_lang = DropDownCombo()" in source
+    assert "self.target_lang = DropDownCombo()" in source
+    assert source.count("setMaxVisibleItems(9)") >= 2
+    assert "QComboBox QAbstractItemView QScrollBar:vertical" in source
+    assert "QComboBox QAbstractItemView QScrollBar::handle:vertical" in source
+    assert "QComboBox QAbstractItemView QScrollBar::add-line:vertical" in source
+
+
 class _LanguageHarness:
     _available_main_translation_pairs = main.DarkThemeApp._available_main_translation_pairs
     _main_translation_source_codes = main.DarkThemeApp._main_translation_source_codes
@@ -141,6 +151,27 @@ class MainLanguagePersistenceTest(unittest.TestCase):
 
             for pair in pairs:
                 pair.close()
+
+    def test_language_popup_is_capped_and_scrollable_on_native_popup_styles(self):
+        combo = main.DropDownCombo()
+        combo.resize(320, 36)
+        combo.setMaxVisibleItems(9)
+        combo.addItems(main.LANGUAGES["en"])
+        combo.set_popup_background("#1e1e1e")
+        combo.show()
+        combo.showPopup()
+        self.app.processEvents()
+
+        popup = combo.view().window()
+        row_height = max(24, combo.view().sizeHintForRow(0))
+        self.assertLessEqual(popup.height(), row_height * 9 + 12)
+        self.assertGreater(combo.view().verticalScrollBar().maximum(), 0)
+        self.assertIn("selection-background-color: #7A5FA1", combo.view().styleSheet())
+        self.assertIn("QScrollBar::handle:vertical", combo.view().styleSheet())
+
+        combo.hidePopup()
+        combo.close()
+        self.app.processEvents()
 
     def test_active_guide_card_is_retranslated_immediately(self):
         harness = SimpleNamespace(

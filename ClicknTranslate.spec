@@ -104,6 +104,41 @@ common_excludes = [
     'jupyter',
 ]
 
+def _stdlib_hiddenimports():
+    """The whole standard library, for the OCR worker only.
+
+    EasyOCR and torch are installed at runtime, so PyInstaller never sees them
+    and bundles only what our own code imports. torch then reaches for whatever
+    it likes — `pickletools` from its serializer, `timeit` from its profiler —
+    and each missing name is a fresh "installed but could not be imported"
+    failure after a 1.3 GB download. Naming them one per rebuild does not
+    converge; carrying the stdlib does, for a few megabytes in a worker that
+    already ships an ONNX runtime.
+    """
+    import sys as _stdlib_sys
+
+    names = sorted(getattr(_stdlib_sys, 'stdlib_module_names', ()))
+    # Skipped on purpose: GUI toolkits the worker must never load (and which the
+    # excludes below would fight over), plus the test and packaging trees.
+    unwanted = {
+        'antigravity', 'this', 'idlelib', 'tkinter', 'turtle', 'turtledemo',
+        'lib2to3', 'test', 'ensurepip', 'venv', 'distutils', 'pydoc_data',
+    }
+    wanted = [name for name in names if not name.startswith('_') and name not in unwanted]
+
+    # Top-level names are not enough: torch imports `unittest.mock`, and a
+    # package's submodules are separate modules to PyInstaller. Walk each one.
+    collected = set(wanted)
+    for name in wanted:
+        try:
+            collected.update(collect_submodules(name))
+        except Exception:
+            # A package that cannot even be imported on this machine (curses
+            # without a terminal, dbm without a backend) has nothing to give.
+            continue
+    return sorted(collected)
+
+
 # RapidOCR is bundled only into the isolated worker. This makes it available on
 # first launch without requiring a matching system Python, while keeping the Qt
 # GUI startup path free of ONNX/OpenCV imports. EasyOCR remains an optional
@@ -149,6 +184,7 @@ ocr_worker_hiddenimports += [
     'six',
 ]
 ocr_worker_hiddenimports += collect_submodules('ctypes')
+ocr_worker_hiddenimports += _stdlib_hiddenimports()
 
 
 a = Analysis(

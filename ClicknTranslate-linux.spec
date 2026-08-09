@@ -23,8 +23,62 @@ if _sys.platform != 'linux':
     raise SystemExit('ClicknTranslate-linux.spec builds the Linux package; use ClicknTranslate.spec on Windows.')
 
 
+def _xcb_platform_libraries():
+    """The libraries Qt's xcb plugin links, resolved from the build machine.
+
+    PyInstaller follows the dependencies of the executable, not of a plugin it
+    merely copies, so `libqxcb.so` shipped with six unresolved sonames and the
+    app died on start with "Could not load the Qt platform plugin xcb" on any
+    machine that did not happen to have them. An AppImage is supposed to carry
+    its own dependencies, so they are bundled rather than documented.
+    """
+    import subprocess
+
+    required = (
+        'libxcb-icccm.so.4',
+        'libxcb-image.so.0',
+        'libxcb-keysyms.so.1',
+        'libxcb-render-util.so.0',
+        'libxcb-shape.so.0',
+        'libxcb-xinerama.so.0',
+        'libxcb-util.so.1',
+        'libxkbcommon-x11.so.0',
+    )
+    try:
+        cache = subprocess.run(
+            ['ldconfig', '-p'], capture_output=True, text=True, check=True
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f'Could not read the shared library cache: {error}')
+
+    found = {}
+    for line in cache.splitlines():
+        entry = line.strip()
+        if '=>' not in entry:
+            continue
+        soname, _, path = entry.partition('=>')
+        soname = soname.split()[0].strip()
+        path = path.strip()
+        if soname in required and soname not in found and _os.path.exists(path):
+            found[soname] = path
+
+    missing = [name for name in required if name not in found]
+    if missing:
+        # Failing the build is the point: shipping without these produces an
+        # AppImage that cannot open a window, and nothing else reports it.
+        packages = 'libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 ' \
+                   'libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxkbcommon-x11-0'
+        raise SystemExit(
+            'The Qt xcb platform plugin needs libraries that are not installed on this '
+            'build machine:\n  ' + '\n  '.join(missing) +
+            f'\n\nInstall them and build again:\n  sudo apt-get install -y {packages}\n'
+            '(tools/setup_linux_env.sh does this for you.)'
+        )
+    return [(path, '.') for path in found.values()]
+
+
 gui_datas = [('icons', 'icons')]
-gui_binaries = []
+gui_binaries = _xcb_platform_libraries()
 gui_hiddenimports = ['pypdf']
 
 for package_name in (
@@ -81,6 +135,41 @@ common_excludes = [
     'jupyter',
 ]
 
+def _stdlib_hiddenimports():
+    """The whole standard library, for the OCR worker only.
+
+    EasyOCR and torch are installed at runtime, so PyInstaller never sees them
+    and bundles only what our own code imports. torch then reaches for whatever
+    it likes — `pickletools` from its serializer, `timeit` from its profiler —
+    and each missing name is a fresh "installed but could not be imported"
+    failure after a 1.3 GB download. Naming them one per rebuild does not
+    converge; carrying the stdlib does, for a few megabytes in a worker that
+    already ships an ONNX runtime.
+    """
+    import sys as _stdlib_sys
+
+    names = sorted(getattr(_stdlib_sys, 'stdlib_module_names', ()))
+    # Skipped on purpose: GUI toolkits the worker must never load (and which the
+    # excludes below would fight over), plus the test and packaging trees.
+    unwanted = {
+        'antigravity', 'this', 'idlelib', 'tkinter', 'turtle', 'turtledemo',
+        'lib2to3', 'test', 'ensurepip', 'venv', 'distutils', 'pydoc_data',
+    }
+    wanted = [name for name in names if not name.startswith('_') and name not in unwanted]
+
+    # Top-level names are not enough: torch imports `unittest.mock`, and a
+    # package's submodules are separate modules to PyInstaller. Walk each one.
+    collected = set(wanted)
+    for name in wanted:
+        try:
+            collected.update(collect_submodules(name))
+        except Exception:
+            # A package that cannot even be imported on this machine (curses
+            # without a terminal, dbm without a backend) has nothing to give.
+            continue
+    return sorted(collected)
+
+
 # RapidOCR is bundled into the isolated worker when it is available in the build
 # environment. Unlike the Windows build this is optional: distributions vary in
 # what onnxruntime wheels they can install, and the app falls back to Tesseract.
@@ -108,6 +197,7 @@ except Exception as _exc:  # pragma: no cover - depends on the build environment
     _bundled_rapidocr = False
 
 ocr_worker_binaries = []
+ocr_worker_hiddenimports += _stdlib_hiddenimports()
 ocr_worker_hiddenimports += [
     'PIL',
     'numpy',

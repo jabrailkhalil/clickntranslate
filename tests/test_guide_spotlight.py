@@ -136,5 +136,50 @@ class ResultWindowDefaultTest(unittest.TestCase):
         self.assertEqual(main.result_window_hidden_modes(merged), ())
 
 
+class IdleCostTest(unittest.TestCase):
+    """Nothing may animate forever.
+
+    Measured on Linux: the welcome dialog's pulsing flag button cost 10% of a
+    core for as long as it stayed open, and the guide's target glow did the same
+    while the guide was up. Both were blurred drop shadows on an endless
+    QPropertyAnimation, and a blur is re-rendered in software every frame. On
+    Windows the same code is invisible in a CPU meter, which is why it survived.
+    """
+
+    def _source(self, name):
+        import inspect
+
+        return inspect.getsource(getattr(main.DarkThemeApp, name))
+
+    def test_the_guide_no_longer_animates_a_blur(self):
+        source = self._source("_highlight_guide_target")
+
+        self.assertNotIn("QGraphicsDropShadowEffect", source)
+        self.assertNotIn("setLoopCount(-1)", source)
+        # The spotlight ring replaced it: a stroked rectangle, not a blur.
+        self.assertIn("_spotlight_guide_target", source)
+
+    def test_the_welcome_pulse_is_bounded(self):
+        import inspect
+
+        source = inspect.getsource(main.WelcomeDialog._pulse_flag_button)
+
+        self.assertIn("QGraphicsDropShadowEffect", source, "the pulse itself is fine")
+        self.assertNotIn("setLoopCount(-1)", source)
+        self.assertIn("setLoopCount(8)", source)
+        # And the effect comes off the button when it is done.
+        self.assertIn("setGraphicsEffect(None)", source)
+
+    def test_the_spotlight_pulse_is_cheap(self):
+        """The one animation left running is a pen stroke, no blur behind it."""
+        import inspect
+
+        source = inspect.getsource(main.GuideSpotlight)
+
+        self.assertIn("setLoopCount(-1)", source)
+        self.assertNotIn("QGraphicsDropShadowEffect", source)
+        self.assertIn("drawRoundedRect", source)
+
+
 if __name__ == "__main__":
     unittest.main()

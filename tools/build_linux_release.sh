@@ -95,21 +95,26 @@ fi
 echo "[4/4] Building the AppImage..."
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "$APPDIR/usr/share/metainfo"
 cp -a "$DIST_DIR/." "$APPDIR/usr/bin/"
 cp "$ICON_PNG" "$APPDIR/usr/share/icons/hicolor/256x256/apps/clickntranslate.png"
 cp "$ICON_PNG" "$APPDIR/clickntranslate.png"
+cp "$REPO_DIR/packaging/linux/io.github.jabrailkhalil.clickntranslate.appdata.xml" \
+    "$APPDIR/usr/share/metainfo/"
 
 "$PYTHON" - "$APPDIR" "$REPO_DIR" <<'PYTHON'
 import sys, os
 sys.path.insert(0, sys.argv[2])
 import linux_desktop
+import platform_support
 
 appdir = sys.argv[1]
 # Inside an AppImage the Exec value is resolved against usr/bin by AppRun.
 text = linux_desktop.desktop_entry_text("clickntranslate")
+desktop_name = platform_support.DESKTOP_ENTRY_NAME
 for path in (
-    os.path.join(appdir, "clickntranslate.desktop"),
-    os.path.join(appdir, "usr", "share", "applications", "clickntranslate.desktop"),
+    os.path.join(appdir, desktop_name),
+    os.path.join(appdir, "usr", "share", "applications", desktop_name),
 ):
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(text)
@@ -134,9 +139,17 @@ fi
 
 APPIMAGE="$RELEASE_DIR/Click-n-Translate-$VERSION-linux-$ARCH.AppImage"
 rm -f "$APPIMAGE"
+# appimagetool asks appstreamcli to resolve every <url>, so a slow Telegram or
+# GitHub endpoint can make an otherwise reproducible local build fail. Validate
+# the complete metadata deterministically first, then tell appimagetool not to
+# repeat the same validation with network access.
+if command -v appstreamcli >/dev/null 2>&1; then
+    appstreamcli validate --no-net \
+        "$APPDIR/usr/share/metainfo/io.github.jabrailkhalil.clickntranslate.appdata.xml"
+fi
 # --appimage-extract-and-run keeps this working where FUSE is unavailable
 # (containers, WSL, some CI images).
-ARCH="$ARCH" "$APPIMAGETOOL" --appimage-extract-and-run "$APPDIR" "$APPIMAGE"
+ARCH="$ARCH" "$APPIMAGETOOL" --appimage-extract-and-run --no-appstream "$APPDIR" "$APPIMAGE"
 
 echo
 echo "Artifacts:"

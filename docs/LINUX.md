@@ -187,39 +187,79 @@ Three fixes came out of porting and apply to both systems:
   It now also scans the standard system locations and, failing that, trusts a
   binary that reports the language itself.
 
-## Verified so far
+## Verification matrix
 
-Checked in Ubuntu 22.04 (WSL2, headless):
+The port is checked in separate layers so a WSL-only success is not mistaken
+for a working Linux desktop build.
 
-* the packaged `ArgosWorker` translates offline (ru→en) with no torch and no
-  onnxruntime present,
-* the GUI binary starts, writes its portable `data/config.json`, and creates its
-  command socket with `0600` permissions,
-* a second launch with `--ocr` or `--translate` delivers the command to the
-  running instance and exits,
-* Tesseract 4.1.1 is detected from `PATH` and `--list-langs` reports the
-  installed languages,
-* **the AppImage runs** (157 MB): it starts, keeps its data in
-  `~/.local/share/clickntranslate` because the AppImage mount is read-only, and
-  accepts a shortcut command from a second launch,
-* the test suite passes: 375 passed, 29 skipped on Linux; 393 passed,
-  11 skipped on Windows,
-* the functional sweep passes: 51 checks on Linux, 34 on Windows, no failures.
+### WSL2 / Ubuntu 22.04
 
-Past the first run (the welcome dialog is modal and needs a person to dismiss
-it), a headless run also shows:
+* the complete unit and integration suites run on Python 3.10 and Windows;
+* all live translation providers respond, and packaged Argos translates
+  ru→en offline without pulling torch into the build;
+* Tesseract recognizes the English and Russian reference images with full text
+  similarity;
+* packaged RapidOCR recognizes the reference image through `OcrWorker`;
+* all seven single-instance commands, including show/hide, are delivered
+  through the UNIX socket;
+* `wl-copy` keeps clipboard text after the writing process exits;
+* desktop entries, launcher actions, icons and autostart can be installed and
+  removed;
+* the tarball and AppImage build, their checksums match, and the AppImage accepts
+  commands from a second launch.
 
-* the `.desktop` entry and the converted PNG icon appearing in
-  `~/.local/share`, with `Exec` pointing at the running executable,
-* all three capture overlays constructed on the GUI thread — Qt only allows
-  widgets there, and X11 complains where Windows silently tolerated it,
-* `clickntranslate --translate` from a second launch logging
-  "Shortcut command received: translate" in the running instance, which then
-  opens the overlay.
+The packaged functional sweep covers the live providers, both installed
+Tesseract languages, packaged Argos/RapidOCR, capture selection, clipboard,
+desktop integration and every single-instance command.
 
-Not yet verified, because it needs a real desktop session: the actual pixels of
-a screen grab on X11 and Wayland, the tray icon, and the desktop shortcut
-bindings.
+WSLg itself does not provide a Screenshot portal to arbitrary test shells. That
+is an environment limitation, not treated as a successful Wayland test.
 
-On GNOME the tray icon needs the AppIndicator extension — the same requirement
-NormCap documents.
+### Linux X11 desktop
+
+A 1600×900 Xephyr desktop with openbox is used as an isolated, genuine X11
+display. The packaged application was verified to:
+
+* open its main window;
+* receive the desktop-bound Ctrl+Alt+O command from a second process;
+* capture the real 1600×900 root window and a 400×200 region;
+* display the selection overlay over the frozen screenshot rather than an
+  opaque black window;
+* load optional EasyOCR code in the frozen worker.
+
+### Linux Wayland desktop
+
+A nested Sway/wlroots compositor is run with its own D-Bus session, PipeWire and
+`xdg-desktop-portal-wlr`. This is a real Wayland protocol path, not an offscreen
+Qt mock. The packaged application was verified to:
+
+* run with Qt's `wayland` platform plugin on a 1280×720 output;
+* discover `org.freedesktop.portal.Screenshot`;
+* receive a 1280×720 screenshot directly from the portal;
+* receive `--show` and `--ocr` from a second process;
+* use that portal screenshot as the frozen OCR background and show the overlay.
+
+This run exposed and fixed two portal-only defects: the D-Bus response must use
+the exact `uint, QVariantMap` Qt slot signature, and the response listener must
+be connected before sending the request because wlroots can answer immediately.
+
+### Ubuntu 24.04 GNOME / Wayland VM
+
+The final AppImage is also tested in a dedicated Hyper-V Ubuntu 24.04 desktop,
+using its normal GNOME Wayland session and FUSE mount rather than extraction or
+an offscreen Qt backend. The release build was verified to:
+
+* start as a single portable AppImage and keep one application process;
+* show, hide and restore through the new `--toggle` command;
+* open OCR on the first invocation, switch the installed-language picker from
+  Russian to English, capture a real desktop region and recognize
+  `Hello world OCR test` exactly with system Tesseract;
+* discover both installed `eng` and `rus` data without loading the AppImage's
+  older bundled `libstdc++` into the system Tesseract process;
+* open the main language selector as a nine-row list with complete rows, the
+  application-coloured selection and a thin draggable scrollbar; all remaining
+  languages are reachable by dragging it.
+
+GNOME's first-use portal permission UI and AppIndicator availability still
+depend on the target distribution's desktop extensions; the application paths
+behind them are covered by the GNOME VM and the separate portal tests above.

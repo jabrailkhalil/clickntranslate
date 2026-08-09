@@ -14,6 +14,7 @@ Order of preference on Wayland:
 3. nothing: the caller gets a message explaining what to install.
 """
 
+import logging
 import os
 import shutil
 import subprocess
@@ -116,34 +117,87 @@ def capture_with_portal():
         # region selection afterwards.
         "interactive": False,
     }
-    reply = QtDBus.QDBusReply(interface.call("Screenshot", "", options))
-    if not reply.isValid():
-        raise CaptureError(f"The portal refused the screenshot request: {reply.error().message()}")
-
-    request_path = str(reply.value().path()) if hasattr(reply.value(), "path") else str(reply.value())
-    if not request_path:
-        raise CaptureError("The portal returned no request handle.")
-
     result = {"uri": "", "response": None}
     loop = QtCore.QEventLoop()
 
-    def on_response(response_code, results):
-        result["response"] = int(response_code)
-        try:
-            result["uri"] = str(results.get("uri", "") or "")
-        except AttributeError:
-            result["uri"] = ""
-        loop.quit()
+    class PortalResponseReceiver(QtCore.QObject):
+        """QtDBus requires a real QObject slot for signal delivery.
+
+        A plain nested Python function looks callable but QDBusConnection
+        rejects it at runtime.  Unit tests did not expose that distinction;
+        wlroots' real ``Response(uint, a{sv})`` signal does.
+        """
+
+        @QtCore.pyqtSlot("uint", "QVariantMap")
+        def receive(self, response_code, results):
+            result["response"] = int(response_code)
+            try:
+                result["uri"] = str(results.get("uri", "") or "")
+            except AttributeError:
+                result["uri"] = ""
+            loop.quit()
+
+    receiver = PortalResponseReceiver()
+
+    # The portal is allowed to emit Response before the Screenshot method call
+    # itself returns.  Subscribe to the deterministic request path first or a
+    # fast compositor (wlroots is one) can finish the screenshot while nobody
+    # is listening, leaving the application to wait until the timeout.
+    sender = str(bus.baseService() or "").lstrip(":").replace(".", "_")
+    request_path = f"/org/freedesktop/portal/desktop/request/{sender}/{token}"
 
     connected = bus.connect(
         "org.freedesktop.portal.Desktop",
         request_path,
         "org.freedesktop.portal.Request",
         "Response",
-        on_response,
+        receiver.receive,
     )
     if not connected:
         raise CaptureError("Could not listen for the portal response.")
+
+    reply = QtDBus.QDBusReply(interface.call("Screenshot", "", options))
+    if not reply.isValid():
+        bus.disconnect(
+            "org.freedesktop.portal.Desktop",
+            request_path,
+            "org.freedesktop.portal.Request",
+            "Response",
+            receiver.receive,
+        )
+        raise CaptureError(f"The portal refused the screenshot request: {reply.error().message()}")
+
+    returned_path = (
+        str(reply.value().path()) if hasattr(reply.value(), "path") else str(reply.value())
+    )
+    if not returned_path:
+        bus.disconnect(
+            "org.freedesktop.portal.Desktop",
+            request_path,
+            "org.freedesktop.portal.Request",
+            "Response",
+            receiver.receive,
+        )
+        raise CaptureError("The portal returned no request handle.")
+    if returned_path != request_path:
+        # This should not happen for a valid handle_token, but keep unusual
+        # portal implementations usable when their response is not immediate.
+        bus.disconnect(
+            "org.freedesktop.portal.Desktop",
+            request_path,
+            "org.freedesktop.portal.Request",
+            "Response",
+            receiver.receive,
+        )
+        request_path = returned_path
+        if not bus.connect(
+            "org.freedesktop.portal.Desktop",
+            request_path,
+            "org.freedesktop.portal.Request",
+            "Response",
+            receiver.receive,
+        ):
+            raise CaptureError("Could not listen for the portal response.")
 
     timer = QtCore.QTimer()
     timer.setSingleShot(True)
@@ -158,7 +212,7 @@ def capture_with_portal():
             request_path,
             "org.freedesktop.portal.Request",
             "Response",
-            on_response,
+            receiver.receive,
         )
 
     if result["response"] is None:
@@ -201,6 +255,7 @@ def capture_with_helper(helper=None):
                 capture_output=True,
                 text=True,
                 timeout=_HELPER_TIMEOUT,
+                env=platform_support.system_subprocess_env(),
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             errors.append(f"{name}: {exc}")
@@ -260,18 +315,79 @@ def _desktop_width(screen):
     return max(right_edges) if right_edges else screen.geometry().width()
 
 
+def looks_blank(pixmap):
+    """Whether a grab came back as a single flat black (or empty) image.
+
+    An X11 client on an Xwayland session gets a root window with nothing in it:
+    the grab succeeds, reports the full screen size, and every pixel is black,
+    because each application is its own Wayland surface. Handing that on as a
+    screenshot sends an empty image to OCR, which then reports "no text found" —
+    a wrong answer to the wrong question. Only black counts, so a desktop with a
+    plain coloured background is not mistaken for a failure.
+    """
+    if pixmap is None or pixmap.isNull():
+        return True
+    image = pixmap.toImage()
+    if image.isNull() or image.width() < 2 or image.height() < 2:
+        return True
+    step_x = max(1, image.width() // 24)
+    step_y = max(1, image.height() // 24)
+    for y in range(0, image.height(), step_y):
+        for x in range(0, image.width(), step_x):
+            if (image.pixel(x, y) & 0xFFFFFF) != 0x000000:
+                return False
+    return True
+
+
+def qt_platform_name():
+    """The windowing system Qt actually connected to, not what the environment
+    advertises."""
+    try:
+        from PyQt5.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        return str(app.platformName()) if app is not None else ""
+    except Exception:
+        return ""
+
+
 def grab_screen(screen):
     """Full-screen pixmap for `screen`, using the best available backend.
 
-    Raises CaptureError when Wayland blocks the capture and no portal or helper
-    can stand in.
+    Raises CaptureError when nothing on this system can produce a screenshot.
     """
     from PyQt5 import QtGui
 
-    if not platform_support.IS_LINUX or not platform_support.is_wayland():
+    if not platform_support.IS_LINUX:
         return screen.grabWindow(0)
 
     errors = []
+    # Ask Qt what it is running on rather than trusting the environment. A
+    # session can export WAYLAND_DISPLAY while this process is an ordinary X11
+    # client — every Xwayland app is, and so is anything started on a nested X
+    # server from a Wayland login. Reading the environment alone sent those to
+    # the portal, which is not there, and capture failed on a display where the
+    # plain X11 grab works perfectly.
+    blank_x11 = False
+    blank_pixmap = None
+    platform_name = qt_platform_name()
+    logging.info(
+        "Screen capture: qt platform=%s, session=%s, portal=%s",
+        platform_name or "unknown",
+        platform_support.linux_session_type() or "unknown",
+        portal_available(),
+    )
+    if platform_name == "xcb":
+        pixmap = screen.grabWindow(0)
+        if not looks_blank(pixmap):
+            logging.info("Screen capture: used the X11 root grab")
+            return pixmap
+        # A real Wayland compositor hands an X11 client an empty root. That is
+        # not a failure yet: the portal below is exactly for this case.
+        blank_x11 = True
+        blank_pixmap = pixmap
+        errors.append("the X11 screen grab came back empty")
+
     if portal_available():
         try:
             path = capture_with_portal()
@@ -297,7 +413,36 @@ def grab_screen(screen):
     except CaptureError as exc:
         errors.append(str(exc))
 
+    if blank_x11:
+        # An all-black grab has two causes and they are not distinguishable from
+        # here: an X11 client on a Wayland desktop reading an empty root, or a
+        # desktop that is simply black — no wallpaper, and this app hides itself
+        # before capturing. The portal above is the fix for the first; if it is
+        # not there, hand back what X11 gave us rather than refusing to capture a
+        # dark screen. OCR finding no text says the same thing without lying.
+        logging.warning(
+            "Screen capture: the X11 grab is entirely black. %s", blank_grab_message()
+        )
+        return blank_pixmap
     raise CaptureError(unavailable_message(errors))
+
+
+def blank_grab_message():
+    """Actionable message for an X11 grab that returned an empty screen."""
+    return (
+        "Screen capture returned an empty image. This happens when the desktop is "
+        f"Wayland and the app is running through Xwayland: only the compositor can read "
+        f"the screen. Install {_portal_package()} and log back in, or run an X11 session."
+    )
+
+
+def _portal_package():
+    desktop = platform_support.desktop_environment()
+    if desktop == "gnome":
+        return "xdg-desktop-portal-gnome"
+    if desktop == "kde":
+        return "xdg-desktop-portal-kde"
+    return "xdg-desktop-portal plus the backend for your desktop"
 
 
 def unavailable_message(errors=()):

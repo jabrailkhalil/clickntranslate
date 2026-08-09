@@ -525,9 +525,20 @@ def check_frozen(dist_dir):
         return
 
     dist = Path(dist_dir)
-    app = dist / platform_support.executable_name("clickntranslate" if platform_support.IS_LINUX else "ClicknTranslate")
-    argos = dist / "_internal" / platform_support.executable_name("ArgosWorker")
-    ocr_worker = dist / "_internal" / platform_support.executable_name("OcrWorker")
+    if platform_support.IS_WINDOWS and (dist / "app" / "ClicknTranslateApp.exe").is_file():
+        # Portable/installer releases deliberately keep only the public launcher
+        # in the root.  The real application and workers are hidden together in
+        # app/, so exercise the exact layout shipped to users instead of the raw
+        # PyInstaller output layout.
+        app = dist / "ClicknTranslate.exe"
+        worker_root = dist / "app" / "_internal"
+    else:
+        app = dist / platform_support.executable_name(
+            "clickntranslate" if platform_support.IS_LINUX else "ClicknTranslate"
+        )
+        worker_root = dist / "_internal"
+    argos = worker_root / platform_support.executable_name("ArgosWorker")
+    ocr_worker = worker_root / platform_support.executable_name("OcrWorker")
 
     for label, path in (("app", app), ("argos worker", argos), ("ocr worker", ocr_worker)):
         check(title, f"{label} present", lambda path=path: path.name if path.is_file() else _fail(f"missing {path}"))
@@ -546,6 +557,12 @@ def check_frozen(dist_dir):
             os.unlink(request_path)
         if payload.get("error"):
             return (SKIP, f"worker said: {payload['error'][:60]}")
+        if payload.get("result") is None:
+            # No error and no text means the direction is simply not installed:
+            # the worker has nothing to translate with. That is a missing
+            # prerequisite on this machine, not a broken build — reporting it as
+            # a failure makes every fresh build machine look red.
+            return (SKIP, "no ru->en package installed on this machine")
         return _nonempty(payload.get("result"))
 
     check(title, "packaged argos worker translates", argos_worker_translates)

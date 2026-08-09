@@ -319,6 +319,19 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
+
+_QT_ICON_CACHE = {}
+
+
+def _cached_qt_icon(relative_path):
+    """Load immutable UI icons once instead of decoding them per overlay."""
+    normalized_path = str(relative_path or "").replace("\\", "/")
+    icon = _QT_ICON_CACHE.get(normalized_path)
+    if icon is None:
+        icon = QtGui.QIcon(resource_path(normalized_path))
+        _QT_ICON_CACHE[normalized_path] = icon
+    return icon
+
 def get_app_dir():
     if hasattr(sys, '_MEIPASS'):
         return sys._MEIPASS
@@ -604,8 +617,28 @@ def _tesseract_psm_order(width, height):
         psm_order = [6, 7, 8, 13, 11]
     return psm_order
 
+
+def _configure_pytesseract_system_environment(pytesseract):
+    """Make pytesseract launch the distro binary outside the AppImage runtime."""
+    if not platform_support.IS_LINUX:
+        return
+    module = pytesseract.pytesseract
+    original = getattr(module, "subprocess_args", None)
+    if not callable(original) or getattr(original, "_clickntranslate_system_env", False) is True:
+        return
+
+    def subprocess_args(*args, **kwargs):
+        result = original(*args, **kwargs)
+        result["env"] = platform_support.system_subprocess_env()
+        return result
+
+    subprocess_args._clickntranslate_system_env = True
+    module.subprocess_args = subprocess_args
+
 def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None):
     import pytesseract
+
+    _configure_pytesseract_system_environment(pytesseract)
 
     if pil_image is None:
         return ""
@@ -1568,6 +1601,7 @@ def _tesseract_reported_languages(tess_cmd):
             capture_output=True,
             text=True,
             timeout=15,
+            env=platform_support.system_subprocess_env(),
             **platform_support.no_window_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -3250,7 +3284,7 @@ class ScreenCaptureOverlay(QWidget):
     def __init__(self, mode="ocr", defer_show=False):
         super().__init__()
         # Устанавливаем иконку приложения
-        self.setWindowIcon(QtGui.QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(_cached_qt_icon("icons/icon.ico"))
         
         self.mode = mode
         self.start_point = None
@@ -3310,7 +3344,7 @@ class ScreenCaptureOverlay(QWidget):
                 if language.code not in available_source_codes:
                     continue
                 self.lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -3320,7 +3354,7 @@ class ScreenCaptureOverlay(QWidget):
                 if language.code not in available_source_codes:
                     continue
                 self.lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -3342,7 +3376,7 @@ class ScreenCaptureOverlay(QWidget):
                 if language.code not in available_source_codes:
                     continue
                 self.lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -3487,7 +3521,7 @@ class ScreenCaptureOverlay(QWidget):
                 if language.code not in target_codes:
                     continue
                 self.target_lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -3523,7 +3557,7 @@ class ScreenCaptureOverlay(QWidget):
                 if language.code not in available_codes:
                     continue
                 self.lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -3583,13 +3617,27 @@ class ScreenCaptureOverlay(QWidget):
         cursor_pos = QtGui.QCursor.pos()
         return QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
 
+    def _freeze_required(self):
+        """Whether the overlay must paint a screenshot instead of being see-through.
+
+        A translucent window only looks translucent where a compositing manager
+        is running. GNOME and KDE composite; openbox, i3 and a plain XFCE do not,
+        and there the selection overlay comes out solid black — the user drags a
+        box across a black screen. Flameshot and NormCap both sidestep this by
+        selecting on a frozen screenshot, so Linux does the same here whatever
+        the setting says. Windows composites always and keeps the setting.
+        """
+        if platform_support.IS_LINUX:
+            return True
+        return bool(self._freeze_screen_on_ocr)
+
     def _capture_frozen_background(self, screen_rect):
         session_id = getattr(self, "_session_id", "unknown")
-        if not self._freeze_screen_on_ocr or screen_rect.isNull():
+        if not self._freeze_required() or screen_rect.isNull():
             self._frozen_background = None
             self._frozen_background_rect = QtCore.QRect()
             logging.debug(
-                f"[OCR:{session_id}] Frozen background skipped; enabled={self._freeze_screen_on_ocr}, "
+                f"[OCR:{session_id}] Frozen background skipped; required={self._freeze_required()}, "
                 f"screen_rect=({_rect_to_text(screen_rect)})"
             )
             return
@@ -3713,6 +3761,15 @@ class ScreenCaptureOverlay(QWidget):
     def _force_topmost(self):
         """Keep the selection overlay above regular and topmost app windows."""
         try:
+            # Raising the parent while a native QComboBox popup is open steals
+            # focus from that popup on Windows. The list remains visible, but
+            # the clicked row is never committed. Delayed topmost retries run
+            # shortly after the overlay appears, exactly when a fast user opens
+            # the language list, so leave the already-topmost window alone until
+            # the popup closes.
+            for combo in (self.lang_combo, self.target_lang_combo):
+                if combo is not None and combo.view().isVisible():
+                    return
             self.raise_()
             if sys.platform == "win32":
                 hwnd = int(self.winId())
@@ -4990,12 +5047,32 @@ class ScreenCaptureOverlay(QWidget):
             msg.exec_()
             self.close()
 
+def _is_gui_thread():
+    app = QApplication.instance()
+    return app is not None and QtCore.QThread.currentThread() == app.thread()
+
+
 def prepare_overlay(mode="ocr"):
+    """Cache an overlay without ever constructing QWidget objects off-thread."""
+    if not _is_gui_thread():
+        logging.warning(
+            "Skipped OCR overlay preparation outside QApplication's GUI thread; "
+            "the overlay will be prepared by the queued GUI callback or lazily on first use"
+        )
+        return False
     try:
-        if mode not in _OVERLAY_POOL or _OVERLAY_POOL[mode] is None:
+        cached = _OVERLAY_POOL.get(mode)
+        if cached is not None and cached.thread() != QApplication.instance().thread():
+            logging.warning(f"Discarding {mode} OCR overlay with invalid thread affinity")
+            _OVERLAY_POOL[mode] = None
+            cached = None
+        if cached is None:
             _OVERLAY_POOL[mode] = ScreenCaptureOverlay(mode, defer_show=True)
+        return True
     except Exception:
         _OVERLAY_POOL[mode] = None
+        logging.exception(f"Could not prepare {mode} OCR overlay")
+        return False
 
 def _safe_prepare_overlay(mode="ocr"):
     """Безопасная подготовка оверлея — вызывается отложенно после closeEvent."""
@@ -5039,6 +5116,11 @@ def get_or_show_overlay(mode="ocr"):
     
     # Создаем или показываем оверлей
     ov = _OVERLAY_POOL.get(mode)
+    app = QApplication.instance()
+    if ov is not None and app is not None and ov.thread() != app.thread():
+        logging.warning(f"Ignoring cached {mode} OCR overlay created outside the GUI thread")
+        _OVERLAY_POOL[mode] = None
+        ov = None
     if ov is None:
         ov = ScreenCaptureOverlay(mode, defer_show=False)
     else:
@@ -5215,6 +5297,8 @@ class FullScreenOCRWorker(QtCore.QThread):
     def run(self):
         lines_data = []
         try:
+            if self.isInterruptionRequested():
+                return
             if not _WINRT_AVAILABLE:
                 logging.error("FullScreenOCR: WinRT not available")
                 self.result_ready.emit([])
@@ -5235,6 +5319,9 @@ class FullScreenOCRWorker(QtCore.QThread):
             finally:
                 loop.close()
 
+            if self.isInterruptionRequested():
+                return
+
             logging.info(f"FullScreenOCR: recognized={recognized}")
             if recognized:
                 for line in recognized.lines:
@@ -5254,7 +5341,8 @@ class FullScreenOCRWorker(QtCore.QThread):
             import traceback
             traceback.print_exc()
 
-        self.result_ready.emit(lines_data)
+        if not self.isInterruptionRequested():
+            self.result_ready.emit(lines_data)
 
 
 class FullScreenTranslateOverlay(QWidget):
@@ -5274,6 +5362,7 @@ class FullScreenTranslateOverlay(QWidget):
         self._lines_data = []
         self.ocr_worker = None
         self._ocr_workers = set()
+        self._pending_translation_pair = None
         self._translation_run_id = 0
         self._is_dragging = False
         self._drag_offset = QtCore.QPoint()
@@ -5323,7 +5412,7 @@ class FullScreenTranslateOverlay(QWidget):
             if language.code not in available_sources:
                 continue
             self.lang_combo.addItem(
-                QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                _cached_qt_icon(language_icon_path(language.code)),
                 language.short_label,
                 language.code,
             )
@@ -5432,7 +5521,7 @@ class FullScreenTranslateOverlay(QWidget):
                 if language.code not in available_targets:
                     continue
                 self.target_lang_combo.addItem(
-                    QtGui.QIcon(resource_path(language_icon_path(language.code))),
+                    _cached_qt_icon(language_icon_path(language.code)),
                     language.short_label,
                     language.code,
                 )
@@ -5483,15 +5572,38 @@ class FullScreenTranslateOverlay(QWidget):
             return
         self.ocr_language = self.src_lang
         self._translation_run_id += 1
-        run_id = self._translation_run_id
         self.loading = True
         self.translated_blocks.clear()
         self.error_message = None
         self.update()
 
-        logging.info(f"FullScreenOverlay: starting OCR ({self.src_lang}->{self.tgt_lang})")
+        # Windows OCR cannot reliably process the same full-screen bitmap from
+        # several language workers at once. Keep only the newest requested pair
+        # and let the currently running native call finish; its result is already
+        # invalidated by translation_run_id and will be ignored.
+        self._pending_translation_pair = (self.src_lang, self.tgt_lang)
+        if self._ocr_workers:
+            logging.info(
+                f"FullScreenOverlay: queued latest OCR pair "
+                f"({self.src_lang}->{self.tgt_lang}); waiting for the active worker"
+            )
+            for worker in list(self._ocr_workers):
+                try:
+                    worker.requestInterruption()
+                except RuntimeError:
+                    pass
+            return
+        self._start_pending_fullscreen_ocr()
+
+    def _start_pending_fullscreen_ocr(self):
+        if self._ocr_workers or not self._pending_translation_pair:
+            return
+        source_code, target_code = self._pending_translation_pair
+        self._pending_translation_pair = None
+        run_id = self._translation_run_id
+        logging.info(f"FullScreenOverlay: starting OCR ({source_code}->{target_code})")
         try:
-            self._start_ocr(run_id, self.src_lang, self.tgt_lang)
+            self._start_ocr(run_id, source_code, target_code)
         except Exception:
             # Anything that stops the OCR worker from starting must surface as a
             # visible error.  Qt swallows slot exceptions through the app-wide
@@ -5545,6 +5657,8 @@ class FullScreenTranslateOverlay(QWidget):
         if worker is None:
             return
         self._ocr_workers.discard(worker)
+        if not self._ocr_workers and self._pending_translation_pair and self.isVisible():
+            QtCore.QTimer.singleShot(0, self._start_pending_fullscreen_ocr)
 
     def _on_ocr_complete(self, lines_data, run_id, source_code, target_code):
         if run_id != self._translation_run_id:
@@ -5941,6 +6055,7 @@ class FullScreenTranslateOverlay(QWidget):
         global _fullscreen_overlay_ref
         self._translation_run_id += 1
         self._rerun_timer.stop()
+        self._pending_translation_pair = None
         for worker in list(self._ocr_workers):
             try:
                 worker.requestInterruption()

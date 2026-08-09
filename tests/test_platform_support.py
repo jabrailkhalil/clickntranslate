@@ -61,6 +61,36 @@ class SubprocessFlagsTest(unittest.TestCase):
         else:
             self.assertEqual(kwargs, {})
 
+    def test_system_subprocess_environment_removes_only_bundled_linux_paths(self):
+        appdir = os.path.abspath(os.path.join(os.sep, "tmp", "clickntranslate.AppDir"))
+        bundled = os.path.join(appdir, "usr", "bin", "_internal")
+        system_path = os.path.abspath(os.path.join(os.sep, "opt", "user-libs"))
+        inherited = os.pathsep.join((bundled, system_path))
+        with mock.patch.object(platform_support, "IS_LINUX", True):
+            with mock.patch.dict(
+                os.environ,
+                {"APPDIR": appdir, "LD_LIBRARY_PATH": inherited, "DISPLAY": ":0"},
+                clear=True,
+            ):
+                child_env = platform_support.system_subprocess_env()
+                self.assertEqual(child_env["LD_LIBRARY_PATH"], system_path)
+                self.assertEqual(child_env["DISPLAY"], ":0")
+                self.assertEqual(os.environ["LD_LIBRARY_PATH"], inherited)
+
+    def test_system_subprocess_environment_drops_an_entire_bundled_value(self):
+        appdir = os.path.abspath(os.path.join(os.sep, "tmp", "clickntranslate.AppDir"))
+        bundled = os.path.join(appdir, "usr", "bin", "_internal")
+        with mock.patch.object(platform_support, "IS_LINUX", True):
+            with mock.patch.dict(
+                os.environ,
+                {"APPDIR": appdir, "LD_LIBRARY_PATH": bundled},
+                clear=True,
+            ):
+                self.assertNotIn(
+                    "LD_LIBRARY_PATH",
+                    platform_support.system_subprocess_env(),
+                )
+
 
 class XdgDirectoryTest(unittest.TestCase):
     def test_environment_override_is_used_when_absolute(self):
@@ -84,7 +114,7 @@ class ShortcutCommandTest(unittest.TestCase):
     def test_every_windows_hotkey_action_has_a_shortcut_action(self):
         self.assertEqual(
             set(platform_support.SHORTCUT_ACTIONS),
-            {"ocr", "copy", "translate", "fullscreen", "selection"},
+            {"ocr", "copy", "translate", "fullscreen", "selection", "toggle"},
         )
 
     def test_command_uses_the_appimage_path_when_running_from_one(self):

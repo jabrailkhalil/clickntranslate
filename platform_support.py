@@ -22,8 +22,8 @@ IS_LINUX = sys.platform.startswith("linux")
 IS_MAC = sys.platform == "darwin"
 
 #: Reverse-DNS identifier used for desktop entries, icons and the IPC socket.
-APP_ID = "io.github.jabrailkhalil.ClicknTranslate"
-DESKTOP_ENTRY_NAME = "clickntranslate.desktop"
+APP_ID = "io.github.jabrailkhalil.clickntranslate"
+DESKTOP_ENTRY_NAME = f"{APP_ID}.desktop"
 LINUX_BINARY_NAME = "clickntranslate"
 
 #: Suffix for bundled helper executables (ArgosWorker, OcrWorker, ...).
@@ -96,6 +96,81 @@ def no_window_kwargs():
     }
 
 
+def _path_is_inside(path, root):
+    """Whether *path* lives below *root*, tolerating different drives."""
+    if not path or not root:
+        return False
+    try:
+        path = os.path.normcase(os.path.abspath(path))
+        root = os.path.normcase(os.path.abspath(root))
+        return os.path.commonpath((path, root)) == root
+    except (OSError, ValueError):
+        return False
+
+
+def system_subprocess_env():
+    """Environment for commands supplied by the operating system.
+
+    PyInstaller has to prepend its private library directory to
+    ``LD_LIBRARY_PATH`` so the frozen application can load Python and Qt.  An
+    AppImage child inherits that value.  Passing it to a distro executable such
+    as Tesseract, gnome-screenshot, wl-copy or xclip can make the executable
+    load the AppImage's older ``libstdc++``/GTK stack and fail before ``main``.
+
+    Keep the desktop/session variables and any user paths, but remove entries
+    that point inside the frozen application.  The process environment itself
+    is never mutated, so bundled helpers continue to use their private runtime.
+    """
+    env = os.environ.copy()
+    if not IS_LINUX:
+        return env
+
+    bundled_roots = [
+        str(os.environ.get("APPDIR", "") or ""),
+        str(getattr(sys, "_MEIPASS", "") or ""),
+    ]
+    if getattr(sys, "frozen", False):
+        bundled_roots.append(os.path.dirname(os.path.abspath(sys.executable)))
+    bundled_roots = [root for root in bundled_roots if root]
+
+    for variable in (
+        "LD_LIBRARY_PATH",
+        "LIBRARY_PATH",
+        "PYTHONPATH",
+        "GI_TYPELIB_PATH",
+        "GTK_PATH",
+        "QT_PLUGIN_PATH",
+        "QML2_IMPORT_PATH",
+    ):
+        value = str(env.get(variable, "") or "")
+        if not value:
+            continue
+        entries = [entry for entry in value.split(os.pathsep) if entry]
+        entries = [
+            entry
+            for entry in entries
+            if not any(_path_is_inside(entry, root) for root in bundled_roots)
+        ]
+        if entries:
+            env[variable] = os.pathsep.join(entries)
+        else:
+            env.pop(variable, None)
+
+    preload = str(env.get("LD_PRELOAD", "") or "")
+    if preload:
+        entries = [entry for entry in preload.replace(":", " ").split() if entry]
+        entries = [
+            entry
+            for entry in entries
+            if not any(_path_is_inside(entry, root) for root in bundled_roots)
+        ]
+        if entries:
+            env["LD_PRELOAD"] = " ".join(entries)
+        else:
+            env.pop("LD_PRELOAD", None)
+    return env
+
+
 # --- XDG base directories -----------------------------------------------------
 
 
@@ -146,7 +221,7 @@ def is_appimage():
 
 #: Command line actions a desktop shortcut can invoke. These mirror the Windows
 #: hotkey actions, which Linux users bind themselves in their desktop settings.
-SHORTCUT_ACTIONS = ("ocr", "copy", "translate", "fullscreen", "selection")
+SHORTCUT_ACTIONS = ("ocr", "copy", "translate", "fullscreen", "selection", "toggle")
 
 
 def shortcut_command(action, executable=None):
@@ -196,6 +271,7 @@ def _copy_with_helper(text):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env=system_subprocess_env(),
                 # Detach so the helper keeps the selection after we exit.
                 start_new_session=True,
             )

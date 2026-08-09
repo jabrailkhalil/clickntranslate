@@ -28,9 +28,13 @@ venv/
 
 # Temporary files
 temp/
+/.tmp/
+/tools/data/
+/to gif/
 
 # Downloaded OCR engine
 ocr/tesseract/
+/ocr/
 
 # Downloaded local translator engines/models
 translators/

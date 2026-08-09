@@ -173,6 +173,22 @@ EASYOCR_PIP_PACKAGES = (
     "packaging==26.2",
     "lazy-loader==0.5",
 )
+# The tree above is resolved for the interpreter the Windows installer downloads
+# (3.13). A distribution's Python is whatever the distribution ships — 3.10 on
+# Ubuntu 22.04 — and most of those pins have no wheel for it, so the install died
+# with "No matching distribution found for scipy==1.18.0" before anything was
+# installed. For an interpreter we do not control, pin EasyOCR itself and leave
+# the rest to pip, which knows what fits that version. `--only-binary=:all:`
+# still applies, so it stays wheels-only.
+EASYOCR_PIP_PACKAGES_ANY_PYTHON = (
+    "easyocr==1.7.2",
+    "torch",
+    "torchvision",
+    "opencv-python-headless",
+    "numpy<3",
+)
+# The version the exact pin set was resolved against.
+EASYOCR_PINNED_PYTHON = (3, 13)
 
 TRANSLATOR_ENGINE_OPTIONS = (
     ("google", "Google", "online"),
@@ -329,6 +345,15 @@ def _populate_grouped_translator_combo(
     return engines_by_index
 
 
+class _DropDownProxyStyle(QtWidgets.QProxyStyle):
+    """Use a real scrollable list instead of the GTK menu-style popup."""
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QtWidgets.QStyle.SH_ComboBox_Popup:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
+
+
 class DropDownCombo(QComboBox):
     """Combo whose list opens under the field instead of on top of it.
 
@@ -340,11 +365,97 @@ class DropDownCombo(QComboBox):
 
     POPUP_GAP = 3
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # GTK's native menu popup ignores maxVisibleItems and adds large
+        # up/down scroller buttons.  A private proxy instance keeps the rest of
+        # the current Qt style while requesting the standard list popup, which
+        # honours the row limit and uses the styled scrollbar.
+        self._drop_down_style = _DropDownProxyStyle()
+        self._drop_down_style.setParent(self)
+        self.setStyle(self._drop_down_style)
+
+    def set_popup_background(self, colour):
+        """Colour for the frame Qt wraps the list in.
+
+        The list itself is styled through the combo's stylesheet, but the popup
+        is a window of its own: on Linux its frame keeps the platform default and
+        showed as white bands down both sides of the list. Windows never showed
+        it because the frame there ends up the same colour as the list.
+        """
+        self._popup_background = str(colour or "")
+        self._paint_popup_frame()
+
+    def _paint_popup_frame(self):
+        view = self.view()
+        popup = view.window() if view is not None else None
+        if popup is None or not getattr(self, "_popup_background", ""):
+            return
+        background = self._popup_background
+        dark = QtGui.QColor(background).lightness() < 128
+        text = "#f4f6fb" if dark else "#202124"
+        hover = "#33313b" if dark else "#e8e3ef"
+        track = "#17161c" if dark else "#f1eef5"
+        handle = "#7A5FA1" if dark else "#9b87b6"
+        handle_hover = "#9A7FC1" if dark else "#7A5FA1"
+        popup.setStyleSheet(f"background-color: {background};")
+        popup.setAutoFillBackground(True)
+        # The list is a top-level popup on Linux, so a parent selector such as
+        # ``QComboBox QAbstractItemView`` does not reliably reach it.  Style the
+        # view and its scrollbar directly: otherwise the proxy popup falls back
+        # to the desktop's blue selection and native scrollbar.
+        view.setStyleSheet(f"""
+            QAbstractItemView {{
+                background-color: {background};
+                color: {text};
+                border: none;
+                outline: none;
+                selection-background-color: #7A5FA1;
+                selection-color: #ffffff;
+            }}
+            QAbstractItemView::item {{
+                min-height: 24px;
+                padding: 3px 6px;
+            }}
+            QAbstractItemView::item:hover {{
+                background-color: {hover};
+                color: {text};
+            }}
+            QAbstractItemView::item:selected {{
+                background-color: #7A5FA1;
+                color: #ffffff;
+            }}
+            QScrollBar:vertical {{
+                background: {track};
+                width: 10px;
+                margin: 3px 2px;
+                border: none;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {handle};
+                min-height: 32px;
+                border: none;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background: {handle_hover}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0;
+                border: none;
+                background: transparent;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
+        """)
+
     def showPopup(self):
         super().showPopup()
+        self._paint_popup_frame()
         popup = self.view().window()
         if popup is None:
             return
+        self._cap_popup_to_visible_rows(popup)
         top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
         below = top_left.y() + self.height() + self.POPUP_GAP
         screen = self._available_screen_rect()
@@ -354,6 +465,39 @@ class DropDownCombo(QComboBox):
             below = above if above >= screen.top() else screen.bottom() - popup.height()
         x = min(top_left.x(), screen.right() - popup.width())
         popup.move(max(screen.left(), x), below)
+
+    def _cap_popup_to_visible_rows(self, popup):
+        """Enforce maxVisibleItems even on GTK/Qt styles that ignore it.
+
+        Qt documents that native popup styles may disregard maxVisibleItems.
+        That made the language list cover almost the whole desktop on Ubuntu
+        and left no scrollbar at all.  Measure the actual styled rows, cap the
+        popup window itself, and let the view expose its normal scrollbar.
+        """
+        view = self.view()
+        if not self.style().styleHint(QtWidgets.QStyle.SH_ComboBox_Popup, None, self):
+            # The standard list popup already honours maxVisibleItems exactly;
+            # resizing it again would shave a few pixels from its final row.
+            return
+        rows = self.model().rowCount()
+        visible_rows = max(1, min(rows, self.maxVisibleItems()))
+        if rows <= visible_rows:
+            return
+
+        fallback_height = max(24, view.fontMetrics().height() + 10)
+        content_height = 2 * view.frameWidth()
+        for row in range(visible_rows):
+            row_height = view.sizeHintForRow(row)
+            content_height += row_height if row_height > 0 else fallback_height
+
+        popup_chrome = max(0, popup.height() - view.height())
+        capped_height = content_height + popup_chrome
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        view.setMaximumHeight(content_height)
+        popup.setMaximumHeight(capped_height)
+        popup.resize(popup.width(), capped_height)
+        if popup.layout() is not None:
+            popup.layout().activate()
 
     def _available_screen_rect(self):
         handle = self.window().windowHandle()
@@ -1200,6 +1344,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "Copy history",
         "fullscreen_translate_label": "Fullscreen Translate:",
         "selection_translate_label": "Selection Translate:",
+        "toggle_window_hotkey_label": "Show / hide app:",
         "result_window_label": "Show window:",
         "result_window_mode_selection": "Text",
         "result_window_mode_area": "Area",
@@ -1280,6 +1425,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "История копирований",
         "fullscreen_translate_label": "Перевод всего экрана",
         "selection_translate_label": "Перевод выделенного текста",
+        "toggle_window_hotkey_label": "Свернуть / развернуть программу",
         "result_window_label": "Показывать окно:",
         "result_window_mode_selection": "Текст",
         "result_window_mode_area": "Зона",
@@ -1359,6 +1505,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "Historial de copias",
         "fullscreen_translate_label": "Traduccion de pantalla:",
         "selection_translate_label": "Traduccion de seleccion:",
+        "toggle_window_hotkey_label": "Mostrar / ocultar aplicacion:",
         "result_window_label": "Mostrar ventana:",
         "result_window_mode_selection": "Texto",
         "result_window_mode_area": "Área",
@@ -1438,6 +1585,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "Kopierverlauf",
         "fullscreen_translate_label": "Bildschirmubersetzung:",
         "selection_translate_label": "Auswahlubersetzung:",
+        "toggle_window_hotkey_label": "App anzeigen / ausblenden:",
         "result_window_label": "Fenster zeigen:",
         "result_window_mode_selection": "Text",
         "result_window_mode_area": "Zone",
@@ -1517,6 +1665,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "Historique des copies",
         "fullscreen_translate_label": "Traduction plein ecran :",
         "selection_translate_label": "Traduction de selection :",
+        "toggle_window_hotkey_label": "Afficher / masquer l'application :",
         "result_window_label": "Afficher fenêtre :",
         "result_window_mode_selection": "Texte",
         "result_window_mode_area": "Zone",
@@ -1596,6 +1745,7 @@ SETTINGS_TEXT = {
         "copy_history_button": "复制历史",
         "fullscreen_translate_label": "全屏翻译：",
         "selection_translate_label": "选中文本翻译：",
+        "toggle_window_hotkey_label": "显示 / 隐藏应用：",
         "result_window_label": "显示窗口：",
         "result_window_mode_selection": "文本",
         "result_window_mode_area": "区域",
@@ -6475,8 +6625,12 @@ class SettingsWindow(QWidget):
             pass
 
     def _apply_engine_combo_style(self, combo):
-        if combo is not None:
-            combo.setStyleSheet(self._engine_combo_style())
+        if combo is None:
+            return
+        combo.setStyleSheet(self._engine_combo_style())
+        if isinstance(combo, DropDownCombo):
+            dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
+            combo.set_popup_background("#20212a" if dark else "#ffffff")
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
@@ -6841,12 +6995,16 @@ class SettingsWindow(QWidget):
         self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
         saved_sel_hotkey = self.parent.config.get("translate_selection_hotkey", "")
         self.translate_selection_hotkey_input.setKeySequence(QKeySequence(saved_sel_hotkey))
+        self.toggle_window_hotkey_input = ClearableKeySequenceEdit()
+        saved_toggle_hotkey = self.parent.config.get("toggle_window_hotkey", "")
+        self.toggle_window_hotkey_input.setKeySequence(QKeySequence(saved_toggle_hotkey))
 
         hotkey_rows = (
             (settings_text(lang, "copy_hotkey_label"), self.copy_hotkey_input),
             (settings_text(lang, "translate_hotkey_label"), self.translate_hotkey_input),
             (settings_text(lang, "fullscreen_translate_label"), self.fullscreen_translate_hotkey_input),
             (settings_text(lang, "selection_translate_label"), self.translate_selection_hotkey_input),
+            (settings_text(lang, "toggle_window_hotkey_label"), self.toggle_window_hotkey_input),
         )
         self.hotkey_labels = []
         for row, (label_text, key_input) in enumerate(hotkey_rows):
@@ -6854,7 +7012,7 @@ class SettingsWindow(QWidget):
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             key_input.setObjectName("secondaryHotkeyInput")
-            key_input.setFixedHeight(40)
+            key_input.setFixedHeight(36)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             hotkey_grid.addWidget(label, row, 0)
             hotkey_grid.addWidget(key_input, row, 1)
@@ -6865,6 +7023,7 @@ class SettingsWindow(QWidget):
         self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
         self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
         self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
+        self.toggle_window_hotkey_input.keySequenceChanged.connect(self.save_toggle_window_hotkey)
 
         remove_label = QLabel(settings_text(lang, "remove_hotkey"))
         remove_label.setObjectName("secondaryHint")
@@ -6890,6 +7049,8 @@ class SettingsWindow(QWidget):
         hotkey_str = self.copy_hotkey_input.keySequence().toString()
         self.parent.config["copy_hotkey"] = hotkey_str
         self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
         # Перезапуск слушателя горячих клавиш для копирования
         if hasattr(self.parent, "copy_hotkey_thread") and self.parent.copy_hotkey_thread is not None:
             # Правильно останавливаем старый поток
@@ -6908,6 +7069,8 @@ class SettingsWindow(QWidget):
         hotkey_str = self.translate_hotkey_input.keySequence().toString()
         self.parent.config["translate_hotkey"] = hotkey_str
         self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
         if hasattr(self.parent, "translate_hotkey_thread") and self.parent.translate_hotkey_thread is not None:
             try:
                 self.parent.translate_hotkey_thread.stop()
@@ -6923,6 +7086,8 @@ class SettingsWindow(QWidget):
         hotkey_str = self.fullscreen_translate_hotkey_input.keySequence().toString()
         self.parent.config["fullscreen_translate_hotkey"] = hotkey_str
         self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
         if hasattr(self.parent, "fullscreen_translate_hotkey_thread") and self.parent.fullscreen_translate_hotkey_thread is not None:
             try:
                 self.parent.fullscreen_translate_hotkey_thread.stop()
@@ -6938,6 +7103,8 @@ class SettingsWindow(QWidget):
         hotkey_str = self.translate_selection_hotkey_input.keySequence().toString()
         self.parent.config["translate_selection_hotkey"] = hotkey_str
         self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
         if hasattr(self.parent, "translate_selection_hotkey_thread") and self.parent.translate_selection_hotkey_thread is not None:
             try:
                 self.parent.translate_selection_hotkey_thread.stop()
@@ -6948,6 +7115,28 @@ class SettingsWindow(QWidget):
         if hotkey_str:
             self.parent.translate_selection_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate_selection, hotkey_id=4)
             self.parent.translate_selection_hotkey_thread.start()
+
+    def save_toggle_window_hotkey(self):
+        hotkey_str = self.toggle_window_hotkey_input.keySequence().toString()
+        self.parent.config["toggle_window_hotkey"] = hotkey_str
+        self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
+        thread = getattr(self.parent, "toggle_window_hotkey_thread", None)
+        if thread is not None:
+            try:
+                thread.stop()
+                thread.join(timeout=0.5)
+            except Exception as exc:
+                print(f"Error stopping window toggle hotkey thread: {exc}")
+            self.parent.toggle_window_hotkey_thread = None
+        if hotkey_str:
+            self.parent.toggle_window_hotkey_thread = self.parent.HotkeyListenerThread(
+                hotkey_str,
+                self.parent.toggle_window_visibility,
+                hotkey_id=5,
+            )
+            self.parent.toggle_window_hotkey_thread.start()
 
     def back_from_hotkeys(self):
         self.init_ui()
@@ -9964,6 +10153,41 @@ finally {
         pip_entry = os.path.join(pip_wheel, "pip")
         return [python_exe, pip_entry]
 
+    @staticmethod
+    def _pip_target_python_version(pip_command):
+        """The Python version the packages will be installed for.
+
+        The command is either our downloaded interpreter or whichever python3
+        the system provides, and those need different requirement sets.
+        """
+        if not pip_command:
+            return (0, 0)
+        try:
+            completed = subprocess.run(
+                [pip_command[0], "-c", "import sys; print('%d %d' % sys.version_info[:2])"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=30,
+                **platform_support.no_window_kwargs(),
+            )
+            major, _, minor = (completed.stdout or "").strip().partition(" ")
+            return (int(major), int(minor))
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return (0, 0)
+
+    def _easyocr_requirements(self, pip_command):
+        version = self._pip_target_python_version(pip_command)
+        if version >= EASYOCR_PINNED_PYTHON:
+            return EASYOCR_PIP_PACKAGES
+        logger.info(
+            "EasyOCR: target Python %s is older than %s, installing with resolved "
+            "dependencies instead of the pinned tree",
+            ".".join(str(part) for part in version),
+            ".".join(str(part) for part in EASYOCR_PINNED_PYTHON),
+        )
+        return EASYOCR_PIP_PACKAGES_ANY_PYTHON
+
     def _prepare_engine_pip_command(
         self,
         temp_dir,
@@ -10325,7 +10549,7 @@ finally {
                 package_root,
                 "--extra-index-url",
                 EASYOCR_EXTRA_INDEX_URL,
-                *EASYOCR_PIP_PACKAGES,
+                *self._easyocr_requirements(pip_command),
             ]
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             process = subprocess.Popen(
@@ -11254,6 +11478,7 @@ finally {
             "no_screen_dimming": False,
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
             "translate_selection_hotkey": "Ctrl+Alt+Q",
+            "toggle_window_hotkey": "Ctrl+Alt+M",
             "result_window_hidden_modes": []
         }
         # Save to disk
