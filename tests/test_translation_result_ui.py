@@ -25,6 +25,10 @@ class _SelectionHarness:
     """Drives the real selection worker from DarkThemeApp without a full window."""
 
     launch_translate_selection = main.DarkThemeApp.launch_translate_selection
+    launch_translate_replace_selection = (
+        main.DarkThemeApp.launch_translate_replace_selection
+    )
+    _launch_translate_selection = main.DarkThemeApp._launch_translate_selection
 
     def __init__(self, config, interface_language="en"):
         self.config = {"interface_language": interface_language}
@@ -44,6 +48,9 @@ class _SelectionHarness:
         self.save_count += 1
 
     def _selected_text_translation_pair(self):
+        return "es", "en"
+
+    def _replace_selected_text_translation_pair(self):
         return "es", "en"
 
     def run_selection_worker(self, selected_text, translated_text):
@@ -196,6 +203,100 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertIn(
             main.TRANSLATION_RESULT_DIALOG_TEXT["en"]["copied"], harness.statuses
         )
+
+    def test_safe_selection_replacement_revalidates_then_pastes(self):
+        copied = []
+        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=42), \
+                mock.patch.object(platform_support, "copy_text",
+                                  side_effect=lambda value: copied.append(value) or True), \
+                mock.patch.object(main, "_clipboard_sequence_number", return_value=7), \
+                mock.patch.object(main, "_wait_for_clipboard_change", return_value=True), \
+                mock.patch.object(main, "simulate_copy") as simulate_copy, \
+                mock.patch.object(main, "simulate_paste") as simulate_paste, \
+                mock.patch.object(main.pyperclip, "paste", return_value="Hello world"), \
+                mock.patch.object(main.time, "sleep"):
+            success, reason = main.replace_selected_text_in_foreground(
+                "Hello world", "Привет, мир", 42
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(reason, "replaced")
+        self.assertEqual(copied[-1], "Привет, мир")
+        self.assertTrue(copied[0].startswith("__CLICKNTRANSLATE_SELECTION_"))
+        simulate_copy.assert_called_once_with()
+        simulate_paste.assert_called_once_with()
+
+    def test_selection_replacement_never_pastes_after_focus_changes(self):
+        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=99), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "simulate_paste") as paste:
+            success, reason = main.replace_selected_text_in_foreground(
+                "Hello", "Привет", 42
+            )
+
+        self.assertFalse(success)
+        self.assertEqual(reason, "focus_changed")
+        copy.assert_not_called()
+        paste.assert_not_called()
+
+    def test_selection_replacement_never_pastes_over_changed_text(self):
+        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=42), \
+                mock.patch.object(platform_support, "copy_text", return_value=True), \
+                mock.patch.object(main, "_clipboard_sequence_number", return_value=7), \
+                mock.patch.object(main, "_wait_for_clipboard_change", return_value=True), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main, "simulate_paste") as paste, \
+                mock.patch.object(main.pyperclip, "paste", return_value="Different text"):
+            success, reason = main.replace_selected_text_in_foreground(
+                "Hello", "Привет", 42
+            )
+
+        self.assertFalse(success)
+        self.assertEqual(reason, "selection_changed")
+        paste.assert_not_called()
+
+    def test_replace_hotkey_uses_one_history_entry_and_can_hide_dialog(self):
+        harness = _SelectionHarness({
+            "result_window_hidden_modes": ["selection"],
+        })
+        fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
+
+        def fake_thread(target=None, daemon=None, **_kwargs):
+            return SimpleNamespace(start=target)
+
+        with mock.patch.object(platform_support, "IS_LINUX", False), \
+                mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main.ctypes, "windll",
+                                  SimpleNamespace(user32=fake_user32), create=True), \
+                mock.patch.object(main.threading, "Thread", fake_thread), \
+                mock.patch.object(main.time, "sleep", lambda _seconds: None), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main.pyperclip, "paste", return_value="Hola mundo"), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=42), \
+                mock.patch.object(main, "replace_selected_text_in_foreground",
+                                  return_value=(True, "replaced")) as replace, \
+                mock.patch.object(translater, "translate_text", return_value="Hello world"), \
+                mock.patch.object(platform_support, "copy_text"), \
+                mock.patch.object(main, "save_copy_history") as history:
+            harness.launch_translate_replace_selection()
+
+        replace.assert_called_once_with("Hola mundo", "Hello world", 42)
+        history.assert_called_once_with("Hello world")
+        self.assertEqual(harness.shown_dialogs, [])
+        self.assertIn(main.ui_text("en", "selection_replaced"), harness.statuses)
+
+    def test_regular_selection_hotkey_never_attempts_replacement(self):
+        harness = _SelectionHarness({"result_window_hidden_modes": ["selection"]})
+
+        with mock.patch.object(
+            main, "replace_selected_text_in_foreground"
+        ) as replace:
+            harness.run_selection_worker("Hola mundo", "Hello world")
+
+        replace.assert_not_called()
 
     def test_unchecked_still_opens_the_result_window(self):
         harness = _SelectionHarness({"result_window_hidden_modes": []})

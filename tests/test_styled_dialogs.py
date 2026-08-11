@@ -114,6 +114,10 @@ def test_document_window_uses_the_shared_frameless_chrome():
     assert dialog.doc_minimize_button.objectName() == "docWindowButton"
     assert dialog.doc_close_button.objectName() == "docWindowClose"
     assert "QFrame#docWindowFrame" in dialog.styleSheet()
+    # Target/provider already have dedicated controls below. A second metadata
+    # sentence in the title bar was clipped and repeated both values.
+    assert not hasattr(dialog, "metadata_label")
+    assert not hasattr(dialog, "header_subtitle")
 
     dialog.close()
     owner.close()
@@ -167,6 +171,39 @@ def test_document_provider_list_groups_online_and_only_installed_offline(monkeyp
     assert not dialog.provider_combo.model().item(offline_header).isEnabled()
     assert dialog.provider_combo.currentData() == "argos"
     assert dialog.provider_combo.findData("hymt") == -1
+
+    dialog.close()
+    owner.close()
+
+
+def test_document_source_language_is_explicit_for_every_provider(monkeypatch):
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "Темная"
+    monkeypatch.setattr(
+        main.translater,
+        "argos_installed_translation_pairs_fast",
+        lambda: {("en", "ru")},
+    )
+    monkeypatch.setattr(main.translater, "hymt_installed", lambda: True)
+
+    dialog = main.DocumentTranslationDialog(owner)
+    app.processEvents()
+
+    for engine in ("google", "mymemory", "lingva", "libretranslate", "hymt"):
+        dialog._populate_provider_combo(engine)
+        dialog._refresh_document_provider_languages()
+        assert dialog.provider_combo.currentData() == engine
+        assert dialog.source_combo.findData("auto") == -1, engine
+        assert dialog.source_combo.currentData() in {
+            language.code for language in main.APP_LANGUAGES
+        }, engine
+
+    dialog._populate_provider_combo("argos")
+    dialog._refresh_document_provider_languages()
+    assert dialog.provider_combo.currentData() == "argos"
+    assert dialog.source_combo.findData("auto") == -1
 
     dialog.close()
     owner.close()

@@ -1640,3 +1640,238 @@ a disposable Inno AppId. It verifies the shipped 1.5.7 ZIP and new
 | `ClicknTranslate-Setup-v1.5.7-win64.exe` | 89600 | `5962954b918484f2793bb659dcc81455de861c43d4262a5b356dc913cd54510c` |
 | `Click-n-Translate-1.5.7-linux-x86_64.AppImage` | 273876160 | `794c86e08cb41a4c69eed082c72ffaeaa57818399c9e5fcdbb2a4c9299990846` |
 | `Click-n-Translate-1.5.7-linux-x86_64.tar.gz` | 271678168 | `64bda9af63dbee7426fcfddcf2266bf16327ff7da747af96caaee187ba588675` |
+
+---
+
+## 22. Release 1.5.8 — workflow and UI completion (2026-08-11)
+
+### 22.1 User-facing changes
+
+* Each hotkey mode can use its own remembered source/target language pair.
+* Windows can optionally replace selected text with its translation. Focus and
+  selection are rechecked before paste; unsafe cases fall back to copying.
+* The main text field now has a compact messenger-style send action and opens
+  the dedicated document workspace from its document icon.
+* The document workspace, onboarding guide, hotkey legend, dropdowns, and
+  settings layout were polished and fully localized.
+* Long-lived dialogs now resync both language and theme when reopened. This
+  includes the document workspace reopening correctly in the light theme.
+
+### 22.2 Final verification
+
+| Layer | Result |
+| --- | --- |
+| Windows source suite | 632 passed, 11 skipped, 8 subtests |
+| Linux source suite (WSL) | 609 passed, 34 skipped, 8 subtests |
+| Windows frozen functional sweep | 30 passed, 0 failed, 10 optional skips |
+| Linux frozen functional sweep | 52 passed, 0 failed, 7 optional skips |
+| Windows updater E2E | portable and installed 1.5.7 -> 1.5.8 passed |
+| Updater safety | user data preserved; locked OCR worker stopped; app restarted |
+| Portable ZIP layout | 4004 entries; one top-level folder; launchers/workers/icon present; no user data |
+| Linux AppImage | AppStream validation passed; extract-and-run stayed healthy for 15 seconds |
+
+The current WSL image does not contain `libfuse.so.2`, so direct AppImage FUSE
+mounting was not available there. The official `--appimage-extract-and-run`
+fallback started successfully; the frozen Linux functional sweep also passed.
+
+### 22.3 Final artifacts
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Click-n-Translate-1.5.8-windows-portable-x64.zip` | 204823199 | `E45175C40277345A803BBD68340D17B0AE70941D4AB054A007227B39BBEDA817` |
+| `Click-n-Translate-1.5.8-windows-x64-installer.exe` | 128503765 | `E9025E6788B6A5A0443CC8AA4E28B0B357DD1EEDF617C70AD9209600F8D9AFEA` |
+| `ClicknTranslate-Setup-v1.5.8-win64.exe` | 89600 | `93A61E198DBC3CE48B080917FA887D3EF87251195951440ADF95A9683D237835` |
+| `Click-n-Translate-1.5.8-linux-x86_64.AppImage` | 273962176 | `131FC838714F06464FA8EBC1623707556D9716C069148BBB6FF5C922F94C0C81` |
+| `Click-n-Translate-1.5.8-linux-x86_64.tar.gz` | 271609750 | `E16BD44E164C616C54B7222C0AB853D2076081CA1E8A5C6A5E97DBB732F3BE6E` |
+
+---
+
+## 20. The main window: measured, then rearranged
+
+The complaint was that it is overloaded and does not say where to start. Measured on the shipped
+layout (700x400, 350px of content):
+
+| block | height |
+| --- | --- |
+| hotkey language bar, with its own hint line | 59 |
+| source language, full width | 32 |
+| target language, full width | 32 |
+| **text box** | **56** |
+| Translate (outlined) | 39 |
+| shortcut legend, two rows | 47 |
+| Shadow mode (solid accent) | 35 |
+
+**126px of language pickers against 56px for the thing the window is for**, three near-identical
+purple rows competing at the top, and the only filled button on the screen was the one that sends
+the window away. Nothing pointed at the task.
+
+### 20.1 What changed
+
+* **One direction row.** Source and target sit side by side with an arrow, as a pair, instead of
+  two stacked full-width combos: 64px → 32px, and it reads as one setting.
+* **The hotkey bar moved below the Translate button**, under a divider. It was first, so the first
+  thing the eye met was the control you need least. Its hint sentence is the bar's tooltip now —
+  the mode combo already reads "Translate and replace · Ctrl+Shift+Q".
+* **The text box takes the freed space**: 56px → 103px, and it is now the tallest block.
+* **The button emphasis is the right way round.** Translate is filled in the accent; Shadow mode
+  is an outline. The outline colour follows the theme — light violet is invisible on white.
+* **The text box border was dark red** (`#550000`), which reads as an error around the box you are
+  meant to type in. It is a neutral hairline that turns accent on focus.
+
+### 20.2 Two things measurement caught that a screenshot would not
+
+* **The mode picker elided silently.** At a fixed 266px, German showed "Übersetzen und ersetzen ·
+  Ctrl+Shi". Adding a hand-computed margin for the stylesheet padding and the chevron was wrong
+  twice (44px, then 58px — still short). `_fit_hotkey_mode_combo()` asks Qt for
+  `sizeHint()` under `AdjustToContents` and runs from `apply_theme`, because the font the text is
+  measured with only exists once the theme is applied.
+* **One line of shortcut chips does not fit.** It looked plausible and drew five chips on top of
+  each other in Russian. Measured in all six languages: five chips plus the engine summary exceed
+  690px in every one of them, so the legend stays two rows.
+
+### 20.3 Testing this screen
+
+`tests/test_main_window_layout.py` builds the window and checks the order, the single direction
+row, the divider, that the text box is the tallest block, and that the legend keeps two rows. It
+stubs `WelcomeDialog`, the launch update check and the first-run guide — a modal dialog in a test
+run waits for a click that never comes.
+
+**Pixel assertions do not belong there.** The offscreen platform draws no text, so its metrics are
+fiction: it reports a 566px size hint for a combo that measures 305px on a real display. Anything
+that depends on text width is checked by `.tmp/check_one_language.py`, which builds the window on
+the real platform, one process per language, and reports what fits.
+
+### 20.4 The legend listed five of six hotkeys
+
+`translate_replace_selection_hotkey` (Ctrl+Shift+Q) is registered like the other five and works,
+but nothing on the main screen mentioned it — the legend read five settings and stopped. It has a
+chip now, under Window in the third column, with a short caption (`hotkey_replace`) in all six
+languages; the settings screen keeps the full "Translate and replace selection".
+
+`HotkeyLegendCoverageTest` compares the hotkeys read by the constructor against the ones read by
+`show_main_screen` and fails on any that are registered but not shown, so a seventh hotkey cannot
+be added and quietly left off the screen. It also fails if the constructor's list changes, which
+is what tells you to update the caption table.
+
+**Stop the app before running `tests/test_main_window_layout.py`.** A live instance owns the
+single-instance handshake, and the second window these tests build waits on it forever — the run
+looks like a hang with no failure.
+
+### 20.5 Four more items, reported together after the redesign: tooltips of two different colours, a separator sitting on
+top of the words, no keyboard way to translate, and content pressed against the window frame.
+
+### 20.6 Tooltips were purple in some places and black in others
+
+A widget with its own stylesheet resolves its tooltip against **that** sheet, so the app-wide
+`QToolTip` rule in `install_tooltip_style()` never reaches it and the platform draws its default:
+black, square corners. Every widget on the main window that both carries a tooltip and sets its own
+stylesheet now appends `TOOLTIP_QSS` — the six title-bar buttons through
+`styled_transparent_button_qss()`, plus the document button, the Translate button and the hotkey
+bar.
+
+The rounded corners needed a second thing. A top-level tooltip window paints its own background
+under the rounded border unless it is told not to, so `border-radius` produced a purple rounded
+rectangle on a black square. `styled_dialogs._RoundedTooltipFilter` watches for `QTipLabel` at
+Polish time and sets `WA_TranslucentBackground` / `WA_NoSystemBackground` on it.
+
+Checked with `.tmp/check_tooltips.py`, which shows each tooltip for real and reads its pixels:
+border colour, and the alpha of the corner pixel (0 = the corner is actually cut). All eight
+sampled tooltips report `purple=True translucent=True corner_alpha=0`. **The harness has to call
+`main.install_tooltip_style(app)`** — that is what `main()` does at startup, and without it the
+filter and the app-wide rule are simply not there, so everything looks black and the measurement
+is meaningless.
+
+### 20.7 The engine divider sat right next to the shortcut text
+
+Two separate causes, both measured with `.tmp/check_separator.py` (per language: clear space
+between the last chip and the panel's `border-left`, and the distance from that line to the text):
+
+1. The gap before the line was the grid's horizontal spacing (10) and the gap after it was the
+   panel's left margin (12 + 1px border = 13). Unequal, and the smaller one was on the side with
+   the shortcut text.
+2. `setColumnMinimumWidth(0, 160)` and `(1, 186)` were measured in English. French and Spanish
+   ("Remplacer", "Reemplazar") overflow them, so the third column was pushed past the divider —
+   in Spanish two chips ended up on the far side of the line. That is what "right next to the
+   words" looked like.
+
+The fixed column widths are gone; the columns take what their text needs. Both gaps are now 12
+(13 after, counting the border) in all six languages. The row had to be paid for: at 672px of
+content width Spanish needed 688, so the chips' `trailing_glyph_room` went 5 → 4, the keycap
+padding 5px → 4px, and the spacing 16 → 12. Measured slack after that, in px:
+en 7, ru 19, de 16, fr 15, es 9, zh 111.
+
+`.tmp/check_row_width.py` prints what the row needs against what it has, per language. Run it
+before touching any font, caption or padding in that row.
+
+### 20.8 Enter translates, Shift+Enter starts a new line
+
+`TranslateOnEnterTextEdit` (main.py) emits `translation_requested` on Return/Enter and falls
+through to Qt when Shift, Alt or Meta is held. Ctrl+Enter still translates, which is what the box
+did before. The translation result window is read-only and the document editor is for documents,
+so neither changed.
+
+The box's tooltip says so in all six languages ("Enter translates · Shift+Enter starts a new
+line"), because a keyboard behaviour nobody can see is a keyboard behaviour nobody uses.
+
+### 20.9 The content touched the frame
+
+`main_layout` margins were `(5, 45, 5, 5)`: 5px from every edge, and the first row 5px under a
+40px title bar. They are `(14, 52, 14, 14)` with spacing 8 — 14 all round, 12 under the title.
+
+The window is fixed at 700x400, so those 20 vertical pixels had to come from somewhere: the
+Translate button's padding 10px → 8px, Shadow mode's 6px → 5px, the hotkey bar's vertical margins
+4 → 3, and the layout spacing 9 → 8. The text box still ends up the tallest block on the screen
+(101px against a 96px minimum), which is the point of the redesign.
+
+`.tmp/check_edges.py` prints the margins, the gap under the title, the gap at the bottom and every
+block's distance from the right edge. `WindowEdgeTest` keeps the rule (sides equal, ≥12, and ≥8
+below the title bar) so the next height problem is not solved by taking the margins back.
+
+### 20.10 "Ruso → Inglés" at the top, "Inglés → Ruso" below
+
+The window carries two direction rows and said nothing about either. The one at
+the top belongs to the typed text; the one in the shortcut bar belongs to
+whichever mode the picker beside it is editing — and **each of the four modes
+keeps its own pair** (`ocr_translate_*`, `fullscreen_translate_from/to`,
+`selection_translate_*`, `replace_selection_*`). A window reading Russian to
+English at the top and English to Russian underneath looks broken; it is just
+two different settings with no label.
+
+`_direction_summary_text()` builds one line under the Translate button:
+
+    Typed text: Russian → English      ·      Shortcuts: Russian → English
+
+Modes sharing a direction are listed once, so the common case is one pair rather
+than four repetitions. When they differ, each group names its modes:
+
+    Typed text: RU → EN   ·   Shortcuts: RU → EN (OCR/Selection/Replace),  EN → RU (Fullscreen)
+
+`_refresh_direction_summary()` fits it to the window, dropping detail in this
+order: full names + mode names → **codes** + mode names → full names → codes.
+Which mode does what is the point of the line, so the spelling of "English" goes
+first. Measured on a real display, in 672px: 375px (en), 455 (ru), 331 (es), 380
+(de), 357 (fr), 300 (zh) when the modes agree; 596–605 when they do not.
+
+Two things to keep:
+
+* It reads the config directly through `_stored_hotkey_pair()`.
+  `_configured_hotkey_translation_pair()` inspects the installed OCR languages,
+  and this label redraws on every combo change. A test fails if the summary ever
+  reaches for `_available_hotkey_translation_pairs`.
+* It is refreshed from `_refresh_selection_pair_hint()` and
+  `_save_main_translation_languages()`, which is every path that can change
+  either pair. `.tmp/check_direction_live.py` drives the real combos and prints
+  the line after each change.
+
+The text box paid for the line: `setMinimumHeight` 96 → 72 (it renders at 77 and
+is still the tallest block).
+
+`tests/test_main_language_persistence.py` borrows `DarkThemeApp` methods onto a
+harness object — add any new method the pair setters call, or the harness raises
+where the app does not.
+
+The guide's `back_home` step used to say the main screen's pair was used by both
+selection hotkeys. That has not been true since the shortcut row went in, and it
+described the exact misconception this line exists to prevent. Corrected in all
+six languages, and its test now checks the shortcuts are described as carrying
+their own pair.

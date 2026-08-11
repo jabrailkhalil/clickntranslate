@@ -169,6 +169,15 @@ class LaunchPromptTest(unittest.TestCase):
             main.DarkThemeApp._on_launch_update_found(app, "10.0.0")
         self.assertTrue(box.called)
 
+    def test_manual_settings_update_owns_the_ui_without_a_second_prompt(self):
+        for marker in ("settings", "manual-flow"):
+            app = _App()
+            app.settings_window = object() if marker == "settings" else None
+            app._update_flow_active = marker == "manual-flow"
+            with mock.patch.object(main, "QMessageBox") as box:
+                main.DarkThemeApp._on_launch_update_found(app, "10.0.0")
+            box.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

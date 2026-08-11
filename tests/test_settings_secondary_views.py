@@ -32,7 +32,9 @@ class _SettingsParent(QWidget):
             "translate_hotkey": "Ctrl+Alt+T",
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
             "translate_selection_hotkey": "Ctrl+Alt+Q",
-            "toggle_window_hotkey": "Ctrl+Alt+M",
+            "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
+            "toggle_window_hotkey": "Ctrl+Shift+Space",
+            "hotkey_defaults_revision": 2,
             "copy_history": True,
             "history": True,
         }
@@ -108,7 +110,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         point = child.mapTo(widget, QPoint(0, 0))
         return point.x(), point.y(), child.width(), child.height()
 
-    def test_hotkeys_are_five_aligned_rows_inside_one_card(self):
+    def test_hotkeys_are_six_aligned_rows_inside_one_card(self):
         self.settings.show_hotkeys_screen()
         self.app.processEvents()
 
@@ -117,12 +119,13 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.translate_hotkey_input,
             self.settings.fullscreen_translate_hotkey_input,
             self.settings.translate_selection_hotkey_input,
+            self.settings.translate_replace_selection_hotkey_input,
             self.settings.toggle_window_hotkey_input,
         )
         input_rects = [self._rect_in(self.settings, field) for field in inputs]
         label_rects = [self._rect_in(self.settings, label) for label in self.settings.hotkey_labels]
 
-        self.assertEqual(len(label_rects), 5)
+        self.assertEqual(len(label_rects), 6)
         self.assertEqual({rect[0] for rect in input_rects}, {input_rects[0][0]})
         self.assertEqual({rect[2] for rect in input_rects}, {input_rects[0][2]})
         self.assertEqual({rect[3] for rect in input_rects}, {36})
@@ -130,7 +133,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.assertEqual(label_rect[1] + label_rect[3] // 2, input_rect[1] + input_rect[3] // 2)
         self.assertEqual(
             [field.keySequence().toString() for field in inputs],
-            ["Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q", "Ctrl+Alt+M"],
+            ["Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q", "Ctrl+Shift+Q", "Ctrl+Shift+Space"],
         )
         self.assertTrue(all(field.objectName() == "secondaryHotkeyInput" for field in inputs))
         self.assertEqual(self.settings.hotkey_back_button.objectName(), "secondaryBackButton")
@@ -140,7 +143,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.secondary_view_shell.height(),
         )
 
-    def test_reset_defaults_keep_all_five_hotkeys(self):
+    def test_reset_defaults_keep_all_six_hotkeys(self):
         class FakeMessageBox:
             Question = 1
             Warning = 2
@@ -189,7 +192,36 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(self.parent.config["translate_hotkey"], "Ctrl+Alt+T")
         self.assertEqual(self.parent.config["fullscreen_translate_hotkey"], "Ctrl+Alt+F")
         self.assertEqual(self.parent.config["translate_selection_hotkey"], "Ctrl+Alt+Q")
-        self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Alt+M")
+        self.assertEqual(self.parent.config["translate_replace_selection_hotkey"], "Ctrl+Shift+Q")
+        self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
+
+    def test_replace_selection_hotkey_restarts_its_own_listener(self):
+        self.settings.show_hotkeys_screen()
+        old_thread = mock.Mock()
+        new_thread = mock.Mock()
+        self.parent.translate_replace_selection_hotkey_thread = old_thread
+        self.parent.launch_translate_replace_selection = mock.Mock()
+        self.parent.HotkeyListenerThread = mock.Mock(return_value=new_thread)
+        field = self.settings.translate_replace_selection_hotkey_input
+        field.blockSignals(True)
+        field.setKeySequence(sw.QKeySequence("Ctrl+Shift+W"))
+        field.blockSignals(False)
+
+        with mock.patch.object(sw.platform_support, "IS_LINUX", False):
+            self.settings.save_translate_replace_selection_hotkey()
+
+        self.assertEqual(
+            self.parent.config["translate_replace_selection_hotkey"],
+            "Ctrl+Shift+W",
+        )
+        old_thread.stop.assert_called_once_with()
+        old_thread.join.assert_called_once_with(timeout=0.5)
+        self.parent.HotkeyListenerThread.assert_called_once_with(
+            "Ctrl+Shift+W",
+            self.parent.launch_translate_replace_selection,
+            hotkey_id=6,
+        )
+        new_thread.start.assert_called_once_with()
 
     def test_translation_history_uses_styled_records_and_balanced_footer(self):
         self.settings.show_history_view()

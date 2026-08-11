@@ -2,7 +2,7 @@ param(
     [string]$IdentityName = "JabrailDigital.ClicknTranslate.Test",
     [string]$Publisher = "CN=Jabrail Digital Test",
     [string]$PublisherDisplayName = "Jabrail Digital",
-    [string]$Version = "1.5.7.0",
+    [string]$Version = "1.5.8.0",
     [string]$BuildPath = "",
     [string]$OutputPath = "",
     [string]$CertificatePath = "",

@@ -26,6 +26,11 @@
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
+    <release version="1.5.8" date="2026-08-10">
+      <description>
+        <p>Safer selected-text translation controls and cross-platform refinements.</p>
+      </description>
+    </release>
     <release version="1.5.7" date="2026-08-10">
       <description>
         <p>Faster OCR startup, reliable system OCR discovery, and window toggle shortcuts.</p>

@@ -237,14 +237,7 @@ class DropDownPlacementTest(unittest.TestCase):
 
 
 class DropDownFrameTest(unittest.TestCase):
-    """The fields have no outline, on purpose.
-
-    A hairline never rendered evenly: at fractional display scaling a 1px border
-    is 2.5 device pixels, so Qt lit two rows fully and a third at half strength
-    and one edge came out thicker and softer than the rest. The window is a
-    fixed size, so the field could not be given room to fix it either. The field
-    now reads from its own darker fill, and hover/focus change that fill.
-    """
+    """Selectors stay visible on both bright and dark backgrounds."""
 
     @classmethod
     def setUpClass(cls):
@@ -259,17 +252,17 @@ class DropDownFrameTest(unittest.TestCase):
         self.app.processEvents()
         return parent, settings
 
-    def test_no_visible_border_is_styled(self):
-        parent, settings = self._settings()
-        try:
-            field_rule = settings._engine_combo_style().split("QComboBox::drop-down")[0]
-            self.assertIn("border: 1px solid transparent", field_rule)
-            # A coloured border in any state is the thing that looked crooked.
-            self.assertNotIn("solid #", field_rule)
-        finally:
-            settings.close()
-            parent.close()
-            self.app.processEvents()
+    def test_a_subtle_visible_border_is_styled_in_both_themes(self):
+        for theme, expected in (("Темная", "#3d3948"), ("Светлая", "#d7cde7")):
+            parent, settings = self._settings(theme)
+            try:
+                field_rule = settings._engine_combo_style().split("QComboBox:hover")[0]
+                self.assertIn(f"border: 1px solid {expected}", field_rule)
+                self.assertNotIn("solid transparent", field_rule)
+            finally:
+                settings.close()
+                parent.close()
+                self.app.processEvents()
 
     def test_nothing_paints_a_frame_any_more(self):
         parent, settings = self._settings()
@@ -283,20 +276,17 @@ class DropDownFrameTest(unittest.TestCase):
             parent.close()
             self.app.processEvents()
 
-    def test_the_field_is_one_flat_colour_to_its_edges(self):
-        """No stroke means the first row of pixels matches the middle."""
-        for theme in ("Темная", "Светлая"):
-            parent, settings = self._settings(theme)
-            try:
-                image = settings.translator_combo.grab().toImage()
-                middle_x = image.width() // 2
-                fill = image.pixel(middle_x, image.height() // 2) & 0xFFFFFF
-                for y in (0, 1, image.height() - 2, image.height() - 1):
-                    self.assertEqual(image.pixel(middle_x, y) & 0xFFFFFF, fill, (theme, y))
-            finally:
-                settings.close()
-                parent.close()
-                self.app.processEvents()
+    def test_light_field_has_a_tinted_surface_and_focus_outline(self):
+        parent, settings = self._settings("Светлая")
+        try:
+            style = settings._engine_combo_style()
+            self.assertIn("background-color: #f6f3fa", style)
+            self.assertIn("border-color: #8063a8", style)
+            self.assertIn("border-radius: 7px", style)
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
 
     def test_opening_the_list_lifts_the_fill_instead(self):
         parent, settings = self._settings()
@@ -320,6 +310,24 @@ class DropDownFrameTest(unittest.TestCase):
             self.app.processEvents()
 
             self.assertNotEqual(closed_fill, opened_fill, "an open list must be visible somehow")
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_rebuilding_settings_hides_the_old_page_immediately(self):
+        parent, settings = self._settings()
+        try:
+            old_widgets = [
+                settings.autostart_checkbox,
+                settings.ocr_engine_combo,
+                settings.clear_cache_btn,
+            ]
+            self.assertTrue(all(not widget.isHidden() for widget in old_widgets))
+
+            settings.clear_main_layout()
+
+            self.assertTrue(all(widget.isHidden() for widget in old_widgets))
         finally:
             settings.close()
             parent.close()

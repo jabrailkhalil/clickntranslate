@@ -92,6 +92,8 @@ class GuideCoverageTest(unittest.TestCase):
                         for word in row.split() if len(word) > 4),
                     (lang, mode, row),
                 )
+            replacement = settings_text(lang, "replace_selection_translate_label")
+            self.assertIn(_normalise(replacement), guide, (lang, replacement))
 
     def test_unticked_does_not_read_as_no_translation(self):
         """The setting only chooses where the result goes, and the guide has to
@@ -120,6 +122,53 @@ class GuideCoverageTest(unittest.TestCase):
             self.assertEqual(
                 html.count("<span class='item-title'>"), html.count("</span>"), lang
             )
+
+    def test_document_guide_covers_every_entry_point_and_partial_translation(self):
+        fragment_clues = {
+            "en": "fragment",
+            "ru": "фрагмент",
+            "es": "fragmento",
+            "de": "abschnitt",
+            "fr": "passage",
+            "zh": "片段",
+        }
+        icon_clues = {
+            "en": "icon",
+            "ru": "значок",
+            "es": "icono",
+            "de": "symbol",
+            "fr": "icône",
+            "zh": "图标",
+        }
+        for lang in LANGUAGES:
+            section = "\n".join(
+                item
+                for _title, items in main.DOCUMENT_HELP_CONTENT[lang]
+                for item in items
+            ).lower()
+            self.assertIn(".docx", section, lang)
+            self.assertIn("ctrl+o", section, lang)
+            self.assertIn(fragment_clues[lang], section, lang)
+            self.assertIn(icon_clues[lang], section, lang)
+
+    def test_hotkey_guide_explains_hover_replace_and_rebinding(self):
+        hover_clues = {
+            "en": "hover",
+            "ru": "наведите",
+            "es": "ratón",
+            "de": "zeigen",
+            "fr": "survolez",
+            "zh": "悬停",
+        }
+        for lang in LANGUAGES:
+            faq = _guide_text(lang).lower()
+            tour = "\n".join(
+                body for _action, _title, body in main.guide_text(lang)["steps"]
+            ).lower()
+            self.assertIn(hover_clues[lang], faq, lang)
+            self.assertIn("ctrl+alt+q", tour, lang)
+            self.assertIn("ctrl+shift+q", tour, lang)
+            self.assertIn("esc", faq, lang)
 
 
 if __name__ == "__main__":

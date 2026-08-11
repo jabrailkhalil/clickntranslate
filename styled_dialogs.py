@@ -51,11 +51,42 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 
+class _RoundedTooltipFilter(QtCore.QObject):
+    """Makes the rounded corners in TOOLTIP_QSS actually round.
+
+    `border-radius` only rounds what Qt paints. The tooltip is a window of its
+    own with square edges, so each corner kept a square of the window's own
+    background — the sharp black corners you see against the rounded purple
+    frame. A translucent background lets the corners show what is behind them.
+    """
+
+    def eventFilter(self, watched, event):
+        if event.type() == QtCore.QEvent.Polish and _is_tooltip(watched):
+            watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+            watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
+        return False
+
+
+def _is_tooltip(widget) -> bool:
+    try:
+        return widget.metaObject().className() == "QTipLabel"
+    except Exception:
+        return False
+
+
+_TOOLTIP_FILTER = None
+
+
 def install_tooltip_style(app=None) -> None:
     """Apply the shared tooltip look to every window, including unstyled ones."""
+    global _TOOLTIP_FILTER
+
     app = app or QtWidgets.QApplication.instance()
     if app is None:
         return
+    if _TOOLTIP_FILTER is None:
+        _TOOLTIP_FILTER = _RoundedTooltipFilter(app)
+        app.installEventFilter(_TOOLTIP_FILTER)
     existing = app.styleSheet() or ""
     if "QToolTip" in existing:
         return

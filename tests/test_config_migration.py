@@ -21,16 +21,51 @@ def test_old_config_receives_all_new_default_hotkeys():
 
     assert migrated["fullscreen_translate_hotkey"] == "Ctrl+Alt+F"
     assert migrated["translate_selection_hotkey"] == "Ctrl+Alt+Q"
-    assert migrated["toggle_window_hotkey"] == "Ctrl+Alt+M"
+    assert migrated["translate_replace_selection_hotkey"] == "Ctrl+Shift+Q"
+    assert migrated["toggle_window_hotkey"] == "Ctrl+Shift+Space"
     assert "fullscreen_translate_hotkey" in missing
     assert "translate_selection_hotkey" in missing
+    assert "translate_replace_selection_hotkey" in missing
     assert "toggle_window_hotkey" in missing
+
+
+def test_old_shared_language_pairs_are_migrated_to_each_hotkey_mode():
+    migrated, missing = main.merge_config_defaults({
+        "main_translation_source_language": "de",
+        "main_translation_target_language": "fr",
+        "ocr_translate_source_language": "zh",
+        "ocr_translate_target_language": "en",
+    })
+
+    assert migrated["selection_translate_source_language"] == "de"
+    assert migrated["selection_translate_target_language"] == "fr"
+    assert migrated["replace_selection_source_language"] == "de"
+    assert migrated["replace_selection_target_language"] == "fr"
+    assert migrated["fullscreen_translate_from"] == "zh"
+    assert migrated["fullscreen_translate_to"] == "en"
+    assert "selection_translate_source_language" in missing
+    assert "replace_selection_source_language" in missing
+    assert "fullscreen_translate_from" in missing
+
+
+def test_old_conflicting_default_is_migrated_but_custom_values_are_preserved():
+    migrated, _missing = main.merge_config_defaults({
+        "toggle_window_hotkey": "Ctrl+Alt+M",
+    })
+    custom, _missing = main.merge_config_defaults({
+        "toggle_window_hotkey": "Ctrl+Shift+Y",
+    })
+
+    assert migrated["toggle_window_hotkey"] == "Ctrl+Shift+Space"
+    assert migrated["hotkey_defaults_revision"] == 2
+    assert custom["toggle_window_hotkey"] == "Ctrl+Shift+Y"
 
 
 def test_intentionally_removed_hotkey_stays_empty():
     config = {
         "fullscreen_translate_hotkey": "",
         "translate_selection_hotkey": "",
+        "translate_replace_selection_hotkey": "",
         "toggle_window_hotkey": "",
     }
 
@@ -38,9 +73,11 @@ def test_intentionally_removed_hotkey_stays_empty():
 
     assert migrated["fullscreen_translate_hotkey"] == ""
     assert migrated["translate_selection_hotkey"] == ""
+    assert migrated["translate_replace_selection_hotkey"] == ""
     assert migrated["toggle_window_hotkey"] == ""
     assert "fullscreen_translate_hotkey" not in missing
     assert "translate_selection_hotkey" not in missing
+    assert "translate_replace_selection_hotkey" not in missing
     assert "toggle_window_hotkey" not in missing
 
 
@@ -70,7 +107,8 @@ def test_app_load_persists_migrated_defaults():
     assert saved
     assert dummy.config["fullscreen_translate_hotkey"] == "Ctrl+Alt+F"
     assert dummy.config["translate_selection_hotkey"] == "Ctrl+Alt+Q"
-    assert dummy.config["toggle_window_hotkey"] == "Ctrl+Alt+M"
+    assert dummy.config["translate_replace_selection_hotkey"] == "Ctrl+Shift+Q"
+    assert dummy.config["toggle_window_hotkey"] == "Ctrl+Shift+Space"
 
 
 def test_window_toggle_preserves_tray_or_taskbar_destination():

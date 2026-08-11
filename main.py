@@ -79,10 +79,10 @@ import webbrowser
 
 try:
     from PyQt5 import QtCore
-    from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QComboBox,
+    from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QGridLayout, QComboBox,
                                  QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QTextBrowser, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
     from PyQt5.QtCore import Qt, QTimer, QSize
-    from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QPolygonF
+    from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics
 except Exception:
     _show_dependency_error()
 from styled_dialogs import (
@@ -100,12 +100,13 @@ from settings_window import (
     GITHUB_RELEASES_PAGE,
     SettingsWindow,
     TesseractInstallProgressDialog,
+    modern_combo_style,
     update_text,
 )
 from app_version import APP_VERSION
 import platform_support
 import portable_paths
-from document_parser import DocumentParseError, format_file_size, parse_document
+from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
 from document_translation import translate_document_text
@@ -134,6 +135,10 @@ INTERFACE_LANGUAGE_OPTIONS = [
 ]
 INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
+LEGACY_TOGGLE_WINDOW_HOTKEY = "Ctrl+Alt+M"
+DEFAULT_TOGGLE_WINDOW_HOTKEY = "Ctrl+Shift+Space"
+HOTKEY_DEFAULTS_REVISION = 2
+
 # --- Единственная константа с дефолтной конфигурацией ---
 DEFAULT_CONFIG = {
     "theme": "Темная",
@@ -143,6 +148,11 @@ DEFAULT_CONFIG = {
     "translation_mode": "English",
     "main_translation_source_language": "en",
     "main_translation_target_language": "ru",
+    "selection_translate_source_language": "en",
+    "selection_translate_target_language": "ru",
+    "replace_selection_source_language": "en",
+    "replace_selection_target_language": "ru",
+    "hotkey_language_editor_mode": "selection",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
     "notifications": False,
@@ -162,10 +172,14 @@ DEFAULT_CONFIG = {
     "last_ocr_language": "ru",
     "ocr_translate_source_language": "en",
     "ocr_translate_target_language": "ru",
+    "fullscreen_translate_from": "en",
+    "fullscreen_translate_to": "ru",
     "no_screen_dimming": False,
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": "Ctrl+Alt+Q",
-    "toggle_window_hotkey": "Ctrl+Alt+M",
+    "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
+    "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
+    "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
     # Modes whose result window is suppressed; the translation is copied instead.
     # Empty by default: every action shows the window until the user turns one
     # off. A tuple, not a list: DEFAULT_CONFIG is shallow-copied in several
@@ -206,6 +220,51 @@ def merge_config_defaults(config):
     missing_keys = tuple(key for key in DEFAULT_CONFIG if key not in source)
     merged = DEFAULT_CONFIG.copy()
     merged.update(source)
+    # Before per-action pairs existed, selected-text translation used the main
+    # pair and fullscreen translation inherited the OCR pair. Preserve exactly
+    # what an existing user had chosen when introducing the separate controls.
+    if "selection_translate_source_language" not in source:
+        merged["selection_translate_source_language"] = source.get(
+            "main_translation_source_language",
+            DEFAULT_CONFIG["selection_translate_source_language"],
+        )
+    if "selection_translate_target_language" not in source:
+        merged["selection_translate_target_language"] = source.get(
+            "main_translation_target_language",
+            DEFAULT_CONFIG["selection_translate_target_language"],
+        )
+    if "replace_selection_source_language" not in source:
+        merged["replace_selection_source_language"] = merged[
+            "selection_translate_source_language"
+        ]
+    if "replace_selection_target_language" not in source:
+        merged["replace_selection_target_language"] = merged[
+            "selection_translate_target_language"
+        ]
+    if "fullscreen_translate_from" not in source:
+        merged["fullscreen_translate_from"] = source.get(
+            "ocr_translate_source_language",
+            DEFAULT_CONFIG["fullscreen_translate_from"],
+        )
+    if "fullscreen_translate_to" not in source:
+        merged["fullscreen_translate_to"] = source.get(
+            "ocr_translate_target_language",
+            DEFAULT_CONFIG["fullscreen_translate_to"],
+        )
+    # Ctrl+Alt+M is commonly claimed by browsers, meeting clients and GPU
+    # overlays.  Move only installations that still carry our old default;
+    # custom shortcuts and intentionally empty values remain untouched.
+    try:
+        defaults_revision = int(source.get("hotkey_defaults_revision", 1) or 1)
+    except (TypeError, ValueError):
+        defaults_revision = 1
+    if (
+        defaults_revision < HOTKEY_DEFAULTS_REVISION
+        and str(source.get("toggle_window_hotkey", "")).strip().lower()
+        == LEGACY_TOGGLE_WINDOW_HOTKEY.lower()
+    ):
+        merged["toggle_window_hotkey"] = DEFAULT_TOGGLE_WINDOW_HOTKEY
+    merged["hotkey_defaults_revision"] = HOTKEY_DEFAULTS_REVISION
     return merged, missing_keys
 
 
@@ -734,6 +793,95 @@ def simulate_copy():
     ctypes.windll.user32.keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0)
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
+
+def simulate_paste():
+    """Send Ctrl+V after the caller has verified the target selection."""
+    VK_CONTROL = 0x11
+    VK_V = 0x56
+    KEYEVENTF_KEYUP = 0x0002
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(VK_V, 0, 0, 0)
+    time.sleep(0.02)
+    ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+
+def _windows_foreground_window():
+    """Return the active HWND, or zero when Windows cannot provide one."""
+    if not platform_support.IS_WINDOWS:
+        return 0
+    try:
+        return int(ctypes.windll.user32.GetForegroundWindow() or 0)
+    except Exception:
+        return 0
+
+
+def _clipboard_sequence_number():
+    """Windows increments this value whenever clipboard contents change."""
+    if not platform_support.IS_WINDOWS:
+        return None
+    try:
+        return int(ctypes.windll.user32.GetClipboardSequenceNumber())
+    except Exception:
+        return None
+
+
+def _wait_for_clipboard_change(previous, timeout=0.8):
+    """Wait for Ctrl+C to publish its result without a fixed blind delay."""
+    if previous is None:
+        time.sleep(min(float(timeout), 0.12))
+        return True
+    deadline = time.monotonic() + max(0.0, float(timeout))
+    while time.monotonic() < deadline:
+        current = _clipboard_sequence_number()
+        if current is not None and current != previous:
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def replace_selected_text_in_foreground(original_text, translated_text,
+                                        expected_window_handle):
+    """Safely replace a still-active Windows text selection.
+
+    Translation can take seconds. During that time the user may switch windows
+    or select different text, so blindly pressing Ctrl+V can overwrite the
+    wrong content. Re-copying the selection immediately before the paste proves
+    both conditions still hold. The caller falls back to a normal clipboard
+    copy for every non-success result.
+    """
+    if not platform_support.IS_WINDOWS:
+        return False, "unsupported"
+    expected = int(expected_window_handle or 0)
+    if not expected or _windows_foreground_window() != expected:
+        return False, "focus_changed"
+
+    marker = f"__CLICKNTRANSLATE_SELECTION_{time.time_ns()}__"
+    if not platform_support.copy_text(marker):
+        return False, "clipboard_unavailable"
+    previous = _clipboard_sequence_number()
+    simulate_copy()
+    changed = _wait_for_clipboard_change(previous)
+
+    if _windows_foreground_window() != expected:
+        return False, "focus_changed"
+    try:
+        selected_now = str(pyperclip.paste() or "")
+    except Exception:
+        return False, "clipboard_unavailable"
+    if not changed or selected_now == marker:
+        return False, "selection_lost"
+    if selected_now.strip() != str(original_text or "").strip():
+        return False, "selection_changed"
+
+    if not platform_support.copy_text(translated_text):
+        return False, "clipboard_unavailable"
+    if _windows_foreground_window() != expected:
+        return False, "focus_changed"
+    time.sleep(0.04)
+    simulate_paste()
+    return True, "replaced"
+
 def get_app_dir():
     """Directory with app resources (icons, etc). In PyInstaller — temp extraction dir."""
     if hasattr(sys, '_MEIPASS'):
@@ -1045,7 +1193,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR Translate",
         "hotkey_fullscreen": "Fullscreen",
         "hotkey_selection": "Selection",
+        "hotkey_toggle": "Window",
+        "hotkey_replace": "Replace",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "Typed text",
+        "direction_shortcuts": "Shortcuts",
+        "direction_hint": "The box above translates the text you type.\nThe shortcuts translate the screen or the selected text, and each\nof them keeps its own direction — change it in the row below.",
         "translator": "Translator",
         "shadow_mode": "Shadow mode",
         "copy": "Copy",
@@ -1055,6 +1208,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "No text selected",
         "translating": "Translating...",
         "translation_error": "Translation error",
+        "selection_replaced": "Selected text replaced",
+        "selection_replace_fallback": "Selection changed. Translation copied instead.",
         "installing_language_packages": "Installing language packages…",
         "argos_package_missing_title": "Argos language package required",
         "argos_package_missing_prompt": "The Argos package for {pair} is not installed. Download and install it now?\n\nThe size depends on the language and can be several hundred megabytes.",
@@ -1088,7 +1243,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR перевод",
         "hotkey_fullscreen": "Экран",
         "hotkey_selection": "Выделение",
+        "hotkey_toggle": "Окно",
+        "hotkey_replace": "Замена",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "Текст в поле",
+        "direction_shortcuts": "Клавиши",
+        "direction_hint": "Поле выше переводит текст, который вы вводите.\nГорячие клавиши переводят экран или выделенный текст, и у каждой\nсвоё направление — измените его в строке ниже.",
         "translator": "Переводчик",
         "shadow_mode": "Режим тени",
         "copy": "Копировать",
@@ -1098,6 +1258,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "Текст не выделен",
         "translating": "Переводим...",
         "translation_error": "Ошибка перевода",
+        "selection_replaced": "Выделенный текст заменён",
+        "selection_replace_fallback": "Выделение изменилось. Перевод скопирован в буфер.",
         "installing_language_packages": "Установка языковых пакетов…",
         "argos_package_missing_title": "Нужен языковой пакет Argos",
         "argos_package_missing_prompt": "Пакет Argos для направления {pair} не установлен. Скачать и установить его сейчас?\n\nРазмер зависит от языка и может составлять несколько сотен мегабайт.",
@@ -1131,7 +1293,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR traducir",
         "hotkey_fullscreen": "Pantalla",
         "hotkey_selection": "Selección",
+        "hotkey_toggle": "Ventana",
+        "hotkey_replace": "Reemplazar",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "Texto escrito",
+        "direction_shortcuts": "Atajos",
+        "direction_hint": "El campo de arriba traduce el texto que escribes.\nLos atajos traducen la pantalla o el texto seleccionado, y cada uno\nguarda su propia dirección: cámbiala en la fila de abajo.",
         "translator": "Traductor",
         "shadow_mode": "Modo sombra",
         "copy": "Copiar",
@@ -1141,6 +1308,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "No hay texto seleccionado",
         "translating": "Traduciendo...",
         "translation_error": "Error de traducción",
+        "selection_replaced": "Texto seleccionado reemplazado",
+        "selection_replace_fallback": "La selección cambió. La traducción se copió al portapapeles.",
         "installing_language_packages": "Instalando paquetes de idioma…",
         "argos_package_missing_title": "Se necesita el paquete de idioma de Argos",
         "argos_package_missing_prompt": "El paquete de Argos para {pair} no está instalado. ¿Descargarlo e instalarlo ahora?\n\nEl tamaño depende del idioma y puede ser de varios cientos de megabytes.",
@@ -1174,7 +1343,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR Übers.",
         "hotkey_fullscreen": "Bildschirm",
         "hotkey_selection": "Auswahl",
+        "hotkey_toggle": "Fenster",
+        "hotkey_replace": "Ersetzen",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "Eingabetext",
+        "direction_shortcuts": "Kürzel",
+        "direction_hint": "Das Feld oben übersetzt den Text, den Sie eingeben.\nDie Kürzel übersetzen den Bildschirm oder den markierten Text, und\njedes behält seine eigene Richtung — änderbar in der Zeile unten.",
         "translator": "Übersetzer",
         "shadow_mode": "Schattenmodus",
         "copy": "Kopieren",
@@ -1184,6 +1358,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "Kein Text ausgewählt",
         "translating": "Übersetze...",
         "translation_error": "Übersetzungsfehler",
+        "selection_replaced": "Markierter Text wurde ersetzt",
+        "selection_replace_fallback": "Die Auswahl hat sich geändert. Die Übersetzung wurde kopiert.",
         "installing_language_packages": "Sprachpakete werden installiert…",
         "argos_package_missing_title": "Argos-Sprachpaket erforderlich",
         "argos_package_missing_prompt": "Das Argos-Paket für {pair} ist nicht installiert. Jetzt herunterladen und installieren?\n\nDie Größe hängt von der Sprache ab und kann mehrere hundert Megabyte betragen.",
@@ -1217,7 +1393,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR traduire",
         "hotkey_fullscreen": "Écran",
         "hotkey_selection": "Sélection",
+        "hotkey_toggle": "Fenêtre",
+        "hotkey_replace": "Remplacer",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "Texte saisi",
+        "direction_shortcuts": "Raccourcis",
+        "direction_hint": "Le champ ci-dessus traduit le texte que vous saisissez.\nLes raccourcis traduisent l'écran ou le texte sélectionné, et chacun\ngarde sa propre direction — modifiable dans la ligne ci-dessous.",
         "translator": "Traducteur",
         "shadow_mode": "Mode ombre",
         "copy": "Copier",
@@ -1227,6 +1408,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "Aucun texte sélectionné",
         "translating": "Traduction...",
         "translation_error": "Erreur de traduction",
+        "selection_replaced": "Texte sélectionné remplacé",
+        "selection_replace_fallback": "La sélection a changé. La traduction a été copiée.",
         "installing_language_packages": "Installation des modules de langue…",
         "argos_package_missing_title": "Module linguistique Argos requis",
         "argos_package_missing_prompt": "Le module Argos pour {pair} n’est pas installé. Le télécharger et l’installer maintenant ?\n\nSa taille dépend de la langue et peut atteindre plusieurs centaines de mégaoctets.",
@@ -1260,7 +1443,12 @@ INTERFACE_TEXT = {
         "hotkey_ocr_translate": "OCR 翻译",
         "hotkey_fullscreen": "全屏",
         "hotkey_selection": "选区",
+        "hotkey_toggle": "窗口",
+        "hotkey_replace": "替换",
         "selection_pair_hint": "{hotkey}: {src} → {tgt}",
+        "direction_typed": "输入的文本",
+        "direction_shortcuts": "快捷键",
+        "direction_hint": "上面的输入框翻译你键入的文本。\n快捷键翻译屏幕或选中的文本，每个快捷键都有自己的方向——\n可在下面一行修改。",
         "translator": "翻译器",
         "shadow_mode": "阴影模式",
         "copy": "复制",
@@ -1270,6 +1458,8 @@ INTERFACE_TEXT = {
         "no_text_selected": "未选择文本",
         "translating": "正在翻译...",
         "translation_error": "翻译错误",
+        "selection_replaced": "已替换所选文本",
+        "selection_replace_fallback": "所选内容已改变，译文已改为复制到剪贴板。",
         "installing_language_packages": "正在安装语言包…",
         "argos_package_missing_title": "需要 Argos 语言包",
         "argos_package_missing_prompt": "尚未安装 {pair} 的 Argos 语言包。是否立即下载并安装？\n\n大小取决于语言，可能达到数百 MB。",
@@ -1305,7 +1495,7 @@ def hotkey_error_text(lang, key, **values):
 DOCUMENT_TEXT = {
     "en": {
         "title": "Document translation",
-        "main_file_tooltip": "Drop .txt, .md, .docx, .pdf, .html or .rtf here, press Ctrl+O, or right-click the main window.",
+        "main_file_tooltip": "Enter translates  ·  Shift+Enter starts a new line\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\nDrop a file here, press Ctrl+O, or right-click the main window.",
         "main_file_hint": "Drop a document here or right-click",
         "attach_file": "Attach file",
         "remove_file": "Remove file",
@@ -1349,7 +1539,7 @@ DOCUMENT_TEXT = {
     },
     "ru": {
         "title": "Перевод документов",
-        "main_file_tooltip": "Перетащите сюда .txt, .md, .docx, .pdf, .html или .rtf, нажмите Ctrl+O или кликните правой кнопкой мыши в главном окне.",
+        "main_file_tooltip": "Enter — перевести  ·  Shift+Enter — новая строка\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\nПеретащите файл сюда, нажмите Ctrl+O или кликните ПКМ.",
         "main_file_hint": "Перетащите документ сюда или кликните правой кнопкой мыши",
         "attach_file": "Прикрепить файл",
         "remove_file": "Убрать файл",
@@ -1393,7 +1583,7 @@ DOCUMENT_TEXT = {
     },
     "es": {
         "title": "Traduccion de documentos",
-        "main_file_tooltip": "Arrastra aqui .txt, .md, .docx, .pdf, .html o .rtf, pulsa Ctrl+O o haz clic derecho en la ventana principal.",
+        "main_file_tooltip": "Enter traduce  ·  Shift+Enter crea una línea nueva\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\nArrastra un archivo, pulsa Ctrl+O o haz clic derecho.",
         "main_file_hint": "Arrastra un documento aqui o haz clic derecho",
         "attach_file": "Adjuntar archivo",
         "remove_file": "Quitar archivo",
@@ -1437,7 +1627,7 @@ DOCUMENT_TEXT = {
     },
     "de": {
         "title": "Dokumentubersetzung",
-        "main_file_tooltip": ".txt, .md, .docx, .pdf, .html oder .rtf hier ablegen, Ctrl+O drucken oder im Hauptfenster rechtsklicken.",
+        "main_file_tooltip": "Enter übersetzt  ·  Shift+Enter fügt eine Zeile ein\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\nDatei hier ablegen, Ctrl+O drücken oder rechtsklicken.",
         "main_file_hint": "Dokument hier ablegen oder rechtsklicken",
         "attach_file": "Datei anheften",
         "remove_file": "Datei entfernen",
@@ -1481,7 +1671,7 @@ DOCUMENT_TEXT = {
     },
     "fr": {
         "title": "Traduction de documents",
-        "main_file_tooltip": "Deposez ici .txt, .md, .docx, .pdf, .html ou .rtf, appuyez sur Ctrl+O ou faites un clic droit dans la fenetre principale.",
+        "main_file_tooltip": "Entrée traduit  ·  Maj+Entrée insère une ligne\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\nDéposez un fichier, appuyez sur Ctrl+O ou faites un clic droit.",
         "main_file_hint": "Deposez un document ici ou clic droit",
         "attach_file": "Joindre un fichier",
         "remove_file": "Retirer le fichier",
@@ -1525,7 +1715,7 @@ DOCUMENT_TEXT = {
     },
     "zh": {
         "title": "文档翻译",
-        "main_file_tooltip": "将 .txt、.md、.docx、.pdf、.html 或 .rtf 拖到这里，按 Ctrl+O，或在主窗口中右键单击。",
+        "main_file_tooltip": "Enter 翻译  ·  Shift+Enter 换行\n.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n将文件拖到这里，按 Ctrl+O，或单击右键。",
         "main_file_hint": "将文档拖到这里或右键单击",
         "attach_file": "附加文件",
         "remove_file": "移除文件",
@@ -1643,43 +1833,71 @@ def provider_display_name(engine, lang, include_kind=False):
 
 
 def document_translation_icon(theme_name):
+    source = QPixmap(resource_path("icons/docs.png"))
+    if source.isNull():
+        return QIcon()
+    if theme_name != "Темная":
+        return QIcon(source)
+
+    # docs.png is the exact black alpha silhouette selected for the light
+    # theme. SourceIn changes only its visible pixels, so the dark-theme icon
+    # is the same asset pixel-for-pixel, simply rendered in white.
+    white = QPixmap(source.size())
+    white.fill(Qt.transparent)
+    painter = QPainter(white)
+    painter.drawPixmap(0, 0, source)
+    painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+    painter.fillRect(white.rect(), QColor("#ffffff"))
+    painter.end()
+    return QIcon(white)
+
+
+def send_arrow_icon(theme_name):
+    """Messenger-style solid arrow with a concave tail, rendered sharply."""
     dark = theme_name == "Темная"
-    line = QColor("#f7f3ff" if dark else "#1f2937")
-    accent = QColor("#c5b3e9" if dark else "#7a5fa1")
-    paper_fill = QColor(255, 255, 255, 22) if dark else QColor(122, 95, 161, 16)
-
-    pixmap = QPixmap(30, 30)
+    color = QColor("#8db6e8" if dark else "#587faa")
+    pixmap = QPixmap(24, 24)
     pixmap.fill(Qt.transparent)
-
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
-    painter.setPen(QPen(accent, 1.8))
-    painter.setBrush(QBrush(paper_fill))
-    painter.drawRoundedRect(QtCore.QRectF(6, 4, 16, 22), 3, 3)
-
-    fold = [
-        QtCore.QPointF(17, 4),
-        QtCore.QPointF(22, 9),
-        QtCore.QPointF(17, 9),
-    ]
-    painter.setBrush(QBrush(QColor(accent.red(), accent.green(), accent.blue(), 62)))
-    painter.drawPolygon(QPolygonF(fold))
-
-    painter.setPen(QPen(line, 1.2))
-    painter.drawLine(QtCore.QPointF(9.5, 13), QtCore.QPointF(18.5, 13))
-    painter.drawLine(QtCore.QPointF(9.5, 16.5), QtCore.QPointF(17, 16.5))
-    painter.drawLine(QtCore.QPointF(9.5, 20), QtCore.QPointF(14.5, 20))
-
     painter.setPen(Qt.NoPen)
-    painter.setBrush(QBrush(accent))
-    painter.drawRoundedRect(QtCore.QRectF(14, 16, 12, 10), 4, 4)
+    painter.setBrush(QBrush(color))
+    arrow = QPainterPath()
+    arrow.moveTo(3.0, 4.0)
+    arrow.lineTo(22.0, 12.0)
+    arrow.lineTo(3.0, 20.0)
+    arrow.lineTo(5.2, 13.2)
+    arrow.lineTo(13.0, 12.0)
+    arrow.lineTo(5.2, 10.8)
+    arrow.closeSubpath()
+    painter.drawPath(arrow)
+    painter.end()
+    return QIcon(pixmap)
 
-    painter.setPen(QPen(QColor("#111827" if dark else "#ffffff"), 1))
-    font = painter.font()
-    font.setPointSize(7)
-    font.setBold(True)
-    painter.setFont(font)
-    painter.drawText(QtCore.QRectF(14, 16, 12, 10), Qt.AlignCenter, "A")
+
+def document_expand_icon(theme_name):
+    """Quiet four-corner icon used to move long input into document mode."""
+    dark = theme_name == "Темная"
+    color = QColor("#8f99a8" if dark else "#687386")
+    pixmap = QPixmap(24, 24)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(color, 1.8)
+    pen.setCapStyle(Qt.RoundCap)
+    pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(pen)
+
+    # Four open corners read as "expand" without looking like another filled
+    # action button beside the messenger-style send arrow.
+    painter.drawLine(5, 9, 5, 5)
+    painter.drawLine(5, 5, 9, 5)
+    painter.drawLine(15, 5, 19, 5)
+    painter.drawLine(19, 5, 19, 9)
+    painter.drawLine(5, 15, 5, 19)
+    painter.drawLine(5, 19, 9, 19)
+    painter.drawLine(15, 19, 19, 19)
+    painter.drawLine(19, 19, 19, 15)
     painter.end()
     return QIcon(pixmap)
 
@@ -1779,7 +1997,9 @@ def welcome_text(lang):
 GUIDE_TEXT = {
     "en": {
         "progress": "{current}/{total}",
-        "click_hint": "Click glow",
+        "click_hint": "Click highlighted control",
+        "read_hint": "Hover for details · Next",
+        "document_hint": "Open icon · Next",
         "skip": "Next",
         "done_title": "Ready",
         "done_body": "You know the main controls now. The full FAQ stays under the info button.",
@@ -1787,37 +2007,57 @@ GUIDE_TEXT = {
             ("language", "Interface language", "Flag changes app, settings, tray and help language."),
             ("theme", "Theme", "Sun/moon switches dark and light themes."),
             ("help", "Help", "Info opens OCR, hotkeys and translator help."),
+            ("shortcut_overview", "Your hotkeys", "These are your current hotkeys. Hover any one on the main screen for its full description. The mode row above sets a separate language pair for each translation action."),
+            ("shortcut_copy", "Copy", "Select a screen area. OCR recognizes its text and copies it to the clipboard without translating it."),
+            ("shortcut_ocr", "OCR Translate", "Select a screen area. OCR recognizes it, then translates it with the language pair saved for the OCR mode."),
+            ("shortcut_fullscreen", "Fullscreen", "Captures the whole screen and places translations over visible text blocks, using the Screen mode's saved language pair."),
+            ("shortcut_selection", "Selection", "Select existing text in another app and press Ctrl+Alt+Q. This mode translates it without changing the original selection."),
+            ("shortcut_replace", "Replace", "Select editable text in another app. Ctrl+Shift+Q replaces that same selection with its translation; if focus changed, the result is only copied."),
+            ("shortcut_toggle", "Window", "Hides the app to its previous destination or restores it from the tray or taskbar. Translation hotkeys keep working while it is hidden."),
+            ("document_translation", "Document translation", "Open the document icon for long text or a file. Paste, drop or attach a document, then translate everything or only the selected fragment. Long text in the main field also reveals an expand icon."),
             ("settings", "Settings", "Gear opens engines, history, updates and hotkeys."),
             ("ocr_engine", "OCR engine", "Choose Windows, Tesseract, EasyOCR or RapidOCR. Install each engine and its languages before recognition."),
             ("translator", "Translator", "Translator: Google online; Argos and Hy-MT offline."),
-            ("result_window", "Result window", "Choose where the result window appears. Purple buttons mean the window will be shown."),
+            ("result_window", "Result window", "Choose which translation actions open the result window. Unticked actions copy the result instead."),
             ("language_packages", "Language packages", "Install OCR languages and Argos directions here first. Only ready languages appear in selectors."),
-            ("hotkeys", "Hotkeys", "Hotkeys configure screen copy and OCR translation."),
-            ("back_home", "Back home", "Home returns to the main translator screen. Its selected language pair is also used for selected-text translation with Ctrl+Alt+Q."),
+            ("hotkeys", "Configure hotkeys", "If a shortcut is inconvenient, open Configure hotkeys. Click its field and press a new combination; press Esc to clear it. Changes apply immediately."),
+            ("back_home", "Back home", "Home returns to the main screen. The top pair translates typed text; each shortcut mode below keeps its own language pair."),
         ],
     },
     "ru": {
         "progress": "{current}/{total}",
-        "click_hint": "Нажми элемент",
-        "skip": "Пропустить",
+        "click_hint": "Нажмите выделенный элемент",
+        "read_hint": "Наведите для справки · Далее",
+        "document_hint": "Значок · Далее",
+        "skip": "Далее",
         "done_title": "Готово",
         "done_body": "Готово. Полная справка - под кнопкой информации.",
         "steps": [
             ("language", "Язык интерфейса", "Флаг меняет язык окна, настроек, трея и справки."),
             ("theme", "Тема", "Солнце/луна переключает темную и светлую тему."),
             ("help", "Помощь", "Информация: OCR, хоткеи и переводчики."),
+            ("shortcut_overview", "Ваши горячие клавиши", "Здесь показаны ваши текущие сочетания. Наведите курсор на любое из них — появится полное описание. В строке режимов выше для каждого действия задаётся своя пара языков."),
+            ("shortcut_copy", "Копирование", "Выделите область экрана. OCR распознает текст и скопирует его в буфер без перевода."),
+            ("shortcut_ocr", "OCR-перевод", "Выделите область экрана. OCR распознает её и переведёт с парой языков, сохранённой для режима OCR."),
+            ("shortcut_fullscreen", "Экран", "Захватывает весь экран и накладывает перевод на видимые текстовые блоки, используя сохранённую пару режима «Экран»."),
+            ("shortcut_selection", "Выделение", "Выделите готовый текст в другой программе и нажмите Ctrl+Alt+Q. Этот режим переведёт его, не изменяя исходное выделение."),
+            ("shortcut_replace", "Замена", "Выделите редактируемый текст в другой программе. Ctrl+Shift+Q заменит то же выделение переводом; если фокус изменился, результат только скопируется."),
+            ("shortcut_toggle", "Окно", "Скрывает программу туда, где она была, или возвращает её из трея либо панели задач. Пока окно скрыто, горячие клавиши перевода продолжают работать."),
+            ("document_translation", "Перевод документов", "Значок документа открывает режим для длинного текста или файла. Вставьте, перетащите или прикрепите документ и переведите всё либо выделенный фрагмент. Если в главном поле больше двух строк, там появится значок разворота."),
             ("settings", "Настройки", "Шестеренка: движки, история, обновления и хоткеи."),
             ("ocr_engine", "OCR-движок", "Выберите Windows, Tesseract, EasyOCR или RapidOCR. До распознавания установите движок и нужные языки."),
             ("translator", "Переводчик", "Переводчик: Google онлайн, Argos и Hy-MT офлайн."),
-            ("result_window", "Окно результата", "Выберите, где показывать результат. Фиолетовая кнопка означает, что окно появится."),
+            ("result_window", "Окно результата", "Выберите, после каких действий открывать окно результата. Для отключённых действий перевод копируется в буфер."),
             ("language_packages", "Языковые пакеты", "Здесь заранее ставятся языки OCR и направления Argos. В списках видны только готовые языки."),
-            ("hotkeys", "Горячие клавиши", "Хоткеи: копирование экрана и OCR-перевод."),
-            ("back_home", "Назад домой", "Домик возвращает на главный экран. Выбранные там языки также используются для перевода выделенного текста по Ctrl+Alt+Q."),
+            ("hotkeys", "Настроить клавиши", "Если сочетание неудобно, откройте «Настроить горячие клавиши». Нажмите его поле и введите новое сочетание; Esc очищает поле. Изменения применяются сразу."),
+            ("back_home", "Назад домой", "Домик возвращает на главный экран. Верхняя пара переводит введённый текст, а для каждого режима горячих клавиш ниже хранится своя пара языков."),
         ],
     },
     "es": {
         "progress": "{current}/{total}",
-        "click_hint": "Pulsa luz",
+        "click_hint": "Pulsa el control resaltado",
+        "read_hint": "Pasa el ratón · Siguiente",
+        "document_hint": "Icono · Siguiente",
         "skip": "Siguiente",
         "done_title": "Listo",
         "done_body": "Ya conoces los controles principales. La guía completa está en el botón de información.",
@@ -1825,18 +2065,28 @@ GUIDE_TEXT = {
             ("language", "Idioma", "Bandera: ventana, ajustes, bandeja y ayuda."),
             ("theme", "Tema", "Sol/luna cambia entre tema oscuro y claro."),
             ("help", "Ayuda", "Info: OCR, atajos y traductores."),
+            ("shortcut_overview", "Tus atajos", "Aquí aparecen tus combinaciones actuales. Pasa el ratón por cualquiera para ver su descripción completa. La fila de modos guarda un par de idiomas independiente para cada acción."),
+            ("shortcut_copy", "Copiar", "Selecciona un área de pantalla. OCR reconoce el texto y lo copia al portapapeles sin traducirlo."),
+            ("shortcut_ocr", "OCR traducir", "Selecciona un área. OCR la reconoce y la traduce con el par de idiomas guardado para el modo OCR."),
+            ("shortcut_fullscreen", "Pantalla", "Captura toda la pantalla y superpone traducciones sobre los bloques de texto visibles con el par guardado de Pantalla."),
+            ("shortcut_selection", "Selección", "Selecciona texto existente en otra aplicación y pulsa Ctrl+Alt+Q. Este modo lo traduce sin modificar la selección original."),
+            ("shortcut_replace", "Reemplazar", "Selecciona texto editable en otra app. Ctrl+Shift+Q reemplaza esa misma selección; si cambió el foco, el resultado solo se copia."),
+            ("shortcut_toggle", "Ventana", "Oculta la app en su ubicación anterior o la restaura desde la bandeja/barra de tareas. Los atajos siguen funcionando mientras está oculta."),
+            ("document_translation", "Traducción de documentos", "Abre el icono de documento para texto largo o archivos. Pega, arrastra o adjunta un documento y traduce todo o solo el fragmento seleccionado. El texto largo del campo principal también muestra un icono para expandirlo."),
             ("settings", "Ajustes", "Engranaje: motores, historial, updates y atajos."),
             ("ocr_engine", "Motor OCR", "Elige Windows, Tesseract, EasyOCR o RapidOCR. Instala el motor y sus idiomas antes de reconocer texto."),
             ("translator", "Traductor", "Traductor: Google online; Argos y Hy-MT offline."),
-            ("result_window", "Ventana de resultado", "Elige dónde aparece la ventana. Los botones morados indican que se mostrará."),
+            ("result_window", "Ventana de resultado", "Elige qué acciones abren la ventana de resultado. Las desmarcadas copian la traducción."),
             ("language_packages", "Paquetes de idioma", "Instala aquí idiomas OCR y direcciones Argos. Los selectores muestran solo los que están listos."),
-            ("hotkeys", "Atajos", "Atajos: copia de pantalla y traducción OCR."),
-            ("back_home", "Volver", "Vuelve a la pantalla principal. El par elegido allí también se usa para traducir texto seleccionado con Ctrl+Alt+Q."),
+            ("hotkeys", "Configurar atajos", "Si un atajo no te resulta cómodo, abre Configurar atajos. Pulsa su campo e introduce otra combinación; Esc lo borra. El cambio se aplica al instante."),
+            ("back_home", "Volver", "Vuelve a la pantalla principal. El par superior traduce el texto escrito; cada modo de atajo inferior conserva su propio par de idiomas."),
         ],
     },
     "de": {
         "progress": "{current}/{total}",
-        "click_hint": "Klick Licht",
+        "click_hint": "Markiertes Element anklicken",
+        "read_hint": "Für Details zeigen · Weiter",
+        "document_hint": "Symbol · Weiter",
         "skip": "Weiter",
         "done_title": "Fertig",
         "done_body": "Die wichtigsten Bedienelemente sind bekannt. Die komplette Hilfe bleibt im Info-Button.",
@@ -1844,18 +2094,28 @@ GUIDE_TEXT = {
             ("language", "Sprache", "Flagge: Sprache für App, Tray und Hilfe."),
             ("theme", "Design", "Sonne/Mond wechselt dunkel und hell."),
             ("help", "Hilfe", "Info: OCR, Hotkeys und Übersetzer."),
+            ("shortcut_overview", "Ihre Hotkeys", "Hier stehen Ihre aktuellen Kombinationen. Zeigen Sie auf eine davon, um die vollständige Erklärung zu sehen. Die Moduszeile speichert für jede Übersetzungsaktion ein eigenes Sprachpaar."),
+            ("shortcut_copy", "Kopieren", "Bildschirmbereich markieren. OCR erkennt den Text und kopiert ihn ohne Übersetzung in die Zwischenablage."),
+            ("shortcut_ocr", "OCR-Übersetzen", "Bereich markieren. OCR erkennt und übersetzt ihn mit dem für den OCR-Modus gespeicherten Sprachpaar."),
+            ("shortcut_fullscreen", "Bildschirm", "Erfasst den ganzen Bildschirm und legt Übersetzungen mit dem gespeicherten Bildschirm-Sprachpaar über sichtbare Textblöcke."),
+            ("shortcut_selection", "Auswahl", "Vorhandenen Text in einer anderen App markieren und Ctrl+Alt+Q drücken. Dieser Modus übersetzt ihn, ohne die ursprüngliche Auswahl zu ändern."),
+            ("shortcut_replace", "Ersetzen", "Bearbeitbaren Text in einer anderen App markieren. Ctrl+Shift+Q ersetzt dieselbe Auswahl; bei geändertem Fokus wird das Ergebnis nur kopiert."),
+            ("shortcut_toggle", "Fenster", "Blendet die App an ihrem vorherigen Ziel aus oder holt sie aus Tray/Taskleiste zurück. Hotkeys funktionieren auch im ausgeblendeten Zustand."),
+            ("document_translation", "Dokumentübersetzung", "Öffnen Sie das Dokumentsymbol für lange Texte oder Dateien. Text einfügen oder Dokument ablegen/anhängen und alles oder nur die Auswahl übersetzen. Bei langem Text erscheint im Hauptfeld ebenfalls ein Erweitern-Symbol."),
             ("settings", "Einstellungen", "Zahnrad: Engines, Verlauf, Updates und Hotkeys."),
             ("ocr_engine", "OCR-Engine", "Windows, Tesseract, EasyOCR oder RapidOCR wählen. Engine und Sprachen vor der Erkennung installieren."),
             ("translator", "Übersetzer", "Übersetzer: Google online; Argos/Hy-MT offline."),
-            ("result_window", "Ergebnisfenster", "Wählen Sie, wo das Fenster erscheint. Violette Schaltflächen bedeuten: Fenster anzeigen."),
+            ("result_window", "Ergebnisfenster", "Wählen Sie, welche Aktionen das Ergebnisfenster öffnen. Nicht markierte Aktionen kopieren die Übersetzung."),
             ("language_packages", "Sprachpakete", "OCR-Sprachen und Argos-Richtungen hier vorab installieren. Nur fertige Sprachen erscheinen in Listen."),
-            ("hotkeys", "Hotkeys", "Hotkeys: Bildschirmkopie und OCR."),
-            ("back_home", "Zurück", "Zurück zum Hauptbildschirm. Das dort gewählte Sprachpaar gilt auch für markierten Text mit Ctrl+Alt+Q."),
+            ("hotkeys", "Hotkeys konfigurieren", "Ist ein Kürzel unpraktisch, öffnen Sie Hotkeys konfigurieren. Feld anklicken und neue Kombination drücken; Esc löscht sie. Änderungen gelten sofort."),
+            ("back_home", "Zurück", "Zurück zum Hauptbildschirm. Das obere Paar übersetzt eingegebenen Text; jedes Übersetzungs-Kürzel darunter behält sein eigenes Sprachpaar."),
         ],
     },
     "fr": {
         "progress": "{current}/{total}",
-        "click_hint": "Clique ici",
+        "click_hint": "Cliquez sur le contrôle surligné",
+        "read_hint": "Survolez pour l'aide · Suivant",
+        "document_hint": "Icône · Suivant",
         "skip": "Suivant",
         "done_title": "Prêt",
         "done_body": "Les contrôles principaux sont vus. L'aide complète reste dans le bouton info.",
@@ -1863,18 +2123,28 @@ GUIDE_TEXT = {
             ("language", "Langue", "Drapeau: langue de l'app, réglages et aide."),
             ("theme", "Thème", "Soleil/lune alterne sombre et clair."),
             ("help", "Aide", "Info: OCR, raccourcis et traducteurs."),
+            ("shortcut_overview", "Vos raccourcis", "Voici vos combinaisons actuelles. Survolez-en une pour lire sa description complète. La ligne des modes garde une paire de langues distincte pour chaque action de traduction."),
+            ("shortcut_copy", "Copier", "Sélectionnez une zone d’écran. L’OCR reconnaît le texte et le copie dans le presse-papiers sans le traduire."),
+            ("shortcut_ocr", "OCR traduire", "Sélectionnez une zone. L’OCR la reconnaît puis la traduit avec la paire de langues enregistrée pour le mode OCR."),
+            ("shortcut_fullscreen", "Écran", "Capture tout l’écran et superpose les traductions aux blocs de texte visibles avec la paire enregistrée du mode Écran."),
+            ("shortcut_selection", "Sélection", "Sélectionnez du texte existant dans une autre app et appuyez sur Ctrl+Alt+Q. Ce mode le traduit sans modifier la sélection d’origine."),
+            ("shortcut_replace", "Remplacer", "Sélectionnez du texte modifiable dans une autre app. Ctrl+Shift+Q remplace cette même sélection ; si le focus change, le résultat est seulement copié."),
+            ("shortcut_toggle", "Fenêtre", "Masque l’app à son emplacement précédent ou la restaure depuis la zone de notification/barre des tâches. Les raccourcis restent actifs quand elle est masquée."),
+            ("document_translation", "Traduction de documents", "Ouvrez l’icône de document pour un long texte ou un fichier. Collez, déposez ou joignez le document, puis traduisez tout ou seulement la sélection. Un texte long dans le champ principal affiche aussi une icône d’agrandissement."),
             ("settings", "Réglages", "Engrenage: moteurs, historique, mises à jour."),
             ("ocr_engine", "Moteur OCR", "Choisissez Windows, Tesseract, EasyOCR ou RapidOCR. Installez le moteur et ses langues avant la reconnaissance."),
             ("translator", "Traducteur", "Traducteur: Google online; Argos/Hy-MT offline."),
-            ("result_window", "Fenêtre de résultat", "Choisissez où afficher la fenêtre. Un bouton violet signifie qu’elle sera affichée."),
+            ("result_window", "Fenêtre de résultat", "Choisissez quelles actions ouvrent la fenêtre de résultat. Les actions décochées copient la traduction."),
             ("language_packages", "Modules de langue", "Installez ici les langues OCR et directions Argos. Seules les langues prêtes figurent dans les listes."),
-            ("hotkeys", "Raccourcis", "Raccourcis: copie écran et OCR."),
-            ("back_home", "Retour", "Retour à l'écran principal. La paire choisie ici sert aussi à traduire le texte sélectionné avec Ctrl+Alt+Q."),
+            ("hotkeys", "Configurer les raccourcis", "Si un raccourci ne convient pas, ouvrez Configurer les raccourcis. Cliquez son champ et saisissez une autre combinaison ; Échap l’efface. Le changement est immédiat."),
+            ("back_home", "Retour", "Retour à l’écran principal. La paire supérieure traduit le texte saisi ; chaque mode de raccourci dessous conserve sa propre paire de langues."),
         ],
     },
     "zh": {
         "progress": "{current}/{total}",
-        "click_hint": "点击高亮处",
+        "click_hint": "点击高亮控件",
+        "read_hint": "悬停查看说明 · 下一步",
+        "document_hint": "点击图标 · 下一步",
         "skip": "下一步",
         "done_title": "完成",
         "done_body": "你已经看过主要控件。完整帮助在信息按钮里。",
@@ -1882,13 +2152,21 @@ GUIDE_TEXT = {
             ("language", "界面语言", "点击旗帜。它会切换窗口、设置、托盘和帮助的语言。"),
             ("theme", "主题", "点击太阳/月亮。这里切换深色和浅色主题。"),
             ("help", "帮助", "点击信息按钮。这里有 OCR、快捷键和翻译器说明。"),
+            ("shortcut_overview", "你的快捷键", "这里显示当前组合键。将鼠标悬停在任意一项上可查看完整说明。上方模式栏会为每个翻译操作保存独立的语言对。"),
+            ("shortcut_copy", "复制", "框选屏幕区域。OCR 会识别文字并复制到剪贴板，不进行翻译。"),
+            ("shortcut_ocr", "OCR 翻译", "框选屏幕区域。OCR 识别后，会使用 OCR 模式保存的语言对进行翻译。"),
+            ("shortcut_fullscreen", "全屏", "捕获整个屏幕，并使用“全屏”模式保存的语言对，将译文覆盖在可见文字块上。"),
+            ("shortcut_selection", "选择", "在其他应用中选中现有文字并按 Ctrl+Alt+Q。此模式只翻译，不修改原来的选区。"),
+            ("shortcut_replace", "替换", "在其他应用中选中可编辑文字。Ctrl+Shift+Q 会替换相同选区；如果焦点改变，则只复制结果。"),
+            ("shortcut_toggle", "窗口", "将应用隐藏到原来的位置，或从托盘/任务栏恢复。应用隐藏时，翻译快捷键仍然有效。"),
+            ("document_translation", "文档翻译", "长文本或文件请打开文档图标。可粘贴、拖放或附加文档，然后翻译全部内容或仅翻译选中片段。主输入框中的长文本也会显示展开图标。"),
             ("settings", "设置", "点击齿轮。引擎、历史、更新和快捷键都在这里。"),
             ("ocr_engine", "OCR 引擎", "选择 Windows、Tesseract、EasyOCR 或 RapidOCR。识别前请先安装引擎和所需语言。"),
             ("translator", "翻译器", "打开翻译器。Google 在线；Argos 和 Hy-MT 可离线使用。"),
-            ("result_window", "结果窗口", "选择在哪些操作后显示结果窗口。紫色按钮表示会显示窗口。"),
+            ("result_window", "结果窗口", "选择哪些翻译操作显示结果窗口。未勾选的操作会复制译文。"),
             ("language_packages", "语言包", "请先在这里安装 OCR 语言和 Argos 翻译方向。下拉列表只显示已就绪的语言。"),
-            ("hotkeys", "快捷键", "点击快捷键。这里设置屏幕复制和 OCR 翻译快捷键。"),
-            ("back_home", "返回主页", "返回主翻译界面。这里选择的语言对也用于 Ctrl+Alt+Q 翻译所选文本。"),
+            ("hotkeys", "设置快捷键", "如果组合键不方便，请打开“设置快捷键”。点击对应输入框并按下新组合；按 Esc 可清除。更改会立即生效。"),
+            ("back_home", "返回主页", "返回主界面。上方语言对用于输入文本；下方每个快捷键模式都会保存自己独立的语言对。"),
         ],
     },
 }
@@ -2083,13 +2361,17 @@ HELP_CONTENT = {
             "<span class='item-title'>Update</span> checks for a newer version and replaces the portable folder with it.",
             "<span class='item-title'>Language packages</span> installs OCR languages and Argos directions in advance.",
             "<span class='item-title'>Copy history</span> and <span class='item-title'>Translation history</span> open what was saved. They stay empty while the matching check box is off.",
-            "<span class='item-title'>Configure hotkeys</span> sets the shortcuts for copy, OCR translate, fullscreen and selection.",
+            "<span class='item-title'>Configure hotkeys</span> sets copy, OCR, fullscreen, safe selection translation, translate-and-replace, and show/hide shortcuts.",
         ]),
         ("Hotkeys", [
+            "Hover any shortcut on the main screen to see its full description. The mode row above it stores a separate source and target language for OCR, Fullscreen, Selection and Replace.",
             "<span class='item-title'>Copy</span> recognizes the selected area and copies text.",
             "<span class='item-title'>OCR Translate</span> recognizes the selected area and translates it.",
             "<span class='item-title'>Fullscreen</span> translates visible text blocks on the screen.",
             "<span class='item-title'>Selection</span> translates the currently selected text from another app.",
+            "<span class='item-title'>Translate and replace selection</span> writes the translation back only if the same text remains selected in the same window. Otherwise it safely copies the translation.",
+            "<span class='item-title'>Window</span> hides the app to its previous destination or restores it from the tray/taskbar.",
+            "If a combination is inconvenient, open <span class='item-title'>Settings → Configure hotkeys</span>, click its field and press a new combination. Esc clears the field; changes apply immediately.",
         ]),
         ("Portable App", [
             "The app stores config, history, cache and optional local engines next to the program folder.",
@@ -2141,13 +2423,17 @@ HELP_CONTENT = {
             "<span class='item-title'>Обновление</span> — проверяет новую версию и заменяет portable-папку.",
             "<span class='item-title'>Языковые пакеты</span> — заранее ставит языки OCR и направления Argos.",
             "<span class='item-title'>История копирований</span> и <span class='item-title'>История переводов</span> — открывают сохранённые списки. Пока соответствующая галочка выключена, они пустые.",
-            "<span class='item-title'>Настроить горячие клавиши</span> — задаёт сочетания для копирования, OCR-перевода, полного экрана и выделения.",
+            "<span class='item-title'>Настроить горячие клавиши</span> — задаёт сочетания для копирования, OCR, экрана, безопасного перевода выделения, перевода с заменой и окна программы.",
         ]),
         ("Горячие клавиши", [
+            "Наведите курсор на любую горячую клавишу в главном окне, чтобы увидеть полное описание. В строке режимов выше отдельно сохраняются исходный и целевой языки для OCR, Экрана, Выделения и Замены.",
             "<span class='item-title'>Копирование</span> распознает выделенную область и копирует текст.",
             "<span class='item-title'>OCR-перевод</span> распознает выделенную область и переводит ее.",
             "<span class='item-title'>Экран</span> переводит видимые текстовые блоки на экране.",
             "<span class='item-title'>Выделение</span> переводит уже выделенный текст из другого приложения.",
+            "<span class='item-title'>Перевести и заменить выделенное</span> подставляет перевод, только если тот же текст всё ещё выделен в том же окне. Иначе перевод безопасно копируется в буфер.",
+            "<span class='item-title'>Окно</span> сворачивает программу туда, где она была, либо возвращает её из трея/панели задач.",
+            "Если сочетание неудобно, откройте <span class='item-title'>Настройки → Настроить горячие клавиши</span>, нажмите его поле и введите новое. Esc очищает поле; изменение применяется сразу.",
         ]),
         ("Портативность", [
             "Конфиг, история, кэш и локальные движки хранятся рядом с папкой программы.",
@@ -2199,13 +2485,17 @@ HELP_CONTENT = {
             "<span class='item-title'>Actualizar</span> busca una version nueva y reemplaza la carpeta portatil.",
             "<span class='item-title'>Paquetes de idiomas</span> instala de antemano idiomas OCR y direcciones Argos.",
             "<span class='item-title'>Historial de copias</span> y <span class='item-title'>Historial de traducciones</span> abren lo guardado; estan vacios mientras la casilla correspondiente este desactivada.",
-            "<span class='item-title'>Configurar atajos</span> define los atajos de copia, traduccion OCR, pantalla completa y seleccion.",
+            "<span class='item-title'>Configurar atajos</span> define copiar, OCR, pantalla, traducción segura de selección, traducción con reemplazo y ventana.",
         ]),
         ("Atajos", [
+            "Pasa el ratón por cualquier atajo de la pantalla principal para ver su descripción. La fila de modos guarda idiomas de origen y destino independientes para OCR, Pantalla, Selección y Reemplazo.",
             "<span class='item-title'>Copiar</span> reconoce el area seleccionada y copia el texto.",
             "<span class='item-title'>OCR traducir</span> reconoce el area seleccionada y la traduce.",
             "<span class='item-title'>Pantalla</span> traduce bloques de texto visibles en pantalla.",
             "<span class='item-title'>Seleccion</span> traduce texto ya seleccionado en otra app.",
+            "<span class='item-title'>Traducir y reemplazar selección</span> sustituye solo si el mismo texto sigue seleccionado en la misma ventana; si no, copia la traducción.",
+            "<span class='item-title'>Ventana</span> oculta la aplicación o la restaura desde la bandeja/barra de tareas.",
+            "Si una combinación no resulta cómoda, abre <span class='item-title'>Ajustes → Configurar atajos</span>, pulsa su campo e introduce otra. Esc borra el campo y el cambio se aplica al instante.",
         ]),
         ("Portabilidad", [
             "Config, historial, cache y motores locales se guardan junto a la carpeta del programa.",
@@ -2257,13 +2547,17 @@ HELP_CONTENT = {
             "<span class='item-title'>Aktualisieren</span> sucht eine neue Version und ersetzt den Portable-Ordner.",
             "<span class='item-title'>Sprachpakete</span> installiert OCR-Sprachen und Argos-Richtungen im Voraus.",
             "<span class='item-title'>Kopierverlauf</span> und <span class='item-title'>Ubersetzungsverlauf</span> offnen das Gespeicherte; sie bleiben leer, solange das passende Kastchen aus ist.",
-            "<span class='item-title'>Tastenkurzel konfigurieren</span> legt die Kurzel fur Kopieren, OCR-Ubersetzung, Vollbild und Auswahl fest.",
+            "<span class='item-title'>Tastenkurzel konfigurieren</span> legt Kopieren, OCR, Vollbild, sichere Auswahlübersetzung, Übersetzen und Ersetzen sowie das App-Fenster fest.",
         ]),
         ("Tastenkurzel", [
+            "Zeigen Sie im Hauptfenster auf ein Kürzel, um die vollständige Erklärung zu sehen. Die Moduszeile speichert getrennte Quell- und Zielsprachen für OCR, Bildschirm, Auswahl und Ersetzen.",
             "<span class='item-title'>Kopieren</span> erkennt den markierten Bereich und kopiert Text.",
             "<span class='item-title'>OCR-Ubersetzen</span> erkennt den markierten Bereich und ubersetzt ihn.",
             "<span class='item-title'>Bildschirm</span> ubersetzt sichtbare Textblocke auf dem Bildschirm.",
             "<span class='item-title'>Auswahl</span> ubersetzt bereits markierten Text aus einer anderen App.",
+            "<span class='item-title'>Auswahl übersetzen und ersetzen</span> ersetzt nur, wenn derselbe Text noch im selben Fenster markiert ist; sonst wird die Übersetzung kopiert.",
+            "<span class='item-title'>Fenster</span> blendet die App aus oder stellt sie aus Tray/Taskleiste wieder her.",
+            "Ist eine Kombination unpraktisch, öffnen Sie <span class='item-title'>Einstellungen → Tastenkurzel konfigurieren</span>, klicken Sie das Feld an und drücken Sie eine neue. Esc löscht das Feld; die Änderung gilt sofort.",
         ]),
         ("Portabilitat", [
             "Konfig, Verlauf, Cache und lokale Engines liegen neben dem Programmordner.",
@@ -2315,13 +2609,17 @@ HELP_CONTENT = {
             "<span class='item-title'>Mettre a jour</span> cherche une nouvelle version et remplace le dossier portable.",
             "<span class='item-title'>Modules linguistiques</span> installe a l'avance les langues OCR et les directions Argos.",
             "<span class='item-title'>Historique des copies</span> et <span class='item-title'>Historique des traductions</span> ouvrent ce qui a ete enregistre ; ils restent vides tant que la case correspondante est decochee.",
-            "<span class='item-title'>Configurer les raccourcis</span> definit les raccourcis de copie, de traduction OCR, de plein ecran et de selection.",
+            "<span class='item-title'>Configurer les raccourcis</span> définit copie, OCR, plein écran, traduction sûre de la sélection, traduction avec remplacement et fenêtre.",
         ]),
         ("Raccourcis", [
+            "Survolez un raccourci de l’écran principal pour lire sa description complète. La ligne des modes conserve des langues source et cible distinctes pour OCR, Écran, Sélection et Remplacement.",
             "<span class='item-title'>Copier</span> reconnait la zone selectionnee et copie le texte.",
             "<span class='item-title'>OCR traduire</span> reconnait la zone selectionnee et la traduit.",
             "<span class='item-title'>Plein ecran</span> traduit les blocs de texte visibles a l'ecran.",
             "<span class='item-title'>Selection</span> traduit le texte deja selectionne dans une autre app.",
+            "<span class='item-title'>Traduire et remplacer la sélection</span> ne remplace que si le même texte reste sélectionné dans la même fenêtre ; sinon la traduction est copiée.",
+            "<span class='item-title'>Fenêtre</span> masque l'application ou la restaure depuis la zone de notification/barre des tâches.",
+            "Si une combinaison ne convient pas, ouvrez <span class='item-title'>Réglages → Configurer les raccourcis</span>, cliquez son champ et saisissez-en une autre. Échap efface le champ ; le changement est immédiat.",
         ]),
         ("Portabilite", [
             "Config, historique, cache et moteurs locaux sont stockes a cote du dossier du programme.",
@@ -2373,13 +2671,17 @@ HELP_CONTENT = {
             "<span class='item-title'>更新</span> 检查新版本并替换便携文件夹。",
             "<span class='item-title'>语言包</span> 用来提前安装 OCR 语言和 Argos 翻译方向。",
             "<span class='item-title'>复制历史</span> 和 <span class='item-title'>翻译历史</span> 打开已保存的记录；对应复选框关闭时它们是空的。",
-            "<span class='item-title'>配置快捷键</span> 设置复制、OCR 翻译、全屏和选中文本的快捷键。",
+            "<span class='item-title'>配置快捷键</span> 可设置复制、OCR、全屏、安全选区翻译、翻译并替换和显示/隐藏应用快捷键。",
         ]),
         ("快捷键", [
+            "将鼠标悬停在主界面的任意快捷键上，可查看完整说明。模式栏会分别保存 OCR、全屏、选择和替换的源语言与目标语言。",
             "<span class='item-title'>复制</span> 识别所选区域并复制文本。",
             "<span class='item-title'>OCR 翻译</span> 识别所选区域并翻译。",
             "<span class='item-title'>全屏</span> 翻译屏幕上可见的文本块。",
             "<span class='item-title'>选区</span> 翻译其他应用中已选中的文本。",
+            "<span class='item-title'>翻译并替换所选文本</span> 仅在同一窗口仍选中相同文本时替换；否则会安全复制译文。",
+            "<span class='item-title'>窗口</span> 隐藏应用，或从托盘/任务栏恢复应用。",
+            "如果组合键不方便，请打开<span class='item-title'>设置 → 配置快捷键</span>，点击对应输入框并按下新组合。Esc 可清除输入框，更改会立即生效。",
         ]),
         ("便携应用", [
             "配置、历史、缓存和本地引擎都保存在程序文件夹旁边。",
@@ -2612,48 +2914,60 @@ LANGUAGE_PACKAGE_HELP_CONTENT = {
 DOCUMENT_HELP_CONTENT = {
     "en": [
         ("Document translation", [
-            "Drop a .txt, .md, .docx, .pdf, .html or .rtf file onto the main window, or press Ctrl+O.",
-            "The document reader can translate the whole file or only selected text.",
+            "Open the document icon in the title bar at any time. For text longer than two visual lines, the main input also shows an expand icon and transfers the text into the document workspace.",
+            "Paste text there, drop or attach a .txt, .md, .docx, .pdf, .html or .rtf file, or press Ctrl+O from the main window.",
+            "Choose the source language, target language and provider explicitly. Argos shows only directions whose packages are installed.",
+            "Translate the whole document, or select a fragment in the left field and choose Translate selection.",
             "Long files are split into ordered chunks; failed chunks stay visible in the result.",
             "Translations can be saved locally as .txt, .md or a reopenable session in the program data folder.",
         ]),
     ],
     "ru": [
         ("Перевод документов", [
-            "Перетащите .txt, .md, .docx, .pdf, .html или .rtf в главное окно, либо нажмите Ctrl+O.",
-            "Окно документа умеет переводить весь файл или только выделенный текст.",
+            "Значок документа в заголовке всегда открывает отдельный режим. Если текст в главном поле занял больше двух строк, там также появится значок разворота: он перенесёт текст в окно документов.",
+            "Вставьте текст, перетащите или прикрепите .txt, .md, .docx, .pdf, .html или .rtf. Из главного окна файл также открывается по Ctrl+O.",
+            "Явно выберите исходный и целевой языки и провайдера. Для Argos показываются только направления с установленными пакетами.",
+            "Можно перевести весь документ либо выделить фрагмент в левом поле и нажать «Перевести выделение».",
             "Длинные файлы режутся на части по порядку; ошибки отдельных частей остаются видимыми в результате.",
             "Перевод можно сохранить локально как .txt, .md или сессию для повторного открытия.",
         ]),
     ],
     "es": [
         ("Traduccion de documentos", [
-            "Arrastra .txt, .md, .docx, .pdf, .html o .rtf a la ventana principal, o pulsa Ctrl+O.",
-            "El lector puede traducir todo el archivo o solo el texto seleccionado.",
+            "Abre el icono de documento de la barra superior. Si el texto principal supera dos líneas visuales, aparece también un icono para expandirlo y transferirlo al espacio de documentos.",
+            "Pega texto, arrastra o adjunta .txt, .md, .docx, .pdf, .html o .rtf. Desde la ventana principal también puedes pulsar Ctrl+O.",
+            "Elige explícitamente el idioma de origen, el de destino y el proveedor. Argos muestra solo las direcciones instaladas.",
+            "Traduce todo el documento o selecciona un fragmento del campo izquierdo y pulsa Traducir selección.",
             "Los archivos largos se dividen en partes ordenadas; las partes fallidas quedan visibles.",
             "La traduccion se guarda localmente como .txt, .md o sesion reutilizable.",
         ]),
     ],
     "de": [
         ("Dokumentubersetzung", [
-            ".txt, .md, .docx, .pdf, .html oder .rtf ins Hauptfenster ziehen oder Ctrl+O drucken.",
-            "Der Dokumentreader ubersetzt die ganze Datei oder nur markierten Text.",
+            "Das Dokumentsymbol in der Titelleiste öffnet den Arbeitsbereich jederzeit. Bei mehr als zwei sichtbaren Zeilen erscheint auch im Hauptfeld ein Erweitern-Symbol und überträgt den Text dorthin.",
+            "Text einfügen, .txt, .md, .docx, .pdf, .html oder .rtf ablegen/anhängen oder im Hauptfenster Ctrl+O drücken.",
+            "Quellsprache, Zielsprache und Anbieter ausdrücklich wählen. Argos zeigt nur Richtungen mit installierten Paketen.",
+            "Das ganze Dokument übersetzen oder links einen Abschnitt markieren und Auswahl übersetzen wählen.",
             "Lange Dateien werden in geordnete Teile geteilt; fehlgeschlagene Teile bleiben sichtbar.",
             "Ubersetzungen werden lokal als .txt, .md oder wieder offnbare Sitzung gespeichert.",
         ]),
     ],
     "fr": [
         ("Traduction de documents", [
-            "Deposez .txt, .md, .docx, .pdf, .html ou .rtf dans la fenetre principale, ou appuyez sur Ctrl+O.",
-            "Le lecteur peut traduire tout le fichier ou seulement le texte selectionne.",
+            "L’icône de document dans la barre de titre ouvre toujours cet espace. Au-delà de deux lignes visuelles, le champ principal affiche aussi une icône d’agrandissement qui y transfère le texte.",
+            "Collez du texte, déposez ou joignez un .txt, .md, .docx, .pdf, .html ou .rtf, ou appuyez sur Ctrl+O dans la fenêtre principale.",
+            "Choisissez explicitement la langue source, la cible et le fournisseur. Argos n’affiche que les directions dont les modules sont installés.",
+            "Traduisez tout le document, ou sélectionnez un passage dans le champ gauche puis choisissez Traduire la sélection.",
             "Les longs fichiers sont decoupes en parties ordonnees; les erreurs restent visibles.",
             "La traduction se sauvegarde localement en .txt, .md ou session reutilisable.",
         ]),
     ],
     "zh": [
         ("文档翻译", [
-            "将 .txt、.md、.docx、.pdf、.html 或 .rtf 拖到主窗口，或按 Ctrl+O。",
-            "文档阅读器可以翻译整个文件，也可以只翻译选中的文本。",
+            "标题栏的文档图标可随时打开文档工作区。主输入框超过两行时也会显示展开图标，并把文字带入文档窗口。",
+            "可以粘贴文字、拖放或附加 .txt、.md、.docx、.pdf、.html 或 .rtf；也可在主窗口按 Ctrl+O。",
+            "请明确选择源语言、目标语言和提供商。Argos 只显示已安装语言包的翻译方向。",
+            "可以翻译整个文档，也可在左侧选中片段后点击“翻译选中内容”。",
             "长文件会按顺序分块翻译；失败的分块会保留在结果中。",
             "译文可本地保存为 .txt、.md 或可重新打开的会话。",
         ]),
@@ -3107,6 +3421,30 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
         "swap": "交换语言",
     },
 }
+
+
+class TranslateOnEnterTextEdit(QTextEdit):
+    """Enter translates, Shift+Enter starts a new line.
+
+    A box that swallows Enter leaves people hunting for the button after they
+    have already finished typing. Ctrl+Enter still translates too, and Alt or
+    Meta with Enter falls through to Qt, so nothing that used to insert a break
+    stopped doing it.
+    """
+
+    #: The user asked for a translation from the keyboard.
+    translation_requested = QtCore.pyqtSignal()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            modifiers = event.modifiers()
+            if modifiers & (Qt.ShiftModifier | Qt.AltModifier | Qt.MetaModifier):
+                super().keyPressEvent(event)
+                return
+            self.translation_requested.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class CenteredFramelessDialog(QDialog):
@@ -3963,8 +4301,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         header.setObjectName("docTopBar")
         header.setAttribute(Qt.WA_StyledBackground, True)
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(18, 14, 18, 12)
-        header_layout.setSpacing(12)
+        header_layout.setContentsMargins(18, 10, 18, 10)
+        header_layout.setSpacing(8)
 
         header_top = QHBoxLayout()
         header_top.setSpacing(12)
@@ -3974,20 +4312,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_icon_label.setAlignment(Qt.AlignCenter)
         header_top.addWidget(self.doc_icon_label)
 
-        title_stack = QVBoxLayout()
-        title_stack.setSpacing(2)
         self.header_title = QLabel(doc_text(self.lang, "title"))
         self.header_title.setObjectName("docTitle")
-        self.header_subtitle = QLabel(doc_text(self.lang, "drop_hint"))
-        self.header_subtitle.setObjectName("docSubtitle")
-        title_stack.addWidget(self.header_title)
-        title_stack.addWidget(self.header_subtitle)
-        self.metadata_label = QLabel("")
-        self.metadata_label.setObjectName("docMetadata")
-        self.metadata_label.setWordWrap(False)
-        self.metadata_label.setTextFormat(Qt.PlainText)
-        title_stack.addWidget(self.metadata_label)
-        header_top.addLayout(title_stack, 1)
+        header_top.addWidget(self.header_title, 1, Qt.AlignVCenter)
 
         self.status_pill = QLabel(doc_text(self.lang, "no_file"))
         self.status_pill.setObjectName("docStatusPill")
@@ -4018,7 +4345,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.source_field_label.setObjectName("docFieldLabel")
         control_row.addWidget(self.source_field_label)
         self.source_combo = QComboBox()
-        self.source_combo.addItem(doc_text(self.lang, "auto_detect"))
         self.source_combo.addItems(LANGUAGES[self.lang])
         self.source_combo.setMinimumWidth(150)
         control_row.addWidget(self.source_combo)
@@ -4049,7 +4375,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             if language_code_from_name(self.target_combo.itemText(target_index), self.lang) == target_code:
                 self.target_combo.setCurrentIndex(target_index)
                 break
-        self.target_combo.currentIndexChanged.connect(self._update_metadata)
         self.target_combo.setMinimumWidth(150)
         control_row.addWidget(self.target_combo)
 
@@ -4237,15 +4562,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 font-size: 18px;
                 font-weight: 900;
             }}
-            QLabel#docSubtitle,
-            QLabel#docMetadata,
             QLabel#docProvider {{
                 color: {muted};
                 font-size: 12px;
                 font-weight: 600;
-            }}
-            QLabel#docMetadata {{
-                color: {faint};
             }}
             QLabel#docStatusPill {{
                 color: {fg};
@@ -4406,9 +4726,25 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         apply_windows_dark_frame(self, self.theme_name == DEFAULT_CONFIG["theme"])
 
     def refresh_theme(self, theme_name):
-        self.theme_name = theme_name
-        self._apply_dialog_theme()
-        self._apply_native_frame_theme()
+        self.setUpdatesEnabled(False)
+        try:
+            self.theme_name = theme_name
+            self._apply_dialog_theme()
+            self._apply_native_frame_theme()
+            # A cached document window may have spent the theme switch hidden.
+            # Force Qt to discard the old dark backing stores before it is
+            # shown again, otherwise several large frames keep their old fill
+            # until the user resizes or interacts with the window.
+            for widget in (self, *self.findChildren(QWidget)):
+                style = widget.style()
+                if style is not None:
+                    style.unpolish(widget)
+                    style.polish(widget)
+                widget.updateGeometry()
+                widget.update()
+        finally:
+            self.setUpdatesEnabled(True)
+        self.update()
 
     def refresh_language(self, language_code):
         old_lang = self.lang
@@ -4418,7 +4754,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.header_title.setText(doc_text(self.lang, "title"))
-        self.header_subtitle.setText(doc_text(self.lang, "drop_hint"))
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
@@ -4435,11 +4770,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         self.source_combo.blockSignals(True)
         self.source_combo.clear()
-        self.source_combo.addItem(doc_text(self.lang, "auto_detect"))
         self.source_combo.addItems(LANGUAGES[self.lang])
         self.source_combo.setCurrentIndex(0)
-        if source_code != "auto":
-            self._set_combo_to_language_code(self.source_combo, source_code)
+        if source_code == "auto":
+            source_code = str(
+                get_cached_config().get("main_translation_source_language", "en")
+                or "en"
+            )
+        self._set_combo_to_language_code(self.source_combo, source_code)
         self.source_combo.blockSignals(False)
 
         self.target_combo.blockSignals(True)
@@ -4460,7 +4798,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         else:
             self.current_status = doc_text(self.lang, "no_file")
         self.status_pill.setText(self.current_status)
-        self._update_metadata()
 
     def _set_combo_to_language_code(self, combo, language_code):
         for index in range(combo.count()):
@@ -4805,7 +5142,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         }
 
     def _refresh_document_provider_languages(self):
-        previous_source = self._source_code() if self.source_combo.count() else "auto"
+        configured_source = str(
+            get_cached_config().get("main_translation_source_language", "en") or "en"
+        )
+        previous_source = (
+            self._source_code() if self.source_combo.count() else configured_source
+        )
+        if previous_source == "auto":
+            previous_source = configured_source
         previous_target = (
             language_code_from_name(self.target_combo.currentText(), self.lang)
             if self.target_combo.count() else
@@ -4823,14 +5167,12 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.target_combo.blockSignals(True)
         try:
             self.source_combo.clear()
-            if not argos:
-                self.source_combo.addItem(doc_text(self.lang, "auto_detect"), "auto")
             for code in source_codes:
                 self.source_combo.addItem(language_display_name(code, self.lang), code)
-            if previous_source == "auto" and not argos:
-                source_code = "auto"
-            elif previous_source in source_codes:
+            if previous_source in source_codes:
                 source_code = previous_source
+            elif configured_source in source_codes:
+                source_code = configured_source
             else:
                 source_code = source_codes[0] if source_codes else ""
             source_index = self.source_combo.findData(source_code)
@@ -4847,7 +5189,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 target_codes = [
                     language.code
                     for language in APP_LANGUAGES
-                    if language.code != (source_code if source_code != "auto" else "")
+                    if language.code != source_code
                 ]
             self.target_combo.clear()
             for code in target_codes:
@@ -4866,7 +5208,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             button = getattr(self, attribute, None)
             if button is not None:
                 button.setEnabled(ready)
-        self._update_metadata()
 
     def _on_document_provider_changed(self):
         self._refresh_document_provider_languages()
@@ -4917,32 +5258,25 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.current_status = str(status)
         if hasattr(self, "status_pill"):
             self.status_pill.setText(self.current_status)
-        self._update_metadata()
 
-    def _update_metadata(self):
-        target = self.target_combo.currentText() if hasattr(self, "target_combo") else ""
-        if self.current_document:
-            parts = [
-                f"{doc_text(self.lang, 'file')}: {self.current_document.file_name}",
-                f"{doc_text(self.lang, 'size')}: {format_file_size(self.current_document.size_bytes)}",
-                f"{doc_text(self.lang, 'detected')}: {self.current_document.detected_language.upper()}",
-                f"{doc_text(self.lang, 'target')}: {target}",
-                f"{doc_text(self.lang, 'provider')}: {self._provider_name()}",
-            ]
-        elif self.session_payload:
-            size = self.session_payload.get("source_size", 0)
-            parts = [
-                f"{doc_text(self.lang, 'file')}: {self._source_file_name()}",
-                f"{doc_text(self.lang, 'size')}: {format_file_size(size)}",
-                f"{doc_text(self.lang, 'target')}: {target}",
-                f"{doc_text(self.lang, 'provider')}: {self.session_payload.get('provider', self._provider_name())}",
-            ]
-        else:
-            parts = [
-                doc_text(self.lang, "loaded") if self.original_view.toPlainText().strip() else doc_text(self.lang, "drop_hint"),
-                f"{doc_text(self.lang, 'provider')}: {self._provider_name()}",
-            ]
-        self.metadata_label.setText("  •  ".join(parts))
+    def load_plain_text(self, text):
+        """Open text from the compact composer without pretending it is a file."""
+        value = str(text or "")
+        if not value.strip() or self.translation_running:
+            return
+        self.current_document = None
+        self.session_payload = None
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.original_view.blockSignals(True)
+        self.original_view.setPlainText(value)
+        self.original_view.blockSignals(False)
+        self.translated_view.clear()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self._set_busy(False)
+        self._set_status(doc_text(self.lang, "loaded"))
 
     def _set_busy(self, busy, loading=False):
         has_translation = bool(str(self.translated_text or "").strip())
@@ -4970,6 +5304,18 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 event.acceptProposedAction()
                 return
         super().dropEvent(event)
+
+
+def styled_transparent_button_qss():
+    """Chromeless button style that still carries the tooltip rule.
+
+    Qt resolves a tooltip against the stylesheet of the widget it belongs to. A
+    widget with its own sheet therefore loses the app-wide QToolTip rule and
+    gets the platform default — a black box with square corners — while widgets
+    without one show the app's purple rounded tooltip. Every per-widget sheet
+    that belongs to something with a tooltip has to carry it.
+    """
+    return "QPushButton { background-color: transparent; border: none; }" + TOOLTIP_QSS
 
 
 class GuideSpotlight(QWidget):
@@ -5051,6 +5397,411 @@ class GuideSpotlight(QWidget):
         painter.end()
 
 
+HOTKEY_LANGUAGE_MODES = ("ocr", "fullscreen", "selection", "replace")
+HOTKEY_LANGUAGE_CONFIG_KEYS = {
+    "ocr": ("ocr_translate_source_language", "ocr_translate_target_language"),
+    "fullscreen": ("fullscreen_translate_from", "fullscreen_translate_to"),
+    "selection": ("selection_translate_source_language", "selection_translate_target_language"),
+    "replace": ("replace_selection_source_language", "replace_selection_target_language"),
+}
+HOTKEY_LANGUAGE_HOTKEY_KEYS = {
+    "ocr": ("translate_hotkey", "Ctrl+Alt+T"),
+    "fullscreen": ("fullscreen_translate_hotkey", "Ctrl+Alt+F"),
+    "selection": ("translate_selection_hotkey", "Ctrl+Alt+Q"),
+    "replace": ("translate_replace_selection_hotkey", "Ctrl+Shift+Q"),
+}
+
+HOTKEY_LANGUAGE_TEXT = {
+    "en": {
+        "title": "Languages for hotkeys",
+        "body": "Each translation shortcut keeps its own language pair.",
+        "bar_hint": "Hotkey languages — choose a mode, then its direction",
+        "bar_caption": "Mode:",
+        "mode_language_heading": "Translation languages by mode",
+        "mode": "Action",
+        "from": "From",
+        "to": "To",
+        "swap": "Swap languages",
+        "done": "Done",
+        "no_pairs": "No ready language pair. Install the required OCR or Argos packages first.",
+        "ocr": "OCR",
+        "fullscreen": "Screen",
+        "selection": "Selection",
+        "replace": "Replace",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+    "ru": {
+        "title": "Языки горячих клавиш",
+        "body": "Для каждого режима сохраняется своя пара языков.",
+        "bar_hint": "Языки горячих клавиш — выберите режим, затем направление",
+        "bar_caption": "Режим:",
+        "mode_language_heading": "Языки перевода в режимах",
+        "mode": "Режим",
+        "from": "С языка",
+        "to": "На язык",
+        "swap": "Поменять языки местами",
+        "done": "Готово",
+        "no_pairs": "Нет готовой пары. Сначала установите нужные пакеты OCR или Argos.",
+        "ocr": "OCR",
+        "fullscreen": "Экран",
+        "selection": "Выделение",
+        "replace": "Замена",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+    "es": {
+        "title": "Idiomas de los atajos",
+        "body": "Cada atajo de traducción conserva su propio par de idiomas.",
+        "bar_hint": "Idiomas de atajos — elija el modo y la dirección",
+        "bar_caption": "Modo:",
+        "mode_language_heading": "Idiomas de traducción por modo",
+        "mode": "Acción",
+        "from": "De",
+        "to": "A",
+        "swap": "Intercambiar idiomas",
+        "done": "Listo",
+        "no_pairs": "No hay ningún par preparado. Instala antes los paquetes OCR o Argos necesarios.",
+        "ocr": "OCR",
+        "fullscreen": "Pantalla",
+        "selection": "Selección",
+        "replace": "Reemplazo",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+    "de": {
+        "title": "Sprachen für Tastenkürzel",
+        "body": "Jedes Übersetzungs-Tastenkürzel behält sein eigenes Sprachpaar.",
+        "bar_hint": "Tastenkürzel-Sprachen — Modus und Richtung wählen",
+        "bar_caption": "Modus:",
+        "mode_language_heading": "Übersetzungssprachen nach Modus",
+        "mode": "Aktion",
+        "from": "Von",
+        "to": "Nach",
+        "swap": "Sprachen tauschen",
+        "done": "Fertig",
+        "no_pairs": "Kein fertiges Sprachpaar. Zuerst die benötigten OCR- oder Argos-Pakete installieren.",
+        "ocr": "OCR",
+        "fullscreen": "Bildschirm",
+        "selection": "Auswahl",
+        "replace": "Ersetzen",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+    "fr": {
+        "title": "Langues des raccourcis",
+        "body": "Chaque raccourci de traduction conserve sa propre paire de langues.",
+        "bar_hint": "Langues des raccourcis — choisissez le mode et la direction",
+        "bar_caption": "Mode :",
+        "mode_language_heading": "Langues de traduction par mode",
+        "mode": "Action",
+        "from": "De",
+        "to": "Vers",
+        "swap": "Inverser les langues",
+        "done": "Terminé",
+        "no_pairs": "Aucune paire prête. Installez d’abord les modules OCR ou Argos requis.",
+        "ocr": "OCR",
+        "fullscreen": "Écran",
+        "selection": "Sélection",
+        "replace": "Remplacement",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+    "zh": {
+        "title": "快捷键语言",
+        "body": "每个翻译快捷键都会保存自己的语言对。",
+        "bar_hint": "快捷键语言 — 选择模式和翻译方向",
+        "bar_caption": "模式：",
+        "mode_language_heading": "各模式的翻译语言",
+        "mode": "操作",
+        "from": "源语言",
+        "to": "目标语言",
+        "swap": "交换语言",
+        "done": "完成",
+        "no_pairs": "没有可用的语言对。请先安装所需的 OCR 或 Argos 语言包。",
+        "ocr": "OCR",
+        "fullscreen": "全屏",
+        "selection": "选择",
+        "replace": "替换",
+        "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
+    },
+}
+
+
+def hotkey_language_text(lang, key):
+    return HOTKEY_LANGUAGE_TEXT.get(lang, HOTKEY_LANGUAGE_TEXT["en"]).get(
+        key, HOTKEY_LANGUAGE_TEXT["en"].get(key, key)
+    )
+
+
+MAIN_HOTKEY_TOOLTIPS = {
+    "en": {
+        "copy": "Select a screen area. OCR copies the recognized text.",
+        "ocr": "Select a screen area. OCR translates it with this mode's language pair.",
+        "fullscreen": "Translate visible text blocks across the whole screen with the Screen pair.",
+        "selection": "Select text in another app, then translate it without changing the original.",
+        "replace": "Select editable text in another app. The same selection is replaced by its translation; if focus changed, the result is only copied.",
+        "toggle": "Hide the app to its previous place or restore it from the tray/taskbar.",
+    },
+    "ru": {
+        "copy": "Выделите область экрана. OCR распознает и скопирует текст.",
+        "ocr": "Выделите область экрана. OCR переведёт её с парой языков этого режима.",
+        "fullscreen": "Переведёт видимые блоки текста на всём экране с парой режима «Экран».",
+        "selection": "Выделите текст в другой программе: он переведётся без изменения оригинала.",
+        "replace": "Выделите редактируемый текст в другой программе. То же выделение заменится переводом; при смене фокуса результат только скопируется.",
+        "toggle": "Скроет программу туда, где она была, или вернёт её из трея/панели задач.",
+    },
+    "es": {
+        "copy": "Selecciona un área de pantalla. OCR reconoce y copia el texto.",
+        "ocr": "Selecciona un área. OCR la traduce con el par de idiomas de este modo.",
+        "fullscreen": "Traduce los bloques de texto visibles en toda la pantalla con el par Pantalla.",
+        "selection": "Selecciona texto en otra app y tradúcelo sin cambiar el original.",
+        "replace": "Selecciona texto editable en otra app. La misma selección se reemplaza; si cambia el foco, el resultado solo se copia.",
+        "toggle": "Oculta la app en su ubicación anterior o la restaura desde bandeja/barra de tareas.",
+    },
+    "de": {
+        "copy": "Bildschirmbereich markieren. OCR erkennt und kopiert den Text.",
+        "ocr": "Bereich markieren. OCR übersetzt ihn mit dem Sprachpaar dieses Modus.",
+        "fullscreen": "Sichtbare Textblöcke des ganzen Bildschirms mit dem Bildschirm-Paar übersetzen.",
+        "selection": "Text in einer anderen App markieren und übersetzen, ohne das Original zu ändern.",
+        "replace": "Bearbeitbaren Text markieren. Dieselbe Auswahl wird ersetzt; bei geändertem Fokus wird das Ergebnis nur kopiert.",
+        "toggle": "App an den vorherigen Ort ausblenden oder aus Tray/Taskleiste wiederherstellen.",
+    },
+    "fr": {
+        "copy": "Sélectionnez une zone d’écran. L’OCR reconnaît et copie le texte.",
+        "ocr": "Sélectionnez une zone. L’OCR la traduit avec la paire de langues de ce mode.",
+        "fullscreen": "Traduit les blocs de texte visibles sur tout l’écran avec la paire Écran.",
+        "selection": "Sélectionnez du texte dans une autre app et traduisez-le sans modifier l’original.",
+        "replace": "Sélectionnez du texte modifiable. La même sélection est remplacée ; si le focus change, le résultat est seulement copié.",
+        "toggle": "Masque l’app à son emplacement précédent ou la restaure depuis la zone de notification/barre des tâches.",
+    },
+    "zh": {
+        "copy": "框选屏幕区域；OCR 会识别并复制文字。",
+        "ocr": "框选屏幕区域；OCR 使用此模式的语言对进行翻译。",
+        "fullscreen": "使用“全屏”语言对翻译整个屏幕上的可见文字块。",
+        "selection": "在其他应用中选中文字并翻译，不修改原文。",
+        "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
+        "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",
+    },
+}
+
+
+def main_hotkey_tooltip(lang, key):
+    text = MAIN_HOTKEY_TOOLTIPS.get(lang, MAIN_HOTKEY_TOOLTIPS["en"])
+    return text.get(key, MAIN_HOTKEY_TOOLTIPS["en"].get(key, key))
+
+
+class HotkeyLanguageDialog(QDialog):
+    """Compact, non-resizing editor opened from the main language-pair hint."""
+
+    def __init__(self, owner):
+        super().__init__(owner, Qt.Popup | Qt.FramelessWindowHint)
+        self.owner = owner
+        self.lang = owner.current_interface_language
+        self._loading = False
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setFixedSize(520, 258)
+
+        root = QFrame(self)
+        root.setObjectName("hotkeyLanguageCard")
+        root.setGeometry(self.rect())
+        shadow = QGraphicsDropShadowEffect(root)
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 7)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        root.setGraphicsEffect(shadow)
+
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(9)
+
+        title_row = QHBoxLayout()
+        title = QLabel(hotkey_language_text(self.lang, "title"))
+        title.setObjectName("hotkeyLanguageTitle")
+        title_row.addWidget(title, 1)
+        close_button = QToolButton()
+        close_button.setObjectName("hotkeyLanguageClose")
+        close_button.setText("×")
+        close_button.setFixedSize(30, 30)
+        close_button.clicked.connect(self.close)
+        title_row.addWidget(close_button)
+        layout.addLayout(title_row)
+
+        body = QLabel(hotkey_language_text(self.lang, "body"))
+        body.setObjectName("hotkeyLanguageBody")
+        layout.addWidget(body)
+
+        self.mode_combo = DropDownCombo()
+        self.mode_combo.setObjectName("hotkeyLanguageCombo")
+        for mode in HOTKEY_LANGUAGE_MODES:
+            hotkey = owner._hotkey_for_translation_mode(mode)
+            self.mode_combo.addItem(
+                f"{hotkey_language_text(self.lang, mode)}  ·  {hotkey}", mode
+            )
+        preferred_mode = owner._hotkey_language_editor_mode()
+        self.mode_combo.setCurrentIndex(
+            max(0, self.mode_combo.findData(preferred_mode))
+        )
+        layout.addWidget(self.mode_combo)
+
+        pair_row = QHBoxLayout()
+        pair_row.setSpacing(8)
+        self.source_combo = DropDownCombo()
+        self.source_combo.setObjectName("hotkeyLanguageCombo")
+        self.source_combo.setAccessibleName(hotkey_language_text(self.lang, "from"))
+        self.swap_button = QToolButton()
+        self.swap_button.setObjectName("hotkeyLanguageSwap")
+        self.swap_button.setText("⇄")
+        self.swap_button.setFixedSize(38, 38)
+        self.swap_button.setToolTip(
+            tooltip_text(hotkey_language_text(self.lang, "swap"))
+        )
+        self.target_combo = DropDownCombo()
+        self.target_combo.setObjectName("hotkeyLanguageCombo")
+        self.target_combo.setAccessibleName(hotkey_language_text(self.lang, "to"))
+        pair_row.addWidget(self.source_combo, 1)
+        pair_row.addWidget(self.swap_button)
+        pair_row.addWidget(self.target_combo, 1)
+        layout.addLayout(pair_row)
+
+        self.status_label = QLabel("")
+        self.status_label.setObjectName("hotkeyLanguageStatus")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label, 1)
+
+        done_button = QPushButton(hotkey_language_text(self.lang, "done"))
+        done_button.setObjectName("hotkeyLanguageDone")
+        done_button.setFixedHeight(34)
+        done_button.clicked.connect(self.close)
+        layout.addWidget(done_button, 0, Qt.AlignRight)
+
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        self.source_combo.currentIndexChanged.connect(self._on_source_changed)
+        self.target_combo.currentIndexChanged.connect(self._persist_pair)
+        self.swap_button.clicked.connect(self._swap_languages)
+        self._apply_theme()
+        self._load_mode()
+
+    def _apply_theme(self):
+        dark = self.owner.current_theme != "Светлая"
+        card = "#121317" if dark else "#fbfafc"
+        text = "#f4f2f8" if dark else "#24212a"
+        muted = "#aaa3b3" if dark else "#716a79"
+        border = "#4b4258" if dark else "#cfc5da"
+        hover = "#302a39" if dark else "#eee8f3"
+        self.setStyleSheet(f"""
+            QFrame#hotkeyLanguageCard {{ background: {card}; border: 1px solid {border}; border-radius: 14px; }}
+            QLabel#hotkeyLanguageTitle {{ color: {text}; font-size: 18px; font-weight: 800; border: none; }}
+            QLabel#hotkeyLanguageBody, QLabel#hotkeyLanguageStatus {{ color: {muted}; font-size: 12px; border: none; }}
+            QToolButton#hotkeyLanguageClose {{ color: {text}; background: transparent; border: none; border-radius: 7px; font-size: 22px; }}
+            QToolButton#hotkeyLanguageClose:hover {{ background: {hover}; }}
+            QToolButton#hotkeyLanguageSwap {{ color: {text}; background: {hover}; border: 1px solid {border}; border-radius: 8px; font-size: 17px; font-weight: 800; }}
+            QPushButton#hotkeyLanguageDone {{ color: #ffffff; background: #7A5FA1; border: 1px solid #9477bc; border-radius: 8px; padding: 4px 18px; font-weight: 700; }}
+            QPushButton#hotkeyLanguageDone:hover {{ background: #8B70B2; }}
+        """)
+        combo_style = modern_combo_style(dark, font_size=14)
+        for combo in (self.mode_combo, self.source_combo, self.target_combo):
+            combo.setStyleSheet(combo_style)
+            combo.setMinimumHeight(38)
+
+    def current_mode(self):
+        return str(self.mode_combo.currentData() or "selection")
+
+    def _load_mode(self):
+        mode = self.current_mode()
+        pairs = self.owner._available_hotkey_translation_pairs(mode)
+        source, target = self.owner._configured_hotkey_translation_pair(mode)
+        source_codes = [
+            language.code for language in APP_LANGUAGES
+            if any(pair_source == language.code for pair_source, _ in pairs)
+        ]
+        self._loading = True
+        try:
+            self.source_combo.clear()
+            for code in source_codes:
+                self.source_combo.addItem(language_display_name(code, self.lang), code)
+            if source not in source_codes and source_codes:
+                source = source_codes[0]
+            self.source_combo.setCurrentIndex(
+                max(0, self.source_combo.findData(source))
+                if source_codes else -1
+            )
+            self._fill_targets(target, pairs)
+        finally:
+            self._loading = False
+        ready = self.source_combo.count() > 0 and self.target_combo.count() > 0
+        self.source_combo.setEnabled(ready)
+        self.target_combo.setEnabled(ready)
+        self.swap_button.setEnabled(ready)
+        self.status_label.setText(
+            "" if ready else hotkey_language_text(self.lang, "no_pairs")
+        )
+        self.owner.config["hotkey_language_editor_mode"] = mode
+        if ready:
+            self._persist_pair()
+        else:
+            self.owner.save_config()
+            self.owner._refresh_selection_pair_hint()
+
+    def _fill_targets(self, preferred, pairs=None):
+        pairs = pairs or self.owner._available_hotkey_translation_pairs(
+            self.current_mode()
+        )
+        source = self.source_combo.currentData()
+        targets = [
+            language.code for language in APP_LANGUAGES
+            if (source, language.code) in pairs
+        ]
+        self.target_combo.clear()
+        for code in targets:
+            self.target_combo.addItem(language_display_name(code, self.lang), code)
+        if preferred not in targets and targets:
+            preferred = targets[0]
+        self.target_combo.setCurrentIndex(
+            max(0, self.target_combo.findData(preferred)) if targets else -1
+        )
+
+    def _on_mode_changed(self, *_args):
+        if not self._loading:
+            self._load_mode()
+
+    def _on_source_changed(self, *_args):
+        if self._loading:
+            return
+        preferred = self.target_combo.currentData()
+        self._loading = True
+        try:
+            self._fill_targets(preferred)
+        finally:
+            self._loading = False
+        self._persist_pair()
+
+    def _persist_pair(self, *_args):
+        if self._loading:
+            return
+        source = self.source_combo.currentData()
+        target = self.target_combo.currentData()
+        if source and target:
+            self.owner._set_hotkey_translation_pair(
+                self.current_mode(), str(source), str(target)
+            )
+
+    def _swap_languages(self):
+        source = self.source_combo.currentData()
+        target = self.target_combo.currentData()
+        pairs = self.owner._available_hotkey_translation_pairs(self.current_mode())
+        if not source or not target or (target, source) not in pairs:
+            return
+        self._loading = True
+        try:
+            self.source_combo.setCurrentIndex(self.source_combo.findData(target))
+            self._fill_targets(source, pairs)
+        finally:
+            self._loading = False
+        self._persist_pair()
+
+    def closeEvent(self, event):
+        if getattr(self.owner, "_hotkey_language_dialog", None) is self:
+            self.owner._hotkey_language_dialog = None
+        super().closeEvent(event)
+
+
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str, str, str, str)
@@ -5111,7 +5862,12 @@ class DarkThemeApp(QMainWindow):
             lambda pos: self.show_main_context_menu(self.central_widget.mapToGlobal(pos))
         )
         self.main_layout = QVBoxLayout()
-        self.main_layout.setContentsMargins(5, 45, 5, 5)
+        # 5px on every side put the content against the frame, and 45 left the
+        # first row 5px under a 40px title bar. The window is fixed at 700x400,
+        # so the air comes out of the padding below: the blocks lost a couple of
+        # pixels each and the text box still ends up the tallest thing here.
+        self.main_layout.setContentsMargins(14, 52, 14, 14)
+        self.main_layout.setSpacing(8)
         self.central_widget.setLayout(self.main_layout)
 
         self.hotkeys_mode = False
@@ -5120,6 +5876,7 @@ class DarkThemeApp(QMainWindow):
         # from.  The title-bar button uses the taskbar; shadow mode and Close
         # use the tray when one is available.
         self._window_hide_destination = "taskbar"
+        self._update_flow_active = False
         self._guide_active = False
         self._guide_step_index = 0
         self._guide_effect_widget = None
@@ -5179,6 +5936,18 @@ class DarkThemeApp(QMainWindow):
         if translate_selection_hotkey:
             self.translate_selection_hotkey_thread = HotkeyListenerThread(translate_selection_hotkey, self.launch_translate_selection, hotkey_id=4)
             self.translate_selection_hotkey_thread.start()
+
+        translate_replace_selection_hotkey = (
+            "" if platform_support.IS_LINUX
+            else self.config.get("translate_replace_selection_hotkey", "")
+        )
+        if translate_replace_selection_hotkey:
+            self.translate_replace_selection_hotkey_thread = HotkeyListenerThread(
+                translate_replace_selection_hotkey,
+                self.launch_translate_replace_selection,
+                hotkey_id=6,
+            )
+            self.translate_replace_selection_hotkey_thread.start()
 
         toggle_window_hotkey = (
             "" if platform_support.IS_LINUX else self.config.get("toggle_window_hotkey", "")
@@ -5469,23 +6238,330 @@ class DarkThemeApp(QMainWindow):
     def _save_main_translation_languages(self):
         self._capture_main_translation_languages()
         self.save_config()
+        self._refresh_direction_summary()
 
-    def _refresh_selection_pair_hint(self):
-        label = getattr(self, "label", None)
-        source_combo = getattr(self, "source_lang", None)
-        target_combo = getattr(self, "target_lang", None)
-        if label is None or source_combo is None or target_combo is None:
+    def _hotkey_language_editor_mode(self):
+        mode = str(self.config.get("hotkey_language_editor_mode", "selection"))
+        return mode if mode in HOTKEY_LANGUAGE_MODES else "selection"
+
+    def _hotkey_for_translation_mode(self, mode):
+        key, fallback = HOTKEY_LANGUAGE_HOTKEY_KEYS.get(
+            mode, HOTKEY_LANGUAGE_HOTKEY_KEYS["selection"]
+        )
+        return str(self.config.get(key, "") or fallback)
+
+    def _available_hotkey_translation_pairs(self, mode):
+        """Pairs usable by both the translator and the OCR action, if any."""
+        pairs = set(self._available_main_translation_pairs())
+        if mode not in {"ocr", "fullscreen"}:
+            return pairs
+        try:
+            from ocr import installed_ocr_language_codes
+
+            engine = self.config.get(
+                "ocr_engine", platform_support.default_ocr_engine()
+            )
+            if mode == "fullscreen" and platform_support.supports_windows_ocr():
+                engine = "Windows"
+            installed_sources = set(
+                installed_ocr_language_codes(engine=engine, config=self.config)
+            )
+            return {
+                (source, target)
+                for source, target in pairs
+                if source in installed_sources
+            }
+        except Exception:
+            logging.exception("Could not inspect hotkey language availability")
+            return pairs
+
+    def _configured_hotkey_translation_pair(self, mode):
+        source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS.get(
+            mode, HOTKEY_LANGUAGE_CONFIG_KEYS["selection"]
+        )
+        source = str(self.config.get(source_key, "en") or "en").lower()
+        target = str(
+            self.config.get(target_key, default_target_for_source(source))
+            or default_target_for_source(source)
+        ).lower()
+        pairs = self._available_hotkey_translation_pairs(mode)
+        if (source, target) in pairs:
+            return source, target
+        for source_language in APP_LANGUAGES:
+            for target_language in APP_LANGUAGES:
+                candidate = (source_language.code, target_language.code)
+                if candidate in pairs:
+                    return candidate
+        if get_language(source) is None:
+            source = "en"
+        if get_language(target) is None or target == source:
+            target = default_target_for_source(source)
+        return source, target
+
+    def _set_hotkey_translation_pair(self, mode, source, target):
+        if mode not in HOTKEY_LANGUAGE_CONFIG_KEYS:
+            return False
+        source = str(source or "").lower()
+        target = str(target or "").lower()
+        if (source, target) not in self._available_hotkey_translation_pairs(mode):
+            return False
+        source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS[mode]
+        self.config[source_key] = source
+        self.config[target_key] = target
+        self.config["hotkey_language_editor_mode"] = mode
+        self.save_config()
+        self._refresh_selection_pair_hint()
+        return True
+
+    def _fill_hotkey_target_control(self, preferred_target=None, pairs=None):
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        mode = self._hotkey_language_editor_mode()
+        pairs = pairs or self._available_hotkey_translation_pairs(mode)
+        source = source_combo.currentData()
+        targets = [
+            language.code
+            for language in APP_LANGUAGES
+            if (source, language.code) in pairs
+        ]
+        target_combo.clear()
+        for code in targets:
+            target_combo.addItem(
+                language_display_name(code, self.current_interface_language), code
+            )
+        if preferred_target not in targets and targets:
+            preferred_target = targets[0]
+        target_combo.setCurrentIndex(
+            target_combo.findData(preferred_target) if preferred_target in targets else -1
+        )
+
+    def _refresh_hotkey_language_controls(self):
+        mode_combo = getattr(self, "hotkey_mode_combo", None)
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if mode_combo is None or source_combo is None or target_combo is None:
+            return False
+        try:
+            mode = self._hotkey_language_editor_mode()
+            pairs = self._available_hotkey_translation_pairs(mode)
+            source, target = self._configured_hotkey_translation_pair(mode)
+            self._hotkey_language_controls_loading = True
+            mode_index = mode_combo.findData(mode)
+            if mode_index >= 0 and mode_combo.currentIndex() != mode_index:
+                mode_combo.setCurrentIndex(mode_index)
+            mode_combo.setToolTip(
+                tooltip_text(main_hotkey_tooltip(self.current_interface_language, mode))
+            )
+            source_codes = [
+                language.code
+                for language in APP_LANGUAGES
+                if any(pair_source == language.code for pair_source, _ in pairs)
+            ]
+            source_combo.clear()
+            for code in source_codes:
+                source_combo.addItem(
+                    language_display_name(code, self.current_interface_language), code
+                )
+            if source not in source_codes and source_codes:
+                source = source_codes[0]
+            source_combo.setCurrentIndex(
+                source_combo.findData(source) if source in source_codes else -1
+            )
+            self._fill_hotkey_target_control(target, pairs)
+            ready = source_combo.count() > 0 and target_combo.count() > 0
+            source_combo.setEnabled(ready)
+            target_combo.setEnabled(ready)
+            return True
+        except RuntimeError:
+            return False
+        finally:
+            self._hotkey_language_controls_loading = False
+
+    def _on_hotkey_mode_changed(self, *_args):
+        if getattr(self, "_hotkey_language_controls_loading", False):
+            return
+        combo = getattr(self, "hotkey_mode_combo", None)
+        mode = str(combo.currentData() or "selection") if combo is not None else "selection"
+        if mode not in HOTKEY_LANGUAGE_MODES:
+            return
+        self.config["hotkey_language_editor_mode"] = mode
+        self._refresh_hotkey_language_controls()
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if source_combo is not None and target_combo is not None:
+            source = source_combo.currentData()
+            target = target_combo.currentData()
+            if source and target:
+                self._set_hotkey_translation_pair(mode, str(source), str(target))
+                return
+        self.save_config()
+
+    def _on_hotkey_source_changed(self, *_args):
+        if getattr(self, "_hotkey_language_controls_loading", False):
+            return
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        preferred = target_combo.currentData() if target_combo is not None else None
+        self._hotkey_language_controls_loading = True
+        try:
+            self._fill_hotkey_target_control(preferred)
+        finally:
+            self._hotkey_language_controls_loading = False
+        self._persist_hotkey_language_controls()
+
+    def _persist_hotkey_language_controls(self, *_args):
+        if getattr(self, "_hotkey_language_controls_loading", False):
+            return
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        source = source_combo.currentData()
+        target = target_combo.currentData()
+        if source and target:
+            self._set_hotkey_translation_pair(
+                self._hotkey_language_editor_mode(), str(source), str(target)
+            )
+
+    def show_hotkey_language_dialog(self):
+        existing = getattr(self, "_hotkey_language_dialog", None)
+        if existing is not None and existing.isVisible():
+            existing.close()
+            return
+        dialog = HotkeyLanguageDialog(self)
+        self._hotkey_language_dialog = dialog
+        anchor = getattr(self, "label", None)
+        if anchor is not None:
+            point = anchor.mapToGlobal(
+                QtCore.QPoint((anchor.width() - dialog.width()) // 2, anchor.height() + 3)
+            )
+        else:
+            point = self.mapToGlobal(
+                QtCore.QPoint((self.width() - dialog.width()) // 2, 60)
+            )
+        screen = QApplication.screenAt(point) or QApplication.primaryScreen()
+        if screen is not None:
+            area = screen.availableGeometry()
+            point.setX(max(area.left() + 8, min(point.x(), area.right() - dialog.width() - 8)))
+            point.setY(max(area.top() + 8, min(point.y(), area.bottom() - dialog.height() - 8)))
+        dialog.move(point)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    #: The short chip caption each hotkey mode is known by on this screen.
+    HOTKEY_MODE_CAPTION_KEYS = {
+        "ocr": "hotkey_ocr_translate",
+        "fullscreen": "hotkey_fullscreen",
+        "selection": "hotkey_selection",
+        "replace": "hotkey_replace",
+    }
+
+    def _stored_hotkey_pair(self, mode):
+        """The pair a mode is configured with, asking no engine anything.
+
+        _configured_hotkey_translation_pair() inspects the installed OCR
+        languages, which is far too much work for a label that redraws whenever
+        a combo changes.
+        """
+        source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS.get(
+            mode, HOTKEY_LANGUAGE_CONFIG_KEYS["selection"]
+        )
+        source = str(self.config.get(source_key, "en") or "en").lower()
+        target = str(self.config.get(target_key, "") or "").lower()
+        if get_language(source) is None:
+            source = "en"
+        if get_language(target) is None or target == source:
+            target = default_target_for_source(source)
+        return source, target
+
+    def _direction_summary_text(self, names=True, modes=True):
+        """One line: what the button translates, and what the shortcuts do.
+
+        Modes that share a direction are listed together, so the common case —
+        all four the same — reads as a single pair instead of four repetitions.
+        """
+        language = self.current_interface_language
+
+        def shown(code):
+            return language_display_name(code, language) if names else code.upper()
+
+        typed_source, typed_target = self._configured_main_translation_pair()
+        groups = []
+        for mode in HOTKEY_LANGUAGE_MODES:
+            pair = self._stored_hotkey_pair(mode)
+            caption = ui_text(language, self.HOTKEY_MODE_CAPTION_KEYS[mode])
+            for known_pair, captions in groups:
+                if known_pair == pair:
+                    captions.append(caption)
+                    break
+            else:
+                groups.append((pair, [caption]))
+
+        if modes and len(groups) > 1:
+            shortcuts = ",  ".join(
+                f"{shown(source)} → {shown(target)} ({'/'.join(captions)})"
+                for (source, target), captions in groups
+            )
+        else:
+            shortcuts = ",  ".join(
+                dict.fromkeys(
+                    f"{shown(source)} → {shown(target)}" for (source, target), _ in groups
+                )
+            )
+        return (
+            f"{ui_text(language, 'direction_typed')}: "
+            f"{shown(typed_source)} → {shown(typed_target)}"
+            "      ·      "
+            f"{ui_text(language, 'direction_shortcuts')}: {shortcuts}"
+        )
+
+    def _refresh_direction_summary(self):
+        """Show a short heading; keep the detailed direction map in its tooltip."""
+        label = getattr(self, "direction_summary", None)
+        if label is None:
             return
         try:
-            if source_combo.count() == 0 or target_combo.count() == 0:
-                label.setText("")
-                return
-            hotkey = self.config.get("translate_selection_hotkey", "") or "Ctrl+Alt+Q"
             label.setText(
-                ui_text(self.current_interface_language, "selection_pair_hint").format(
-                    src=source_combo.currentText(),
-                    tgt=target_combo.currentText(),
-                    hotkey=hotkey,
+                hotkey_language_text(
+                    self.current_interface_language, "mode_language_heading"
+                )
+            )
+            label.setToolTip(
+                tooltip_text(
+                    f"{self._direction_summary_text()}\n"
+                    f"{ui_text(self.current_interface_language, 'direction_hint')}"
+                )
+            )
+        except RuntimeError:
+            return
+
+    def _refresh_selection_pair_hint(self):
+        self._refresh_direction_summary()
+        if self._refresh_hotkey_language_controls():
+            return
+        label = getattr(self, "label", None)
+        if label is None:
+            return
+        try:
+            mode = self._hotkey_language_editor_mode()
+            source_code, target_code = self._configured_hotkey_translation_pair(mode)
+            label.setText(
+                hotkey_language_text(self.current_interface_language, "hint").format(
+                    mode=hotkey_language_text(self.current_interface_language, mode),
+                    src=language_display_name(
+                        source_code, self.current_interface_language
+                    ),
+                    tgt=language_display_name(
+                        target_code, self.current_interface_language
+                    ),
+                    hotkey=self._hotkey_for_translation_mode(mode),
+                )
+            )
+            label.setToolTip(
+                tooltip_text(
+                    hotkey_language_text(self.current_interface_language, "body")
                 )
             )
         except RuntimeError:
@@ -5496,9 +6572,12 @@ class DarkThemeApp(QMainWindow):
         self._refresh_selection_pair_hint()
 
     def _selected_text_translation_pair(self):
-        """Use the exact language pair chosen on the main translator screen."""
-        self._capture_main_translation_languages()
-        return self._configured_main_translation_pair()
+        """Return the persistent pair assigned to Ctrl+Alt+Q."""
+        return self._configured_hotkey_translation_pair("selection")
+
+    def _replace_selected_text_translation_pair(self):
+        """Return the independent pair assigned to Ctrl+Shift+Q."""
+        return self._configured_hotkey_translation_pair("replace")
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
@@ -5582,7 +6661,7 @@ class DarkThemeApp(QMainWindow):
         self.title_bar.setAlignment(Qt.AlignCenter)
 
         self.flag_button = QPushButton(self)
-        self.flag_button.setStyleSheet("background-color: transparent; border: none;")
+        self.flag_button.setStyleSheet(styled_transparent_button_qss())
         self.flag_button.setGeometry(10, 5, 30, 30)
         self.flag_button.clicked.connect(self.show_interface_language_menu)
         self.update_interface_language_button()
@@ -5590,52 +6669,49 @@ class DarkThemeApp(QMainWindow):
         self.theme_button = QPushButton(self)
         self.update_theme_icon()
         self.theme_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "theme")))
-        self.theme_button.setStyleSheet("background-color: transparent; border: none;")
+        self.theme_button.setStyleSheet(styled_transparent_button_qss())
         self.theme_button.setGeometry(50, 5, 30, 30)
         self.theme_button.clicked.connect(self.toggle_theme)
 
         self.minimize_button = QPushButton(self)
         self.minimize_button.setText("‒")
         self.minimize_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "minimize")))
-        self.minimize_button.setStyleSheet("background-color: transparent; border: none;")
+        self.minimize_button.setStyleSheet(styled_transparent_button_qss())
         self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
         self.minimize_button.clicked.connect(self.minimize_to_taskbar)
 
         self.document_button = QPushButton(self)
-        self.document_button.setToolTip(tooltip_text(doc_text(self.current_interface_language, "title")))
-        self.document_button.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                border-radius: 12px;
-            }
-            QPushButton:hover {
-                background-color: rgba(197, 179, 233, 42);
-            }
-        """)
+        self.document_button.setAccessibleName(
+            doc_text(self.current_interface_language, "title")
+        )
+        self.document_button.setToolTip(
+            tooltip_text(doc_text(self.current_interface_language, "title"))
+        )
+        self.document_button.setStyleSheet(styled_transparent_button_qss())
         self.document_button.setGeometry(self.width() - 190, 5, 30, 30)
         self.document_button.setIconSize(QSize(26, 26))
-        self.document_button.clicked.connect(lambda _checked=False: self.open_document_translation())
-        self.update_document_icon()
+        self.document_button.clicked.connect(
+            lambda _checked=False: self.open_document_translation()
+        )
 
         # Кнопка помощи (FAQ)
         self.help_button = QPushButton(self)
         self.help_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "help")))
-        self.help_button.setStyleSheet("background-color: transparent; border: none;")
+        self.help_button.setStyleSheet(styled_transparent_button_qss())
         self.help_button.setGeometry(self.width() - 155, 5, 30, 30)
         self.help_button.clicked.connect(self.show_help_dialog)
         self.update_help_icon()
 
         self.settings_button = QPushButton(self)
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
-        self.settings_button.setStyleSheet("background-color: transparent; border: none;")
+        self.settings_button.setStyleSheet(styled_transparent_button_qss())
         self.settings_button.setGeometry(self.width() - 120, 5, 30, 30)
         self.settings_button.clicked.connect(self.show_settings)
 
         self.close_button = QPushButton(self)
         self.close_button.setText("×")
         self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
-        self.close_button.setStyleSheet("background-color: transparent; border: none;")
+        self.close_button.setStyleSheet(styled_transparent_button_qss())
         self.close_button.setGeometry(self.width() - 40, 5, 30, 30)
         self.close_button.clicked.connect(self.close)
 
@@ -5767,6 +6843,13 @@ class DarkThemeApp(QMainWindow):
             return
         if latest_version == str(self.config.get("skipped_update_version", "")):
             return
+        # A manual check owns the update UI.  In particular, do not let the
+        # delayed launch check open its Update/Skip dialog while Settings is
+        # already on screen: two top-level windows competing for activation is
+        # what produced the visible flashing reported by users.
+        settings = getattr(self, "settings_window", None)
+        if getattr(self, "_update_flow_active", False) or settings is not None:
+            return
         lang = self.current_interface_language
 
         box = QMessageBox(self)
@@ -5839,6 +6922,13 @@ class DarkThemeApp(QMainWindow):
             return getattr(self, "help_button", None)
         if action in ("settings", "back_home"):
             return getattr(self, "settings_button", None)
+        if action == "shortcut_overview":
+            return getattr(self, "hotkey_language_bar", None)
+        if action.startswith("shortcut_"):
+            key = action.removeprefix("shortcut_")
+            return (getattr(self, "main_hotkey_references", None) or {}).get(key)
+        if action == "document_translation":
+            return getattr(self, "document_button", None)
 
         settings_window = getattr(self, "settings_window", None)
         if settings_window is None:
@@ -5878,9 +6968,16 @@ class DarkThemeApp(QMainWindow):
         ))
         self._guide_title.setText(title)
         self._guide_body.setText(body)
-        self._guide_hint.setText(text["click_hint"])
+        if action == "shortcut_overview" or action.startswith("shortcut_"):
+            hint = text.get("read_hint", text["click_hint"])
+        elif action == "document_translation":
+            hint = text.get("document_hint", text["click_hint"])
+        else:
+            hint = text["click_hint"]
+        self._guide_hint.setText(hint)
         if hasattr(self, "_guide_skip_btn"):
             self._guide_skip_btn.setText(text["skip"])
+            self._guide_skip_btn.setEnabled(True)
         self._position_guide_bubble(target)
         self._guide_bubble.show()
         self._guide_bubble.raise_()
@@ -6061,12 +7158,23 @@ class DarkThemeApp(QMainWindow):
             return
         if action != self._guide_current_action():
             return
+        button = getattr(self, "_guide_skip_btn", None)
+        if button is not None:
+            button.setEnabled(False)
         self._guide_step_index += 1
         self._schedule_guide_step(120)
 
     def skip_current_guide_step(self):
         if not self._guide_active:
             return
+        button = getattr(self, "_guide_skip_btn", None)
+        if button is not None:
+            if not button.isEnabled():
+                return
+            # The old card remains visible until the next target has been
+            # prepared. Disable it during that short transition so a double
+            # click cannot advance two or three steps at once.
+            button.setEnabled(False)
         action = self._guide_current_action()
         self._guide_step_index += 1
         if action == "settings" and getattr(self, "settings_window", None) is None:
@@ -6337,9 +7445,25 @@ class DarkThemeApp(QMainWindow):
         return ""
 
     def launch_translate_selection(self):
-        """Translate currently selected text: simulate Ctrl+C, read clipboard, translate, show dialog."""
+        """Translate selected text without ever modifying the source application."""
+        return self._launch_translate_selection(replace_selection=False)
+
+    def launch_translate_replace_selection(self):
+        """Translate selected text and safely replace that exact selection on Windows."""
+        return self._launch_translate_selection(replace_selection=True)
+
+    def _launch_translate_selection(self, replace_selection=False):
+        """Shared selected-text workflow used by the safe and replacement hotkeys."""
         print("launch_translate_selection called")
-        source_code, target_code = self._selected_text_translation_pair()
+        source_code, target_code = (
+            self._replace_selected_text_translation_pair()
+            if replace_selection
+            else self._selected_text_translation_pair()
+        )
+        replace_selection = bool(replace_selection and platform_support.IS_WINDOWS)
+        # Capture this before translation starts. The worker verifies it again
+        # immediately before pasting, after also re-copying the same selection.
+        selection_window = _windows_foreground_window() if replace_selection else 0
 
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
@@ -6386,21 +7510,52 @@ class DarkThemeApp(QMainWindow):
                 print(f"[SEL] result: {len(translated) if translated else 0} chars")
                 if not translated:
                     return
-                if result_window_hidden_for(self.config, "selection"):
-                    platform_support.copy_text(translated)
-                    save_copy_history(translated)
-                    dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
-                        lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
+
+                replacement_attempted = replace_selection
+                replacement_succeeded = False
+                if replacement_attempted:
+                    replacement_succeeded, _reason = replace_selected_text_in_foreground(
+                        text, translated, selection_window
                     )
-                    self._show_status_signal.emit(dialog_text["copied"])
+                    # Ctrl+V needs the translation in the clipboard. On a safe
+                    # fallback we put it there explicitly, so the user never
+                    # loses a finished translation even if focus moved.
+                    if not replacement_succeeded:
+                        platform_support.copy_text(translated)
+                    save_copy_history(translated)
+                    self._show_status_signal.emit(
+                        ui_text(
+                            lang,
+                            "selection_replaced" if replacement_succeeded
+                            else "selection_replace_fallback",
+                        )
+                    )
+
+                if result_window_hidden_for(self.config, "selection"):
+                    if not replacement_attempted:
+                        platform_support.copy_text(translated)
+                        save_copy_history(translated)
+                        dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
+                            lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
+                        )
+                        self._show_status_signal.emit(dialog_text["copied"])
                     time.sleep(1.2)
                     self._hide_status_signal.emit()
                     return
                 theme = self.config.get("theme", "Темная")
-                auto_copy = self.config.get("copy_translated_text", False)
+                # Replacement already uses the clipboard exactly once. Let the
+                # result window say Ready instead of copying and recording the
+                # same value a second time.
+                auto_copy = (
+                    False if replacement_attempted
+                    else self.config.get("copy_translated_text", False)
+                )
                 self._show_selection_signal.emit(
                     translated, auto_copy, lang, theme, text, source_code, target_code
                 )
+                if replacement_attempted:
+                    time.sleep(0.8)
+                    self._hide_status_signal.emit()
             except Exception as e:
                 err_msg = ui_text(lang, "translation_error")
                 self._show_status_signal.emit(f"{err_msg}: {e}")
@@ -6445,6 +7600,14 @@ class DarkThemeApp(QMainWindow):
         scrollbar_bg = theme['button_background']
         scrollbar_handle = '#7A5FA1'  # Фиолетовый
         scrollbar_handle_hover = '#9A7FC1'
+        is_dark = self.current_theme != "Светлая"
+        # This is passive status information, not another control. A single
+        # quiet divider separates it from the shortcuts without creating a
+        # button- or card-shaped target.
+        engine_panel_divider = "#494550" if is_dark else "#d9d2e0"
+        engine_panel_text = "#b9adc8" if is_dark else "#71657d"
+        input_border = "#3a3547" if is_dark else "#cfc8df"
+        input_border_focus = "#a985d2" if is_dark else "#8f7ab8"
         style_sheet = f"""
             QMainWindow {{
                 background-color: {theme['background']};
@@ -6453,6 +7616,27 @@ class DarkThemeApp(QMainWindow):
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
+            }}
+            QFrame#mainEngineStatusPanel {{
+                background: transparent;
+                border: none;
+                border-left: 1px solid {engine_panel_divider};
+                border-radius: 0;
+            }}
+            QFrame#mainSectionDivider {{
+                background: {engine_panel_divider};
+                border: none;
+                max-height: 1px;
+            }}
+            QLabel#mainOcrSummary,
+            QLabel#mainTranslatorSummary {{
+                color: {engine_panel_text};
+                background: transparent;
+                border: none;
+                font-size: 13px;
+                font-weight: 500;
+                margin: 0;
+                padding: 0;
             }}
             QComboBox {{
                 background-color: {theme['button_background']};
@@ -6527,9 +7711,15 @@ class DarkThemeApp(QMainWindow):
             QLineEdit, QTextEdit {{
                 background-color: {theme['button_background']};
                 color: {theme['text_color']};
-                border: 1px solid #550000;
-                padding: 5px;
+                /* Was a dark red hairline, which reads as an error state around
+                   the box you are meant to type in. */
+                border: 1px solid {input_border};
+                border-radius: 8px;
+                padding: 6px;
                 font-size: 14px;
+            }}
+            QLineEdit:focus, QTextEdit:focus {{
+                border: 1px solid {input_border_focus};
             }}
             QTextEdit QScrollBar:vertical {{
                 background: {scrollbar_bg};
@@ -6554,16 +7744,16 @@ class DarkThemeApp(QMainWindow):
             }}
         """
         self.setStyleSheet(style_sheet)
-        popup_background = theme['button_background']
-        for combo_name in ("source_lang", "target_lang"):
-            combo = getattr(self, combo_name, None)
-            if isinstance(combo, DropDownCombo):
-                combo.set_popup_background(popup_background)
+        self._apply_main_combo_theme(is_dark)
+        # The theme decides the font, and the font decides how wide the mode
+        # picker has to be to show its longest entry.
+        self._fit_hotkey_mode_combo()
         if hasattr(self, "title_bar"):
             header_bg = "#c0c0c0" if self.current_theme == "Светлая" else theme['button_background']
             self.title_bar.setStyleSheet(
                 f"font-size: 18px; font-weight: bold; color: {theme['text_color']}; background-color: {header_bg};"
             )
+
         if hasattr(self, "minimize_button") and hasattr(self, "close_button"):
             if self.current_theme == "Светлая":
                 self.minimize_button.setStyleSheet("""
@@ -6631,6 +7821,140 @@ class DarkThemeApp(QMainWindow):
                     self.settings_button.setIcon(QIcon(resource_path("icons/dark_home.png")))
                     self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
 
+    def _apply_main_combo_theme(self, is_dark):
+        """Restyle live main-page selectors and forget deleted Qt wrappers.
+
+        Navigating to Settings deletes the main page asynchronously. Python
+        attributes can therefore still reference wrappers whose C++ combo has
+        already gone. Touching one raises RuntimeError and used to abort the
+        theme switch halfway through, producing a light title over dark blocks.
+        """
+        popup_background = "#20212a" if is_dark else "#ffffff"
+        hotkey_bar = getattr(self, "hotkey_language_bar", None)
+        if isinstance(hotkey_bar, QFrame):
+            try:
+                bar_background = "#17151c" if is_dark else "#f6f2fa"
+                bar_border = "#4f4162" if is_dark else "#cdbce1"
+                hint_color = "#c4a8e8" if is_dark else "#735396"
+                hotkey_bar.setStyleSheet(f"""
+                    QFrame#hotkeyLanguageBar {{
+                        background: {bar_background};
+                        border: 1px solid {bar_border};
+                        border-radius: 9px;
+                    }}
+                    QLabel#hotkeyLanguageBarHint {{
+                        color: {hint_color};
+                        background: transparent;
+                        border: none;
+                        font-size: 13px;
+                        font-weight: 700;
+                    }}
+                    QLabel#hotkeyLanguageBarArrow {{
+                        color: {hint_color};
+                        background: transparent;
+                        border: none;
+                        font-size: 17px;
+                        font-weight: 700;
+                    }}
+                """ + TOOLTIP_QSS)
+            except RuntimeError:
+                self.hotkey_language_bar = None
+        for combo_name in (
+            "source_lang",
+            "target_lang",
+            "hotkey_mode_combo",
+            "hotkey_source_combo",
+            "hotkey_target_combo",
+        ):
+            combo = getattr(self, combo_name, None)
+            if isinstance(combo, DropDownCombo):
+                try:
+                    font_size = 13 if combo_name.startswith("hotkey_") else 16
+                    combo_style = modern_combo_style(is_dark, font_size=font_size)
+                    if combo_name.startswith("hotkey_"):
+                        accent = "#775e96" if is_dark else "#aa8bcc"
+                        hover = "#b395d9" if is_dark else "#8462aa"
+                        combo_style += f"""
+                            QComboBox {{ border: 1px solid {accent}; }}
+                            QComboBox:hover, QComboBox:focus {{ border: 1px solid {hover}; }}
+                        """
+                    combo.setStyleSheet(combo_style)
+                    combo.set_popup_background(popup_background)
+                except RuntimeError:
+                    # The corresponding page is already gone; show_main_screen
+                    # creates a fresh selector when the user returns.
+                    setattr(self, combo_name, None)
+        self._apply_main_translate_button_theme(is_dark)
+
+    def _apply_main_translate_button_theme(self, is_dark):
+        """Style the input and action as one chat-like composer."""
+        button = getattr(self, "translate_button", None)
+        if not isinstance(button, QPushButton):
+            return
+        try:
+            composer = getattr(self, "main_composer", None)
+            background = "#17161b" if is_dark else "#fbf9fd"
+            border = "#4b4256" if is_dark else "#cfc5da"
+            input_text = "#f2eff6" if is_dark else "#27222d"
+            muted = "#948d9e" if is_dark else "#77707e"
+            if isinstance(composer, QFrame):
+                composer.setStyleSheet(
+                    "QFrame#mainComposer {"
+                    f" background-color: {background}; border: 1px solid {border};"
+                    " border-radius: 14px; }"
+                    "QFrame#mainComposer:hover {"
+                    " border-color: #6f5a86; }"
+                    "QTextEdit#mainComposerInput {"
+                    f" background: transparent; color: {input_text};"
+                    f" selection-background-color: #7A5FA1; border: none;"
+                    " padding: 7px 9px; font-size: 14px; }"
+                    "QTextEdit#mainComposerInput:disabled {"
+                    f" color: {muted}; }}"
+                    + TOOLTIP_QSS
+                )
+            button.setStyleSheet(
+                "QPushButton#mainTranslateButton {"
+                " border: none; border-radius: 7px; padding: 0;"
+                " background-color: transparent; }"
+                "QPushButton#mainTranslateButton:hover {"
+                " background-color: rgba(122, 95, 161, 42); }"
+                "QPushButton#mainTranslateButton:pressed {"
+                " background-color: rgba(122, 95, 161, 72); }"
+                "QPushButton#mainTranslateButton:disabled {"
+                " background-color: transparent; }"
+                + TOOLTIP_QSS
+            )
+            button.setIcon(send_arrow_icon("Темная" if is_dark else "Светлая"))
+            button.setIconSize(QSize(24, 24))
+            expand_button = getattr(self, "document_expand_button", None)
+            if isinstance(expand_button, QPushButton):
+                expand_button.setStyleSheet(
+                    "QPushButton#mainDocumentExpandButton {"
+                    " border: none; border-radius: 7px; padding: 0;"
+                    " background-color: transparent; }"
+                    "QPushButton#mainDocumentExpandButton:hover {"
+                    " background-color: rgba(122, 95, 161, 34); }"
+                    "QPushButton#mainDocumentExpandButton:pressed {"
+                    " background-color: rgba(122, 95, 161, 62); }"
+                    + TOOLTIP_QSS
+                )
+                expand_button.setIcon(
+                    document_expand_icon("Темная" if is_dark else "Светлая")
+                )
+                expand_button.setIconSize(QSize(24, 24))
+            heading = getattr(self, "direction_summary", None)
+            if isinstance(heading, QLabel):
+                heading_color = "#c4a3e8" if is_dark else "#674586"
+                heading.setStyleSheet(
+                    "QLabel#mainDirectionSummary {"
+                    f" color: {heading_color}; background: transparent;"
+                    " border: none; padding: 0 3px; margin: 0;"
+                    " font-size: 14px; font-weight: 700; }"
+                    + TOOLTIP_QSS
+                )
+        except RuntimeError:
+            self.translate_button = None
+
     def update_theme_icon(self):
         icon_path = resource_path("icons/sun.png") if self.current_theme == "Темная" else resource_path("icons/moon.png")
         self.theme_button.setIcon(QIcon(icon_path))
@@ -6644,19 +7968,59 @@ class DarkThemeApp(QMainWindow):
                 self.help_button.setIcon(QIcon(resource_path("icons/faq_white_theme.png")))
 
     def update_document_icon(self):
-        if hasattr(self, "document_button"):
-            self.document_button.setIcon(document_translation_icon(self.current_theme))
+        title_button = getattr(self, "document_button", None)
+        if isinstance(title_button, QPushButton):
+            try:
+                title_button.setIcon(document_translation_icon(self.current_theme))
+            except RuntimeError:
+                self.document_button = None
+        button = getattr(self, "document_expand_button", None)
+        if isinstance(button, QPushButton):
+            try:
+                button.setIcon(document_expand_icon(self.current_theme))
+            except RuntimeError:
+                self.document_expand_button = None
 
     def toggle_theme(self):
-        self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
-        self.save_config()
-        self.apply_theme()
-        self.update_theme_icon()
-        if self.settings_window is not None:
-            self.settings_window.apply_theme()
-        if self.document_dialog is not None and self.document_dialog.isVisible():
-            self.document_dialog.refresh_theme(self.current_theme)
+        # Apply the parent and every open child as one paint transaction.  Qt
+        # otherwise exposes the parent with the new palette while cached child
+        # backing stores still contain the old one, leaving dark rectangles in
+        # the light theme until another repaint happens.
+        self.setUpdatesEnabled(False)
+        try:
+            self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
+            self.save_config()
+            self.apply_theme()
+            self.update_theme_icon()
+            if self.settings_window is not None:
+                self.settings_window.apply_theme()
+            if self.document_dialog is not None:
+                self.document_dialog.refresh_theme(self.current_theme)
+        finally:
+            self.setUpdatesEnabled(True)
+        self._refresh_theme_paint_tree()
+        QTimer.singleShot(0, self._refresh_theme_paint_tree)
         self._complete_guide_step("theme")
+
+    def _refresh_theme_paint_tree(self):
+        """Drop cached style geometry and repaint the complete fixed window."""
+        try:
+            widgets = [self]
+            widgets.extend(self.findChildren(QWidget))
+            for widget in widgets:
+                style = widget.style()
+                if style is not None:
+                    style.unpolish(widget)
+                    style.polish(widget)
+                widget.updateGeometry()
+                widget.update()
+            central = self.centralWidget()
+            if central is not None and central.layout() is not None:
+                central.layout().invalidate()
+                central.layout().activate()
+            self.repaint()
+        except RuntimeError:
+            pass
 
     def toggle_language(self):
         codes = [option["code"] for option in INTERFACE_LANGUAGE_OPTIONS]
@@ -6681,8 +8045,20 @@ class DarkThemeApp(QMainWindow):
             self.minimize_button.setToolTip(tooltip_text(ui_text(lang, "minimize")))
         if hasattr(self, "help_button"):
             self.help_button.setToolTip(tooltip_text(ui_text(lang, "help")))
-        if hasattr(self, "document_button"):
-            self.document_button.setToolTip(tooltip_text(doc_text(lang, "title")))
+        document_button = getattr(self, "document_button", None)
+        if isinstance(document_button, QPushButton):
+            try:
+                document_button.setAccessibleName(doc_text(lang, "title"))
+                document_button.setToolTip(tooltip_text(doc_text(lang, "title")))
+            except RuntimeError:
+                self.document_button = None
+        document_expand_button = getattr(self, "document_expand_button", None)
+        if isinstance(document_expand_button, QPushButton):
+            try:
+                document_expand_button.setAccessibleName(doc_text(lang, "title"))
+                document_expand_button.setToolTip(tooltip_text(doc_text(lang, "title")))
+            except RuntimeError:
+                self.document_expand_button = None
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
             self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang][key]))
@@ -7059,20 +8435,23 @@ class DarkThemeApp(QMainWindow):
         # QFontMetrics.horizontalAdvance excludes a glyph's anti-aliased edge
         # overhang. With an exactly-sized bold label the final C/F/Q loses its
         # rightmost pixels, so keep a small optical safety area at the end.
-        trailing_glyph_room = 5
+        trailing_glyph_room = 4
         layout.setContentsMargins(0, 0, trailing_glyph_room, 0)
         layout.setSpacing(3)
 
         caption_label = QLabel(f"{caption}:")
         caption_label.setObjectName("mainHotkeyCaption")
-        caption_label.setStyleSheet("font-size: 13px; color: #888; padding: 0; margin: 0;")
+        caption_label.setStyleSheet("font-size: 14px; color: #99919f; padding: 0; margin: 0;")
         caption_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         value_label = QLabel(str(sequence))
         value_label.setObjectName("mainHotkeyValue")
         value_label.setStyleSheet(
-            "font-size: 13px; color: #7A5FA1; font-weight: bold; padding: 0; margin: 0;"
+            "font-size: 13px; color: #9f7aca; font-weight: bold; "
+            "background-color: rgba(122, 95, 161, 22); "
+            "border: 1px solid rgba(122, 95, 161, 105); border-radius: 5px; "
+            "padding: 1px 4px; margin: 0;"
         )
-        value_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        value_label.setAlignment(Qt.AlignCenter)
         value_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(caption_label)
         layout.addWidget(value_label)
@@ -7085,11 +8464,31 @@ class DarkThemeApp(QMainWindow):
         pair.ensurePolished()
         layout.activate()
         pair.setFixedWidth(pair.sizeHint().width())
+        layout.invalidate()
+        layout.activate()
         pair.trailing_glyph_room = trailing_glyph_room
         pair.setToolTip(tooltip_text(f"{caption}: {sequence}"))
         pair.caption_label = caption_label
         pair.value_label = value_label
         return pair
+
+    @staticmethod
+    def _align_main_hotkey_pair_group(*pairs):
+        """Align keycap borders within one fixed legend column."""
+        pairs = tuple(pair for pair in pairs if pair is not None)
+        if not pairs:
+            return
+        caption_width = max(pair.caption_label.sizeHint().width() for pair in pairs)
+        value_width = max(pair.value_label.sizeHint().width() for pair in pairs)
+        for pair in pairs:
+            pair.caption_label.setFixedWidth(caption_width)
+            pair.value_label.setFixedWidth(value_width)
+            pair.setFixedWidth(
+                caption_width
+                + value_width
+                + pair.layout().spacing()
+                + pair.trailing_glyph_room
+            )
 
     def show_main_screen(self):
         self.clear_layout()
@@ -7101,41 +8500,168 @@ class DarkThemeApp(QMainWindow):
         translator_engine = cached_config.get("translator_engine", "Google").lower()
         ocr_engine = cached_config.get("ocr_engine", platform_support.default_ocr_engine())
         
-        self.label = QLabel("")
-        self.label.setAlignment(Qt.AlignCenter)
-        self.label.setWordWrap(True)
-        self.label.setStyleSheet("color: #a98bd4; font-size: 15px; font-weight: 700; margin-top: 8px; margin-bottom: 5px;")
-        self.main_layout.addWidget(self.label)
-        self.main_layout.addSpacing(2)
+        self.label = None
+        self._hotkey_language_controls_loading = True
+        # The window had three competing rows of language pickers and put the
+        # hotkey one first, so the first thing the eye landed on was the control
+        # you need least. Order now follows what the window is for: pick a
+        # direction, type, translate — then the hotkey settings, then reference.
+        self.hotkey_language_bar = QFrame()
+        self.hotkey_language_bar.setObjectName("hotkeyLanguageBar")
+        hotkey_bar_layout = QVBoxLayout(self.hotkey_language_bar)
+        hotkey_bar_layout.setContentsMargins(7, 3, 7, 3)
+        hotkey_bar_layout.setSpacing(3)
+        self.direction_summary = QLabel()
+        self.direction_summary.setObjectName("mainDirectionSummary")
+        self.direction_summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.direction_summary.setFixedHeight(22)
+        hotkey_bar_layout.addWidget(self.direction_summary)
+        hotkey_row = QHBoxLayout()
+        hotkey_row.setContentsMargins(0, 0, 0, 0)
+        hotkey_row.setSpacing(6)
+        # The mode combo reads "Selection · Ctrl+Alt+Q", which says what the row
+        # is for; the sentence that used to sit above it cost a whole line to
+        # repeat that. It is the bar's tooltip now.
+        hotkey_caption = QLabel(hotkey_language_text(self.current_interface_language, "bar_caption"))
+        hotkey_caption.setObjectName("hotkeyLanguageBarHint")
+        hotkey_row.addWidget(hotkey_caption)
+        self.hotkey_language_bar.setToolTip(
+            tooltip_text(hotkey_language_text(self.current_interface_language, "bar_hint"))
+        )
+        self.hotkey_mode_combo = DropDownCombo()
+        self.hotkey_mode_combo.setMaxVisibleItems(4)
+        for mode in HOTKEY_LANGUAGE_MODES:
+            self.hotkey_mode_combo.addItem(
+                hotkey_language_text(self.current_interface_language, mode),
+                mode,
+            )
+            self.hotkey_mode_combo.setItemData(
+                self.hotkey_mode_combo.count() - 1,
+                tooltip_text(main_hotkey_tooltip(self.current_interface_language, mode)),
+                Qt.ToolTipRole,
+            )
+        self.hotkey_mode_combo.setFixedWidth(160)
+        self.hotkey_source_combo = DropDownCombo()
+        self.hotkey_source_combo.setMaxVisibleItems(9)
+        self.hotkey_target_combo = DropDownCombo()
+        self.hotkey_target_combo.setMaxVisibleItems(9)
+        pair_arrow = QLabel("→")
+        pair_arrow.setObjectName("hotkeyLanguageBarArrow")
+        pair_arrow.setAlignment(Qt.AlignCenter)
+        pair_arrow.setFixedWidth(18)
+        hotkey_row.addWidget(self.hotkey_mode_combo)
+        hotkey_row.addWidget(self.hotkey_source_combo, 1)
+        hotkey_row.addWidget(pair_arrow)
+        hotkey_row.addWidget(self.hotkey_target_combo, 1)
+        hotkey_bar_layout.addLayout(hotkey_row)
+
         self.source_lang = DropDownCombo()
         self.source_lang.setMaxVisibleItems(9)
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
-        self.main_layout.addWidget(self.source_lang)
         self.target_lang = DropDownCombo()
         self.target_lang.setMaxVisibleItems(9)
-        self.main_layout.addWidget(self.target_lang)
+        self._apply_main_combo_theme(self.current_theme == "Темная")
+        # Side by side with an arrow between them, so it reads as one direction
+        # rather than two unrelated drop-downs — and it costs one row instead of
+        # two, which is what the text box below gets back.
+        language_picker_layout = QHBoxLayout()
+        language_picker_layout.setContentsMargins(0, 0, 0, 0)
+        language_picker_layout.setSpacing(6)
+        main_pair_arrow = QLabel("→")
+        main_pair_arrow.setObjectName("hotkeyLanguageBarArrow")
+        main_pair_arrow.setAlignment(Qt.AlignCenter)
+        main_pair_arrow.setFixedWidth(18)
+        language_picker_layout.addWidget(self.source_lang, 1)
+        language_picker_layout.addWidget(main_pair_arrow)
+        language_picker_layout.addWidget(self.target_lang, 1)
+        self.main_layout.addLayout(language_picker_layout)
         self._restore_main_translation_languages()
         self._refresh_selection_pair_hint()
+        self.hotkey_mode_combo.currentIndexChanged.connect(
+            self._on_hotkey_mode_changed
+        )
+        self.hotkey_source_combo.currentIndexChanged.connect(
+            self._on_hotkey_source_changed
+        )
+        self.hotkey_target_combo.currentIndexChanged.connect(
+            self._persist_hotkey_language_controls
+        )
+        self._hotkey_language_controls_loading = False
         self.source_lang.currentIndexChanged.connect(self.update_languages)
         self.target_lang.currentIndexChanged.connect(self._on_main_translation_target_changed)
-        self.text_input = QTextEdit()
+        self.main_composer = QFrame()
+        self.main_composer.setObjectName("mainComposer")
+        self.main_composer.setFixedHeight(76)
+        composer_layout = QGridLayout(self.main_composer)
+        composer_layout.setContentsMargins(3, 3, 4, 5)
+        composer_layout.setSpacing(0)
+        composer_layout.setColumnStretch(0, 1)
+        # Keep both actions in a narrow rail of their own. Long input never
+        # grows a scrollbar beside the send arrow: after two visual lines an
+        # unobtrusive expand action appears and opens the document workspace.
+
+        self.text_input = TranslateOnEnterTextEdit()
+        self.text_input.setObjectName("mainComposerInput")
         self.text_input.setPlaceholderText(
             f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
         )
-        self.text_input.setToolTip(tooltip_text(doc_text(self.current_interface_language, "main_file_tooltip")))
-        self.text_input.setMinimumHeight(45)
-        self.text_input.setMaximumHeight(70)
+        # Deliberately plain two-line text. Qt respects the explicit line break
+        # without squeezing it into the narrow rich-text tooltip seen before.
+        self.text_input.setToolTip(doc_text(self.current_interface_language, "main_file_tooltip"))
+        # This is what the window is for, so it gets the room the second
+        # language row and the hint line used to take.
+        self.text_input.setFixedHeight(68)
+        self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
         self.text_input.setAcceptDrops(False)
-        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.text_input.setContextMenuPolicy(Qt.CustomContextMenu)
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
-        self.main_layout.addWidget(self.text_input)
+        self.text_input.translation_requested.connect(self.translate_input_text)
+        self.text_input.textChanged.connect(self._schedule_document_expand_visibility)
+        composer_layout.addWidget(self.text_input, 0, 0)
 
-        # Кнопка перевода сразу под полем ввода
-        self.translate_button = QPushButton(ui_text(self.current_interface_language, "translate_button"))
+        composer_actions = QWidget(self.main_composer)
+        composer_actions.setObjectName("mainComposerActions")
+        composer_actions.setFixedWidth(34)
+        composer_actions_layout = QVBoxLayout(composer_actions)
+        composer_actions_layout.setContentsMargins(0, 0, 0, 0)
+        composer_actions_layout.setSpacing(0)
+
+        self.document_expand_button = QPushButton()
+        self.document_expand_button.setObjectName("mainDocumentExpandButton")
+        self.document_expand_button.setAccessibleName(
+            doc_text(self.current_interface_language, "title")
+        )
+        self.document_expand_button.setToolTip(
+            tooltip_text(doc_text(self.current_interface_language, "title"))
+        )
+        self.document_expand_button.setFixedSize(28, 28)
+        self.document_expand_button.clicked.connect(
+            self._open_composer_in_document_translation
+        )
+        self.document_expand_button.hide()
+        composer_actions_layout.addWidget(
+            self.document_expand_button, 0, Qt.AlignHCenter | Qt.AlignTop
+        )
+        composer_actions_layout.addStretch(1)
+
+        translate_action_text = ui_text(
+            self.current_interface_language, "translate_button"
+        )
+        self.translate_button = QPushButton()
         self.translate_button.clicked.connect(self.translate_input_text)
-        self.translate_button.setStyleSheet("border: 2px solid #C5B3E9; border-radius: 8px; font-size: 16px; padding: 8px 0; background: none; color: #7A5FA1;")
+        self.translate_button.setObjectName("mainTranslateButton")
+        self.translate_button.setAccessibleName(translate_action_text)
+        self.translate_button.setToolTip(
+            tooltip_text(f"{translate_action_text} (Enter)")
+        )
+        self.translate_button.setFixedSize(32, 32)
+        composer_actions_layout.addWidget(
+            self.translate_button, 0, Qt.AlignHCenter | Qt.AlignBottom
+        )
+        composer_layout.addWidget(composer_actions, 0, 1)
+        self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
         self.translate_button.setEnabled(has_translation_pair)
         if not has_translation_pair:
@@ -7144,7 +8670,18 @@ class DarkThemeApp(QMainWindow):
                     ui_text(self.current_interface_language, "install_argos_packages_hint")
                 )
             )
-        self.main_layout.addWidget(self.translate_button)
+        self.main_layout.addWidget(self.main_composer)
+
+        self._refresh_direction_summary()
+        self._apply_main_translate_button_theme(self.current_theme == "Темная")
+
+        # Everything below this line is settings and reference, not the task.
+        divider = QFrame()
+        divider.setObjectName("mainSectionDivider")
+        divider.setFrameShape(QFrame.HLine)
+        divider.setFixedHeight(1)
+        self.main_layout.addWidget(divider)
+        self.main_layout.addWidget(self.hotkey_language_bar)
 
         # --- Блок хоткеев (показываем всегда) ---
         not_set = "—"
@@ -7154,52 +8691,139 @@ class DarkThemeApp(QMainWindow):
         translate_hk = self.config.get("translate_hotkey", "") or not_set
         fs_hk = self.config.get("fullscreen_translate_hotkey", "") or not_set
         sel_hk = self.config.get("translate_selection_hotkey", "") or not_set
+        toggle_hk = self.config.get("toggle_window_hotkey", "") or not_set
+        # Six hotkeys are registered; the legend listed five. Translate-and-
+        # replace was the one nobody could see here.
+        replace_hk = self.config.get("translate_replace_selection_hotkey", "") or not_set
 
         tr_names = {"argos": "Argos", "hymt": "Hy-MT", "google": "Google", "mymemory": "MyMemory", "lingva": "Lingva", "libretranslate": "LibreTranslate"}
         tr_name = tr_names.get(translator_engine, translator_engine.capitalize())
 
-        # Row 1: Copy + OCR translate | OCR engine + Translator
-        row1 = QHBoxLayout()
-        row1.setSpacing(12)
+        # Two rows, three columns, engine summary alongside. One row was tried:
+        # measured in all six languages, five chips plus the summary do not fit
+        # 690px in any of them — they drew over each other.
+        hotkey_grid = QGridLayout()
+        hotkey_grid.setContentsMargins(0, 0, 0, 0)
+        # The gap before the divider is this spacing, and the gap after it is
+        # the panel's left margin below. They are kept equal on purpose: 10
+        # against 17 was the separator sitting on top of the words. 12 is what
+        # the widest language (Spanish) can afford without the last shortcut
+        # crossing the line.
+        hotkey_grid.setHorizontalSpacing(12)
+        hotkey_grid.setVerticalSpacing(2)
+
         r1_copy = self._create_main_hotkey_pair(ui_text(lang, "hotkey_copy"), copy_hk)
         r1_translate = self._create_main_hotkey_pair(
             ui_text(lang, "hotkey_ocr_translate"), translate_hk
         )
-        row1.addWidget(r1_copy, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row1.addWidget(r1_translate, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row1.addStretch(1)
-        r1_right = QLabel(f"OCR: <b>{ocr_engine}</b>")
-        r1_right.setStyleSheet("font-size: 13px; color: #7A5FA1; margin-right: 8px;")
-        r1_right.setTextFormat(Qt.RichText)
-        row1.addWidget(r1_right, alignment=Qt.AlignRight)
-        self.main_layout.addLayout(row1)
-
-        # Row 2: Fullscreen + Selection | Translator
-        row2 = QHBoxLayout()
-        row2.setSpacing(12)
+        r1_toggle = self._create_main_hotkey_pair(
+            ui_text(lang, "hotkey_toggle"), toggle_hk
+        )
         r2_fullscreen = self._create_main_hotkey_pair(
             ui_text(lang, "hotkey_fullscreen"), fs_hk
         )
         r2_selection = self._create_main_hotkey_pair(
             ui_text(lang, "hotkey_selection"), sel_hk
         )
-        row2.addWidget(r2_fullscreen, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row2.addWidget(r2_selection, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row2.addStretch(1)
-        r2_right = QLabel(f"{ui_text(lang, 'translator')}: <b>{tr_name}</b>")
-        r2_right.setStyleSheet("font-size: 13px; color: #7A5FA1; margin-right: 8px;")
-        r2_right.setTextFormat(Qt.RichText)
-        row2.addWidget(r2_right, alignment=Qt.AlignRight)
-        self.main_layout.addLayout(row2)
+        r2_replace = self._create_main_hotkey_pair(
+            ui_text(lang, "hotkey_replace"), replace_hk
+        )
+        self.main_hotkey_references = {
+            "copy": r1_copy,
+            "ocr": r1_translate,
+            "toggle": r1_toggle,
+            "fullscreen": r2_fullscreen,
+            "selection": r2_selection,
+            "replace": r2_replace,
+        }
+        self.replace_hotkey_reference = r2_replace
+        for help_key, pair in (
+            ("copy", r1_copy),
+            ("ocr", r1_translate),
+            ("toggle", r1_toggle),
+            ("fullscreen", r2_fullscreen),
+            ("selection", r2_selection),
+            ("replace", r2_replace),
+        ):
+            help_value = tooltip_text(main_hotkey_tooltip(lang, help_key))
+            pair.setToolTip(help_value)
+            pair.setAccessibleDescription(main_hotkey_tooltip(lang, help_key))
+            for label in pair.findChildren(QLabel):
+                label.setToolTip(help_value)
+        self._align_main_hotkey_pair_group(r1_copy, r2_fullscreen)
+        self._align_main_hotkey_pair_group(r1_translate, r2_selection)
+        self._align_main_hotkey_pair_group(r1_toggle, r2_replace)
+        ocr_summary = QLabel(f"OCR: <b>{ocr_engine}</b>")
+        ocr_summary.setObjectName("mainOcrSummary")
+        translator_summary = QLabel(
+            f"{ui_text(lang, 'translator')}: <b>{tr_name}</b>"
+        )
+        translator_summary.setObjectName("mainTranslatorSummary")
+        for summary in (ocr_summary, translator_summary):
+            summary.setTextFormat(Qt.RichText)
+            summary.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        engine_status_panel = QFrame()
+        engine_status_panel.setObjectName("mainEngineStatusPanel")
+        engine_status_layout = QVBoxLayout(engine_status_panel)
+        # Same air on both sides of the divider line, in every language.
+        engine_status_layout.setContentsMargins(12, 0, 2, 0)
+        engine_status_layout.setSpacing(0)
+        engine_status_layout.addWidget(ocr_summary)
+        engine_status_layout.addWidget(translator_summary)
+
+        # No fixed column widths. 160 and 186 were measured for English; French
+        # and Spanish ("Remplacer", "Reemplazar") then pushed the third column
+        # past the engine divider, which is what put the separator right up
+        # against the words. Let the columns take what their text needs and give
+        # the leftover to the gap before the divider.
+        hotkey_grid.setColumnStretch(3, 1)
+        hotkey_grid.addWidget(r1_copy, 0, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r2_fullscreen, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r1_translate, 0, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r2_selection, 1, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r1_toggle, 0, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r2_replace, 1, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(engine_status_panel, 0, 3, 2, 1)
+        self.main_layout.addLayout(hotkey_grid)
 
         # Кнопка старт (shadow mode) в самом низу
         start_text = ui_text(self.current_interface_language, "shadow_mode")
         self.start_button = QPushButton(start_text)
-        self.start_button.setStyleSheet("border: none; font-size: 16px; padding: 8px 0; background-color: #C5B3E9; color: #111; border-radius: 8px;")
+        # Secondary: it sends the window away, which is not what someone opening
+        # this window came to do. It used to be the only filled button here.
+        self.start_button.setObjectName("mainShadowButton")
+        # Light violet is legible on the dark theme and nearly invisible on the
+        # light one, so the outline follows the theme.
+        shadow_ink = "#C5B3E9" if self.current_theme != "Светлая" else "#6b4f96"
+        self.start_button.setStyleSheet(
+            "QPushButton#mainShadowButton {"
+            f" border: 1px solid {shadow_ink}; border-radius: 8px; font-size: 14px;"
+            f" padding: 5px 0; background: transparent; color: {shadow_ink}; }}"
+            "QPushButton#mainShadowButton:hover { background-color: rgba(122, 95, 161, 38); }"
+        )
         self.main_layout.addWidget(self.start_button)
         self.start_button.clicked.connect(self.minimize_to_tray)
         self.apply_theme()
         self._complete_guide_step("back_home")
+
+    def _fit_hotkey_mode_combo(self):
+        """Fit the short mode names without stealing room from both languages."""
+        combo = getattr(self, "hotkey_mode_combo", None)
+        if combo is None:
+            return
+        try:
+            # Ask Qt instead of guessing at the padding. Adding a margin by hand
+            # was wrong twice: the stylesheet's padding, the chevron and the
+            # frame do not add up to any number worth hard-coding, and German
+            # kept losing the last character of "Ctrl+Shift+Q".
+            combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+            combo.setMinimumWidth(0)
+            combo.setMaximumWidth(16777215)
+            needed = combo.sizeHint().width()
+            combo.setFixedWidth(min(200, max(160, needed)))
+        except RuntimeError:
+            pass
 
     def show_settings(self):
         self.clear_layout()
@@ -7244,11 +8868,15 @@ class DarkThemeApp(QMainWindow):
         self._refresh_selection_pair_hint()
 
     def clear_layout(self):
-        # Удаляем все виджеты и layout'ы из main_layout
+        # Hide removed pages synchronously.  deleteLater() alone leaves their
+        # old backing stores visible until Qt processes deferred deletes; when
+        # the theme changes in that interval, those stale dark widgets appear
+        # as black rectangles over the light settings page.
         while self.main_layout.count():
             item = self.main_layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.deleteLater()
             elif item.layout():
                 self._clear_nested_layout(item.layout())
@@ -7258,18 +8886,85 @@ class DarkThemeApp(QMainWindow):
             item = layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.deleteLater()
             elif item.layout():
                 self._clear_nested_layout(item.layout())
 
-    def open_document_translation(self, path=None):
-        if self.document_dialog is None or not self.document_dialog.isVisible():
-            self.document_dialog = DocumentTranslationDialog(self, initial_path=path)
-        elif path:
-            self.document_dialog.load_file(path)
-        self.document_dialog.show()
-        self.document_dialog.raise_()
-        self.document_dialog.activateWindow()
+    def _schedule_document_expand_visibility(self):
+        QTimer.singleShot(0, self._update_document_expand_visibility)
+
+    def _composer_visual_line_count(self):
+        editor = getattr(self, "text_input", None)
+        if not isinstance(editor, QTextEdit):
+            return 0
+        document = editor.document()
+        # Force the layout to catch up before counting wrapped lines.
+        document.documentLayout().documentSize()
+        line_count = 0
+        block = document.begin()
+        while block.isValid():
+            layout = block.layout()
+            line_count += max(1, layout.lineCount() if layout is not None else 1)
+            block = block.next()
+        return line_count
+
+    def _update_document_expand_visibility(self):
+        button = getattr(self, "document_expand_button", None)
+        editor = getattr(self, "text_input", None)
+        if not isinstance(button, QPushButton) or not isinstance(editor, QTextEdit):
+            return
+        try:
+            # One or two lines remain a quick message. Longer text gets a clear
+            # way into the spacious document editor instead of a tiny scrollbar.
+            button.setVisible(
+                bool(editor.toPlainText().strip())
+                and self._composer_visual_line_count() > 2
+            )
+        except RuntimeError:
+            self.document_expand_button = None
+
+    def _open_composer_in_document_translation(self):
+        editor = getattr(self, "text_input", None)
+        text = editor.toPlainText() if isinstance(editor, QTextEdit) else ""
+        if text.strip():
+            self.open_document_translation(initial_text=text)
+
+    def _on_document_dialog_destroyed(self, *_args):
+        self.document_dialog = None
+
+    def open_document_translation(self, path=None, initial_text=None):
+        dialog = self.document_dialog
+        try:
+            if dialog is not None:
+                dialog.windowTitle()
+        except RuntimeError:
+            dialog = None
+
+        if dialog is None:
+            dialog = DocumentTranslationDialog(self)
+            dialog.destroyed.connect(self._on_document_dialog_destroyed)
+            self.document_dialog = dialog
+
+        # The dialog is cached after closing. It therefore may have missed a
+        # theme or interface-language change while hidden; synchronise it on
+        # every open instead of trusting the state from its first creation.
+        dialog.refresh_theme(self.current_theme)
+        if dialog.lang != self.current_interface_language:
+            dialog.refresh_language(self.current_interface_language)
+
+        if path:
+            dialog.load_file(path)
+        elif initial_text is not None:
+            dialog.load_plain_text(initial_text)
+
+        if dialog.isMinimized():
+            dialog.showNormal()
+        else:
+            dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        return dialog
 
     def _apply_main_context_menu_style(self, menu):
         if self.current_theme == "Темная":
@@ -7484,6 +9179,13 @@ class DarkThemeApp(QMainWindow):
                 self.translate_selection_hotkey_thread.join(timeout=0.5)
         except Exception as e:
             print(f"Error stopping selection hotkey thread: {e}")
+        try:
+            thread = getattr(self, "translate_replace_selection_hotkey_thread", None)
+            if thread is not None:
+                thread.stop()
+                thread.join(timeout=0.5)
+        except Exception as e:
+            print(f"Error stopping replace-selection hotkey thread: {e}")
         try:
             if hasattr(self, "toggle_window_hotkey_thread") and self.toggle_window_hotkey_thread is not None:
                 self.toggle_window_hotkey_thread.stop()

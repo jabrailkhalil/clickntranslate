@@ -221,6 +221,31 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         parent.close()
         self.app.processEvents()
 
+    def test_fixed_settings_rows_stay_top_anchored(self):
+        """Adding a third selector must not push the checkbox stack down."""
+        parent, settings = self._result_window_settings(lang="ru")
+        try:
+            autostart = self._rect_in_settings(settings, settings.autostart_checkbox)
+            start_minimized = self._rect_in_settings(
+                settings, settings.start_minimized_checkbox
+            )
+            copy_translated = self._rect_in_settings(
+                settings, settings.copy_translated_checkbox
+            )
+            ocr = self._rect_in_settings(settings, settings.ocr_engine_combo)
+            translator = self._rect_in_settings(settings, settings.translator_combo)
+            result = self._rect_in_settings(settings, settings.result_window_control)
+
+            self.assertEqual(autostart[1], settings.main_layout.contentsMargins().top())
+            self.assertEqual(autostart[1], ocr[1])
+            self.assertEqual(start_minimized[1], translator[1])
+            self.assertEqual(copy_translated[1], result[1])
+            self.assertTrue(settings.main_layout.alignment() & Qt.AlignTop)
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
     def test_the_three_modes_are_rows_in_the_dropdown(self):
         """The row used to be three inline buttons. It is a drop-down now, and
         the three actions stay independent switches rather than one choice."""
@@ -230,7 +255,6 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         self.assertIsInstance(control, QComboBox)
         # Screen-area OCR and plain copy never open a result window, so they
         # must not be offered here; only these three modes actually show one.
-        # The extra row is the header that says what the list is for.
         self.assertEqual(control.count(), len(main.RESULT_WINDOW_MODES) + 1)
         header = control.model().item(0)
         self.assertEqual(header.text(), settings_text("en", "result_window_modes_header"))

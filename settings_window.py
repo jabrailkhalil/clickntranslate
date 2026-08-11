@@ -507,6 +507,72 @@ class DropDownCombo(QComboBox):
         return screen.availableGeometry()
 
 
+def modern_combo_style(dark, font_size=15):
+    """Return the shared modern selector style used throughout the app."""
+    is_dark = bool(dark)
+    bg = "#17181d" if is_dark else "#f6f3fa"
+    bg_lit = "#221f2c" if is_dark else "#eee8f7"
+    text = "#f4f6fb" if is_dark else "#202124"
+    border = "#3d3948" if is_dark else "#d7cde7"
+    border_hover = "#6f598d" if is_dark else "#ad97cb"
+    accent = "#9A7FC1" if is_dark else "#8063a8"
+    popup_bg = "#20212a" if is_dark else "#ffffff"
+    selection = "#5f4a88" if is_dark else "#d9cdf0"
+    arrow_icon = resource_path(
+        "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
+    ).replace("\\", "/")
+    return f"""
+        QComboBox {{
+            /* Keep the fixed 32px row, but inset the painted field vertically.
+               Three stacked selectors then have a clear 7px visual gap without
+               moving any surrounding controls in the 700x400 window. */
+            margin: 2px 3px;
+            padding: 3px 28px 3px 10px;
+            min-height: 20px;
+            background-color: {bg};
+            color: {text};
+            border: 1px solid {border};
+            border-radius: 7px;
+            font-size: {int(font_size)}px;
+        }}
+        QComboBox:hover {{
+            background-color: {bg_lit};
+            border-color: {border_hover};
+        }}
+        QComboBox:focus, QComboBox:on {{
+            background-color: {bg_lit};
+            border-color: {accent};
+        }}
+        QComboBox::drop-down {{
+            subcontrol-origin: padding;
+            subcontrol-position: center right;
+            width: 24px;
+            border: none;
+            background: transparent;
+            image: url({arrow_icon});
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {popup_bg};
+            color: {text};
+            selection-background-color: {selection};
+            selection-color: #ffffff;
+            outline: none;
+            border: 1px solid {border};
+            border-radius: 7px;
+            padding: 3px 0px;
+        }}
+        QComboBox QAbstractItemView::item {{
+            min-height: 24px;
+            padding: 2px 8px;
+            color: {text};
+        }}
+        QComboBox QAbstractItemView::item:disabled {{
+            color: {text};
+            background-color: {popup_bg};
+        }}
+    """
+
+
 class ResultWindowModeCombo(DropDownCombo):
     """Drop-down that turns the result window on or off per action.
 
@@ -537,11 +603,13 @@ class ResultWindowModeCombo(DropDownCombo):
         self.setModel(QtGui.QStandardItemModel(0, 1, self))
         self.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
 
-        if header:
+        def append_header(text):
+            if not text:
+                return
             # "Show:" alone does not say show what, or after what. A disabled
             # first row says it where it is needed, the same way the engine
             # combos label their Online/Offline groups.
-            head = QtGui.QStandardItem(header)
+            head = QtGui.QStandardItem(text)
             head.setFlags(Qt.NoItemFlags)
             head_font = head.font()
             head_font.setBold(True)
@@ -550,6 +618,7 @@ class ResultWindowModeCombo(DropDownCombo):
             head.setSizeHint(QtCore.QSize(0, self.ROW_HEIGHT))
             self.model().appendRow(head)
 
+        append_header(header)
         for mode in self._modes:
             item = QtGui.QStandardItem(labels[mode])
             item.setData(mode, Qt.UserRole)
@@ -598,8 +667,11 @@ class ResultWindowModeCombo(DropDownCombo):
 
     def _toggle_pressed(self, index):
         item = self.model().itemFromIndex(index)
-        if item is not None:
-            self.toggle_mode(item.data(Qt.UserRole))
+        if item is None or not item.isEnabled():
+            return
+        value = item.data(Qt.UserRole)
+        if value in self._modes:
+            self.toggle_mode(value)
 
     def _refresh_icons(self):
         # The tick is an icon rather than Qt's own check indicator: a stylesheet
@@ -660,9 +732,12 @@ class ResultWindowModeCombo(DropDownCombo):
         # The closed control may only have room for "2 of 3", so the tooltip and
         # the screen reader always spell out which actions are on.
         detail = self.detail_text()
-        self.setAccessibleDescription(f"{self._help}. {detail}" if self._help else detail)
+        accessible_detail = detail
+        self.setAccessibleDescription(
+            f"{self._help}. {accessible_detail}" if self._help else accessible_detail
+        )
         if self._help:
-            self.setToolTip(tooltip_text(f"{self._help}\n{detail}"))
+            self.setToolTip(tooltip_text(f"{self._help}\n{accessible_detail}"))
         self.update()
 
     def showPopup(self):
@@ -1362,6 +1437,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the result window after pressing Translate.",
+        "replace_selection_translate_label": "Translate and replace selection:",
+        "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
         "copy_hotkey_label": "Copy Selected Hotkey:",
         "translate_hotkey_label": "Translate Hotkey:",
         "remove_local_tesseract": "Remove local Tesseract",
@@ -1443,6 +1520,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать окно после нажатия кнопки «Перевести».",
+        "replace_selection_translate_label": "Перевести и заменить выделенное:",
+        "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
         "remove_local_tesseract": "Удалить локальный Tesseract",
@@ -1523,6 +1602,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la ventana al pulsar Traducir.",
+        "replace_selection_translate_label": "Traducir y reemplazar selección:",
+        "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
         "copy_hotkey_label": "Atajo para copiar seleccion:",
         "translate_hotkey_label": "Atajo de traduccion:",
         "remove_local_tesseract": "Eliminar Tesseract local",
@@ -1603,6 +1684,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Fenster nach einem Klick auf Übersetzen zeigen.",
+        "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
+        "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
         "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
         "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
@@ -1683,6 +1766,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la fenêtre après avoir cliqué sur Traduire.",
+        "replace_selection_translate_label": "Traduire et remplacer la sélection :",
+        "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
         "copy_hotkey_label": "Raccourci de copie :",
         "translate_hotkey_label": "Raccourci de traduction :",
         "remove_local_tesseract": "Supprimer Tesseract local",
@@ -1763,6 +1848,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "点击“翻译”后显示窗口。",
+        "replace_selection_translate_label": "翻译并替换所选文本：",
+        "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
         "copy_hotkey_label": "复制选区快捷键：",
         "translate_hotkey_label": "翻译快捷键：",
         "remove_local_tesseract": "删除本地 Tesseract",
@@ -6015,6 +6102,10 @@ class SettingsWindow(QWidget):
                 item = self.main_layout.takeAt(0)
                 widget = item.widget()
                 if widget:
+                    # A deferred delete is not an immediate visual removal.
+                    # Hide the old settings page first so a theme/language
+                    # change cannot expose its cached pixels over the new one.
+                    widget.hide()
                     widget.deleteLater()
                 elif item.layout():
                     self.clear_nested_layout(item.layout())
@@ -6025,6 +6116,7 @@ class SettingsWindow(QWidget):
                 item = layout.takeAt(0)
                 widget = item.widget()
                 if widget:
+                    widget.hide()
                     widget.deleteLater()
                 elif item.layout():
                     self.clear_nested_layout(item.layout())
@@ -6040,10 +6132,14 @@ class SettingsWindow(QWidget):
         self.secondary_view_shell = None
         self.main_layout.setContentsMargins(5, 5, 5, 5)
         self.main_layout.setSpacing(8)
+        # This page is rendered inside a fixed 690x390 viewport. Keep the
+        # controls top-anchored so adding a selector on the right cannot move
+        # the checkbox column on the left.
+        self.main_layout.setAlignment(Qt.AlignTop)
         lang = self.parent.current_interface_language
 
         # --- ГРУППА ЧЕКБОКСОВ ---
-        self.main_layout.addSpacing(5)
+        # The layout margin already supplies the intended 5px top inset.
 
         margin_top_val = "-12px" if self.parent.current_theme == "Темная" else "-6px"
         fixed_height = 38
@@ -6634,72 +6730,7 @@ class SettingsWindow(QWidget):
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        bg = "#17181d" if is_dark else "#ffffff"
-        # Hover/focus lifts the fill instead of drawing an outline.
-        bg_lit = "#221f2c" if is_dark else "#f2eef8"
-        text = "#f4f6fb" if is_dark else "#202124"
-        border = "#34313f" if is_dark else "#cfc8df"
-        popup_bg = "#20212a" if is_dark else "#ffffff"
-        selection = "#5f4a88" if is_dark else "#d9cdf0"
-        hover = "#a985d2" if is_dark else "#8f7ab8"
-        # Qt fills the box instead of mitering CSS borders into a triangle, and a
-        # styled drop-down suppresses the platform arrow, so the chevron is a
-        # real image. Forward slashes: a stylesheet url() treats \\ as an escape.
-        arrow_icon = resource_path(
-            "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
-        ).replace("\\", "/")
-        return f"""
-            QComboBox {{
-                margin-left: 3px;
-                margin-right: 3px;
-                padding-left: 10px;
-                padding-right: 26px;
-                background-color: {bg};
-                color: {text};
-                /* No outline, by request. A hairline never rendered evenly here:
-                   at fractional display scaling a 1px border is 2.5 device
-                   pixels, so one edge came out thicker and softer than the rest
-                   and the field looked crooked. The window is a fixed size, so
-                   the field cannot simply be given more room either. It reads as
-                   a field from its own darker fill; hover and focus change that
-                   fill instead of drawing a line. Transparent rather than none:
-                   the box model keeps the 1px ring so nothing shifts by a pixel
-                   when the state changes. */
-                border: 1px solid transparent;
-                border-radius: 6px;
-                font-size: 15px;
-            }}
-            QComboBox:hover, QComboBox:focus, QComboBox:on {{
-                background-color: {bg_lit};
-            }}
-            QComboBox::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: center right;
-                width: 24px;
-                border: none;
-                background: transparent;
-                image: url({arrow_icon});
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {popup_bg};
-                color: {text};
-                selection-background-color: {selection};
-                selection-color: #ffffff;
-                outline: none;
-                border: 1px solid {border};
-                border-radius: 6px;
-                padding: 3px 0px;
-            }}
-            QComboBox QAbstractItemView::item {{
-                min-height: 24px;
-                padding: 2px 8px;
-                color: {text};
-            }}
-            QComboBox QAbstractItemView::item:disabled {{
-                color: {text};
-                background-color: {popup_bg};
-            }}
-        """
+        return modern_combo_style(is_dark)
 
     def _secondary_palette(self):
         if self.parent.current_theme == "Темная":
@@ -6995,6 +7026,18 @@ class SettingsWindow(QWidget):
         self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
         saved_sel_hotkey = self.parent.config.get("translate_selection_hotkey", "")
         self.translate_selection_hotkey_input.setKeySequence(QKeySequence(saved_sel_hotkey))
+        self.translate_replace_selection_hotkey_input = ClearableKeySequenceEdit()
+        saved_replace_hotkey = self.parent.config.get(
+            "translate_replace_selection_hotkey", ""
+        )
+        self.translate_replace_selection_hotkey_input.setKeySequence(
+            QKeySequence(saved_replace_hotkey)
+        )
+        if platform_support.IS_LINUX:
+            self.translate_replace_selection_hotkey_input.setEnabled(False)
+            self.translate_replace_selection_hotkey_input.setToolTip(
+                settings_text(lang, "replace_selection_unavailable")
+            )
         self.toggle_window_hotkey_input = ClearableKeySequenceEdit()
         saved_toggle_hotkey = self.parent.config.get("toggle_window_hotkey", "")
         self.toggle_window_hotkey_input.setKeySequence(QKeySequence(saved_toggle_hotkey))
@@ -7004,6 +7047,7 @@ class SettingsWindow(QWidget):
             (settings_text(lang, "translate_hotkey_label"), self.translate_hotkey_input),
             (settings_text(lang, "fullscreen_translate_label"), self.fullscreen_translate_hotkey_input),
             (settings_text(lang, "selection_translate_label"), self.translate_selection_hotkey_input),
+            (settings_text(lang, "replace_selection_translate_label"), self.translate_replace_selection_hotkey_input),
             (settings_text(lang, "toggle_window_hotkey_label"), self.toggle_window_hotkey_input),
         )
         self.hotkey_labels = []
@@ -7011,11 +7055,14 @@ class SettingsWindow(QWidget):
             label = QLabel(label_text.rstrip(":"))
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            label.setFixedHeight(36)
             key_input.setObjectName("secondaryHotkeyInput")
             key_input.setFixedHeight(36)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             hotkey_grid.addWidget(label, row, 0)
             hotkey_grid.addWidget(key_input, row, 1)
+            if key_input is self.translate_replace_selection_hotkey_input and platform_support.IS_LINUX:
+                label.setToolTip(settings_text(lang, "replace_selection_unavailable"))
             self.hotkey_labels.append(label)
         shell_layout.addWidget(hotkey_card)
 
@@ -7023,6 +7070,9 @@ class SettingsWindow(QWidget):
         self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
         self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
         self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
+        self.translate_replace_selection_hotkey_input.keySequenceChanged.connect(
+            self.save_translate_replace_selection_hotkey
+        )
         self.toggle_window_hotkey_input.keySequenceChanged.connect(self.save_toggle_window_hotkey)
 
         remove_label = QLabel(settings_text(lang, "remove_hotkey"))
@@ -7115,6 +7165,28 @@ class SettingsWindow(QWidget):
         if hotkey_str:
             self.parent.translate_selection_hotkey_thread = self.parent.HotkeyListenerThread(hotkey_str, self.parent.launch_translate_selection, hotkey_id=4)
             self.parent.translate_selection_hotkey_thread.start()
+
+    def save_translate_replace_selection_hotkey(self):
+        hotkey_str = self.translate_replace_selection_hotkey_input.keySequence().toString()
+        self.parent.config["translate_replace_selection_hotkey"] = hotkey_str
+        self.parent.save_config()
+        if platform_support.IS_LINUX:
+            return
+        thread = getattr(self.parent, "translate_replace_selection_hotkey_thread", None)
+        if thread is not None:
+            try:
+                thread.stop()
+                thread.join(timeout=0.5)
+            except Exception as exc:
+                print(f"Error stopping replace-selection hotkey thread: {exc}")
+            self.parent.translate_replace_selection_hotkey_thread = None
+        if hotkey_str:
+            self.parent.translate_replace_selection_hotkey_thread = self.parent.HotkeyListenerThread(
+                hotkey_str,
+                self.parent.launch_translate_replace_selection,
+                hotkey_id=6,
+            )
+            self.parent.translate_replace_selection_hotkey_thread.start()
 
     def save_toggle_window_hotkey(self):
         hotkey_str = self.toggle_window_hotkey_input.keySequence().toString()
@@ -7568,6 +7640,7 @@ class SettingsWindow(QWidget):
 
     def _start_update_check(self):
         lang = self.parent.current_interface_language
+        self._set_parent_update_flow_active(True)
         self._update_cancel_requested.clear()
         self._update_phase = "checking"
         self._update_temp_dir = ""
@@ -7577,6 +7650,11 @@ class SettingsWindow(QWidget):
 
         worker = threading.Thread(target=self._check_latest_release_worker, daemon=True)
         worker.start()
+
+    def _set_parent_update_flow_active(self, active):
+        parent = getattr(self, "parent", None)
+        if parent is not None:
+            parent._update_flow_active = bool(active)
 
     def _set_update_controls_enabled(self, enabled, text=None):
         if not hasattr(self, "update_btn"):
@@ -7812,6 +7890,7 @@ class SettingsWindow(QWidget):
         latest_version = payload.get("latest_version") or APP_VERSION
 
         if status == "cancelled" or self._update_cancel_requested.is_set():
+            self._set_parent_update_flow_active(False)
             self._update_cancel_requested.clear()
             self._cleanup_update_temp_dir()
             QMessageBox.information(
@@ -7822,6 +7901,7 @@ class SettingsWindow(QWidget):
             return
 
         if status == "error":
+            self._set_parent_update_flow_active(False)
             QMessageBox.warning(
                 self,
                 update_text(lang, "error_title"),
@@ -7830,6 +7910,7 @@ class SettingsWindow(QWidget):
             return
 
         if status == "up_to_date":
+            self._set_parent_update_flow_active(False)
             QMessageBox.information(
                 self,
                 settings_text(lang, "update"),
@@ -7838,6 +7919,7 @@ class SettingsWindow(QWidget):
             return
 
         if status in ("no_asset", "invalid_asset"):
+            self._set_parent_update_flow_active(False)
             msg = QMessageBox(self)
             msg.setWindowTitle(settings_text(lang, "update"))
             msg.setText(update_text(lang, "no_asset"))
@@ -7851,6 +7933,7 @@ class SettingsWindow(QWidget):
             return
 
         if status == "ready" and not platform_support.supports_in_app_update():
+            self._set_parent_update_flow_active(False)
             # Only the Windows build ships the helpers that replace the running
             # app. Elsewhere the new version is announced and the user updates
             # through whatever installed it (a new AppImage, their package
@@ -7872,6 +7955,7 @@ class SettingsWindow(QWidget):
             asset_url = payload.get("asset_url")
             checksum_url = payload.get("checksum_url")
             if not asset_url:
+                self._set_parent_update_flow_active(False)
                 QMessageBox.warning(
                     self,
                     update_text(lang, "error_title"),
@@ -7888,9 +7972,13 @@ class SettingsWindow(QWidget):
             confirm.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
             confirm.exec_()
             if confirm.clickedButton() != yes_btn:
+                self._set_parent_update_flow_active(False)
                 return
 
             self._start_update_download(asset_url, asset_name, latest_version, checksum_url)
+            return
+
+        self._set_parent_update_flow_active(False)
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
         lang = self.parent.current_interface_language
@@ -8886,6 +8974,7 @@ finally {
     @QtCore.pyqtSlot()
     def _restore_update_button_after_download(self):
         self._update_in_progress = False
+        self._set_parent_update_flow_active(False)
         self._update_phase = "idle"
         self._update_cancel_requested.clear()
         self._cleanup_update_temp_dir()
@@ -8895,6 +8984,7 @@ finally {
     @QtCore.pyqtSlot()
     def _on_update_cancelled(self):
         self._update_in_progress = False
+        self._set_parent_update_flow_active(False)
         self._update_phase = "idle"
         self._cleanup_update_temp_dir()
         self._update_cancel_requested.clear()
@@ -8911,6 +9001,7 @@ finally {
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
         self._update_in_progress = False
+        self._set_parent_update_flow_active(False)
         self._update_phase = "idle"
         self._cleanup_update_temp_dir()
         self._update_cancel_requested.clear()
@@ -11455,6 +11546,11 @@ finally {
             "translation_mode": "English",
             "main_translation_source_language": "en",
             "main_translation_target_language": "ru",
+            "selection_translate_source_language": "en",
+            "selection_translate_target_language": "ru",
+            "replace_selection_source_language": "en",
+            "replace_selection_target_language": "ru",
+            "hotkey_language_editor_mode": "selection",
             "ocr_hotkeys": "Ctrl+O",
             "copy_hotkey": "Ctrl+Alt+C",
             "translate_hotkey": "Ctrl+Alt+T",
@@ -11475,11 +11571,15 @@ finally {
             "last_ocr_language": "ru",
             "ocr_translate_source_language": "en",
             "ocr_translate_target_language": "ru",
+            "fullscreen_translate_from": "en",
+            "fullscreen_translate_to": "ru",
             "no_screen_dimming": False,
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
             "translate_selection_hotkey": "Ctrl+Alt+Q",
-            "toggle_window_hotkey": "Ctrl+Alt+M",
-            "result_window_hidden_modes": []
+            "toggle_window_hotkey": "Ctrl+Shift+Space",
+            "hotkey_defaults_revision": 2,
+            "result_window_hidden_modes": [],
+            "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
         }
         # Save to disk
         config_path = get_data_file("config.json")
