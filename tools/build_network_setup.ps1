@@ -1,12 +1,13 @@
 param(
-    [string]$Version = "1.5.8",
+    [string]$Version = "1.5.9",
     [Parameter(Mandatory = $true)][string]$SetupUrl,
     [Parameter(Mandatory = $true)][string]$SetupSha256,
     [string]$OutputPath = ""
 )
 $ErrorActionPreference = "Stop"
-if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version." }
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { throw "Invalid version." }
 if ($SetupSha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "Invalid setup SHA-256." }
+$fileVersion = if (($Version -split '\.').Count -eq 3) { "$Version.0" } else { $Version }
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $OutputPath) { $OutputPath = Join-Path $root "releases\ClicknTranslate-Setup-v$Version-win64.exe" }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
@@ -30,8 +31,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("Click'n'Translate Setup")]
 [assembly: AssemblyCompany("Jabrail Digital")]
 [assembly: AssemblyProduct("Click'n'Translate")]
-[assembly: AssemblyVersion("$Version.0")]
-[assembly: AssemblyFileVersion("$Version.0")]
+[assembly: AssemblyVersion("$fileVersion")]
+[assembly: AssemblyFileVersion("$fileVersion")]
 "@, [System.Text.UTF8Encoding]::new($false))
     & $compiler /nologo /target:winexe /platform:x64 /optimize+ `
         /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `

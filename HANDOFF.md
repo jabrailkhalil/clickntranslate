@@ -1686,6 +1686,46 @@ fallback started successfully; the frozen Linux functional sweep also passed.
 
 ---
 
+## 23. Release 1.5.9 — mode memory and preference consistency (2026-08-11)
+
+### 23.1 User-facing changes
+
+* A language pair changed in a translation result now belongs to, and is
+  remembered by, the exact mode that opened the result.
+* Translate-and-replace is a seamless action: it no longer opens the ordinary
+  selected-text result window, and with automatic copying disabled it restores
+  the user's previous clipboard contents after a successful paste.
+* Automatic copy, copy history, and translation history now use one consistent
+  path. Changes made in Settings are immediately visible to OCR actions rather
+  than waiting for a filesystem timestamp change.
+* Hover/status popups use real rounded window masks on Windows.
+
+### 23.2 Final verification
+
+| Layer | Result |
+| --- | --- |
+| Windows source suite | 638 passed, 11 skipped, 8 subtests |
+| Linux source suite (WSL) | 615 passed, 34 skipped, 8 subtests |
+| Final focused regression suite | 151 passed |
+| Windows frozen functional sweep | 34 passed, 0 failed, 6 optional skips |
+| Linux frozen functional sweep | 56 passed, 0 failed, 3 optional skips |
+| Windows updater E2E | portable and installed 1.5.8 -> 1.5.9 passed |
+| Updater safety | user data preserved; locked OCR worker stopped; app restarted |
+| Portable ZIP layout | 4004 entries; one top-level folder; launchers/workers present; no user data or top-level README/CMD |
+| Linux AppImage | AppStream validation passed; extract-and-run stayed healthy for 15 seconds |
+
+### 23.3 Final artifacts
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Click-n-Translate-1.5.9-windows-portable-x64.zip` | 204829904 | `BF6C37005DCC016C5AEBDEC37A5C7B66C0E7E95A99A4308BA728387B1A3FFAA3` |
+| `Click-n-Translate-1.5.9-windows-x64-installer.exe` | 128530581 | `F61D37EFD5F0A76DC8577F2CB4C9B6C7E3F8E0200939B82DC27DA616A8FBAEE5` |
+| `ClicknTranslate-Setup-v1.5.9-win64.exe` | 89600 | `4058C0C05BD5E9905A9A80F17FC002D575CE191F9F3096CDD09BA6CB49B179EF` |
+| `Click-n-Translate-1.5.9-linux-x86_64.AppImage` | 273962176 | `D36CC8494EF0677F38150F964916711EC8633008161302F2EFDF0E8C887F1426` |
+| `Click-n-Translate-1.5.9-linux-x86_64.tar.gz` | 271608904 | `9F05A608B741E2DF40ABCA847AF721B9A715A07370EEB3A95B6AD15A932E1E08` |
+
+---
+
 ## 20. The main window: measured, then rearranged
 
 The complaint was that it is overloaded and does not say where to start. Measured on the shipped

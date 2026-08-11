@@ -1,6 +1,6 @@
 #define MyAppName "Click'n'Translate"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.8"
+  #define MyAppVersion "1.5.9"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"
@@ -38,7 +38,7 @@ CloseApplications=force
 CloseApplicationsFilter=*.*
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion={#MyAppVersion}.0
+VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany=Jabrail Digital
 VersionInfoDescription=Click'n'Translate Windows installer
 VersionInfoProductName={#MyAppName}

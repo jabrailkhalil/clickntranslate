@@ -1767,6 +1767,20 @@ def _write_ocr_config_updates(updates):
             _ocr_config_mtime = os.path.getmtime(config_path)
         except Exception:
             _ocr_config_mtime = 0
+        # Keep the live main window in sync. Otherwise a later save from the
+        # settings screen can overwrite a language pair that the OCR/fullscreen
+        # overlay has already persisted to disk.
+        for module_name in ("main", "__main__"):
+            module = sys.modules.get(module_name)
+            if module is None:
+                continue
+            window = getattr(module, "_main_window_ref", None)
+            live_config = getattr(window, "config", None)
+            if isinstance(live_config, dict):
+                live_config.update(updates)
+            invalidate = getattr(module, "invalidate_config_cache", None)
+            if callable(invalidate):
+                invalidate()
         return True
     except Exception as e:
         logging.warning(f"Failed to save OCR config updates: {e}")
@@ -1790,6 +1804,13 @@ def _remove_auto_mode_from_config(config):
 # --- Кэширование конфигурации ---
 _ocr_config_cache = None
 _ocr_config_mtime = 0
+
+
+def invalidate_ocr_config_cache():
+    """Force the next OCR action to read settings freshly from disk."""
+    global _ocr_config_cache, _ocr_config_mtime
+    _ocr_config_cache = None
+    _ocr_config_mtime = 0
 
 def get_cached_ocr_config():
     """Возвращает закэшированную конфигурацию OCR."""
@@ -4903,7 +4924,7 @@ class ScreenCaptureOverlay(QWidget):
                     config = get_cached_ocr_config()
                     theme = config.get("theme", "Темная")
                     lang = config.get("interface_language", "ru")
-                    auto_copy = config.get("copy_translated_text", True)
+                    auto_copy = config.get("copy_translated_text", False)
                     # Ленивый импорт для избежания циклического импорта
                     from main import (
                         result_window_hidden_for,
@@ -4941,10 +4962,8 @@ class ScreenCaptureOverlay(QWidget):
                         source_text=text,
                         source_lang=source_code,
                         target_lang=target_code,
+                        result_mode="area",
                     )
-                    if auto_copy:
-                        platform_support.copy_text(translated_text)
-                        save_copy_history(translated_text)
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
                 self.close()
@@ -5724,6 +5743,10 @@ class FullScreenTranslateOverlay(QWidget):
         self.translated_blocks = list(blocks or [])
         self.error_message = str(error_message or "") or None
         self.loading = False
+        if self.translated_blocks and not self.error_message:
+            original_text = "\n".join(str(block[1] or "") for block in self.translated_blocks)
+            translated_text = "\n".join(str(block[2] or "") for block in self.translated_blocks)
+            save_translation_history(original_text, translated_text, self.tgt_lang)
         self.update()
 
     # ---- painting --------------------------------------------------

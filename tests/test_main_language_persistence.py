@@ -164,11 +164,19 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             harness._replace_selected_text_translation_pair(), ("de", "fr")
         )
         self.assertTrue(
+            harness._set_hotkey_translation_pair("replace", "zh", "en")
+        )
+        self.assertEqual(
+            harness._replace_selected_text_translation_pair(), ("zh", "en")
+        )
+        self.assertEqual(harness.config["replace_selection_source_language"], "zh")
+        self.assertEqual(harness.config["replace_selection_target_language"], "en")
+        self.assertTrue(
             harness._set_hotkey_translation_pair("selection", "it", "es")
         )
         self.assertEqual(harness._selected_text_translation_pair(), ("it", "es"))
         self.assertEqual(
-            harness._replace_selected_text_translation_pair(), ("de", "fr")
+            harness._replace_selected_text_translation_pair(), ("zh", "en")
         )
 
     def test_hotkey_language_hint_exists_in_every_interface_language(self):

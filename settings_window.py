@@ -60,7 +60,13 @@ def _invalidate_main_config_cache():
                 invalidate_config_cache()
             except Exception:
                 pass
-            return
+    ocr_module = sys.modules.get("ocr")
+    invalidate_ocr = getattr(ocr_module, "invalidate_ocr_config_cache", None)
+    if callable(invalidate_ocr):
+        try:
+            invalidate_ocr()
+        except Exception:
+            pass
 
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):

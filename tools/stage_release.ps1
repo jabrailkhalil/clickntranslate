@@ -1,14 +1,15 @@
 param(
-    [string]$Version = "1.5.8",
+    [string]$Version = "1.5.9",
     [switch]$SkipPyInstaller
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "Version must contain three numeric parts, for example 1.5.0."
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+    throw "Version must contain three or four numeric parts, for example 1.5.8 or 1.5.8.1."
 }
+$fileVersion = if (($Version -split '\.').Count -eq 3) { "$Version.0" } else { $Version }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $releasesRoot = Join-Path $repoRoot "releases"
@@ -45,14 +46,14 @@ Move-Item `
     -Destination (Join-Path $innerRoot "ClicknTranslateApp.exe")
 
 & (Join-Path $PSScriptRoot "build_launcher.ps1") `
-    -Version ($Version + ".0") `
+    -Version $fileVersion `
     -OutputPath (Join-Path $packageRoot "ClicknTranslate.exe")
 if ($LASTEXITCODE -ne 0) {
     throw "Launcher build failed with exit code $LASTEXITCODE."
 }
 
 & (Join-Path $PSScriptRoot "build_apply_updater.ps1") `
-    -Version ($Version + ".0") `
+    -Version $fileVersion `
     -OutputPath (Join-Path $innerRoot "_internal\ClicknTranslateUpdater.exe")
 if ($LASTEXITCODE -ne 0) {
     throw "Updater build failed with exit code $LASTEXITCODE."

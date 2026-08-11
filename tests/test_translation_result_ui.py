@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import main  # noqa: E402
+import ocr  # noqa: E402
 import platform_support  # noqa: E402
 import translater  # noqa: E402
 from PyQt5.QtWidgets import QWidget  # noqa: E402
@@ -68,6 +69,7 @@ class _SelectionHarness:
         with mock.patch.object(platform_support, "IS_LINUX", True), \
                 mock.patch.object(main.threading, "Thread", fake_thread), \
                 mock.patch.object(main.time, "sleep", lambda _seconds: None), \
+                mock.patch.object(main, "save_translation_history"), \
                 mock.patch.object(
                     translater, "translate_text", return_value=translated_text
                 ):
@@ -147,9 +149,11 @@ class TranslationResultUiTest(unittest.TestCase):
             lang="ru",
             theme="Темная",
         )
-        with mock.patch.object(platform_support, "copy_text") as copy:
+        with mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history:
             dialog.copy_button.click()
         copy.assert_called_once_with("кореец → Coreano")
+        history.assert_called_once_with("кореец → Coreano")
         self.assertEqual(dialog.status_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT["ru"]["copied"])
 
         with mock.patch.object(main.webbrowser, "open") as browser:
@@ -183,6 +187,7 @@ class TranslationResultUiTest(unittest.TestCase):
             source_text="",
             source_lang="",
             target_lang="",
+            result_mode="main",
         )
         dialog.exec_.assert_not_called()
         dialog.show.assert_called_once_with()
@@ -194,7 +199,8 @@ class TranslationResultUiTest(unittest.TestCase):
         harness = _SelectionHarness({"result_window_hidden_modes": ["selection"]})
 
         with mock.patch.object(platform_support, "copy_text") as copy:
-            with mock.patch.object(main, "save_copy_history") as history:
+            with mock.patch.object(main, "save_copy_history") as history, \
+                    mock.patch.object(main, "save_translation_history"):
                 harness.run_selection_worker("Hola mundo", "Hello world")
 
         copy.assert_called_once_with("Hello world")
@@ -258,9 +264,11 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertEqual(reason, "selection_changed")
         paste.assert_not_called()
 
-    def test_replace_hotkey_uses_one_history_entry_and_can_hide_dialog(self):
+    def test_replace_hotkey_uses_one_history_entry_and_never_opens_dialog(self):
         harness = _SelectionHarness({
-            "result_window_hidden_modes": ["selection"],
+            # The ordinary selection result window is enabled. Replacement is
+            # still a separate seamless mode and must not inherit that UI.
+            "result_window_hidden_modes": [],
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
@@ -279,14 +287,42 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main, "replace_selected_text_in_foreground",
                                   return_value=(True, "replaced")) as replace, \
                 mock.patch.object(translater, "translate_text", return_value="Hello world"), \
-                mock.patch.object(platform_support, "copy_text"), \
-                mock.patch.object(main, "save_copy_history") as history:
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history, \
+                mock.patch.object(main, "save_translation_history"):
             harness.launch_translate_replace_selection()
 
         replace.assert_called_once_with("Hola mundo", "Hello world", 42)
-        history.assert_called_once_with("Hello world")
+        self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Hola mundo")])
+        history.assert_not_called()
         self.assertEqual(harness.shown_dialogs, [])
         self.assertIn(main.ui_text("en", "selection_replaced"), harness.statuses)
+
+    def test_replace_fallback_copies_and_still_never_opens_dialog(self):
+        harness = _SelectionHarness({"result_window_hidden_modes": []})
+        fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
+
+        with mock.patch.object(platform_support, "IS_LINUX", False), \
+                mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main.ctypes, "windll",
+                                  SimpleNamespace(user32=fake_user32), create=True), \
+                mock.patch.object(main.threading, "Thread", _immediate_thread), \
+                mock.patch.object(main.time, "sleep"), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main.pyperclip, "paste", return_value="Hola mundo"), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=42), \
+                mock.patch.object(main, "replace_selected_text_in_foreground",
+                                  return_value=(False, "focus_changed")), \
+                mock.patch.object(translater, "translate_text", return_value="Hello world"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history, \
+                mock.patch.object(main, "save_translation_history"):
+            harness.launch_translate_replace_selection()
+
+        self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Hello world")])
+        history.assert_called_once_with("Hello world")
+        self.assertEqual(harness.shown_dialogs, [])
+        self.assertIn(main.ui_text("en", "selection_replace_fallback"), harness.statuses)
 
     def test_regular_selection_hotkey_never_attempts_replacement(self):
         harness = _SelectionHarness({"result_window_hidden_modes": ["selection"]})
@@ -297,6 +333,29 @@ class TranslationResultUiTest(unittest.TestCase):
             harness.run_selection_worker("Hola mundo", "Hello world")
 
         replace.assert_not_called()
+
+    def test_visible_selection_with_auto_copy_off_restores_previous_clipboard(self):
+        harness = _SelectionHarness({
+            "result_window_hidden_modes": [],
+            "copy_translated_text": False,
+        })
+        fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
+
+        with mock.patch.object(platform_support, "IS_LINUX", False), \
+                mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main.ctypes, "windll",
+                                  SimpleNamespace(user32=fake_user32), create=True), \
+                mock.patch.object(main.threading, "Thread", _immediate_thread), \
+                mock.patch.object(main.time, "sleep"), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo"]), \
+                mock.patch.object(translater, "translate_text", return_value="Hello world"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_translation_history"):
+            harness.launch_translate_selection()
+
+        self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Before")])
+        self.assertEqual(len(harness.shown_dialogs), 1)
 
     def test_unchecked_still_opens_the_result_window(self):
         harness = _SelectionHarness({"result_window_hidden_modes": []})
@@ -357,6 +416,7 @@ class TranslationResultUiTest(unittest.TestCase):
             with mock.patch.object(main, "get_cached_config", return_value=config), \
                     mock.patch.object(platform_support, "copy_text") as copy, \
                     mock.patch.object(main, "save_copy_history") as history, \
+                    mock.patch.object(main, "save_translation_history") as translation_history, \
                     mock.patch.object(main, "show_translation_dialog") as dialog, \
                     mock.patch.object(main.QTimer, "singleShot"):
                 harness._present_main_translation_result("Привет", "Hello", "en", "ru")
@@ -365,6 +425,7 @@ class TranslationResultUiTest(unittest.TestCase):
             # Auto-copy must not turn into a double copy or a duplicate history row.
             self.assertEqual(copy.call_count, 1, auto_copy)
             self.assertEqual(history.call_count, 1, auto_copy)
+            translation_history.assert_called_once_with("Hello", "Привет", "ru")
             self.assertIn(
                 main.TRANSLATION_RESULT_DIALOG_TEXT["en"]["copied"], harness.statuses
             )
@@ -379,12 +440,17 @@ class TranslationResultUiTest(unittest.TestCase):
             "result_window_hidden_modes": ["selection", "area"],
         }
         with mock.patch.object(main, "get_cached_config", return_value=config), \
-                mock.patch.object(platform_support, "copy_text"), \
-                mock.patch.object(main, "save_copy_history"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history, \
+                mock.patch.object(main, "save_translation_history") as translation_history, \
                 mock.patch.object(main, "show_translation_dialog") as dialog:
             harness._present_main_translation_result("Привет", "Hello", "en", "ru")
 
         dialog.assert_called_once()
+        self.assertEqual(dialog.call_args.kwargs["result_mode"], "main")
+        copy.assert_not_called()
+        history.assert_not_called()
+        translation_history.assert_called_once_with("Hello", "Привет", "ru")
         self.assertEqual(harness.statuses, [])
 
     def test_the_default_is_shown_everywhere_and_is_immutable(self):
@@ -439,36 +505,73 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertEqual(dialog.translated_text, "Hallo Welt")
         self.assertTrue(dialog.target_combo.isEnabled())
         # Copy now yields the re-translated text, not the original result.
-        with mock.patch.object(platform_support, "copy_text") as copy:
+        with mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history"):
             dialog.copy_button.click()
         copy.assert_called_once_with("Hallo Welt")
         dialog.close()
 
-    def test_changed_pair_is_remembered_for_main_selection_and_area_translation(self):
-        parent = _PairMemoryParent()
-        dialog = main.TranslationResultDialog(
-            parent,
-            "Hello world",
-            auto_copy=False,
-            lang="en",
-            theme="Темная",
-            source_text="Hola mundo",
-            source_lang="es",
-            target_lang="en",
-        )
+    def test_retranslated_result_respects_auto_copy_checkbox(self):
+        dialog = self._pair_dialog(auto_copy=True)
 
         with mock.patch.object(main.threading, "Thread", _immediate_thread), \
-                mock.patch.object(translater, "translate_text", return_value="Hallo Welt"):
+                mock.patch.object(translater, "translate_text", return_value="Hallo Welt"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history:
             dialog.target_combo.setCurrentIndex(dialog.target_combo.findData("de"))
         self.app.processEvents()
 
-        self.assertEqual(parent.config["main_translation_source_language"], "es")
-        self.assertEqual(parent.config["main_translation_target_language"], "de")
-        self.assertEqual(parent.config["ocr_translate_source_language"], "es")
-        self.assertEqual(parent.config["ocr_translate_target_language"], "de")
-        self.assertEqual(parent.save_count, 1)
+        copy.assert_called_once_with("Hallo Welt")
+        history.assert_called_once_with("Hallo Welt")
+        self.assertEqual(dialog.status_label.text(), dialog.text["auto_copied"])
         dialog.close()
-        parent.close()
+
+    def test_changed_pair_is_remembered_only_for_the_invoking_mode(self):
+        expected_keys = {
+            "main": ("main_translation_source_language", "main_translation_target_language"),
+            "area": ("ocr_translate_source_language", "ocr_translate_target_language"),
+            "selection": ("selection_translate_source_language", "selection_translate_target_language"),
+        }
+        all_pair_keys = {key for keys in expected_keys.values() for key in keys}
+
+        for mode, keys in expected_keys.items():
+            parent = _PairMemoryParent()
+            dialog = main.TranslationResultDialog(
+                parent,
+                "Hello world",
+                auto_copy=False,
+                lang="en",
+                theme="Темная",
+                source_text="Hola mundo",
+                source_lang="es",
+                target_lang="en",
+                result_mode=mode,
+            )
+
+            with mock.patch.object(main.threading, "Thread", _immediate_thread), \
+                    mock.patch.object(translater, "translate_text", return_value="Hallo Welt"):
+                dialog.target_combo.setCurrentIndex(dialog.target_combo.findData("de"))
+            self.app.processEvents()
+
+            self.assertEqual(parent.config[keys[0]], "es", mode)
+            self.assertEqual(parent.config[keys[1]], "de", mode)
+            self.assertTrue(
+                all(key in keys for key in parent.config if key in all_pair_keys), mode
+            )
+            self.assertEqual(parent.save_count, 1, mode)
+            dialog.close()
+            parent.close()
+
+    def test_disabled_history_flags_never_touch_history_files(self):
+        with mock.patch.object(main, "get_cached_config", return_value={"copy_history": False}), \
+                mock.patch.object(main, "get_data_file") as copy_file:
+            main._save_copy_history_sync("do not store")
+        copy_file.assert_not_called()
+
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value={"history": False}), \
+                mock.patch.object(ocr, "get_data_file") as translation_file:
+            ocr._save_translation_history_sync("original", "translated", "en")
+        translation_file.assert_not_called()
 
     def test_swap_flips_the_pair_and_retranslates(self):
         dialog = self._pair_dialog()

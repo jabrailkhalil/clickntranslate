@@ -61,9 +61,24 @@ class _RoundedTooltipFilter(QtCore.QObject):
     """
 
     def eventFilter(self, watched, event):
-        if event.type() == QtCore.QEvent.Polish and _is_tooltip(watched):
+        rounded_popup = _is_rounded_popup(watched)
+        if event.type() == QtCore.QEvent.Polish and rounded_popup:
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
+            watched.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        if rounded_popup and event.type() in (
+            QtCore.QEvent.Polish,
+            QtCore.QEvent.Show,
+            QtCore.QEvent.Resize,
+        ):
+            # Qt's stylesheet rounds only the paint; on Windows the native
+            # tooltip/popup window itself remains rectangular.  A real window
+            # mask removes those four square hover corners.  Apply once now
+            # and once after Qt has finished laying out a newly shown tip.
+            _apply_rounded_popup_mask(watched)
+            QtCore.QTimer.singleShot(
+                0, lambda widget=watched: _apply_rounded_popup_mask(widget)
+            )
         return False
 
 
@@ -72,6 +87,30 @@ def _is_tooltip(widget) -> bool:
         return widget.metaObject().className() == "QTipLabel"
     except Exception:
         return False
+
+
+def _is_rounded_popup(widget) -> bool:
+    try:
+        return _is_tooltip(widget) or bool(
+            widget.property("clickntranslateRoundedPopup")
+        )
+    except (AttributeError, RuntimeError):
+        return False
+
+
+def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
+    """Clip a tooltip-sized top-level window to true rounded corners."""
+    try:
+        rect = widget.rect()
+        if rect.width() < 2 or rect.height() < 2:
+            return
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(QtCore.QRectF(rect), radius, radius)
+        polygon = path.toFillPolygon().toPolygon()
+        widget.setMask(QtGui.QRegion(polygon))
+    except (AttributeError, RuntimeError):
+        # The shared QTipLabel can be destroyed before the queued pass runs.
+        return
 
 
 _TOOLTIP_FILTER = None

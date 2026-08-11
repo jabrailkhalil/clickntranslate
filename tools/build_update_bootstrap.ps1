@@ -1,12 +1,12 @@
 param(
-    [string]$Version = "1.5.8",
+    [string]$Version = "1.5.9",
     [string]$SetupPath = "",
     [string]$OutputPath = ""
 )
 
 $ErrorActionPreference = "Stop"
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "Version must contain three numeric parts, for example 1.5.1."
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+    throw "Version must contain three or four numeric parts, for example 1.5.8 or 1.5.8.1."
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -39,7 +39,7 @@ $bootstrapPath = Join-Path $payloadRoot "ClicknTranslate.exe"
 
 try {
     New-Item -ItemType Directory -Path $innerInternal -Force | Out-Null
-    $fourPartVersion = "$Version.0"
+    $fourPartVersion = if (($Version -split '\.').Count -eq 3) { "$Version.0" } else { $Version }
     $versionCode = @"
 using System.Reflection;
 [assembly: AssemblyTitle("Click'n'Translate Update Bootstrap")]

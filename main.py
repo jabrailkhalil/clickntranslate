@@ -1013,6 +1013,18 @@ def save_copy_history(text):
     """Асинхронно сохранить текст в историю копирований (не блокирует UI)."""
     threading.Thread(target=_save_copy_history_sync, args=(text,), daemon=True).start()
 
+
+def save_translation_history(original_text, translated_text, language):
+    """Persist a translation through OCR's shared portable history writer."""
+    try:
+        from ocr import save_translation_history as _save_translation_history
+
+        _save_translation_history(original_text, translated_text, language)
+    except Exception:
+        logging.getLogger("clickntranslate.history").exception(
+            "Could not save translation history"
+        )
+
 # Сигнал для уведомления об ошибке регистрации хоткея
 class _HotkeyErrorDispatcher(QtCore.QObject):
     registration_failed = QtCore.pyqtSignal(str)
@@ -3505,9 +3517,10 @@ class TranslationResultDialog(QDialog):
     _retranslated_signal = QtCore.pyqtSignal(str, str)
 
     def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная",
-                 source_text="", source_lang="", target_lang=""):
+                 source_text="", source_lang="", target_lang="", result_mode="main"):
         super().__init__(parent)
         self.translated_text = str(translated_text or "")
+        self.auto_copy = bool(auto_copy)
         self.lang = lang if lang in TRANSLATION_RESULT_DIALOG_TEXT else "en"
         self.text = TRANSLATION_RESULT_DIALOG_TEXT[self.lang]
         self._drag_position = None
@@ -3518,6 +3531,7 @@ class TranslationResultDialog(QDialog):
         self.source_text = str(source_text or "")
         self.source_code = str(source_lang or "").lower()
         self.target_code = str(target_lang or "").lower()
+        self.result_mode = str(result_mode or "main").lower()
         self.pair_row_available = bool(
             self.source_text.strip()
             and get_language(self.source_code) is not None
@@ -3768,16 +3782,18 @@ class TranslationResultDialog(QDialog):
         remember = getattr(owner, "_remember_translation_result_pair", None)
         if callable(remember):
             try:
-                remember(self.source_code, self.target_code)
+                remember(self.source_code, self.target_code, self.result_mode)
             except (RuntimeError, OSError, ValueError):
                 logging.getLogger("clickntranslate.result").exception(
                     "Could not remember the translation-result language pair"
                 )
 
     def _start_retranslate(self):
+        # Remember the UI choice immediately.  Persistence must not depend on
+        # the network request succeeding (or even starting).
+        self._remember_language_pair()
         if self._retranslating:
             return
-        self._remember_language_pair()
         self._retranslating = True
         self._set_pair_row_enabled(False)
         self.status_label.setText(ui_text(self.lang, "translating"))
@@ -3809,11 +3825,17 @@ class TranslationResultDialog(QDialog):
             return
         self.translated_text = translated_text
         self.text_edit.setPlainText(translated_text)
-        self.status_label.setText(self.text["ready"])
+        if self.auto_copy:
+            platform_support.copy_text(translated_text)
+            save_copy_history(translated_text)
+            self.status_label.setText(self.text["auto_copied"])
+        else:
+            self.status_label.setText(self.text["ready"])
         self.copy_button.setText(ui_text(self.lang, "copy"))
 
     def _copy_result(self):
         platform_support.copy_text(self.translated_text)
+        save_copy_history(self.translated_text)
         self.status_label.setText(self.text["copied"])
         self.copy_button.setText(ui_text(self.lang, "copy"))
 
@@ -4256,6 +4278,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translation_results = []
         self.translation_error_message_visible = False
         self.translation_running = False
+        self._active_translation_source_text = ""
+        self._active_translation_target_code = ""
 
         self._document_loaded_signal.connect(self._on_document_loaded)
         self._document_error_signal.connect(self._on_document_error)
@@ -4922,6 +4946,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         source_code = self._source_code()
         target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
+        self._active_translation_source_text = text
+        self._active_translation_target_code = target_code
 
         def progress(done, total, message):
             self._document_progress_signal.emit(int(done), int(total), str(message))
@@ -4966,6 +4992,12 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self._set_status(f"{doc_text(self.lang, 'translate_failed')}: {failed}")
         else:
             self._set_status(doc_text(self.lang, "done"))
+            if self.translated_text:
+                save_translation_history(
+                    self._active_translation_source_text,
+                    self.translated_text,
+                    self._active_translation_target_code,
+                )
 
     def _friendly_provider_failure_text(self, results):
         results = list(results or [])
@@ -6092,6 +6124,10 @@ class DarkThemeApp(QMainWindow):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+        ocr_module = sys.modules.get("ocr")
+        invalidate_ocr = getattr(ocr_module, "invalidate_ocr_config_cache", None)
+        if callable(invalidate_ocr):
+            invalidate_ocr()
 
     def _available_main_translation_pairs(self):
         engine = str(self.config.get("translator_engine", "Google")).strip().lower()
@@ -6148,8 +6184,8 @@ class DarkThemeApp(QMainWindow):
             target_code = default_target_for_source(source_code)
         return source_code, target_code
 
-    def _remember_translation_result_pair(self, source_code, target_code):
-        """Use a pair chosen in the result window for every later translation."""
+    def _remember_translation_result_pair(self, source_code, target_code, mode="main"):
+        """Persist a result-window pair only for the action that opened it."""
         source_code = str(source_code or "").lower()
         target_code = str(target_code or "").lower()
         if (
@@ -6159,21 +6195,36 @@ class DarkThemeApp(QMainWindow):
         ):
             return
 
-        # Main/selected-text translation and area OCR keep separate selectors,
-        # but the result window is shared by both.  Updating both pairs makes
-        # the user's choice survive regardless of which action they use next.
-        self.config["main_translation_source_language"] = source_code
-        self.config["main_translation_target_language"] = target_code
-        self.config["ocr_translate_source_language"] = source_code
-        self.config["ocr_translate_target_language"] = target_code
+        normalized_mode = str(mode or "main").lower()
+        if normalized_mode in {"area", "ocr"}:
+            normalized_mode = "ocr"
 
-        if (
-            getattr(self, "settings_window", None) is None
-            and hasattr(self, "source_lang")
-            and hasattr(self, "target_lang")
-        ):
-            self._restore_main_translation_languages()
+        if normalized_mode == "main":
+            source_key = "main_translation_source_language"
+            target_key = "main_translation_target_language"
+        else:
+            keys = HOTKEY_LANGUAGE_CONFIG_KEYS.get(normalized_mode)
+            if keys is None:
+                logging.getLogger("clickntranslate.result").warning(
+                    "Ignoring unknown translation-result mode: %s", mode
+                )
+                return
+            source_key, target_key = keys
+
+        self.config[source_key] = source_code
+        self.config[target_key] = target_code
+
+        if normalized_mode == "main" and hasattr(self, "source_lang") and hasattr(self, "target_lang"):
+            try:
+                self._restore_main_translation_languages()
+            except RuntimeError:
+                # The main controls can be queued for deletion while settings
+                # are open. save_config() then keeps the just-written pair.
+                pass
         self.save_config()
+        refresh = getattr(self, "_refresh_selection_pair_hint", None)
+        if callable(refresh):
+            refresh()
 
     def _capture_main_translation_languages(self):
         if not hasattr(self, "config"):
@@ -7395,9 +7446,12 @@ class DarkThemeApp(QMainWindow):
         from PyQt5.QtWidgets import QLabel
         self._status_label = QLabel()
         self._status_label.setWindowFlags(Qt.ToolTip | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self._status_label.setProperty("clickntranslateRoundedPopup", True)
+        self._status_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._status_label.setAttribute(Qt.WA_NoSystemBackground, True)
         self._status_label.setStyleSheet(
-            "QLabel { background-color: #1a1a2e; color: #e0e0e0; padding: 8px 16px; "
-            "border: 1px solid #550000; border-radius: 6px; font-size: 14px; }"
+            TOOLTIP_QSS.replace("QToolTip", "QLabel")
+            + "\nQLabel { font-size: 14px; }"
         )
         self._status_label.hide()
         self._show_status_signal.connect(self._on_show_status)
@@ -7467,6 +7521,12 @@ class DarkThemeApp(QMainWindow):
 
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
+            clipboard_before_capture = None
+
+            def restore_captured_clipboard():
+                if platform_support.IS_WINDOWS and clipboard_before_capture is not None:
+                    platform_support.copy_text(clipboard_before_capture)
+
             try:
                 if platform_support.IS_LINUX:
                     # X11 and Wayland keep the highlighted text in the PRIMARY
@@ -7474,6 +7534,10 @@ class DarkThemeApp(QMainWindow):
                     # and nothing is written to the user's clipboard.
                     text = self._read_primary_selection()
                 else:
+                    try:
+                        clipboard_before_capture = str(pyperclip.paste() or "")
+                    except Exception:
+                        clipboard_before_capture = None
                     # Release all modifier keys first
                     KEYEVENTF_KEYUP = 0x0002
                     for vk in (0x11, 0x12, 0x10, 0x5B, 0x5C):
@@ -7492,6 +7556,7 @@ class DarkThemeApp(QMainWindow):
                         else pyperclip.paste()
                     )
                 if not text or not text.strip():
+                    restore_captured_clipboard()
                     lang = self.config.get("interface_language", "ru")
                     no_text = ui_text(lang, "no_text_selected")
                     self._show_status_signal.emit(no_text)
@@ -7509,7 +7574,10 @@ class DarkThemeApp(QMainWindow):
                 self._hide_status_signal.emit()
                 print(f"[SEL] result: {len(translated) if translated else 0} chars")
                 if not translated:
+                    restore_captured_clipboard()
                     return
+
+                save_translation_history(text, translated, target_code)
 
                 replacement_attempted = replace_selection
                 replacement_succeeded = False
@@ -7522,7 +7590,17 @@ class DarkThemeApp(QMainWindow):
                     # loses a finished translation even if focus moved.
                     if not replacement_succeeded:
                         platform_support.copy_text(translated)
-                    save_copy_history(translated)
+                        save_copy_history(translated)
+                    elif self.config.get("copy_translated_text", False):
+                        # Successful replacement leaves the translated text in
+                        # the clipboard; record it only when auto-copy is on.
+                        save_copy_history(translated)
+                    else:
+                        # Ctrl+V already consumed the translated text. Restore
+                        # what was on the clipboard before Ctrl+Shift+Q so the
+                        # auto-copy checkbox really remains off.
+                        time.sleep(0.08)
+                        restore_captured_clipboard()
                     self._show_status_signal.emit(
                         ui_text(
                             lang,
@@ -7531,32 +7609,34 @@ class DarkThemeApp(QMainWindow):
                         )
                     )
 
+                    # Translate-and-replace is a separate, deliberately
+                    # seamless mode.  Its result is already either pasted into
+                    # the verified selection or copied as a safe fallback, so
+                    # it must never continue into the ordinary selected-text
+                    # result dialog (regardless of the user's dialog setting).
+                    time.sleep(1.2)
+                    self._hide_status_signal.emit()
+                    return
+
                 if result_window_hidden_for(self.config, "selection"):
-                    if not replacement_attempted:
-                        platform_support.copy_text(translated)
-                        save_copy_history(translated)
-                        dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
-                            lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
-                        )
-                        self._show_status_signal.emit(dialog_text["copied"])
+                    platform_support.copy_text(translated)
+                    save_copy_history(translated)
+                    dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
+                        lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
+                    )
+                    self._show_status_signal.emit(dialog_text["copied"])
                     time.sleep(1.2)
                     self._hide_status_signal.emit()
                     return
                 theme = self.config.get("theme", "Темная")
-                # Replacement already uses the clipboard exactly once. Let the
-                # result window say Ready instead of copying and recording the
-                # same value a second time.
-                auto_copy = (
-                    False if replacement_attempted
-                    else self.config.get("copy_translated_text", False)
-                )
+                auto_copy = self.config.get("copy_translated_text", False)
+                if not auto_copy:
+                    restore_captured_clipboard()
                 self._show_selection_signal.emit(
                     translated, auto_copy, lang, theme, text, source_code, target_code
                 )
-                if replacement_attempted:
-                    time.sleep(0.8)
-                    self._hide_status_signal.emit()
             except Exception as e:
+                restore_captured_clipboard()
                 err_msg = ui_text(lang, "translation_error")
                 self._show_status_signal.emit(f"{err_msg}: {e}")
                 print(f"Error in translate_selection: {e}")
@@ -7580,10 +7660,8 @@ class DarkThemeApp(QMainWindow):
                 source_text=source_text,
                 source_lang=source_lang,
                 target_lang=target_lang,
+                result_mode="selection",
             )
-            if auto_copy:
-                platform_support.copy_text(translated)
-                save_copy_history(translated)
         except Exception as e:
             print(f"Error showing translation dialog: {e}")
 
@@ -9313,24 +9391,15 @@ class DarkThemeApp(QMainWindow):
     def _present_main_translation_result(self, translated_text, source_text="",
                                          source_lang="", target_lang=""):
         config = get_cached_config()
-        auto_copy = config.get("copy_translated_text", True)
+        auto_copy = config.get("copy_translated_text", False)
         lang = config.get("interface_language", "ru")
         theme = config.get("theme", "Темная")
-        if auto_copy:
-            platform_support.copy_text(translated_text)
-            try:
-                if config.get("copy_history", False):
-                    save_copy_history(translated_text)
-            except Exception:
-                pass
+        save_translation_history(source_text, translated_text, target_lang)
         if result_window_hidden_for(config, "main"):
-            if not auto_copy:
-                platform_support.copy_text(translated_text)
-                try:
-                    if config.get("copy_history", False):
-                        save_copy_history(translated_text)
-                except Exception:
-                    pass
+            # Hiding the result window explicitly makes the clipboard the only
+            # delivery channel, independent of the auto-copy preference.
+            platform_support.copy_text(translated_text)
+            save_copy_history(translated_text)
             dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
                 lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
             )
@@ -9346,13 +9415,8 @@ class DarkThemeApp(QMainWindow):
             source_text=source_text,
             source_lang=source_lang,
             target_lang=target_lang,
+            result_mode="main",
         )
-        if not auto_copy:
-            try:
-                if config.get("copy_history", False):
-                    save_copy_history(translated_text)
-            except Exception:
-                pass
 
     def _start_argos_translation(self, text, source_code, target_code):
         if self._argos_translation_running:
@@ -9518,9 +9582,11 @@ def _live_translation_result_dialogs():
 
 # --- Универсальный диалог перевода ---
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная',
-                            source_text="", source_lang="", target_lang=""):
+                            source_text="", source_lang="", target_lang="",
+                            result_mode="main"):
     if auto_copy:
         platform_support.copy_text(translated_text)
+        save_copy_history(translated_text)
     _translation_result_dialogs[:] = _live_translation_result_dialogs()
     dialog = TranslationResultDialog(
         parent,
@@ -9531,6 +9597,7 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
         source_text=source_text,
         source_lang=source_lang,
         target_lang=target_lang,
+        result_mode=result_mode,
     )
     stack_index = min(len(_translation_result_dialogs), 4)
     dialog._stack_offset = QtCore.QPoint(18 * stack_index, 48 * stack_index)

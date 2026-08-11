@@ -29,6 +29,8 @@ class TestVersionHelpers(unittest.TestCase):
     def test_is_newer_version(self):
         self.assertTrue(sw._is_newer_version("1.3.4", "1.3.3"))
         self.assertTrue(sw._is_newer_version("v2.0.0", "1.9.9"))
+        self.assertTrue(sw._is_newer_version("1.5.9", "1.5.8"))
+        self.assertFalse(sw._is_newer_version("1.5.8", "1.5.9"))
         self.assertFalse(sw._is_newer_version("1.3.3", "1.3.3"))
         self.assertFalse(sw._is_newer_version("1.3.2", "1.3.3"))
 

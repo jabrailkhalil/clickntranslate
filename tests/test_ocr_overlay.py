@@ -9,7 +9,7 @@ from unittest import mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt5.QtCore import QPoint, Qt
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QLabel
 
 import ocr
 import platform_support
@@ -413,6 +413,14 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         self.assertTrue(wrapped.startswith("<qt>"))
         self.assertIn(f"width:{styled_dialogs.TOOLTIP_WRAP_WIDTH}px", wrapped)
         self.assertIn("border-radius", styled_dialogs.TOOLTIP_QSS)
+
+        popup = QLabel("Rounded")
+        popup.setProperty("clickntranslateRoundedPopup", True)
+        popup.resize(120, 36)
+        styled_dialogs._apply_rounded_popup_mask(popup)
+        self.assertFalse(popup.mask().isEmpty())
+        self.assertFalse(popup.mask().contains(QPoint(0, 0)))
+        self.assertTrue(popup.mask().contains(popup.rect().center()))
 
         # The stylesheet must live in exactly one place.
         for module_name in ("main", "settings_window"):
