@@ -4,7 +4,7 @@
 
 ### Лучшая программа для перевода экрана и OCR на Windows.
 
-[**Скачать для Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-portable-x64.zip) · [Последний релиз](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[**Скачать для Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-portable-x64.zip) · [Последний релиз](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram: @jabrail_digital**](https://t.me/jabrail_digital)
 
 ![Последний релиз](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
