@@ -221,6 +221,26 @@ The release uses a folder-based PyInstaller build for responsive startup. Option
 
 </details>
 
+## Research use and citation
+
+Click'n'Translate can be used as a versioned software substrate for experiments
+on screen-text OCR, multilingual interface accessibility, and local-versus-online
+translation workflows. The [research-use guide](docs/RESEARCH.md) defines a
+reproducible snapshot procedure, identifies observable outputs, and separates
+application behavior from experiment-specific analysis. Citation metadata is
+available in [`CITATION.cff`](CITATION.cff), and the draft software paper is in
+[`paper.md`](paper.md).
+
+Scientific claims belong in the study that performs the experiment. The project
+README and software paper describe the application and its research affordances;
+they do not claim that one OCR or translation engine is universally superior.
+
+## License
+
+Click'n'Translate is distributed under the
+[GNU General Public License v3.0](LICENSE). Third-party engines, models, and
+libraries retain their own licenses.
+
 ## Support the project
 
 If Click'n'Translate saves you time:

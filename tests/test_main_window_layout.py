@@ -21,7 +21,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from PyQt5.QtCore import Qt  # noqa: E402
+from PyQt5.QtCore import QEvent, Qt  # noqa: E402
 from PyQt5.QtGui import QImage, QTextCursor  # noqa: E402
 from PyQt5.QtTest import QTest  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QFrame, QWidget  # noqa: E402
@@ -125,6 +125,7 @@ class MainWindowGeometryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+        cls.app.setQuitOnLastWindowClosed(False)
 
     def setUp(self):
         # The window opens its welcome dialog on a fresh config, and a modal
@@ -140,6 +141,9 @@ class MainWindowGeometryTest(unittest.TestCase):
         guide = mock.patch.object(main.DarkThemeApp, "_maybe_start_first_run_guide")
         guide.start()
         self.addCleanup(guide.stop)
+        hotkey_listener = mock.patch.object(main, "HotkeyListenerThread")
+        hotkey_listener.start()
+        self.addCleanup(hotkey_listener.stop)
 
         try:
             self.window = main.DarkThemeApp()
@@ -150,7 +154,13 @@ class MainWindowGeometryTest(unittest.TestCase):
             self.app.processEvents()
 
     def tearDown(self):
+        # closeEvent normally minimizes a live application to the tray. Tests
+        # need a real shutdown so the next window does not inherit Qt objects
+        # and background workers from the previous case.
+        self.window.force_quit = True
         self.window.close()
+        self.window.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
         self.app.processEvents()
 
     def _blocks(self):
@@ -384,6 +394,7 @@ class DirectionSummaryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+        cls.app.setQuitOnLastWindowClosed(False)
 
     def setUp(self):
         welcome = mock.patch.object(main, "WelcomeDialog")
@@ -397,6 +408,9 @@ class DirectionSummaryTest(unittest.TestCase):
         guide = mock.patch.object(main.DarkThemeApp, "_maybe_start_first_run_guide")
         guide.start()
         self.addCleanup(guide.stop)
+        hotkey_listener = mock.patch.object(main, "HotkeyListenerThread")
+        hotkey_listener.start()
+        self.addCleanup(hotkey_listener.stop)
         try:
             self.window = main.DarkThemeApp()
         except Exception as error:                      # pragma: no cover
@@ -406,7 +420,10 @@ class DirectionSummaryTest(unittest.TestCase):
         self.window.config["main_translation_target_language"] = "en"
 
     def tearDown(self):
+        self.window.force_quit = True
         self.window.close()
+        self.window.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
         self.app.processEvents()
 
     def _set_every_mode(self, source, target):

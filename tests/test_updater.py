@@ -526,6 +526,8 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())", script_text)
             self.assertIn("Move-UpdateItemWithRetry", script_text)
             self.assertIn("Get-DescendantProcessIds", script_text)
+            self.assertIn("GetLongPathNameW", script_text)
+            self.assertIn("Resolve-ComparablePath", script_text)
             self.assertIn("Stop-InstallProcesses", script_text)
             self.assertIn("^unins\\d*\\.(exe|dat|msg)$", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
@@ -751,7 +753,10 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
             self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
-            self.assertIsNotNone(blocker.poll(), "Locked OCR worker was left running")
+            try:
+                blocker.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.fail("Locked OCR worker was left running")
         finally:
             if blocker is not None and blocker.poll() is None:
                 subprocess.run(

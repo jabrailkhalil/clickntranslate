@@ -75,9 +75,10 @@ class TestLauncher(unittest.TestCase):
                 time.sleep(0.05)
 
             self.assertTrue(marker.exists(), "The launcher did not start the inner executable")
-            self.assertEqual(
-                os.path.normcase(marker.read_text(encoding="utf-8").strip()),
-                os.path.normcase(str(install_root)),
+            actual_working_directory = marker.read_text(encoding="utf-8").strip()
+            self.assertTrue(
+                os.path.samefile(actual_working_directory, install_root),
+                f"{actual_working_directory!r} does not identify {str(install_root)!r}",
             )
             self.assertEqual((install_root / "unins000.dat").read_text(encoding="utf-8"), "metadata")
             self.assertTrue((install_root / "unins000.exe").is_file())

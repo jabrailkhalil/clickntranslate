@@ -8749,6 +8749,49 @@ function Get-DescendantProcessIds {
     }
 }
 
+$pathCanonicalizerAvailable = $true
+try {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace ClickNTranslate {
+    public static class NativePath {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetLongPathNameW(
+            string shortPath,
+            StringBuilder longPath,
+            uint bufferLength
+        );
+
+        public static string GetLongPath(string path) {
+            var buffer = new StringBuilder(32768);
+            var length = GetLongPathNameW(path, buffer, (uint)buffer.Capacity);
+            return length > 0 && length < buffer.Capacity ? buffer.ToString() : path;
+        }
+    }
+}
+"@ -ErrorAction Stop
+} catch {
+    $pathCanonicalizerAvailable = $false
+    Write-UpdateLog ("Could not load Windows path canonicalizer: " + $_.Exception.Message)
+}
+
+function Resolve-ComparablePath {
+    param([string]$LiteralPath)
+    $resolved = [System.IO.Path]::GetFullPath($LiteralPath)
+    try {
+        $resolved = (Get-Item -LiteralPath $resolved -Force -ErrorAction Stop).FullName
+    } catch {}
+    if ($pathCanonicalizerAvailable) {
+        try {
+            $resolved = [ClickNTranslate.NativePath]::GetLongPath($resolved)
+        } catch {}
+    }
+    return $resolved.TrimEnd('\', '/')
+}
+
 function Stop-InstallProcesses {
     param([string]$InstallRoot, [int[]]$KnownChildPids)
     foreach ($childPid in @($KnownChildPids)) {
@@ -8758,11 +8801,12 @@ function Stop-InstallProcesses {
         }
     }
 
-    $rootPrefix = [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    $rootPrefix = (Resolve-ComparablePath $InstallRoot) + [System.IO.Path]::DirectorySeparatorChar
     try {
         foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
             $executable = [string]$process.ExecutablePath
-            if ($executable -and $executable.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $comparableExecutable = if ($executable) { Resolve-ComparablePath $executable } else { "" }
+            if ($comparableExecutable.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
                 Write-UpdateLog "Stopping process from install directory: PID=$($process.ProcessId); Path=$executable"
                 Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue
             }
@@ -8776,7 +8820,8 @@ function Stop-InstallProcesses {
         try {
             $remaining = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
                 $path = [string]$_.ExecutablePath
-                $path -and $path.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+                $comparablePath = if ($path) { Resolve-ComparablePath $path } else { "" }
+                $comparablePath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)
             })
         } catch {}
         if ($remaining.Count -eq 0) { return }
