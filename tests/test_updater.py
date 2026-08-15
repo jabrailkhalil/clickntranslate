@@ -526,6 +526,8 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Set-Location -LiteralPath ([System.IO.Path]::GetTempPath())", script_text)
             self.assertIn("Move-UpdateItemWithRetry", script_text)
             self.assertIn("Get-DescendantProcessIds", script_text)
+            self.assertIn("GetLongPathNameW", script_text)
+            self.assertIn("Resolve-ComparablePath", script_text)
             self.assertIn("Stop-InstallProcesses", script_text)
             self.assertIn("^unins\\d*\\.(exe|dat|msg)$", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
