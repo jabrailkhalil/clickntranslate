@@ -751,7 +751,10 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
             self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
-            self.assertIsNotNone(blocker.poll(), "Locked OCR worker was left running")
+            try:
+                blocker.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.fail("Locked OCR worker was left running")
         finally:
             if blocker is not None and blocker.poll() is None:
                 subprocess.run(
