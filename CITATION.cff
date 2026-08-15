@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: >-
+  If you use Click'n'Translate in research, please cite the software using the
+  metadata below and archive the exact release or commit used in your study.
+title: "Click'n'Translate"
+type: software
+authors:
+  - family-names: Khalilov
+    given-names: Dzhabrail Elnurovich
+    orcid: "https://orcid.org/0009-0002-2391-692X"
+repository-code: "https://github.com/jabrailkhalil/clickntranslate"
+url: "https://github.com/jabrailkhalil/clickntranslate"
+version: 1.5.9
+date-released: 2026-08-11
+license: GPL-3.0-only
+abstract: >-
+  Click'n'Translate is a cross-platform desktop application for capturing,
+  recognizing, copying, and translating text from graphical user interfaces.
+  It provides multiple local OCR backends, online and offline translation
+  routes, versioned release artifacts, and testable platform adapters for
+  research on screen text and multilingual interface workflows.
+keywords:
+  - screen text
+  - optical character recognition
+  - machine translation
+  - graphical user interface
+  - accessibility
+  - research software
