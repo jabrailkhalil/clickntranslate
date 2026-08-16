@@ -7,7 +7,7 @@
 **The best all-in-one screen translator for Windows.**<br>
 Fast online translation · Private offline engines · Four OCR options · Global hotkeys
 
-[**Download the Windows installer**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-x64-installer.exe) · [**Portable ZIP**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-portable-x64.zip) · [Release notes](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram**](https://t.me/jabrail_digital)
+[**Download the Windows installer**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.0-windows-x64-installer.exe) · [**Portable ZIP**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.0-windows-portable-x64.zip) · [Release notes](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram**](https://t.me/jabrail_digital)
 
 ![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=for-the-badge&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=for-the-badge) ![No account required](https://img.shields.io/badge/Account-Not%20required-16a34a?style=for-the-badge)
 
@@ -114,8 +114,8 @@ Installed packages are shown first. Downloads display progress, can continue in 
 
 | Edition | Choose it when… | How to start |
 | --- | --- | --- |
-| **Windows installer** | You want the simplest setup, shortcuts, and reliable in-app updates | [Download the installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-x64-installer.exe) and run it |
-| **Portable ZIP** | You want a self-contained folder you can move or keep on another drive | [Download the ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-portable-x64.zip), extract it, and run `ClicknTranslate.exe` |
+| **Windows installer** | You want the simplest setup, shortcuts, and reliable in-app updates | [Download the installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.0-windows-x64-installer.exe) and run it |
+| **Portable ZIP** | You want a self-contained folder you can move or keep on another drive | [Download the ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.0-windows-portable-x64.zip), extract it, and run `ClicknTranslate.exe` |
 
 ### Start translating in under a minute
 
@@ -253,6 +253,6 @@ If Click'n'Translate saves you time:
 
 ### Ready to translate anything on your screen?
 
-[**Download Click'n'Translate for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.5.9-windows-x64-installer.exe)
+[**Download Click'n'Translate for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.0-windows-x64-installer.exe)
 
 </div>

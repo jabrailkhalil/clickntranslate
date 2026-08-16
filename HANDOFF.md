@@ -1915,3 +1915,40 @@ selection hotkeys. That has not been true since the shortcut row went in, and it
 described the exact misconception this line exists to prevent. Corrected in all
 six languages, and its test now checks the shortcuts are described as carrying
 their own pair.
+
+---
+
+## 24. Release 1.6.0 — updater path reliability and project readiness (2026-08-16)
+
+### 24.1 Included changes
+
+* Windows update process discovery canonicalizes short and long executable
+  paths before stopping locked helpers.
+* Cross-platform GitHub Actions run the source suite on Windows and Ubuntu.
+* GPL-3.0 licensing, citation, contribution, security, and research metadata
+  are now part of the release tree.
+* AppStream metadata uses the repository's actual GPL-3.0-only license.
+
+### 24.2 Verification
+
+| Layer | Result |
+| --- | --- |
+| Windows source suite | 638 passed, 11 platform skips, 8 subtests |
+| Linux source suite (WSL Ubuntu 22.04) | 615 passed, 34 platform skips, 8 subtests |
+| Windows frozen functional sweep | 34 passed, 0 failed, 6 optional skips |
+| Linux frozen functional sweep (offline) | 52 passed, 0 failed, 7 optional/network skips |
+| Linux online providers | Lingva, MyMemory, and LibreTranslate passed; Google timed out once in WSL after passing on Windows |
+| Windows updater E2E | portable and installed 1.5.9 -> 1.6.0 passed |
+| Updater safety | user data preserved; locked OCR worker stopped; app restarted |
+| Portable ZIP layout | 4004 entries; one top-level folder; launchers/workers present; no user data or top-level README/CMD |
+| Linux AppImage | AppStream validation passed; extract-and-run stayed healthy for 15 seconds |
+
+### 24.3 Artifacts
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Click-n-Translate-1.6.0-windows-portable-x64.zip` | 209159975 | `AB3E2E4B295FE7F6BB6ADC5FEBFF7DABC56DA8BF2C18DE197B19A03160D287B7` |
+| `Click-n-Translate-1.6.0-windows-x64-installer.exe` | 128523745 | `D04EECB71D2BFFCC70CC84E0C1BF135AC3AB56042CA70407F07E8CC6873BE2DE` |
+| `ClicknTranslate-Setup-v1.6.0-win64.exe` | 89600 | `8E8E3893E1E02DF83F7AE7423E6625A87F961FDA459D32537E71A157BC114B78` |
+| `Click-n-Translate-1.6.0-linux-x86_64.AppImage` | 273966272 | `1E1BEA0D395FCA2E86F0F8A7ACA296D6543C44CA19F5FEF52AF5BDF67D8A6B36` |
+| `Click-n-Translate-1.6.0-linux-x86_64.tar.gz` | 271606631 | `27ABD0E0A7D6CBD42AE91CFC0466DBDCFE6AD49477A45BE6393AAE8F2723EE3B` |
