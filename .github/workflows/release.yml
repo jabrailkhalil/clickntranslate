@@ -30,7 +30,8 @@ jobs:
           "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install -r requirements-linux.txt pytest pyinstaller
           "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install --no-deps "argostranslate~=1.11.0"
       - name: Test Linux source
-        run: "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pytest -q
+        run: |
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pytest -q
       - name: Build Linux release
         env:
           VENV: ${{ runner.temp }}/clickntranslate-venv
