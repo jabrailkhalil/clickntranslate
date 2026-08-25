@@ -26,6 +26,11 @@
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
+    <release version="1.6.1" date="2026-08-25">
+      <description>
+        <p>Faster engine switching, refined language controls, startup diagnostics, and interface polish.</p>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-08-16">
       <description>
         <p>Reliable Windows updater path handling, cross-platform CI, and complete research and contribution metadata.</p>

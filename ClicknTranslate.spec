@@ -359,7 +359,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Avoid executable packers in public builds. Packed unsigned PyInstaller
+    # stubs receive substantially more heuristic antivirus detections.
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -379,7 +381,7 @@ worker_exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -398,7 +400,7 @@ ocr_worker_exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -429,7 +431,7 @@ coll = COLLECT(
     ocr_worker_a.binaries,
     ocr_worker_a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='ClicknTranslate',
 )

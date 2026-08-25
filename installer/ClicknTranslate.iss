@@ -1,6 +1,6 @@
 #define MyAppName "Click'n'Translate"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.6.0"
+  #define MyAppVersion "1.6.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"
@@ -48,6 +48,10 @@ VersionInfoProductVersion={#MyAppVersion}
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
+[CustomMessages]
+english.MainExecutableMissing=The main application file was blocked or removed while it was being installed.%n%nCheck the antivirus quarantine, allow the ClicknTranslate folder, and run this installer again.
+russian.MainExecutableMissing=Основной файл программы был заблокирован или удалён во время установки.%n%nПроверьте карантин антивируса, добавьте папку ClicknTranslate в исключения и запустите установщик ещё раз.
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -64,3 +68,14 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\ClicknTranslate.exe"; Worki
 
 [Run]
 Filename: "{app}\ClicknTranslate.exe"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and
+     (not FileExists(ExpandConstant('{app}\app\ClicknTranslateApp.exe'))) then
+  begin
+    Log('ClicknTranslateApp.exe is missing after file installation. Antivirus quarantine is likely.');
+    RaiseException(CustomMessage('MainExecutableMissing'));
+  end;
+end;

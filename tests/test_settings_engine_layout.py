@@ -16,6 +16,8 @@ from PyQt5.QtWidgets import QApplication, QComboBox, QStyle, QStyleOptionComboBo
 
 import main  # noqa: E402
 from settings_window import (  # noqa: E402
+    EASYOCR_ENGINE_DISPLAY,
+    RAPIDOCR_ENGINE_DISPLAY,
     SettingsWindow,
     settings_text,
     _populate_grouped_ocr_combo,
@@ -165,6 +167,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     self.assertNotIn("padding-bottom: 6px", button.styleSheet())
                     self.assertNotIn("padding-bottom: 12px", button.styleSheet())
                     self.assertIn("font-size: 16px", button.styleSheet())
+                    self.assertEqual(button._label_offset_y, -3)
             self.assertEqual(
                 [(rect[0], rect[2]) for rect in action_rects[0]],
                 [(rect[0], rect[2]) for rect in action_rects[1]],
@@ -174,7 +177,6 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 action_rects[2][0][0] + action_rects[2][0][2],
                 action_rects[0][-1][0] + action_rects[0][-1][2],
             )
-
             settings.close()
             parent.close()
             self.app.processEvents()
@@ -439,6 +441,40 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 if child.isVisible()
             )
             self.assertLessEqual(lowest, settings.height(), lang)
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_neural_ocr_selection_never_runs_heavy_import_probe(self):
+        parent, settings = self._result_window_settings()
+        try:
+            for engine, availability_name, heavy_probe_name in (
+                (EASYOCR_ENGINE_DISPLAY, "_easyocr_runtime_installed", "_easyocr_importable_status"),
+                (RAPIDOCR_ENGINE_DISPLAY, "_rapidocr_runtime_installed", "_rapidocr_importable_status"),
+            ):
+                parent.config["ocr_engine"] = "Windows"
+                with mock.patch.object(settings, availability_name, return_value=True), mock.patch.object(
+                    settings,
+                    heavy_probe_name,
+                    side_effect=AssertionError("heavy runtime probe reached the UI thread"),
+                ) as heavy_probe:
+                    settings.handle_ocr_engine_change(engine)
+                heavy_probe.assert_not_called()
+                self.assertEqual(parent.config["ocr_engine"], engine)
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
+    def test_translator_combo_has_no_stale_delete_button_slot(self):
+        parent, settings = self._result_window_settings()
+        try:
+            index = settings.translator_combo.findData("lingva")
+            self.assertGreaterEqual(index, 0)
+            settings.translator_combo.setCurrentIndex(index)
+            self.app.processEvents()
+            self.assertEqual(parent.config["translator_engine"], "lingva")
+        finally:
             settings.close()
             parent.close()
             self.app.processEvents()

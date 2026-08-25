@@ -123,6 +123,13 @@ class GuideCoverageTest(unittest.TestCase):
                 html.count("<span class='item-title'>"), html.count("</span>"), lang
             )
 
+    def test_help_uses_a_real_light_palette(self):
+        html = main.help_text("ru", "Светлая")
+
+        self.assertIn("body { color: #2b2532", html)
+        self.assertIn(".hero-title { color: #211b28", html)
+        self.assertNotIn("body { color: #e8e0f7", html)
+
     def test_document_guide_covers_every_entry_point_and_partial_translation(self):
         fragment_clues = {
             "en": "fragment",

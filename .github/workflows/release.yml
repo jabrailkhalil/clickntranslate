@@ -1,0 +1,65 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-linux.txt
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream libegl1 libgl1 libxcb-xinerama0 libxkbcommon-x11-0
+          python -m venv "$RUNNER_TEMP/clickntranslate-venv"
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install -r requirements-linux.txt pytest pyinstaller
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install --no-deps "argostranslate~=1.11.0"
+      - name: Test Linux source
+        run: "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pytest -q
+      - name: Build Linux release
+        env:
+          VENV: ${{ runner.temp }}/clickntranslate-venv
+        run: tools/build_linux_release.sh
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: |
+            releases/Click-n-Translate-*-linux-x86_64.AppImage
+            releases/Click-n-Translate-*-linux-x86_64.tar.gz
+            releases/Click-n-Translate-*-linux-x86_64.sha256
+          if-no-files-found: error
+
+  draft:
+    needs: linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-release
+          path: release-assets
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Click'n'Translate 1.6.1
+          body: |
+            | Version | Purpose |
+            |---|---|
+            | 1.6.1 | Faster engine switching, refined language controls, startup diagnostics, and UI polish. |
+          files: release-assets/*

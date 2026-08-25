@@ -306,10 +306,11 @@ class MainWindowGeometryTest(unittest.TestCase):
                 index,
             )
 
-    def test_the_shortcut_legend_keeps_six_chips_on_two_rows(self):
-        """Six chips plus the engine summary do not fit one 690px line in any
-        of the six languages — measured; they drew over each other. Two rows of
-        three columns is what fits.
+    def test_the_shortcut_legend_keeps_six_chips_on_three_rows(self):
+        """The old three-column minimum width exceeded the fixed main window.
+
+        Two columns keep the full labels and key sequences readable while
+        leaving the engine divider a real gutter instead of an overlap.
         """
         chips = self.window.findChildren(QWidget, "mainHotkeyPair")
         # Six hotkeys are registered, so six are listed. The legend showed five
@@ -323,7 +324,7 @@ class MainWindowGeometryTest(unittest.TestCase):
         )
         self.assertEqual(set(self.window.main_hotkey_references.values()), set(chips))
         rows = {chip.mapTo(self.window, chip.rect().topLeft()).y() for chip in chips}
-        self.assertEqual(len(rows), 2, "the legend should be two rows")
+        self.assertEqual(len(rows), 3, "the legend should be three rows")
 
     def test_next_button_cannot_skip_multiple_cards_during_transition(self):
         self.window._guide_active = True
@@ -497,6 +498,39 @@ class DirectionSummaryTest(unittest.TestCase):
             side_effect=AssertionError("the summary must not probe the engines"),
         ):
             self.window._direction_summary_text()
+
+    def test_main_and_hotkey_arrows_swap_their_own_language_pairs(self):
+        for button in (
+            self.window.main_language_swap,
+            self.window.hotkey_language_swap,
+        ):
+            self.assertIsInstance(button, main.LanguageSwapButton)
+            self.assertEqual(button.text(), "")
+
+        self.window.config["translator_engine"] = "Google"
+        self.window.config["main_translation_source_language"] = "en"
+        self.window.config["main_translation_target_language"] = "ru"
+        self.window._restore_main_translation_languages()
+
+        self.window.main_language_swap.click()
+
+        self.assertEqual(
+            self.window._configured_main_translation_pair(),
+            ("ru", "en"),
+        )
+
+        source_key, target_key = main.HOTKEY_LANGUAGE_CONFIG_KEYS["selection"]
+        self.window.config["hotkey_language_editor_mode"] = "selection"
+        self.window.config[source_key] = "en"
+        self.window.config[target_key] = "ru"
+        self.window._refresh_hotkey_language_controls()
+
+        self.window.hotkey_language_swap.click()
+
+        self.assertEqual(
+            self.window._configured_hotkey_translation_pair("selection"),
+            ("ru", "en"),
+        )
 
     def test_the_label_carries_the_tooltip_style(self):
         """A widget with its own stylesheet resolves its tooltip against that

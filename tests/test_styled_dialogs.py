@@ -209,6 +209,34 @@ def test_document_source_language_is_explicit_for_every_provider(monkeypatch):
     owner.close()
 
 
+def test_document_language_arrow_swaps_source_and_target(monkeypatch):
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "Темная"
+    monkeypatch.setattr(
+        main,
+        "get_cached_config",
+        lambda: {
+            "main_translation_source_language": "en",
+            "main_translation_target_language": "ru",
+            "translator_engine": "Google",
+        },
+    )
+
+    dialog = main.DocumentTranslationDialog(owner)
+    app.processEvents()
+    dialog.source_combo.setCurrentIndex(dialog.source_combo.findData("en"))
+    dialog.target_combo.setCurrentIndex(dialog.target_combo.findData("ru"))
+
+    dialog.language_arrow.click()
+
+    assert dialog.source_combo.currentData() == "ru"
+    assert dialog.target_combo.currentData() == "en"
+    dialog.close()
+    owner.close()
+
+
 def test_faq_uses_custom_chrome_and_exposes_project_links():
     app = _app()
 
@@ -235,6 +263,7 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
         observed["github_at_end"] = help_text.toHtml().rfind("github.com/jabrailkhalil/clickntranslate") > help_text.toHtml().rfind("section-title")
         observed["external_links"] = help_text.openExternalLinks()
         observed["telegram"] = dialog.findChild(QtWidgets.QPushButton, "helpTelegramButton") is not None
+        observed["bug_report"] = dialog.findChild(QtWidgets.QPushButton, "helpBugReportButton") is not None
         observed["frame"] = dialog.findChild(QtWidgets.QFrame, "helpDialogFrame") is not None
         dialog.accept()
 
@@ -246,6 +275,7 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
         "github_at_end": True,
         "external_links": True,
         "telegram": True,
+        "bug_report": True,
         "frame": True,
     }
     assert "background-color: transparent" in main._HELP_STYLE

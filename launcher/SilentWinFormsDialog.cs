@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 internal static class SilentWinFormsDialog
@@ -58,6 +60,79 @@ internal static class SilentWinFormsDialog
                 form.CancelButton = ok;
             }
 
+            return form.ShowDialog();
+        }
+    }
+
+    internal static DialogResult ShowStartupFailure(
+        string text,
+        string title,
+        string reportButtonText,
+        string closeButtonText,
+        string reportReadyText,
+        string reportFailedText,
+        Func<string> createReport)
+    {
+        using (Form form = new Form())
+        {
+            form.Text = title ?? "Click'n'Translate";
+            form.StartPosition = FormStartPosition.CenterScreen;
+            form.FormBorderStyle = FormBorderStyle.FixedDialog;
+            form.MinimizeBox = false;
+            form.MaximizeBox = false;
+            form.ShowInTaskbar = true;
+            form.BackColor = Color.FromArgb(16, 17, 20);
+            form.ForeColor = Color.FromArgb(245, 245, 247);
+            form.ClientSize = new Size(620, 285);
+            form.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
+
+            Label message = new Label
+            {
+                AutoSize = false,
+                Text = text ?? string.Empty,
+                ForeColor = form.ForeColor,
+                BackColor = form.BackColor,
+                Location = new Point(24, 20),
+                Size = new Size(572, 190),
+                TextAlign = ContentAlignment.MiddleLeft,
+            };
+            form.Controls.Add(message);
+
+            FlowLayoutPanel actions = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                Location = new Point(24, 225),
+                Size = new Size(572, 40),
+                BackColor = form.BackColor,
+            };
+            form.Controls.Add(actions);
+
+            Button close = CreateButton(closeButtonText, DialogResult.Cancel, false);
+            Button report = CreateButton(reportButtonText, DialogResult.None, true);
+            report.Size = new Size(178, 34);
+            report.Click += delegate
+            {
+                report.Enabled = false;
+                try
+                {
+                    string path = createReport == null ? null : createReport();
+                    message.Text = reportReadyText + Environment.NewLine + Environment.NewLine + path;
+                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                    {
+                        Process.Start("explorer.exe", "/select,\"" + path + "\"");
+                    }
+                }
+                catch (Exception error)
+                {
+                    message.Text = reportFailedText + Environment.NewLine + Environment.NewLine + error.Message;
+                    report.Enabled = true;
+                }
+            };
+            actions.Controls.Add(close);
+            actions.Controls.Add(report);
+            form.AcceptButton = report;
+            form.CancelButton = close;
             return form.ShowDialog();
         }
     }

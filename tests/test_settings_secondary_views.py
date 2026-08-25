@@ -128,9 +128,16 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(len(label_rects), 6)
         self.assertEqual({rect[0] for rect in input_rects}, {input_rects[0][0]})
         self.assertEqual({rect[2] for rect in input_rects}, {input_rects[0][2]})
-        self.assertEqual({rect[3] for rect in input_rects}, {36})
+        self.assertEqual({rect[3] for rect in input_rects}, {30})
         for label_rect, input_rect in zip(label_rects, input_rects):
             self.assertEqual(label_rect[1] + label_rect[3] // 2, input_rect[1] + input_rect[3] // 2)
+        for upper, lower in zip(input_rects, input_rects[1:]):
+            upper_bottom = upper[1] + upper[3]
+            self.assertGreaterEqual(
+                lower[1] - upper_bottom,
+                4,
+                "rounded hotkey fields must not touch or overlap",
+            )
         self.assertEqual(
             [field.keySequence().toString() for field in inputs],
             ["Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q", "Ctrl+Shift+Q", "Ctrl+Shift+Space"],

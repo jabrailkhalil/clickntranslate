@@ -351,6 +351,15 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.app.processEvents()
         self.assertFalse(self.dialog.isVisible())
 
+    def test_light_theme_uses_light_custom_title_bar(self):
+        self.parent.current_theme = "Светлая"
+        self.dialog._apply_style()
+
+        style = self.dialog.styleSheet()
+        self.assertIn("background-color: #f2edf7", style)
+        self.assertIn("color: #2b2333", style)
+        self.assertNotIn("background-color: #090a0d", style)
+
     def test_every_ocr_language_is_present_in_each_per_language_table(self):
         expected = {language.code for language in LANGUAGES}
         self.owner.tesseract_path = r"C:\Tesseract\tesseract.exe"

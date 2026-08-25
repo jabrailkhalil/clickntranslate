@@ -136,6 +136,31 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         finally:
             overlay.deleteLater()
 
+    def test_translate_overlay_swap_button_flips_and_saves_the_pair(self):
+        config = {
+            "interface_language": "en",
+            "translator_engine": "Google",
+            "ocr_engine": "Tesseract",
+            "ocr_translate_source_language": "en",
+            "ocr_translate_target_language": "ru",
+        }
+        with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
+                mock.patch.object(ocr, "installed_ocr_language_codes", return_value=["en", "ru"]), \
+                mock.patch.object(ocr, "_write_ocr_config_updates") as save_pair:
+            overlay = ocr.ScreenCaptureOverlay("translate", defer_show=True)
+            try:
+                self.assertTrue(overlay.translate_arrow_label.isEnabled())
+                overlay.translate_arrow_label.click()
+
+                self.assertEqual(overlay._current_translate_pair(), ("ru", "en"))
+                save_pair.assert_called_with({
+                    "last_ocr_language": "ru",
+                    "ocr_translate_source_language": "ru",
+                    "ocr_translate_target_language": "en",
+                })
+            finally:
+                overlay.deleteLater()
+
     def test_fullscreen_overlay_remembers_independent_chinese_to_english_pair(self):
         config = {
             "interface_language": "en",
@@ -166,6 +191,17 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                     "fullscreen_translate_from": "zh",
                     "fullscreen_translate_to": "en",
                 })
+
+                save_pair.reset_mock()
+                with mock.patch.object(overlay._rerun_timer, "start") as rerun:
+                    overlay.translate_arrow_label.click()
+                self.assertEqual(overlay.lang_combo.currentData(), "en")
+                self.assertEqual(overlay.target_lang_combo.currentData(), "zh")
+                save_pair.assert_called_with({
+                    "fullscreen_translate_from": "en",
+                    "fullscreen_translate_to": "zh",
+                })
+                rerun.assert_called_once_with()
             finally:
                 overlay.close()
                 overlay.deleteLater()

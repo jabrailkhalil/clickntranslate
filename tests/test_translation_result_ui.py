@@ -126,6 +126,14 @@ class TranslationResultUiTest(unittest.TestCase):
 
             self.assertEqual(dialog.text_edit.toPlainText(), "A translated sentence.")
             self.assertEqual(dialog.title_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["title"])
+            eyebrow = dialog.findChild(main.QLabel, "translationResultEyebrow")
+            self.assertIsNotNone(eyebrow)
+            self.assertGreaterEqual(
+                eyebrow.contentsRect().width(),
+                eyebrow.fontMetrics().horizontalAdvance(eyebrow.text()),
+                lang,
+            )
+            self.assertGreater(dialog.title_label.width(), 0, lang)
             self.assertTrue(dialog.windowFlags() & main.Qt.FramelessWindowHint)
             self.assertTrue(dialog.windowFlags() & main.Qt.WindowStaysOnTopHint)
             self.assertTrue(dialog.testAttribute(main.Qt.WA_TranslucentBackground))
@@ -633,6 +641,8 @@ class TranslationResultUiTest(unittest.TestCase):
     def test_swap_tooltip_is_localized_in_every_language(self):
         for lang in main.TRANSLATION_RESULT_DIALOG_TEXT:
             dialog = self._pair_dialog(lang=lang)
+            self.assertIsInstance(dialog.swap_button, main.LanguageSwapButton)
+            self.assertEqual(dialog.swap_button.text(), "")
             self.assertIn(
                 main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["swap"],
                 dialog.swap_button.toolTip(),

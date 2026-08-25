@@ -57,6 +57,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No OCR languages installed",
         "no_installed_translation_pairs": "No installed translation pairs",
         "install_languages_first": "Install a language first in Settings → Language packages.",
+        "swap_languages": "Swap languages",
     },
     "ru": {
         "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
@@ -79,6 +80,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Нет установленных языков OCR",
         "no_installed_translation_pairs": "Нет установленных направлений перевода",
         "install_languages_first": "Сначала установите язык: Настройки → Языковые пакеты.",
+        "swap_languages": "Поменять языки местами",
     },
     "es": {
         "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
@@ -98,6 +100,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No hay idiomas OCR instalados",
         "no_installed_translation_pairs": "No hay direcciones de traducción instaladas",
         "install_languages_first": "Instala primero un idioma en Ajustes → Paquetes de idioma.",
+        "swap_languages": "Intercambiar idiomas",
     },
     "de": {
         "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
@@ -117,6 +120,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Keine OCR-Sprachen installiert",
         "no_installed_translation_pairs": "Keine Übersetzungsrichtungen installiert",
         "install_languages_first": "Installiere zuerst eine Sprache unter Einstellungen → Sprachpakete.",
+        "swap_languages": "Sprachen tauschen",
     },
     "fr": {
         "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
@@ -136,6 +140,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Aucune langue OCR installée",
         "no_installed_translation_pairs": "Aucune direction de traduction installée",
         "install_languages_first": "Installez d’abord une langue dans Réglages → Modules de langue.",
+        "swap_languages": "Inverser les langues",
     },
     "zh": {
         "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
@@ -155,6 +160,7 @@ OCR_UI_TEXT = {
         "no_installed_languages": "未安装 OCR 语言",
         "no_installed_translation_pairs": "未安装翻译方向",
         "install_languages_first": "请先在设置 → 语言包中安装语言。",
+        "swap_languages": "交换语言",
     },
 }
 
@@ -3379,18 +3385,31 @@ class ScreenCaptureOverlay(QWidget):
                     language.short_label,
                     language.code,
                 )
-            self.translate_arrow_label = QtWidgets.QLabel("→", self)
-            self.translate_arrow_label.setAlignment(QtCore.Qt.AlignCenter)
+            self.translate_arrow_label = QtWidgets.QToolButton(self)
+            self.translate_arrow_label.setText("⇄")
+            self.translate_arrow_label.setCursor(QtCore.Qt.ArrowCursor)
+            self.translate_arrow_label.setToolTip(
+                ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
+            )
             self.translate_arrow_label.setStyleSheet("""
-                QLabel {
+                QToolButton {
                     color: #d8e3f2;
-                    font-size: 20px;
+                    font-size: 17px;
                     font-weight: 700;
                     background-color: rgba(22, 25, 31, 244);
                     border: 1px solid rgba(105, 123, 150, 130);
                     border-radius: 12px;
                 }
+                QToolButton:hover {
+                    background-color: rgba(40, 47, 60, 252);
+                    border-color: rgba(160, 186, 220, 220);
+                }
+                QToolButton:disabled {
+                    color: rgba(118, 128, 143, 180);
+                    border-color: rgba(73, 82, 96, 110);
+                }
             """)
+            self.translate_arrow_label.clicked.connect(self._swap_translate_languages)
             self.target_lang_combo = QtWidgets.QComboBox(self)
         else:
             for language in APP_LANGUAGES:
@@ -3560,6 +3579,7 @@ class ScreenCaptureOverlay(QWidget):
         finally:
             self.target_lang_combo.blockSignals(False)
         self.current_target_language = self.target_lang_combo.currentData() or default_target_for_source(source_code)
+        self._update_translate_swap_enabled()
 
     def _refresh_available_language_choices(self, config):
         available_codes = installed_ocr_language_codes(config=config)
@@ -3600,6 +3620,57 @@ class ScreenCaptureOverlay(QWidget):
         if self.target_lang_combo is not None:
             target_code = self.target_lang_combo.currentData()
         return source_code, default_target_for_source(source_code, target_code)
+
+    def _update_translate_swap_enabled(self):
+        button = self.translate_arrow_label
+        if button is None or self.target_lang_combo is None:
+            return
+        source = self.lang_combo.currentData()
+        target = self.target_lang_combo.currentData()
+        reverse_targets = (
+            _translation_targets_for_source(str(target), get_cached_ocr_config())
+            if target else []
+        )
+        button.setEnabled(
+            bool(
+                source
+                and target
+                and self.lang_combo.findData(target) >= 0
+                and str(source) in reverse_targets
+            )
+        )
+
+    def _swap_translate_languages(self):
+        if self.target_lang_combo is None:
+            return
+        source = self.lang_combo.currentData()
+        target = self.target_lang_combo.currentData()
+        if not source or not target or self.lang_combo.findData(target) < 0:
+            self._update_translate_swap_enabled()
+            return
+        if str(source) not in _translation_targets_for_source(str(target), get_cached_ocr_config()):
+            self._update_translate_swap_enabled()
+            return
+        self._updating_language_controls = True
+        try:
+            self.lang_combo.setCurrentIndex(self.lang_combo.findData(target))
+            self.current_language = str(target)
+            self.current_target_language = str(source)
+            self._populate_translate_target_combo(str(source))
+            target_index = self.target_lang_combo.findData(source)
+            if target_index >= 0:
+                self.target_lang_combo.setCurrentIndex(target_index)
+        finally:
+            self._updating_language_controls = False
+        source_code, target_code = self._current_translate_pair()
+        self.current_language = source_code
+        self.current_target_language = target_code
+        _write_ocr_config_updates({
+            "last_ocr_language": source_code,
+            "ocr_translate_source_language": source_code,
+            "ocr_translate_target_language": target_code,
+        })
+        self._update_translate_swap_enabled()
 
     def _refresh_language_controls_from_config(self, config):
         self._updating_language_controls = True
@@ -4116,6 +4187,7 @@ class ScreenCaptureOverlay(QWidget):
                 updates["last_ocr_language"] = source_code
                 updates["ocr_translate_source_language"] = source_code
                 updates["ocr_translate_target_language"] = target_code
+                self._update_translate_swap_enabled()
             if _write_ocr_config_updates(updates):
                 logging.info(f"Saved OCR language: {updates['last_ocr_language']}")
 
@@ -5417,7 +5489,12 @@ class FullScreenTranslateOverlay(QWidget):
         # two independent controls so any valid direction can be chosen.
         self.lang_combo = QtWidgets.QComboBox(self)
         self.target_lang_combo = QtWidgets.QComboBox(self)
-        self.translate_arrow_label = QtWidgets.QLabel("\u2192", self)
+        self.translate_arrow_label = QtWidgets.QToolButton(self)
+        self.translate_arrow_label.setText("⇄")
+        self.translate_arrow_label.setCursor(QtCore.Qt.ArrowCursor)
+        self.translate_arrow_label.setToolTip(
+            ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
+        )
         fullscreen_config = dict(config)
         # Positional full-screen OCR uses Windows OCR's native line geometry.
         fullscreen_config["ocr_engine"] = "Windows"
@@ -5447,15 +5524,22 @@ class FullScreenTranslateOverlay(QWidget):
             default_idx = 0
         self.lang_combo.setCurrentIndex(default_idx)
 
-        self.translate_arrow_label.setAlignment(QtCore.Qt.AlignCenter)
         self.translate_arrow_label.setStyleSheet("""
-            QLabel {
+            QToolButton {
                 color: #d8e3f2;
-                font-size: 20px;
+                font-size: 17px;
                 font-weight: 700;
                 background-color: rgba(22, 25, 31, 244);
                 border: 1px solid rgba(105, 123, 150, 130);
                 border-radius: 11px;
+            }
+            QToolButton:hover {
+                background-color: rgba(40, 47, 60, 252);
+                border-color: rgba(160, 186, 220, 220);
+            }
+            QToolButton:disabled {
+                color: rgba(118, 128, 143, 180);
+                border-color: rgba(73, 82, 96, 110);
             }
         """)
         combo_style = """
@@ -5504,6 +5588,7 @@ class FullScreenTranslateOverlay(QWidget):
 
         self.lang_combo.currentIndexChanged.connect(self._on_fullscreen_source_changed)
         self.target_lang_combo.currentIndexChanged.connect(self._on_fullscreen_target_changed)
+        self.translate_arrow_label.clicked.connect(self._swap_fullscreen_languages)
         controls_enabled = not no_source_languages and self.target_lang_combo.currentData() is not None
         self.lang_combo.setEnabled(not no_source_languages)
         self.target_lang_combo.setEnabled(controls_enabled)
@@ -5557,6 +5642,7 @@ class FullScreenTranslateOverlay(QWidget):
                 self.target_lang_combo.setEnabled(True)
         finally:
             self.target_lang_combo.blockSignals(False)
+        self._update_fullscreen_swap_enabled()
 
     def _on_fullscreen_source_changed(self):
         previous_target = self.target_lang_combo.currentData()
@@ -5564,8 +5650,45 @@ class FullScreenTranslateOverlay(QWidget):
         self._on_fullscreen_target_changed()
 
     def _on_fullscreen_target_changed(self):
+        self._update_fullscreen_swap_enabled()
         if self._persist_fullscreen_pair():
             self._rerun_timer.start()
+
+    def _update_fullscreen_swap_enabled(self):
+        source = self.lang_combo.currentData()
+        target = self.target_lang_combo.currentData()
+        reverse_targets = (
+            _translation_targets_for_source(str(target), get_cached_ocr_config())
+            if target else []
+        )
+        self.translate_arrow_label.setEnabled(
+            bool(
+                source
+                and target
+                and self.lang_combo.findData(target) >= 0
+                and str(source) in reverse_targets
+            )
+        )
+
+    def _swap_fullscreen_languages(self):
+        source = self.lang_combo.currentData()
+        target = self.target_lang_combo.currentData()
+        if not source or not target or self.lang_combo.findData(target) < 0:
+            self._update_fullscreen_swap_enabled()
+            return
+        if str(source) not in _translation_targets_for_source(str(target), get_cached_ocr_config()):
+            self._update_fullscreen_swap_enabled()
+            return
+        self.lang_combo.blockSignals(True)
+        try:
+            self.lang_combo.setCurrentIndex(self.lang_combo.findData(target))
+        finally:
+            self.lang_combo.blockSignals(False)
+        self._populate_fullscreen_target_combo(str(source))
+        target_index = self.target_lang_combo.findData(source)
+        if target_index >= 0:
+            self.target_lang_combo.setCurrentIndex(target_index)
+        self._on_fullscreen_target_changed()
 
     def _persist_fullscreen_pair(self):
         source_code = self.lang_combo.currentData()

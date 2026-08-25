@@ -15,6 +15,7 @@ import time
 import ctypes
 import logging
 import base64
+import importlib.util
 from pathlib import Path
 from urllib.parse import urlparse
 try:
@@ -769,6 +770,29 @@ class ResultWindowModeCombo(DropDownCombo):
         option.currentIcon = QtGui.QIcon()
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
         painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        painter.end()
+
+
+class OpticallyCenteredPushButton(QPushButton):
+    """Paint a connected button's label at a deliberate optical centre.
+
+    IMPORTANT: changing ``padding-top`` or ``padding-bottom`` in the footer
+    button QSS does not visibly move the text with Qt's Windows stylesheet
+    engine.  Do not retry that ineffective fix.  The joined button frames must
+    remain stationary, so only ``CE_PushButtonLabel`` is translated here.
+    """
+
+    def __init__(self, text="", parent=None, label_offset_y=-3):
+        super().__init__(text, parent)
+        self._label_offset_y = int(label_offset_y)
+
+    def paintEvent(self, event):
+        option = QtWidgets.QStyleOptionButton()
+        self.initStyleOption(option)
+        painter = QtWidgets.QStylePainter(self)
+        painter.drawControl(QtWidgets.QStyle.CE_PushButtonBevel, option)
+        option.rect.translate(0, self._label_offset_y)
+        painter.drawControl(QtWidgets.QStyle.CE_PushButtonLabel, option)
         painter.end()
 
 
@@ -2832,38 +2856,43 @@ class OcrLanguageManagerDialog(QDialog):
         return bool(theme) and theme not in {"светлая", "light", "white"}
 
     def _apply_style(self):
-        chrome_style = """
-            QFrame#languageManagerTitleBar {
-                background-color: #090a0d;
+        dark = self._is_dark_theme()
+        title_background = "#090a0d" if dark else "#f2edf7"
+        title_border = "#302a3a" if dark else "#d7cde7"
+        title_text = "#f7f3ff" if dark else "#2b2333"
+        close_text = "#f4eefc" if dark else "#4b4057"
+        chrome_style = f"""
+            QFrame#languageManagerTitleBar {{
+                background-color: {title_background};
                 border: none;
-                border-bottom: 1px solid #302a3a;
-            }
-            QLabel#languageManagerTitleIcon {
+                border-bottom: 1px solid {title_border};
+            }}
+            QLabel#languageManagerTitleIcon {{
                 background: transparent;
                 border: none;
-            }
-            QLabel#languageManagerTitleLabel {
+            }}
+            QLabel#languageManagerTitleLabel {{
                 background: transparent;
-                color: #f7f3ff;
+                color: {title_text};
                 border: none;
                 font-size: 13px;
                 font-weight: 700;
-            }
-            QToolButton#languageManagerTitleClose {
+            }}
+            QToolButton#languageManagerTitleClose {{
                 background: transparent;
-                color: #f4eefc;
+                color: {close_text};
                 border: none;
                 border-radius: 6px;
                 font-size: 18px;
                 font-weight: 500;
                 padding: 0px;
-            }
-            QToolButton#languageManagerTitleClose:hover {
+            }}
+            QToolButton#languageManagerTitleClose:hover {{
                 background-color: #d44b55;
                 color: #ffffff;
-            }
+            }}
         """ + TOOLTIP_QSS
-        if self._is_dark_theme():
+        if dark:
             self.setStyleSheet(chrome_style + """
                 QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #111216; }
@@ -2905,7 +2934,7 @@ class OcrLanguageManagerDialog(QDialog):
             """)
         else:
             self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
+                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #d7cde7; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #ffffff; }
                 QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
                 QTableWidget { background: #ffffff; alternate-background-color: #f7f6fb; color: #202124; gridline-color: #d8d8d8; selection-background-color: #d9cdf0; selection-color: #202124; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #d8d2e2; border-radius: 7px; }
@@ -6184,7 +6213,7 @@ class SettingsWindow(QWidget):
             installed_ocr_engines.add("Tesseract")
         if self._rapidocr_runtime_installed():
             installed_ocr_engines.add(RAPIDOCR_ENGINE_DISPLAY)
-        if self._local_easyocr_installed():
+        if self._easyocr_runtime_installed():
             installed_ocr_engines.add(EASYOCR_ENGINE_DISPLAY)
         _populate_grouped_ocr_combo(
             self.ocr_engine_combo,
@@ -6270,7 +6299,6 @@ class SettingsWindow(QWidget):
             idx = self._translator_engines.index("google")
         self.translator_combo.setCurrentIndex(idx)
         self.translator_combo.currentIndexChanged.connect(self._on_translator_changed)
-        self.translator_combo.currentIndexChanged.connect(lambda _idx: self._sync_translator_engine_delete_button())
         self._apply_engine_combo_style(self.translator_combo)
         self.translator_combo.setFixedWidth(engine_combo_width)
         self.translator_combo.setFixedHeight(engine_control_height)
@@ -6429,10 +6457,10 @@ class SettingsWindow(QWidget):
         # --- Группа кнопок: Clear cache | Reset | Update (горизонтальная, связанные стили) ---
         btn_group_layout = QHBoxLayout()
         btn_group_layout.setContentsMargins(0, 0, 0, 0)
-        btn_group_layout.setSpacing(0)  # Без зазора между кнопками
+        btn_group_layout.setSpacing(0)
         
         # Левая кнопка - закругление слева (фиолетовая)
-        self.clear_cache_btn = QPushButton(settings_text(lang, "clear_cache"))
+        self.clear_cache_btn = OpticallyCenteredPushButton(settings_text(lang, "clear_cache"))
         self.clear_cache_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -6453,11 +6481,12 @@ class SettingsWindow(QWidget):
             QPushButton:hover { background-color: #8B70B2; }
         """)
         self.clear_cache_btn.setFixedHeight(action_button_height)
+        self.clear_cache_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.clear_cache_btn.clicked.connect(self.clear_all_cache)
         btn_group_layout.addWidget(self.clear_cache_btn, 1)
         
         # Средняя кнопка - без закругления (красная - сброс)
-        self.reset_btn = QPushButton(settings_text(lang, "reset"))
+        self.reset_btn = OpticallyCenteredPushButton(settings_text(lang, "reset"))
         self.reset_btn.setStyleSheet("""
             QPushButton {
                 background-color: #D44444; 
@@ -6477,11 +6506,12 @@ class SettingsWindow(QWidget):
             QPushButton:hover { background-color: #E55555; }
         """)
         self.reset_btn.setFixedHeight(action_button_height)
+        self.reset_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.reset_btn.clicked.connect(self.reset_settings)
         btn_group_layout.addWidget(self.reset_btn, 1)
         
         # Правая кнопка - закругление справа (фиолетовая - обновление)
-        self.update_btn = QPushButton(settings_text(lang, "update"))
+        self.update_btn = OpticallyCenteredPushButton(settings_text(lang, "update"))
         self.update_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -6502,11 +6532,11 @@ class SettingsWindow(QWidget):
             QPushButton:hover { background-color: #8B70B2; }
         """)
         self.update_btn.setFixedHeight(action_button_height)
+        self.update_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.update_btn.clicked.connect(self.check_for_updates)
         btn_group_layout.addWidget(self.update_btn, 1)
-        
+
         self.main_layout.addLayout(btn_group_layout)
-        # Убрали spacing 10, чтобы кнопки слиплись
         self.main_layout.addSpacing(0)
 
         # --- ГРУППА КНОПОК: OCR languages | Hotkeys ---
@@ -6514,7 +6544,7 @@ class SettingsWindow(QWidget):
         tools_row.setSpacing(0)
         tools_row.setContentsMargins(0, 0, 0, 0)
 
-        self.ocr_languages_btn = QPushButton(settings_text(lang, "ocr_language_packs"))
+        self.ocr_languages_btn = OpticallyCenteredPushButton(settings_text(lang, "ocr_language_packs"))
         self.ocr_languages_btn.clicked.connect(self.show_ocr_language_manager)
         self.ocr_languages_btn.setToolTip(tooltip_text(settings_text(lang, "manage_ocr_languages")))
         self.ocr_languages_btn.setStyleSheet("""
@@ -6537,7 +6567,7 @@ class SettingsWindow(QWidget):
         tools_row.addWidget(self.ocr_languages_btn, 1)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
-        self.hotkeys_button = QPushButton(settings_text(lang, "hotkeys"))
+        self.hotkeys_button = OpticallyCenteredPushButton(settings_text(lang, "hotkeys"))
         self.hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
         self.hotkeys_button.setStyleSheet("""
@@ -6554,7 +6584,9 @@ class SettingsWindow(QWidget):
         self.hotkeys_button.setFixedHeight(action_button_height)
         self.hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        self.translation_history_btn = QPushButton(settings_text(lang, "translation_history_button"))
+        self.translation_history_btn = OpticallyCenteredPushButton(
+            settings_text(lang, "translation_history_button")
+        )
         self.translation_history_btn.clicked.connect(self.show_history_view)
         self.translation_history_btn.setStyleSheet("""
             QPushButton {
@@ -6573,13 +6605,13 @@ class SettingsWindow(QWidget):
 
         self.main_layout.addLayout(tools_row)
         self.main_layout.addSpacing(0)
-        
+
         # --- Нижняя строка без вертикального разреза ---
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(0)  # Без зазора
+        btn_row.setSpacing(0)
         btn_row.setContentsMargins(0, 0, 0, 0)
 
-        self.copy_history_btn = QPushButton(settings_text(lang, "copy_history_button"))
+        self.copy_history_btn = OpticallyCenteredPushButton(settings_text(lang, "copy_history_button"))
         self.copy_history_btn.clicked.connect(self.show_copy_history_view)
         # Copy history lives beside translation history in the upper tools row.
         self.copy_history_btn.setStyleSheet("""
@@ -6610,15 +6642,19 @@ class SettingsWindow(QWidget):
                 border-bottom-right-radius: 8px;
             }
         """)
+        self.hotkeys_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         btn_row.addWidget(self.hotkeys_button, 1)
         self.main_layout.addLayout(btn_row)
         self.main_layout.addSpacing(10)
         
         # --- Версия программы ---
-        version_label = QLabel(f"V{APP_VERSION}")
-        version_label.setAlignment(Qt.AlignCenter)
-        version_label.setStyleSheet("color: #7A5FA1; font-size: 16px; font-weight: bold; margin-bottom: 2px; margin-top: 2px;")
-        self.main_layout.addWidget(version_label)
+        self.version_label = QLabel(f"V{APP_VERSION}")
+        self.version_label.setAlignment(Qt.AlignCenter)
+        self.version_label.setStyleSheet(
+            "color: #7A5FA1; font-size: 16px; font-weight: bold; "
+            "margin-bottom: 2px; margin-top: 2px;"
+        )
+        self.main_layout.addWidget(self.version_label)
         self.main_layout.addStretch()
 
     def set_language_package_task_status(self, text="", percent=None, kind="running"):
@@ -6823,7 +6859,7 @@ class SettingsWindow(QWidget):
                 color: {colors['text']};
                 border: 1px solid {colors['border']};
                 border-radius: 8px;
-                padding: 6px 10px;
+                padding: 4px 10px;
                 font-size: 14px;
                 font-weight: 700;
                 selection-background-color: {colors['accent']};
@@ -7015,9 +7051,17 @@ class SettingsWindow(QWidget):
         hotkey_grid = QGridLayout(hotkey_card)
         hotkey_grid.setContentsMargins(12, 9, 12, 9)
         hotkey_grid.setHorizontalSpacing(14)
-        hotkey_grid.setVerticalSpacing(7)
+        # The shell has 320 logical pixels in the fixed main window. Six 36 px
+        # fields plus five 7 px gaps and the card margins need 269 px, while Qt
+        # can give the card only 219 px. It consequently placed rows 34–35 px
+        # apart and their 36 px rounded frames overlapped. Keep a deliberate,
+        # visible 4 px gutter and size the card to the exact non-overlapping
+        # requirement: 6 * 30 + 5 * 4 + 18 = 218 content pixels, plus the
+        # card's two one-pixel border edges.
+        hotkey_grid.setVerticalSpacing(4)
         hotkey_grid.setColumnStretch(0, 1)
         hotkey_grid.setColumnMinimumWidth(1, 230)
+        hotkey_card.setFixedHeight(220)
         self.hotkey_card = hotkey_card
 
         self.copy_hotkey_input = ClearableKeySequenceEdit()
@@ -7061,9 +7105,9 @@ class SettingsWindow(QWidget):
             label = QLabel(label_text.rstrip(":"))
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            label.setFixedHeight(36)
+            label.setFixedHeight(30)
             key_input.setObjectName("secondaryHotkeyInput")
-            key_input.setFixedHeight(36)
+            key_input.setFixedHeight(30)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             hotkey_grid.addWidget(label, row, 0)
             hotkey_grid.addWidget(key_input, row, 1)
@@ -9451,14 +9495,30 @@ finally {
     def _local_rapidocr_installed(self):
         return self._rapidocr_package_present_under(self._local_rapidocr_dir())
 
+    @staticmethod
+    def _module_available_without_import(*module_names):
+        """Check an optional runtime without executing its package import.
+
+        Importing EasyOCR pulls Torch and importing RapidOCR pulls ONNX Runtime.
+        Doing either from a combo-box signal blocks Qt's UI thread for a
+        noticeable amount of time.  Runtime validation still happens in the
+        background installer/worker; selection only needs a cheap presence
+        check.
+        """
+        for module_name in module_names:
+            try:
+                if importlib.util.find_spec(module_name) is not None:
+                    return True
+            except (ImportError, AttributeError, ValueError):
+                continue
+        return False
+
     def _rapidocr_runtime_installed(self):
         if self._local_rapidocr_installed():
             return True
-        try:
-            import ocr
-            return bool(ocr._native_ocr_worker_command())
-        except Exception:
-            return False
+        return self._module_available_without_import(
+            "rapidocr", "rapidocr_onnxruntime"
+        )
 
     def _easyocr_package_present_under(self, root_dir):
         if not root_dir or not os.path.isdir(root_dir):
@@ -9474,6 +9534,11 @@ finally {
 
     def _local_easyocr_installed(self):
         return self._easyocr_package_present_under(self._local_easyocr_dir())
+
+    def _easyocr_runtime_installed(self):
+        if self._local_easyocr_installed():
+            return True
+        return self._module_available_without_import("easyocr")
 
     def _reset_tesseract_runtime_cache(self):
         try:
@@ -9600,9 +9665,7 @@ finally {
 
     def _handle_easyocr_engine_change(self):
         self.previous_ocr_engine = self.parent.config.get("ocr_engine", platform_support.default_ocr_engine())
-        self._reset_easyocr_runtime_cache()
-        available, error = self._easyocr_importable_status()
-        if available:
+        if self._easyocr_runtime_installed():
             self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
             return
 
@@ -9610,8 +9673,6 @@ finally {
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="EasyOCR"))
         msg.setText(engine_text(lang, "easyocr_prompt"))
-        if error and self._local_easyocr_installed():
-            msg.setDetailedText(str(error))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
@@ -9627,9 +9688,7 @@ finally {
 
     def _handle_rapidocr_engine_change(self):
         self.previous_ocr_engine = self.parent.config.get("ocr_engine", platform_support.default_ocr_engine())
-        self._reset_rapidocr_runtime_cache()
-        available, error = self._rapidocr_importable_status()
-        if available:
+        if self._rapidocr_runtime_installed():
             self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
             return
 
@@ -9637,8 +9696,6 @@ finally {
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="RapidOCR"))
         msg.setText(engine_text(lang, "rapidocr_prompt"))
-        if error and self._local_rapidocr_installed():
-            msg.setDetailedText(str(error))
         msg.setIcon(QMessageBox.Question)
         msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
@@ -9718,11 +9775,12 @@ finally {
     def _find_hymt_runner_under(self, root_dir):
         if not root_dir or not os.path.isdir(root_dir):
             return ""
-        # Imported lazily like every other translater use here, so the Argos
-        # runtime is not pulled into the settings window.
-        import translater
-
-        candidates = translater.hymt_runner_names()
+        # Keep a provider switch independent of importing the translation
+        # runtime.  These are the same platform-aware names translater.py uses.
+        candidates = tuple(
+            platform_support.executable_name(stem).lower()
+            for stem in ("hymt", "llama-cli", "llama-run", "main")
+        )
         for name in candidates:
             direct_path = os.path.join(root_dir, name)
             if os.path.isfile(direct_path):

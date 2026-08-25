@@ -18,6 +18,7 @@ import threading
 import time
 import logging
 import translater
+import diagnostics
 
 # CTranslate2 can crash when its native runtime is first loaded after Qt on
 # Windows. Load it while startup is still single-threaded; online translation
@@ -78,7 +79,7 @@ import urllib.parse
 import webbrowser
 
 try:
-    from PyQt5 import QtCore
+    from PyQt5 import QtCore, QtGui
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QGridLayout, QComboBox,
                                  QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QTextBrowser, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
     from PyQt5.QtCore import Qt, QTimer, QSize
@@ -2252,6 +2253,69 @@ _HELP_STYLE = """
 </style>
 """
 
+_HELP_STYLE_LIGHT = """
+<style>
+    body { color: #2b2532; font-family: "Segoe UI"; }
+    .hero {
+        background-color: transparent;
+        border: 1px solid rgba(122, 95, 161, 0.34);
+        border-radius: 14px;
+        padding: 13px;
+        margin-bottom: 14px;
+    }
+    .hero-title { color: #211b28; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+    .hero-subtitle { color: #655c70; font-size: 13px; line-height: 1.45; }
+    .section {
+        background-color: transparent;
+        border: 1px solid rgba(122, 95, 161, 0.20);
+        border-radius: 13px;
+        margin-bottom: 12px;
+        padding: 12px;
+    }
+    .section-title {
+        color: #68478f;
+        background-color: transparent;
+        font-size: 16px;
+        font-weight: 900;
+        margin-bottom: 8px;
+    }
+    .item { margin: 7px 0; font-size: 13px; line-height: 1.42; }
+    .item-title { color: #65438d; font-weight: 900; }
+    .recommended { color: #238047; font-size: 12px; font-weight: 800; }
+    .step {
+        background-color: rgba(122, 95, 161, 0.08);
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin: 6px 0;
+        font-size: 13px;
+    }
+    .kbd {
+        color: #ffffff;
+        background-color: #76599d;
+        border-radius: 7px;
+        padding: 2px 6px;
+        font-weight: 900;
+    }
+    .note {
+        color: #51485c;
+        background-color: rgba(42, 140, 190, 0.08);
+        border: 1px solid rgba(42, 140, 190, 0.20);
+        border-radius: 10px;
+        padding: 9px;
+        margin-top: 8px;
+    }
+    .footer { margin-top: 16px; text-align: center; }
+    .footer a {
+        color: #5f3f86;
+        background-color: #f0e9f7;
+        border: 1px solid #9d83bd;
+        padding: 8px 16px;
+        font-weight: 800;
+        text-decoration: none;
+    }
+</style>
+"""
+
 ADDITIONAL_HELP_TEXT = {
     "es": _HELP_STYLE + """
 <div class="section"><div class="section-title">🚀 Inicio rápido</div>
@@ -2865,6 +2929,39 @@ HELP_EXTRA_CONTENT = {
     ],
 }
 
+BUG_REPORT_HELP_CONTENT = {
+    "en": [("Bug reports", [
+        "Open <span class='item-title'>Help → Bug report</span> to create a diagnostic ZIP, then attach it to GitHub Issues or Telegram.",
+        "The report contains version, OS, engine choices, file checks and updater logs. Clipboard, histories, document text and OCR logs are excluded.",
+        "If the app cannot start, use <span class='item-title'>Create bug report</span> in the startup error window; it creates the same kind of safe startup report.",
+    ])],
+    "ru": [("Как сообщить об ошибке", [
+        "Откройте <span class='item-title'>Справка → Отчёт об ошибке</span>: программа создаст диагностический ZIP, который можно прикрепить в GitHub Issues или Telegram.",
+        "В отчёте есть версия, Windows, выбранные движки, проверка файлов и логи обновления. Буфер обмена, истории, документы и OCR-логи исключены.",
+        "Если программа не запускается, нажмите <span class='item-title'>Создать отчёт</span> прямо в стартовом окне ошибки — оно создаст безопасный отчёт без запуска приложения.",
+    ])],
+    "es": [("Informar de un error", [
+        "Abre <span class='item-title'>Ayuda → Informe de error</span> y adjunta el ZIP creado en GitHub o Telegram.",
+        "El informe excluye el portapapeles, los historiales, los documentos y los registros OCR.",
+        "Si la app no inicia, usa <span class='item-title'>Create bug report</span> en la ventana de error.",
+    ])],
+    "de": [("Fehler melden", [
+        "Öffne <span class='item-title'>Hilfe → Fehlerbericht</span> und hänge die ZIP-Datei an GitHub oder Telegram an.",
+        "Zwischenablage, Verläufe, Dokumente und OCR-Protokolle werden nicht aufgenommen.",
+        "Wenn die App nicht startet, nutze <span class='item-title'>Create bug report</span> im Startfehlerfenster.",
+    ])],
+    "fr": [("Signaler une erreur", [
+        "Ouvrez <span class='item-title'>Aide → Rapport d’erreur</span> puis joignez le ZIP sur GitHub ou Telegram.",
+        "Le presse-papiers, les historiques, les documents et les journaux OCR sont exclus.",
+        "Si l’app ne démarre pas, utilisez <span class='item-title'>Create bug report</span> dans la fenêtre d’erreur.",
+    ])],
+    "zh": [("报告错误", [
+        "打开<span class='item-title'>帮助 → 错误报告</span>，然后将生成的 ZIP 附加到 GitHub 或 Telegram。",
+        "报告不包含剪贴板、历史记录、文档文本或 OCR 日志。",
+        "如果应用无法启动，请在启动错误窗口中选择 <span class='item-title'>Create bug report</span>。",
+    ])],
+}
+
 LANGUAGE_PACKAGE_HELP_CONTENT = {
     "en": [
         ("Language packages", [
@@ -2988,12 +3085,12 @@ DOCUMENT_HELP_CONTENT = {
 
 
 HELP_ACTION_TEXT = {
-    "en": {"title": "FAQ", "guide": "Start interactive guide", "github": "GitHub project", "telegram": "Telegram", "close": "Got it"},
-    "ru": {"title": "Справка", "guide": "Пройти обучение", "github": "Проект на GitHub", "telegram": "Telegram", "close": "Понятно"},
-    "es": {"title": "Ayuda", "guide": "Iniciar guía", "github": "Proyecto en GitHub", "telegram": "Telegram", "close": "Entendido"},
-    "de": {"title": "Hilfe", "guide": "Tour starten", "github": "Projekt auf GitHub", "telegram": "Telegram", "close": "Verstanden"},
-    "fr": {"title": "Aide", "guide": "Lancer le guide", "github": "Projet sur GitHub", "telegram": "Telegram", "close": "Compris"},
-    "zh": {"title": "帮助", "guide": "开始引导", "github": "GitHub 项目", "telegram": "Telegram", "close": "知道了"},
+    "en": {"title": "FAQ", "guide": "Start interactive guide", "github": "GitHub project", "telegram": "Telegram", "report": "Bug report", "report_ready": "The diagnostic ZIP was created. Attach it to a GitHub issue or Telegram message.\n\n{path}", "report_failed": "The diagnostic report could not be created.\n\n{error}", "close": "Got it"},
+    "ru": {"title": "Справка", "guide": "Пройти обучение", "github": "Проект на GitHub", "telegram": "Telegram", "report": "Отчёт об ошибке", "report_ready": "Диагностический ZIP создан. Прикрепите его к обращению в GitHub или Telegram.\n\n{path}", "report_failed": "Не удалось создать диагностический отчёт.\n\n{error}", "close": "Понятно"},
+    "es": {"title": "Ayuda", "guide": "Iniciar guía", "github": "Proyecto en GitHub", "telegram": "Telegram", "report": "Informe de error", "report_ready": "Se creó el ZIP de diagnóstico. Adjúntalo a GitHub o Telegram.\n\n{path}", "report_failed": "No se pudo crear el informe de diagnóstico.\n\n{error}", "close": "Entendido"},
+    "de": {"title": "Hilfe", "guide": "Tour starten", "github": "Projekt auf GitHub", "telegram": "Telegram", "report": "Fehlerbericht", "report_ready": "Die Diagnose-ZIP wurde erstellt. Bitte an GitHub oder Telegram anhängen.\n\n{path}", "report_failed": "Der Diagnosebericht konnte nicht erstellt werden.\n\n{error}", "close": "Verstanden"},
+    "fr": {"title": "Aide", "guide": "Lancer le guide", "github": "Projet sur GitHub", "telegram": "Telegram", "report": "Rapport d’erreur", "report_ready": "L’archive ZIP de diagnostic a été créée. Joignez-la sur GitHub ou Telegram.\n\n{path}", "report_failed": "Impossible de créer le rapport de diagnostic.\n\n{error}", "close": "Compris"},
+    "zh": {"title": "帮助", "guide": "开始引导", "github": "GitHub 项目", "telegram": "Telegram", "report": "错误报告", "report_ready": "诊断 ZIP 已创建。请将其附加到 GitHub 或 Telegram。\n\n{path}", "report_failed": "无法创建诊断报告。\n\n{error}", "close": "知道了"},
 }
 
 
@@ -3002,15 +3099,17 @@ def help_action_text(lang, key):
     return text.get(key, HELP_ACTION_TEXT["en"].get(key, key))
 
 
-def help_text(lang):
+def help_text(lang, theme="Темная"):
     sections = (
         HELP_CONTENT.get(lang, HELP_CONTENT["en"])
         + LANGUAGE_PACKAGE_HELP_CONTENT.get(lang, LANGUAGE_PACKAGE_HELP_CONTENT["en"])
         + DOCUMENT_HELP_CONTENT.get(lang, DOCUMENT_HELP_CONTENT["en"])
         + HELP_EXTRA_CONTENT.get(lang, HELP_EXTRA_CONTENT["en"])
+        + BUG_REPORT_HELP_CONTENT.get(lang, BUG_REPORT_HELP_CONTENT["en"])
     )
     intro = HELP_INTRO.get(lang, HELP_INTRO["en"])
-    blocks = [_HELP_STYLE, f'<div class="hero"><div class="hero-title">Click&apos;n&apos;Translate</div><div class="hero-subtitle">{intro}</div></div>']
+    style = _HELP_STYLE if theme != "Светлая" else _HELP_STYLE_LIGHT
+    blocks = [style, f'<div class="hero"><div class="hero-title">Click&apos;n&apos;Translate</div><div class="hero-subtitle">{intro}</div></div>']
     for title, items in sections:
         blocks.append(f'<div class="section"><div class="section-title">{title}</div>')
         for item in items:
@@ -3435,6 +3534,72 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
 }
 
 
+class LanguageSwapButton(QToolButton):
+    """Theme-aware two-arrow control used by every language pair.
+
+    The Unicode ``⇄`` glyph varies by font and looked like a tiny not-equal
+    sign on Windows.  Painting two simple rounded arrows keeps the symbol
+    recognisable and centred at every DPI without adding another asset file.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setText("")
+        self.setAccessibleName("Swap languages")
+        self.setIconSize(QtCore.QSize(20, 16))
+        self._refresh_swap_icon()
+
+    @staticmethod
+    def _swap_pixmap(color):
+        ratio = max(
+            1.0,
+            float(QApplication.instance().devicePixelRatio())
+            if QApplication.instance() is not None else 1.0,
+        )
+        pixmap = QtGui.QPixmap(int(22 * ratio), int(16 * ratio))
+        pixmap.setDevicePixelRatio(ratio)
+        pixmap.fill(Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            pen = QtGui.QPen(QtGui.QColor(color), 1.8)
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            # Upper arrow points right; lower arrow points left.
+            painter.drawLine(QtCore.QPointF(3.0, 5.0), QtCore.QPointF(18.0, 5.0))
+            painter.drawLine(QtCore.QPointF(18.0, 5.0), QtCore.QPointF(14.5, 2.0))
+            painter.drawLine(QtCore.QPointF(18.0, 5.0), QtCore.QPointF(14.5, 8.0))
+            painter.drawLine(QtCore.QPointF(19.0, 11.0), QtCore.QPointF(4.0, 11.0))
+            painter.drawLine(QtCore.QPointF(4.0, 11.0), QtCore.QPointF(7.5, 8.0))
+            painter.drawLine(QtCore.QPointF(4.0, 11.0), QtCore.QPointF(7.5, 14.0))
+        finally:
+            painter.end()
+        return pixmap
+
+    def _refresh_swap_icon(self):
+        dark = self.palette().color(QtGui.QPalette.Window).lightness() < 128
+        normal = "#c5b3e9" if dark else "#6b4f96"
+        active = "#e0d4f7" if dark else "#7a5fa1"
+        disabled = QtGui.QColor(normal)
+        disabled.setAlpha(90)
+        icon = QtGui.QIcon()
+        icon.addPixmap(self._swap_pixmap(normal), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(self._swap_pixmap(active), QtGui.QIcon.Active, QtGui.QIcon.Off)
+        icon.addPixmap(self._swap_pixmap(disabled), QtGui.QIcon.Disabled, QtGui.QIcon.Off)
+        self.setIcon(icon)
+
+    def showEvent(self, event):
+        self._refresh_swap_icon()
+        super().showEvent(event)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QtCore.QEvent.PaletteChange, QtCore.QEvent.StyleChange):
+            self._refresh_swap_icon()
+
+
 class TranslateOnEnterTextEdit(QTextEdit):
     """Enter translates, Shift+Enter starts a new line.
 
@@ -3576,15 +3741,18 @@ class TranslationResultDialog(QDialog):
         heading.setSpacing(1)
         eyebrow = QLabel(self.text["eyebrow"])
         eyebrow.setObjectName("translationResultEyebrow")
-        eyebrow.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        eyebrow.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.title_label = QLabel(self.text["title"])
         self.title_label.setObjectName("translationResultTitle")
         self.title_label.setWordWrap(True)
-        self.title_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         heading.addWidget(eyebrow)
         heading.addWidget(self.title_label)
-        header.addLayout(heading)
-        header.addStretch()
+        # Give the heading the stretch, not a blank spacer beside it. With both
+        # labels set to QSizePolicy.Ignored and a separate stretch item, Qt was
+        # allowed to assign the entire heading a width of zero; the result
+        # window then showed only the T icon and close button in every language.
+        header.addLayout(heading, 1)
 
         self.title_close_button = QToolButton(self)
         self.title_close_button.setObjectName("translationResultTitleClose")
@@ -3711,9 +3879,8 @@ class TranslationResultDialog(QDialog):
         self.source_combo.setCurrentIndex(max(0, self.source_combo.findData(self.source_code)))
         row.addWidget(self.source_combo, stretch=1)
 
-        self.swap_button = QToolButton(self)
+        self.swap_button = LanguageSwapButton(self)
         self.swap_button.setObjectName("translationResultSwap")
-        self.swap_button.setText("⇄")
         self.swap_button.setFixedSize(34, 34)
         self.swap_button.setToolTip(tooltip_text(self.text["swap"]))
         self.swap_button.clicked.connect(self._swap_languages)
@@ -4373,9 +4540,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.source_combo.setMinimumWidth(150)
         control_row.addWidget(self.source_combo)
 
-        self.language_arrow = QLabel("→")
-        self.language_arrow.setObjectName("docArrow")
-        self.language_arrow.setAlignment(Qt.AlignCenter)
+        self.language_arrow = LanguageSwapButton()
+        self.language_arrow.setObjectName("docLanguageSwap")
+        self.language_arrow.setFixedSize(32, 32)
+        self.language_arrow.setToolTip(
+            tooltip_text(hotkey_language_text(self.lang, "swap"))
+        )
+        self.language_arrow.clicked.connect(self._swap_document_languages)
         control_row.addWidget(self.language_arrow)
 
         self.target_field_label = QLabel(doc_text(self.lang, "target") + ":")
@@ -4410,6 +4581,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._populate_provider_combo()
         self.provider_combo.currentIndexChanged.connect(self._on_document_provider_changed)
         self.source_combo.currentIndexChanged.connect(self._on_document_source_changed)
+        self.target_combo.currentIndexChanged.connect(self._update_document_swap_button)
         control_row.addWidget(self.provider_combo)
         control_row.addStretch(1)
         header_layout.addLayout(control_row)
@@ -4600,10 +4772,21 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 font-size: 12px;
                 font-weight: 800;
             }}
-            QLabel#docArrow {{
-                color: {muted};
+            QToolButton#docLanguageSwap {{
+                color: {accent};
+                background-color: {control};
+                border: 1px solid {border};
+                border-radius: 8px;
                 font-size: 16px;
                 font-weight: 900;
+            }}
+            QToolButton#docLanguageSwap:hover {{
+                background-color: {control_hover};
+                border-color: {accent};
+            }}
+            QToolButton#docLanguageSwap:disabled {{
+                color: {faint};
+                border-color: {soft_border};
             }}
             QLabel#docFieldLabel {{
                 color: {muted};
@@ -5240,12 +5423,45 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             button = getattr(self, attribute, None)
             if button is not None:
                 button.setEnabled(ready)
+        self._update_document_swap_button()
 
     def _on_document_provider_changed(self):
         self._refresh_document_provider_languages()
 
     def _on_document_source_changed(self):
         self._refresh_document_provider_languages()
+
+    def _update_document_swap_button(self):
+        button = getattr(self, "language_arrow", None)
+        if not isinstance(button, QToolButton):
+            return
+        source = self.source_combo.currentData()
+        target = self.target_combo.currentData()
+        button.setEnabled(
+            bool(source and target and (str(target), str(source)) in self._document_translation_pairs())
+        )
+
+    def _swap_document_languages(self):
+        source = self.source_combo.currentData()
+        target = self.target_combo.currentData()
+        if not source or not target:
+            return
+        if (str(target), str(source)) not in self._document_translation_pairs():
+            self._update_document_swap_button()
+            return
+        self.source_combo.blockSignals(True)
+        try:
+            self.source_combo.setCurrentIndex(self.source_combo.findData(target))
+        finally:
+            self.source_combo.blockSignals(False)
+        self._refresh_document_provider_languages()
+        target_index = self.target_combo.findData(source)
+        if target_index >= 0:
+            self.target_combo.setCurrentIndex(target_index)
+        remember = getattr(self.parent_app, "_remember_translation_result_pair", None)
+        if callable(remember):
+            remember(str(target), str(source), "main")
+        self._update_document_swap_button()
 
     def _provider_name(self):
         return provider_display_name(self._provider_engine(), self.lang)
@@ -5321,6 +5537,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.source_combo.setEnabled(not busy)
         self.target_combo.setEnabled(not busy)
         self.provider_combo.setEnabled(not busy)
+        self.language_arrow.setEnabled(not busy)
+        if not busy:
+            self._update_document_swap_button()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls() and event.mimeData().urls():
@@ -5677,9 +5896,8 @@ class HotkeyLanguageDialog(QDialog):
         self.source_combo = DropDownCombo()
         self.source_combo.setObjectName("hotkeyLanguageCombo")
         self.source_combo.setAccessibleName(hotkey_language_text(self.lang, "from"))
-        self.swap_button = QToolButton()
+        self.swap_button = LanguageSwapButton()
         self.swap_button.setObjectName("hotkeyLanguageSwap")
-        self.swap_button.setText("⇄")
         self.swap_button.setFixedSize(38, 38)
         self.swap_button.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
@@ -6285,6 +6503,9 @@ class DarkThemeApp(QMainWindow):
             self.source_lang.blockSignals(False)
             self.target_lang.blockSignals(False)
         self._capture_main_translation_languages()
+        update_swap = getattr(self, "_update_main_language_swap", None)
+        if callable(update_swap):
+            update_swap()
 
     def _save_main_translation_languages(self):
         self._capture_main_translation_languages()
@@ -6424,6 +6645,12 @@ class DarkThemeApp(QMainWindow):
             ready = source_combo.count() > 0 and target_combo.count() > 0
             source_combo.setEnabled(ready)
             target_combo.setEnabled(ready)
+            swap_button = getattr(self, "hotkey_language_swap", None)
+            if isinstance(swap_button, QToolButton):
+                swap_button.setEnabled(
+                    ready
+                    and (str(target_combo.currentData()), str(source_combo.currentData())) in pairs
+                )
             return True
         except RuntimeError:
             return False
@@ -6474,6 +6701,35 @@ class DarkThemeApp(QMainWindow):
             self._set_hotkey_translation_pair(
                 self._hotkey_language_editor_mode(), str(source), str(target)
             )
+        self._update_hotkey_language_swap()
+
+    def _update_hotkey_language_swap(self):
+        button = getattr(self, "hotkey_language_swap", None)
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if not isinstance(button, QToolButton) or source_combo is None or target_combo is None:
+            return
+        source = source_combo.currentData()
+        target = target_combo.currentData()
+        pairs = self._available_hotkey_translation_pairs(self._hotkey_language_editor_mode())
+        button.setEnabled(bool(source and target and (str(target), str(source)) in pairs))
+
+    def _swap_hotkey_language_controls(self):
+        source_combo = getattr(self, "hotkey_source_combo", None)
+        target_combo = getattr(self, "hotkey_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        source = source_combo.currentData()
+        target = target_combo.currentData()
+        mode = self._hotkey_language_editor_mode()
+        if not source or not target:
+            return
+        pairs = self._available_hotkey_translation_pairs(mode)
+        if (str(target), str(source)) not in pairs:
+            self._update_hotkey_language_swap()
+            return
+        self._set_hotkey_translation_pair(mode, str(target), str(source))
+        self._refresh_hotkey_language_controls()
 
     def show_hotkey_language_dialog(self):
         existing = getattr(self, "_hotkey_language_dialog", None)
@@ -6619,6 +6875,42 @@ class DarkThemeApp(QMainWindow):
             return
 
     def _on_main_translation_target_changed(self, *_args):
+        self._save_main_translation_languages()
+        self._refresh_selection_pair_hint()
+        update_swap = getattr(self, "_update_main_language_swap", None)
+        if callable(update_swap):
+            update_swap()
+
+    def _update_main_language_swap(self):
+        button = getattr(self, "main_language_swap", None)
+        source_combo = getattr(self, "source_lang", None)
+        target_combo = getattr(self, "target_lang", None)
+        if not isinstance(button, QToolButton) or source_combo is None or target_combo is None:
+            return
+        try:
+            source = language_code_from_name(
+                source_combo.currentText(), self.current_interface_language
+            )
+            target = language_code_from_name(
+                target_combo.currentText(), self.current_interface_language
+            )
+            button.setEnabled((target, source) in self._available_main_translation_pairs())
+        except RuntimeError:
+            return
+
+    def _swap_main_translation_languages(self):
+        source = language_code_from_name(
+            self.source_lang.currentText(), self.current_interface_language
+        )
+        target = language_code_from_name(
+            self.target_lang.currentText(), self.current_interface_language
+        )
+        if (target, source) not in self._available_main_translation_pairs():
+            self._update_main_language_swap()
+            return
+        self.config["main_translation_source_language"] = target
+        self.config["main_translation_target_language"] = source
+        self._restore_main_translation_languages()
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
 
@@ -7927,12 +8219,21 @@ class DarkThemeApp(QMainWindow):
                         font-size: 13px;
                         font-weight: 700;
                     }}
-                    QLabel#hotkeyLanguageBarArrow {{
+                    QToolButton#hotkeyLanguageBarSwap {{
                         color: {hint_color};
-                        background: transparent;
-                        border: none;
-                        font-size: 17px;
-                        font-weight: 700;
+                        background: {'#211d29' if is_dark else '#eee7f5'};
+                        border: 1px solid {bar_border};
+                        border-radius: 8px;
+                        font-size: 16px;
+                        font-weight: 800;
+                    }}
+                    QToolButton#hotkeyLanguageBarSwap:hover {{
+                        background: {'#30283b' if is_dark else '#e1d4ee'};
+                        border-color: {hint_color};
+                    }}
+                    QToolButton#hotkeyLanguageBarSwap:disabled {{
+                        color: {'#665d70' if is_dark else '#aaa0b5'};
+                        border-color: {'#37313e' if is_dark else '#ddd6e4'};
                     }}
                 """ + TOOLTIP_QSS)
             except RuntimeError:
@@ -7962,6 +8263,25 @@ class DarkThemeApp(QMainWindow):
                     # The corresponding page is already gone; show_main_screen
                     # creates a fresh selector when the user returns.
                     setattr(self, combo_name, None)
+        main_swap = getattr(self, "main_language_swap", None)
+        if isinstance(main_swap, QToolButton):
+            try:
+                background = "#211d29" if is_dark else "#f1ebf6"
+                hover = "#342b40" if is_dark else "#e3d7ed"
+                border = "#5e4d70" if is_dark else "#c8b5d7"
+                text = "#c4a8e8" if is_dark else "#735396"
+                disabled = "#665d70" if is_dark else "#aaa0b5"
+                main_swap.setStyleSheet(f"""
+                    QToolButton {{
+                        color: {text}; background: {background};
+                        border: 1px solid {border}; border-radius: 9px;
+                        font-size: 17px; font-weight: 800;
+                    }}
+                    QToolButton:hover {{ background: {hover}; border-color: {text}; }}
+                    QToolButton:disabled {{ color: {disabled}; border-color: {disabled}; }}
+                """)
+            except RuntimeError:
+                self.main_language_swap = None
         self._apply_main_translate_button_theme(is_dark)
 
     def _apply_main_translate_button_theme(self, is_dark):
@@ -8246,9 +8566,15 @@ class DarkThemeApp(QMainWindow):
         title_stack = QVBoxLayout()
         title_stack.setSpacing(0)
         title_label = QLabel(help_action_text(lang, "title"))
-        title_label.setStyleSheet("font-size: 21px; font-weight: 900; color: #ffffff;")
+        title_color = "#ffffff" if theme == "Темная" else "#27212f"
+        subtitle_color = "#a994d2" if theme == "Темная" else "#735396"
+        title_label.setStyleSheet(
+            f"font-size: 21px; font-weight: 900; color: {title_color};"
+        )
         subtitle_label = QLabel("Click'n'Translate")
-        subtitle_label.setStyleSheet("font-size: 12px; font-weight: 800; color: #a994d2;")
+        subtitle_label.setStyleSheet(
+            f"font-size: 12px; font-weight: 800; color: {subtitle_color};"
+        )
         title_stack.addWidget(title_label)
         title_stack.addWidget(subtitle_label)
         title_row.addLayout(title_stack)
@@ -8263,7 +8589,7 @@ class DarkThemeApp(QMainWindow):
         layout.addLayout(title_row)
 
         # Текст FAQ всегда строится из актуального языка интерфейса.
-        help_html = help_text(lang)
+        help_html = help_text(lang, theme)
 
         text_edit = QTextBrowser()
         text_edit.setReadOnly(True)
@@ -8333,13 +8659,13 @@ class DarkThemeApp(QMainWindow):
                 }
                 QFrame#helpDialogFrame {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
-                    border: 1px solid rgba(197, 179, 233, 105);
+                        stop:0 #ffffff, stop:0.58 #fbf9fd, stop:1 #f2ebf8);
+                    border: 1px solid #cdbce1;
                     border-radius: 16px;
                 }
                 QToolButton#helpTitleClose {
                     background: transparent;
-                    color: #cfc7dd;
+                    color: #4b4057;
                     border: none;
                     border-radius: 8px;
                     font-size: 22px;
@@ -8351,16 +8677,16 @@ class DarkThemeApp(QMainWindow):
             """)
             text_edit.setStyleSheet("""
                 QTextEdit {
-                    background-color: rgba(9, 12, 20, 165);
-                    color: #e0e0e0;
-                    border: 1px solid rgba(197, 179, 233, 70);
+                    background-color: #ffffff;
+                    color: #2b2532;
+                    border: 1px solid #d7cde7;
                     border-radius: 16px;
                     padding: 15px;
                     font-size: 13px;
                     line-height: 1.5;
                 }
                 QScrollBar:vertical {
-                    background: transparent;
+                    background: #f1edf6;
                     width: 10px;
                     margin: 4px 2px 4px 2px;
                 }
@@ -8375,6 +8701,9 @@ class DarkThemeApp(QMainWindow):
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                     height: 0;
                     background: none;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                    background: transparent;
                 }
             """)
 
@@ -8405,7 +8734,7 @@ class DarkThemeApp(QMainWindow):
 
         telegram_btn = QPushButton(help_action_text(lang, "telegram"))
         telegram_btn.setObjectName("helpTelegramButton")
-        telegram_btn.setStyleSheet("""
+        secondary_button_style = """
             QPushButton {
                 background: rgba(255, 255, 255, 12);
                 color: #efe8ff;
@@ -8419,11 +8748,39 @@ class DarkThemeApp(QMainWindow):
                 background: rgba(197, 179, 233, 48);
                 border-color: #c5b3e9;
             }
-        """)
+        """ if theme == "Темная" else """
+            QPushButton {
+                background: rgba(122, 95, 161, 10);
+                color: #4d3865;
+                border: 1px solid #c8b8dc;
+                border-radius: 12px;
+                padding: 10px 16px;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            QPushButton:hover {
+                background: #eee6f6;
+                border-color: #8f70b3;
+            }
+        """
+        telegram_btn.setStyleSheet(secondary_button_style)
         telegram_btn.clicked.connect(
             lambda: webbrowser.open("https://t.me/jabrail_digital")
         )
         button_row.addWidget(telegram_btn)
+
+        report_btn = QPushButton(help_action_text(lang, "report"))
+        report_btn.setObjectName("helpBugReportButton")
+        report_btn.setStyleSheet(telegram_btn.styleSheet())
+        report_btn.setToolTip(
+            tooltip_text(
+                "Creates a privacy-safe ZIP without clipboard, history or document text."
+                if lang != "ru" else
+                "Создаёт безопасный ZIP без буфера обмена, истории и текста документов."
+            )
+        )
+        report_btn.clicked.connect(lambda: self._create_bug_report(dialog))
+        button_row.addWidget(report_btn)
         button_row.addStretch()
 
         # Кнопка закрытия
@@ -8441,6 +8798,20 @@ class DarkThemeApp(QMainWindow):
             QPushButton:hover {
                 background-color: rgba(197, 179, 233, 48);
             }
+        """ if theme == "Темная" else """
+            QPushButton {
+                background-color: rgba(122, 95, 161, 10);
+                color: #4d3865;
+                border: 1px solid #c8b8dc;
+                border-radius: 12px;
+                padding: 10px 26px;
+                font-size: 14px;
+                font-weight: 900;
+            }
+            QPushButton:hover {
+                background-color: #eee6f6;
+                border-color: #8f70b3;
+            }
         """)
         close_btn.clicked.connect(dialog.close)
         button_row.addWidget(close_btn)
@@ -8448,6 +8819,37 @@ class DarkThemeApp(QMainWindow):
 
         dialog.exec_()
         self._complete_guide_step("help")
+
+    def _create_bug_report(self, parent=None):
+        lang = self.current_interface_language
+        try:
+            report_path = diagnostics.create_bug_report(app_version=APP_VERSION)
+        except Exception as error:
+            logging.exception("Could not create the user diagnostic report")
+            QMessageBox.warning(
+                parent or self,
+                help_action_text(lang, "report"),
+                help_action_text(lang, "report_failed").format(error=error),
+            )
+            return None
+
+        try:
+            if platform_support.IS_WINDOWS:
+                subprocess.Popen(
+                    ["explorer.exe", "/select," + str(report_path)],
+                    **platform_support.no_window_kwargs(),
+                )
+            elif platform_support.IS_LINUX:
+                subprocess.Popen(["xdg-open", str(report_path.parent)])
+        except Exception:
+            logging.exception("Could not reveal the diagnostic report")
+
+        QMessageBox.information(
+            parent or self,
+            help_action_text(lang, "report"),
+            help_action_text(lang, "report_ready").format(path=report_path),
+        )
+        return report_path
 
     def _close_help_and_start_guide(self, dialog):
         dialog.accept()
@@ -8623,13 +9025,15 @@ class DarkThemeApp(QMainWindow):
         self.hotkey_source_combo.setMaxVisibleItems(9)
         self.hotkey_target_combo = DropDownCombo()
         self.hotkey_target_combo.setMaxVisibleItems(9)
-        pair_arrow = QLabel("→")
-        pair_arrow.setObjectName("hotkeyLanguageBarArrow")
-        pair_arrow.setAlignment(Qt.AlignCenter)
-        pair_arrow.setFixedWidth(18)
+        self.hotkey_language_swap = LanguageSwapButton()
+        self.hotkey_language_swap.setObjectName("hotkeyLanguageBarSwap")
+        self.hotkey_language_swap.setFixedSize(30, 30)
+        self.hotkey_language_swap.setToolTip(
+            tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
+        )
         hotkey_row.addWidget(self.hotkey_mode_combo)
         hotkey_row.addWidget(self.hotkey_source_combo, 1)
-        hotkey_row.addWidget(pair_arrow)
+        hotkey_row.addWidget(self.hotkey_language_swap)
         hotkey_row.addWidget(self.hotkey_target_combo, 1)
         hotkey_bar_layout.addLayout(hotkey_row)
 
@@ -8645,14 +9049,17 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout = QHBoxLayout()
         language_picker_layout.setContentsMargins(0, 0, 0, 0)
         language_picker_layout.setSpacing(6)
-        main_pair_arrow = QLabel("→")
-        main_pair_arrow.setObjectName("hotkeyLanguageBarArrow")
-        main_pair_arrow.setAlignment(Qt.AlignCenter)
-        main_pair_arrow.setFixedWidth(18)
+        self.main_language_swap = LanguageSwapButton()
+        self.main_language_swap.setObjectName("mainLanguageSwap")
+        self.main_language_swap.setFixedSize(34, 34)
+        self.main_language_swap.setToolTip(
+            tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
+        )
         language_picker_layout.addWidget(self.source_lang, 1)
-        language_picker_layout.addWidget(main_pair_arrow)
+        language_picker_layout.addWidget(self.main_language_swap)
         language_picker_layout.addWidget(self.target_lang, 1)
         self.main_layout.addLayout(language_picker_layout)
+        self._apply_main_combo_theme(self.current_theme == "Темная")
         self._restore_main_translation_languages()
         self._refresh_selection_pair_hint()
         self.hotkey_mode_combo.currentIndexChanged.connect(
@@ -8664,9 +9071,11 @@ class DarkThemeApp(QMainWindow):
         self.hotkey_target_combo.currentIndexChanged.connect(
             self._persist_hotkey_language_controls
         )
+        self.hotkey_language_swap.clicked.connect(self._swap_hotkey_language_controls)
         self._hotkey_language_controls_loading = False
         self.source_lang.currentIndexChanged.connect(self.update_languages)
         self.target_lang.currentIndexChanged.connect(self._on_main_translation_target_changed)
+        self.main_language_swap.clicked.connect(self._swap_main_translation_languages)
         self.main_composer = QFrame()
         self.main_composer.setObjectName("mainComposer")
         self.main_composer.setFixedHeight(76)
@@ -8777,9 +9186,13 @@ class DarkThemeApp(QMainWindow):
         tr_names = {"argos": "Argos", "hymt": "Hy-MT", "google": "Google", "mymemory": "MyMemory", "lingva": "Lingva", "libretranslate": "LibreTranslate"}
         tr_name = tr_names.get(translator_engine, translator_engine.capitalize())
 
-        # Two rows, three columns, engine summary alongside. One row was tried:
-        # measured in all six languages, five chips plus the summary do not fit
-        # 690px in any of them — they drew over each other.
+        # Three compact rows, two columns, engine summary alongside.  The former
+        # two-by-three grid looked fine in English, but its real minimum width
+        # was 23 px wider than this fixed window: Ctrl+Shift+Space silently
+        # entered the divider's cell and the two borders touched.  Turning the
+        # same six references into two columns keeps the type at its readable
+        # size, preserves the separator the UI is built around, and leaves a
+        # genuine 12 px gutter in every language.
         hotkey_grid = QGridLayout()
         hotkey_grid.setContentsMargins(0, 0, 0, 0)
         # The gap before the divider is this spacing, and the gap after it is
@@ -8828,9 +9241,8 @@ class DarkThemeApp(QMainWindow):
             pair.setAccessibleDescription(main_hotkey_tooltip(lang, help_key))
             for label in pair.findChildren(QLabel):
                 label.setToolTip(help_value)
-        self._align_main_hotkey_pair_group(r1_copy, r2_fullscreen)
-        self._align_main_hotkey_pair_group(r1_translate, r2_selection)
-        self._align_main_hotkey_pair_group(r1_toggle, r2_replace)
+        self._align_main_hotkey_pair_group(r1_copy, r2_fullscreen, r1_toggle)
+        self._align_main_hotkey_pair_group(r1_translate, r2_selection, r2_replace)
         ocr_summary = QLabel(f"OCR: <b>{ocr_engine}</b>")
         ocr_summary.setObjectName("mainOcrSummary")
         translator_summary = QLabel(
@@ -8855,14 +9267,14 @@ class DarkThemeApp(QMainWindow):
         # past the engine divider, which is what put the separator right up
         # against the words. Let the columns take what their text needs and give
         # the leftover to the gap before the divider.
-        hotkey_grid.setColumnStretch(3, 1)
+        hotkey_grid.setColumnStretch(2, 1)
         hotkey_grid.addWidget(r1_copy, 0, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r2_fullscreen, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         hotkey_grid.addWidget(r1_translate, 0, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r2_fullscreen, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         hotkey_grid.addWidget(r2_selection, 1, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r1_toggle, 0, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r2_replace, 1, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(engine_status_panel, 0, 3, 2, 1)
+        hotkey_grid.addWidget(r1_toggle, 2, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(r2_replace, 2, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        hotkey_grid.addWidget(engine_status_panel, 0, 2, 3, 1)
         self.main_layout.addLayout(hotkey_grid)
 
         # Кнопка старт (shadow mode) в самом низу
@@ -8944,6 +9356,9 @@ class DarkThemeApp(QMainWindow):
             self.translate_button.setEnabled(self.target_lang.count() > 0)
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
+        update_swap = getattr(self, "_update_main_language_swap", None)
+        if callable(update_swap):
+            update_swap()
 
     def clear_layout(self):
         # Hide removed pages synchronously.  deleteLater() alone leaves their
