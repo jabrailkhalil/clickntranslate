@@ -4,7 +4,7 @@
 
 ### Translate any text on Windows — from games, images, videos, apps, and documents.
 
-**Click'n'Translate** (also written **ClicknTranslate**, **Click n Translate**, or **Click and Translate**) is an open-source all-in-one screen translator and OCR tool for Windows.<br>
+**Click'n'Translate (ClicknTranslate)** is an open-source all-in-one screen translator and OCR tool for Windows.<br>
 Fast online translation · Private offline engines · Four OCR options · Global hotkeys
 
 [**Download the Windows installer**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-x64-installer.exe) · [**Portable ZIP**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-portable-x64.zip) · [Release notes](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram**](https://t.me/jabrail_digital)
