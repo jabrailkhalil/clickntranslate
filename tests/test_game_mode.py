@@ -227,15 +227,24 @@ class GameModeWidgetTest(unittest.TestCase):
         overlay.target_window = 123
         overlay._created_at = 0
         try:
-            with mock.patch.object(game_mode, "_window_is_minimized", return_value=True):
+            # Window handles and foreground/minimized state are a Windows-only
+            # capability. Exercise that branch explicitly so the same product
+            # test remains meaningful on the Linux release runner.
+            with mock.patch.object(
+                game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(game_mode, "_window_is_minimized", return_value=True):
                 self.assertFalse(overlay._target_is_active())
-            with mock.patch.object(game_mode, "_window_is_minimized", return_value=False), mock.patch.object(
-                game_mode, "_foreground_window", return_value=999
-            ):
+            with mock.patch.object(
+                game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(
+                game_mode, "_window_is_minimized", return_value=False
+            ), mock.patch.object(game_mode, "_foreground_window", return_value=999):
                 self.assertFalse(overlay._target_is_active())
-            with mock.patch.object(game_mode, "_window_is_minimized", return_value=False), mock.patch.object(
-                game_mode, "_foreground_window", return_value=123
-            ):
+            with mock.patch.object(
+                game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(
+                game_mode, "_window_is_minimized", return_value=False
+            ), mock.patch.object(game_mode, "_foreground_window", return_value=123):
                 self.assertTrue(overlay._target_is_active())
         finally:
             overlay.close()
