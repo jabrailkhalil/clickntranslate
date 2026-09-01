@@ -33,6 +33,14 @@ def test_bug_report_excludes_histories_document_text_and_runtime_ocr_log(tmp_pat
             archive.read(name).decode("utf-8", errors="replace") for name in names
         )
     assert "report.txt" in names
+    assert "HOW_TO_SEND.txt" in names
+    assert "environment.json" in names
+    assert "safe-config.json" in names
+    assert report.parent.name.startswith("ClicknTranslate-bug-report-")
+    assert (report.parent / "HOW_TO_SEND.txt").is_file()
+    instructions = (report.parent / "HOW_TO_SEND.txt").read_text(encoding="utf-8")
+    assert "github.com/jabrailkhalil/clickntranslate/issues" in instructions
+    assert "t.me/jabrail_digital" in instructions
     assert "ocr_debug.log" not in combined
     assert "must-not-leak" not in combined
     assert "private clipboard" not in combined

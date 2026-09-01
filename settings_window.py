@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout, QScrollArea
+    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
@@ -401,8 +401,8 @@ class DropDownCombo(QComboBox):
         background = self._popup_background
         dark = QtGui.QColor(background).lightness() < 128
         text = "#f4f6fb" if dark else "#202124"
-        hover = "#33313b" if dark else "#e8e3ef"
-        track = "#17161c" if dark else "#f1eef5"
+        hover = "#33313b" if dark else "#ddd6e4"
+        track = "#17161c" if dark else "#e3dde7"
         handle = "#7A5FA1" if dark else "#9b87b6"
         handle_hover = "#9A7FC1" if dark else "#7A5FA1"
         popup.setStyleSheet(f"background-color: {background};")
@@ -517,14 +517,14 @@ class DropDownCombo(QComboBox):
 def modern_combo_style(dark, font_size=15):
     """Return the shared modern selector style used throughout the app."""
     is_dark = bool(dark)
-    bg = "#17181d" if is_dark else "#f6f3fa"
-    bg_lit = "#221f2c" if is_dark else "#eee8f7"
+    bg = "#17181d" if is_dark else "#e9e4ed"
+    bg_lit = "#221f2c" if is_dark else "#ded7e5"
     text = "#f4f6fb" if is_dark else "#202124"
     border = "#3d3948" if is_dark else "#d7cde7"
     border_hover = "#6f598d" if is_dark else "#ad97cb"
     accent = "#9A7FC1" if is_dark else "#8063a8"
-    popup_bg = "#20212a" if is_dark else "#ffffff"
-    selection = "#5f4a88" if is_dark else "#d9cdf0"
+    popup_bg = "#20212a" if is_dark else "#f1edf4"
+    selection = "#5f4a88" if is_dark else "#cfc1df"
     arrow_icon = resource_path(
         "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
     ).replace("\\", "/")
@@ -793,6 +793,106 @@ class OpticallyCenteredPushButton(QPushButton):
         painter.drawControl(QtWidgets.QStyle.CE_PushButtonBevel, option)
         option.rect.translate(0, self._label_offset_y)
         painter.drawControl(QtWidgets.QStyle.CE_PushButtonLabel, option)
+        painter.end()
+
+
+class LanguageSwapButton(QToolButton):
+    """Consistent vector swap icon for every language-pair control.
+
+    A Unicode swap glyph changes shape and vertical alignment with the active
+    font.  Drawing the two arrows ourselves keeps page 3 identical to the main
+    and result-window controls at every DPI and in both themes.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setText("")
+        self.setAccessibleName("Swap languages")
+        self.setIconSize(QtCore.QSize(20, 16))
+        self._refresh_swap_icon()
+
+    @staticmethod
+    def _swap_pixmap(color):
+        ratio = max(
+            1.0,
+            float(QApplication.instance().devicePixelRatio())
+            if QApplication.instance() is not None else 1.0,
+        )
+        pixmap = QtGui.QPixmap(int(22 * ratio), int(16 * ratio))
+        pixmap.setDevicePixelRatio(ratio)
+        pixmap.fill(Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        try:
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            pen = QtGui.QPen(QtGui.QColor(color), 1.8)
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawLine(QtCore.QPointF(3.0, 5.0), QtCore.QPointF(18.0, 5.0))
+            painter.drawLine(QtCore.QPointF(18.0, 5.0), QtCore.QPointF(14.5, 2.0))
+            painter.drawLine(QtCore.QPointF(18.0, 5.0), QtCore.QPointF(14.5, 8.0))
+            painter.drawLine(QtCore.QPointF(19.0, 11.0), QtCore.QPointF(4.0, 11.0))
+            painter.drawLine(QtCore.QPointF(4.0, 11.0), QtCore.QPointF(7.5, 8.0))
+            painter.drawLine(QtCore.QPointF(4.0, 11.0), QtCore.QPointF(7.5, 14.0))
+        finally:
+            painter.end()
+        return pixmap
+
+    def _refresh_swap_icon(self):
+        dark = self.palette().color(QtGui.QPalette.Window).lightness() < 128
+        normal = "#c5b3e9" if dark else "#6b4f96"
+        active = "#e0d4f7" if dark else "#7a5fa1"
+        disabled = QtGui.QColor(normal)
+        disabled.setAlpha(90)
+        icon = QtGui.QIcon()
+        icon.addPixmap(self._swap_pixmap(normal), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(self._swap_pixmap(active), QtGui.QIcon.Active, QtGui.QIcon.Off)
+        icon.addPixmap(self._swap_pixmap(disabled), QtGui.QIcon.Disabled, QtGui.QIcon.Off)
+        self.setIcon(icon)
+
+    def showEvent(self, event):
+        self._refresh_swap_icon()
+        super().showEvent(event)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QtCore.QEvent.PaletteChange, QtCore.QEvent.StyleChange):
+            self._refresh_swap_icon()
+
+
+class SettingsPageDotButton(QToolButton):
+    """Small page indicator with a comfortably large click target."""
+
+    def __init__(self, parent=None, dark=True):
+        super().__init__(parent)
+        self._dark = bool(dark)
+        self.setCheckable(True)
+        self.setAutoExclusive(True)
+        self.setAutoRaise(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(24, 16)
+
+    def set_dark(self, dark):
+        self._dark = bool(dark)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        if self.isChecked():
+            color = QColor("#B89AE8" if self._dark else "#7A5FA1")
+            diameter = 10
+        else:
+            color = QColor("#756B80" if self._dark else "#B6A9C7")
+            diameter = 9
+        if self.underMouse():
+            color = QColor("#D1B8F5" if self._dark else "#8B70B2")
+        x = (self.width() - diameter) / 2
+        y = (self.height() - diameter) / 2
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(color)
+        painter.drawEllipse(QtCore.QRectF(x, y, diameter, diameter))
         painter.end()
 
 
@@ -1412,6 +1512,37 @@ def _is_newer_version(latest, current):
 SETTINGS_TEXT = {
     "en": {
         "autostart": "Start with OS",
+        "update_check_on_launch": "Check for updates when the app starts",
+        "dim_screen_during_ocr": "Dim the screen while selecting an OCR area",
+        "ocr_dim_strength_tooltip": "Choose how dark the area outside the OCR selection becomes.",
+        "restore_clipboard_after_selection": "Restore clipboard after selected-text actions",
+        "restore_clipboard_tooltip": "Restore what was in the clipboard after a visible selection translation or a successful replacement. Explicit copy actions still keep the result.",
+        "copy_notification": "Notify me after text is copied",
+        "copy_notification_tooltip": "Show a short system notification when Click'n'Translate puts a result in the clipboard.",
+        "create_bug_report": "Bug report",
+        "bug_report_tooltip": "Create a diagnostic ZIP without clipboard contents, histories or document text.",
+        "export_settings": "Export",
+        "import_settings": "Import",
+        "export_settings_tooltip": "Save all application settings to a portable JSON file.",
+        "import_settings_tooltip": "Load a Click'n'Translate settings JSON and apply it now.",
+        "settings_exported": "Settings were exported.\n\n{path}",
+        "settings_imported": "Settings were imported and applied.",
+        "settings_transfer_failed": "Could not transfer settings.\n\n{error}",
+        "settings_file_filter": "Click'n'Translate settings (*.json)",
+        "ocr_behavior_heading": "OCR behavior",
+        "updates_heading": "Updates",
+        "settings_page_main": "General settings",
+        "settings_page_updates": "OCR and updates",
+        "settings_page_game": "Dynamic translation",
+        "game_settings_heading": "Dynamic translation",
+        "game_languages": "Languages:",
+        "game_swap_languages": "Swap dynamic translation languages",
+        "game_scan_interval": "Scan interval:",
+        "game_overlay_opacity": "Translation background:",
+        "game_pause_inactive": "Pause when the target app is inactive",
+        "game_pause_inactive_tooltip": "Pauses OCR when the window active at mode start is minimized or no longer in the foreground. Translation resumes automatically when you return.",
+        "game_show_original": "Show recognized text above the translation",
+        "game_workflow_note": "Start Dynamic translation, select one or more text areas, then press Start. Translation updates in place; launch the mode again to stop.",
         "translation_mode": "Text translation mode: {mode}",
         "hotkeys": "Configure hotkeys",
         "save_and_back": "Save and return",
@@ -1448,6 +1579,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "Translation history",
         "copy_history_button": "Copy history",
         "fullscreen_translate_label": "Fullscreen Translate:",
+        "game_translate_label": "Dynamic:",
         "selection_translate_label": "Selection Translate:",
         "toggle_window_hotkey_label": "Show / hide app:",
         "result_window_label": "Show window:",
@@ -1494,6 +1626,37 @@ SETTINGS_TEXT = {
     },
     "ru": {
         "autostart": "Запускать вместе с ОС",
+        "update_check_on_launch": "Проверять обновления при запуске",
+        "dim_screen_during_ocr": "Затемнять экран при выборе области OCR",
+        "ocr_dim_strength_tooltip": "Настройте силу затемнения за пределами выбранной области OCR.",
+        "restore_clipboard_after_selection": "Восстанавливать буфер после работы с выделением",
+        "restore_clipboard_tooltip": "Возвращает прежнее содержимое буфера после показа перевода или успешной замены. Явное копирование всё равно сохраняет результат.",
+        "copy_notification": "Уведомлять после копирования текста",
+        "copy_notification_tooltip": "Показывает короткое системное уведомление, когда Click'n'Translate помещает результат в буфер.",
+        "create_bug_report": "Баг-репорт",
+        "bug_report_tooltip": "Создаёт диагностический ZIP без содержимого буфера, историй и текста документов.",
+        "export_settings": "Экспорт",
+        "import_settings": "Импорт",
+        "export_settings_tooltip": "Сохраняет все настройки в переносимый JSON-файл.",
+        "import_settings_tooltip": "Загружает JSON настроек Click'n'Translate и сразу применяет его.",
+        "settings_exported": "Настройки экспортированы.\n\n{path}",
+        "settings_imported": "Настройки импортированы и применены.",
+        "settings_transfer_failed": "Не удалось перенести настройки.\n\n{error}",
+        "settings_file_filter": "Настройки Click'n'Translate (*.json)",
+        "ocr_behavior_heading": "Поведение OCR",
+        "updates_heading": "Обновления",
+        "settings_page_main": "Основные настройки",
+        "settings_page_updates": "OCR и обновления",
+        "settings_page_game": "Динамический перевод",
+        "game_settings_heading": "Динамический перевод",
+        "game_languages": "Языки:",
+        "game_swap_languages": "Поменять языки динамического перевода местами",
+        "game_scan_interval": "Частота проверки:",
+        "game_overlay_opacity": "Фон перевода:",
+        "game_pause_inactive": "Пауза, когда целевое окно неактивно",
+        "game_pause_inactive_tooltip": "OCR приостанавливается, если окно, активное при запуске режима, свёрнуто или больше не находится на переднем плане. При возврате перевод продолжится автоматически.",
+        "game_show_original": "Показывать распознанный текст над переводом",
+        "game_workflow_note": "Запустите динамический режим, выделите одну или несколько областей и нажмите «Запустить». Перевод обновляется на месте; повторный запуск остановит режим.",
         "translation_mode": "Режим перевода текста: {mode}",
         # Обновлённый текст: теперь явно указывается мгновенный перевод выделенного текста
         "hotkeys": "Настроить горячие клавиши",
@@ -1531,6 +1694,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "История переводов",
         "copy_history_button": "История копирований",
         "fullscreen_translate_label": "Перевод всего экрана",
+        "game_translate_label": "Динамический",
         "selection_translate_label": "Перевод выделенного текста",
         "toggle_window_hotkey_label": "Свернуть / развернуть программу",
         "result_window_label": "Показывать окно:",
@@ -1577,6 +1741,36 @@ SETTINGS_TEXT = {
     },
     "es": {
         "autostart": "Iniciar con el sistema",
+        "update_check_on_launch": "Buscar actualizaciones al iniciar",
+        "dim_screen_during_ocr": "Oscurecer la pantalla al seleccionar un área OCR",
+        "ocr_dim_strength_tooltip": "Elige cuánto se oscurece el área fuera de la selección OCR.",
+        "restore_clipboard_after_selection": "Restaurar el portapapeles tras usar texto seleccionado",
+        "restore_clipboard_tooltip": "Restaura el contenido anterior tras mostrar una traducción o reemplazar la selección. Las copias explícitas conservan el resultado.",
+        "copy_notification": "Notificar después de copiar texto",
+        "copy_notification_tooltip": "Muestra una notificación breve cuando Click'n'Translate copia un resultado.",
+        "create_bug_report": "Informe de error",
+        "bug_report_tooltip": "Crea un ZIP de diagnóstico sin portapapeles, historiales ni texto de documentos.",
+        "export_settings": "Exportar", "import_settings": "Importar",
+        "export_settings_tooltip": "Guarda todos los ajustes en un archivo JSON portable.",
+        "import_settings_tooltip": "Carga y aplica un JSON de ajustes de Click'n'Translate.",
+        "settings_exported": "Ajustes exportados.\n\n{path}",
+        "settings_imported": "Los ajustes se importaron y aplicaron.",
+        "settings_transfer_failed": "No se pudieron transferir los ajustes.\n\n{error}",
+        "settings_file_filter": "Ajustes de Click'n'Translate (*.json)",
+        "ocr_behavior_heading": "Comportamiento de OCR",
+        "updates_heading": "Actualizaciones",
+        "settings_page_main": "Ajustes generales",
+        "settings_page_updates": "OCR y actualizaciones",
+        "settings_page_game": "Traducción dinámica",
+        "game_settings_heading": "Traducción dinámica",
+        "game_languages": "Idiomas:",
+        "game_swap_languages": "Intercambiar idiomas de traducción dinámica",
+        "game_scan_interval": "Intervalo de lectura:",
+        "game_overlay_opacity": "Fondo de traducción:",
+        "game_pause_inactive": "Pausar si la aplicación vinculada está inactiva",
+        "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
+        "game_show_original": "Mostrar el texto reconocido sobre la traducción",
+        "game_workflow_note": "Inicia el modo dinámico, selecciona una o varias zonas y pulsa Iniciar. La traducción se actualiza en el lugar; inicia el modo otra vez para detenerlo.",
         "translation_mode": "Modo de traduccion: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
@@ -1613,6 +1807,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "Historial de traducciones",
         "copy_history_button": "Historial de copias",
         "fullscreen_translate_label": "Traduccion de pantalla:",
+        "game_translate_label": "Dinámico:",
         "selection_translate_label": "Traduccion de seleccion:",
         "toggle_window_hotkey_label": "Mostrar / ocultar aplicacion:",
         "result_window_label": "Mostrar ventana:",
@@ -1659,6 +1854,36 @@ SETTINGS_TEXT = {
     },
     "de": {
         "autostart": "Mit dem System starten",
+        "update_check_on_launch": "Beim Start nach Updates suchen",
+        "dim_screen_during_ocr": "Bildschirm bei der OCR-Auswahl abdunkeln",
+        "ocr_dim_strength_tooltip": "Legt fest, wie stark der Bereich außerhalb der OCR-Auswahl abgedunkelt wird.",
+        "restore_clipboard_after_selection": "Zwischenablage nach Textauswahl wiederherstellen",
+        "restore_clipboard_tooltip": "Stellt den vorherigen Inhalt nach einer sichtbaren Übersetzung oder erfolgreichen Ersetzung wieder her. Explizites Kopieren behält das Ergebnis.",
+        "copy_notification": "Nach dem Kopieren benachrichtigen",
+        "copy_notification_tooltip": "Zeigt eine kurze Systemmeldung, wenn Click'n'Translate ein Ergebnis kopiert.",
+        "create_bug_report": "Fehlerbericht",
+        "bug_report_tooltip": "Erstellt eine Diagnose-ZIP ohne Zwischenablage, Verläufe oder Dokumenttext.",
+        "export_settings": "Exportieren", "import_settings": "Importieren",
+        "export_settings_tooltip": "Speichert alle Einstellungen in einer portablen JSON-Datei.",
+        "import_settings_tooltip": "Lädt eine Click'n'Translate-JSON und wendet sie sofort an.",
+        "settings_exported": "Einstellungen wurden exportiert.\n\n{path}",
+        "settings_imported": "Einstellungen wurden importiert und angewendet.",
+        "settings_transfer_failed": "Einstellungen konnten nicht übertragen werden.\n\n{error}",
+        "settings_file_filter": "Click'n'Translate-Einstellungen (*.json)",
+        "ocr_behavior_heading": "OCR-Verhalten",
+        "updates_heading": "Updates",
+        "settings_page_main": "Allgemeine Einstellungen",
+        "settings_page_updates": "OCR und Updates",
+        "settings_page_game": "Dynamische Übersetzung",
+        "game_settings_heading": "Dynamische Übersetzung",
+        "game_languages": "Sprachen:",
+        "game_swap_languages": "Sprachen der dynamischen Übersetzung tauschen",
+        "game_scan_interval": "Scanintervall:",
+        "game_overlay_opacity": "Übersetzungshintergrund:",
+        "game_pause_inactive": "Pausieren, wenn die Ziel-App inaktiv ist",
+        "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
+        "game_show_original": "Erkannten Text über der Übersetzung zeigen",
+        "game_workflow_note": "Dynamischen Modus starten, einen oder mehrere Textbereiche wählen und Start drücken. Die Übersetzung wird dort aktualisiert; erneutes Starten beendet den Modus.",
         "translation_mode": "Ubersetzungsmodus: {mode}",
         "hotkeys": "Tastenkurzel konfigurieren",
         "save_and_back": "Speichern und zuruck",
@@ -1695,6 +1920,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "Ubersetzungsverlauf",
         "copy_history_button": "Kopierverlauf",
         "fullscreen_translate_label": "Bildschirmubersetzung:",
+        "game_translate_label": "Dynamisch:",
         "selection_translate_label": "Auswahlubersetzung:",
         "toggle_window_hotkey_label": "App anzeigen / ausblenden:",
         "result_window_label": "Fenster zeigen:",
@@ -1741,6 +1967,36 @@ SETTINGS_TEXT = {
     },
     "fr": {
         "autostart": "Demarrer avec le systeme",
+        "update_check_on_launch": "Rechercher les mises à jour au démarrage",
+        "dim_screen_during_ocr": "Assombrir l’écran pendant la sélection OCR",
+        "ocr_dim_strength_tooltip": "Choisissez l’intensité de l’assombrissement hors de la sélection OCR.",
+        "restore_clipboard_after_selection": "Restaurer le presse-papiers après une sélection",
+        "restore_clipboard_tooltip": "Restaure le contenu précédent après l’affichage d’une traduction ou un remplacement réussi. Une copie explicite conserve le résultat.",
+        "copy_notification": "Notifier après la copie du texte",
+        "copy_notification_tooltip": "Affiche une brève notification lorsque Click'n'Translate copie un résultat.",
+        "create_bug_report": "Rapport de bug",
+        "bug_report_tooltip": "Crée un ZIP de diagnostic sans presse-papiers, historiques ni texte de document.",
+        "export_settings": "Exporter", "import_settings": "Importer",
+        "export_settings_tooltip": "Enregistre tous les réglages dans un fichier JSON portable.",
+        "import_settings_tooltip": "Charge et applique un JSON de réglages Click'n'Translate.",
+        "settings_exported": "Réglages exportés.\n\n{path}",
+        "settings_imported": "Les réglages ont été importés et appliqués.",
+        "settings_transfer_failed": "Impossible de transférer les réglages.\n\n{error}",
+        "settings_file_filter": "Réglages Click'n'Translate (*.json)",
+        "ocr_behavior_heading": "Comportement OCR",
+        "updates_heading": "Mises à jour",
+        "settings_page_main": "Réglages généraux",
+        "settings_page_updates": "OCR et mises à jour",
+        "settings_page_game": "Traduction dynamique",
+        "game_settings_heading": "Traduction dynamique",
+        "game_languages": "Langues :",
+        "game_swap_languages": "Inverser les langues de la traduction dynamique",
+        "game_scan_interval": "Intervalle d’analyse :",
+        "game_overlay_opacity": "Fond de traduction :",
+        "game_pause_inactive": "Pause si l’application liée est inactive",
+        "game_pause_inactive_tooltip": "L’OCR s’arrête si la fenêtre active au lancement du mode est réduite ou n’est plus au premier plan. La traduction reprend automatiquement au retour.",
+        "game_show_original": "Afficher le texte reconnu au-dessus de la traduction",
+        "game_workflow_note": "Lancez le mode dynamique, choisissez une ou plusieurs zones puis appuyez sur Démarrer. La traduction s’actualise sur place ; relancer le mode l’arrête.",
         "translation_mode": "Mode de traduction : {mode}",
         "hotkeys": "Configurer les raccourcis",
         "save_and_back": "Enregistrer et revenir",
@@ -1777,6 +2033,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "Historique des traductions",
         "copy_history_button": "Historique des copies",
         "fullscreen_translate_label": "Traduction plein ecran :",
+        "game_translate_label": "Dynamique :",
         "selection_translate_label": "Traduction de selection :",
         "toggle_window_hotkey_label": "Afficher / masquer l'application :",
         "result_window_label": "Afficher fenêtre :",
@@ -1823,6 +2080,36 @@ SETTINGS_TEXT = {
     },
     "zh": {
         "autostart": "随系统启动",
+        "update_check_on_launch": "启动时检查更新",
+        "dim_screen_during_ocr": "选择 OCR 区域时调暗屏幕",
+        "ocr_dim_strength_tooltip": "设置 OCR 选择区域外的变暗程度。",
+        "restore_clipboard_after_selection": "处理所选文本后恢复剪贴板",
+        "restore_clipboard_tooltip": "显示翻译或成功替换后恢复原剪贴板内容；明确的复制操作仍会保留结果。",
+        "copy_notification": "复制文本后通知我",
+        "copy_notification_tooltip": "当 Click'n'Translate 将结果复制到剪贴板时显示简短系统通知。",
+        "create_bug_report": "创建安全错误报告",
+        "bug_report_tooltip": "创建不包含剪贴板、历史记录或文档文本的诊断 ZIP。",
+        "export_settings": "导出设置", "import_settings": "导入设置",
+        "export_settings_tooltip": "将所有应用设置保存为可移植 JSON 文件。",
+        "import_settings_tooltip": "加载 Click'n'Translate 设置 JSON 并立即应用。",
+        "settings_exported": "设置已导出。\n\n{path}",
+        "settings_imported": "设置已导入并应用。",
+        "settings_transfer_failed": "无法传输设置。\n\n{error}",
+        "settings_file_filter": "Click'n'Translate 设置 (*.json)",
+        "ocr_behavior_heading": "OCR 行为",
+        "updates_heading": "更新",
+        "settings_page_main": "常规设置",
+        "settings_page_updates": "OCR 与更新",
+        "settings_page_game": "动态翻译",
+        "game_settings_heading": "动态翻译",
+        "game_languages": "语言：",
+        "game_swap_languages": "交换动态翻译语言",
+        "game_scan_interval": "扫描间隔：",
+        "game_overlay_opacity": "翻译背景：",
+        "game_pause_inactive": "绑定应用未激活时暂停",
+        "game_pause_inactive_tooltip": "如果启动模式时的活动窗口被最小化或不再位于前台，OCR 会暂停；返回该窗口后会自动继续翻译。",
+        "game_show_original": "在译文上方显示识别文本",
+        "game_workflow_note": "启动动态模式，选择一个或多个文字区域后点击开始。译文会在原位置更新；再次启动该模式即可停止。",
         "translation_mode": "文本翻译模式：{mode}",
         "hotkeys": "配置快捷键",
         "save_and_back": "保存并返回",
@@ -1859,6 +2146,7 @@ SETTINGS_TEXT = {
         "translation_history_button": "翻译历史",
         "copy_history_button": "复制历史",
         "fullscreen_translate_label": "全屏翻译：",
+        "game_translate_label": "动态模式：",
         "selection_translate_label": "选中文本翻译：",
         "toggle_window_hotkey_label": "显示 / 隐藏应用：",
         "result_window_label": "显示窗口：",
@@ -1908,6 +2196,75 @@ SETTINGS_TEXT = {
 def settings_text(lang, key):
     texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
     return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
+
+
+SETTINGS_EXPORT_FORMAT = "clickntranslate-settings"
+SETTINGS_EXPORT_SCHEMA = 1
+
+
+def settings_export_payload(config):
+    """Return a portable, JSON-only settings document."""
+    safe = json.loads(json.dumps(dict(config or {}), ensure_ascii=False))
+    return {
+        "format": SETTINGS_EXPORT_FORMAT,
+        "schema": SETTINGS_EXPORT_SCHEMA,
+        "app_version": APP_VERSION,
+        "settings": safe,
+    }
+
+
+def validated_import_settings(payload, defaults):
+    """Validate an exported document and return known, type-safe settings."""
+    if not isinstance(payload, dict):
+        raise ValueError("The settings file must contain a JSON object.")
+    if payload.get("format") != SETTINGS_EXPORT_FORMAT:
+        raise ValueError("This is not a Click'n'Translate settings export.")
+    try:
+        schema = int(payload.get("schema", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("The settings schema is invalid.") from exc
+    if schema < 1 or schema > SETTINGS_EXPORT_SCHEMA:
+        raise ValueError(f"Unsupported settings schema: {schema}")
+    raw = payload.get("settings")
+    if not isinstance(raw, dict):
+        raise ValueError("The export does not contain a settings object.")
+
+    accepted = {}
+    for key, value in raw.items():
+        if key not in defaults:
+            continue
+        default = defaults[key]
+        valid = False
+        if isinstance(default, bool):
+            valid = isinstance(value, bool)
+        elif isinstance(default, int) and not isinstance(default, bool):
+            valid = isinstance(value, int) and not isinstance(value, bool)
+        elif isinstance(default, float):
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool)
+            if valid:
+                value = float(value)
+        elif isinstance(default, str):
+            valid = isinstance(value, str)
+        elif isinstance(default, (tuple, list)):
+            valid = isinstance(value, (tuple, list))
+            if valid:
+                value = list(value)
+        elif default is None:
+            valid = value is None
+        if valid:
+            accepted[key] = value
+    numeric_ranges = {
+        "ocr_dim_strength": (0, 80),
+        "game_capture_interval_ms": (450, 10000),
+        "game_overlay_opacity": (45, 100),
+        "game_text_similarity": (0.50, 1.0),
+    }
+    for key, (minimum, maximum) in numeric_ranges.items():
+        if key in accepted:
+            accepted[key] = max(minimum, min(maximum, accepted[key]))
+    if not accepted:
+        raise ValueError("The export contains no compatible settings.")
+    return accepted
 
 
 HISTORY_RECORD_TEXT = {
@@ -2934,11 +3291,11 @@ class OcrLanguageManagerDialog(QDialog):
             """)
         else:
             self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #ffffff; color: #202124; border: 1px solid #d7cde7; font-family: 'Segoe UI'; font-size: 13px; }
-                QWidget#languageManagerContent { background-color: #ffffff; }
+                QDialog#languageManagerDialog { background-color: #f0edf3; color: #241f2a; border: 1px solid #bcb2c7; font-family: 'Segoe UI'; font-size: 13px; }
+                QWidget#languageManagerContent { background-color: #f0edf3; }
                 QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
-                QTableWidget { background: #ffffff; alternate-background-color: #f7f6fb; color: #202124; gridline-color: #d8d8d8; selection-background-color: #d9cdf0; selection-color: #202124; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #d8d2e2; border-radius: 7px; }
-                QHeaderView::section { background: #f0eef7; color: #202124; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
+                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 7px; }
+                QHeaderView::section { background: #ddd7e2; color: #241f2a; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
                 QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 600; }
                 QPushButton:hover { background-color: #8B70B2; }
                 QPushButton:disabled { background-color: #d8d4e2; color: #777; }
@@ -2950,10 +3307,10 @@ class OcrLanguageManagerDialog(QDialog):
                 QPushButton#languagePackageEngineRemove:hover { background-color: #fbe9ed; color: #8f2a40; }
                 QPushButton#languagePackageEngineRemove:pressed { background-color: #f3d7de; }
                 QPushButton#languagePackageEngineRemove:disabled { color: #a39aad; border-color: #e6e1ec; }
-                QFrame#languagePackageEmptyState { background: #f7f6fb; border: 1px solid #d8d2e2; border-radius: 10px; }
+                QFrame#languagePackageEmptyState { background: #e9e3ed; border: 1px solid #bcb2c7; border-radius: 10px; }
                 QLabel#languagePackageEmptyTitle { color: #202124; font-size: 18px; font-weight: 700; }
                 QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
-                QLineEdit { background: #ffffff; color: #202124; border: 1px solid #cfc8df; border-radius: 6px; padding: 6px 9px; }
+                QLineEdit { background: #f3eff5; color: #241f2a; border: 1px solid #bcb2c7; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
                 QScrollBar:vertical { background: #f1eff5; width: 12px; margin: 0; border: none; }
                 QScrollBar::handle:vertical { background: #9b87b6; min-height: 36px; border-radius: 5px; margin: 2px; }
@@ -6069,6 +6426,10 @@ class SettingsWindow(QWidget):
         self.parent.config["autostart"] = enabled
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
+        if enabled:
+            complete = getattr(self.parent, "_complete_guide_step", None)
+            if callable(complete):
+                complete("autostart")
 
     def auto_save_setting(self, key, value):
         self.parent.config[key] = value
@@ -6078,6 +6439,316 @@ class SettingsWindow(QWidget):
             self.parent.autostart = value
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
+
+    def _on_start_minimized_toggled(self, state):
+        enabled = bool(state)
+        self.auto_save_setting("start_minimized", enabled)
+        if enabled:
+            complete = getattr(self.parent, "_complete_guide_step", None)
+            if callable(complete):
+                complete("start_minimized")
+
+    def _save_ocr_dim_strength(self, value):
+        strength = max(0, min(80, int(value)))
+        label = getattr(self, "ocr_dim_strength_value", None)
+        if label is not None:
+            label.setText(f"{strength}%")
+        self.auto_save_setting("ocr_dim_strength", strength)
+
+    def _save_game_scan_interval(self, value):
+        interval = max(450, min(10000, int(value)))
+        label = getattr(self, "game_scan_interval_value", None)
+        if label is not None:
+            label.setText(f"{interval / 1000:.1f} s")
+        self.auto_save_setting("game_capture_interval_ms", interval)
+
+    def _save_game_overlay_opacity(self, value):
+        opacity = max(45, min(100, int(value)))
+        label = getattr(self, "game_overlay_opacity_value", None)
+        if label is not None:
+            label.setText(f"{opacity}%")
+        self.auto_save_setting("game_overlay_opacity", opacity)
+
+    def _game_source_changed(self, _index=None):
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        selected_target = target_combo.currentData()
+        self._populate_game_targets(selected_target)
+        self._save_game_language_pair()
+
+    def _populate_game_targets(self, selected_target=None, fast=False):
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        source = str(source_combo.currentData() or "en")
+        preferred = str(
+            selected_target
+            or self.parent.config.get("game_translate_target_language")
+            or "ru"
+        )
+        if fast:
+            available = {preferred} if preferred != source else {
+                "ru" if source != "ru" else "en"
+            }
+        else:
+            try:
+                from ocr import _translation_targets_for_source
+                available = set(_translation_targets_for_source(source, self.parent.config))
+            except Exception:
+                available = {language.code for language in APP_LANGUAGES if language.code != source}
+        target_combo.blockSignals(True)
+        try:
+            target_combo.clear()
+            for language in APP_LANGUAGES:
+                if language.code not in available or language.code == source:
+                    continue
+                target_combo.addItem(language.short_label, language.code)
+            index = target_combo.findData(preferred)
+            target_combo.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            target_combo.blockSignals(False)
+        self._update_game_swap_enabled()
+
+    def _populate_game_language_controls(self, fast=False):
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        current_source = str(
+            source_combo.currentData()
+            or self.parent.config.get("game_translate_source_language")
+            or "en"
+        )
+        config = dict(self.parent.config)
+        if fast:
+            available = {current_source}
+        else:
+            try:
+                from ocr import installed_ocr_language_codes
+                available = set(installed_ocr_language_codes(config=config))
+            except Exception:
+                available = {language.code for language in APP_LANGUAGES}
+        source_combo.blockSignals(True)
+        try:
+            source_combo.clear()
+            for language in APP_LANGUAGES:
+                if language.code not in available:
+                    continue
+                source_combo.addItem(language.short_label, language.code)
+            index = source_combo.findData(current_source)
+            source_combo.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            source_combo.blockSignals(False)
+        self._populate_game_targets(
+            self.parent.config.get("game_translate_target_language", "ru"),
+            fast=fast,
+        )
+
+    def _verify_game_language_controls(self):
+        """Do the slower installed-language probe after the feature page paints."""
+        if getattr(self, "_game_language_controls_verified", False):
+            return
+        page = getattr(self, "settings_game_page", None)
+        if page is None or not page.isVisible():
+            return
+        self._populate_game_language_controls()
+        self._game_language_controls_verified = True
+
+    def _save_game_language_pair(self, _index=None):
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        source, target = source_combo.currentData(), target_combo.currentData()
+        if not source or not target or source == target:
+            self._update_game_swap_enabled()
+            return
+        unchanged = (
+            str(self.parent.config.get("game_translate_source_language", "")) == str(source)
+            and str(self.parent.config.get("game_translate_target_language", "")) == str(target)
+        )
+        if unchanged:
+            self._update_game_swap_enabled()
+            return
+        self.parent.config["game_translate_source_language"] = str(source)
+        self.parent.config["game_translate_target_language"] = str(target)
+        self.parent.save_config()
+        _invalidate_main_config_cache()
+        self._update_game_swap_enabled()
+
+    def _update_game_swap_enabled(self):
+        button = getattr(self, "game_swap_button", None)
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if button is None or source_combo is None or target_combo is None:
+            return
+        source, target = source_combo.currentData(), target_combo.currentData()
+        reverse_available = False
+        if source and target and source_combo.findData(target) >= 0:
+            try:
+                from ocr import _translation_targets_for_source
+                reverse_available = str(source) in _translation_targets_for_source(
+                    str(target), self.parent.config
+                )
+            except Exception:
+                reverse_available = True
+        button.setEnabled(bool(reverse_available))
+
+    def _swap_game_languages(self):
+        source_combo = getattr(self, "game_source_combo", None)
+        target_combo = getattr(self, "game_target_combo", None)
+        if source_combo is None or target_combo is None:
+            return
+        source, target = source_combo.currentData(), target_combo.currentData()
+        target_index = source_combo.findData(target)
+        if target_index < 0:
+            self._update_game_swap_enabled()
+            return
+        source_combo.blockSignals(True)
+        try:
+            source_combo.setCurrentIndex(target_index)
+        finally:
+            source_combo.blockSignals(False)
+        self._populate_game_targets(source)
+        reverse_index = target_combo.findData(source)
+        if reverse_index >= 0:
+            target_combo.setCurrentIndex(reverse_index)
+        self._save_game_language_pair()
+
+    def _set_ocr_dimming_enabled(self, enabled):
+        enabled = bool(enabled)
+        slider = getattr(self, "ocr_dim_strength_slider", None)
+        value_label = getattr(self, "ocr_dim_strength_value", None)
+        if slider is not None:
+            slider.setEnabled(enabled)
+        if value_label is not None:
+            value_label.setEnabled(enabled)
+        self.auto_save_setting("dim_screen_during_ocr", enabled)
+
+    def _create_bug_report_from_settings(self):
+        creator = getattr(self.parent, "_create_bug_report", None)
+        if callable(creator):
+            return creator(self)
+        return None
+
+    def _settings_default_export_path(self):
+        desktop = QtCore.QStandardPaths.writableLocation(
+            QtCore.QStandardPaths.DesktopLocation
+        )
+        folder = desktop or str(Path.home())
+        return str(Path(folder) / f"ClicknTranslate-settings-v{APP_VERSION}.json")
+
+    def export_settings(self):
+        lang = self.parent.current_interface_language
+        path, _selected = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            settings_text(lang, "export_settings"),
+            self._settings_default_export_path(),
+            settings_text(lang, "settings_file_filter"),
+        )
+        if not path:
+            return None
+        target = Path(path)
+        if target.suffix.lower() != ".json":
+            target = target.with_suffix(".json")
+        temporary = target.with_name(target.name + ".tmp")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(
+                json.dumps(
+                    settings_export_payload(self.parent.config),
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                ) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(str(temporary), str(target))
+        except Exception as error:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            QMessageBox.warning(
+                self,
+                settings_text(lang, "export_settings"),
+                settings_text(lang, "settings_transfer_failed").format(error=error),
+            )
+            return None
+        QMessageBox.information(
+            self,
+            settings_text(lang, "export_settings"),
+            settings_text(lang, "settings_exported").format(path=target),
+        )
+        return target
+
+    def import_settings(self):
+        lang = self.parent.current_interface_language
+        path, _selected = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            settings_text(lang, "import_settings"),
+            str(Path(self._settings_default_export_path()).parent),
+            settings_text(lang, "settings_file_filter"),
+        )
+        if not path:
+            return None
+        try:
+            payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+            from main import (
+                DEFAULT_CONFIG,
+                merge_config_defaults,
+                normalize_interface_language,
+            )
+
+            imported = validated_import_settings(payload, DEFAULT_CONFIG)
+            merged, _missing = merge_config_defaults(imported)
+            merged["interface_language"] = normalize_interface_language(
+                merged.get("interface_language")
+            )
+            merged["theme"] = (
+                "Светлая" if merged.get("theme") == "Светлая" else "Темная"
+            )
+            # Dynamic translation has one supported workflow in this release.
+            merged["game_capture_mode"] = "region"
+
+            self.parent.config = merged
+            self.parent.current_theme = merged["theme"]
+            self.parent.current_interface_language = merged["interface_language"]
+            self.parent.start_minimized = bool(merged.get("start_minimized", False))
+            self.parent.translation_mode = merged.get("translation_mode", "English")
+            self.parent.autostart = bool(merged.get("autostart", False))
+            actual_autostart = self.parent.set_autostart(self.parent.autostart)
+            self.parent.autostart = bool(actual_autostart)
+            self.parent.config["autostart"] = self.parent.autostart
+            self.parent.save_config()
+
+            restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
+            if callable(restart_hotkeys):
+                restart_hotkeys()
+            self.parent.apply_theme()
+            self.parent.refresh_interface_language_ui()
+            self.init_ui()
+            self.apply_theme()
+            self._set_settings_page(0)
+        except Exception as error:
+            logging.exception("Could not import Click'n'Translate settings")
+            QMessageBox.warning(
+                self,
+                settings_text(lang, "import_settings"),
+                settings_text(lang, "settings_transfer_failed").format(error=error),
+            )
+            return None
+
+        applied_lang = self.parent.current_interface_language
+        QMessageBox.information(
+            self,
+            settings_text(applied_lang, "import_settings"),
+            settings_text(applied_lang, "settings_imported"),
+        )
+        return Path(path)
 
     def on_history_checkbox_toggled(self, state):
         self.auto_save_setting("history", state)
@@ -6131,6 +6802,24 @@ class SettingsWindow(QWidget):
         self.apply_theme()
 
     def clear_main_layout(self):
+        # Absolute fixed-window regions are not owned by main_layout. Hide
+        # their children explicitly as well: secondary screens and a language
+        # rebuild must never leave a cached footer button painted on top.
+        for attribute in (
+            "settings_updates_page",
+            "settings_game_page",
+            "settings_action_panel",
+            "settings_page_footer",
+        ):
+            region = getattr(self, attribute, None)
+            if region is None:
+                continue
+            try:
+                for child in region.findChildren(QWidget):
+                    child.hide()
+                region.hide()
+            except RuntimeError:
+                pass
         # Очищаем все элементы из текущего макета
         if self.main_layout is not None:
             while self.main_layout.count():
@@ -6140,6 +6829,11 @@ class SettingsWindow(QWidget):
                     # A deferred delete is not an immediate visual removal.
                     # Hide the old settings page first so a theme/language
                     # change cannot expose its cached pixels over the new one.
+                    # A stacked page keeps its children's own hidden flag
+                    # unchanged when only the stack is hidden, so hide every
+                    # descendant explicitly as well.
+                    for child in widget.findChildren(QWidget):
+                        child.hide()
                     widget.hide()
                     widget.deleteLater()
                 elif item.layout():
@@ -6157,30 +6851,60 @@ class SettingsWindow(QWidget):
                     self.clear_nested_layout(item.layout())
 
     def setup_new_layout(self):
+        # These fixed-window regions are absolute children rather than layout
+        # items, so remove them explicitly when rebuilding or relanguaging.
+        for attribute in (
+            "settings_updates_page",
+            "settings_game_page",
+            "settings_action_panel",
+            "settings_page_footer",
+        ):
+            widget = getattr(self, attribute, None)
+            if widget is None:
+                continue
+            try:
+                for child in widget.findChildren(QWidget):
+                    child.hide()
+                widget.hide()
+                widget.deleteLater()
+            except RuntimeError:
+                pass
+            setattr(self, attribute, None)
         # Больше не пересоздаём layout, только очищаем
         self.clear_main_layout()
 
     def init_ui(self):
+        # Every visit starts from the compact general page.  Remembering page
+        # 2/3 made Settings appear empty or unfamiliar on the next opening.
+        page_to_restore = 0
         self.setup_new_layout()
         self.hotkeys_mode = False
         self._secondary_view_kind = None
         self.secondary_view_shell = None
         self.main_layout.setContentsMargins(5, 5, 5, 5)
-        self.main_layout.setSpacing(8)
+        # Five general rows must finish clearly above the fixed action panel.
+        # An 8px gap plus 38px rows produced a 46px rhythm and let the final
+        # checkbox run into the buttons in the real embedded viewport.
+        self.main_layout.setSpacing(4)
         # This page is rendered inside a fixed 690x390 viewport. Keep the
         # controls top-anchored so adding a selector on the right cannot move
         # the checkbox column on the left.
         self.main_layout.setAlignment(Qt.AlignTop)
         lang = self.parent.current_interface_language
+        self._ui_language = lang
+        self._game_language_controls_verified = False
 
         # --- ГРУППА ЧЕКБОКСОВ ---
         # The layout margin already supplies the intended 5px top inset.
 
         margin_top_val = "-12px" if self.parent.current_theme == "Темная" else "-6px"
-        fixed_height = 38
+        fixed_height = 34
         engine_combo_width = 180
         engine_control_height = 32
-        action_button_height = 36
+        # Three joined action rows must fit above the pager in the real
+        # 672x334 settings viewport. At 36px Qt overlaps the rows and paints
+        # over their lower borders; 31px keeps every frame intact.
+        action_button_height = 29
         
         # --- СТРОКА 1: Запускать вместе с ОС + Движок OCR ---
         row1 = QHBoxLayout()
@@ -6235,8 +6959,11 @@ class SettingsWindow(QWidget):
         self.ocr_engine_combo.setFixedWidth(engine_combo_width)
         self.ocr_engine_combo.setFixedHeight(engine_control_height)
         # Все три правых элемента имеют высоту 32 px и один вертикальный центр.
-        row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignVCenter)
-        row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignVCenter)
+        # Pin the controls to the row's top edge. Centering a 32px control in
+        # a stylesheet-sized checkbox row rounds differently after a language
+        # rebuild and produced a visible one-pixel jump on Windows.
+        row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignTop)
+        row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignTop)
         
         # Each popup item has its own concise explanation.  Avoid one giant
         # native tooltip covering most of the fixed settings window.
@@ -6258,7 +6985,7 @@ class SettingsWindow(QWidget):
         row2.setSpacing(8)
         self.start_minimized_checkbox = QCheckBox(settings_text(lang, "start_minimized"))
         self.start_minimized_checkbox.setChecked(self.parent.config.get("start_minimized", False))
-        self.start_minimized_checkbox.toggled.connect(lambda state: self.auto_save_setting("start_minimized", state))
+        self.start_minimized_checkbox.toggled.connect(self._on_start_minimized_toggled)
         self.start_minimized_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:300px;")
         self.start_minimized_checkbox.setFixedHeight(fixed_height)
         row2.addWidget(self.start_minimized_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
@@ -6302,8 +7029,8 @@ class SettingsWindow(QWidget):
         self._apply_engine_combo_style(self.translator_combo)
         self.translator_combo.setFixedWidth(engine_combo_width)
         self.translator_combo.setFixedHeight(engine_control_height)
-        row2.addWidget(self.translator_engine_label, alignment=Qt.AlignVCenter)
-        row2.addWidget(self.translator_combo, alignment=Qt.AlignVCenter)
+        row2.addWidget(self.translator_engine_label, alignment=Qt.AlignTop)
+        row2.addWidget(self.translator_combo, alignment=Qt.AlignTop)
         
         translator_picker_help = {
             "en": "Online providers need internet. Installed offline providers are listed separately.",
@@ -6416,8 +7143,8 @@ class SettingsWindow(QWidget):
         self.result_window_control.set_help_text(settings_text(lang, "result_window_tooltip"))
         self.result_window_label.setToolTip(tooltip_text(settings_text(lang, "result_window_tooltip")))
 
-        row3.addWidget(self.result_window_label, alignment=Qt.AlignVCenter)
-        row3.addWidget(self.result_window_control, alignment=Qt.AlignVCenter)
+        row3.addWidget(self.result_window_label, alignment=Qt.AlignTop)
+        row3.addWidget(self.result_window_control, alignment=Qt.AlignTop)
         self.main_layout.addLayout(row3)
 
         # Остальные чекбоксы
@@ -6452,15 +7179,31 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.freeze_screen_checkbox, alignment=Qt.AlignLeft)
 
         # --- конец блока чекбоксов ---
-        self.main_layout.addSpacing(4)
 
-        # --- Группа кнопок: Clear cache | Reset | Update (горизонтальная, связанные стили) ---
-        btn_group_layout = QHBoxLayout()
-        btn_group_layout.setContentsMargins(0, 0, 0, 0)
-        btn_group_layout.setSpacing(0)
+        # All three action rows share one grid. Separate horizontal layouts
+        # round a width that is not divisible by three independently, which
+        # made their vertical dividers disagree by one pixel. A single grid
+        # owns every column boundary and removes the gaps between the rows.
+        self.settings_action_panel = QWidget(self)
+        self.settings_action_panel.setObjectName("settingsActionPanel")
+        self.settings_action_panel.setAttribute(Qt.WA_StyledBackground, True)
+        self.settings_action_panel.setFixedHeight(action_button_height * 3 + 4)
+        action_grid = QGridLayout(self.settings_action_panel)
+        # The panel owns the complete outer frame. One-pixel layout gaps are
+        # the internal dividers, so no child can paint over a neighbour's or
+        # the panel's lower border after a language/theme rebuild.
+        action_grid.setContentsMargins(1, 1, 1, 1)
+        # With two 1px outer margins the fixed panel's inner width divides
+        # exactly into three columns. A layout gap consumed an extra two pixels
+        # and made the right column one pixel wider after every rebuild.
+        action_grid.setHorizontalSpacing(0)
+        action_grid.setVerticalSpacing(1)
+        for column in range(3):
+            action_grid.setColumnStretch(column, 1)
         
         # Левая кнопка - закругление слева (фиолетовая)
         self.clear_cache_btn = OpticallyCenteredPushButton(settings_text(lang, "clear_cache"))
+        self.clear_cache_btn.setObjectName("settingsClearCacheButton")
         self.clear_cache_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -6483,10 +7226,11 @@ class SettingsWindow(QWidget):
         self.clear_cache_btn.setFixedHeight(action_button_height)
         self.clear_cache_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.clear_cache_btn.clicked.connect(self.clear_all_cache)
-        btn_group_layout.addWidget(self.clear_cache_btn, 1)
+        action_grid.addWidget(self.clear_cache_btn, 0, 0)
         
         # Средняя кнопка - без закругления (красная - сброс)
         self.reset_btn = OpticallyCenteredPushButton(settings_text(lang, "reset"))
+        self.reset_btn.setObjectName("settingsResetButton")
         self.reset_btn.setStyleSheet("""
             QPushButton {
                 background-color: #D44444; 
@@ -6508,10 +7252,11 @@ class SettingsWindow(QWidget):
         self.reset_btn.setFixedHeight(action_button_height)
         self.reset_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.reset_btn.clicked.connect(self.reset_settings)
-        btn_group_layout.addWidget(self.reset_btn, 1)
+        action_grid.addWidget(self.reset_btn, 0, 1)
         
         # Правая кнопка - закругление справа (фиолетовая - обновление)
         self.update_btn = OpticallyCenteredPushButton(settings_text(lang, "update"))
+        self.update_btn.setObjectName("settingsUpdateButton")
         self.update_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7A5FA1; 
@@ -6534,17 +7279,12 @@ class SettingsWindow(QWidget):
         self.update_btn.setFixedHeight(action_button_height)
         self.update_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.update_btn.clicked.connect(self.check_for_updates)
-        btn_group_layout.addWidget(self.update_btn, 1)
-
-        self.main_layout.addLayout(btn_group_layout)
-        self.main_layout.addSpacing(0)
+        action_grid.addWidget(self.update_btn, 0, 2)
 
         # --- ГРУППА КНОПОК: OCR languages | Hotkeys ---
-        tools_row = QHBoxLayout()
-        tools_row.setSpacing(0)
-        tools_row.setContentsMargins(0, 0, 0, 0)
 
         self.ocr_languages_btn = OpticallyCenteredPushButton(settings_text(lang, "ocr_language_packs"))
+        self.ocr_languages_btn.setObjectName("settingsLanguagePackagesButton")
         self.ocr_languages_btn.clicked.connect(self.show_ocr_language_manager)
         self.ocr_languages_btn.setToolTip(tooltip_text(settings_text(lang, "manage_ocr_languages")))
         self.ocr_languages_btn.setStyleSheet("""
@@ -6564,10 +7304,11 @@ class SettingsWindow(QWidget):
         self.ocr_languages_btn.setFixedHeight(action_button_height)
         self.ocr_languages_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self._apply_language_package_task_status()
-        tools_row.addWidget(self.ocr_languages_btn, 1)
+        action_grid.addWidget(self.ocr_languages_btn, 1, 0)
 
         # --- ГРУППА КНОПОК (расширенные для полного текста) ---
         self.hotkeys_button = OpticallyCenteredPushButton(settings_text(lang, "hotkeys"))
+        self.hotkeys_button.setObjectName("settingsHotkeysButton")
         self.hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
         self.hotkeys_button.setStyleSheet("""
@@ -6587,6 +7328,7 @@ class SettingsWindow(QWidget):
         self.translation_history_btn = OpticallyCenteredPushButton(
             settings_text(lang, "translation_history_button")
         )
+        self.translation_history_btn.setObjectName("settingsTranslationHistoryButton")
         self.translation_history_btn.clicked.connect(self.show_history_view)
         self.translation_history_btn.setStyleSheet("""
             QPushButton {
@@ -6601,17 +7343,12 @@ class SettingsWindow(QWidget):
         """)
         self.translation_history_btn.setFixedHeight(action_button_height)
         self.translation_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        tools_row.addWidget(self.translation_history_btn, 1)
-
-        self.main_layout.addLayout(tools_row)
-        self.main_layout.addSpacing(0)
+        action_grid.addWidget(self.translation_history_btn, 1, 2)
 
         # --- Нижняя строка без вертикального разреза ---
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(0)
-        btn_row.setContentsMargins(0, 0, 0, 0)
 
         self.copy_history_btn = OpticallyCenteredPushButton(settings_text(lang, "copy_history_button"))
+        self.copy_history_btn.setObjectName("settingsCopyHistoryButton")
         self.copy_history_btn.clicked.connect(self.show_copy_history_view)
         # Copy history lives beside translation history in the upper tools row.
         self.copy_history_btn.setStyleSheet("""
@@ -6629,7 +7366,7 @@ class SettingsWindow(QWidget):
         self.copy_history_btn.setFixedHeight(action_button_height)
         self.copy_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
 
-        tools_row.insertWidget(1, self.copy_history_btn, 1)
+        action_grid.addWidget(self.copy_history_btn, 1, 1)
         self.hotkeys_button.setStyleSheet("""
             QPushButton {
                 padding: 0px 16px;
@@ -6643,19 +7380,466 @@ class SettingsWindow(QWidget):
             }
         """)
         self.hotkeys_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        btn_row.addWidget(self.hotkeys_button, 1)
-        self.main_layout.addLayout(btn_row)
-        self.main_layout.addSpacing(10)
+        action_grid.addWidget(self.hotkeys_button, 2, 0, 1, 3)
+        self._apply_action_panel_style()
         
-        # --- Версия программы ---
-        self.version_label = QLabel(f"V{APP_VERSION}")
-        self.version_label.setAlignment(Qt.AlignCenter)
-        self.version_label.setStyleSheet(
-            "color: #7A5FA1; font-size: 16px; font-weight: bold; "
-            "margin-bottom: 2px; margin-top: 2px;"
+        # --- Page 2: OCR behaviour and updates ---
+        # Keep this as one clean page.  The fixed 700x400 window does not have
+        # enough horizontal room for a second settings form beside it without
+        # truncating both columns.
+        self.settings_updates_page = QWidget(self)
+        self.settings_updates_page.setObjectName("settingsUpdatesPage")
+        self.settings_updates_page.setAttribute(Qt.WA_StyledBackground, True)
+        updates_layout = QVBoxLayout(self.settings_updates_page)
+        updates_layout.setContentsMargins(0, 0, 0, 0)
+        updates_layout.setSpacing(4)
+        updates_layout.setAlignment(Qt.AlignTop)
+        page_checkbox_height = fixed_height
+
+        # These controls belong together: they all change what happens while
+        # the user is selecting an OCR region. Move the existing widgets from
+        # page one instead of creating duplicate settings with divergent state.
+        for checkbox in (self.keep_visible_checkbox, self.freeze_screen_checkbox):
+            self.main_layout.removeWidget(checkbox)
+            checkbox.setParent(self.settings_updates_page)
+            checkbox.setFixedHeight(page_checkbox_height)
+            updates_layout.addWidget(checkbox, alignment=Qt.AlignLeft)
+
+        self.dim_screen_during_ocr_checkbox = QCheckBox(
+            settings_text(lang, "dim_screen_during_ocr"), self.settings_updates_page
         )
-        self.main_layout.addWidget(self.version_label)
+        self.dim_screen_during_ocr_checkbox.setChecked(
+            bool(self.parent.config.get("dim_screen_during_ocr", False))
+        )
+        self.dim_screen_during_ocr_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        self.dim_screen_during_ocr_checkbox.setFixedHeight(page_checkbox_height)
+        dim_tooltip = settings_text(lang, "ocr_dim_strength_tooltip")
+        self.dim_screen_during_ocr_checkbox.setToolTip(tooltip_text(dim_tooltip))
+
+        dim_row = QHBoxLayout()
+        dim_row.setContentsMargins(0, 0, 0, 0)
+        dim_row.setSpacing(8)
+        dim_row.addWidget(
+            self.dim_screen_during_ocr_checkbox,
+            alignment=Qt.AlignLeft | Qt.AlignVCenter,
+        )
+        dim_row.addStretch(1)
+        try:
+            dim_strength = int(self.parent.config.get("ocr_dim_strength", 60))
+        except (TypeError, ValueError):
+            dim_strength = 60
+        dim_strength = max(0, min(80, dim_strength))
+        self.ocr_dim_strength_value = QLabel(f"{dim_strength}%")
+        self.ocr_dim_strength_value.setObjectName("ocrDimStrengthValue")
+        self.ocr_dim_strength_value.setFixedWidth(42)
+        self.ocr_dim_strength_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.ocr_dim_strength_value.setToolTip(tooltip_text(dim_tooltip))
+        dim_row.addWidget(self.ocr_dim_strength_value)
+        self.ocr_dim_strength_slider = QSlider(Qt.Horizontal)
+        self.ocr_dim_strength_slider.setObjectName("ocrDimStrengthSlider")
+        self.ocr_dim_strength_slider.setRange(0, 80)
+        self.ocr_dim_strength_slider.setSingleStep(5)
+        self.ocr_dim_strength_slider.setPageStep(10)
+        self.ocr_dim_strength_slider.setValue(dim_strength)
+        self.ocr_dim_strength_slider.setFixedWidth(140)
+        self.ocr_dim_strength_slider.setToolTip(tooltip_text(dim_tooltip))
+        self.ocr_dim_strength_slider.setAccessibleName(dim_tooltip)
+        self.ocr_dim_strength_slider.valueChanged.connect(self._save_ocr_dim_strength)
+        dim_row.addWidget(self.ocr_dim_strength_slider, alignment=Qt.AlignVCenter)
+        updates_layout.addLayout(dim_row)
+        self.dim_screen_during_ocr_checkbox.toggled.connect(
+            self._set_ocr_dimming_enabled
+        )
+        self.ocr_dim_strength_slider.setEnabled(
+            self.dim_screen_during_ocr_checkbox.isChecked()
+        )
+        self.ocr_dim_strength_value.setEnabled(
+            self.dim_screen_during_ocr_checkbox.isChecked()
+        )
+
+        self.restore_clipboard_checkbox = QCheckBox(
+            settings_text(lang, "restore_clipboard_after_selection"),
+            self.settings_updates_page,
+        )
+        self.restore_clipboard_checkbox.setChecked(
+            bool(self.parent.config.get("restore_clipboard_after_selection", True))
+        )
+        self.restore_clipboard_checkbox.setToolTip(
+            tooltip_text(settings_text(lang, "restore_clipboard_tooltip"))
+        )
+        self.restore_clipboard_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        self.restore_clipboard_checkbox.setFixedHeight(page_checkbox_height)
+        self.restore_clipboard_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting(
+                "restore_clipboard_after_selection", bool(state)
+            )
+        )
+        updates_layout.addWidget(self.restore_clipboard_checkbox, alignment=Qt.AlignLeft)
+
+        self.copy_notification_checkbox = QCheckBox(
+            settings_text(lang, "copy_notification"), self.settings_updates_page
+        )
+        self.copy_notification_checkbox.setChecked(
+            bool(self.parent.config.get("notifications", False))
+        )
+        self.copy_notification_checkbox.setToolTip(
+            tooltip_text(settings_text(lang, "copy_notification_tooltip"))
+        )
+        self.copy_notification_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        self.copy_notification_checkbox.setFixedHeight(page_checkbox_height)
+        self.copy_notification_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("notifications", bool(state))
+        )
+        updates_layout.addWidget(
+            self.copy_notification_checkbox, alignment=Qt.AlignLeft
+        )
+
+        self.update_check_on_launch_checkbox = QCheckBox(
+            settings_text(lang, "update_check_on_launch")
+        )
+        self.update_check_on_launch_checkbox.setChecked(
+            bool(self.parent.config.get("update_check_on_launch", True))
+        )
+        self.update_check_on_launch_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("update_check_on_launch", bool(state))
+        )
+        self.update_check_on_launch_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        self.update_check_on_launch_checkbox.setFixedHeight(page_checkbox_height)
+        updates_layout.addWidget(
+            self.update_check_on_launch_checkbox,
+            alignment=Qt.AlignLeft | Qt.AlignVCenter,
+        )
+
+        transfer_row = QHBoxLayout()
+        transfer_row.setContentsMargins(0, 2, 0, 0)
+        transfer_row.setSpacing(6)
+
+        self.export_settings_btn = QPushButton(
+            settings_text(lang, "export_settings"), self.settings_updates_page
+        )
+        self.export_settings_btn.setObjectName("settingsTransferButton")
+        self.export_settings_btn.setToolTip(
+            tooltip_text(settings_text(lang, "export_settings_tooltip"))
+        )
+        self.export_settings_btn.clicked.connect(self.export_settings)
+
+        self.import_settings_btn = QPushButton(
+            settings_text(lang, "import_settings"), self.settings_updates_page
+        )
+        self.import_settings_btn.setObjectName("settingsTransferButton")
+        self.import_settings_btn.setToolTip(
+            tooltip_text(settings_text(lang, "import_settings_tooltip"))
+        )
+        self.import_settings_btn.clicked.connect(self.import_settings)
+
+        self.create_bug_report_btn = QPushButton(
+            settings_text(lang, "create_bug_report"), self.settings_updates_page
+        )
+        self.create_bug_report_btn.setObjectName("settingsBugReportButton")
+        self.create_bug_report_btn.setToolTip(
+            tooltip_text(settings_text(lang, "bug_report_tooltip"))
+        )
+        self.create_bug_report_btn.clicked.connect(
+            self._create_bug_report_from_settings
+        )
+        for button in (
+            self.export_settings_btn,
+            self.import_settings_btn,
+            self.create_bug_report_btn,
+        ):
+            button.setFixedHeight(page_checkbox_height)
+            button.setMinimumWidth(0)
+            # Ignore translated size hints: all three buttons own exactly one
+            # third of the fixed-width row in every interface language.
+            button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+            transfer_row.addWidget(button, 1)
+        updates_layout.addLayout(transfer_row)
+        updates_layout.addStretch()
+        self.settings_updates_page.hide()
+
+        # --- Page 3: dynamic translation ---
+        # Dynamic translation has one predictable workflow: replace text in
+        # one or more areas selected by the user.
+        self.settings_game_page = QWidget(self)
+        self.settings_game_page.setObjectName("settingsGamePage")
+        self.settings_game_page.setAttribute(Qt.WA_StyledBackground, True)
+        game_layout = QGridLayout(self.settings_game_page)
+        game_layout.setContentsMargins(8, 0, 8, 0)
+        game_layout.setHorizontalSpacing(12)
+        game_layout.setVerticalSpacing(3)
+        game_layout.setColumnStretch(0, 1)
+        game_layout.setColumnMinimumWidth(1, 310)
+        game_layout.setAlignment(Qt.AlignTop)
+
+        self.game_settings_heading = QLabel(settings_text(lang, "game_settings_heading"))
+        self.game_settings_heading.setObjectName("gameSettingsHeading")
+        self.game_settings_heading.setFixedHeight(28)
+        game_layout.addWidget(self.game_settings_heading, 0, 0, 1, 2)
+
+        def game_row(label_text):
+            label = QLabel(label_text, self.settings_game_page)
+            label.setObjectName("gameSettingsLabel")
+            label.setFixedHeight(32)
+            label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            return label
+
+        self.game_languages_label = game_row(
+            settings_text(lang, "game_languages")
+        )
+        self.game_language_controls = QWidget(self.settings_game_page)
+        self.game_language_controls.setObjectName("gameLanguageControls")
+        self.game_language_controls.setFixedSize(310, 32)
+        language_row = QHBoxLayout(self.game_language_controls)
+        language_row.setContentsMargins(0, 0, 0, 0)
+        language_row.setSpacing(6)
+        self.game_source_combo = DropDownCombo(self.settings_game_page)
+        self.game_target_combo = DropDownCombo(self.settings_game_page)
+        for combo in (self.game_source_combo, self.game_target_combo):
+            combo.setFixedSize(132, 32)
+            self._apply_engine_combo_style(combo)
+        self.game_swap_button = LanguageSwapButton(self.settings_game_page)
+        self.game_swap_button.setObjectName("gameLanguageSwap")
+        self.game_swap_button.setFixedSize(34, 32)
+        self.game_swap_button.setToolTip(tooltip_text(settings_text(lang, "game_swap_languages")))
+        language_row.addWidget(self.game_source_combo)
+        language_row.addWidget(self.game_swap_button)
+        language_row.addWidget(self.game_target_combo)
+        game_layout.addWidget(self.game_languages_label, 1, 0)
+        game_layout.addWidget(self.game_language_controls, 1, 1)
+
+        self.game_scan_interval_label = game_row(
+            settings_text(lang, "game_scan_interval")
+        )
+        try:
+            game_interval = int(self.parent.config.get("game_capture_interval_ms", 850))
+        except (TypeError, ValueError):
+            game_interval = 850
+        game_interval = max(450, min(10000, game_interval))
+        self.game_interval_controls = QWidget(self.settings_game_page)
+        self.game_interval_controls.setObjectName("gameIntervalControls")
+        self.game_interval_controls.setFixedSize(310, 32)
+        interval_row = QHBoxLayout(self.game_interval_controls)
+        interval_row.setContentsMargins(0, 0, 0, 0)
+        interval_row.setSpacing(8)
+        self.game_scan_interval_slider = QSlider(Qt.Horizontal, self.settings_game_page)
+        self.game_scan_interval_slider.setObjectName("gameScanIntervalSlider")
+        self.game_scan_interval_slider.setRange(450, 10000)
+        self.game_scan_interval_slider.setSingleStep(50)
+        self.game_scan_interval_slider.setPageStep(500)
+        self.game_scan_interval_slider.setValue(game_interval)
+        self.game_scan_interval_slider.setFixedWidth(240)
+        self.game_scan_interval_value = QLabel(f"{game_interval / 1000:.1f} s")
+        self.game_scan_interval_value.setObjectName("gameSettingValue")
+        self.game_scan_interval_value.setFixedWidth(62)
+        self.game_scan_interval_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        interval_row.addWidget(self.game_scan_interval_slider)
+        interval_row.addWidget(self.game_scan_interval_value)
+        game_layout.addWidget(self.game_scan_interval_label, 2, 0)
+        game_layout.addWidget(self.game_interval_controls, 2, 1)
+
+        self.game_overlay_opacity_label = game_row(
+            settings_text(lang, "game_overlay_opacity")
+        )
+        try:
+            game_opacity = int(self.parent.config.get("game_overlay_opacity", 88))
+        except (TypeError, ValueError):
+            game_opacity = 88
+        game_opacity = max(45, min(100, game_opacity))
+        self.game_opacity_controls = QWidget(self.settings_game_page)
+        self.game_opacity_controls.setObjectName("gameOpacityControls")
+        self.game_opacity_controls.setFixedSize(310, 32)
+        opacity_row = QHBoxLayout(self.game_opacity_controls)
+        opacity_row.setContentsMargins(0, 0, 0, 0)
+        opacity_row.setSpacing(8)
+        self.game_overlay_opacity_slider = QSlider(Qt.Horizontal, self.settings_game_page)
+        self.game_overlay_opacity_slider.setObjectName("gameOverlayOpacitySlider")
+        self.game_overlay_opacity_slider.setRange(45, 100)
+        self.game_overlay_opacity_slider.setSingleStep(1)
+        self.game_overlay_opacity_slider.setPageStep(5)
+        self.game_overlay_opacity_slider.setValue(game_opacity)
+        self.game_overlay_opacity_slider.setFixedWidth(240)
+        self.game_overlay_opacity_value = QLabel(f"{game_opacity}%")
+        self.game_overlay_opacity_value.setObjectName("gameSettingValue")
+        self.game_overlay_opacity_value.setFixedWidth(62)
+        self.game_overlay_opacity_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        opacity_row.addWidget(self.game_overlay_opacity_slider)
+        opacity_row.addWidget(self.game_overlay_opacity_value)
+        game_layout.addWidget(self.game_overlay_opacity_label, 3, 0)
+        game_layout.addWidget(self.game_opacity_controls, 3, 1)
+
+        self.game_pause_inactive_checkbox = QCheckBox(
+            settings_text(lang, "game_pause_inactive"), self.settings_game_page
+        )
+        self.game_pause_inactive_checkbox.setChecked(
+            bool(self.parent.config.get("game_pause_when_inactive", True))
+        )
+        self.game_pause_inactive_checkbox.setToolTip(
+            tooltip_text(settings_text(lang, "game_pause_inactive_tooltip"))
+        )
+        self.game_pause_inactive_checkbox.setFixedHeight(page_checkbox_height)
+        self.game_pause_inactive_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        game_layout.addWidget(
+            self.game_pause_inactive_checkbox, 4, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
+        )
+
+        self.game_show_original_checkbox = QCheckBox(
+            settings_text(lang, "game_show_original"), self.settings_game_page
+        )
+        self.game_show_original_checkbox.setChecked(
+            bool(self.parent.config.get("game_show_original_text", False))
+        )
+        self.game_show_original_checkbox.setFixedHeight(page_checkbox_height)
+        self.game_show_original_checkbox.setStyleSheet(
+            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+        )
+        game_layout.addWidget(
+            self.game_show_original_checkbox, 5, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
+        )
+
+        self.game_workflow_note = QLabel(
+            settings_text(lang, "game_workflow_note"), self.settings_game_page
+        )
+        self.game_workflow_note.setObjectName("gameWorkflowNote")
+        self.game_workflow_note.setWordWrap(True)
+        self.game_workflow_note.setFixedHeight(42)
+        game_layout.addWidget(self.game_workflow_note, 6, 0, 1, 2)
+        game_layout.setRowStretch(7, 1)
+
+        # Build the hidden page from the known application language catalog.
+        # Probing EasyOCR/Tesseract packages before Settings has even painted
+        # was the visible pause reported by users; exact availability is
+        # reconciled lazily when the Dynamic page is opened.
+        self._populate_game_language_controls(fast=True)
+        self.game_source_combo.currentIndexChanged.connect(self._game_source_changed)
+        self.game_target_combo.currentIndexChanged.connect(self._save_game_language_pair)
+        self.game_swap_button.clicked.connect(self._swap_game_languages)
+        self.game_scan_interval_slider.valueChanged.connect(
+            self._save_game_scan_interval
+        )
+        self.game_overlay_opacity_slider.valueChanged.connect(
+            self._save_game_overlay_opacity
+        )
+        self.game_pause_inactive_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("game_pause_when_inactive", bool(state))
+        )
+        self.game_show_original_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("game_show_original_text", bool(state))
+        )
+        self.settings_game_page.hide()
+
+        # --- Переключатель страниц ---
+        # The version moved to the persistent FAQ header.  Only the dots use
+        # this space now, so the connected buttons retain their lower border.
+        self.settings_page_footer = QWidget(self)
+        dots_layout = QHBoxLayout(self.settings_page_footer)
+        dots_layout.setContentsMargins(0, 0, 0, 0)
+        dots_layout.setSpacing(0)
+        dots_layout.setAlignment(Qt.AlignCenter)
+        self.settings_page_dots = []
+        dark = self.parent.current_theme != "Светлая"
+        for index, text_key in enumerate((
+            "settings_page_main",
+            "settings_page_updates",
+            "settings_page_game",
+        )):
+            dot = SettingsPageDotButton(self.settings_page_footer, dark=dark)
+            dot.setAccessibleName(settings_text(lang, text_key))
+            dot.setToolTip(tooltip_text(settings_text(lang, text_key)))
+            dot.clicked.connect(
+                lambda _checked=False, page_index=index: self._set_settings_page(page_index)
+            )
+            dots_layout.addWidget(dot)
+            self.settings_page_dots.append(dot)
+        self.settings_page_footer.setFixedHeight(16)
         self.main_layout.addStretch()
+        self._position_settings_updates_page()
+        self._set_settings_page(page_to_restore)
+        QtCore.QTimer.singleShot(0, self._position_settings_updates_page)
+
+    def _set_settings_page(self, index):
+        updates_page = getattr(self, "settings_updates_page", None)
+        game_page = getattr(self, "settings_game_page", None)
+        if updates_page is None or game_page is None:
+            return
+        index = max(0, min(int(index), 2))
+        self._settings_page_index = index
+        action_panel = getattr(self, "settings_action_panel", None)
+        if index:
+            if action_panel is not None:
+                action_panel.hide()
+            self._position_settings_updates_page()
+        else:
+            if action_panel is not None:
+                action_panel.show()
+                action_panel.raise_()
+        updates_page.setVisible(index == 1)
+        game_page.setVisible(index == 2)
+        if index == 1:
+            updates_page.raise_()
+        elif index == 2:
+            game_page.raise_()
+            # Paint the page before reconciling optional OCR packages.  The
+            # user sees an immediate page change even on machines where
+            # loading flag icons or probing EasyOCR is slow.
+            QtCore.QTimer.singleShot(80, self._verify_game_language_controls)
+        footer = getattr(self, "settings_page_footer", None)
+        if footer is not None:
+            footer.show()
+            footer.raise_()
+        for dot_index, dot in enumerate(getattr(self, "settings_page_dots", ())):
+            dot.setChecked(dot_index == index)
+        complete = getattr(self.parent, "_complete_guide_step", None)
+        if callable(complete):
+            complete({0: "settings_page_main", 1: "settings_page_updates", 2: "settings_page_game"}[index])
+
+    def _position_settings_updates_page(self):
+        overlay = getattr(self, "settings_updates_page", None)
+        game_page = getattr(self, "settings_game_page", None)
+        footer = getattr(self, "settings_page_footer", None)
+        if overlay is None or game_page is None or footer is None:
+            return
+        margins = self.main_layout.contentsMargins()
+        top = margins.top()
+        left = margins.left()
+        right = self.width() - margins.right()
+        footer_top = self.height() - margins.bottom() - footer.height()
+        footer.setGeometry(
+            left,
+            footer_top,
+            max(0, right - left),
+            footer.height(),
+        )
+        footer_layout = footer.layout()
+        if footer_layout is not None:
+            footer_layout.invalidate()
+            footer_layout.activate()
+        fixed_gap = 6
+        action_panel = getattr(self, "settings_action_panel", None)
+        if action_panel is not None:
+            action_top = footer_top - fixed_gap - action_panel.height()
+            action_panel.setGeometry(
+                left,
+                action_top,
+                max(0, right - left),
+                action_panel.height(),
+            )
+        bottom = max(top, footer_top - fixed_gap)
+        overlay.setGeometry(left, top, max(0, right - left), max(0, bottom - top))
+        game_page.setGeometry(left, top, max(0, right - left), max(0, bottom - top))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_settings_updates_page()
 
     def set_language_package_task_status(self, text="", percent=None, kind="running"):
         """Keep a background package job visible after its dialog is hidden.
@@ -6768,7 +7952,25 @@ class SettingsWindow(QWidget):
         combo.setStyleSheet(self._engine_combo_style())
         if isinstance(combo, DropDownCombo):
             dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-            combo.set_popup_background("#20212a" if dark else "#ffffff")
+            combo.set_popup_background("#20212a" if dark else "#f1edf4")
+
+    def _apply_game_language_combo_style(self, combo):
+        """Keep the two-letter language code visible in the compact pair."""
+        if combo is None:
+            return
+        dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
+        combo.setStyleSheet(
+            modern_combo_style(dark, font_size=13)
+            + """
+                QComboBox {
+                    margin: 2px 0px;
+                    padding: 3px 19px 3px 5px;
+                }
+                QComboBox::drop-down { width: 18px; }
+            """
+        )
+        if isinstance(combo, DropDownCombo):
+            combo.set_popup_background("#20212a" if dark else "#f1edf4")
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
@@ -6792,10 +7994,10 @@ class SettingsWindow(QWidget):
                 "scroll": "#6f5a8c",
             }
         return {
-            "surface": "#f6f3fa",
-            "card": "#ffffff",
-            "field": "#f1edf6",
-            "field_alt": "#ebe2f4",
+            "surface": "#ece7f0",
+            "card": "#f3eff5",
+            "field": "#e5dfe9",
+            "field_alt": "#ddd3e5",
             "text": "#241d2d",
             "muted": "#756b80",
             "border": "#d5cae2",
@@ -7056,12 +8258,12 @@ class SettingsWindow(QWidget):
         # can give the card only 219 px. It consequently placed rows 34–35 px
         # apart and their 36 px rounded frames overlapped. Keep a deliberate,
         # visible 4 px gutter and size the card to the exact non-overlapping
-        # requirement: 6 * 30 + 5 * 4 + 18 = 218 content pixels, plus the
-        # card's two one-pixel border edges.
-        hotkey_grid.setVerticalSpacing(4)
+        # requirement. Seven 27 px rows plus six 3 px gaps and the card
+        # margins need 225 px; this still fits without adding a scrollbar.
+        hotkey_grid.setVerticalSpacing(3)
         hotkey_grid.setColumnStretch(0, 1)
         hotkey_grid.setColumnMinimumWidth(1, 230)
-        hotkey_card.setFixedHeight(220)
+        hotkey_card.setFixedHeight(227)
         self.hotkey_card = hotkey_card
 
         self.copy_hotkey_input = ClearableKeySequenceEdit()
@@ -7091,6 +8293,9 @@ class SettingsWindow(QWidget):
         self.toggle_window_hotkey_input = ClearableKeySequenceEdit()
         saved_toggle_hotkey = self.parent.config.get("toggle_window_hotkey", "")
         self.toggle_window_hotkey_input.setKeySequence(QKeySequence(saved_toggle_hotkey))
+        self.game_translate_hotkey_input = ClearableKeySequenceEdit()
+        saved_game_hotkey = self.parent.config.get("game_translate_hotkey", "")
+        self.game_translate_hotkey_input.setKeySequence(QKeySequence(saved_game_hotkey))
 
         hotkey_rows = (
             (settings_text(lang, "copy_hotkey_label"), self.copy_hotkey_input),
@@ -7098,6 +8303,7 @@ class SettingsWindow(QWidget):
             (settings_text(lang, "fullscreen_translate_label"), self.fullscreen_translate_hotkey_input),
             (settings_text(lang, "selection_translate_label"), self.translate_selection_hotkey_input),
             (settings_text(lang, "replace_selection_translate_label"), self.translate_replace_selection_hotkey_input),
+            (settings_text(lang, "game_translate_label"), self.game_translate_hotkey_input),
             (settings_text(lang, "toggle_window_hotkey_label"), self.toggle_window_hotkey_input),
         )
         self.hotkey_labels = []
@@ -7105,9 +8311,9 @@ class SettingsWindow(QWidget):
             label = QLabel(label_text.rstrip(":"))
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            label.setFixedHeight(30)
+            label.setFixedHeight(27)
             key_input.setObjectName("secondaryHotkeyInput")
-            key_input.setFixedHeight(30)
+            key_input.setFixedHeight(27)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             hotkey_grid.addWidget(label, row, 0)
             hotkey_grid.addWidget(key_input, row, 1)
@@ -7124,6 +8330,7 @@ class SettingsWindow(QWidget):
             self.save_translate_replace_selection_hotkey
         )
         self.toggle_window_hotkey_input.keySequenceChanged.connect(self.save_toggle_window_hotkey)
+        self.game_translate_hotkey_input.keySequenceChanged.connect(self.save_game_translate_hotkey)
 
         remove_label = QLabel(settings_text(lang, "remove_hotkey"))
         remove_label.setObjectName("secondaryHint")
@@ -7144,6 +8351,35 @@ class SettingsWindow(QWidget):
         self._refresh_secondary_view_theme()
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
+
+    def focus_hotkey_setting(self, config_key):
+        """Open the hotkey page and focus the field named by its config key."""
+        if not getattr(self, "hotkeys_mode", False):
+            self.show_hotkeys_screen()
+        field_names = {
+            "copy_hotkey": "copy_hotkey_input",
+            "translate_hotkey": "translate_hotkey_input",
+            "fullscreen_translate_hotkey": "fullscreen_translate_hotkey_input",
+            "translate_selection_hotkey": "translate_selection_hotkey_input",
+            "translate_replace_selection_hotkey": "translate_replace_selection_hotkey_input",
+            "game_translate_hotkey": "game_translate_hotkey_input",
+            "toggle_window_hotkey": "toggle_window_hotkey_input",
+        }
+        field = getattr(self, field_names.get(str(config_key), ""), None)
+        if field is None:
+            return False
+
+        def activate_field():
+            try:
+                field.setFocus(Qt.OtherFocusReason)
+                editor = field.findChild(QLineEdit)
+                if editor is not None:
+                    editor.selectAll()
+            except RuntimeError:
+                pass
+
+        QtCore.QTimer.singleShot(0, activate_field)
+        return True
 
     def save_copy_hotkey(self):
         hotkey_str = self.copy_hotkey_input.keySequence().toString()
@@ -7259,6 +8495,30 @@ class SettingsWindow(QWidget):
                 hotkey_id=5,
             )
             self.parent.toggle_window_hotkey_thread.start()
+
+    def save_game_translate_hotkey(self):
+        hotkey_str = self.game_translate_hotkey_input.keySequence().toString()
+        self.parent.config["game_translate_hotkey"] = hotkey_str
+        self.parent.save_config()
+        if hasattr(self.parent, "refresh_interface_language_ui"):
+            self.parent.refresh_interface_language_ui()
+        if platform_support.IS_LINUX:
+            return
+        thread = getattr(self.parent, "game_translate_hotkey_thread", None)
+        if thread is not None:
+            try:
+                thread.stop()
+                thread.join(timeout=0.5)
+            except Exception as exc:
+                print(f"Error stopping dynamic translation hotkey thread: {exc}")
+            self.parent.game_translate_hotkey_thread = None
+        if hotkey_str:
+            self.parent.game_translate_hotkey_thread = self.parent.HotkeyListenerThread(
+                hotkey_str,
+                self.parent.launch_game_translate,
+                hotkey_id=7,
+            )
+            self.parent.game_translate_hotkey_thread.start()
 
     def back_from_hotkeys(self):
         self.init_ui()
@@ -9215,6 +10475,70 @@ finally {
             app.quit()
         os._exit(0)
 
+    def _apply_action_panel_style(self):
+        """Paint the connected action grid as one complete framed control."""
+        panel = getattr(self, "settings_action_panel", None)
+        if panel is None:
+            return
+        dark = self.parent.current_theme != "Светлая"
+        separator = "#6b587d" if dark else "#a99ab7"
+        surface = "#15151a" if dark else "#e4dee8"
+        hover = "#242129" if dark else "#d8d0df"
+        text = "#ffffff" if dark else "#2b2531"
+        panel.setStyleSheet(
+            "QWidget#settingsActionPanel {"
+            f" background:{separator}; border:1px solid {separator};"
+            " border-radius:9px; }"
+        )
+
+        top_specs = (
+            (getattr(self, "clear_cache_btn", None), "#7A5FA1", "#8B70B2", "8px", "0px"),
+            (getattr(self, "reset_btn", None), "#D44444", "#E55555", "0px", "0px"),
+            (getattr(self, "update_btn", None), "#7A5FA1", "#8B70B2", "0px", "8px"),
+        )
+        for column, (button, background, active, left_radius, right_radius) in enumerate(top_specs):
+            if button is None:
+                continue
+            divider = f"border-left:1px solid {separator};" if column else ""
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background:{background}; color:#ffffff; border:none;
+                    {divider}
+                    border-top-left-radius:{left_radius};
+                    border-top-right-radius:{right_radius};
+                    border-bottom-left-radius:0px; border-bottom-right-radius:0px;
+                    padding:0 8px; font-family:'Segoe UI';
+                    font-size: 16px; font-weight: 700;
+                }}
+                QPushButton:hover {{ background:{active}; }}
+            """)
+
+        middle_buttons = (
+            getattr(self, "ocr_languages_btn", None),
+            getattr(self, "copy_history_btn", None),
+            getattr(self, "translation_history_btn", None),
+        )
+        for column, button in enumerate(middle_buttons):
+            if button is not None:
+                divider = f"border-left:1px solid {separator};" if column else ""
+                button.setStyleSheet(f"""
+                    QPushButton {{ background:{surface}; color:{text}; border:none;
+                        {divider} border-radius:0; padding:0 6px;
+                        font-family:'Segoe UI'; font-size: 16px; font-weight: 700; }}
+                    QPushButton:hover {{ background:{hover}; }}
+                    QPushButton[packageTaskDone="true"] {{ color:#398f53; }}
+                """)
+        hotkeys = getattr(self, "hotkeys_button", None)
+        if hotkeys is not None:
+            hotkeys.setStyleSheet(f"""
+                QPushButton {{ background:{surface}; color:{text}; border:none;
+                    border-top-left-radius:0; border-top-right-radius:0;
+                    border-bottom-left-radius:8px; border-bottom-right-radius:8px;
+                    padding:0 12px; font-family:'Segoe UI';
+                    font-size: 16px; font-weight: 700; }}
+                QPushButton:hover {{ background:{hover}; }}
+            """)
+
     def apply_theme(self):
         THEMES_LOCAL = {
             "Темная": {
@@ -9222,11 +10546,17 @@ finally {
                 "text_color": "#ffffff",
             },
             "Светлая": {
-                "background": "#ffffff",
-                "text_color": "#000000",
+                "background": "#f0edf3",
+                "text_color": "#241f2a",
             }
         }
         theme = THEMES_LOCAL.get(self.parent.current_theme) or next(iter(THEMES_LOCAL.values()))
+        self._ui_theme = self.parent.current_theme
+        dark = self.parent.current_theme != "Светлая"
+        slider_track = "#3a3344" if dark else "#d4cadc"
+        slider_disabled = "#29262d" if dark else "#e3dde7"
+        disabled_text = "#756B80" if dark else "#7c7087"
+        report_hover = "#211b29" if dark else "#ded6e5"
         style = f"""
             QWidget {{
                 background-color: {theme['background']};
@@ -9249,7 +10579,7 @@ finally {
                 height: 20px;
             }}
             QCheckBox:disabled {{
-                color: rgba(244, 246, 251, 110);
+                color: {disabled_text};
             }}
             QPushButton {{
                 background-color: {theme['background']};
@@ -9261,13 +10591,129 @@ finally {
             QPushButton#saveReturnButton {{
                 border: 2px solid #C5B3E9;
             }}
+            QSlider#ocrDimStrengthSlider::groove:horizontal {{
+                height: 5px;
+                background: {slider_track};
+                border-radius: 2px;
+            }}
+            QSlider#ocrDimStrengthSlider::sub-page:horizontal {{
+                background: #9B78C8;
+                border-radius: 2px;
+            }}
+            QSlider#ocrDimStrengthSlider::handle:horizontal {{
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                background: #C5B3E9;
+                border: 1px solid #7A5FA1;
+                border-radius: 8px;
+            }}
+            QSlider#ocrDimStrengthSlider::groove:horizontal:disabled,
+            QSlider#ocrDimStrengthSlider::sub-page:horizontal:disabled {{
+                background: {slider_disabled};
+            }}
+            QSlider#ocrDimStrengthSlider::handle:horizontal:disabled {{
+                background: #756B80;
+                border-color: #5f5668;
+            }}
+            QLabel#ocrDimStrengthValue {{
+                color: {theme['text_color']};
+                font-size: 14px;
+                font-weight: 700;
+            }}
+            QLabel#ocrDimStrengthValue:disabled {{
+                color: {disabled_text};
+            }}
+            QLabel#gameSettingsHeading {{
+                color: #A97BDD;
+                font-size: 16px;
+                font-weight: 800;
+            }}
+            QLabel#gameSettingsLabel {{
+                color: {theme['text_color']};
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QLabel#gameSettingValue {{
+                color: {theme['text_color']};
+                font-size: 14px;
+                font-weight: 700;
+            }}
+            QLabel#gameWorkflowNote {{
+                color: {disabled_text};
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QToolButton#gameLanguageSwap {{
+                color: #B78BE5;
+                background: transparent;
+                border: 1px solid #6C587E;
+                border-radius: 9px;
+                font-size: 17px;
+                font-weight: 800;
+            }}
+            QToolButton#gameLanguageSwap:hover {{
+                background: {report_hover};
+                border-color: #A97BDD;
+            }}
+            QToolButton#gameLanguageSwap:disabled {{
+                color: {disabled_text};
+                border-color: {slider_disabled};
+            }}
+            QSlider#gameScanIntervalSlider::groove:horizontal,
+            QSlider#gameOverlayOpacitySlider::groove:horizontal {{
+                height: 5px;
+                background: {slider_track};
+                border-radius: 2px;
+            }}
+            QSlider#gameScanIntervalSlider::sub-page:horizontal,
+            QSlider#gameOverlayOpacitySlider::sub-page:horizontal {{
+                background: #9B78C8;
+                border-radius: 2px;
+            }}
+            QSlider#gameScanIntervalSlider::handle:horizontal,
+            QSlider#gameOverlayOpacitySlider::handle:horizontal {{
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                background: #C5B3E9;
+                border: 1px solid #7A5FA1;
+                border-radius: 8px;
+            }}
+            QPushButton#settingsBugReportButton,
+            QPushButton#settingsTransferButton {{
+                background: transparent;
+                color: {theme['text_color']};
+                border: 1px solid #C5B3E9;
+                border-radius: 8px;
+                padding: 0px 7px;
+                text-align: center;
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            QPushButton#settingsBugReportButton:hover,
+            QPushButton#settingsTransferButton:hover {{
+                background: {report_hover};
+                border-color: #9B78C8;
+            }}
         """
         self.setStyleSheet(style)
+        self._apply_action_panel_style()
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
+        for dot in getattr(self, "settings_page_dots", ()):
+            try:
+                dot.set_dark(self.parent.current_theme != "Светлая")
+            except RuntimeError:
+                pass
         # The theme sets the font this box is measured with, so its width can
         # only be worked out here.
         self._fit_copy_translated_checkbox()
-        for combo_name in ("ocr_engine_combo", "translator_combo"):
+        for combo_name in (
+            "ocr_engine_combo",
+            "translator_combo",
+            "game_source_combo",
+            "game_target_combo",
+        ):
             combo = getattr(self, combo_name, None)
             if combo is not None:
                 try:
@@ -9306,6 +10752,11 @@ finally {
 
     def update_language(self):
         self.init_ui()
+        # init_ui() creates a completely new widget tree. Reapply both the
+        # palette and AccentControlStyle to those new controls immediately;
+        # otherwise reparented OCR check boxes fall back to Windows' native
+        # white squares and font-dependent size hints move the footer rows.
+        self.apply_theme()
         # The package manager builds all of its text once, from the language it
         # was created with, and it is kept alive between openings — so without
         # this it stays in the old language until the app restarts.
@@ -11599,25 +13050,7 @@ finally {
             def restore_button():
                 try:
                     self.clear_cache_btn.setText(original_text)
-                    # Восстанавливаем оригинальный фиолетовый стиль
-                    self.clear_cache_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #7A5FA1; 
-                            color: #fff; 
-                            border: none;
-                            border-top-left-radius: 8px;
-                            border-bottom-left-radius: 0px;
-                            border-top-right-radius: 0px;
-                            border-bottom-right-radius: 0px;
-                            padding-top: 0px;
-                            padding-bottom: 6px;
-                            padding-left: 12px;
-                            padding-right: 12px;
-                            font-size: 16px;
-                            font-weight: bold;
-                        }
-                        QPushButton:hover { background-color: #8B70B2; }
-                    """)
+                    self._apply_action_panel_style()
                     self.clear_cache_btn.setEnabled(True)
                 except Exception:
                     pass
@@ -11626,7 +13059,7 @@ finally {
 
 
     def reset_settings(self):
-        """Reset all program settings to default values (white theme, English, etc.)."""
+        """Reset behaviour settings while preserving the interface language."""
         lang = self.parent.current_interface_language
         title = settings_text(lang, "reset")
         question = settings_text(lang, "reset_question")
@@ -11644,7 +13077,10 @@ finally {
         # Default configuration
         default_config = {
             "theme": "Темная",
-            "interface_language": "en",
+            # Language is identity/navigation state, not a behaviour setting.
+            # Resetting it while the title-bar flag kept the previous icon made
+            # the application visibly contradict itself until the next launch.
+            "interface_language": lang,
             "ocr_language": "ru",
             "autostart": False,
             "autostart_backend": (
@@ -11666,12 +13102,24 @@ finally {
             "notifications": False,
             "history": False,
             "start_minimized": False,
+            "update_check_on_launch": True,
+            # Do not replay already acknowledged release notes after resetting
+            # unrelated behaviour settings.
+            "last_seen_startup_news_version": self.parent.config.get(
+                "last_seen_startup_news_version", ""
+            ),
+            "last_seen_startup_news_id": self.parent.config.get(
+                "last_seen_startup_news_id", ""
+            ),
             "show_update_info": False,
             "first_run_guide_completed": False,
             "first_run_guide_pending": False,
             "ocr_engine": platform_support.default_ocr_engine(),
             "copy_translated_text": False,
+            "restore_clipboard_after_selection": True,
             "freeze_screen_on_ocr": False,
+            "dim_screen_during_ocr": False,
+            "ocr_dim_strength": 60,
             "debug_ocr_artifacts": False,
             "copy_history": False,
             "translator_engine": "Google",
@@ -11682,13 +13130,22 @@ finally {
             "ocr_translate_target_language": "ru",
             "fullscreen_translate_from": "en",
             "fullscreen_translate_to": "ru",
+            "game_translate_source_language": "en",
+            "game_translate_target_language": "ru",
+            "game_capture_mode": "region",
+            "game_capture_interval_ms": 850,
+            "game_text_similarity": 0.90,
+            "game_pause_when_inactive": True,
+            "game_show_original_text": False,
+            "game_overlay_opacity": 88,
             "no_screen_dimming": False,
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
             "translate_selection_hotkey": "Ctrl+Alt+Q",
-            "toggle_window_hotkey": "Ctrl+Shift+Space",
-            "hotkey_defaults_revision": 2,
-            "result_window_hidden_modes": [],
             "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
+            "game_translate_hotkey": "Ctrl+Alt+G",
+            "toggle_window_hotkey": "Ctrl+Shift+Space",
+            "hotkey_defaults_revision": 5,
+            "result_window_hidden_modes": [],
         }
         # Save to disk
         config_path = get_data_file("config.json")

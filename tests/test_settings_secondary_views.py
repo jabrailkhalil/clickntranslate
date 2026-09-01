@@ -33,8 +33,9 @@ class _SettingsParent(QWidget):
             "fullscreen_translate_hotkey": "Ctrl+Alt+F",
             "translate_selection_hotkey": "Ctrl+Alt+Q",
             "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
+            "game_translate_hotkey": "Ctrl+Alt+G",
             "toggle_window_hotkey": "Ctrl+Shift+Space",
-            "hotkey_defaults_revision": 2,
+            "hotkey_defaults_revision": 5,
             "copy_history": True,
             "history": True,
         }
@@ -110,7 +111,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         point = child.mapTo(widget, QPoint(0, 0))
         return point.x(), point.y(), child.width(), child.height()
 
-    def test_hotkeys_are_six_aligned_rows_inside_one_card(self):
+    def test_hotkeys_are_seven_aligned_rows_inside_one_card(self):
         self.settings.show_hotkeys_screen()
         self.app.processEvents()
 
@@ -120,27 +121,28 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.fullscreen_translate_hotkey_input,
             self.settings.translate_selection_hotkey_input,
             self.settings.translate_replace_selection_hotkey_input,
+            self.settings.game_translate_hotkey_input,
             self.settings.toggle_window_hotkey_input,
         )
         input_rects = [self._rect_in(self.settings, field) for field in inputs]
         label_rects = [self._rect_in(self.settings, label) for label in self.settings.hotkey_labels]
 
-        self.assertEqual(len(label_rects), 6)
+        self.assertEqual(len(label_rects), 7)
         self.assertEqual({rect[0] for rect in input_rects}, {input_rects[0][0]})
         self.assertEqual({rect[2] for rect in input_rects}, {input_rects[0][2]})
-        self.assertEqual({rect[3] for rect in input_rects}, {30})
+        self.assertEqual({rect[3] for rect in input_rects}, {27})
         for label_rect, input_rect in zip(label_rects, input_rects):
             self.assertEqual(label_rect[1] + label_rect[3] // 2, input_rect[1] + input_rect[3] // 2)
         for upper, lower in zip(input_rects, input_rects[1:]):
             upper_bottom = upper[1] + upper[3]
             self.assertGreaterEqual(
                 lower[1] - upper_bottom,
-                4,
+                3,
                 "rounded hotkey fields must not touch or overlap",
             )
         self.assertEqual(
             [field.keySequence().toString() for field in inputs],
-            ["Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q", "Ctrl+Shift+Q", "Ctrl+Shift+Space"],
+            ["Ctrl+Alt+C", "Ctrl+Alt+T", "Ctrl+Alt+F", "Ctrl+Alt+Q", "Ctrl+Shift+Q", "Ctrl+Alt+G", "Ctrl+Shift+Space"],
         )
         self.assertTrue(all(field.objectName() == "secondaryHotkeyInput" for field in inputs))
         self.assertEqual(self.settings.hotkey_back_button.objectName(), "secondaryBackButton")
@@ -150,7 +152,18 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.secondary_view_shell.height(),
         )
 
-    def test_reset_defaults_keep_all_six_hotkeys(self):
+    def test_main_badge_navigation_focuses_the_requested_hotkey_field(self):
+        self.assertTrue(self.settings.focus_hotkey_setting("game_translate_hotkey"))
+        self.app.processEvents()
+
+        self.assertTrue(self.settings.hotkeys_mode)
+        editor = self.settings.game_translate_hotkey_input.findChild(sw.QLineEdit)
+        self.assertIsNotNone(editor)
+        self.assertTrue(
+            self.settings.game_translate_hotkey_input.hasFocus() or editor.hasFocus()
+        )
+
+    def test_reset_defaults_keep_all_seven_hotkeys(self):
         class FakeMessageBox:
             Question = 1
             Warning = 2
@@ -191,15 +204,32 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             def clickedButton(self):
                 return self._clicked
 
+        # Resetting behaviour must not silently change the interface language.
+        # The old implementation changed the text to English while leaving the
+        # title-bar flag on the previously selected language.
+        self.parent.current_interface_language = "de"
+        self.parent.config["interface_language"] = "de"
+        self.parent.config["last_seen_startup_news_version"] = "1.7.0"
+        self.parent.config["last_seen_startup_news_id"] = "community-1000-gaming"
         self.parent.apply_theme = lambda: None
         with mock.patch.object(sw, "QMessageBox", FakeMessageBox):
             self.settings.reset_settings()
 
+        self.assertEqual(self.parent.config["interface_language"], "de")
+        self.assertEqual(self.parent.current_interface_language, "de")
+        self.assertEqual(
+            self.parent.config["last_seen_startup_news_version"], "1.7.0"
+        )
+        self.assertEqual(
+            self.parent.config["last_seen_startup_news_id"],
+            "community-1000-gaming",
+        )
         self.assertEqual(self.parent.config["copy_hotkey"], "Ctrl+Alt+C")
         self.assertEqual(self.parent.config["translate_hotkey"], "Ctrl+Alt+T")
         self.assertEqual(self.parent.config["fullscreen_translate_hotkey"], "Ctrl+Alt+F")
         self.assertEqual(self.parent.config["translate_selection_hotkey"], "Ctrl+Alt+Q")
         self.assertEqual(self.parent.config["translate_replace_selection_hotkey"], "Ctrl+Shift+Q")
+        self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Alt+G")
         self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
 
     def test_replace_selection_hotkey_restarts_its_own_listener(self):
@@ -227,6 +257,31 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             "Ctrl+Shift+W",
             self.parent.launch_translate_replace_selection,
             hotkey_id=6,
+        )
+        new_thread.start.assert_called_once_with()
+
+    def test_game_hotkey_restarts_the_game_listener(self):
+        self.settings.show_hotkeys_screen()
+        old_thread = mock.Mock()
+        new_thread = mock.Mock()
+        self.parent.game_translate_hotkey_thread = old_thread
+        self.parent.launch_game_translate = mock.Mock()
+        self.parent.HotkeyListenerThread = mock.Mock(return_value=new_thread)
+        field = self.settings.game_translate_hotkey_input
+        field.blockSignals(True)
+        field.setKeySequence(sw.QKeySequence("Ctrl+Shift+G"))
+        field.blockSignals(False)
+
+        with mock.patch.object(sw.platform_support, "IS_LINUX", False):
+            self.settings.save_game_translate_hotkey()
+
+        self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Shift+G")
+        old_thread.stop.assert_called_once_with()
+        old_thread.join.assert_called_once_with(timeout=0.5)
+        self.parent.HotkeyListenerThread.assert_called_once_with(
+            "Ctrl+Shift+G",
+            self.parent.launch_game_translate,
+            hotkey_id=7,
         )
         new_thread.start.assert_called_once_with()
 
@@ -301,7 +356,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.app.processEvents()
 
         style = self.settings.secondary_view_shell.styleSheet()
-        self.assertIn("#f6f3fa", style)
+        self.assertIn("#ece7f0", style)
         self.assertEqual(self.settings.history_count_label.text(), "2")
         rendered = "\n".join(
             label.text()

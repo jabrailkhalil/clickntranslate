@@ -569,13 +569,13 @@ class StyledMessageBox(QtWidgets.QMessageBox):
 
     def _apply_style(self):
         dark = getattr(self, "_dark", True)
-        background = "#101114" if dark else "#f8f8fb"
-        panel = "#17181d" if dark else "#ffffff"
+        background = "#101114" if dark else "#efecf2"
+        panel = "#17181d" if dark else "#f5f2f7"
         text = "#f5f5f7" if dark else "#17171a"
         muted = "#b8b8c2" if dark else "#55545e"
         border = "#33313c" if dark else "#d7d3df"
-        button = "#211f28" if dark else "#ffffff"
-        button_hover = "#322d3d" if dark else "#eee9f5"
+        button = "#211f28" if dark else "#e8e3ec"
+        button_hover = "#322d3d" if dark else "#dcd4e3"
         qss = f"""
             QWidget#styledMessageBox {{
                 background: {background};
@@ -1123,13 +1123,13 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
 
     def _apply_style(self):
         dark = self._dark
-        background = "#101114" if dark else "#f8f8fb"
-        panel = "#17181d" if dark else "#ffffff"
+        background = "#101114" if dark else "#efecf2"
+        panel = "#17181d" if dark else "#f5f2f7"
         text = "#f5f5f7" if dark else "#17171a"
         muted = "#b8b8c2" if dark else "#55545e"
         border = "#33313c" if dark else "#d7d3df"
-        button = "#211f28" if dark else "#ffffff"
-        button_hover = "#322d3d" if dark else "#eee9f5"
+        button = "#211f28" if dark else "#e8e3ec"
+        button_hover = "#322d3d" if dark else "#dcd4e3"
         qss = f"""
             QDialog#styledMessageBox {{ background: {background}; color: {text}; border: 1px solid {border}; }}
             QFrame#styledMessageTitleBar {{ background: #151515; border: none; border-bottom: 1px solid #29292d; }}

@@ -1438,6 +1438,32 @@ def _google_translate_chunk(text, source_code, target_code):
     }
     session = _get_http_session()
     r = session.get(url, params=params, timeout=10)
+
+    # Google occasionally rate-limits the public ``gtx`` endpoint by IP even
+    # for a single short request.  Keep the selected provider as Google and
+    # retry through the endpoint used by Google's dictionary extension.  This
+    # is deliberately limited to 429: other failures remain visible instead of
+    # silently changing the behaviour selected by the user.
+    if r.status_code == 429:
+        fallback_url = 'https://clients5.google.com/translate_a/t'
+        fallback_params = {
+            'client': 'dict-chrome-ex',
+            'sl': source_api,
+            'tl': target_api,
+            'q': text,
+        }
+        fallback = session.get(fallback_url, params=fallback_params, timeout=10)
+        fallback.raise_for_status()
+        fallback_data = fallback.json()
+        if (
+            isinstance(fallback_data, list)
+            and fallback_data
+            and isinstance(fallback_data[0], str)
+            and fallback_data[0]
+        ):
+            return fallback_data[0]
+        raise ValueError("Google fallback returned an unexpected response")
+
     r.raise_for_status()
     data = r.json()
     return ''.join(seg[0] for seg in data[0] if seg and seg[0])

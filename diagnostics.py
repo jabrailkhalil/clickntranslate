@@ -8,10 +8,13 @@ the generated ZIP before attaching it to GitHub or Telegram.
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import os
 import platform
 import re
+import shutil
+import struct
 import sys
 import tempfile
 import time
@@ -25,13 +28,43 @@ SAFE_CONFIG_KEYS = (
     "theme",
     "ocr_engine",
     "translator_engine",
-    "start_in_shadow_mode",
-    "show_window_after_selection",
-    "show_window_after_ocr",
-    "show_window_after_translation",
+    "autostart",
+    "autostart_backend",
+    "start_minimized",
+    "update_check_on_launch",
+    "allow_online_provider_fallback",
+    "copy_history",
+    "history",
     "copy_translated_text",
-    "keep_window_visible_during_ocr",
+    "restore_clipboard_after_selection",
+    "notifications",
+    "keep_visible_on_ocr",
     "freeze_screen_on_ocr",
+    "dim_screen_during_ocr",
+    "ocr_dim_strength",
+    "game_capture_interval_ms",
+    "game_text_similarity",
+    "game_pause_when_inactive",
+    "game_show_original_text",
+    "game_overlay_opacity",
+    "game_translate_source_language",
+    "game_translate_target_language",
+    "ocr_translate_source_language",
+    "ocr_translate_target_language",
+    "fullscreen_translate_from",
+    "fullscreen_translate_to",
+    "selection_translate_source_language",
+    "selection_translate_target_language",
+    "replace_selection_source_language",
+    "replace_selection_target_language",
+    "result_window_hidden_modes",
+    "copy_hotkey",
+    "translate_hotkey",
+    "fullscreen_translate_hotkey",
+    "translate_selection_hotkey",
+    "translate_replace_selection_hotkey",
+    "game_translate_hotkey",
+    "toggle_window_hotkey",
 )
 
 
@@ -117,8 +150,93 @@ def _tail(path: Path, limit: int = MAX_LOG_BYTES) -> bytes:
 
 
 def _default_output_dir() -> Path:
-    desktop = Path.home() / "Desktop"
-    return desktop if desktop.is_dir() else Path(tempfile.gettempdir())
+    # OneDrive often redirects Desktop on Windows. A report placed in Temp is
+    # easy to lose immediately after the Explorer window closes, so prefer all
+    # common user-visible locations before falling back to Documents.
+    candidates = [
+        Path(value) / "Desktop"
+        for value in (
+            os.environ.get("OneDrive", ""),
+            os.environ.get("OneDriveConsumer", ""),
+            os.environ.get("USERPROFILE", ""),
+            str(Path.home()),
+        )
+        if value
+    ]
+    root = next((candidate for candidate in candidates if candidate.is_dir()), None)
+    if root is None:
+        root = Path.home() / "Documents"
+    return root / "ClicknTranslate Bug Reports"
+
+
+def _package_versions() -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for distribution in (
+        "PyQt5",
+        "requests",
+        "Pillow",
+        "pytesseract",
+        "easyocr",
+        "rapidocr-onnxruntime",
+        "argostranslate",
+        "psutil",
+    ):
+        try:
+            versions[distribution] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            versions[distribution] = "not installed"
+        except Exception as error:
+            versions[distribution] = f"unknown: {_redact(error)}"
+    return versions
+
+
+def _environment_report(root: Path, app_version: str) -> dict[str, object]:
+    try:
+        disk = shutil.disk_usage(root)
+        disk_info = {
+            "total_bytes": disk.total,
+            "free_bytes": disk.free,
+        }
+    except OSError as error:
+        disk_info = {"error": _redact(error)}
+    return {
+        "generated_local": time.strftime("%Y-%m-%d %H:%M:%S %z"),
+        "app_version": app_version,
+        "platform": _redact(platform.platform()),
+        "windows_version": _redact(platform.win32_ver()),
+        "machine": platform.machine(),
+        "process_bits": struct.calcsize("P") * 8,
+        "python": platform.python_version(),
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "executable": _redact(sys.executable),
+        "root": _redact(root),
+        "display_environment": {
+            key: _redact(os.environ.get(key, ""))
+            for key in ("LANG", "QT_QPA_PLATFORM", "XDG_SESSION_TYPE", "WAYLAND_DISPLAY", "DISPLAY")
+            if os.environ.get(key)
+        },
+        "disk": disk_info,
+        "packages": _package_versions(),
+    }
+
+
+def _send_instructions(report_name: str) -> str:
+    return f"""Click'n'Translate bug report
+
+SEND / ОТПРАВКА
+1. Attach {report_name} to one of these places:
+   GitHub: https://github.com/jabrailkhalil/clickntranslate/issues
+   Telegram: https://t.me/jabrail_digital
+2. In the message describe what you did, what you expected, and what happened.
+3. Add a screenshot or video separately if it helps. Check it for private text first.
+
+1. Прикрепите {report_name} в GitHub Issues или Telegram по ссылкам выше.
+2. Опишите: что делали, что ожидали и что произошло.
+3. Скриншот или видео прикрепляйте отдельно, предварительно проверив личный текст.
+
+The ZIP excludes clipboard contents, translation/copy history, document text,
+OCR images, recognized text and API keys.
+"""
 
 
 def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_version: str = "unknown") -> Path:
@@ -129,7 +247,15 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
     destination = Path(output_dir) if output_dir is not None else _default_output_dir()
     destination.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    report_path = destination / f"ClicknTranslate-bug-report-{stamp}.zip"
+    report_dir = destination / f"ClicknTranslate-bug-report-{stamp}"
+    counter = 2
+    while report_dir.exists():
+        report_dir = destination / f"ClicknTranslate-bug-report-{stamp}-{counter}"
+        counter += 1
+    report_dir.mkdir(parents=True)
+    report_path = report_dir / f"ClicknTranslate-bug-report-{stamp}.zip"
+    instructions = _send_instructions(report_path.name)
+    (report_dir / "HOW_TO_SEND.txt").write_text(instructions, encoding="utf-8")
 
     launcher = root / "ClicknTranslate.exe"
     inner = root / "app" / "ClicknTranslateApp.exe"
@@ -153,7 +279,15 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
         "",
         "safe_config:",
         json.dumps(_safe_config(data_root), ensure_ascii=False, indent=2, sort_keys=True),
+        "",
+        "When reporting the issue, describe:",
+        "- steps that caused it",
+        "- expected result",
+        "- actual result",
+        "- whether it happens every time.",
     ]
+    environment = _environment_report(root, app_version)
+    safe_config = _safe_config(data_root)
 
     runtime_log = data_root / "logs" / "ocr_debug.log"
     if runtime_log.is_file():
@@ -175,6 +309,15 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
     ]
     with zipfile.ZipFile(report_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("report.txt", "\n".join(lines) + "\n")
+        archive.writestr("HOW_TO_SEND.txt", instructions)
+        archive.writestr(
+            "environment.json",
+            json.dumps(environment, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        )
+        archive.writestr(
+            "safe-config.json",
+            json.dumps(safe_config, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        )
         used_names: set[str] = set()
         for candidate in log_candidates:
             if not candidate.is_file():

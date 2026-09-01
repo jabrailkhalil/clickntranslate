@@ -179,6 +179,35 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             harness._replace_selected_text_translation_pair(), ("zh", "en")
         )
 
+    def test_ocr_mode_does_not_blank_both_pickers_before_its_first_model(self):
+        harness = _LanguageHarness({
+            "translator_engine": "lingva",
+            "ocr_engine": "EasyOCR",
+            "hotkey_language_editor_mode": "ocr",
+            "ocr_translate_source_language": "ru",
+            "ocr_translate_target_language": "en",
+        })
+        harness.hotkey_mode_combo = main.DropDownCombo()
+        harness.hotkey_mode_combo.addItem("OCR", "ocr")
+        harness.hotkey_source_combo = main.DropDownCombo()
+        harness.hotkey_target_combo = main.DropDownCombo()
+        harness.hotkey_language_swap = main.LanguageSwapButton()
+        try:
+            # EasyOCR downloads/selects a language model on first use, so a
+            # new installation legitimately reports no installed models yet.
+            with mock.patch("ocr.installed_ocr_language_codes", return_value=[]):
+                self.assertTrue(harness._refresh_hotkey_language_controls())
+
+            self.assertGreater(harness.hotkey_source_combo.count(), 0)
+            self.assertGreater(harness.hotkey_target_combo.count(), 0)
+            self.assertEqual(harness.hotkey_source_combo.currentData(), "ru")
+            self.assertEqual(harness.hotkey_target_combo.currentData(), "en")
+        finally:
+            harness.hotkey_mode_combo.close()
+            harness.hotkey_source_combo.close()
+            harness.hotkey_target_combo.close()
+            harness.hotkey_language_swap.close()
+
     def test_hotkey_language_hint_exists_in_every_interface_language(self):
         for language_code in main.HOTKEY_LANGUAGE_TEXT:
             text = main.hotkey_language_text(language_code, "hint").format(
@@ -316,7 +345,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         main.DarkThemeApp._apply_main_combo_theme(harness, False)
 
         self.assertIsNone(harness.source_lang)
-        self.assertIn("background-color: #f6f3fa", live.styleSheet())
+        self.assertIn("background-color: #e9e4ed", live.styleSheet())
         live.close()
         self.app.processEvents()
 
@@ -333,8 +362,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         single_shot.assert_called_once_with(0, harness._show_guide_step)
 
     def test_guide_says_the_shortcuts_carry_their_own_pair(self):
-        """It used to say the main screen's pair drove Ctrl+Alt+Q and
-        Ctrl+Shift+Q. Each of the four shortcut modes keeps its own pair, set
+        """Each of the four shortcut modes keeps its own pair, set
         in the shortcut row, and the line under Translate spells out which is
         which. Telling people otherwise is what makes the window look broken
         when the top row and the shortcut row disagree.
@@ -374,11 +402,10 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 item for _title, items in main.HELP_CONTENT[language_code] for item in items
             )
             self.assertIn(clue, guide)
-            # The guide quotes only the two shortcuts whose difference matters
-            # here. Other combinations are user-configurable and their current
-            # values are already visible in the main-window chips.
-            self.assertIn("Ctrl+Alt+Q", guide)
-            self.assertIn("Ctrl+Shift+Q", guide)
+            # Optional actions no longer claim global combinations by default;
+            # their guide cards point users to the configurable shortcut.
+            self.assertNotIn("Ctrl+Alt+Q", guide)
+            self.assertNotIn("Ctrl+Shift+Q", guide)
             self.assertIn(clue, faq)
 
     def test_guide_explains_result_window_picker_in_every_language(self):
@@ -397,6 +424,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             "shortcut_copy",
             "shortcut_ocr",
             "shortcut_fullscreen",
+            "shortcut_game",
             "shortcut_selection",
             "shortcut_replace",
             "shortcut_toggle",

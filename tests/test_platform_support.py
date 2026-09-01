@@ -114,7 +114,7 @@ class ShortcutCommandTest(unittest.TestCase):
     def test_every_windows_hotkey_action_has_a_shortcut_action(self):
         self.assertEqual(
             set(platform_support.SHORTCUT_ACTIONS),
-            {"ocr", "copy", "translate", "fullscreen", "selection", "toggle"},
+            {"ocr", "copy", "translate", "fullscreen", "selection", "game", "toggle"},
         )
 
     def test_command_uses_the_appimage_path_when_running_from_one(self):

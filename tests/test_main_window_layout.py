@@ -111,7 +111,7 @@ class HotkeyBarTextTest(unittest.TestCase):
 
     def test_every_shortcut_has_localized_hover_help(self):
         for language in LANGUAGES:
-            for action in ("copy", "ocr", "fullscreen", "selection", "replace", "toggle"):
+            for action in ("copy", "ocr", "fullscreen", "game", "selection", "replace", "toggle"):
                 self.assertTrue(main.main_hotkey_tooltip(language, action), (language, action))
 
 
@@ -138,6 +138,11 @@ class MainWindowGeometryTest(unittest.TestCase):
         )
         update_check.start()
         self.addCleanup(update_check.stop)
+        startup_news = mock.patch.object(
+            main.DarkThemeApp, "_maybe_show_startup_news"
+        )
+        startup_news.start()
+        self.addCleanup(startup_news.stop)
         guide = mock.patch.object(main.DarkThemeApp, "_maybe_start_first_run_guide")
         guide.start()
         self.addCleanup(guide.stop)
@@ -234,8 +239,8 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertIs(reopened, dialog)
         self.assertEqual(reopened.theme_name, "Светлая")
         style = reopened.styleSheet().lower()
-        self.assertIn("background-color: #f3f5f8", style)
-        self.assertIn("background-color: #ffffff", style)
+        self.assertIn("background-color: #e7e2ea", style)
+        self.assertIn("background-color: #f1edf4", style)
         self.assertNotIn("background-color: #0e1116", style)
 
     def test_the_two_language_pickers_sit_on_one_line(self):
@@ -275,6 +280,54 @@ class MainWindowGeometryTest(unittest.TestCase):
             self.window.hotkey_language_bar.y(), self.window.translate_button.y()
         )
 
+    def test_settings_widget_is_reused_instead_of_rebuilt(self):
+        self.window.show_settings()
+        self.app.processEvents()
+        first = self.window.settings_window
+
+        self.window.show_main_screen()
+        QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        self.app.processEvents()
+        self.window.show_settings()
+        self.app.processEvents()
+
+        self.assertIs(self.window.settings_window, first)
+
+    def test_return_from_settings_does_not_repolish_the_hidden_settings_tree(self):
+        self.window.show_settings()
+        self.app.processEvents()
+
+        with mock.patch.object(self.window, "apply_theme", wraps=self.window.apply_theme) as apply:
+            self.window.show_main_screen()
+
+        apply.assert_not_called()
+
+    def test_home_icon_contrasts_with_both_title_bar_themes(self):
+        def first_opaque_rgb():
+            image = self.window.settings_button.icon().pixmap(64, 64).toImage().convertToFormat(
+                QImage.Format_ARGB32
+            )
+            values = []
+            for y in range(image.height()):
+                for x in range(image.width()):
+                    color = image.pixelColor(x, y)
+                    if color.alpha() >= 220:
+                        values.append((color.red() + color.green() + color.blue()) / 3)
+            self.assertTrue(values)
+            return sum(values) / len(values)
+
+        original_theme = self.window.current_theme
+        try:
+            self.window.current_theme = "Темная"
+            self.window.set_settings_button_to_home()
+            self.assertGreater(first_opaque_rgb(), 200)
+            self.window.current_theme = "Светлая"
+            self.window.set_settings_button_to_home()
+            self.assertLess(first_opaque_rgb(), 55)
+        finally:
+            self.window.current_theme = original_theme
+            self.window.set_settings_button_to_settings()
+
     def test_a_divider_separates_the_task_from_the_reference(self):
         dividers = [
             child for child in self.window.findChildren(QFrame)
@@ -306,25 +359,115 @@ class MainWindowGeometryTest(unittest.TestCase):
                 index,
             )
 
-    def test_the_shortcut_legend_keeps_six_chips_on_three_rows(self):
-        """The old three-column minimum width exceeded the fixed main window.
-
-        Two columns keep the full labels and key sequences readable while
-        leaving the engine divider a real gutter instead of an overlap.
-        """
+    def test_the_shortcut_legend_keeps_seven_chips_and_gaming_with_the_rest(self):
+        """Seven readable shortcuts share one three-row reference block."""
         chips = self.window.findChildren(QWidget, "mainHotkeyPair")
-        # Six hotkeys are registered, so six are listed. The legend showed five
-        # and left translate-and-replace invisible.
-        self.assertEqual(len(chips), 6)
+        # All seven registered actions are listed, including Gaming.
+        self.assertEqual(len(chips), 7)
         self.assertTrue(all(chip.toolTip() for chip in chips))
         self.assertIn(self.window.replace_hotkey_reference, chips)
         self.assertEqual(
             set(self.window.main_hotkey_references),
-            {"copy", "ocr", "fullscreen", "selection", "replace", "toggle"},
+            {"copy", "ocr", "fullscreen", "game", "selection", "replace", "toggle"},
         )
         self.assertEqual(set(self.window.main_hotkey_references.values()), set(chips))
         rows = {chip.mapTo(self.window, chip.rect().topLeft()).y() for chip in chips}
-        self.assertEqual(len(rows), 3, "the legend should be three rows")
+        self.assertEqual(len(rows), 3)
+        refs = self.window.main_hotkey_references
+        absolute_y = lambda key: refs[key].mapTo(
+            self.window, refs[key].rect().topLeft()
+        ).y()
+        self.assertEqual(absolute_y("copy"), absolute_y("ocr"))
+        self.assertEqual(absolute_y("fullscreen"), absolute_y("selection"))
+        self.assertEqual(absolute_y("toggle"), absolute_y("replace"))
+        game = self.window.main_hotkey_references["game"]
+        self.assertEqual(absolute_y("game"), absolute_y("copy"))
+        self.assertLess(absolute_y("copy"), absolute_y("selection"))
+        self.assertLessEqual(
+            absolute_y("game") + game.height(), self.window.start_button.y()
+        )
+
+    def test_gaming_chip_keeps_the_same_readable_style_in_every_language(self):
+        for language in LANGUAGES:
+            pair = self.window._create_main_hotkey_pair(
+                main.ui_text(language, "hotkey_gaming"),
+                main.DEFAULT_GAME_HOTKEY,
+            )
+            try:
+                self.assertEqual(pair.height(), 22, language)
+                self.assertIn("font-size: 14px", pair.caption_label.styleSheet())
+                self.assertIn("font-size: 13px", pair.value_label.styleSheet())
+            finally:
+                pair.deleteLater()
+
+    def test_every_language_keeps_both_hotkey_rows_inside_the_window(self):
+        original_language = self.window.current_interface_language
+        try:
+            # Rebuilding the real screen emits language-combo persistence
+            # signals. Suppress disk writes: this geometry sweep must never
+            # change the developer's own interface language.
+            with mock.patch.object(self.window, "save_config"):
+                for language in LANGUAGES:
+                    self.window.current_interface_language = language
+                    self.window.show_main_screen()
+                    for _ in range(3):
+                        self.app.processEvents()
+
+                    refs = self.window.main_hotkey_references
+                    absolute = {
+                        key: widget.mapTo(self.window, widget.rect().topLeft())
+                        for key, widget in refs.items()
+                    }
+                    for left_key, right_key in (
+                        ("copy", "ocr"),
+                        ("fullscreen", "selection"),
+                        ("toggle", "replace"),
+                    ):
+                        self.assertEqual(
+                            absolute[left_key].y(), absolute[right_key].y(), language
+                        )
+                        self.assertLess(
+                            absolute[left_key].x(), absolute[right_key].x(), language
+                        )
+                    self.assertEqual(absolute["game"].y(), absolute["copy"].y(), language)
+                    self.assertTrue(all(widget.x() >= 0 for widget in refs.values()), language)
+                    self.assertTrue(
+                        all(widget.x() < self.window.central_widget.width() for widget in refs.values()),
+                        language,
+                    )
+                    self.assertLessEqual(
+                        absolute["game"].y() + refs["game"].height(),
+                        self.window.start_button.y(),
+                        language,
+                    )
+        finally:
+            with mock.patch.object(self.window, "save_config"):
+                self.window.current_interface_language = original_language
+                self.window.show_main_screen()
+                self.app.processEvents()
+
+    def test_clicking_hotkey_badge_offers_its_exact_setting(self):
+        game = self.window.main_hotkey_references["game"]
+        with mock.patch.object(self.window, "_offer_hotkey_settings") as offer:
+            QTest.mouseClick(game.value_label, Qt.LeftButton)
+
+        offer.assert_called_once_with(
+            "game_translate_hotkey",
+            main.ui_text(self.window.current_interface_language, "hotkey_gaming"),
+        )
+
+    def test_declining_hotkey_prompt_does_not_open_settings(self):
+        with (
+            mock.patch.object(self.window, "_confirm_open_hotkey_settings", return_value=False),
+            mock.patch.object(self.window, "_open_hotkey_setting") as open_setting,
+        ):
+            accepted = self.window._offer_hotkey_settings("copy_hotkey", "Copy")
+
+        self.assertFalse(accepted)
+        open_setting.assert_not_called()
+
+    def test_gaming_is_not_a_title_bar_button(self):
+        self.assertFalse(hasattr(self.window, "game_button"))
 
     def test_next_button_cannot_skip_multiple_cards_during_transition(self):
         self.window._guide_active = True
@@ -374,6 +517,8 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.window.show_settings()
         self.app.processEvents()
         for action in actions[settings_index + 1:-1]:
+            self.window._prepare_guide_settings_page(action)
+            self.app.processEvents()
             target = self.window._guide_target_widget(action)
             self.assertIsNotNone(target, action)
             self.assertTrue(target.isVisible(), action)
@@ -406,6 +551,11 @@ class DirectionSummaryTest(unittest.TestCase):
         )
         update_check.start()
         self.addCleanup(update_check.stop)
+        startup_news = mock.patch.object(
+            main.DarkThemeApp, "_maybe_show_startup_news"
+        )
+        startup_news.start()
+        self.addCleanup(startup_news.stop)
         guide = mock.patch.object(main.DarkThemeApp, "_maybe_start_first_run_guide")
         guide.start()
         self.addCleanup(guide.stop)
@@ -446,8 +596,9 @@ class DirectionSummaryTest(unittest.TestCase):
 
         text = self.window._direction_summary_text()
 
-        self.assertIn("Russian", text)
-        self.assertIn("English", text)
+        language = self.window.current_interface_language
+        self.assertIn(main.language_display_name("ru", language), text)
+        self.assertIn(main.language_display_name("en", language), text)
         # Four modes agreeing must not print four identical pairs.
         self.assertEqual(text.count("→"), 2)
         self.assertNotIn("(", text)
@@ -618,15 +769,7 @@ class TranslateOnEnterTest(unittest.TestCase):
 
 
 class EngineDividerSpacingTest(unittest.TestCase):
-    """The divider gets the same room on both sides, in every language.
-
-    Two separate defects produced "the separator is right next to the words":
-    the gap before it was 10 against 17 after it, and fixed column widths
-    measured in English pushed the French and Spanish shortcuts past the line
-    entirely. Pixels are measured on a real display by .tmp/check_separator.py —
-    the offscreen platform draws no text, so its metrics are fiction. What is
-    checkable here is the rule that produced them.
-    """
+    """The fixed-width shortcut legend keeps its proven quiet divider."""
 
     @staticmethod
     def _source():
@@ -634,18 +777,19 @@ class EngineDividerSpacingTest(unittest.TestCase):
 
         return inspect.getsource(main.DarkThemeApp.show_main_screen)
 
-    def test_the_gap_before_the_divider_matches_the_gap_after_it(self):
+    def test_divider_sits_after_every_shortcut(self):
         import re
 
         source = self._source()
-        before = re.search(r"hotkey_grid\.setHorizontalSpacing\((\d+)\)", source)
-        after = re.search(
-            r"engine_status_layout\.setContentsMargins\((\d+),", source
-        )
-        self.assertIsNotNone(before)
-        self.assertIsNotNone(after)
-        self.assertEqual(int(before.group(1)), int(after.group(1)))
-        self.assertGreaterEqual(int(before.group(1)), 12)
+        spacing = re.search(r"hotkey_grid\.setHorizontalSpacing\((\d+)\)", source)
+        self.assertIsNotNone(spacing)
+        self.assertEqual(int(spacing.group(1)), 12)
+        self.assertIn("engine_status_panel", source)
+        self.assertIn("hotkey_grid.addWidget(game_reference, 0, 2", source)
+        self.assertIn("hotkey_grid.addWidget(engine_status_panel, 0, 3", source)
+        self.assertNotIn("engine_status_layout.addWidget(game_reference)", source)
+        self.assertIn("self._align_main_hotkey_pair_group", source)
+        self.assertNotIn("compact=True", source)
 
     def test_no_column_is_pinned_to_a_width_measured_in_one_language(self):
         self.assertNotIn("setColumnMinimumWidth", self._source())
@@ -685,8 +829,7 @@ class WindowEdgeTest(unittest.TestCase):
 class HotkeyLegendCoverageTest(unittest.TestCase):
     """Every hotkey the app registers has to be visible on the main screen.
 
-    Six are registered; the legend listed five, so translate-and-replace
-    (Ctrl+Shift+Q) existed and worked with nothing on screen saying so.
+    All seven shortcuts, including Gaming, live in the main-screen legend.
     """
 
     #: Every hotkey setting the app reads when it registers them.
@@ -696,11 +839,12 @@ class HotkeyLegendCoverageTest(unittest.TestCase):
         "fullscreen_translate_hotkey",
         "translate_selection_hotkey",
         "translate_replace_selection_hotkey",
+        "game_translate_hotkey",
         "toggle_window_hotkey",
     )
 
     def test_the_registration_list_is_what_this_test_thinks_it_is(self):
-        """If a seventh hotkey is added, this fails before the legend does."""
+        """If another hotkey is added, this fails before its visible entry does."""
         import inspect
         import re
 
@@ -714,8 +858,11 @@ class HotkeyLegendCoverageTest(unittest.TestCase):
         import inspect
         import re
 
-        source = inspect.getsource(main.DarkThemeApp.show_main_screen)
-        shown = set(re.findall(r'self\.config\.get\("([a-z_]+_hotkey)"', source))
+        source = "\n".join((
+            inspect.getsource(main.DarkThemeApp.show_main_screen),
+            inspect.getsource(main.DarkThemeApp.init_ui),
+        ))
+        shown = set(re.findall(r"self\.config\.get\(['\"]([a-z_]+_hotkey)['\"]", source))
 
         missing = sorted(set(self.REGISTERED) - shown)
         self.assertEqual(missing, [], f"registered but not shown: {missing}")
@@ -727,6 +874,7 @@ class HotkeyLegendCoverageTest(unittest.TestCase):
             "hotkey_fullscreen",
             "hotkey_selection",
             "hotkey_replace",
+            "game_translate",
             "hotkey_toggle",
         )
         self.assertEqual(len(captions), len(self.REGISTERED))
@@ -734,8 +882,8 @@ class HotkeyLegendCoverageTest(unittest.TestCase):
             for key in captions:
                 caption = main.ui_text(language, key)
                 self.assertTrue(caption and caption != key, (language, key))
-                # Chips sit three to a row: a sentence does not fit.
-                self.assertLessEqual(len(caption), 16, (language, key, caption))
+                # Chips are short; the dedicated game title can be a little wider.
+                self.assertLessEqual(len(caption), 22, (language, key, caption))
 
 
 if __name__ == "__main__":

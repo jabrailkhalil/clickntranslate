@@ -4,7 +4,7 @@ Click'n'Translate is a user-invoked Windows screen OCR and translation utility.
 
 - The application runs as a full-trust desktop process because it registers global hotkeys, captures a screen region selected by the user, reads/writes the clipboard on request, and starts optional OCR/translation worker processes.
 - `CreateProcess`/`ShellExecute` references reported by the optional WACK blocked-executable heuristic are expected: the app launches its packaged `ArgosWorker.exe` and `OcrWorker.exe`, optional locally installed OCR runtimes, Hy-MT's local runner, and user-requested browser links. It does not install or silently run command shells.
-- Default hotkeys are Ctrl+Alt+C (OCR to clipboard), Ctrl+Alt+T (OCR and translate), Ctrl+Alt+F (full-screen translation), and Ctrl+Alt+Q (selected-area translation). All hotkeys can be changed in Settings.
+- Default hotkeys are Ctrl+Alt+C (OCR to clipboard), Ctrl+Alt+T (OCR and translate), Ctrl+Alt+F (full-screen translation), and Ctrl+Alt+G (Gaming). Selection, replace, and show/hide shortcuts are intentionally unassigned until the user chooses them in Settings.
 - Online translation engines send only the text the user asks to translate to the selected provider. Offline Argos and Hy-MT engines process translations locally after packages are downloaded.
 - Windows OCR, Tesseract, RapidOCR, and EasyOCR process images locally. Optional engine and language packages are downloaded only after a user action.
 - The application has no account system, advertising, analytics, or telemetry.

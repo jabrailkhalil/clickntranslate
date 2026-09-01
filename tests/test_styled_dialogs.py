@@ -40,7 +40,7 @@ def test_external_message_style_cannot_remove_shared_chrome():
     box.setStyleSheet("QMessageBox { background-color: #ffffff; }")
 
     assert box._dark is False
-    assert "#f8f8fb" in box.styleSheet()
+    assert "#efecf2" in box.styleSheet()
     assert "QFrame#styledMessageTitleBar" in box.styleSheet()
 
 
@@ -118,6 +118,46 @@ def test_document_window_uses_the_shared_frameless_chrome():
     # sentence in the title bar was clipped and repeated both values.
     assert not hasattr(dialog, "metadata_label")
     assert not hasattr(dialog, "header_subtitle")
+
+    dialog.close()
+    owner.close()
+
+
+def test_document_pane_borders_survive_theme_and_language_switches():
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = "en"
+    owner.current_theme = "Темная"
+
+    dialog = main.DocumentTranslationDialog(owner)
+    dialog.show()
+    app.processEvents()
+
+    for theme, language, border in (
+        ("Темная", "ru", "#2d3746"),
+        ("Светлая", "de", "#b9afc4"),
+        ("Темная", "fr", "#2d3746"),
+    ):
+        dialog.refresh_theme(theme)
+        dialog.refresh_language(language)
+        app.processEvents()
+
+        style = dialog.styleSheet().lower()
+        editor_rule = style.split("qtextedit#doceditor {", 1)[1].split("}", 1)[0]
+        focus_rule = style.split("qtextedit#doceditor:focus {", 1)[1].split("}", 1)[0]
+        for rule in (editor_rule, focus_rule):
+            assert f"border-left: 1px solid {border}" in rule
+            assert f"border-right: 1px solid {border}" in rule
+            assert f"border-bottom: 1px solid {border}" in rule
+            assert "border: none" not in rule
+
+        pane_rule = style.split("qframe#docpane {", 1)[1].split("}", 1)[0]
+        header_rule = style.split("qframe#docpaneheader {", 1)[1].split("}", 1)[0]
+        assert "border: none" in pane_rule
+        assert f"border: 1px solid {border}" in header_rule
+
+        margins = dialog.window_frame.layout().contentsMargins()
+        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (1, 1, 1, 1)
 
     dialog.close()
     owner.close()
@@ -264,7 +304,14 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
         observed["external_links"] = help_text.openExternalLinks()
         observed["telegram"] = dialog.findChild(QtWidgets.QPushButton, "helpTelegramButton") is not None
         observed["bug_report"] = dialog.findChild(QtWidgets.QPushButton, "helpBugReportButton") is not None
+        guide = dialog.findChild(QtWidgets.QPushButton, "helpGuideButton")
+        observed["guide_fits"] = (
+            guide is not None
+            and guide.width() >= guide.sizeHint().width()
+        )
         observed["frame"] = dialog.findChild(QtWidgets.QFrame, "helpDialogFrame") is not None
+        version = dialog.findChild(QtWidgets.QLabel, "helpVersionLabel")
+        observed["version"] = version.text() if version is not None else ""
         dialog.accept()
 
     QtCore.QTimer.singleShot(0, inspect_and_close)
@@ -276,7 +323,9 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
         "external_links": True,
         "telegram": True,
         "bug_report": True,
+        "guide_fits": True,
         "frame": True,
+        "version": f"Click'n'Translate · V{main.APP_VERSION}",
     }
     assert "background-color: transparent" in main._HELP_STYLE
     owner.close()

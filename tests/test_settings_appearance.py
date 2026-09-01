@@ -137,6 +137,53 @@ class CheckBoxIndicatorTest(unittest.TestCase):
             settings.close()
             parent.close()
 
+    def test_language_rebuild_repaints_every_ocr_checkbox_in_the_accent(self):
+        """Changing UI language rebuilds the settings widget tree.
+
+        The rebuilt/reparented OCR boxes must not fall back to the native
+        Windows white indicator seen in the regression screenshot.
+        """
+        parent = _Parent("Темная")
+        with mock.patch.object(
+            SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"
+        ):
+            settings = SettingsWindow(parent)
+        try:
+            settings.setFixedSize(672, 334)
+            settings.show()
+            self.app.processEvents()
+            for language in ("ru", "en", "de", "fr", "es", "zh"):
+                parent.current_interface_language = language
+                settings.update_language()
+                settings._set_settings_page(1)
+                self.app.processEvents()
+
+                for box in (
+                    settings.keep_visible_checkbox,
+                    settings.freeze_screen_checkbox,
+                    settings.dim_screen_during_ocr_checkbox,
+                    settings.restore_clipboard_checkbox,
+                    settings.copy_notification_checkbox,
+                    settings.update_check_on_launch_checkbox,
+                ):
+                    box.setChecked(True)
+                    self.app.processEvents()
+                    option = QStyleOptionButton()
+                    box.initStyleOption(option)
+                    indicator = box.style().subElementRect(
+                        QStyle.SE_CheckBoxIndicator, option, box
+                    )
+                    painted = _colors(box.grab().toImage().copy(indicator))
+                    self.assertIn(
+                        styled_dialogs.ACCENT.lower(),
+                        painted,
+                        (language, box.text(), painted),
+                    )
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
 
 class EngineComboTest(unittest.TestCase):
     @classmethod
@@ -280,7 +327,7 @@ class DropDownFrameTest(unittest.TestCase):
         parent, settings = self._settings("Светлая")
         try:
             style = settings._engine_combo_style()
-            self.assertIn("background-color: #f6f3fa", style)
+            self.assertIn("background-color: #e9e4ed", style)
             self.assertIn("border-color: #8063a8", style)
             self.assertIn("border-radius: 7px", style)
         finally:
@@ -462,7 +509,7 @@ class PopupFrameTest(unittest.TestCase):
         return parent, settings
 
     def test_every_picker_knows_its_popup_colour(self):
-        for theme, expected in (("Темная", "#20212a"), ("Светлая", "#ffffff")):
+        for theme, expected in (("Темная", "#20212a"), ("Светлая", "#f1edf4")):
             parent, settings = self._settings(theme)
             try:
                 for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
@@ -500,7 +547,7 @@ class PopupFrameTest(unittest.TestCase):
             settings.apply_theme()
             self.app.processEvents()
 
-            self.assertEqual(combo._popup_background, "#ffffff")
+            self.assertEqual(combo._popup_background, "#f1edf4")
         finally:
             settings.close()
             parent.close()

@@ -31,11 +31,12 @@ class DesktopEntryTest(unittest.TestCase):
     def test_actions_cover_the_capture_commands(self):
         text = linux_desktop.desktop_entry_text("/opt/clickntranslate")
 
-        self.assertIn("Actions=Toggle;Capture;Copy;Translate;Fullscreen;", text)
+        self.assertIn("Actions=Toggle;Capture;Copy;Translate;Fullscreen;Game;", text)
         self.assertIn("Exec=/opt/clickntranslate --toggle", text)
         self.assertIn("[Desktop Action Capture]", text)
         self.assertIn("Exec=/opt/clickntranslate --ocr", text)
         self.assertIn("Exec=/opt/clickntranslate --fullscreen", text)
+        self.assertIn("Exec=/opt/clickntranslate --game", text)
 
     def test_every_action_maps_to_a_real_shortcut_action(self):
         for _name, _label, action in linux_desktop.DESKTOP_ACTIONS:

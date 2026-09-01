@@ -4,7 +4,7 @@
 
 ### La meilleure application de traduction d'écran et d'OCR pour Windows.
 
-[**Télécharger pour Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-x64-installer.exe) · [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-portable-x64.zip) · [Dernière version](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[**Télécharger pour Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) · [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip) · [Dernière version](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 ![Dernière version](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
 
@@ -56,7 +56,7 @@ Aucun autre outil de ce segment ne réunit un choix aussi complet d'OCR, de trad
 
 ## Démarrage rapide
 
-1. Téléchargez et lancez le **[programme d'installation Windows](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-x64-installer.exe)**.
+1. Téléchargez et lancez le **[programme d'installation Windows](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe)**.
 2. Ouvrez Click'n'Translate et choisissez les langues de l'interface, de l'OCR et de traduction.
 3. Appuyez sur `Ctrl + Alt + T`, sélectionnez une zone et obtenez la traduction.
 4. Pour la traduction hors ligne ou d'autres OCR, ouvrez **Paramètres → Paquets de langues** et installez uniquement ce dont vous avez besoin.
@@ -65,11 +65,11 @@ Aucune installation de Python et aucun compte ne sont nécessaires. Windows 10 e
 
 ### Version portable
 
-Téléchargez le [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.6.1-windows-portable-x64.zip), extrayez-le dans un dossier permanent et lancez `ClicknTranslate.exe`. Placez le dossier à son emplacement définitif avant d'activer le démarrage automatique ou de créer des raccourcis.
+Téléchargez le [ZIP portable](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip), extrayez-le dans un dossier permanent et lancez `ClicknTranslate.exe`. Placez le dossier à son emplacement définitif avant d'activer le démarrage automatique ou de créer des raccourcis.
 
 ### Mise à jour depuis une ancienne version
 
-Le programme de mise à jour des versions antérieures à 1.5.0 ne peut pas installer la version actuelle de manière fiable. Si vous venez de 1.4.x, fermez l’application et installez manuellement 1.6.1 une seule fois. Les utilisateurs de 1.5.0 ou version ultérieure peuvent passer à 1.6.1 depuis l’application.
+Le programme de mise à jour des versions antérieures à 1.5.0 ne peut pas installer la version actuelle de manière fiable. Si vous venez de 1.4.x, fermez l’application et installez manuellement 1.7.0 une seule fois. Les utilisateurs de 1.5.0 ou version ultérieure peuvent passer à 1.7.0 depuis l’application.
 
 ## Le meilleur choix au quotidien
 

@@ -221,7 +221,7 @@ def is_appimage():
 
 #: Command line actions a desktop shortcut can invoke. These mirror the Windows
 #: hotkey actions, which Linux users bind themselves in their desktop settings.
-SHORTCUT_ACTIONS = ("ocr", "copy", "translate", "fullscreen", "selection", "toggle")
+SHORTCUT_ACTIONS = ("ocr", "copy", "translate", "fullscreen", "selection", "game", "toggle")
 
 
 def shortcut_command(action, executable=None):

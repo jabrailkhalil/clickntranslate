@@ -97,5 +97,39 @@ class ServerErrorDetailTest(unittest.TestCase):
         self.assertEqual(translater._server_error_detail(response), "Too many requests")
 
 
+class GoogleTranslateTest(unittest.TestCase):
+    def test_rate_limited_primary_endpoint_uses_google_fallback(self):
+        primary = mock.Mock(status_code=429)
+        fallback = mock.Mock(status_code=200)
+        fallback.json.return_value = ["Привет, мир"]
+        session = SimpleNamespace(get=mock.Mock(side_effect=[primary, fallback]))
+
+        with mock.patch.object(translater, "_get_http_session", return_value=session):
+            result = translater.google_translate("Hello world", "en", "ru")
+
+        self.assertEqual(result, "Привет, мир")
+        self.assertEqual(session.get.call_count, 2)
+        first_url = session.get.call_args_list[0].args[0]
+        fallback_url = session.get.call_args_list[1].args[0]
+        self.assertEqual(first_url, "https://translate.googleapis.com/translate_a/single")
+        self.assertEqual(fallback_url, "https://clients5.google.com/translate_a/t")
+        self.assertEqual(
+            session.get.call_args_list[1].kwargs["params"]["client"],
+            "dict-chrome-ex",
+        )
+        fallback.raise_for_status.assert_called_once_with()
+
+    def test_non_rate_limit_error_does_not_change_google_endpoint(self):
+        response = mock.Mock(status_code=500)
+        response.raise_for_status.side_effect = RuntimeError("google down")
+        session = SimpleNamespace(get=mock.Mock(return_value=response))
+
+        with mock.patch.object(translater, "_get_http_session", return_value=session):
+            with self.assertRaisesRegex(RuntimeError, "google down"):
+                translater.google_translate("Hello world", "en", "ru")
+
+        self.assertEqual(session.get.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -146,7 +146,7 @@ class TranslationResultUiTest(unittest.TestCase):
             if theme == "Темная":
                 self.assertIn("background: #111216", dialog.styleSheet())
             else:
-                self.assertIn("background: #fbfafc", dialog.styleSheet())
+                self.assertIn("background: #ece7f0", dialog.styleSheet())
             dialog.close()
 
     def test_copy_and_google_buttons_work_without_closing_the_result(self):
@@ -306,6 +306,33 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertEqual(harness.shown_dialogs, [])
         self.assertIn(main.ui_text("en", "selection_replaced"), harness.statuses)
 
+    def test_successful_replacement_respects_disabled_clipboard_restore(self):
+        harness = _SelectionHarness({
+            "result_window_hidden_modes": [],
+            "restore_clipboard_after_selection": False,
+        })
+        fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
+
+        with mock.patch.object(platform_support, "IS_LINUX", False), \
+                mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main.ctypes, "windll",
+                                  SimpleNamespace(user32=fake_user32), create=True), \
+                mock.patch.object(main.threading, "Thread", _immediate_thread), \
+                mock.patch.object(main.time, "sleep"), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main.pyperclip, "paste", return_value="Hola mundo"), \
+                mock.patch.object(main, "_windows_foreground_window", return_value=42), \
+                mock.patch.object(main, "replace_selected_text_in_foreground",
+                                  return_value=(True, "replaced")), \
+                mock.patch.object(translater, "translate_text", return_value="Hello world"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history"), \
+                mock.patch.object(main, "save_translation_history"):
+            harness.launch_translate_replace_selection()
+
+        self.assertEqual(copy.call_args_list, [mock.call("")])
+        self.assertEqual(harness.shown_dialogs, [])
+
     def test_replace_fallback_copies_and_still_never_opens_dialog(self):
         harness = _SelectionHarness({"result_window_hidden_modes": []})
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
@@ -363,6 +390,32 @@ class TranslationResultUiTest(unittest.TestCase):
             harness.launch_translate_selection()
 
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Before")])
+        self.assertEqual(len(harness.shown_dialogs), 1)
+
+    def test_clipboard_restore_setting_can_leave_the_captured_selection(self):
+        harness = _SelectionHarness({
+            "result_window_hidden_modes": [],
+            "copy_translated_text": False,
+            "restore_clipboard_after_selection": False,
+        })
+        fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
+
+        with mock.patch.object(platform_support, "IS_LINUX", False), \
+                mock.patch.object(platform_support, "IS_WINDOWS", True), \
+                mock.patch.object(main.ctypes, "windll",
+                                  SimpleNamespace(user32=fake_user32), create=True), \
+                mock.patch.object(main.threading, "Thread", _immediate_thread), \
+                mock.patch.object(main.time, "sleep"), \
+                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo"]), \
+                mock.patch.object(translater, "translate_text", return_value="Hello world"), \
+                mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_translation_history"):
+            harness.launch_translate_selection()
+
+        # The empty write belongs to the internal Ctrl+C capture. With restore
+        # disabled the old "Before" value is deliberately not written back.
+        self.assertEqual(copy.call_args_list, [mock.call("")])
         self.assertEqual(len(harness.shown_dialogs), 1)
 
     def test_unchecked_still_opens_the_result_window(self):

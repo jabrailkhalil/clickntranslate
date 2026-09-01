@@ -26,6 +26,11 @@
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
+    <release version="1.7.0" date="2026-09-01">
+      <description>
+        <p>Dynamic multi-area translation, complete default hotkeys, settings transfer, guided onboarding, safe bug reports, and extensive reliability and interface fixes.</p>
+      </description>
+    </release>
     <release version="1.6.1" date="2026-08-25">
       <description>
         <p>Faster engine switching, refined language controls, startup diagnostics, and interface polish.</p>

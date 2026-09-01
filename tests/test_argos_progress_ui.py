@@ -122,7 +122,7 @@ class ArgosProgressUiTest(unittest.TestCase):
             if theme == "Темная":
                 self.assertIn("background: #111216", dialog.styleSheet())
             else:
-                self.assertIn("background: #fbfafc", dialog.styleSheet())
+                self.assertIn("background: #ece7f0", dialog.styleSheet())
             dialog.close()
 
     def test_package_prompt_buttons_return_the_expected_result(self):
@@ -165,7 +165,7 @@ class ArgosProgressUiTest(unittest.TestCase):
             if theme == "Темная":
                 self.assertIn("background: #111216", dialog.styleSheet())
             else:
-                self.assertIn("background: #fbfafc", dialog.styleSheet())
+                self.assertIn("background: #ece7f0", dialog.styleSheet())
             dialog.close()
 
     def test_translation_error_dialog_has_localized_fallback_for_empty_error(self):

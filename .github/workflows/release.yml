@@ -60,9 +60,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: Click'n'Translate 1.6.1
+          name: Click'n'Translate 1.7.0
           body: |
             | Version | Purpose |
             |---|---|
+            | 1.7.0 | Dynamic multi-area translation, mutually exclusive live modes, complete default hotkeys, settings transfer, guided onboarding, safe bug reports, and extensive UI reliability fixes. |
             | 1.6.1 | Faster engine switching, refined language controls, startup diagnostics, and UI polish. |
+            | 1.6.0 | Reliable updater path handling, cross-platform CI, and complete release metadata. |
           files: release-assets/*

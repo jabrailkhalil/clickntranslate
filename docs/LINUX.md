@@ -31,6 +31,7 @@ So the app exposes commands instead:
 | `clickntranslate --translate` | Capture a region and translate it |
 | `clickntranslate --fullscreen` | Translate the whole screen |
 | `clickntranslate --selection` | Translate the current selection |
+| `clickntranslate --game` | Dynamically replace text over one or more selected areas (X11) |
 
 Running one of these while the app is already in the tray hands the action to
 the running instance over a UNIX socket in `$XDG_RUNTIME_DIR` and exits. If the

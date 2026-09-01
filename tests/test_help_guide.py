@@ -167,14 +167,23 @@ class GuideCoverageTest(unittest.TestCase):
             "fr": "survolez",
             "zh": "悬停",
         }
+        assigned_clues = {
+            "en": "assigned shortcut",
+            "ru": "назначенное",
+            "es": "asignado",
+            "de": "zugewiesene",
+            "fr": "attribué",
+            "zh": "已分配",
+        }
         for lang in LANGUAGES:
             faq = _guide_text(lang).lower()
             tour = "\n".join(
                 body for _action, _title, body in main.guide_text(lang)["steps"]
             ).lower()
             self.assertIn(hover_clues[lang], faq, lang)
-            self.assertIn("ctrl+alt+q", tour, lang)
-            self.assertIn("ctrl+shift+q", tour, lang)
+            self.assertIn(assigned_clues[lang], tour, lang)
+            self.assertNotIn("ctrl+alt+q", tour, lang)
+            self.assertNotIn("ctrl+shift+q", tour, lang)
             self.assertIn("esc", faq, lang)
 
 

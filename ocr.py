@@ -11,6 +11,8 @@ from dataclasses import dataclass
 import shutil
 import time
 import re
+import functools
+import threading
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
@@ -745,6 +747,22 @@ _RAPID_OCR_ENGINE = None
 _RAPID_OCR_IMPORT_ERROR = None
 _RAPID_OCR_LOCAL_PATHS_READY = False
 _RAPID_OCR_DLL_DIR_HANDLES = []
+_NATIVE_OCR_RUNTIME_LOCK = threading.RLock()
+
+
+def _serialized_native_ocr_runtime(function):
+    """Keep native OCR imports and cache resets out of concurrent threads.
+
+    Torch/ONNX Runtime load process-wide DLLs on Windows.  Two language-manager
+    windows used to be able to probe those modules at the same time, which can
+    hang the UI and may even terminate Python inside the native loader.
+    """
+    @functools.wraps(function)
+    def locked(*args, **kwargs):
+        with _NATIVE_OCR_RUNTIME_LOCK:
+            return function(*args, **kwargs)
+
+    return locked
 
 
 def _native_ocr_worker_enabled():
@@ -984,6 +1002,7 @@ def _ensure_rapidocr_local_paths():
     _RAPID_OCR_LOCAL_PATHS_READY = True
 
 
+@_serialized_native_ocr_runtime
 def reset_rapidocr_runtime_cache(clear_modules=False):
     global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR, _RAPID_OCR_LOCAL_PATHS_READY
     _RAPID_OCR_ENGINE = None
@@ -1002,6 +1021,7 @@ def reset_rapidocr_runtime_cache(clear_modules=False):
                 sys.modules.pop(module_name, None)
 
 
+@_serialized_native_ocr_runtime
 def rapidocr_importable():
     global _RAPID_OCR_IMPORT_ERROR
     if _native_ocr_worker_enabled():
@@ -1026,6 +1046,7 @@ def rapidocr_importable():
     return False, _RAPID_OCR_IMPORT_ERROR
 
 
+@_serialized_native_ocr_runtime
 def _get_rapidocr_engine():
     global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR
     if _RAPID_OCR_ENGINE is not None:
@@ -1276,6 +1297,7 @@ def _ensure_easyocr_local_paths():
     _EASY_OCR_LOCAL_PATHS_READY = True
 
 
+@_serialized_native_ocr_runtime
 def reset_easyocr_runtime_cache(clear_modules=False):
     global _EASY_OCR_READERS, _EASY_OCR_IMPORT_ERROR, _EASY_OCR_LOCAL_PATHS_READY
     _EASY_OCR_READERS = {}
@@ -1305,6 +1327,7 @@ def reset_easyocr_runtime_cache(clear_modules=False):
                 sys.modules.pop(module_name, None)
 
 
+@_serialized_native_ocr_runtime
 def easyocr_importable():
     global _EASY_OCR_IMPORT_ERROR
     if _native_ocr_worker_enabled():
@@ -1327,6 +1350,7 @@ def _easyocr_model_dir():
     return model_dir
 
 
+@_serialized_native_ocr_runtime
 def _get_easyocr_reader(language_code, download_enabled=False):
     global _EASY_OCR_IMPORT_ERROR
     language_codes = tuple(easyocr_language_codes(language_code))
@@ -1843,6 +1867,16 @@ def get_cached_ocr_config():
 
 def load_ocr_config():
     return get_cached_ocr_config().get("ocr_language", "ru")
+
+
+def ocr_dim_strength(config=None):
+    """Return the user-facing dim amount as a safe 0..80 percentage."""
+    source = config if isinstance(config, dict) else get_cached_ocr_config()
+    try:
+        value = int(source.get("ocr_dim_strength", 60))
+    except (TypeError, ValueError):
+        value = 60
+    return max(0, min(80, value))
 
 def _save_translation_history_sync(original_text, translated_text, language):
     """Синхронная запись в историю переводов (выполняется в отдельном потоке)."""
@@ -3332,6 +3366,8 @@ class ScreenCaptureOverlay(QWidget):
         # Загрузка последнего выбранного языка из конфигурации
         config = get_cached_ocr_config()
         self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
+        self._dim_screen_during_ocr = bool(config.get("dim_screen_during_ocr", False))
+        self._ocr_dim_strength = ocr_dim_strength(config)
         if self.mode == "translate":
             self.current_language, self.current_target_language = _configured_ocr_translate_pair(config)
         else:
@@ -3799,6 +3835,8 @@ class ScreenCaptureOverlay(QWidget):
             logging.info(f"[OCR:{self._session_id}] Showing overlay; mode={self.mode}")
             config = get_cached_ocr_config()
             self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
+            self._dim_screen_during_ocr = bool(config.get("dim_screen_during_ocr", False))
+            self._ocr_dim_strength = ocr_dim_strength(config)
             self._refresh_language_controls_from_config(config)
             self.setWindowOpacity(1.0)
 
@@ -3974,6 +4012,11 @@ class ScreenCaptureOverlay(QWidget):
                     pass
         self._frozen_background = None
         self._frozen_background_rect = QtCore.QRect()
+        try:
+            from mode_coordinator import release_mode
+            release_mode(f"capture:{self.mode}")
+        except Exception:
+            pass
         super().closeEvent(event)
         # Подготавливаем новый оверлей ПОСЛЕ закрытия текущего (отложенно)
         mode = self.mode
@@ -3983,8 +4026,9 @@ class ScreenCaptureOverlay(QWidget):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
-        # Затемнение отключено постоянно: выделение читается на живом/замороженном фоне.
-        no_dimming = True
+        # Затемнение снова управляется настройкой. По умолчанию оно выключено,
+        # чтобы сохранить привычное поведение существующих установок.
+        no_dimming = not self._dim_screen_during_ocr
 
         # Если включена заморозка экрана — рисуем заготовленный кадр
         if self._freeze_screen_on_ocr and (self._frozen_background is None or self._frozen_background.isNull()):
@@ -3994,7 +4038,8 @@ class ScreenCaptureOverlay(QWidget):
         
         # Если не требуется затемнение, рисуем минимальный невидимый фон для перехвата мыши
         if not no_dimming:
-            painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 150))
+            alpha = round(255 * max(0, min(80, self._ocr_dim_strength)) / 100)
+            painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, alpha))
         else:
             # Минимальное затемнение (практически невидимое) для перехвата событий мыши
             # Без этого окно полностью прозрачно и клики проваливаются сквозь него
@@ -4075,17 +4120,10 @@ class ScreenCaptureOverlay(QWidget):
             )
             self.update()
         elif event.button() == QtCore.Qt.RightButton:
-            # Правая кнопка мыши — полный выход из программы
-            logging.info(f"[OCR:{self._session_id}] Right click closes overlay/app")
+            # ПКМ отменяет только текущее выделение. Главное окно, трей и
+            # глобальные горячие клавиши должны продолжать работать.
+            logging.info(f"[OCR:{self._session_id}] Right click cancels overlay")
             self.close()
-            # Находим главное окно и вызываем полный выход
-            app = QApplication.instance()
-            for widget in app.topLevelWidgets():
-                if hasattr(widget, 'exit_app'):
-                    widget.exit_app()
-                    return
-            # Fallback: просто завершаем приложение
-            app.quit()
 
     def mouseMoveEvent(self, event):
         if self.start_point is not None:
@@ -5189,6 +5227,11 @@ def _close_active_overlays(except_mode=None):
         finally:
             _ACTIVE_OVERLAYS[active_mode] = None
 
+
+def stop_screen_capture_modes():
+    """Close every area-selection overlay without starting another mode."""
+    _close_active_overlays()
+
 def get_or_show_overlay(mode="ocr"):
     # Не допускаем одновременное существование панелей разных режимов
     _close_active_overlays(except_mode=mode)
@@ -5222,17 +5265,26 @@ def get_or_show_overlay(mode="ocr"):
     _OVERLAY_POOL[mode] = None
 
 def run_screen_capture(mode="ocr"):
+    from mode_coordinator import release_mode, request_mode
+
+    mode_name = f"capture:{mode}"
+    if not request_mode(mode_name, stop_screen_capture_modes):
+        return
     app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-        install_qt_exception_guard()
-        app._native_dialog_frame_filter = NativeDialogFrameFilter(app)
-        app.installEventFilter(app._native_dialog_frame_filter)
-        logging.info("Запуск OCR приложения...")
-        get_or_show_overlay(mode)
-        app.exec_()
-    else:
-        get_or_show_overlay(mode)
+    try:
+        if app is None:
+            app = QApplication([])
+            install_qt_exception_guard()
+            app._native_dialog_frame_filter = NativeDialogFrameFilter(app)
+            app.installEventFilter(app._native_dialog_frame_filter)
+            logging.info("Запуск OCR приложения...")
+            get_or_show_overlay(mode)
+            app.exec_()
+        else:
+            get_or_show_overlay(mode)
+    except Exception:
+        release_mode(mode_name)
+        raise
 
 def warm_up():
     # Pre-initialize OCR engines for common languages to reduce first-use latency
@@ -6208,6 +6260,11 @@ class FullScreenTranslateOverlay(QWidget):
             except RuntimeError:
                 pass
         _fullscreen_overlay_ref = None
+        try:
+            from mode_coordinator import release_mode
+            release_mode("fullscreen")
+        except Exception:
+            pass
         super().closeEvent(event)
         self.deleteLater()
 
@@ -6221,16 +6278,30 @@ def run_fullscreen_translate():
     global _fullscreen_overlay_ref, _fullscreen_translate_busy
     if _fullscreen_translate_busy:
         return
-    if _fullscreen_overlay_ref is not None:
-        _fullscreen_overlay_ref.close()
+    from mode_coordinator import release_mode, request_mode
+
+    def stop_fullscreen():
+        global _fullscreen_overlay_ref
+        overlay = _fullscreen_overlay_ref
         _fullscreen_overlay_ref = None
+        if overlay is not None:
+            try:
+                overlay.close()
+            except RuntimeError:
+                pass
+
+    if not request_mode("fullscreen", stop_fullscreen):
         return
     app = QApplication.instance()
     if app is None:
+        release_mode("fullscreen")
         return
     _fullscreen_translate_busy = True
     try:
         _fullscreen_overlay_ref = FullScreenTranslateOverlay()
+    except Exception:
+        release_mode("fullscreen")
+        raise
     finally:
         _fullscreen_translate_busy = False
 

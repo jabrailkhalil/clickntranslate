@@ -1,11 +1,11 @@
 param(
-    [string]$Version = "1.6.1.0",
+    [string]$Version = "1.7.0.0",
     [string]$OutputPath = "",
     # Must name a zip that actually exists in the release.  Earlier versions
     # defaulted to ClicknTranslate-v<ver>-win64.zip, which has never been
     # published under that name, so the repair tool downloaded a 404.
-    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.6.1/Click-n-Translate-1.6.1-windows-portable-x64.zip",
-    [string]$PackageSha256 = "4FB5A8DAAE471BFE216039646BD5A939F15FE941E2A1442C8C740E2D860AD3BC"
+    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/Click-n-Translate-1.7.0-windows-portable-x64.zip",
+    [string]$PackageSha256 = "1AAEE222B1D1D3024B022F9187E762719EA8582CD9DD56FD34BA19BF12C12528"
 )
 
 $ErrorActionPreference = "Stop"

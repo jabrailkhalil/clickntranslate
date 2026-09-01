@@ -24,6 +24,9 @@ DESKTOP_ACTIONS = (
     ("Copy", "Copy text from screen", "copy"),
     ("Translate", "Translate text on screen", "translate"),
     ("Fullscreen", "Translate the whole screen", "fullscreen"),
+    # Keep the desktop-action id stable for existing launchers; only its
+    # user-visible name changed from Gaming to Dynamic translation.
+    ("Game", "Start dynamic translation", "game"),
 )
 
 

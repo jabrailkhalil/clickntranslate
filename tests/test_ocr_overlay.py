@@ -109,6 +109,65 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             overlay.lang_combo = original_combo
             overlay.deleteLater()
 
+    def test_right_click_cancels_only_the_capture_overlay(self):
+        overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
+        event = mock.Mock()
+        event.button.return_value = Qt.RightButton
+        main_window = SimpleNamespace(exit_app=mock.Mock())
+        app = mock.Mock()
+        app.topLevelWidgets.return_value = [main_window]
+        application = mock.Mock()
+        application.instance.return_value = app
+        try:
+            with mock.patch.object(overlay, "close") as close_overlay, \
+                    mock.patch.object(ocr, "QApplication", application):
+                overlay.mousePressEvent(event)
+
+            close_overlay.assert_called_once_with()
+            application.instance.assert_not_called()
+            main_window.exit_app.assert_not_called()
+            app.quit.assert_not_called()
+        finally:
+            overlay.deleteLater()
+
+    def test_screen_dimming_setting_changes_the_overlay_pixels(self):
+        def rendered_alpha(enabled, strength=60):
+            config = {
+                "freeze_screen_on_ocr": False,
+                "dim_screen_during_ocr": enabled,
+                "ocr_dim_strength": strength,
+                "last_ocr_language": "en",
+            }
+            with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config):
+                overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
+            try:
+                overlay.resize(80, 60)
+                image = ocr.QtGui.QImage(overlay.size(), ocr.QtGui.QImage.Format_ARGB32)
+                image.fill(ocr.QtCore.Qt.transparent)
+                overlay.render(image)
+                return image.pixelColor(40, 30).alpha()
+            finally:
+                overlay.deleteLater()
+
+        almost_clear = rendered_alpha(False)
+        dimmed = rendered_alpha(True)
+        self.assertLessEqual(almost_clear, 10)
+        self.assertGreaterEqual(dimmed, 140)
+        self.assertGreater(dimmed, almost_clear + 100)
+
+        gentle = rendered_alpha(True, 20)
+        strong = rendered_alpha(True, 80)
+        self.assertLess(gentle, dimmed)
+        self.assertGreater(strong, dimmed)
+        self.assertGreater(strong, gentle + 140)
+
+    def test_ocr_dim_strength_is_clamped_and_tolerates_bad_config(self):
+        self.assertEqual(ocr.ocr_dim_strength({}), 60)
+        self.assertEqual(ocr.ocr_dim_strength({"ocr_dim_strength": "35"}), 35)
+        self.assertEqual(ocr.ocr_dim_strength({"ocr_dim_strength": -20}), 0)
+        self.assertEqual(ocr.ocr_dim_strength({"ocr_dim_strength": 200}), 80)
+        self.assertEqual(ocr.ocr_dim_strength({"ocr_dim_strength": "bad"}), 60)
+
     def test_translate_combo_data_keeps_configured_target(self):
         self.assertEqual(
             ocr._combo_data_to_translate_pair(("de", "fr"), {"ocr_translate_target_language": "ru"}),
