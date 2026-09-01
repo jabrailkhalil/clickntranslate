@@ -302,6 +302,6 @@ If Click'n'Translate saves you time:
 
 ### Ready to translate anything on your screen?
 
-[**Download Click'n'Translate for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe)
+[**Download Click'n'Translate for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases)
 
 </div>
