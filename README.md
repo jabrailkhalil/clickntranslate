@@ -5,7 +5,7 @@
 ### Translate any text on Windows — from games, images, videos, apps, and documents.
 
 **Click'n'Translate (ClicknTranslate)** is an open-source all-in-one screen translator and OCR tool for Windows.<br>
-Fast online translation · Private offline engines · Four OCR options · Global hotkeys
+Fast online translation · Private offline engines · Four OCR options · Seven ready-to-use hotkeys
 
 [**Download the Windows installer**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) · [**Portable ZIP**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip) · [Release notes](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram**](https://t.me/jabrail_digital)
 
@@ -17,6 +17,19 @@ Fast online translation · Private offline engines · Four OCR options · Global
 
 ![Three ways to use Click'n'Translate](docs/images/how-it-works.png)
 
+## New in 1.7.0
+
+| Improvement | What it changes |
+| --- | --- |
+| **Dynamic multi-area translation** | Select one or several screen regions and keep their translated text updated in place |
+| **Seven default hotkeys** | Every major action works immediately and remains fully configurable |
+| **Clean mode switching** | Starting another interactive mode closes the previous one; pressing the active shortcut again stops that mode |
+| **Settings transfer** | Export your configuration and import it on another computer without moving histories, caches, or private text |
+| **Safe bug reports** | Create a diagnostic package for GitHub or Telegram without clipboard contents, document text, histories, or credentials |
+| **Refined interface** | More reliable layouts, borders, themes, notifications, onboarding, and document translation |
+
+Click'n'Translate has passed **1,000 downloads** and remains free and open source.
+
 ## See it. Select it. Understand it.
 
 Click'n'Translate turns text anywhere on your Windows screen into something you can copy or understand. Select an area, press a global hotkey, and continue working — without retyping text, opening a browser tab, or breaking your flow.
@@ -27,6 +40,8 @@ Click'n'Translate turns text anywhere on your Windows screen into something you 
 | Translate part of an app, game, or image | OCR + translation | A focused translation window |
 | Understand an entire screen | Full-screen translation | Translated text placed over the original |
 | Translate highlighted text instantly | Selection translation | Your saved source and target language pair |
+| Write in another language | Selection replacement | Highlight your text and replace it with the translation |
+| Follow changing text | Dynamic translation | Live translations over one or several selected areas |
 | Translate a document | Drag and drop or `Ctrl + O` | Side-by-side original and translation |
 
 > **One app instead of a collection of utilities:** screen capture, OCR, online translation, offline translation, document translation, histories, language packages, and configurable hotkeys all work together.
@@ -58,6 +73,7 @@ Click'n'Translate turns text anywhere on your Windows screen into something you 
 | Capability | What you get |
 | --- | --- |
 | **Instant screen translation** | Capture a region or the whole screen and translate it immediately |
+| **Dynamic translation** | Keep several selected screen areas translated as their contents change |
 | **Text extraction everywhere** | Copy text from games, video, images, remote desktops, and interfaces that block selection |
 | **Online and offline translation** | Choose speed and convenience, or keep translation on your PC |
 | **Four OCR engines** | Match the engine to the language, font, image quality, or task |
@@ -84,7 +100,7 @@ Click'n'Translate turns text anywhere on your Windows screen into something you 
 | Availability | Requires internet | Works without internet after setup |
 | Best choice for | Everyday convenience | Sensitive text, travel, and private workflows |
 
-## Four actions. Zero friction.
+## Seven actions. Zero friction.
 
 | Default hotkey | Action |
 | --- | --- |
@@ -92,8 +108,11 @@ Click'n'Translate turns text anywhere on your Windows screen into something you 
 | `Ctrl + Alt + T` | Capture an area, recognize the text, and translate it |
 | `Ctrl + Alt + F` | Translate the entire screen |
 | `Ctrl + Alt + Q` | Translate selected text with the language pair from the main window |
+| `Ctrl + Shift + Q` | Replace selected text with its translation |
+| `Ctrl + Shift + Space` | Show or hide Click'n'Translate |
+| `Ctrl + Alt + G` | Start or stop Dynamic translation for selected screen areas |
 
-Every shortcut can be changed in **Settings → Configure hotkeys**. Your chosen languages are remembered, including the pair used for selected-text and full-screen translation.
+Every shortcut can be changed or cleared in **Settings → Configure hotkeys**. Your chosen language pair is remembered separately for OCR, selected text, replacement, full-screen, and Dynamic translation.
 
 ## Language packages without the command line
 
@@ -116,6 +135,8 @@ Installed packages are shown first. Downloads display progress, can continue in 
 | --- | --- | --- |
 | **Windows installer** | You want the simplest setup, shortcuts, and reliable in-app updates | [Download the installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) and run it |
 | **Portable ZIP** | You want a self-contained folder you can move or keep on another drive | [Download the ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip), extract it, and run `ClicknTranslate.exe` |
+| **Linux AppImage** | You want a ready-to-run x86_64 Linux build | [Download the AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-linux-x86_64.AppImage), make it executable, and run it |
+| **Linux TAR** | You prefer an extracted portable Linux folder | [Download the archive](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-linux-x86_64.tar.gz) and extract it |
 
 ### Start translating in under a minute
 
@@ -131,6 +152,7 @@ No account or separate Python installation is required. Click'n'Translate suppor
 | Use case | Why it helps |
 | --- | --- |
 | Games and visual novels | Translate dialogue without leaving the game |
+| Changing subtitles and dialogue | Keep multiple chosen regions translated with Dynamic mode |
 | Images and videos | Extract text that was never selectable |
 | Work applications | Translate labels, messages, reports, and remote desktops |
 | Documents | Open common formats and work with original and translated text side by side |
@@ -144,6 +166,7 @@ No account or separate Python installation is required. Click'n'Translate suppor
 | Dark and light themes | Dedicated OCR and Argos worker processes |
 | System tray and optional Windows startup | Transactional updates with rollback protection |
 | Configurable global hotkeys | Automatic restart after a successful update |
+| Settings import and export | Mutually exclusive interactive modes with shortcut toggles |
 | Local copy and translation histories | User data preserved across updates |
 | Clear package download progress | Folder-based build for responsive startup |
 | Multilingual onboarding and FAQ | Optional engines isolated inside the app folder |
@@ -199,6 +222,20 @@ The application, settings, histories, and optional packages stay with the extrac
 <summary><strong>Which document formats are supported?</strong></summary>
 
 Click'n'Translate can open `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm`, and `.rtf`. Translations can be saved as text, Markdown, or a reopenable local session.
+
+</details>
+
+<details>
+<summary><strong>How does Dynamic translation work?</strong></summary>
+
+Press `Ctrl + Alt + G`, draw one or several regions, and finish the selection. Click'n'Translate periodically recognizes those regions and updates the translated overlays when their text changes. Press the same shortcut again to stop the session. Frequency, overlay opacity, original-text display, and inactive-window pausing are configurable.
+
+</details>
+
+<details>
+<summary><strong>Can I move my settings to another computer?</strong></summary>
+
+Yes. Use **Settings → Export settings** and import the resulting file on the other computer. The export contains preferences and hotkeys, but excludes histories, caches, downloaded models, clipboard contents, document text, and credentials.
 
 </details>
 

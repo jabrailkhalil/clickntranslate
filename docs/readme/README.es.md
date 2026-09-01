@@ -20,25 +20,39 @@ Click'n'Translate es la mejor aplicación integral de traducción de pantalla de
 
 ![Click'n'Translate traduce texto de un juego al chino y al francés](../images/translation-demo-v2.gif)
 
+## Novedades de la versión 1.7.0
+
+- **Traducción dinámica de varias áreas.** Selecciona una o varias zonas y mantén la traducción actualizada sobre ellas cuando cambie el texto.
+- **Siete atajos listos para usar.** Todas las acciones principales funcionan desde el primer inicio y cada combinación se puede cambiar o borrar.
+- **Un solo modo activo.** Iniciar otro modo interactivo cierra el anterior; repetir el mismo atajo detiene el modo actual.
+- **Importación y exportación de ajustes.** Traslada preferencias y atajos a otro equipo sin historiales, cachés ni texto privado.
+- **Informes de errores seguros.** Crea un paquete de diagnóstico para GitHub o Telegram sin portapapeles, documentos, historiales ni credenciales.
+- **Interfaz refinada.** Se corrigieron bordes, temas, diseños, notificaciones, guía inicial y traducción de documentos.
+
+Click'n'Translate ha superado las **1.000 descargas** y seguirá siendo gratuito y de código abierto.
+
 ## ¿Por qué Click'n'Translate es la mejor?
 
 - **Traduce lo que ves.** Captura un área o la pantalla completa y obtén la traducción al instante.
 - **Copia texto que no se puede seleccionar.** Extráelo de imágenes, vídeos, juegos, escritorios remotos e interfaces protegidas.
 - **Elige entre conexión y privacidad.** Usa proveedores rápidos en línea o procesa el texto localmente con Argos y Hy-MT.
 - **Utiliza el OCR adecuado.** Windows OCR, Tesseract, RapidOCR y EasyOCR están disponibles desde un único gestor de paquetes.
-- **Funciona sobre cualquier aplicación.** Cuatro atajos globales personalizables están siempre disponibles.
+- **Funciona sobre cualquier aplicación.** Siete atajos globales personalizables están siempre disponibles.
 - **Mantén el control.** Los historiales de traducción y copia son opcionales y se guardan localmente.
 
-## Cuatro acciones, sin interrupciones
+## Siete acciones, sin interrupciones
 
 | Atajo predeterminado | Acción |
 | --- | --- |
 | `Ctrl + Alt + C` | Extraer el texto de un área y copiarlo |
 | `Ctrl + Alt + T` | Capturar un área, reconocer el texto y traducirlo |
 | `Ctrl + Alt + F` | Traducir la pantalla completa |
-| `Ctrl + Alt + Q` | Traducir un área seleccionada de la pantalla |
+| `Ctrl + Alt + Q` | Traducir el texto seleccionado en la aplicación activa |
+| `Ctrl + Shift + Q` | Sustituir el texto seleccionado por su traducción |
+| `Ctrl + Shift + Space` | Mostrar u ocultar Click'n'Translate |
+| `Ctrl + Alt + G` | Iniciar o detener la traducción dinámica de las áreas elegidas |
 
-Todos los atajos se pueden modificar en **Ajustes → Configurar atajos**.
+Todos los atajos se pueden modificar o borrar en **Ajustes → Configurar atajos**. Las parejas de idiomas se recuerdan por separado para OCR, selección, sustitución, pantalla completa y traducción dinámica.
 
 ## Motores de traducción y OCR
 
@@ -76,6 +90,9 @@ El actualizador de las versiones anteriores a 1.5.0 no puede instalar la versió
 - Temas claro y oscuro
 - Bandeja del sistema e inicio opcional con Windows
 - Atajos globales personalizables
+- Traducción dinámica de varias áreas seleccionadas
+- Importación y exportación de ajustes
+- Creación de informes de errores de diagnóstico seguros
 - Historiales locales de copia y traducción
 - Progreso de descarga y eliminación de paquetes
 - Procesos independientes para OCR y Argos, para una mayor estabilidad
@@ -97,6 +114,7 @@ La versión publicada utiliza una compilación de PyInstaller basada en carpetas
 
 ## Soporte y comentarios
 
+- Abre **Ayuda → Informe de errores** en la aplicación, crea el paquete de diagnóstico y adjúntalo a tu mensaje. No incluye texto privado, historiales, documentos ni credenciales.
 - [Informar de un error o proponer una función](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram: [@jabrail_digital](https://t.me/jabrail_digital)
 

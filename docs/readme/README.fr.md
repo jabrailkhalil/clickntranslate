@@ -20,25 +20,39 @@ Click'n'Translate est la meilleure application tout-en-un de traduction d'écran
 
 ![Click'n'Translate traduit du texte de jeu en chinois et en français](../images/translation-demo-v2.gif)
 
+## Nouveautés de la version 1.7.0
+
+- **Traduction dynamique de plusieurs zones.** Sélectionnez une ou plusieurs zones et maintenez leur traduction à jour lorsque le texte change.
+- **Sept raccourcis prêts à l'emploi.** Toutes les actions principales fonctionnent dès le premier lancement et chaque combinaison peut être modifiée ou effacée.
+- **Un seul mode actif.** Le lancement d'un nouveau mode interactif ferme le précédent ; le même raccourci arrête le mode en cours.
+- **Importation et exportation des paramètres.** Transférez préférences et raccourcis vers un autre ordinateur sans historiques, caches ni texte privé.
+- **Rapports de bogue sûrs.** Créez un paquet de diagnostic pour GitHub ou Telegram sans presse-papiers, documents, historiques ni identifiants.
+- **Interface affinée.** Les bordures, thèmes, mises en page, notifications, l'apprentissage et la traduction de documents ont été corrigés.
+
+Click'n'Translate a dépassé les **1 000 téléchargements** et restera gratuit et open source.
+
 ## Pourquoi Click'n'Translate est la meilleure ?
 
 - **Traduisez ce que vous voyez.** Capturez une zone ou l'écran entier et obtenez immédiatement la traduction.
 - **Copiez le texte impossible à sélectionner.** Extrayez-le d'images, de vidéos, de jeux, de bureaux à distance et d'interfaces protégées.
 - **Choisissez entre rapidité et confidentialité.** Utilisez des services en ligne ou conservez le traitement sur votre PC avec Argos et Hy-MT.
 - **Choisissez le bon moteur OCR.** Windows OCR, Tesseract, RapidOCR et EasyOCR sont disponibles dans un gestionnaire de paquets unique.
-- **Travaillez dans n'importe quelle application.** Quatre raccourcis globaux personnalisables restent toujours disponibles.
+- **Travaillez dans n'importe quelle application.** Sept raccourcis globaux personnalisables restent toujours disponibles.
 - **Gardez le contrôle.** Les historiques de traduction et de copie sont facultatifs et stockés localement.
 
-## Quatre actions, sans friction
+## Sept actions, sans friction
 
 | Raccourci par défaut | Action |
 | --- | --- |
 | `Ctrl + Alt + C` | Extraire le texte d'une zone et le copier |
 | `Ctrl + Alt + T` | Capturer une zone, reconnaître le texte et le traduire |
 | `Ctrl + Alt + F` | Traduire l'écran entier |
-| `Ctrl + Alt + Q` | Traduire une zone sélectionnée de l'écran |
+| `Ctrl + Alt + Q` | Traduire le texte sélectionné dans l'application active |
+| `Ctrl + Shift + Q` | Remplacer le texte sélectionné par sa traduction |
+| `Ctrl + Shift + Space` | Afficher ou masquer Click'n'Translate |
+| `Ctrl + Alt + G` | Démarrer ou arrêter la traduction dynamique des zones choisies |
 
-Tous les raccourcis peuvent être modifiés dans **Paramètres → Configurer les raccourcis**.
+Tous les raccourcis peuvent être modifiés ou effacés dans **Paramètres → Configurer les raccourcis**. Les paires de langues sont mémorisées séparément pour l'OCR, la sélection, le remplacement, le plein écran et la traduction dynamique.
 
 ## Moteurs de traduction et d'OCR
 
@@ -76,6 +90,9 @@ Le programme de mise à jour des versions antérieures à 1.5.0 ne peut pas inst
 - Thèmes sombre et clair
 - Zone de notification et démarrage facultatif avec Windows
 - Raccourcis globaux personnalisables
+- Traduction dynamique de plusieurs zones sélectionnées
+- Importation et exportation des paramètres
+- Création de rapports de bogue diagnostiques sûrs
 - Historiques locaux de copie et de traduction
 - Progression des téléchargements et suppression des paquets
 - Processus distincts pour l'OCR et Argos afin d'améliorer la stabilité
@@ -97,6 +114,7 @@ La version publiée utilise une construction PyInstaller en mode dossier pour d�
 
 ## Assistance et retours
 
+- Dans l'application, ouvrez **Aide → Rapport de bogue**, créez le paquet de diagnostic et joignez-le à votre message. Il n'inclut aucun texte privé, historique, document ou identifiant.
 - [Signaler un problème ou proposer une fonctionnalité](https://github.com/jabrailkhalil/clickntranslate/issues)
 - Telegram : [@jabrail_digital](https://t.me/jabrail_digital)
 
