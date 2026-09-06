@@ -1,0 +1,39 @@
+{
+  "date": "2026-09-07",
+  "integration_commit": "c55a899a35e20f051b62e0ce75a26491b811f22a",
+  "mac_base_commit": "2d54c1aba4d7c28b0bb2e0a73604fa3dd5e040a2",
+  "architecture": "arm64",
+  "macos": "14.3 (23D56)",
+  "cocoa_pytest": {
+    "passed": 1029,
+    "skipped": 72,
+    "subtests": 892,
+    "seconds": 122.23
+  },
+  "offscreen_pytest": {
+    "passed": 1025,
+    "skipped": 76,
+    "subtests": 892,
+    "seconds": 91.3
+  },
+  "build_command": "bash tools/build_macos_release.sh",
+  "mach_o_files_verified": 224,
+  "minimum_macos": "13.4",
+  "source_screenshots": 310,
+  "installed_screenshots": 310,
+  "signing": "ad hoc",
+  "notarization": false,
+  "gatekeeper": "rejected",
+  "artifacts": [
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166176411,
+      "sha256": "3e1cc9e8035d503428333d0a4d1b165d5827a94899f365b00d70dbd94897d450"
+    },
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153464698,
+      "sha256": "5b9674fe4201a2734bddb5243182cd8d143a6398296dc4f406513cefff092569"
+    }
+  ]
+}

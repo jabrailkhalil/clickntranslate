@@ -62,14 +62,14 @@ def test_primary_and_secondary_actions_match_across_windows(app, theme):
     colors = button_palette(theme != "Светлая")
     installer = main.ArgosPackageInstallDialog(owner, "RU → EN", "ru", theme)
     result = main.TranslationResultDialog(
-        owner, "Пример перевода", auto_copy=False, lang="ru", theme=theme,
+        owner, "Пример перевода", auto_copy=False, lang="ru", theme=theme, source_text="Example",
     )
     message = StyledMessageBox(owner)
     accept = message.addButton("Установить", message.AcceptRole)
     cancel = message.addButton("Отмена", message.RejectRole)
     groups = (
-        (colors["accent"], [installer.install_button, result.copy_button, accept]),
-        (colors["surface"], [installer.cancel_button, result.close_button, cancel]),
+        (colors["accent"], [installer.install_button, result.translate_button, accept]),
+        (colors["surface"], [installer.cancel_button, result.copy_button, result.close_button, cancel]),
     )
     try:
         for window in (installer, result, message):

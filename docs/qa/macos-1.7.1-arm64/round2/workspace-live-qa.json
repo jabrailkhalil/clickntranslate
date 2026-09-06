@@ -1,0 +1,21 @@
+{
+  "google_command_return": {
+    "source": "Please open the window and read the document.",
+    "result": "Пожалуйста, откройте окно и прочитайте документ.",
+    "scope": "Qt-local key event delivered on native Cocoa, not a physical keyboard test"
+  },
+  "swap_real_reverse_translation": {
+    "source": "Это отредактированный перевод.",
+    "result": "This is an edited translation."
+  },
+  "resize_and_theme_keep_drafts": "passed",
+  "selected_provider_http_503": {
+    "requests": [
+      "/translate"
+    ],
+    "error": "Ошибка перевода: LibreTranslate failed: http://127.0.0.1:61415: HTTP 503",
+    "drafts_preserved": true,
+    "provider_preserved": true,
+    "other_providers_called": false
+  }
+}

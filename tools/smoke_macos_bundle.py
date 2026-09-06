@@ -31,12 +31,18 @@ def main():
     # smoke test never asks for access to the developer's personal folders.
     with tempfile.TemporaryDirectory(prefix='cnt-mac-render-') as temporary:
         native_report = Path(temporary) / report.name
-        subprocess.run(['/usr/bin/open', '-n', '-W', '-a', str(application),
-                        '--args', '--smoke-test', str(native_report)],
-                       env=environment, check=True,
-                       timeout=300 if environment.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1' else 120)
-        for result in Path(temporary).iterdir():
-            shutil.copy2(result, report.parent / result.name)
+        try:
+            subprocess.run(['/usr/bin/open', '-n', '-W', '-a', str(application),
+                            '--stdout', str(Path(temporary) / 'smoke-stdout.log'),
+                            '--stderr', str(Path(temporary) / 'smoke-stderr.log'),
+                            '--args', '--smoke-test', str(native_report)],
+                           env=environment, check=True,
+                           timeout=300 if environment.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1' else 120)
+        finally:
+            for result in Path(temporary).iterdir():
+                shutil.copy2(result, report.parent / result.name)
+    if not report.exists():
+        raise RuntimeError('The LaunchServices smoke did not finish; see build/macos/smoke-stderr.log')
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert payload["vision"] == "ok", payload
     payload['launchservices'] = 'ok'

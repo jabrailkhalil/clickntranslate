@@ -1,0 +1,10 @@
+{
+  "screen_capture": "blocked",
+  "reason": "CGSSessionScreenIsLocked is true; current QScreen captures are fully transparent",
+  "earlier_unlocked_captures": [
+    "light-tooltip-screen-unlocked.png",
+    "light-menu-screen-unlocked.png",
+    "light-message-screen-unlocked.png"
+  ],
+  "native_background_checks": "passed separately in source and installed smoke"
+}

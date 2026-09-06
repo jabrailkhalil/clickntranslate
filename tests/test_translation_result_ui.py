@@ -107,9 +107,16 @@ class _PairMemoryParent(QWidget):
 
 
 class TranslationResultUiTest(unittest.TestCase):
+    def setUp(self):
+        history = mock.patch.object(main, "save_translation_history")
+        history.start()
+        self.addCleanup(history.stop)
+
     @classmethod
     def setUpClass(cls):
         cls.app = main.QApplication.instance() or main.QApplication([])
+        from qt_layout_test_support import ensure_layout_fonts
+        ensure_layout_fonts(cls.app)
 
     def test_result_dialog_is_frameless_themed_and_localized(self):
         for index, lang in enumerate(main.TRANSLATION_RESULT_DIALOG_TEXT):
@@ -125,23 +132,21 @@ class TranslationResultUiTest(unittest.TestCase):
             self.app.processEvents()
 
             self.assertEqual(dialog.text_edit.toPlainText(), "A translated sentence.")
-            self.assertEqual(dialog.title_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["title"])
-            eyebrow = dialog.findChild(main.QLabel, "translationResultEyebrow")
-            self.assertIsNotNone(eyebrow)
+            self.assertEqual(dialog.title_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["workspace_title"])
             self.assertGreaterEqual(
-                eyebrow.contentsRect().width(),
-                eyebrow.fontMetrics().horizontalAdvance(eyebrow.text()),
+                dialog.title_label.contentsRect().width(),
+                dialog.title_label.fontMetrics().horizontalAdvance(dialog.title_label.text()),
                 lang,
             )
             self.assertGreater(dialog.title_label.width(), 0, lang)
             self.assertTrue(dialog.windowFlags() & main.Qt.FramelessWindowHint)
             self.assertTrue(dialog.windowFlags() & main.Qt.WindowStaysOnTopHint)
             self.assertTrue(dialog.testAttribute(main.Qt.WA_TranslucentBackground))
-            self.assertEqual(dialog.width(), 480)
+            self.assertGreaterEqual(dialog.width(), dialog.minimumSizeHint().width())
             self.assertFalse(dialog.copy_button.autoDefault())
-            self.assertFalse(dialog.google_button.autoDefault())
+            self.assertFalse(dialog.translate_button.autoDefault())
             self.assertFalse(dialog.close_button.autoDefault())
-            for button in (dialog.copy_button, dialog.google_button, dialog.close_button):
+            for button in (dialog.copy_button, dialog.translate_button, dialog.close_button):
                 self.assertGreaterEqual(button.width(), button.sizeHint().width())
             if theme == "Темная":
                 self.assertIn("background: #111216", dialog.styleSheet())
@@ -149,7 +154,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 self.assertIn("background: #ece7f0", dialog.styleSheet())
             dialog.close()
 
-    def test_copy_and_google_buttons_work_without_closing_the_result(self):
+    def test_copy_button_works_without_closing_the_result(self):
         dialog = main.TranslationResultDialog(
             None,
             "кореец → Coreano",
@@ -164,10 +169,6 @@ class TranslationResultUiTest(unittest.TestCase):
         history.assert_called_once_with("кореец → Coreano")
         self.assertEqual(dialog.status_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT["ru"]["copied"])
 
-        with mock.patch.object(main.webbrowser, "open") as browser:
-            dialog.google_button.click()
-        browser.assert_called_once()
-        self.assertIn("%D0%BA%D0%BE%D1%80%D0%B5%D0%B5%D1%86", browser.call_args.args[0])
         self.assertEqual(dialog.result(), 0)
         dialog.close()
 
@@ -537,7 +538,7 @@ class TranslationResultUiTest(unittest.TestCase):
         options.update(kwargs)
         return main.TranslationResultDialog(None, "Hello world", **options)
 
-    def test_pair_row_appears_only_when_the_original_text_and_pair_are_known(self):
+    def test_editors_and_a_valid_pair_remain_available_without_original_metadata(self):
         with_pair = self._pair_dialog()
         self.assertTrue(with_pair.pair_row_available)
         self.assertEqual(with_pair.source_combo.currentData(), "es")
@@ -549,15 +550,17 @@ class TranslationResultUiTest(unittest.TestCase):
 
         for missing in ({"source_text": "  "}, {"source_lang": ""}, {"target_lang": "es"}):
             plain = self._pair_dialog(**missing)
-            self.assertFalse(plain.pair_row_available, missing)
-            self.assertIsNone(plain.source_combo)
+            self.assertTrue(plain.pair_row_available, missing)
+            self.assertIsNotNone(plain.source_combo)
+            self.assertNotEqual(plain.source_combo.currentData(), plain.target_combo.currentData())
+            self.assertEqual(plain.source_edit.toPlainText(), missing.get('source_text', 'Hola mundo'))
             plain.close()
 
     def test_changing_the_target_retranslates_the_original_text(self):
         dialog = self._pair_dialog()
         calls = []
 
-        def fake_translate(text, source, target):
+        def fake_translate(text, source, target, **kwargs):
             calls.append((text, source, target))
             return "Hallo Welt"
 
@@ -647,14 +650,15 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(
                     translater,
                     "translate_text",
-                    lambda text, src, tgt: calls.append((text, src, tgt)) or "Hola mundo",
+                    lambda text, src, tgt, **kw: calls.append((text, src, tgt)) or "Hola mundo",
                 ):
             dialog.swap_button.click()
         self.app.processEvents()
 
         self.assertEqual(dialog.source_combo.currentData(), "en")
         self.assertEqual(dialog.target_combo.currentData(), "es")
-        self.assertEqual(calls, [("Hola mundo", "en", "es")])
+        self.assertEqual(calls, [("Hello world", "en", "es")])
+        self.assertEqual(dialog.source_edit.toPlainText(), "Hello world")
         dialog.close()
 
     def test_changing_the_source_keeps_a_valid_target_and_retranslates(self):
@@ -665,7 +669,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(
                     translater,
                     "translate_text",
-                    lambda text, src, tgt: calls.append((src, tgt)) or "ok",
+                    lambda text, src, tgt, **kw: calls.append((src, tgt)) or "ok",
                 ):
             dialog.source_combo.setCurrentIndex(dialog.source_combo.findData("en"))
         self.app.processEvents()
@@ -680,7 +684,7 @@ class TranslationResultUiTest(unittest.TestCase):
     def test_failed_retranslate_keeps_the_previous_result_and_reports_it(self):
         dialog = self._pair_dialog()
 
-        def boom(_text, _source, _target):
+        def boom(_text, _source, _target, **kwargs):
             raise RuntimeError("no network")
 
         with mock.patch.object(main.threading, "Thread", _immediate_thread), \
@@ -702,7 +706,7 @@ class TranslationResultUiTest(unittest.TestCase):
             self.assertIsInstance(dialog.swap_button, main.LanguageSwapButton)
             self.assertEqual(dialog.swap_button.text(), "")
             self.assertIn(
-                main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["swap"],
+                main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["swap_texts"],
                 dialog.swap_button.toolTip(),
             )
             dialog.close()

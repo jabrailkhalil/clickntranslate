@@ -1,0 +1,10 @@
+{
+  "installed": "/Applications/ClicknTranslate.app",
+  "dmg_copy": "passed",
+  "deep_signature": "passed",
+  "bundle_executable": "ClicknTranslate",
+  "background_only": false,
+  "minimum_macos": "13.4",
+  "gatekeeper_returncode": 3,
+  "gatekeeper": "/Applications/ClicknTranslate.app: rejected"
+}

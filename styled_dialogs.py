@@ -98,8 +98,14 @@ class _RoundedTooltipFilter(QtCore.QObject):
             # even while the same tip stays visible. Apply after Qt finishes
             # assigning its new owner, without reentering stylesheet polish.
             QtCore.QTimer.singleShot(0, lambda widget=watched: _apply_tooltip_theme(widget))
-        rounded_popup = is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
+        rounded_popup = (is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
+                         or (sys.platform == 'darwin' and isinstance(watched, QtWidgets.QMenu)))
         if event_type == QtCore.QEvent.Polish and rounded_popup:
+            # Cocoa gives an ordinary Qt.ToolTip panel an opaque native
+            # background even when its Qt backing store has transparent
+            # corners. Configure it before the native window is created.
+            if sys.platform == 'darwin' and not watched.windowFlags() & QtCore.Qt.FramelessWindowHint:
+                watched.setWindowFlag(QtCore.Qt.FramelessWindowHint, True)
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
             watched.setAttribute(QtCore.Qt.WA_StyledBackground, True)
@@ -128,6 +134,8 @@ def _is_tooltip(widget) -> bool:
 
 def _apply_tooltip_theme(widget) -> None:
     try:
+        if sip.isdeleted(widget):
+            return
         style = tooltip_stylesheet(_uses_dark_theme(widget))
         if widget.styleSheet() != style:
             widget.setStyleSheet(style)
@@ -148,6 +156,15 @@ def _is_rounded_popup(widget) -> bool:
 def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
     """Clip a tooltip-sized top-level window to true rounded corners."""
     try:
+        if sip.isdeleted(widget):
+            return
+        if sys.platform == 'darwin':
+            # Cocoa now composites the translucent surface correctly. A
+            # logical-pixel QRegion would cut its antialiased Retina edge
+            # into visible two-pixel steps.
+            # No mask was installed on Cocoa, so no native operation is
+            # needed here (including for a queued update after tip disposal).
+            return
         rect = widget.rect()
         if rect.width() < 2 or rect.height() < 2:
             return
@@ -161,6 +178,37 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
 
 
 _TOOLTIP_FILTER = None
+
+
+class StatusPopup(QtWidgets.QLabel):
+    """A non-activating status tip with a painted, translucent surface."""
+
+    def __init__(self):
+        super().__init__(None, QtCore.Qt.ToolTip | QtCore.Qt.WindowStaysOnTopHint
+                         | QtCore.Qt.FramelessWindowHint)
+        self.setProperty('clickntranslateRoundedPopup', True)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._refresh_theme()
+
+    def _refresh_theme(self):
+        set_widget_stylesheet(self, tooltip_stylesheet().replace('QToolTip', 'QLabel')
+                              + '\nQLabel { font-size: 14px; }')
+
+    def showEvent(self, event):
+        self._refresh_theme()
+        super().showEvent(event)
+
+    def paintEvent(self, event):
+        # QLabel paints its text but can omit the stylesheet surface when
+        # WA_TranslucentBackground is set. Draw that surface explicitly.
+        painter = QtGui.QPainter(self)
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
+        self.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, option, painter, self)
+        painter.end()
+        super().paintEvent(event)
 
 
 def install_tooltip_style(app=None, dark=None) -> None:

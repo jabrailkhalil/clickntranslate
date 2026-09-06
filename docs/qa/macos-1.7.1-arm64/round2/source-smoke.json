@@ -1,0 +1,2525 @@
+{
+  "macos": "14.3",
+  "architecture": "arm64",
+  "python": "3.12.14",
+  "qt": "5.15.14",
+  "pyqt": "5.15.11",
+  "screenshots": [
+    {
+      "file": "source-smoke-dark-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages0-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages0-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages0-2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages0-3.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages1-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-packages1-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-hotkeys.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-copy-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-translation-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-documents.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2268,
+      "height": 1470,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1900,
+      "height": 1308,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-result-narrow.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 958,
+      "height": 1298,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-help.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1448,
+      "height": 1472,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-en-guide.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages0-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages0-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages0-2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages0-3.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages1-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-packages1-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-hotkeys.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-copy-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-translation-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-documents.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2268,
+      "height": 1470,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1900,
+      "height": 1308,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-result-narrow.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 958,
+      "height": 1298,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-help.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1448,
+      "height": 1472,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-ru-guide.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-de-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-es-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-fr-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-zh-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages0-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages0-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages0-2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages0-3.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages1-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-packages1-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-hotkeys.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-copy-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-translation-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-documents.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2268,
+      "height": 1470,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1900,
+      "height": 1308,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-result-narrow.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 958,
+      "height": 1298,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-help.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1448,
+      "height": 1472,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-en-guide.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages0-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages0-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages0-2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages0-3.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages1-0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-packages1-1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1600,
+      "height": 1396,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-hotkeys.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-copy-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-translation-history.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-documents.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2268,
+      "height": 1470,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1900,
+      "height": 1308,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-result-narrow.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 958,
+      "height": 1298,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-help.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1448,
+      "height": 1472,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-ru-guide.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-de-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-es-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-fr-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-80-main.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-80-settings0.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-80-settings1.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-80-settings2.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-100-main.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-100-settings0.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-100-settings1.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-100-settings2.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-125-main.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-125-settings0.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-125-settings1.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-125-settings2.png",
+      "requested_percent": 125,
+      "effective_percent": 125,
+      "width": 2188,
+      "height": 1250,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-150-main.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-150-settings0.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-150-settings1.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-150-settings2.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-200-main.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-200-settings0.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-200-settings1.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-zh-200-settings2.png",
+      "requested_percent": 200,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-dark-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "source-smoke-light-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    }
+  ],
+  "gui": "ok",
+  "settings": "ok",
+  "theme": "ok",
+  "hotkey_registration": "ok",
+  "hotkey_conflict_and_reregister": "ok",
+  "permission_preflight": {
+    "screen": true,
+    "accessibility": true
+  },
+  "vision": "ok",
+  "vision_languages": [
+    "en-US",
+    "fr-FR",
+    "it-IT",
+    "de-DE",
+    "es-ES",
+    "pt-BR",
+    "zh-Hans",
+    "zh-Hant",
+    "yue-Hans",
+    "yue-Hant",
+    "ko-KR",
+    "ja-JP",
+    "ru-RU",
+    "uk-UA",
+    "th-TH",
+    "vi-VT"
+  ],
+  "native_popup_surfaces": {
+    "dark_tooltip": "transparent Cocoa background; painted surface",
+    "dark_status": "transparent Cocoa background; painted surface",
+    "dark_menu": "transparent Cocoa background; painted surface",
+    "light_tooltip": "transparent Cocoa background; painted surface",
+    "light_status": "transparent Cocoa background; painted surface",
+    "light_menu": "transparent Cocoa background; painted surface"
+  }
+}

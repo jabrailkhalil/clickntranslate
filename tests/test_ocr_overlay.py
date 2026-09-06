@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import time
 import unittest
@@ -513,9 +514,13 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         popup.setProperty("clickntranslateRoundedPopup", True)
         popup.resize(120, 36)
         styled_dialogs._apply_rounded_popup_mask(popup)
-        self.assertFalse(popup.mask().isEmpty())
-        self.assertFalse(popup.mask().contains(QPoint(0, 0)))
-        self.assertTrue(popup.mask().contains(popup.rect().center()))
+        if sys.platform == 'darwin':
+            # Cocoa uses an alpha surface; a QRegion aliases Retina corners.
+            self.assertTrue(popup.mask().isEmpty())
+        else:
+            self.assertFalse(popup.mask().isEmpty())
+            self.assertFalse(popup.mask().contains(QPoint(0, 0)))
+            self.assertTrue(popup.mask().contains(popup.rect().center()))
 
         # The stylesheet must live in exactly one place.
         for module_name in ("main", "settings_window"):

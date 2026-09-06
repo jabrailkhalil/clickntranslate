@@ -8,6 +8,73 @@ import tempfile
 from unittest import mock
 
 
+def popup_screenshots(app, window, report_path, screenshots):
+    """Check the real NSWindow background as well as Qt's painted corners."""
+    import ctypes
+    import objc
+    from PyQt5 import QtCore, QtWidgets
+    from PyQt5.QtTest import QTest
+    from styled_dialogs import StatusPopup
+
+    result = {}
+    for theme in ('dark', 'light'):
+        expected = 'Темная' if theme == 'dark' else 'Светлая'
+        if window.current_theme != expected:
+            window.toggle_theme()
+        window.activateWindow()
+        QTest.qWait(100)
+        for name in ('tooltip', 'status', 'menu'):
+            # A menu or another tooltip can destroy the shared QTipLabel.
+            # Inspect and capture each popup before opening the next one.
+            if name == 'tooltip':
+                button = window.help_button
+                QtWidgets.QToolTip.showText(button.mapToGlobal(QtCore.QPoint(0, 25)),
+                                           'Native tooltip / Подсказка', button)
+                QTest.qWait(50)
+                widget = next(w for w in app.topLevelWidgets()
+                              if w.metaObject().className() == 'QTipLabel' and w.isVisible())
+            elif name == 'status':
+                widget = StatusPopup()
+                widget.setText('Translation completed / Перевод завершён')
+                widget.adjustSize()
+                widget.show()
+            else:
+                widget = QtWidgets.QMenu(window)
+                window._apply_main_context_menu_style(widget)
+                widget.addAction('Translate / Перевести')
+                widget.popup(window.mapToGlobal(QtCore.QPoint(40, 100)))
+            QTest.qWait(30)
+            try:
+                native_view = objc.objc_object(c_void_p=ctypes.c_void_p(int(widget.winId())))
+                native_window = native_view.window()
+                try:
+                    assert not native_window.isOpaque()
+                    assert native_window.backgroundColor().alphaComponent() == 0.0
+                finally:
+                    del native_window, native_view
+                picture = widget.grab()
+                image = picture.toImage()
+                assert image.pixelColor(0, 0).alpha() == 0
+                assert widget.mask().isEmpty()
+                background = image.pixelColor(image.width() // 2, round(4 * picture.devicePixelRatioF()))
+                assert background.alpha() > 240
+                filename = f'{report_path.stem}-{theme}-{name}.png'
+                assert picture.save(str(report_path.with_name(filename)))
+                screenshots.append({'file': filename, 'requested_percent': 100,
+                                    'effective_percent': 100, 'width': picture.width(),
+                                    'height': picture.height(), 'dpr': picture.devicePixelRatioF()})
+                result[f'{theme}_{name}'] = 'transparent Cocoa background; painted surface'
+            finally:
+                if name == 'tooltip':
+                    QtWidgets.QToolTip.hideText()
+                    QTest.qWait(350)
+                else:
+                    widget.close()
+                    widget.deleteLater()
+                app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    return result
+
+
 def extended_screenshots(main, app, window, report_path, screenshots):
     """Opt-in native rendering matrix; no input synthesis or user data."""
     from PyQt5 import QtCore, QtWidgets
@@ -73,6 +140,11 @@ def extended_screenshots(main, app, window, report_path, screenshots):
                          source_text='Hello, world!', source_lang='en', target_lang='ru')
             result.show()
             capture(result, prefix + '-result', 100)
+            drafts = result.source_edit.toPlainText(), result.text_edit.toPlainText()
+            result.resize(420, 620)
+            capture(result, prefix + '-result-narrow', 100)
+            assert result._panel_orientation is False
+            assert drafts == (result.source_edit.toPlainText(), result.text_edit.toPlainText())
             result.close()
             result.deleteLater()
             def close_help():
@@ -145,6 +217,7 @@ def run(main, report_path):
             window.grab().save(str(report_path.with_suffix(".png")))
             if os.environ.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1':
                 extended_screenshots(main, app, window, report_path, screenshots)
+            popup_results = popup_screenshots(app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -170,6 +243,7 @@ def run(main, report_path):
                 "permission_preflight": {kind: macos_desktop.permission_granted(kind)
                                          for kind in ('screen', 'accessibility')},
                 "vision": "ok", "vision_languages": macos_ocr.supported_languages(),
+                "native_popup_surfaces": popup_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

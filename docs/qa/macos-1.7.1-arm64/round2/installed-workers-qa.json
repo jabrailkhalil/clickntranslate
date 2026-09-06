@@ -1,0 +1,61 @@
+{
+  "easyocr": {
+    "returncode": 0,
+    "response": {
+      "results": [
+        {
+          "label": "retina",
+          "text": "CLICK TRANSLATE",
+          "confidence": 0.88921362555565,
+          "boxes_count": 1,
+          "items": [
+            [
+              [
+                [
+                  328.0,
+                  128.0
+                ],
+                [
+                  1276.0,
+                  128.0
+                ],
+                [
+                  1276.0,
+                  230.0
+                ],
+                [
+                  328.0,
+                  230.0
+                ]
+              ],
+              "CLICK TRANSLATE",
+              0.88921362555565
+            ]
+          ],
+          "elapsed_ms": 2271.060666000267,
+          "error": ""
+        }
+      ],
+      "error": ""
+    },
+    "stderr": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/easyocr-data/ocr/easyocr/torch/ao/nn/quantized/dynamic/modules/rnn.py:162: UserWarning: torch.quantize_per_tensor, torch.quantize_per_channel and other quantized tensor creation functions that produce tensors with dtype torch.quint8, torch.qint8, and torch.qint32 are deprecated and will be removed in a future PyTorch release. Please see https://github.com/pytorch/pytorch/issues/184982 for more information. (Triggered internally at /Users/runner/work/pytorch/pytorch/aten/src/ATen/quantized/Quantizer.cpp:116.)\n  w_ih = torch.quantize_per_tensor(\n/Users/jabrail/Desktop/click/clickntranslate/build/macos/easyocr-data/ocr/easyocr/torch/utils/data/dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.\n  super().__init__(loader)\n"
+  },
+  "argos_offline_restart": {
+    "returncode": 0,
+    "response": {
+      "result": "Установленное приложение работает после перезагрузки компьютера.",
+      "statuses": [],
+      "error": ""
+    },
+    "stderr": ""
+  },
+  "argos_missing_pair": {
+    "returncode": 0,
+    "response": {
+      "result": null,
+      "statuses": [],
+      "error": ""
+    },
+    "stderr": ""
+  }
+}
