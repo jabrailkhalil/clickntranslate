@@ -75,6 +75,91 @@ def popup_screenshots(app, window, report_path, screenshots):
     return result
 
 
+def dropdown_screenshots(main, app, window, report_path, screenshots):
+    """Check first/repeated list geometry in the frozen Cocoa application."""
+    from PyQt5 import QtCore, QtWidgets
+    from PyQt5.QtTest import QTest
+
+    checked = []
+    def inspect(combo, name, requested, effective):
+        previous = None
+        for attempt in (1, 2):
+            combo.showPopup()
+            QTest.qWait(100)
+            popup, view = combo.view().window(), combo.view()
+            assert popup.isVisible(), name
+            proxy = popup.graphicsProxyWidget()
+            if proxy is not None:
+                root = combo.window()
+                geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
+                bounds = QtCore.QRectF(root.rect())
+                anchor = QtCore.QRectF(QtCore.QRect(combo.mapTo(root, QtCore.QPoint()), combo.size()))
+            else:
+                geometry = QtCore.QRectF(popup.geometry())
+                bounds = QtCore.QRectF(combo._available_screen_rect())
+                anchor = QtCore.QRectF(QtCore.QRect(combo.mapToGlobal(QtCore.QPoint()), combo.size()))
+            assert bounds.contains(geometry), (name, geometry, bounds)
+            assert not anchor.intersects(geometry), (name, anchor, geometry)
+            if previous is not None:
+                assert geometry == previous, (name, previous, geometry)
+            previous = geometry
+            if attempt == 1:
+                picture = window.grab() if proxy is not None else popup.grab()
+                filename = f'{report_path.stem}-combo-{name}.png'
+                assert picture.save(str(report_path.with_name(filename)))
+                screenshots.append({'file': filename, 'requested_percent': requested,
+                                    'effective_percent': effective, 'width': picture.width(),
+                                    'height': picture.height(), 'dpr': picture.devicePixelRatioF()})
+            view.scrollToBottom()
+            app.processEvents()
+            last = combo.model().index(combo.count() - 1, combo.modelColumn(), combo.rootModelIndex())
+            row = view.visualRect(last)
+            visible = row.intersected(view.viewport().rect())
+            assert not visible.isEmpty() and visible.height() == row.height(), (name, row, visible)
+            combo.hidePopup()
+            QTest.qWait(20)
+        checked.append(name)
+
+    window.set_interface_language('ru')
+    for theme in ('dark', 'light'):
+        expected = 'Темная' if theme == 'dark' else 'Светлая'
+        if window.current_theme != expected:
+            window.toggle_theme()
+        for percent in (80, 100, 150):
+            actual = window.set_ui_scale_percent(percent)
+            prefix = f'{theme}-{percent}'
+            window.show_main_screen()
+            for key in ('source_lang', 'target_lang', 'hotkey_mode_combo',
+                        'hotkey_source_combo', 'hotkey_target_combo'):
+                inspect(getattr(window, key), prefix + '-main-' + key, percent, actual)
+            window.show_settings()
+            settings = window.settings_window
+            settings._set_settings_page(0)
+            for key in ('ocr_engine_combo', 'translator_combo', 'result_window_control'):
+                inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
+            settings._set_settings_page(2)
+            for key in ('game_source_combo', 'game_target_combo'):
+                inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
+            window.show_main_screen()
+            result = main.TranslationResultDialog(window, 'Привет!', auto_copy=False,
+                         lang='ru', theme=window.current_theme, source_text='Hello!',
+                         source_lang='en', target_lang='ru')
+            document = main.DocumentTranslationDialog(window)
+            for name, dialog, keys in (
+                ('result', result, ('source_combo', 'target_combo')),
+                ('document', document, ('source_combo', 'target_combo', 'provider_combo')),
+            ):
+                dialog.show()
+                app.processEvents()
+                for key in keys:
+                    inspect(getattr(dialog, key), prefix + '-' + name + '-' + key, percent, actual)
+                dialog.close()
+                dialog.deleteLater()
+                app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    return {'cases': len(checked), 'openings': len(checked) * 2,
+            'checks': 'stable anchor, available bounds, last row reachable', 'names': checked}
+
+
 def extended_screenshots(main, app, window, report_path, screenshots):
     """Opt-in native rendering matrix; no input synthesis or user data."""
     from PyQt5 import QtCore, QtWidgets
@@ -217,6 +302,7 @@ def run(main, report_path):
             window.grab().save(str(report_path.with_suffix(".png")))
             if os.environ.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1':
                 extended_screenshots(main, app, window, report_path, screenshots)
+            dropdown_results = dropdown_screenshots(main, app, window, report_path, screenshots)
             popup_results = popup_screenshots(app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
@@ -244,6 +330,7 @@ def run(main, report_path):
                                          for kind in ('screen', 'accessibility')},
                 "vision": "ok", "vision_languages": macos_ocr.supported_languages(),
                 "native_popup_surfaces": popup_results,
+                "dropdowns": dropdown_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

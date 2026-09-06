@@ -328,27 +328,35 @@ class MainWindowScaleController(QObject):
         return self.view.mapFromScene(self.proxy.mapToScene(QPointF(local)))
 
 
-def position_embedded_combo_popup(combo, popup, gap):
+def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
+    """Fit a list beside its field, in one coordinate system and on one screen."""
+    bounds = bounds.adjusted(margin, margin, -margin, -margin)
+    below = anchor.y() + anchor.height() + gap
+    below_space = max(0, bounds.y() + bounds.height() - below)
+    above_space = max(0, anchor.y() - gap - bounds.y())
+    open_below = desired.height() <= below_space or below_space >= above_space
+    room = below_space if open_below else above_space
+    height = max(1, min(desired.height(), room or bounds.height()))
+    width = max(1, min(desired.width(), bounds.width()))
+    x = max(bounds.left(), min(anchor.x(), bounds.x() + bounds.width() - width))
+    y = below if open_below else anchor.y() - gap - height
+    y = max(bounds.top(), min(y, bounds.y() + bounds.height() - height))
+    return QRect(x, y, width, height)
+
+
+def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
     """Popup coordinates belong to the scene, not to the native desktop."""
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()
     if reference is None or proxy is None:
         return False
-    top_left = combo.mapTo(root, QPoint())
-    below = top_left.y() + combo.height() + gap
-    below_space = max(0, root.height() - below - 4)
-    above_space = max(0, top_left.y() - gap - 4)
-    open_below = popup.height() <= below_space or below_space >= above_space
-    space = below_space if open_below else above_space
-    height = min(popup.height(), space)
-    width = min(popup.width(), root.width() - 8)
-    popup.resize(width, max(1, height))
+    anchor = QRect(combo.mapTo(root, QPoint()), combo.size())
+    geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4)
+    popup.resize(geometry.size())
     if popup.layout() is not None:
         popup.layout().activate()
-    x = max(4, min(top_left.x(), root.width() - width - 4))
-    y = below if open_below else top_left.y() - gap - popup.height()
-    scene_position = root.graphicsProxyWidget().mapToScene(QPointF(x, y))
+    scene_position = root.graphicsProxyWidget().mapToScene(QPointF(geometry.topLeft()))
     parent = proxy.parentItem()
     proxy.setPos(parent.mapFromScene(scene_position) if parent is not None else scene_position)
     return True

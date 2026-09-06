@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-07",
+  "base_commit": "eb266a10eb00237d7a0f25c176f9692f1562830b",
+  "host": {
+    "model": "MacBookAir10,1",
+    "cpu": "Apple M1",
+    "ram_gb": 8,
+    "macos": "14.3",
+    "build": "23D56",
+    "architecture": "arm64",
+    "qt_platform": "cocoa",
+    "retina_dpr": 2
+  },
+  "pytest": {
+    "cocoa": {
+      "passed": 1038,
+      "skipped": 72,
+      "subtests": 892,
+      "seconds": 132.27
+    },
+    "offscreen": {
+      "passed": 1034,
+      "skipped": 76,
+      "subtests": 892,
+      "seconds": 99.8
+    }
+  },
+  "source_smoke": {
+    "result": "passed",
+    "screenshots": 400,
+    "dropdown_cases": 90,
+    "dropdown_openings": 180
+  },
+  "installed_smoke": {
+    "result": "passed",
+    "screenshots": 400,
+    "dropdown_cases": 90,
+    "dropdown_openings": 180,
+    "launchservices": "passed",
+    "vision": "passed",
+    "rapidocr_helper": "passed",
+    "argos_helper": "passed"
+  },
+  "build": {
+    "command": "bash tools/build_macos_release.sh",
+    "exit_code": 0,
+    "mach_o_files": 224,
+    "minimum_macos": "13.4",
+    "signature": "ad hoc; deep strict verification passed",
+    "notarized": false,
+    "gatekeeper": "rejected"
+  },
+  "artifacts": [
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166070662,
+      "sha256": "1fc9897f5f805c50a0cc866f392cc1dd305487c06cf690892d3e674e4bfafb54"
+    },
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153474756,
+      "sha256": "f1c04e429d431c550adbab05720744b42159b8daf589bd9d9fa99c3c48419f98"
+    }
+  ],
+  "limits": [
+    "Qt-local popup opening and rendering, not physical keyboard/mouse or external-app acceptance.",
+    "Requested main-window scales 150/200 percent are constrained to about 138 percent by this display.",
+    "Installed Screen Recording and Accessibility remain ungranted.",
+    "Physical hotkeys, external replacement, full dynamic translation and next login remain pending as documented in MACOS_QA.md."
+  ]
+}

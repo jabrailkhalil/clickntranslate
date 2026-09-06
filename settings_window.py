@@ -1,5 +1,5 @@
 from button_styles import button_qss, button_palette, standard_buttons
-from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup
+from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
 from PyQt5 import sip
 import os
 import json
@@ -383,6 +383,7 @@ class DropDownCombo(QComboBox):
 
     POPUP_GAP = 3
     GROUP_HEADER_ROLE = Qt.UserRole + 100
+    aboutToShowPopup = QtCore.pyqtSignal()
 
     def set_group_header(self, index):
         _configure_engine_group_header(self, index)
@@ -423,6 +424,11 @@ class DropDownCombo(QComboBox):
                                  if sys.platform == 'darwin' else _DropDownProxyStyle())
         self._drop_down_style.setParent(self)
         self.setStyle(self._drop_down_style)
+        self._laying_out_popup = False
+        self._popup_model = None
+        self._popup_layout_timer = QtCore.QTimer(self)
+        self._popup_layout_timer.setSingleShot(True)
+        self._popup_layout_timer.timeout.connect(self._layout_open_popup)
 
     def set_popup_background(self, colour):
         """Colour for the frame Qt wraps the list in.
@@ -522,61 +528,113 @@ class DropDownCombo(QComboBox):
             }}
         """)
 
-    def showPopup(self):
-        super().showPopup()
-        self._paint_popup_frame()
-        popup = self.view().window()
-        if popup is None:
-            return
-        self._cap_popup_to_visible_rows(popup)
-        if position_embedded_combo_popup(self, popup, self.POPUP_GAP):
-            return
-        top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
-        below = top_left.y() + self.height() + self.POPUP_GAP
-        screen = self._available_screen_rect()
-        if below + popup.height() > screen.bottom():
-            # No room underneath: sit above the field, still clear of it.
-            above = top_left.y() - popup.height() - self.POPUP_GAP
-            below = above if above >= screen.top() else screen.bottom() - popup.height()
-        x = min(top_left.x(), screen.right() - popup.width())
-        popup.move(max(screen.left(), x), below)
-
-    def _cap_popup_to_visible_rows(self, popup):
-        """Enforce maxVisibleItems even on GTK/Qt styles that ignore it.
-
-        Qt documents that native popup styles may disregard maxVisibleItems.
-        That made the language list cover almost the whole desktop on Ubuntu
-        and left no scrollbar at all.  Measure the actual styled rows, cap the
-        popup window itself, and let the view expose its normal scrollbar.
-        """
+    def _prepare_popup(self):
+        # Polish the list before QComboBox measures it for the first opening.
+        # Its native popup lives outside the dialog's font/scale traversal.
+        self.ensurePolished()
         view = self.view()
-        if not self.style().styleHint(QtWidgets.QStyle.SH_ComboBox_Popup, None, self):
-            # The standard list popup already honours maxVisibleItems exactly;
-            # resizing it again would shave a few pixels from its final row.
-            return
-        rows = self.model().rowCount()
-        visible_rows = max(1, min(rows, self.maxVisibleItems()))
-        if rows <= visible_rows:
-            return
-
-        fallback_height = max(24, view.fontMetrics().height() + 10)
-        content_height = 2 * view.frameWidth()
-        for row in range(visible_rows):
-            row_height = view.sizeHintForRow(row)
-            content_height += row_height if row_height > 0 else fallback_height
-
-        popup_chrome = max(0, popup.height() - view.height())
-        capped_height = content_height + popup_chrome
+        if view.font() != self.font():
+            view.setFont(self.font())
+        self._paint_popup_frame()
+        popup = view.window()
+        popup.ensurePolished()
+        view.ensurePolished()
         view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        view.setMaximumHeight(content_height)
-        popup.setMaximumHeight(capped_height)
-        popup.resize(popup.width(), capped_height)
-        if popup.layout() is not None:
-            popup.layout().activate()
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        view.setMinimumSize(0, 0)
+        view.setMaximumSize(16777215, 16777215)
+        popup.setMinimumSize(0, 0)
+        popup.setMaximumSize(16777215, 16777215)
+        view.doItemsLayout()
+        popup.installEventFilter(self)
+        model = self.model()
+        if model is not self._popup_model:
+            if self._popup_model is not None and not sip.isdeleted(self._popup_model):
+                for name in ('rowsInserted', 'rowsRemoved', 'modelReset', 'dataChanged', 'layoutChanged'):
+                    getattr(self._popup_model, name).disconnect(self._queue_popup_layout)
+            self._popup_model = model
+            for name in ('rowsInserted', 'rowsRemoved', 'modelReset', 'dataChanged', 'layoutChanged'):
+                getattr(model, name).connect(self._queue_popup_layout)
+        return popup
+
+    def showPopup(self):
+        self.aboutToShowPopup.emit()
+        self._prepare_popup()
+        super().showPopup()
+        self._layout_open_popup()
+        # Cocoa synchronizes a newly created QGraphicsProxyWidget after Show.
+        # That can overwrite the scene position with unscaled window coordinates.
+        self._queue_popup_layout()
+
+    def hidePopup(self):
+        self._popup_layout_timer.stop()
+        super().hidePopup()
+
+    def eventFilter(self, watched, event):
+        if (getattr(self, '_popup_layout_timer', None) is not None
+                and watched is self.view().window()):
+            if event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize, QtCore.QEvent.Show):
+                self._queue_popup_layout()
+            elif event.type() == QtCore.QEvent.Hide:
+                self._popup_layout_timer.stop()
+        return super().eventFilter(watched, event)
+
+    def _queue_popup_layout(self, *args):
+        if not self._laying_out_popup and self.view().window().isVisible():
+            self._popup_layout_timer.start(0)
+
+    def _popup_content_size(self):
+        view = self.view()
+        view.doItemsLayout()
+        heights, widest = [], 0
+        root = self.rootModelIndex()
+        for row in range(self.model().rowCount(root)):
+            if hasattr(view, 'isRowHidden') and view.isRowHidden(row):
+                continue
+            index = self.model().index(row, self.modelColumn(), root)
+            font = index.data(Qt.FontRole) or view.font()
+            metrics = QtGui.QFontMetrics(font)
+            height = view.sizeHintForRow(row)
+            heights.append(height if height > 0 else metrics.height() + 6)
+            # SizeHintRole may specify only a row height (the checkbox picker).
+            # Measure text and decoration as well, so localized labels fit.
+            width = metrics.horizontalAdvance(str(index.data(Qt.DisplayRole) or ''))
+            icon = index.data(Qt.DecorationRole)
+            if icon is not None:
+                width += max(18, self.iconSize().width()) + 6
+            widest = max(widest, width)
+        visible = max(1, min(len(heights), self.maxVisibleItems()))
+        # Allow any scrolled group of rows, including taller section headers.
+        content_height = sum(sorted(heights, reverse=True)[:visible]) or view.fontMetrics().height()
+        chrome = max(2, view.window().height() - view.viewport().height())
+        scrollbar = view.verticalScrollBar().sizeHint().width()
+        width = max(self.width(), view.sizeHintForColumn(self.modelColumn()) + 16 + scrollbar,
+                    widest + 24 + scrollbar)
+        return QtCore.QSize(width, content_height + chrome)
+
+    def _layout_open_popup(self):
+        if self._laying_out_popup or not self.view().window().isVisible():
+            return
+        self._laying_out_popup = True
+        try:
+            popup = self.view().window()
+            desired = self._popup_content_size()
+            popup.setMinimumSize(0, 0)
+            if not position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired):
+                anchor = QtCore.QRect(self.mapToGlobal(QtCore.QPoint()), self.size())
+                popup.setGeometry(combo_popup_geometry(anchor, desired,
+                                                       self._available_screen_rect(), self.POPUP_GAP))
+            if popup.layout() is not None:
+                popup.layout().activate()
+            self.view().scrollTo(self.view().currentIndex(), QtWidgets.QAbstractItemView.EnsureVisible)
+        finally:
+            self._laying_out_popup = False
 
     def _available_screen_rect(self):
-        handle = self.window().windowHandle()
-        screen = handle.screen() if handle is not None else None
+        screen = QtWidgets.QApplication.screenAt(self.mapToGlobal(self.rect().center()))
+        if screen is None:
+            handle = self.window().windowHandle()
+            screen = handle.screen() if handle is not None else None
         if screen is None:
             screen = QtWidgets.QApplication.primaryScreen()
         return screen.availableGeometry()
@@ -811,18 +869,6 @@ class ResultWindowModeCombo(DropDownCombo):
         if self._help:
             self.setToolTip(tooltip_text(f"{self._help}\n{accessible_detail}"))
         self.update()
-
-    def showPopup(self):
-        # Without this the popup is only as wide as the closed control, which
-        # clips the longer localized labels.
-        view = self.view()
-        widest = max(
-            (QtGui.QFontMetrics(view.font()).horizontalAdvance(self.model().item(row).text())
-             for row in range(self.model().rowCount())),
-            default=0,
-        )
-        view.setMinimumWidth(max(self.width(), widest + 56))
-        super().showPopup()
 
     def paintEvent(self, event):
         # The combo would otherwise show whichever row is "current"; it has to
@@ -7816,6 +7862,10 @@ class SettingsWindow(QWidget):
         self.game_source_combo = DropDownCombo(self.settings_game_page)
         self.game_target_combo = DropDownCombo(self.settings_game_page)
         for combo in (self.game_source_combo, self.game_target_combo):
+            # A click can beat the deferred installed-language probe. Finish
+            # it before showing the list, so clear()/repopulation cannot close
+            # a one-row popup underneath the user's pointer.
+            combo.aboutToShowPopup.connect(self._verify_game_language_controls)
             combo.setFixedSize(147, 32)
             self._apply_game_language_combo_style(combo)
         self.game_swap_button = LanguageSwapButton(self.settings_game_page)

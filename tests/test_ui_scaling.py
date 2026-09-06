@@ -11,7 +11,7 @@ from unittest import mock
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PyQt5.QtCore import QEvent, QPoint, QPointF, QRect, Qt
+from PyQt5.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, Qt
 from PyQt5.QtGui import QColor, QIcon, QIconEngine, QMouseEvent, QPalette, QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QGraphicsItem
@@ -248,6 +248,53 @@ class UiScalingTest(unittest.TestCase):
         self.settle()
         self.assertEqual(combo.currentIndex(), last)
         self.assertFalse(popup.isVisible())
+
+    def test_first_popup_keeps_its_anchor_after_native_proxy_sync_and_zoom(self):
+        self.window.show_main_screen()
+        for percent in (80, 100, 137):
+            self.window.set_ui_scale_percent(percent)
+            self.settle()
+            for combo in (self.window.source_lang, self.window.target_lang,
+                          self.window.hotkey_source_combo):
+                geometries = []
+                for attempt in (1, 2):
+                    self.click(combo)
+                    # Cocoa's native-to-scene synchronization is posted after
+                    # showPopup returns; processEvents alone missed the jump.
+                    QTest.qWait(100)
+                    popup = combo.view().window()
+                    self.assertTrue(popup.isVisible())
+                    proxy = popup.graphicsProxyWidget()
+                    root = combo.window()
+                    geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
+                    field = QRect(combo.mapTo(root, QPoint()), combo.size())
+                    self.assertTrue(root.rect().contains(geometry.toAlignedRect()))
+                    self.assertFalse(geometry.intersects(QRectF(field)),
+                                     (percent, attempt, geometry, field))
+                    geometries.append(geometry)
+                    QTest.keyClick(self.controller.view.viewport(), Qt.Key_Escape)
+                    self.settle()
+                self.assertEqual(geometries[0], geometries[1])
+
+    def test_dynamic_language_catalog_is_ready_before_the_first_popup(self):
+        self.window.show_settings()
+        settings = self.window.settings_window
+        settings._set_settings_page(2)
+        with mock.patch('ocr.installed_ocr_language_codes', return_value={'en', 'ru', 'de'}):
+            settings._refresh_game_language_controls()
+            combo = settings.game_source_combo
+            self.assertEqual(combo.count(), 1)
+            combo.showPopup()
+            self.assertEqual(combo.count(), 3)
+            QTest.qWait(120)
+            self.assertTrue(combo.view().window().isVisible())
+            self.assertEqual(combo.currentData(), 'en')
+            first = combo.view().window().size()
+            combo.hidePopup()
+            combo.showPopup()
+            QTest.qWait(100)
+            self.assertEqual(combo.view().window().size(), first)
+            combo.hidePopup()
 
     def test_header_drag_and_document_shortcut_reach_the_native_window(self):
         self.window.set_ui_scale_percent(175)
