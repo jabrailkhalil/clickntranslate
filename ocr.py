@@ -788,7 +788,11 @@ def _serialized_native_ocr_runtime(function):
 def _native_ocr_worker_enabled():
     if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
         return False
-    return bool(getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_USE_OCR_WORKER") == "1")
+    # Re-importing Torch after removing/reinstalling an engine can fail in its
+    # native NumPy bridge. Source launches need the same process isolation as
+    # the frozen Mac application, including installer validation.
+    return bool(platform_support.IS_MAC or getattr(sys, "frozen", False)
+                or os.environ.get("CLICKNTRANSLATE_USE_OCR_WORKER") == "1")
 
 
 def _native_ocr_worker_path():

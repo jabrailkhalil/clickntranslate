@@ -195,6 +195,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
         expected_ocr_titles = ["Tesseract", "EasyOCR", "RapidOCR"]
         if platform_support.supports_windows_ocr():
             expected_ocr_titles.insert(0, "Windows")
+        if platform_support.IS_MAC:
+            expected_ocr_titles.insert(0, "Apple Vision")
         self.assertEqual(ocr_titles, expected_ocr_titles)
         # Hy-MT is a translator you install and remove, so it has a tab of its
         # own here; that used to be possible only from the × in the picker.
@@ -1283,6 +1285,10 @@ class EasyOcrRequirementsTest(unittest.TestCase):
 
     def setUp(self):
         from settings_window import SettingsWindow
+
+        platform_patch = mock.patch.object(platform_support, 'IS_MAC', False)
+        platform_patch.start()
+        self.addCleanup(platform_patch.stop)
 
         self.parent = _AppParent()
         self.parent.config = {"autostart": False, "start_minimized": False,

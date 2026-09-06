@@ -101,9 +101,9 @@ def _unavailable_sentencizer(*args, **kwargs):
 
 def _prepare_argos_environment():
     """Makes argostranslate importable without torch/stanza/onnxruntime."""
-    if portable_paths.is_windows_packaged():
-        # Keep Argos models and indexes in the package's writable LocalState.
-        # The MSIX installation directory is read-only and changes on updates.
+    if portable_paths.is_windows_packaged() or platform_support.IS_MAC:
+        # Keep native Mac data in Application Support and MSIX data in its
+        # writable LocalState. Never write inside the signed application.
         argos_root = os.path.join(portable_paths.portable_base_dir(), "argos")
         os.environ.setdefault("XDG_DATA_HOME", os.path.join(argos_root, "data"))
         os.environ.setdefault("XDG_CONFIG_HOME", os.path.join(argos_root, "config"))
@@ -157,6 +157,13 @@ def _ensure_argos_available():
     try:
         import argostranslate.package as loaded_pkg
         import argostranslate.translate as loaded_tr
+        if platform_support.IS_MAC:
+            # Source versions before 1.7.1 used the upstream ~/.local path.
+            # Continue to read those models without moving or deleting them.
+            from pathlib import Path
+            legacy = Path.home() / '.local/share/argos-translate/packages'
+            if legacy.is_dir() and legacy not in loaded_pkg.settings.package_dirs:
+                loaded_pkg.settings.package_dirs.append(legacy)
     except Exception as exc:
         HAS_ARGOS = False
         _argos_import_error = exc

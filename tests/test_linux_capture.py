@@ -311,7 +311,7 @@ class OverlayFreezeTest(unittest.TestCase):
     def test_windows_keeps_the_users_setting(self):
         import ocr
 
-        with mock.patch.object(platform_support, "IS_LINUX", False):
+        with mock.patch.multiple(platform_support, IS_LINUX=False, IS_WINDOWS=True, IS_MAC=False):
             self.assertFalse(ocr.ScreenCaptureOverlay._freeze_required(self._overlay(False)))
             self.assertTrue(ocr.ScreenCaptureOverlay._freeze_required(self._overlay(True)))
 

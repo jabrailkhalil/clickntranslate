@@ -26,6 +26,7 @@ def mac(monkeypatch, tmp_path):
     monkeypatch.setattr(platform_support, "IS_WINDOWS", False)
     monkeypatch.setattr(platform_support, "IS_LINUX", False)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(desktop, 'user_data_dir', lambda: str(tmp_path / 'Library/Application Support/ClicknTranslate'))
     return tmp_path
 
 
@@ -294,3 +295,36 @@ def test_dynamic_position_mode_passes_its_selected_engine(app, monkeypatch):
 @pytest.mark.skipif(sys.platform != 'darwin', reason='requires the real macOS frameworks')
 def test_native_vision_language_catalog_is_available():
     assert 'en' in vision.language_codes()
+
+
+def test_source_macos_ocr_is_also_isolated(mac, monkeypatch):
+    import ocr
+    monkeypatch.delattr(sys, 'frozen', raising=False)
+    monkeypatch.delenv('CLICKNTRANSLATE_USE_OCR_WORKER', raising=False)
+    assert ocr._native_ocr_worker_enabled()
+    assert ocr._native_ocr_worker_command() == [sys.executable, str(Path(ocr.__file__).with_name('ocr_worker.py'))]
+
+
+def test_mac_picker_sees_rapidocr_in_the_bundled_helper(mac, monkeypatch):
+    import ocr
+    import settings_window as settings
+    monkeypatch.setattr(sys, 'frozen', True, raising=False)
+    monkeypatch.setattr(ocr, '_native_ocr_worker_path', lambda: '/App/Contents/MacOS/OcrWorker')
+    owner = SimpleNamespace(_local_rapidocr_installed=lambda: False,
+                            _module_available_without_import=mock.Mock(return_value=False))
+    assert settings.SettingsWindow._rapidocr_runtime_installed(owner)
+    owner._module_available_without_import.assert_not_called()
+
+
+def test_mac_argos_defaults_to_application_support_and_respects_overrides(mac, monkeypatch):
+    import translater
+    for name in ('XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_CONFIG_HOME'):
+        monkeypatch.delenv(name, raising=False)
+    translater._prepare_argos_environment()
+    expected = mac / 'Library/Application Support/ClicknTranslate/argos'
+    assert Path(os.environ['XDG_DATA_HOME']) == expected / 'data'
+    assert Path(os.environ['XDG_CACHE_HOME']) == expected / 'cache'
+    assert Path(os.environ['XDG_CONFIG_HOME']) == expected / 'config'
+    monkeypatch.setenv('XDG_DATA_HOME', str(mac / 'custom'))
+    translater._prepare_argos_environment()
+    assert Path(os.environ['XDG_DATA_HOME']) == mac / 'custom'

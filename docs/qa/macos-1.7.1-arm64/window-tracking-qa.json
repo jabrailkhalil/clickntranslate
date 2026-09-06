@@ -1,0 +1,43 @@
+{
+  "number": 2092,
+  "initial": {
+    "rect": [
+      120,
+      100,
+      600,
+      160
+    ],
+    "hidden": false,
+    "owned": true
+  },
+  "moved": {
+    "rect": [
+      280,
+      190,
+      600,
+      160
+    ],
+    "hidden": false,
+    "owned": true
+  },
+  "minimized": {
+    "rect": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "hidden": true,
+    "owned": false
+  },
+  "closed": {
+    "rect": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "hidden": true,
+    "owned": false
+  }
+}

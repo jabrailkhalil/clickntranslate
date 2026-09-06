@@ -1,0 +1,89 @@
+{
+  "permissions": {
+    "screen": true,
+    "accessibility": true
+  },
+  "region": {
+    "logical": [
+      100,
+      100,
+      800,
+      180
+    ],
+    "pixels": [
+      1600,
+      360
+    ],
+    "dpr": 2.0
+  },
+  "fullscreen": {
+    "pixels": [
+      2560,
+      1600
+    ],
+    "crop": [
+      1600,
+      360
+    ]
+  },
+  "engines": {
+    "apple vision": {
+      "status": "passed",
+      "result": [
+        [
+          333.3333281111111,
+          133.00000037037034,
+          940.0,
+          93.99999999999997,
+          "CLICK TRANSLATE"
+        ]
+      ]
+    },
+    "tesseract": {
+      "status": "passed",
+      "result": [
+        [
+          336,
+          140,
+          927,
+          77,
+          "CLICK TRANSLATE"
+        ]
+      ]
+    },
+    "rapidocr": {
+      "status": "passed",
+      "result": [
+        [
+          326.0,
+          128.0,
+          951.0,
+          101.0,
+          "CLICK TRANSLATE"
+        ]
+      ]
+    },
+    "easyocr": {
+      "status": "passed",
+      "result": [
+        [
+          328.0,
+          128.0,
+          948.0,
+          102.0,
+          "CLICK TRANSLATE"
+        ]
+      ]
+    }
+  },
+  "target_window": {
+    "number": 0,
+    "rect": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "minimized": false
+  }
+}

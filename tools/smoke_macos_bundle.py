@@ -3,6 +3,8 @@
 import json
 import os
 from pathlib import Path
+import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,10 +20,26 @@ def main():
     environment = os.environ.copy()
     # Exercise Cocoa, not Qt's offscreen plugin. No screen capture/input requests.
     environment.pop("QT_QPA_PLATFORM", None)
-    subprocess.run([str(executables / "ClicknTranslate"), "--smoke-test", str(report)],
-                   env=environment, check=True, timeout=120)
+    info = plistlib.loads((application / 'Contents/Info.plist').read_bytes())
+    assert info['CFBundleExecutable'] == 'ClicknTranslate', info
+    assert not info.get('LSBackgroundOnly') and not info.get('LSUIElement'), info
+    # Exercise the same entry point as Finder and login startup. Running the
+    # binary directly misses incorrect CFBundleExecutable/background metadata.
+    report.unlink(missing_ok=True)
+    # A checkout on Desktop/Documents is TCC-protected for a Finder-launched
+    # app. Save its fixtures in a temporary directory so this noninteractive
+    # smoke test never asks for access to the developer's personal folders.
+    with tempfile.TemporaryDirectory(prefix='cnt-mac-render-') as temporary:
+        native_report = Path(temporary) / report.name
+        subprocess.run(['/usr/bin/open', '-n', '-W', '-a', str(application),
+                        '--args', '--smoke-test', str(native_report)],
+                       env=environment, check=True,
+                       timeout=300 if environment.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1' else 120)
+        for result in Path(temporary).iterdir():
+            shutil.copy2(result, report.parent / result.name)
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert payload["vision"] == "ok", payload
+    payload['launchservices'] = 'ok'
     with tempfile.TemporaryDirectory(prefix="cnt-mac-workers-") as temporary:
         root = Path(temporary)
         # Argos creates its cache/config folders during import. Keep this build

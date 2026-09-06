@@ -1,0 +1,14 @@
+{
+  "ClicknTranslate": {
+    "sha256": "82f822ee951e2a6083dca344d7855bcbbcbd8af2853e131cec8bdb5eb540b746",
+    "matches_installed_copy": true
+  },
+  "OcrWorker": {
+    "sha256": "91982cc625671162273e1c4600b973e318544c39da88f3c5e10089b79039db0e",
+    "matches_installed_copy": true
+  },
+  "ArgosWorker": {
+    "sha256": "96c24a0ed5755baa5dc1c4268b81b90ec2c766f84ef1929322b390a6d45fa034",
+    "matches_installed_copy": true
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "checks": {
+    "vision_en": {
+      "status": "passed",
+      "result": {
+        "text": "CLICK TRANSLATE",
+        "boxes": [
+          [
+            [
+              32.00000236999995,
+              49.99999990000001
+            ],
+            [
+              506.00000236999995,
+              49.99999990000001
+            ],
+            [
+              506.00000236999995,
+              89.9999999
+            ],
+            [
+              32.00000236999995,
+              89.9999999
+            ]
+          ]
+        ]
+      },
+      "seconds": 0.57
+    },
+    "vision_ru": {
+      "status": "passed",
+      "result": {
+        "text": "Проверка перевода",
+        "boxes": [
+          [
+            [
+              31.999997620000048,
+              52.000000060000005
+            ],
+            [
+              507.9999976200001,
+              52.000000060000005
+            ],
+            [
+              507.9999976200001,
+              100.00000005999998
+            ],
+            [
+              31.999997620000048,
+              100.00000005999998
+            ]
+          ]
+        ]
+      },
+      "seconds": 0.23
+    },
+    "rapidocr": {
+      "status": "passed",
+      "result": {
+        "results": [
+          {
+            "label": "en",
+            "text": "CLICK TRANSLATE",
+            "confidence": 0.9970685084660847,
+            "boxes_count": 1,
+            "items": [
+              [
+                [
+                  [
+                    28.0,
+                    45.0
+                  ],
+                  [
+                    509.0,
+                    44.0
+                  ],
+                  [
+                    510.0,
+                    94.0
+                  ],
+                  [
+                    28.0,
+                    95.0
+                  ]
+                ],
+                "CLICK TRANSLATE",
+                0.9970685084660847
+              ]
+            ],
+            "elapsed_ms": 768.6996249999538,
+            "error": ""
+          }
+        ],
+        "error": ""
+      },
+      "seconds": 1.19
+    },
+    "Google_short": {
+      "status": "passed",
+      "result": "Привет, мир! Это собственный тест перевода для Mac.",
+      "seconds": 0.92
+    },
+    "Google_long": {
+      "status": "passed",
+      "result": {
+        "length": 6569
+      },
+      "seconds": 1.63
+    },
+    "MyMemory_short": {
+      "status": "passed",
+      "result": "Здравствуйте, мир! Это нативный тест перевода для Mac.",
+      "seconds": 0.78
+    },
+    "MyMemory_long": {
+      "status": "passed",
+      "result": {
+        "length": 6569
+      },
+      "seconds": 1.72
+    },
+    "Lingva_short": {
+      "status": "passed",
+      "result": "Привет, мир! Это собственный тест перевода для Mac.",
+      "seconds": 2.94
+    },
+    "Lingva_long": {
+      "status": "passed",
+      "result": {
+        "length": 6569
+      },
+      "seconds": 3.05
+    },
+    "LibreTranslate_short": {
+      "status": "passed",
+      "result": "Привет, мир! Это нативный тест перевода Mac.",
+      "seconds": 0.47
+    },
+    "LibreTranslate_long": {
+      "status": "passed",
+      "result": {
+        "length": 6569
+      },
+      "seconds": 4.64
+    },
+    "argos_catalog": {
+      "status": "passed",
+      "result": {
+        "packages": 100
+      },
+      "seconds": 0.31
+    },
+    "argos_install": {
+      "status": "passed",
+      "result": [
+        [
+          "en",
+          "ru"
+        ]
+      ],
+      "seconds": 9.07
+    },
+    "argos_short": {
+      "status": "passed",
+      "result": "Привет, мир! Это нативный тест перевода Mac.",
+      "seconds": 0.33
+    },
+    "argos_long": {
+      "status": "passed",
+      "result": {
+        "length": 6569
+      },
+      "seconds": 22.79
+    },
+    "argos_uninstall": {
+      "status": "passed",
+      "result": [
+        [
+          "en",
+          "ru"
+        ]
+      ],
+      "seconds": 0.0
+    },
+    "argos_absent": {
+      "status": "passed",
+      "result": true,
+      "seconds": 0.0
+    },
+    "argos_reinstall": {
+      "status": "passed",
+      "result": [
+        [
+          "en",
+          "ru"
+        ]
+      ],
+      "seconds": 1.42
+    },
+    "argos_cancel": {
+      "status": "passed",
+      "result": "cancelled; no package installed",
+      "seconds": 0.0
+    }
+  }
+}

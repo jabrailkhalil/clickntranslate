@@ -288,9 +288,13 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
     def __init__(self, dark: bool = True):
         # Never pass QApplication.style() here: QProxyStyle takes ownership of
         # the style it is given and would delete the application's own, which
-        # crashes the process the next time anything paints. With no argument
-        # the proxy defers to the application style without owning it.
-        super().__init__()
+        # crashes the process the next time anything paints. On macOS the
+        # default proxy creates Aqua even when the app uses Fusion, bringing
+        # back negative layout insets. Give it its own Fusion instance.
+        if sys.platform == 'darwin':
+            super().__init__(QtWidgets.QStyleFactory.create('Fusion'))
+        else:
+            super().__init__()
         self.dark = bool(dark)
 
     def _draw_chevron(self, option, painter):

@@ -419,7 +419,8 @@ class DropDownCombo(QComboBox):
         # up/down scroller buttons.  A private proxy instance keeps the rest of
         # the current Qt style while requesting the standard list popup, which
         # honours the row limit and uses the styled scrollbar.
-        self._drop_down_style = _DropDownProxyStyle()
+        self._drop_down_style = (_DropDownProxyStyle(QtWidgets.QStyleFactory.create('Fusion'))
+                                 if sys.platform == 'darwin' else _DropDownProxyStyle())
         self._drop_down_style.setParent(self)
         self.setStyle(self._drop_down_style)
 
@@ -3451,7 +3452,11 @@ class OcrLanguageManagerDialog(QDialog):
         title_border = "#302a3a" if dark else "#d7cde7"
         title_text = "#f7f3ff" if dark else "#2b2333"
         close_text = "#f4eefc" if dark else "#4b4057"
+        page_background = "#111216" if dark else "#f0edf3"
         chrome_style = f"""
+            QTabWidget::pane, QTabWidget > QStackedWidget {{
+                background-color: {page_background};
+            }}
             QFrame#languageManagerTitleBar {{
                 background-color: {title_background};
                 border: none;
@@ -7026,6 +7031,8 @@ class SettingsWindow(QWidget):
         super().__init__(parent)
         self.parent = parent
         self.hotkeys_mode = False
+        from ui_scaling import configure_interface_style
+        configure_interface_style()
         self.previous_ocr_engine = None  # Для отката OCR движка при отмене загрузки
         self.previous_translator_engine = None
         self._update_in_progress = False
@@ -11222,6 +11229,12 @@ finally {
     def _rapidocr_runtime_installed(self):
         if self._local_rapidocr_installed():
             return True
+        if platform_support.IS_MAC and getattr(sys, 'frozen', False):
+            # The Mac GUI deliberately excludes ONNX/RapidOCR. Its bundled
+            # helper owns them; find_spec in the GUI cannot see that archive.
+            import ocr
+            if ocr._native_ocr_worker_path():
+                return True
         return self._module_available_without_import(
             "rapidocr", "rapidocr_onnxruntime"
         )

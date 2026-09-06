@@ -29,9 +29,22 @@ def configure_qt_platform():
         os.environ['QT_QPA_PLATFORM'] = platform.rstrip(':') + ':fontengine=freetype'
 
 
+def configure_interface_style():
+    """Keep the custom canvas geometry independent of native Aqua insets."""
+    app = QApplication.instance()
+    if sys.platform == 'darwin' and app is not None and not getattr(app, '_cnt_style_ready', False):
+        # Aqua extends checkbox/button layout rectangles and uses native menu
+        # popups, which overlap controls inside our transformed canvas. Fusion
+        # supplies predictable widget metrics; Cocoa still owns native windows,
+        # input, Retina rendering and accessibility.
+        app.setStyle('Fusion')
+        app._cnt_style_ready = True
+
+
 def configure_interface_font():
     """Use grayscale glyph edges that remain clean under the scene transform."""
     app = QApplication.instance()
+    configure_interface_style()
     font = QFont(app.font())
     if sys.platform == 'win32':
         if font.family() in ('MS Shell Dlg', 'MS Shell Dlg 2', 'MS Sans Serif'):

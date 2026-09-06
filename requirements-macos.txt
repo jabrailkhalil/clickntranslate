@@ -1,4 +1,4 @@
-# macOS 13+, native arm64 or x86_64, Python 3.12. No Windows dependencies.
+# macOS 13.4+, native arm64 or x86_64, Python 3.12. No Windows dependencies.
 PyQt5~=5.15.11
 Pillow
 pyperclip
@@ -13,6 +13,7 @@ packaging
 # Install Argos itself with --no-deps (see tools/setup_macos_env.sh).
 ctranslate2==4.7.1
 sentencepiece==0.2.1
+sacremoses>=0.0.53,<0.2
 filelock
 PyYAML
 

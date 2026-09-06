@@ -78,7 +78,10 @@ def test_portable_bootstrap_produces_pip_command_without_system_python():
         assert progress[-1] == (11, True)
 
 
-def test_engine_installer_falls_back_when_matching_python_is_missing():
+def test_engine_installer_falls_back_when_matching_python_is_missing(monkeypatch):
+    monkeypatch.setattr(platform_support, "IS_WINDOWS", True)
+    monkeypatch.setattr(platform_support, "IS_MAC", False)
+    monkeypatch.setattr(platform_support, "IS_LINUX", False)
     portable_command = [r"C:\Temp\python.exe", r"C:\Temp\pip.whl\pip"]
     dummy = SimpleNamespace(
         _find_rapidocr_install_python_command=mock.Mock(side_effect=RuntimeError("missing")),

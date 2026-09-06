@@ -250,7 +250,9 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                     + pair.trailing_glyph_room
                 )
                 self.assertGreaterEqual(pair.width(), required, language_code)
-                self.assertEqual(pair.value_label.text(), sequence)
+                from PyQt5.QtGui import QKeySequence
+                expected = QKeySequence(sequence).toString(QKeySequence.NativeText) if main.platform_support.IS_MAC else sequence
+                self.assertEqual(pair.value_label.text(), expected)
 
             for pair in pairs:
                 pair.close()
@@ -402,6 +404,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 item for _title, items in main.HELP_CONTENT[language_code] for item in items
             )
             self.assertIn(clue, guide)
+            self.assertIn("shortcut_toggle", [action for action, _title, _body in main.guide_text(language_code)["steps"]])
             # Optional actions no longer claim global combinations by default;
             # their guide cards point users to the configurable shortcut.
             self.assertNotIn("Ctrl+Alt+Q", guide)
@@ -421,6 +424,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
     def test_setup_guide_finishes_with_shortcuts_and_a_real_translation(self):
         shortcut_steps = [
             "shortcut_overview",
+            "shortcut_toggle",
             "shortcut_selection",
             "shortcut_replace",
             "main_translate",

@@ -1,14 +1,16 @@
 # macOS port (1.7.1 development)
 
 The source implements macOS support for Apple Silicon (`arm64`) and Intel
-(`x86_64`). The build targets macOS 13 or newer and Python 3.12. Separate native
+(`x86_64`). The build targets macOS 13.4 or newer and Python 3.12. Separate native
 builds avoid requiring Rosetta or a mixture of incompatible native libraries.
 
-**Status:** implemented in source with portable regression tests. The current
-development host is Windows with WSL, so the `.app` has **not been built or
-interactively tested on a Mac here**. Native validation is provided by
-`.github/workflows/macos.yml`; it must pass on both architectures before this
-port is called release-ready. No Developer ID or notarization has been applied.
+**Status (2026-09-06):** built on an Apple Silicon Mac running macOS 14.3,
+installed from DMG, and tested with native Cocoa, LaunchServices, Vision,
+the optional OCR engines and translation providers. See [the native QA report](MACOS_QA.md)
+for evidence and the remaining manual checks. Intel, macOS 13.4 runtime behavior,
+and several permission/input/display scenarios remain unverified. This is an
+ad-hoc signed development build, without Developer ID or notarization; it is
+not yet a trusted public release. The two-architecture CI has not been dispatched.
 
 For the next agent testing on a real Mac, see [the handoff checklist](MACOS_HANDOFF.md).
 It includes source-transfer instructions, exact commands, required manual checks,
@@ -27,6 +29,9 @@ For example, with an existing Homebrew installation, Python is available through
 `brew install python@3.12`. The setup script creates `.venv-macos`, installs the
 Mac requirements and installs Argos without its unnecessary sentence-splitter
 dependency tree. It does not change login items or grant privacy permissions.
+Dependency wheels are resolved for the older deployment target even on newer
+hosts. The build additionally checks actual Mach-O minimum versions: ONNX
+Runtime's current wheel is tagged 13.0 but its binaries require 13.4.
 
 Apple Vision is the default OCR engine and works locally without model downloads.
 The language list comes from the installed macOS version. Tesseract, RapidOCR
@@ -86,16 +91,25 @@ bash tools/build_macos_release.sh
 
 Run on the target architecture. The script builds `dist/ClicknTranslate.app`,
 checks its three embedded Python archives and code signatures, exercises the
-actual Cocoa GUI, settings/theme, Vision OCR, Carbon registration, and both
-frozen helpers. It then creates `.dmg`, `.zip` and SHA-256 files in `releases/`.
+actual Cocoa GUI through LaunchServices, settings/theme, Vision OCR, Carbon
+registration, and both frozen helpers. It verifies the GUI bundle entry point
+and every Mach-O deployment target, then creates `.dmg`, `.zip` and SHA-256 files
+in `releases/`. For the extended theme/language/scale rendering matrix, run:
+
+```bash
+CLICKNTRANSLATE_EXTENDED_SMOKE=1 .venv-macos/bin/python tools/smoke_macos_bundle.py /Applications/ClicknTranslate.app
+```
+
+This renders application windows into temporary files before copying the results
+to `build/macos`, avoiding a Desktop/Documents permission prompt during smoke QA.
 The DMG contains an Applications shortcut: copy the app there before enabling
 autostart. The icon uses the original 1024-pixel PNG.
 
 The `macOS` GitHub Actions workflow can be started manually. Pull requests that
 change its inputs run it as well. The release workflow calls both Mac builds
 before creating a draft release; it uploads only package/checksum assets, not
-the smoke-test screenshots. No workflow has been dispatched from this Windows
-session, and this document does not imply that native CI has already passed.
+the smoke-test screenshots. Local native testing does not imply that both CI
+architectures have already passed.
 
 For distribution, supply a Developer ID Application identity already present in
 the macOS keychain as `MACOS_CODESIGN_IDENTITY`. With a separately provisioned

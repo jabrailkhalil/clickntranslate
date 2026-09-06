@@ -127,9 +127,9 @@ class GuideSetupTest(unittest.TestCase):
         self.assertFalse(self.window._guide_active)
         for action, (_widget, _page, desired) in GUIDE_SETTING_STEPS.items():
             self.assertEqual(self.window.config[action], desired, action)
-        self.assertEqual(self.window._guide_progress.text(), "28 / 28")
-        self.assertEqual(self.window._guide_bubble.progress_bar.maximum(), 28)
-        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 28)
+        self.assertEqual(self.window._guide_progress.text(), "29 / 29")
+        self.assertEqual(self.window._guide_bubble.progress_bar.maximum(), 29)
+        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 29)
         self.assertEqual(self.window._guide_body.text(), setup_labels(
             self.window.current_interface_language
         )["done_body"].format(ready=14, total=14))
@@ -145,8 +145,8 @@ class GuideSetupTest(unittest.TestCase):
         self.window._guide_active = True
         self.window._guide_step_index = len(GUIDE_SETUP_ORDER)
         self.window._show_guide_step()
-        self.assertEqual(self.window._guide_progress.text(), "28 / 28")
-        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 28)
+        self.assertEqual(self.window._guide_progress.text(), "29 / 29")
+        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 29)
         self.assertEqual(self.window._guide_body.text(), setup_labels(
             self.window.current_interface_language
         )["done_body"].format(ready=0, total=14))

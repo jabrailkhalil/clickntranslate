@@ -1,0 +1,9 @@
+{
+  "Argos": {
+    "reported_error": "Argos offline translation package is not installed for en->ja. Install the required direction in Settings > Language packages > Argos."
+  },
+  "Hy-MT": {
+    "selected_key": "hymt",
+    "reported_error": "Hy-MT не установлен. Установите пакет Hy-MT в настройках переводчика."
+  }
+}

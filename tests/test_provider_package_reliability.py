@@ -233,7 +233,8 @@ def test_cancellation_during_validation_restores_previous_engine(tmp_path):
 
 
 @pytest.mark.parametrize('version,locked', [((3,10),False),((3,12),True),((3,13),True),((3,14),False)])
-def test_easyocr_dependency_lock_matches_only_verified_python_versions(version, locked):
+def test_easyocr_dependency_lock_matches_only_verified_python_versions(version, locked, monkeypatch):
+    monkeypatch.setattr(sw.platform_support, 'IS_MAC', False)
     dummy = SimpleNamespace(_pip_target_python_version=lambda command: version)
     requirements = sw.SettingsWindow._easyocr_requirements(dummy, ['python'])
     assert requirements == (sw.EASYOCR_PIP_PACKAGES if locked else sw.EASYOCR_PIP_PACKAGES_ANY_PYTHON)

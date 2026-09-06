@@ -23,31 +23,31 @@ class ExecutableNamingTest(unittest.TestCase):
 
 class SessionDetectionTest(unittest.TestCase):
     def test_session_type_prefers_the_explicit_variable(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"XDG_SESSION_TYPE": "wayland"}, clear=False):
                 self.assertEqual(platform_support.linux_session_type(), "wayland")
                 self.assertTrue(platform_support.is_wayland())
 
     def test_session_type_falls_back_to_display_variables(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {}, clear=True):
                 os.environ["DISPLAY"] = ":0"
                 self.assertEqual(platform_support.linux_session_type(), "x11")
                 self.assertFalse(platform_support.is_wayland())
 
     def test_session_type_is_empty_without_a_display(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {}, clear=True):
                 self.assertEqual(platform_support.linux_session_type(), "")
                 self.assertFalse(platform_support.has_display())
 
     def test_desktop_environment_reads_a_colon_separated_list(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "ubuntu:GNOME"}, clear=True):
                 self.assertEqual(platform_support.desktop_environment(), "gnome")
 
     def test_plasma_is_reported_as_kde(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "KDE:plasma"}, clear=True):
                 self.assertEqual(platform_support.desktop_environment(), "kde")
 
@@ -66,7 +66,7 @@ class SubprocessFlagsTest(unittest.TestCase):
         bundled = os.path.join(appdir, "usr", "bin", "_internal")
         system_path = os.path.abspath(os.path.join(os.sep, "opt", "user-libs"))
         inherited = os.pathsep.join((bundled, system_path))
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(
                 os.environ,
                 {"APPDIR": appdir, "LD_LIBRARY_PATH": inherited, "DISPLAY": ":0"},
@@ -80,7 +80,7 @@ class SubprocessFlagsTest(unittest.TestCase):
     def test_system_subprocess_environment_drops_an_entire_bundled_value(self):
         appdir = os.path.abspath(os.path.join(os.sep, "tmp", "clickntranslate.AppDir"))
         bundled = os.path.join(appdir, "usr", "bin", "_internal")
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(
                 os.environ,
                 {"APPDIR": appdir, "LD_LIBRARY_PATH": bundled},
@@ -118,7 +118,7 @@ class ShortcutCommandTest(unittest.TestCase):
         )
 
     def test_command_uses_the_appimage_path_when_running_from_one(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"APPIMAGE": "/opt/Click-n-Translate.AppImage"}, clear=False):
                 self.assertEqual(
                     platform_support.shortcut_command("ocr"),
@@ -144,11 +144,11 @@ class OcrEngineAvailabilityTest(unittest.TestCase):
         self.assertNotIn("windows", platform_support.LINUX_OCR_ENGINES)
 
     def test_install_hint_matches_the_package_manager(self):
-        with mock.patch.object(platform_support.shutil, "which", side_effect=lambda name: "/usr/bin/dnf" if name == "dnf" else None):
+        with mock.patch.object(platform_support, "IS_MAC", False), mock.patch.object(platform_support.shutil, "which", side_effect=lambda name: "/usr/bin/dnf" if name == "dnf" else None):
             self.assertIn("dnf install", platform_support.tesseract_install_hint())
 
     def test_install_hint_falls_back_to_debian(self):
-        with mock.patch.object(platform_support.shutil, "which", return_value=None):
+        with mock.patch.object(platform_support, "IS_MAC", False), mock.patch.object(platform_support.shutil, "which", return_value=None):
             self.assertIn("apt install", platform_support.tesseract_install_hint())
 
 
@@ -160,7 +160,7 @@ class UpdatePolicyTest(unittest.TestCase):
 class LinuxPortableBaseDirTest(unittest.TestCase):
     def test_appimage_keeps_user_data_in_xdg(self):
         data_home = os.path.abspath(os.sep + "home" + os.sep + "u" + os.sep + "data")
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"APPIMAGE": "/opt/app.AppImage", "XDG_DATA_HOME": data_home}, clear=False):
                 self.assertEqual(
                     portable_paths.portable_base_dir(),
@@ -168,7 +168,7 @@ class LinuxPortableBaseDirTest(unittest.TestCase):
                 )
 
     def test_frozen_tarball_stays_portable_when_writable(self, ):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {}, clear=True):
                 with mock.patch.object(portable_paths.sys, "frozen", True, create=True):
                     with mock.patch.object(portable_paths, "is_internal_worker_layout", return_value=False):
@@ -178,7 +178,7 @@ class LinuxPortableBaseDirTest(unittest.TestCase):
 
     def test_internal_worker_resolves_the_application_root(self):
         """A helper in _internal must use the app folder, not its own."""
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {}, clear=True):
                 with mock.patch.object(portable_paths.sys, "frozen", True, create=True):
                     with mock.patch.object(portable_paths, "is_internal_worker_layout", return_value=True):
@@ -193,7 +193,7 @@ class LinuxPortableBaseDirTest(unittest.TestCase):
                                 )
 
     def test_appimage_is_the_executable_a_shortcut_should_launch(self):
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"APPIMAGE": "/opt/Click-n-Translate.AppImage"}, clear=False):
                 self.assertEqual(
                     portable_paths.public_executable_path(),
@@ -202,7 +202,7 @@ class LinuxPortableBaseDirTest(unittest.TestCase):
 
     def test_read_only_install_falls_back_to_xdg(self):
         data_home = os.path.abspath(os.sep + "home" + os.sep + "u" + os.sep + "data")
-        with mock.patch.object(platform_support, "IS_LINUX", True):
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False):
             with mock.patch.dict(os.environ, {"XDG_DATA_HOME": data_home}, clear=True):
                 with mock.patch.object(portable_paths.sys, "frozen", True, create=True):
                     with mock.patch.object(portable_paths, "is_internal_worker_layout", return_value=False):

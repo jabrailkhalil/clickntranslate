@@ -28,14 +28,14 @@ class OcrEngineComboTest(unittest.TestCase):
 
     def test_windows_lists_every_engine(self):
         combo = QComboBox()
-        with mock.patch.object(platform_support, "supports_windows_ocr", return_value=True):
+        with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False):
             sw._populate_grouped_ocr_combo(combo, "en")
 
         self.assertEqual(self._engines_in_combo(combo), ["Windows", "Tesseract", "RapidOCR", "EasyOCR"])
 
     def test_linux_drops_the_windows_engine(self):
         combo = QComboBox()
-        with mock.patch.object(platform_support, "supports_windows_ocr", return_value=False):
+        with mock.patch.multiple(platform_support, IS_WINDOWS=False, IS_LINUX=True, IS_MAC=False):
             sw._populate_grouped_ocr_combo(combo, "en")
 
         engines = self._engines_in_combo(combo)

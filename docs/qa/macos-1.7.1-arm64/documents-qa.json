@@ -1,0 +1,24 @@
+{
+  "txt": {
+    "parse": "passed",
+    "translation": "Пожалуйста, откройте окно и прочтите этот документ.",
+    "engine": "Google",
+    "save_reopen": "passed",
+    "chunks": 1
+  },
+  "docx": {
+    "parse": "passed",
+    "translation": "Пожалуйста, откройте окно и прочтите этот документ.",
+    "engine": "Google",
+    "save_reopen": "passed",
+    "chunks": 1
+  },
+  "pdf": {
+    "parse": "passed",
+    "translation": "--- Страница 1 ---\nПожалуйста, откройте окно и прочтите этот документ.\n1",
+    "engine": "Google",
+    "save_reopen": "passed",
+    "chunks": 1
+  },
+  "cancel_before_request": "passed"
+}

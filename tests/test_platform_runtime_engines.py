@@ -13,6 +13,11 @@ import platform_support  # noqa: E402
 
 
 class PythonInstallHintTest(unittest.TestCase):
+    def setUp(self):
+        platform_patch = mock.patch.multiple(platform_support, IS_MAC=False, IS_WINDOWS=False, IS_LINUX=True)
+        platform_patch.start()
+        self.addCleanup(platform_patch.stop)
+
     def test_debian_hint_names_the_versioned_package(self):
         with mock.patch.object(platform_support.shutil, "which", side_effect=lambda name: "/usr/bin/apt-get" if name == "apt-get" else None):
             hint = platform_support.python_install_hint("3.12")

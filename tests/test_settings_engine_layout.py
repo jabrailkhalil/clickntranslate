@@ -126,6 +126,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         ]
         self.assertEqual(ocr_values[:2], ["Tesseract", "EasyOCR"])
         expected_tail = ["Windows", "RapidOCR"] if platform_support.supports_windows_ocr() else ["RapidOCR"]
+        if platform_support.IS_MAC:
+            expected_tail.insert(0, "Apple Vision")
         self.assertEqual(ocr_values[2:], expected_tail)
         tesseract_index = ocr_combo.findData("Tesseract")
         self.assertIn("classic OCR", ocr_combo.itemData(tesseract_index, Qt.ToolTipRole))

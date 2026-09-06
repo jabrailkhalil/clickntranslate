@@ -28,7 +28,7 @@ gui = Analysis(['main.py'], pathex=[SPECPATH],
                          'sentencepiece', 'onnxruntime', 'rapidocr_onnxruntime', 'cv2'],
                noarchive=False)
 argos = Analysis(['argos_worker.py'], pathex=[SPECPATH], datas=[], binaries=[],
-                 hiddenimports=['argostranslate.package', 'argostranslate.translate', 'filelock'],
+                 hiddenimports=['argostranslate.package', 'argostranslate.translate', 'filelock', 'sacremoses'],
                  excludes=[*common_excludes, *optional, *native_bridges, 'PyQt5',
                            'onnxruntime', 'rapidocr_onnxruntime', 'cv2'], noarchive=False)
 
@@ -41,7 +41,7 @@ for module in sorted(sys.stdlib_module_names):
         continue
     stdlib.add(module)
     stdlib.update(collect_submodules(module, on_error='ignore'))
-ocr_hidden = list(stdlib) + collect_submodules('rapidocr_onnxruntime') + [
+ocr_hidden = list(stdlib) + collect_submodules('rapidocr_onnxruntime') + collect_submodules('PIL') + [
     'onnxruntime', 'cv2', 'pyclipper', 'shapely', 'yaml', 'tqdm', 'six', 'numpy', 'PIL']
 ocr = Analysis(['ocr_worker.py'], pathex=[SPECPATH], binaries=[],
                datas=collect_data_files('rapidocr_onnxruntime'), hiddenimports=ocr_hidden,
@@ -67,10 +67,17 @@ collection = COLLECT(gui_exe, argos_exe, ocr_exe,
 app = BUNDLE(collection, name='ClicknTranslate.app', icon='build/macos/icon.icns',
              bundle_identifier=APP_ID, codesign_identity=identity, entitlements_file=entitlements,
              info_plist={
+                 # COLLECT sorts its executables and does not retain the GUI
+                 # console flag. BUNDLE otherwise picks ArgosWorker and marks
+                 # the whole application as background-only.
+                 'CFBundleExecutable': 'ClicknTranslate',
+                 'LSBackgroundOnly': False,
                  'CFBundleDisplayName': "Click’n’Translate",
                  'CFBundleShortVersionString': APP_VERSION,
                  'CFBundleVersion': APP_VERSION,
-                 'LSMinimumSystemVersion': '13.0',
+                 # ONNX Runtime's wheels are tagged macosx_13_0 but their
+                 # Mach-O libraries actually require 13.4.
+                 'LSMinimumSystemVersion': '13.4',
                  'NSHighResolutionCapable': True,
                  'NSSupportsAutomaticGraphicsSwitching': True,
                  'NSPrincipalClass': 'NSApplication',

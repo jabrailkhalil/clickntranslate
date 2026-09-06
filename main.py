@@ -6644,6 +6644,8 @@ class DarkThemeApp(QMainWindow):
     _copy_notification_signal = QtCore.pyqtSignal(str)
 
     def __init__(self):
+        from ui_scaling import configure_interface_style
+        configure_interface_style()
         super().__init__()
         self._launch_update_signal.connect(self._on_launch_update_found)
         self._copy_notification_signal.connect(self._show_copy_notification)

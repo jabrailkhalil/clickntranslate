@@ -1,0 +1,894 @@
+{
+  "declared_minimum": "13.4.0",
+  "libraries": [
+    {
+      "file": "Contents/Frameworks/AppKit/_AppKit.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/AppKit/_inlines.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/CoreFoundation/_CoreFoundation.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/CoreFoundation/_inlines.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/CoreML/_CoreML.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/CoreText/_manual.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Foundation/_Foundation.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Foundation/_inlines.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/HIServices/_HIServices.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libXau.6.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libavif.16.4.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libbrotlicommon.1.2.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libbrotlidec.1.2.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libfreetype.6.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libharfbuzz.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libjpeg.62.4.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/liblcms2.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/liblzma.5.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libopenjp2.2.5.4.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libpng16.16.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libsharpyuv.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libtiff.6.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libwebp.7.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libwebpdemux.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libwebpmux.3.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libxcb.1.1.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/__dot__dylibs/libz.1.3.1.zlib-ng.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_avif.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imaging.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imagingcms.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imagingft.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imagingmath.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imagingmorph.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_imagingtk.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PIL/_webp.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtCore.framework/Versions/5/QtCore",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtDBus.framework/Versions/5/QtDBus",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtGui.framework/Versions/5/QtGui",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtNetwork.framework/Versions/5/QtNetwork",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtPrintSupport.framework/Versions/5/QtPrintSupport",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtQml.framework/Versions/5/QtQml",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtQmlModels.framework/Versions/5/QtQmlModels",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtQuick.framework/Versions/5/QtQuick",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtSvg.framework/Versions/5/QtSvg",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtWebSockets.framework/Versions/5/QtWebSockets",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/lib/QtWidgets.framework/Versions/5/QtWidgets",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/generic/libqtuiotouchplugin.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/iconengines/libqsvgicon.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqgif.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqicns.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqico.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqjpeg.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqmacheif.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqmacjp2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqsvg.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqtga.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqtiff.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqwbmp.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/imageformats/libqwebp.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/platforms/libqcocoa.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/platforms/libqminimal.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/platforms/libqoffscreen.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/platforms/libqwebgl.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/platformthemes/libqxdgdesktopportal.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/Qt5/plugins/styles/libqmacstyle.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/QtCore.abi3.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/QtDBus.abi3.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/QtGui.abi3.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/QtWidgets.abi3.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/PyQt5/sip.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreGraphics/_callbacks.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreGraphics/_coregraphics.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreGraphics/_doubleindirect.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreGraphics/_inlines.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreGraphics/_sortandmap.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/CoreVideo/_CVPixelBuffer.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/ImageKit/_imagekit.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/PDFKit/_PDFKit.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/QuartzCore/_quartzcore.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Quartz/QuickLookUI/_QuickLookUI.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/Vision/_Vision.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/charset_normalizer/cd.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/charset_normalizer/md.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/ctranslate2/__dot__dylibs/libctranslate2.4.7.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/ctranslate2/_ext.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libIex-3_3.32.3.3.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libIlmThread-3_3.32.3.3.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libImath-3_1.29.11.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libOpenEXR-3_3.32.3.3.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libOpenEXRCore-3_3.32.3.3.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libSDL2-2.0.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libSvtAv1Enc.3.0.2.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libX11.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libXau.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libXdmcp.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libaom.3.12.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libarchive.13.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libaribb24.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libass.9.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavcodec.61.19.101.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavdevice.61.3.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavfilter.10.4.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavformat.61.7.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavif.16.3.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libavutil.59.39.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libb2.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libbluray.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libbrotlicommon.1.1.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libbrotlidec.1.1.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libbrotlienc.1.1.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libcjson.1.7.18.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libcrypto.3.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libdav1d.7.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libdeflate.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libfontconfig.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libfreetype.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libfribidi.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libgif.7.2.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libglib-2.0.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libgmp.10.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libgnutls.30.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libgraphite2.3.2.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libharfbuzz.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libhogweed.6.10.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libhwy.1.2.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libidn2.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libintl.8.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libjpeg.8.3.2.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libjxl.0.11.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libjxl_cms.0.11.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libjxl_threads.0.11.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/liblcms2.2.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libleptonica.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/liblz4.1.10.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/liblzma.5.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libmbedcrypto.3.6.3.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libmp3lame.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libnettle.8.10.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libogg.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libopencore-amrnb.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libopencore-amrwb.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libopenjp2.2.5.3.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libopus.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libp11-kit.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libpcre2-8.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libpng16.16.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libpostproc.58.3.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/librav1e.0.8.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/librist.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/librubberband.3.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsamplerate.0.2.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsharpyuv.0.1.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsnappy.1.2.2.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsodium.26.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsoxr.0.1.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libspeex.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libsrt.1.5.4.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libssh.4.10.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libssl.3.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libswresample.5.3.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libswscale.8.3.100.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libtasn1.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libtesseract.5.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libtheoradec.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libtheoraenc.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libtiff.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libunibreak.6.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libunistring.5.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libvidstab.1.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libvmaf.3.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libvorbis.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libvorbisenc.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libvpx.11.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libwebp.7.1.10.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libwebpmux.3.1.1.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libx264.164.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libx265.215.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libxcb-shape.0.0.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libxcb-shm.0.0.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libxcb-xfixes.0.0.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libxcb.1.1.0.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libzimg.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libzmq.5.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/__dot__dylibs/libzstd.1.5.7.dylib",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/cv2/cv2.abi3.so",
+      "minimum_macos": "13.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/libpython3.12.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/__dot__dylibs/libgcc_s.1.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/__dot__dylibs/libquadmath.0.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/__dot__dylibs/libscipy_openblas64_.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/_core/_multiarray_tests.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/_core/_multiarray_umath.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/fft/_pocketfft_umath.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/linalg/_umath_linalg.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_bounded_integers.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_common.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_generator.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_mt19937.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_pcg64.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_philox.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/_sfc64.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/bit_generator.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/numpy/random/mtrand.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/objc/_machsignals.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/objc/_objc.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/onnxruntime/capi/libonnxruntime.1.23.2.dylib",
+      "minimum_macos": "13.4.0"
+    },
+    {
+      "file": "Contents/Frameworks/onnxruntime/capi/onnxruntime_pybind11_state.so",
+      "minimum_macos": "13.4.0"
+    },
+    {
+      "file": "Contents/Frameworks/psutil/_psutil_osx.abi3.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/pyclipper/_pyclipper.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/python3__dot__12/lib-dynload/_crypt.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/python3__dot__12/lib-dynload/_dbm.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/regex/_regex.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/sentencepiece/_sentencepiece.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/shapely/__dot__dylibs/libgeos.3.13.1.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/shapely/__dot__dylibs/libgeos_c.1.19.2.dylib",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/shapely/_geometry_helpers.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/shapely/_geos.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/shapely/lib.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/Frameworks/yaml/_yaml.cpython-312-darwin.so",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/MacOS/ArgosWorker",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/MacOS/ClicknTranslate",
+      "minimum_macos": "11.0.0"
+    },
+    {
+      "file": "Contents/MacOS/OcrWorker",
+      "minimum_macos": "11.0.0"
+    }
+  ],
+  "incompatible": []
+}

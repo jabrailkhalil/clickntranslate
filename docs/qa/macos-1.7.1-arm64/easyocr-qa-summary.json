@@ -1,0 +1,22 @@
+{
+  "install": {
+    "seconds": 61.39,
+    "installed": true
+  },
+  "recognition": {
+    "returncode": 0,
+    "stdout": "{\"results\": [{\"label\": \"en\", \"text\": \"CLICK TRANSLATE\", \"confidence\": 0.9408213265576604, \"boxes_count\": 1, \"items\": [[[[28.0, 42.0], [512.0, 42.0], [512.0, 98.0], [28.0, 98.0]], \"CLICK TRANSLATE\", 0.9408213265576604]], \"elapsed_ms\": 1009.0318339998703, \"error\": \"\"}], \"error\": \"\"}\n"
+  },
+  "delete": [
+    true,
+    ""
+  ],
+  "cancel": {
+    "seconds": 0.35,
+    "installed": false
+  },
+  "reinstall": {
+    "seconds": 63.87,
+    "installed": true
+  }
+}

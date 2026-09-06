@@ -281,6 +281,11 @@ class DropDownPlacementTest(unittest.TestCase):
         parent.config["result_window_hidden_modes"] = ["area"]
         with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"):
             settings = SettingsWindow(parent)
+        # Native Cocoa cannot position a popup against an invisible ancestor.
+        # Exercise the same visible-parent hierarchy as the real application.
+        parent.resize(700, 500)
+        parent.move(20, 40)
+        parent.show()
         settings.show()
         self.app.processEvents()
         return parent, settings

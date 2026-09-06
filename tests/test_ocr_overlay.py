@@ -742,12 +742,15 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 return Reader()
 
             ocr._get_easyocr_reader = fake_reader
-            text, failure = ocr._recognize_easyocr_variants(
-                [("raw", Image.new("RGB", (80, 24), "white"))],
-                "ru",
-                "unit",
-                "unit-test",
-            )
+            # This case checks the in-process reader's language contract;
+            # native helper dispatch has its own tests in test_ocr_native_worker.
+            with mock.patch.object(ocr, '_native_ocr_worker_enabled', return_value=False):
+                text, failure = ocr._recognize_easyocr_variants(
+                    [("raw", Image.new("RGB", (80, 24), "white"))],
+                    "ru",
+                    "unit",
+                    "unit-test",
+                )
 
             self.assertEqual(text, "Привет мир")
             self.assertEqual(failure, "")

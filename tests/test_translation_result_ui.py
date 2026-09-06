@@ -66,7 +66,7 @@ class _SelectionHarness:
         def fake_thread(target=None, daemon=None, **_kwargs):
             return SimpleNamespace(start=target)
 
-        with mock.patch.object(platform_support, "IS_LINUX", True), \
+        with mock.patch.multiple(platform_support, IS_LINUX=True, IS_WINDOWS=False, IS_MAC=False), \
                 mock.patch.object(main.threading, "Thread", fake_thread), \
                 mock.patch.object(main.time, "sleep", lambda _seconds: None), \
                 mock.patch.object(main, "save_translation_history"), \
@@ -220,7 +220,7 @@ class TranslationResultUiTest(unittest.TestCase):
 
     def test_safe_selection_replacement_revalidates_then_pastes(self):
         copied = []
-        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+        with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False), \
                 mock.patch.object(main, "_windows_foreground_window", return_value=42), \
                 mock.patch.object(platform_support, "copy_text",
                                   side_effect=lambda value: copied.append(value) or True), \
@@ -242,7 +242,7 @@ class TranslationResultUiTest(unittest.TestCase):
         simulate_paste.assert_called_once_with()
 
     def test_selection_replacement_never_pastes_after_focus_changes(self):
-        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+        with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False), \
                 mock.patch.object(main, "_windows_foreground_window", return_value=99), \
                 mock.patch.object(platform_support, "copy_text") as copy, \
                 mock.patch.object(main, "simulate_paste") as paste:
@@ -256,7 +256,7 @@ class TranslationResultUiTest(unittest.TestCase):
         paste.assert_not_called()
 
     def test_selection_replacement_never_pastes_over_changed_text(self):
-        with mock.patch.object(platform_support, "IS_WINDOWS", True), \
+        with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False), \
                 mock.patch.object(main, "_windows_foreground_window", return_value=42), \
                 mock.patch.object(platform_support, "copy_text", return_value=True), \
                 mock.patch.object(main, "_clipboard_sequence_number", return_value=7), \
@@ -283,7 +283,8 @@ class TranslationResultUiTest(unittest.TestCase):
         def fake_thread(target=None, daemon=None, **_kwargs):
             return SimpleNamespace(start=target)
 
-        with mock.patch.object(platform_support, "IS_LINUX", False), \
+        with mock.patch.object(platform_support, "IS_MAC", False), \
+                mock.patch.object(platform_support, "IS_LINUX", False), \
                 mock.patch.object(platform_support, "IS_WINDOWS", True), \
                 mock.patch.object(main.ctypes, "windll",
                                   SimpleNamespace(user32=fake_user32), create=True), \
@@ -313,7 +314,8 @@ class TranslationResultUiTest(unittest.TestCase):
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
-        with mock.patch.object(platform_support, "IS_LINUX", False), \
+        with mock.patch.object(platform_support, "IS_MAC", False), \
+                mock.patch.object(platform_support, "IS_LINUX", False), \
                 mock.patch.object(platform_support, "IS_WINDOWS", True), \
                 mock.patch.object(main.ctypes, "windll",
                                   SimpleNamespace(user32=fake_user32), create=True), \
@@ -337,7 +339,8 @@ class TranslationResultUiTest(unittest.TestCase):
         harness = _SelectionHarness({"result_window_hidden_modes": []})
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
-        with mock.patch.object(platform_support, "IS_LINUX", False), \
+        with mock.patch.object(platform_support, "IS_MAC", False), \
+                mock.patch.object(platform_support, "IS_LINUX", False), \
                 mock.patch.object(platform_support, "IS_WINDOWS", True), \
                 mock.patch.object(main.ctypes, "windll",
                                   SimpleNamespace(user32=fake_user32), create=True), \
@@ -376,7 +379,8 @@ class TranslationResultUiTest(unittest.TestCase):
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
-        with mock.patch.object(platform_support, "IS_LINUX", False), \
+        with mock.patch.object(platform_support, "IS_MAC", False), \
+                mock.patch.object(platform_support, "IS_LINUX", False), \
                 mock.patch.object(platform_support, "IS_WINDOWS", True), \
                 mock.patch.object(main.ctypes, "windll",
                                   SimpleNamespace(user32=fake_user32), create=True), \
@@ -400,7 +404,8 @@ class TranslationResultUiTest(unittest.TestCase):
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
-        with mock.patch.object(platform_support, "IS_LINUX", False), \
+        with mock.patch.object(platform_support, "IS_MAC", False), \
+                mock.patch.object(platform_support, "IS_LINUX", False), \
                 mock.patch.object(platform_support, "IS_WINDOWS", True), \
                 mock.patch.object(main.ctypes, "windll",
                                   SimpleNamespace(user32=fake_user32), create=True), \

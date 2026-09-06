@@ -13,6 +13,7 @@ mkdir -p build/macos releases
 "$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller ClicknTranslate-macos.spec
 APP="dist/ClicknTranslate.app"
 codesign --verify --deep --strict --verbose=2 "$APP"
+"$PYTHON" tools/check_macos_compatibility.py "$APP"
 "$PYTHON" tools/smoke_macos_bundle.py "$APP"
 
 # Notarize only with an explicitly configured Developer ID and keychain profile.

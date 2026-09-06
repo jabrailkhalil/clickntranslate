@@ -909,7 +909,8 @@ class TestTesseractInstallerHelpers(unittest.TestCase):
     def test_get_tesseract_bundle_url_uses_release_asset(self):
         dummy = types.SimpleNamespace()
 
-        url = sw.SettingsWindow._get_tesseract_bundle_url(dummy, is_x64=True)
+        with mock.patch.multiple(sw.platform_support, IS_WINDOWS=True, IS_MAC=False, IS_LINUX=False):
+            url = sw.SettingsWindow._get_tesseract_bundle_url(dummy, is_x64=True)
 
         self.assertIn("/releases/download/v1.3.2/", url)
         self.assertTrue(url.endswith("ClicknTranslate-tesseract-win64.zip"))

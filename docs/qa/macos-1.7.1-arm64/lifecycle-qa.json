@@ -1,0 +1,7 @@
+{
+  "existing_installed_pid": 16667,
+  "show_status": "ok",
+  "scope": "Existing installed instance accepted show over IPC. A new LaunchServices --autostart process forwarded and exited. The original process and configuration were preserved; no interactive replacement prompt was tested.",
+  "duplicate_autostart_exitcode": 0,
+  "only_original_instance_remains": true
+}
