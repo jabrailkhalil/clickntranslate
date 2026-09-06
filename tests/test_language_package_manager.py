@@ -477,7 +477,9 @@ class LanguagePackageDialogTest(unittest.TestCase):
             for button in table._package_action_buttons:
                 self.assertEqual(button.objectName(), "languagePackageAction")
                 self.assertGreaterEqual(button.minimumHeight(), 32)
-                self.assertIn("background-color: #7A5FA1", button.styleSheet())
+                button.ensurePolished()
+                self.assertEqual(button.palette().button().color().name(),
+                                 "#7a5fa1" if button.property("buttonRole") == "primary" else "#211d28")
         self.assertIn("QPushButton#languagePackageAction", self.dialog.styleSheet())
         for table in self._package_tables():
             scrollbar_style = table.verticalScrollBar().styleSheet()

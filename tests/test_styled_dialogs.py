@@ -59,9 +59,10 @@ def test_theme_detection_accepts_settings_parent_attribute():
 def test_message_box_centers_on_embedded_settings_in_global_coordinates():
     app = _app()
     main_window = QtWidgets.QWidget()
-    # Keep the fixture far enough from the 800x600 offscreen screen edges so
-    # the dialog's safety clamping does not mask the coordinate-space check.
+    # Center relative to logical screen coordinates, including 150% system DPI,
+    # so edge clamping does not mask the coordinate-space check.
     main_window.setGeometry(120, 80, 700, 400)
+    main_window.move(app.primaryScreen().availableGeometry().center() - main_window.rect().center())
     embedded_settings = QtWidgets.QWidget(main_window)
     embedded_settings.setGeometry(0, 40, 700, 350)
     main_window.show()
@@ -96,6 +97,44 @@ def test_qt_exception_guard_is_idempotent():
         __import__("sys").excepthook = previous
 
 
+def test_unchanged_stylesheet_does_not_repolish_child_widgets():
+    from styled_dialogs import set_widget_stylesheet
+
+    app = _app()
+
+    class StyleEvents(QtCore.QObject):
+        def __init__(self):
+            super().__init__()
+            self.count = 0
+
+        def eventFilter(self, watched, event):
+            if event.type() == QtCore.QEvent.StyleChange:
+                self.count += 1
+            return False
+
+    owner = QtWidgets.QWidget()
+    button = QtWidgets.QPushButton("Action", owner)
+    events = StyleEvents()
+    button.installEventFilter(events)
+    try:
+        dark = "QPushButton { color: #ffffff; background: #302938; }"
+        light = "QPushButton { color: #302938; background: #ffffff; }"
+        set_widget_stylesheet(owner, dark)
+        app.processEvents()
+        initial = events.count
+        assert initial > 0
+        for _ in range(5):
+            set_widget_stylesheet(owner, dark)
+        app.processEvents()
+        assert events.count == initial
+        set_widget_stylesheet(owner, light)
+        app.processEvents()
+        assert events.count > initial
+    finally:
+        owner.close()
+        owner.deleteLater()
+
+
 def test_document_window_uses_the_shared_frameless_chrome():
     app = _app()
     owner = QtWidgets.QWidget()
@@ -123,6 +162,73 @@ def test_document_window_uses_the_shared_frameless_chrome():
     owner.close()
 
 
+def test_document_stop_keeps_finished_text_and_does_not_report_completion(monkeypatch):
+    from types import SimpleNamespace
+    import document_translation
+
+    app = _app()
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = 'ru'
+    owner.current_theme = 'Темная'
+    dialog = main.DocumentTranslationDialog(owner)
+    workers = []
+    monkeypatch.setattr(main.threading, 'Thread', lambda target, **kwargs: SimpleNamespace(start=lambda: workers.append(target)))
+    saved = []
+    monkeypatch.setattr(main, 'save_translation_history', lambda *args: saved.append(args))
+    received = {}
+
+    def translate(text, source, target, **kwargs):
+        received.update(kwargs)
+        assert kwargs['cancel_event'].is_set()
+        return 'Готовая часть. ', [document_translation.TranslationChunkResult(0, 'Finished part. ', 'Готовая часть. ')]
+
+    monkeypatch.setattr(main, 'translate_document_text', translate)
+    try:
+        dialog.show()
+        dialog._start_translation('Finished part. More text.')
+        assert dialog.translation_running
+        assert dialog.translate_file_button.isEnabled()
+        assert dialog.translate_file_button.text() == 'Остановить'
+        dialog.translate_file_button.click()
+        assert not dialog.translate_file_button.isEnabled()
+        assert dialog._translation_cancel_event.is_set()
+        dialog.refresh_language('en')
+        assert dialog.translate_file_button.text() == 'Stop'
+        assert not dialog.translate_file_button.isEnabled()
+        assert dialog.current_status == main.doc_text('en', 'canceling_translation')
+        dialog.refresh_language('ru')
+        workers[0]()
+        app.processEvents()
+        assert not dialog.translation_running
+        assert dialog.translated_view.toPlainText() == 'Готовая часть. '
+        assert dialog.current_status == 'Перевод остановлен'
+        assert dialog.progress_bar.value() < 100
+        assert dialog.save_button.isEnabled()
+        assert dialog.translate_file_button.text() == main.doc_text('ru', 'translate_file')
+        assert not saved
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        owner.close()
+
+
+def test_closing_document_requests_cancellation(monkeypatch):
+    import threading
+    _app()
+    owner = QtWidgets.QWidget()
+    dialog = main.DocumentTranslationDialog(owner)
+    try:
+        dialog.translation_running = True
+        dialog._translation_cancel_event = threading.Event()
+        dialog.reject()
+        assert dialog._translation_cancel_event.is_set()
+    finally:
+        dialog.translation_running = False
+        dialog.close()
+        dialog.deleteLater()
+        owner.close()
+
+
 def test_document_pane_borders_survive_theme_and_language_switches():
     app = _app()
     owner = QtWidgets.QWidget()
@@ -133,34 +239,76 @@ def test_document_pane_borders_survive_theme_and_language_switches():
     dialog.show()
     app.processEvents()
 
-    for theme, language, border in (
-        ("Темная", "ru", "#2d3746"),
-        ("Светлая", "de", "#b9afc4"),
-        ("Темная", "fr", "#2d3746"),
+    for theme, language in (
+        ("Темная", "ru"),
+        ("Светлая", "de"),
+        ("Темная", "fr"),
     ):
         dialog.refresh_theme(theme)
         dialog.refresh_language(language)
         app.processEvents()
 
-        style = dialog.styleSheet().lower()
-        editor_rule = style.split("qtextedit#doceditor {", 1)[1].split("}", 1)[0]
-        focus_rule = style.split("qtextedit#doceditor:focus {", 1)[1].split("}", 1)[0]
-        for rule in (editor_rule, focus_rule):
-            assert f"border-left: 1px solid {border}" in rule
-            assert f"border-right: 1px solid {border}" in rule
-            assert f"border-bottom: 1px solid {border}" in rule
-            assert "border: none" not in rule
-
-        pane_rule = style.split("qframe#docpane {", 1)[1].split("}", 1)[0]
-        header_rule = style.split("qframe#docpaneheader {", 1)[1].split("}", 1)[0]
-        assert "border: none" in pane_rule
-        assert f"border: 1px solid {border}" in header_rule
+        # Check the rendered, continuous border on both panels, including the
+        # seam where independently rounded editor/header frames used to meet.
+        for editor in (dialog.original_view, dialog.translated_view):
+            pane = editor.parentWidget()
+            image = pane.grab().toImage()
+            dpr = image.devicePixelRatio()
+            edge = [image.pixelColor(0, round(y * dpr)) for y in
+                    (20, editor.y() - 1, editor.y(), pane.height() // 2)]
+            assert all(color == edge[0] for color in edge)
+            assert edge[0] != image.pixelColor(round(12 * dpr), round(pane.height() / 2 * dpr))
+        left, right = dialog.document_splitter.widget(0), dialog.document_splitter.widget(1)
+        assert right.x() - (left.x() + left.width()) >= 10
 
         margins = dialog.window_frame.layout().contentsMargins()
         assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (1, 1, 1, 1)
 
     dialog.close()
     owner.close()
+
+
+def test_tooltips_render_in_the_current_theme_across_widgets_and_theme_switches():
+    from PyQt5 import QtGui, QtTest
+    from styled_dialogs import install_tooltip_style, _uses_dark_theme
+
+    app = _app()
+    old_style, old_theme = app.styleSheet(), app.property('ui_theme')
+    old_palette = QtWidgets.QToolTip.palette()
+    owner = QtWidgets.QWidget()
+    layout = QtWidgets.QHBoxLayout(owner)
+    buttons = [QtWidgets.QPushButton('First'), QtWidgets.QPushButton('Second')]
+    for button in buttons:
+        button.setStyleSheet('QPushButton { border: none; padding: 4px; }')
+        layout.addWidget(button)
+    owner.show()
+    try:
+        for theme in ('Темная', 'Светлая', 'Темная', 'Светлая'):
+            app.setProperty('ui_theme', theme)
+            install_tooltip_style(app)
+            dark = theme == 'Темная'
+            assert _uses_dark_theme() == dark
+            for index, button in enumerate(buttons):
+                app.processEvents()
+                QtWidgets.QToolTip.showText(button.mapToGlobal(button.rect().center()),
+                                          f'{theme}: Tooltip {index}', button)
+                QtTest.QTest.qWait(30)
+                tips = [w for w in app.topLevelWidgets()
+                        if w.metaObject().className() == 'QTipLabel' and w.isVisible()]
+                assert tips, (theme, index)
+                tip = tips[0]
+                image = tip.grab().toImage()
+                lightness = image.pixelColor(image.width() // 2, round(4 * image.devicePixelRatio())).lightness()
+                assert (lightness < 90 if dark else lightness > 210), (theme, index, lightness, tip.styleSheet())
+                ink = QtWidgets.QToolTip.palette().color(QtGui.QPalette.ToolTipText).lightness()
+                assert ink > 200 if dark else ink < 90
+    finally:
+        QtWidgets.QToolTip.hideText()
+        QtTest.QTest.qWait(300)
+        owner.close()
+        app.setProperty('ui_theme', old_theme)
+        app.setStyleSheet(old_style)
+        QtWidgets.QToolTip.setPalette(old_palette)
 
 
 def test_document_window_uses_saved_target_when_opened_from_settings(monkeypatch):

@@ -93,7 +93,6 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
             dummy._verify_file_sha256 = lambda *_args, **_kwargs: None
             dummy._find_hymt_model_under = lambda path: sw.SettingsWindow._find_hymt_model_under(dummy, path)
             dummy._find_hymt_runner_under = lambda path: sw.SettingsWindow._find_hymt_runner_under(dummy, path)
-            dummy._restore_hymt_backup = lambda final, backup: sw.SettingsWindow._restore_hymt_backup(dummy, final, backup)
 
             invoke_calls = []
 

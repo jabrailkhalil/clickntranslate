@@ -137,6 +137,43 @@ class CheckBoxIndicatorTest(unittest.TestCase):
             settings.close()
             parent.close()
 
+    def test_reused_style_repaints_existing_and_new_checkboxes_without_accumulating(self):
+        parent = _Parent()
+        with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"):
+            settings = SettingsWindow(parent)
+        try:
+            box = settings.autostart_checkbox
+            box.setChecked(False)
+            style_count = len(settings.findChildren(styled_dialogs.AccentControlStyle))
+            for theme in ("Светлая", "Темная") * 4:
+                parent.current_theme = theme
+                settings.apply_theme()
+                self.app.processEvents()
+                self.assertEqual(len(settings.findChildren(styled_dialogs.AccentControlStyle)), style_count)
+                # Rebuilding a settings page adds controls after the first
+                # installation; reuse must also style those new controls.
+                fresh = QCheckBox("New setting", settings)
+                try:
+                    styled_dialogs.install_accent_controls(settings, theme != "Светлая")
+                    for control in (box, fresh):
+                        control.resize(control.sizeHint())
+                        option = QStyleOptionButton()
+                        control.initStyleOption(option)
+                        rect = control.style().subElementRect(QStyle.SE_CheckBoxIndicator, option, control)
+                        image = QImage(control.size(), QImage.Format_ARGB32)
+                        image.fill(0)
+                        control.render(image)
+                        color = image.pixelColor(rect.center()).name()
+                        self.assertEqual(color, "#ffffff" if theme == "Светлая" else "#17181d", control.text())
+                finally:
+                    fresh.deleteLater()
+        finally:
+            settings.close()
+            parent.close()
+            settings.deleteLater()
+            parent.deleteLater()
+            self.app.processEvents()
+
     def test_language_rebuild_repaints_every_ocr_checkbox_in_the_accent(self):
         """Changing UI language rebuilds the settings widget tree.
 
@@ -389,6 +426,14 @@ class LanguagePackageTabsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        # These checks measure tab geometry, not installed native OCR engines
+        # or the remote package index. Keep workers out of the layout fixture.
+        for name in ("_start_runtime_probe", "_start_argos_catalog_refresh"):
+            patch = mock.patch.object(OcrLanguageManagerDialog, name)
+            patch.start()
+            self.addCleanup(patch.stop)
 
     def _dialog(self, lang="en"):
         parent = _Parent()

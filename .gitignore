@@ -14,6 +14,7 @@ build.py
 *.spec
 !ClicknTranslate.spec
 !ClicknTranslate-linux.spec
+!ClicknTranslate-macos.spec
 
 # Virtual environments
 venv/
@@ -51,6 +52,9 @@ launch_log.txt
 
 # Debug images
 debug_*.png
+# Local output of the developer-only visual layout constructor.  Approved
+# values are copied into code; personal drag experiments never enter releases.
+/ui_layout_draft.json
 
 # Misc junk files
 git
@@ -96,3 +100,9 @@ data/**/*.log
 !tools/*.ps1
 # The Linux build scripts are covered by the same rule.
 !tools/*.sh
+
+# Native Mac development/build artifacts and local signing material.
+.venv-macos/
+*.dmg
+*.icns
+*.p12

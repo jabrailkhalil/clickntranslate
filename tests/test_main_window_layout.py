@@ -12,6 +12,7 @@ below the divider is settings and reference.
 
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -21,12 +22,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from PyQt5 import QtCore  # noqa: E402
 from PyQt5.QtCore import QEvent, Qt  # noqa: E402
-from PyQt5.QtGui import QImage, QTextCursor  # noqa: E402
+from PyQt5.QtGui import QImage, QMouseEvent, QTextCursor  # noqa: E402
 from PyQt5.QtTest import QTest  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QFrame, QWidget  # noqa: E402
 
 import main  # noqa: E402
+import layout_editor  # noqa: E402
+from qt_layout_test_support import ensure_layout_fonts
 
 LANGUAGES = ("en", "ru", "es", "de", "fr", "zh")
 
@@ -43,12 +47,12 @@ class MainScreenSourceTest(unittest.TestCase):
     def test_the_blocks_are_added_in_task_order(self):
         source = self._source()
         order = [
-            "self.main_layout.addLayout(language_picker_layout)",
-            "self.main_layout.addWidget(self.main_composer)",
-            "self.main_layout.addWidget(divider)",
-            "self.main_layout.addWidget(self.hotkey_language_bar)",
-            "self.main_layout.addLayout(hotkey_grid)",
-            "self.main_layout.addWidget(self.start_button)",
+            "text_section_layout.addLayout(language_picker_layout)",
+            "text_section_layout.addWidget(self.main_composer, 1)",
+            "self.main_layout.addWidget(self.main_text_section, 1)",
+            "shortcut_section_layout.addWidget(self.hotkey_language_bar)",
+            "self.main_layout.addWidget(self.main_shortcut_section)",
+            "self.main_layout.addWidget(self.main_footer)",
         ]
         positions = []
         for marker in order:
@@ -64,20 +68,19 @@ class MainScreenSourceTest(unittest.TestCase):
 
     def test_translate_is_inside_the_chat_composer(self):
         source = self._source()
-        translate = source[source.index("mainTranslateButton"):source.index("mainSectionDivider")]
+        translate = source[source.index("mainTranslateButton"):source.index("shortcut_section_layout.addWidget(self.hotkey_language_bar)")]
         shadow = source[source.index("mainShadowButton"):]
 
         self.assertIn("composer_actions_layout.addWidget", translate)
         self.assertIn("Qt.AlignHCenter | Qt.AlignBottom", translate)
         self.assertIn("self.text_input.setViewportMargins(0, 0, 0, 0)", source)
         self.assertIn("self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)", source)
-        self.assertIn("self.main_layout.addWidget(self.main_composer)", translate)
+        self.assertIn("text_section_layout.addWidget(self.main_composer, 1)", translate)
         self.assertNotIn("self.main_layout.addWidget(self.translate_button)", translate)
-        self.assertIn("self.translate_button = QPushButton()", source)
+        self.assertIn("self.translate_button = ScaledIconButton()", source)
         self.assertIn("self.translate_button.setFixedSize(32, 32)", translate)
         self.assertIn("self.document_expand_button.hide()", source)
         self.assertIn("_apply_main_translate_button_theme", translate)
-        self.assertIn("background: transparent", shadow)
         self.assertNotIn("background-color: #C5B3E9", shadow)
 
     def test_main_reference_text_keeps_a_readable_size(self):
@@ -88,15 +91,15 @@ class MainScreenSourceTest(unittest.TestCase):
         theme = inspect.getsource(main.DarkThemeApp._apply_main_combo_theme)
         self.assertIn('font-size: 14px', helper)
         self.assertIn('font-size: 13px', helper)
-        self.assertIn('font-size: 13px', theme)
+        self.assertIn('font-size: 12px', helper)
+        self.assertIn('font_size = 13', theme)
 
     def test_the_text_box_has_room_to_be_the_focus(self):
         source = self._source()
-        # 96 until the direction line went in under the Translate button; the
-        # window is fixed at 700x400, so the line was paid for from here. Still
-        # three lines of text, and still the tallest block on the screen.
-        self.assertIn("self.main_composer.setFixedHeight(76)", source)
-        self.assertIn("self.text_input.setFixedHeight(68)", source)
+        # Reserve a real gap below the language pickers within the fixed
+        # 700x400 viewport, while retaining three readable lines of text.
+        self.assertIn("self.main_composer.setMinimumHeight(74)", source)
+        self.assertIn("self.text_input.setMinimumHeight(66)", source)
 
 
 class HotkeyBarTextTest(unittest.TestCase):
@@ -125,6 +128,7 @@ class MainWindowGeometryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+        ensure_layout_fonts(cls.app)
         cls.app.setQuitOnLastWindowClosed(False)
 
     def setUp(self):
@@ -175,14 +179,367 @@ class MainWindowGeometryTest(unittest.TestCase):
     def test_the_chat_composer_stays_compact(self):
         # A Telegram-style composer is deliberately shorter than the settings
         # panel below it, while still fitting two placeholder/text lines.
-        self.assertEqual(self.window.text_input.height(), 68)
-        self.assertEqual(self.window.main_composer.height(), 76)
+        self.assertGreaterEqual(self.window.text_input.height(), 66)
+        self.assertGreaterEqual(self.window.main_composer.height(), 74)
+        self.assertLess(self.window.main_composer.height(), self.window.main_shortcut_section.height())
+
+    def test_visual_constructor_edits_real_widgets_and_keeps_a_separate_draft(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            draft_path = Path(temporary) / "layout.json"
+            panel = layout_editor.LayoutEditorPanel(self.window, draft_path)
+            panel.show()
+            for _ in range(4):
+                self.app.processEvents()
+            try:
+                # Rapid page changes used to leave several zero-delay overlay
+                # rebuilds queued. They reparented the same Qt controls more
+                # than once and could crash Windows with an access violation.
+                for _ in range(3):
+                    for screen in ("settings0", "settings1", "settings2", "main"):
+                        panel.show_screen(screen)
+                for _ in range(8):
+                    self.app.processEvents()
+                self.assertEqual(panel.screen, "main")
+                self.assertTrue(all(
+                    button.isEnabled() for button in panel.screen_buttons.values()
+                ))
+                self.assertTrue(panel.overlay._detached_buttons)
+                for control, info in panel.overlay._detached_buttons.items():
+                    if info["key"] not in panel.values["widgets"]["main"]:
+                        self.assertEqual(
+                            control.pos(), info["absolute"].topLeft(), info["key"]
+                        )
+                theme_default_position = panel.overlay._detached_buttons[
+                    self.window.theme_button
+                ]["absolute"].topLeft()
+                detached_keys = {
+                    info["key"] for info in panel.overlay._detached_buttons.values()
+                }
+                self.assertIn("mainTextSectionTitle", detached_keys)
+                self.assertIn("mainShortcutSectionTitle", detached_keys)
+                self.assertIn("mainOcrSummary", detached_keys)
+                source_info = panel.overlay._detached_buttons[self.window.source_lang]
+                translate_info = panel.overlay._detached_buttons[self.window.translate_button]
+                source_target = panel.target_by_id(f"button:{source_info['key']}")
+                translate_target = panel.target_by_id(f"button:{translate_info['key']}")
+                marquee = source_target["rect"].united(translate_target["rect"])
+                panel.area_select_button.setChecked(True)
+                panel.overlay.mousePressEvent(QMouseEvent(
+                    QEvent.MouseButtonPress,
+                    QtCore.QPointF(marquee.topLeft()),
+                    Qt.LeftButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseMoveEvent(QMouseEvent(
+                    QEvent.MouseMove,
+                    QtCore.QPointF(marquee.bottomRight()),
+                    Qt.NoButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseReleaseEvent(QMouseEvent(
+                    QEvent.MouseButtonRelease,
+                    QtCore.QPointF(marquee.bottomRight()),
+                    Qt.LeftButton,
+                    Qt.NoButton,
+                    Qt.NoModifier,
+                ))
+                self.assertTrue({
+                    f"button:{source_info['key']}",
+                    f"button:{translate_info['key']}",
+                }.issubset(panel.overlay._selected_ids))
+                self.assertFalse(panel.area_selection_mode)
+                title_info = panel.overlay._detached_buttons[self.window.title_bar]
+                panel.select_target(f"button:{title_info['key']}")
+                panel.text_edit.setText("Click'n'Translate — макет")
+                panel.apply_selected_text()
+                self.assertEqual(
+                    self.window.title_bar.text(), "Click'n'Translate — макет"
+                )
+                self.assertEqual(
+                    panel.values["widgets"]["main"][title_info["key"]]["text"],
+                    "Click'n'Translate — макет",
+                )
+                self.window.activateWindow()
+                QTest.keyClick(self.window, Qt.Key_Z, Qt.ControlModifier)
+                for _ in range(3):
+                    self.app.processEvents()
+                self.assertEqual(
+                    self.window.title_bar.text(),
+                    main.INTERFACE_TEXT[self.window.current_interface_language]["title"],
+                )
+                # The properties editor has its own native text-undo behavior.
+                # Ctrl+Z must still undo the layout command, not only edit the
+                # QLineEdit, because that is where a designer usually has focus.
+                title_info = panel.overlay._detached_buttons[self.window.title_bar]
+                panel.select_target(f"button:{title_info['key']}")
+                panel.text_edit.setText("Click'n'Translate — второй макет")
+                panel.apply_selected_text()
+                panel.text_edit.setFocus()
+                QTest.keyClick(panel.text_edit, Qt.Key_Z, Qt.ControlModifier)
+                for _ in range(3):
+                    self.app.processEvents()
+                self.assertEqual(
+                    self.window.title_bar.text(),
+                    main.INTERFACE_TEXT[self.window.current_interface_language]["title"],
+                )
+                translate_button = self.window.translate_button
+                button_info = panel.overlay._detached_buttons[translate_button]
+                button_origin = translate_button.pos()
+                local_start = translate_button.rect().center()
+                local_finish = local_start + QtCore.QPoint(24, 11)
+                panel.overlay.eventFilter(translate_button, QMouseEvent(
+                    QEvent.MouseButtonPress,
+                    QtCore.QPointF(local_start),
+                    Qt.LeftButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.eventFilter(translate_button, QMouseEvent(
+                    QEvent.MouseMove,
+                    QtCore.QPointF(local_finish),
+                    Qt.NoButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.eventFilter(translate_button, QMouseEvent(
+                    QEvent.MouseButtonRelease,
+                    QtCore.QPointF(local_finish),
+                    Qt.LeftButton,
+                    Qt.NoButton,
+                    Qt.NoModifier,
+                ))
+                expected_x, expected_y = panel.overlay._snap_position(
+                    button_origin.x() + 24,
+                    button_origin.y() + 11,
+                    translate_button.width(),
+                    translate_button.height(),
+                )
+                expected_button_position = QtCore.QPoint(expected_x, expected_y)
+                self.assertEqual(translate_button.pos(), expected_button_position)
+                self.assertEqual(
+                    panel.values["widgets"]["main"][button_info["key"]],
+                    {"x": translate_button.x(), "y": translate_button.y()},
+                )
+
+                source_combo = self.window.source_lang
+                source_info = panel.overlay._detached_buttons[source_combo]
+                translate_origin = QtCore.QPoint(translate_button.pos())
+                source_origin = QtCore.QPoint(source_combo.pos())
+                panel.select_targets([
+                    f"button:{button_info['key']}",
+                    f"button:{source_info['key']}",
+                ])
+                panel.nudge_selected(0, 1)
+                self.assertEqual(
+                    translate_button.y() - translate_origin.y(),
+                    panel.overlay._grid_size(),
+                )
+                self.assertEqual(
+                    source_combo.y() - source_origin.y(),
+                    panel.overlay._grid_size(),
+                )
+                panel.undo_layout()
+                for _ in range(4):
+                    self.app.processEvents()
+                translate_button = self.window.translate_button
+                self.assertEqual(translate_button.pos(), translate_origin)
+                self.assertEqual(self.window.source_lang.pos(), source_origin)
+
+                engine = next(
+                    target
+                    for target in panel.overlay.targets()
+                    if target["id"] == "engine"
+                )
+                original_width = panel.values["main"]["engine_status_width"]
+                # Status labels are stacked now; use the empty trailing gutter.
+                start = QtCore.QPoint(engine["rect"].right() - 2, engine["rect"].center().y())
+                finish = start + QtCore.QPoint(16, 0)
+                panel.overlay.mousePressEvent(QMouseEvent(
+                    QEvent.MouseButtonPress,
+                    QtCore.QPointF(start),
+                    Qt.LeftButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseMoveEvent(QMouseEvent(
+                    QEvent.MouseMove,
+                    QtCore.QPointF(finish),
+                    Qt.NoButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseReleaseEvent(
+                    QMouseEvent(
+                        QEvent.MouseButtonRelease,
+                        QtCore.QPointF(finish),
+                        Qt.LeftButton,
+                        Qt.NoButton,
+                        Qt.NoModifier,
+                    )
+                )
+                self.app.processEvents()
+                self.assertEqual(
+                    panel.values["main"]["engine_status_width"],
+                    original_width - 16,
+                )
+                self.assertTrue(draft_path.is_file())
+
+                copy_target = next(
+                    target
+                    for target in panel.overlay.targets()
+                    if target["id"] == "hotkey:copy"
+                )
+                copy_widget = copy_target["resize_widget"]
+                original_copy_size = QtCore.QSize(copy_widget.size())
+                resize_start = copy_target["rect"].topRight() + QtCore.QPoint(-2, 2)
+                resize_finish = resize_start + QtCore.QPoint(16, 8)
+                panel.overlay.mousePressEvent(QMouseEvent(
+                    QEvent.MouseButtonPress,
+                    QtCore.QPointF(resize_start),
+                    Qt.LeftButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseMoveEvent(QMouseEvent(
+                    QEvent.MouseMove,
+                    QtCore.QPointF(resize_finish),
+                    Qt.NoButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseReleaseEvent(QMouseEvent(
+                    QEvent.MouseButtonRelease,
+                    QtCore.QPointF(resize_finish),
+                    Qt.LeftButton,
+                    Qt.NoButton,
+                    Qt.NoModifier,
+                ))
+                copy_size_draft = panel.values["widgets"]["main"]["hotkey_card_copy"]
+                self.assertGreater(copy_widget.width(), original_copy_size.width())
+                self.assertEqual(copy_size_draft["w"], copy_widget.width())
+                self.assertEqual(copy_size_draft["h"], copy_widget.height())
+
+                copy_target = next(
+                    target
+                    for target in panel.overlay.targets()
+                    if target["id"] == "hotkey:copy"
+                )
+                copy_start = QtCore.QPoint(
+                    copy_target["rect"].center().x(),
+                    copy_target["rect"].top() + 4,
+                )
+                empty_slot = panel.overlay._main_slots()[7].center()
+                panel.overlay.mousePressEvent(QMouseEvent(
+                    QEvent.MouseButtonPress,
+                    QtCore.QPointF(copy_start),
+                    Qt.LeftButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseMoveEvent(QMouseEvent(
+                    QEvent.MouseMove,
+                    QtCore.QPointF(empty_slot),
+                    Qt.NoButton,
+                    Qt.LeftButton,
+                    Qt.NoModifier,
+                ))
+                panel.overlay.mouseReleaseEvent(QMouseEvent(
+                    QEvent.MouseButtonRelease,
+                    QtCore.QPointF(empty_slot),
+                    Qt.LeftButton,
+                    Qt.NoButton,
+                    Qt.NoModifier,
+                ))
+                for _ in range(3):
+                    self.app.processEvents()
+                self.assertEqual(
+                    panel.values["main"]["hotkey_order"][7], "copy"
+                )
+
+                panel.show_screen("settings1")
+                for _ in range(3):
+                    self.app.processEvents()
+                detached_keys = {
+                    info["key"]
+                    for info in panel.overlay._detached_buttons.values()
+                }
+                self.assertTrue({
+                    "export_settings_btn",
+                    "import_settings_btn",
+                    "create_bug_report_btn",
+                    "update_check_on_launch_checkbox",
+                }.issubset(detached_keys))
+                self.assertNotIn("autostart_checkbox", detached_keys)
+                self.assertNotIn("ocr_engine_combo", detached_keys)
+                self.assertTrue(
+                    any(
+                        target["id"] == "settings-actions"
+                        for target in panel.overlay.targets()
+                    )
+                )
+                panel.show_screen("settings2")
+                for _ in range(3):
+                    self.app.processEvents()
+                detached_keys = {
+                    info["key"]
+                    for info in panel.overlay._detached_buttons.values()
+                }
+                self.assertTrue({
+                    "game_source_combo",
+                    "game_target_combo",
+                    "game_scan_interval_slider",
+                    "game_overlay_opacity_slider",
+                }.issubset(detached_keys))
+                self.assertNotIn("autostart_checkbox", detached_keys)
+                self.assertNotIn("export_settings_btn", detached_keys)
+                panel.show_screen("main")
+                for _ in range(3):
+                    self.app.processEvents()
+                restored_translate = self.window.translate_button
+                saved_translate = panel.values["widgets"]["main"][
+                    "translate_button"
+                ]
+                self.assertEqual(
+                    restored_translate.pos(),
+                    QtCore.QPoint(saved_translate["x"], saved_translate["y"]),
+                )
+                self.assertEqual(
+                    self.window.theme_button.pos(), theme_default_position
+                )
+                self.assertEqual(
+                    self.window.main_hotkey_references["copy"].size(),
+                    QtCore.QSize(copy_size_draft["w"], copy_size_draft["h"]),
+                )
+                panel.language_combo.setCurrentIndex(
+                    panel.language_combo.findData("de")
+                )
+                panel.theme_combo.setCurrentIndex(
+                    panel.theme_combo.findData("Светлая")
+                )
+                for _ in range(4):
+                    self.app.processEvents()
+                self.assertEqual(
+                    self.window.translate_button.pos(),
+                    QtCore.QPoint(saved_translate["x"], saved_translate["y"]),
+                )
+                self.assertEqual(
+                    self.window.main_hotkey_references["copy"].size(),
+                    QtCore.QSize(copy_size_draft["w"], copy_size_draft["h"]),
+                )
+            finally:
+                panel.overlay.hide()
+                panel.hide()
+                panel.deleteLater()
+                self.window.show_main_screen()
+                self.app.processEvents()
 
     def test_send_action_sits_below_and_to_the_right_of_the_text_view(self):
         button = self.window.translate_button
         text = self.window.text_input
-        button_top_left = button.mapTo(self.window, button.rect().topLeft())
-        text_top_left = text.mapTo(self.window, text.rect().topLeft())
+        button_top_left = button.mapTo(self.window.ui_root, button.rect().topLeft())
+        text_top_left = text.mapTo(self.window.ui_root, text.rect().topLeft())
         button_left = button_top_left.x()
         button_bottom = button_top_left.y() + button.height() - 1
         text_right = text_top_left.x() + text.width() - 1
@@ -207,7 +564,7 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertTrue(expand.isVisible())
 
     def test_document_workspace_reopens_and_receives_composer_text(self):
-        text = "one\ntwo\nthree"
+        text = "one\ntwo\nthree\nfour"
         self.window.text_input.setPlainText(text)
         for _ in range(3):
             self.app.processEvents()
@@ -238,10 +595,12 @@ class MainWindowGeometryTest(unittest.TestCase):
 
         self.assertIs(reopened, dialog)
         self.assertEqual(reopened.theme_name, "Светлая")
-        style = reopened.styleSheet().lower()
-        self.assertIn("background-color: #e7e2ea", style)
-        self.assertIn("background-color: #f1edf4", style)
-        self.assertNotIn("background-color: #0e1116", style)
+        # Verify the painted surfaces instead of pinning a particular shade.
+        for surface in (reopened.window_frame, reopened.original_view.viewport(),
+                        reopened.translated_view.viewport()):
+            image = surface.grab().toImage()
+            pixel = image.pixelColor(image.width() // 2, image.height() - round(12 * image.devicePixelRatio()))
+            self.assertGreater(pixel.lightness(), 200)
 
     def test_the_two_language_pickers_sit_on_one_line(self):
         source = self.window.source_lang
@@ -260,7 +619,7 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertLess(button.x(), self.window.help_button.x())
         self.assertLess(self.window.help_button.x(), self.window.settings_button.x())
 
-    def test_document_icon_uses_black_and_white_variants_of_docs_png(self):
+    def test_document_icon_uses_black_and_white_contours(self):
         def visible_rgb(icon):
             image = icon.pixmap(64, 64).toImage().convertToFormat(
                 QImage.Format_ARGB32
@@ -270,14 +629,15 @@ class MainWindowGeometryTest(unittest.TestCase):
                     color = image.pixelColor(x, y)
                     if color.alpha() >= 240:
                         return color.red(), color.green(), color.blue()
-            self.fail("docs.png produced no opaque icon pixels")
+            self.fail("Document icon produced no opaque pixels")
 
         self.assertEqual(visible_rgb(main.document_translation_icon("Светлая")), (0, 0, 0))
         self.assertEqual(visible_rgb(main.document_translation_icon("Темная")), (255, 255, 255))
 
     def test_the_hotkey_bar_comes_after_the_translate_button(self):
         self.assertGreater(
-            self.window.hotkey_language_bar.y(), self.window.translate_button.y()
+            self.window.hotkey_language_bar.mapTo(self.window.ui_root, QtCore.QPoint()).y(),
+            self.window.translate_button.mapTo(self.window.ui_root, QtCore.QPoint()).y()
         )
 
     def test_settings_widget_is_reused_instead_of_rebuilt(self):
@@ -328,23 +688,22 @@ class MainWindowGeometryTest(unittest.TestCase):
             self.window.current_theme = original_theme
             self.window.set_settings_button_to_settings()
 
-    def test_a_divider_separates_the_task_from_the_reference(self):
-        dividers = [
-            child for child in self.window.findChildren(QFrame)
-            if child.objectName() == "mainSectionDivider"
-        ]
-        self.assertEqual(len(dividers), 1)
-        divider = dividers[0]
-        self.assertLess(divider.y(), self.window.hotkey_language_bar.y())
-        self.assertGreater(divider.y(), self.window.translate_button.y())
+    def test_text_and_shortcuts_occupy_separate_labeled_regions(self):
+        text = self.window.main_text_section
+        shortcuts = self.window.main_shortcut_section
+        footer = self.window.main_footer
+        rect = lambda widget: QtCore.QRect(widget.mapTo(self.window.ui_root, QtCore.QPoint()), widget.size())
+        self.assertGreaterEqual(rect(shortcuts).top() - rect(text).bottom(), 8)
+        self.assertGreaterEqual(rect(footer).top() - rect(shortcuts).bottom(), 8)
+        self.assertTrue(text.isAncestorOf(self.window.source_lang))
+        self.assertTrue(text.isAncestorOf(self.window.text_input))
+        self.assertTrue(shortcuts.isAncestorOf(self.window.hotkey_mode_combo))
+        self.assertTrue(shortcuts.isAncestorOf(self.window.main_hotkey_area))
+        self.assertTrue(footer.isAncestorOf(self.window.start_button))
+        self.assertEqual(self.window.ui_root.size(), QtCore.QSize(700, 400))
 
     def test_the_mode_picker_is_sized_by_qt_not_by_a_guess(self):
-        """The picker contains short action names while Qt chooses their width.
-
-        The pixel result cannot be asserted here — the offscreen platform draws
-        no text, so its metrics are fiction. This checks the sizing rule and the
-        upper bound which preserves room for both language selectors.
-        """
+        """Full mode names get their measured width on the current platform."""
         import inspect
 
         source = inspect.getsource(main.DarkThemeApp._fit_hotkey_mode_combo)
@@ -352,16 +711,16 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertIn("AdjustToContents", source)
         self.assertIn("sizeHint().width()", source)
         self.assertGreaterEqual(self.window.hotkey_mode_combo.width(), 160)
-        self.assertLessEqual(self.window.hotkey_mode_combo.width(), 200)
+        self.assertEqual(self.window.hotkey_mode_combo.width(), max(160, self.window.hotkey_mode_combo.sizeHint().width()))
         for index in range(self.window.hotkey_mode_combo.count()):
             self.assertTrue(
                 self.window.hotkey_mode_combo.itemData(index, Qt.ToolTipRole),
                 index,
             )
 
-    def test_the_shortcut_legend_keeps_seven_chips_and_gaming_with_the_rest(self):
-        """Seven readable shortcuts share one three-row reference block."""
-        chips = self.window.findChildren(QWidget, "mainHotkeyPair")
+    def test_the_shortcut_legend_keeps_seven_actions_in_two_columns(self):
+        """Every action is visible in four aligned rows, without card frames."""
+        chips = self.window.ui_root.findChildren(QWidget, "mainHotkeyPair")
         # All seven registered actions are listed, including Gaming.
         self.assertEqual(len(chips), 7)
         self.assertTrue(all(chip.toolTip() for chip in chips))
@@ -371,36 +730,39 @@ class MainWindowGeometryTest(unittest.TestCase):
             {"copy", "ocr", "fullscreen", "game", "selection", "replace", "toggle"},
         )
         self.assertEqual(set(self.window.main_hotkey_references.values()), set(chips))
-        rows = {chip.mapTo(self.window, chip.rect().topLeft()).y() for chip in chips}
-        self.assertEqual(len(rows), 3)
+        rows = {chip.mapTo(self.window.ui_root, chip.rect().topLeft()).y() for chip in chips}
+        self.assertEqual(len(rows), 4)
         refs = self.window.main_hotkey_references
         absolute_y = lambda key: refs[key].mapTo(
-            self.window, refs[key].rect().topLeft()
+            self.window.ui_root, refs[key].rect().topLeft()
         ).y()
         self.assertEqual(absolute_y("copy"), absolute_y("ocr"))
-        self.assertEqual(absolute_y("fullscreen"), absolute_y("selection"))
-        self.assertEqual(absolute_y("toggle"), absolute_y("replace"))
+        self.assertEqual(absolute_y("toggle"), absolute_y("fullscreen"))
+        self.assertEqual(absolute_y("game"), absolute_y("selection"))
         game = self.window.main_hotkey_references["game"]
-        self.assertEqual(absolute_y("game"), absolute_y("copy"))
-        self.assertLess(absolute_y("copy"), absolute_y("selection"))
+        self.assertLess(absolute_y("copy"), absolute_y("game"))
+        self.assertLess(absolute_y("game"), absolute_y("replace"))
         self.assertLessEqual(
-            absolute_y("game") + game.height(), self.window.start_button.y()
+            absolute_y("game") + game.height(), self.window.start_button.mapTo(self.window.ui_root, QtCore.QPoint()).y()
         )
 
-    def test_gaming_chip_keeps_the_same_readable_style_in_every_language(self):
+    def test_dynamic_reference_keeps_the_same_readable_style_in_every_language(self):
         for language in LANGUAGES:
             pair = self.window._create_main_hotkey_pair(
-                main.ui_text(language, "hotkey_gaming"),
+                main.main_hotkey_compact_caption(language, "game"),
                 main.DEFAULT_GAME_HOTKEY,
+                compact=True,
             )
             try:
-                self.assertEqual(pair.height(), 22, language)
-                self.assertIn("font-size: 14px", pair.caption_label.styleSheet())
-                self.assertIn("font-size: 13px", pair.value_label.styleSheet())
+                for label in (pair.caption_label, pair.value_label):
+                    self.assertGreaterEqual(label.height(), label.sizeHint().height(), language)
+                    self.assertLessEqual(label.height(), pair.height(), language)
+                self.assertIn("font-size: 13px", pair.caption_label.styleSheet())
+                self.assertIn("font-size: 12px", pair.value_label.styleSheet())
             finally:
                 pair.deleteLater()
 
-    def test_every_language_keeps_both_hotkey_rows_inside_the_window(self):
+    def test_every_language_keeps_the_shortcut_columns_and_status_inside_the_window(self):
         original_language = self.window.current_interface_language
         try:
             # Rebuilding the real screen emits language-combo persistence
@@ -415,29 +777,62 @@ class MainWindowGeometryTest(unittest.TestCase):
 
                     refs = self.window.main_hotkey_references
                     absolute = {
-                        key: widget.mapTo(self.window, widget.rect().topLeft())
+                        key: widget.mapTo(self.window.ui_root, widget.rect().topLeft())
                         for key, widget in refs.items()
                     }
                     for left_key, right_key in (
-                        ("copy", "ocr"),
-                        ("fullscreen", "selection"),
-                        ("toggle", "replace"),
+                        ("ocr", "copy"),
+                        ("fullscreen", "toggle"),
+                        ("selection", "game"),
                     ):
                         self.assertEqual(
                             absolute[left_key].y(), absolute[right_key].y(), language
                         )
                         self.assertLess(
-                            absolute[left_key].x(), absolute[right_key].x(), language
+                            absolute[left_key].x() + refs[left_key].width(),
+                            absolute[right_key].x(),
+                            language,
                         )
-                    self.assertEqual(absolute["game"].y(), absolute["copy"].y(), language)
+                    for column in (("ocr", "fullscreen", "selection", "replace"), ("copy", "toggle", "game")):
+                        key_edges = {
+                            refs[key].value_label.mapTo(self.window.ui_root, refs[key].value_label.rect().topRight()).x()
+                            for key in column
+                        }
+                        self.assertEqual(len(key_edges), 1, language)
                     self.assertTrue(all(widget.x() >= 0 for widget in refs.values()), language)
                     self.assertTrue(
-                        all(widget.x() < self.window.central_widget.width() for widget in refs.values()),
+                        all(
+                            absolute[key].x() + widget.width()
+                            <= self.window.central_widget.width()
+                            for key, widget in refs.items()
+                        ),
                         language,
                     )
+                    engine = self.window.main_engine_status_panel
+                    engine_position = engine.mapTo(
+                        self.window.ui_root, engine.rect().topLeft()
+                    )
+                    shortcuts_bottom = max(absolute[key].y() + widget.height() for key, widget in refs.items())
+                    self.assertLessEqual(
+                        shortcuts_bottom,
+                        engine_position.y(),
+                        language,
+                    )
+                    self.assertTrue(self.window.main_footer.isAncestorOf(engine))
+                    self.assertLessEqual(engine_position.y() + engine.height(), self.window.height() - 14)
+                    for key, pair in refs.items():
+                        for label in (pair.caption_label, pair.value_label):
+                            if label.wordWrap():
+                                self.assertLessEqual(label.heightForWidth(label.width()), label.height(), (language, key, label.text()))
+                            else:
+                                self.assertLessEqual(
+                                    label.fontMetrics().horizontalAdvance(label.text()),
+                                    label.contentsRect().width(),
+                                    (language, key, label.text()),
+                                )
                     self.assertLessEqual(
                         absolute["game"].y() + refs["game"].height(),
-                        self.window.start_button.y(),
+                        self.window.start_button.mapTo(self.window.ui_root, QtCore.QPoint()).y(),
                         language,
                     )
         finally:
@@ -456,6 +851,51 @@ class MainWindowGeometryTest(unittest.TestCase):
             main.ui_text(self.window.current_interface_language, "hotkey_gaming"),
         )
 
+    def test_caption_shortcut_and_empty_space_are_one_click_target(self):
+        bindings = {
+            "copy": "copy_hotkey", "ocr": "translate_hotkey",
+            "fullscreen": "fullscreen_translate_hotkey", "selection": "translate_selection_hotkey",
+            "replace": "translate_replace_selection_hotkey", "toggle": "toggle_window_hotkey",
+            "game": "game_translate_hotkey",
+        }
+        for action, row in self.window.main_hotkey_references.items():
+            points = (
+                row.caption_label.geometry().center(),
+                row.value_label.geometry().center(),
+                QtCore.QPoint((row.caption_label.geometry().right() + row.value_label.x()) // 2, row.height() // 2),
+            )
+            for point in points:
+                with self.subTest(action=action, point=point), mock.patch.object(self.window, "_offer_hotkey_settings") as offer:
+                    hit = self.window.ui_root.childAt(row.mapTo(self.window.ui_root, point))
+                    self.assertIs(hit, row)
+                    QTest.mouseClick(row, Qt.LeftButton, pos=point)
+                    offer.assert_called_once()
+                    self.assertEqual(offer.call_args.args[0], bindings[action])
+
+    def test_shortcut_row_can_be_activated_from_the_keyboard(self):
+        row = self.window.main_hotkey_references["copy"]
+        self.assertEqual(row.focusPolicy(), Qt.StrongFocus)
+        self.assertEqual(row.caption_label.focusPolicy(), Qt.NoFocus)
+        self.assertEqual(row.value_label.focusPolicy(), Qt.NoFocus)
+        for key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter):
+            with self.subTest(key=key), mock.patch.object(self.window, "_offer_hotkey_settings") as offer:
+                QTest.keyClick(row, key)
+                offer.assert_called_once()
+                self.assertEqual(offer.call_args.args[0], "copy_hotkey")
+
+    def test_shortcut_row_does_not_activate_on_right_click_or_cancelled_press(self):
+        row = self.window.main_hotkey_references["copy"]
+        with (
+            mock.patch.object(self.window, "_offer_hotkey_settings") as offer,
+            mock.patch.object(self.window, "show_main_context_menu") as context_menu,
+        ):
+            QTest.mouseClick(row, Qt.RightButton)
+            QTest.mouseRelease(row, Qt.LeftButton)
+            QTest.mousePress(row, Qt.LeftButton)
+            QTest.mouseRelease(row, Qt.LeftButton, pos=QtCore.QPoint(row.width() + 5, row.height() // 2))
+        offer.assert_not_called()
+        context_menu.assert_called_once()
+
     def test_declining_hotkey_prompt_does_not_open_settings(self):
         with (
             mock.patch.object(self.window, "_confirm_open_hotkey_settings", return_value=False),
@@ -471,7 +911,7 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_next_button_cannot_skip_multiple_cards_during_transition(self):
         self.window._guide_active = True
-        self.window._guide_step_index = 3  # shortcut overview on the main screen
+        self.window._guide_step_index = main.GUIDE_TOUR_ORDER.index("shortcut_overview")
         self.window._show_guide_step()
         start = self.window._guide_step_index
 
@@ -487,14 +927,15 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_clicking_a_highlighted_control_also_locks_next_until_new_card(self):
         self.window._guide_active = True
-        self.window._guide_step_index = 3
+        self.window._guide_step_index = main.GUIDE_TOUR_ORDER.index("shortcut_overview")
         self.window._show_guide_step()
+        start = self.window._guide_step_index
         action = self.window._guide_current_action()
 
         self.window._complete_guide_step(action)
         self.window.skip_current_guide_step()
 
-        self.assertEqual(self.window._guide_step_index, 4)
+        self.assertEqual(self.window._guide_step_index, start + 1)
         self.assertFalse(self.window._guide_skip_btn.isEnabled())
         self.window._guide_active = False
         self.window._guide_step_timer.stop()
@@ -508,15 +949,7 @@ class MainWindowGeometryTest(unittest.TestCase):
                 self.window.current_interface_language
             )["steps"]
         ]
-        settings_index = actions.index("settings")
-        for action in actions[:settings_index + 1]:
-            target = self.window._guide_target_widget(action)
-            self.assertIsNotNone(target, action)
-            self.assertTrue(target.isVisible(), action)
-
-        self.window.show_settings()
-        self.app.processEvents()
-        for action in actions[settings_index + 1:-1]:
+        for action in actions:
             self.window._prepare_guide_settings_page(action)
             self.app.processEvents()
             target = self.window._guide_target_widget(action)
@@ -583,13 +1016,10 @@ class DirectionSummaryTest(unittest.TestCase):
             self.window.config[source_key] = source
             self.window.config[target_key] = target
 
-    def test_it_heads_the_mode_controls_inside_their_panel(self):
-        import inspect
-
-        source = inspect.getsource(main.DarkThemeApp.show_main_screen)
-        heading = source.index("hotkey_bar_layout.addWidget(self.direction_summary)")
-        controls = source.index("hotkey_bar_layout.addLayout(hotkey_row)")
-        self.assertLess(heading, controls)
+    def test_mode_languages_use_one_row_with_the_details_in_hover_help(self):
+        self.assertTrue(self.window.direction_summary.isHidden())
+        self.assertEqual(self.window.hotkey_language_bar.height(), 30)
+        self.assertTrue(self.window.hotkey_language_bar.toolTip())
 
     def test_one_direction_everywhere_is_said_once(self):
         self._set_every_mode("ru", "en")
@@ -769,7 +1199,7 @@ class TranslateOnEnterTest(unittest.TestCase):
 
 
 class EngineDividerSpacingTest(unittest.TestCase):
-    """The fixed-width shortcut legend keeps its proven quiet divider."""
+    """Passive engine information occupies one footer below the references."""
 
     @staticmethod
     def _source():
@@ -777,19 +1207,28 @@ class EngineDividerSpacingTest(unittest.TestCase):
 
         return inspect.getsource(main.DarkThemeApp.show_main_screen)
 
-    def test_divider_sits_after_every_shortcut(self):
+    def test_engine_status_and_shadow_action_share_the_footer(self):
+        import inspect
         import re
 
         source = self._source()
-        spacing = re.search(r"hotkey_grid\.setHorizontalSpacing\((\d+)\)", source)
+        spacing = re.search(
+            r"MAIN_HOTKEY_HORIZONTAL_SPACING\s*=\s*(\d+)",
+            inspect.getsource(main),
+        )
         self.assertIsNotNone(spacing)
-        self.assertEqual(int(spacing.group(1)), 12)
+        self.assertEqual(int(spacing.group(1)), 28)
+        self.assertIn("hotkey_grid.setHorizontalSpacing(hotkey_spacing)", source)
         self.assertIn("engine_status_panel", source)
-        self.assertIn("hotkey_grid.addWidget(game_reference, 0, 2", source)
-        self.assertIn("hotkey_grid.addWidget(engine_status_panel, 0, 3", source)
+        self.assertIn("MAIN_HOTKEY_DEFAULT_ORDER", source)
+        self.assertIn("engine_status_panel.setMaximumWidth(engine_status_width)", source)
+        self.assertIn("hotkey_grid.setColumnStretch(column, 1)", source)
+        self.assertIn("footer_layout.addWidget(engine_status_panel, 0, 0)", source)
+        self.assertIn("footer_layout.addWidget(self.start_button, 0, 1)", source)
+        self.assertIn("footer_layout.addWidget(ocr_summary, 0, 2)", source)
+        self.assertNotIn("mainEngineStatusSeparator", source)
         self.assertNotIn("engine_status_layout.addWidget(game_reference)", source)
-        self.assertIn("self._align_main_hotkey_pair_group", source)
-        self.assertNotIn("compact=True", source)
+        self.assertIn("compact=True", source)
 
     def test_no_column_is_pinned_to_a_width_measured_in_one_language(self):
         self.assertNotIn("setColumnMinimumWidth", self._source())

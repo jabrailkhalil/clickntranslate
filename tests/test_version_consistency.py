@@ -16,7 +16,7 @@ def test_release_version_is_synchronized_everywhere():
     version = match.group(1)
     four_part = version + ".0" if version.count(".") == 2 else version
 
-    assert version == "1.7.0"
+    assert version == "1.7.1"
     assert f'#define MyAppVersion "{version}"' in _read("installer/ClicknTranslate.iss")
     assert f'version="{four_part}"' in _read("installer/windows/ClicknTranslate.exe.manifest")
     assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateRepair.manifest")
@@ -29,16 +29,14 @@ def test_release_version_is_synchronized_everywhere():
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_update_repair.ps1")
     assert f'[string]$Version = "{version}"' in _read("tools/build_update_bootstrap.ps1")
     assert f'[string]$Version = "{version}"' in _read("tools/build_network_setup.ps1")
-    # The repair tool must point at an asset that is really published; the
-    # portable zip is the one attached to every release.
-    assert (
-        f"/v{version}/Click-n-Translate-{version}-windows-portable-x64.zip"
-        in _read("tools/build_update_repair.ps1")
-    )
 
 
 def test_readmes_link_to_current_release_assets():
-    version = "1.7.0"
+    # Download links follow the published release, while APP_VERSION can
+    # already describe the next unreleased version under development.
+    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\s*$', _read("CITATION.cff"), re.M)
+    assert match
+    version = match.group(1)
     for relative_path in (
         "README.md",
         "docs/readme/README.ru.md",

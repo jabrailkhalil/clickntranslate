@@ -49,15 +49,15 @@ class RuntimeEngineInstallerTest(unittest.TestCase):
         start = self.source.index("def _find_rapidocr_install_python_command")
         body = self.source[start:start + 2500]
 
-        self.assertIn("platform_support.IS_LINUX", body)
+        self.assertIn("not platform_support.IS_WINDOWS", body)
         self.assertIn("platform_support.python_install_hint(required)", body)
 
     def test_windows_only_python_bootstrap_is_refused_on_linux(self):
         start = self.source.index("def _portable_pip_bootstrap_plan")
         body = self.source[start:start + 900]
 
-        self.assertIn("platform_support.IS_LINUX", body)
-        self.assertLess(body.index("IS_LINUX"), body.index("EASYOCR_PYTHON_ARCHIVE"))
+        self.assertIn("not platform_support.IS_WINDOWS", body)
+        self.assertLess(body.index("IS_WINDOWS"), body.index("EASYOCR_PYTHON_ARCHIVE"))
 
 
 if __name__ == "__main__":

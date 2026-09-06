@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from button_styles import standard_buttons
+from ui_scaling import native_window_parent
+
 import ctypes
 import logging
 import os
@@ -9,24 +12,38 @@ import re
 import sys
 from pathlib import Path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 
 # One definition for every tooltip in the application.  It used to be pasted
 # into four separate stylesheets, so any widget outside those four got the
 # system default instead and the popups did not match each other.
-TOOLTIP_QSS = """
-    QToolTip {
-        background-color: #17131f;
-        color: #f7f3ff;
-        border: 1px solid #7a5fa1;
+def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
+    """Use the same theme-aware surface for native tips and status popups."""
+    if dark is None:
+        dark = _uses_dark_theme()
+    background, foreground, border = (
+        ("#211d28", "#f7f3ff", "#7a5fa1") if dark else
+        ("#faf7fc", "#302639", "#a18caf")
+    )
+    if use_palette:
+        background, foreground, border = 'palette(tool-tip-base)', 'palette(tool-tip-text)', 'palette(mid)'
+    return f"""
+    QToolTip {{
+        background-color: {background};
+        color: {foreground};
+        border: 1px solid {border};
         border-radius: 8px;
         padding: 7px 11px;
         font-family: 'Segoe UI';
         font-size: 13px;
         opacity: 245;
-    }
+    }}
 """
+
+
+# Kept for callers that inspect the shared style; runtime uses the function.
+TOOLTIP_QSS = tooltip_stylesheet(True)
 
 # Qt only word-wraps a tooltip when the text looks like rich text
 # (QTipLabel does `setWordWrap(Qt::mightBeRichText(text))`).  A long plain
@@ -61,12 +78,32 @@ class _RoundedTooltipFilter(QtCore.QObject):
     """
 
     def eventFilter(self, watched, event):
-        rounded_popup = _is_rounded_popup(watched)
-        if event.type() == QtCore.QEvent.Polish and rounded_popup:
+        event_type = event.type()
+        if event_type not in (
+            QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
+            QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
+        ):
+            return False
+        if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
+            return False
+        is_tooltip = _is_tooltip(watched)
+        if is_tooltip and event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show):
+            # QTipLabel is reused across unrelated windows. Its previous owner
+            # and stylesheet must not leave a dark tooltip in the light theme.
+            _apply_tooltip_theme(watched)
+        if is_tooltip and event_type in (
+            QtCore.QEvent.Show, QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
+        ):
+            # Moving between controls calls QTipLabel::setStyleSheet("/* */")
+            # even while the same tip stays visible. Apply after Qt finishes
+            # assigning its new owner, without reentering stylesheet polish.
+            QtCore.QTimer.singleShot(0, lambda widget=watched: _apply_tooltip_theme(widget))
+        rounded_popup = is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
+        if event_type == QtCore.QEvent.Polish and rounded_popup:
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
             watched.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        if rounded_popup and event.type() in (
+        if rounded_popup and event_type in (
             QtCore.QEvent.Polish,
             QtCore.QEvent.Show,
             QtCore.QEvent.Resize,
@@ -87,6 +124,16 @@ def _is_tooltip(widget) -> bool:
         return widget.metaObject().className() == "QTipLabel"
     except Exception:
         return False
+
+
+def _apply_tooltip_theme(widget) -> None:
+    try:
+        style = tooltip_stylesheet(_uses_dark_theme(widget))
+        if widget.styleSheet() != style:
+            widget.setStyleSheet(style)
+    except RuntimeError:
+        # A pending hover can be cancelled before the queued update runs.
+        pass
 
 
 def _is_rounded_popup(widget) -> bool:
@@ -116,20 +163,34 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
 _TOOLTIP_FILTER = None
 
 
-def install_tooltip_style(app=None) -> None:
+def install_tooltip_style(app=None, dark=None) -> None:
     """Apply the shared tooltip look to every window, including unstyled ones."""
     global _TOOLTIP_FILTER
 
     app = app or QtWidgets.QApplication.instance()
     if app is None:
         return
-    if _TOOLTIP_FILTER is None:
+    if not hasattr(app, '_rounded_tooltip_filter'):
         _TOOLTIP_FILTER = _RoundedTooltipFilter(app)
         app.installEventFilter(_TOOLTIP_FILTER)
+        app._rounded_tooltip_filter = _TOOLTIP_FILTER
+    if dark is None:
+        dark = _uses_dark_theme()
     existing = app.styleSheet() or ""
-    if "QToolTip" in existing:
-        return
-    app.setStyleSheet(existing + TOOLTIP_QSS)
+    # The application rule stays constant. Replacing the entire application
+    # stylesheet on every theme switch also repolishes rich-text documents and
+    # can accidentally turn their already scaled font into a new baseline.
+    style = re.sub(r'QToolTip\s*\{[^}]*\}', '', existing).rstrip() + '\n' + tooltip_stylesheet(use_palette=True)
+    if style != existing:
+        app.setStyleSheet(style)
+    palette = QtWidgets.QToolTip.palette()
+    palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor('#211d28' if dark else '#faf7fc'))
+    palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor('#f7f3ff' if dark else '#302639'))
+    palette.setColor(QtGui.QPalette.Mid, QtGui.QColor('#7a5fa1' if dark else '#a18caf'))
+    QtWidgets.QToolTip.setPalette(palette)
+    for widget in app.topLevelWidgets():
+        if _is_tooltip(widget):
+            widget.setStyleSheet(tooltip_stylesheet(dark))
 
 
 def install_qt_exception_guard() -> None:
@@ -170,7 +231,7 @@ def _theme_value(widget) -> str:
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         try:
-            for attr in ("current_theme", "theme"):
+            for attr in ("current_theme", "theme", "theme_name"):
                 value = getattr(current, attr, None)
                 if isinstance(value, str) and value:
                     return value.lower()
@@ -196,7 +257,8 @@ def _uses_dark_theme(widget=None) -> bool:
     value = _theme_value(widget)
     if not value:
         app = QtWidgets.QApplication.instance()
-        value = _theme_value(app.activeWindow()) if app is not None else ""
+        value = str(app.property('ui_theme') or _theme_value(app.activeWindow())) if app is not None else ""
+    value = value.lower()
     if any(marker in value for marker in ("свет", "light")):
         return False
     if any(marker in value for marker in ("тем", "dark")):
@@ -366,23 +428,34 @@ def accent_check_pixmap(checked: bool, dark: bool = True, size: int = 18) -> QtG
     return pixmap
 
 
+def set_widget_stylesheet(widget, stylesheet):
+    """Avoid a full Qt repolish when the requested stylesheet is unchanged."""
+    if widget.styleSheet() != stylesheet:
+        widget.setStyleSheet(stylesheet)
+
+
 def install_accent_controls(widget, dark: bool = True) -> None:
     """Use the accent-painted controls for `widget` and everything inside it."""
     if widget is None:
         return
     try:
-        style = AccentControlStyle(dark)
-        # setStyle() does not take ownership, so the proxy has to be kept alive
-        # by something: parent it to the widget and hold a reference as well.
-        style.setParent(widget)
-        widget._accent_control_style = style
-        widget.setStyle(style)
-        for child in widget.findChildren(QtWidgets.QCheckBox):
-            child.setStyle(style)
+        style = getattr(widget, '_accent_control_style', None)
+        if style is None or sip.isdeleted(style):
+            style = AccentControlStyle(dark)
+            # setStyle() does not take ownership. Keep one proxy for the
+            # lifetime of this widget instead of allocating one per theme.
+            style.setParent(widget)
+            widget._accent_control_style = style
+        style.dark = bool(dark)
         # Drop-down popups are separate top-level widgets, so the check boxes on
         # checkable rows would otherwise keep the platform's white squares.
-        for view in widget.findChildren(QtWidgets.QAbstractItemView):
-            view.setStyle(style)
+        controls = [widget, *widget.findChildren(QtWidgets.QCheckBox),
+                    *widget.findChildren(QtWidgets.QAbstractItemView)]
+        for control in controls:
+            if control.property('_cntAccentStyle') is not style:
+                control.setStyle(style)
+                control.setProperty('_cntAccentStyle', style)
+            control.update()
     except Exception:
         # Styling must never break a window that is otherwise fine.
         logging.getLogger("clickntranslate.style").debug("accent controls unavailable", exc_info=True)
@@ -404,19 +477,20 @@ def apply_dark_native_frame(widget, enabled: bool = True) -> None:
                     break
             except Exception:
                 continue
-        if enabled:
-            # Caption, caption text and border colors on current Windows builds.
-            for attribute, color in ((35, 0x00151515), (36, 0x00FFFFFF), (34, 0x002C2C2C)):
-                try:
-                    color_value = ctypes.c_uint(color)
-                    dwmapi.DwmSetWindowAttribute(
-                        hwnd,
-                        attribute,
-                        ctypes.byref(color_value),
-                        ctypes.sizeof(color_value),
-                    )
-                except Exception:
-                    continue
+        # Reset explicit colours too when switching back to the light theme.
+        colors = ((35, 0x00151515), (36, 0x00FFFFFF), (34, 0x002C2C2C)) if enabled else (
+            (35, 0xFFFFFFFF), (36, 0xFFFFFFFF), (34, 0xFFFFFFFF))
+        for attribute, color in colors:
+            try:
+                color_value = ctypes.c_uint(color)
+                dwmapi.DwmSetWindowAttribute(
+                    hwnd,
+                    attribute,
+                    ctypes.byref(color_value),
+                    ctypes.sizeof(color_value),
+                )
+            except Exception:
+                continue
     except Exception:
         pass
 
@@ -430,7 +504,7 @@ class NativeDialogFrameFilter(QtCore.QObject):
             and isinstance(watched, QtWidgets.QDialog)
             and not (watched.windowFlags() & QtCore.Qt.FramelessWindowHint)
         ):
-            QtCore.QTimer.singleShot(0, lambda dialog=watched: apply_dark_native_frame(dialog, True))
+            QtCore.QTimer.singleShot(0, lambda dialog=watched: apply_dark_native_frame(dialog, _uses_dark_theme(dialog)))
         return super().eventFilter(watched, event)
 
 
@@ -494,7 +568,7 @@ class StyledMessageBox(QtWidgets.QMessageBox):
     def __init__(self, parent=None):
         self._styled_ready = False
         self._external_stylesheet = ""
-        super().__init__(parent)
+        super().__init__(native_window_parent(parent))
         self._styled_ready = True
         self._dark = _uses_dark_theme(parent)
         self._message_icon = self.NoIcon
@@ -882,7 +956,7 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
     )
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(native_window_parent(parent))
         self._dark = _uses_dark_theme(parent)
         self._external_stylesheet = ""
         self._message_icon = self.NoIcon
@@ -1059,6 +1133,8 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
             button = QtWidgets.QPushButton(str(button_or_text), self)
             actual_role = self.ActionRole if role is None else role
         self._button_roles[button] = actual_role
+        button.setProperty("buttonRole", "danger" if actual_role == self.DestructiveRole else
+                           "primary" if actual_role in (self.AcceptRole, self.YesRole) else "secondary")
         button.clicked.connect(lambda _checked=False, current=button: self._button_clicked(current))
         self.button_row.addWidget(button)
         return button
@@ -1128,23 +1204,18 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
         text = "#f5f5f7" if dark else "#17171a"
         muted = "#b8b8c2" if dark else "#55545e"
         border = "#33313c" if dark else "#d7d3df"
-        button = "#211f28" if dark else "#e8e3ec"
-        button_hover = "#322d3d" if dark else "#dcd4e3"
         qss = f"""
             QDialog#styledMessageBox {{ background: {background}; color: {text}; border: 1px solid {border}; }}
-            QFrame#styledMessageTitleBar {{ background: #151515; border: none; border-bottom: 1px solid #29292d; }}
-            QLabel#styledMessageTitle {{ color: #f7f7f7; background: transparent; border: none; font-size: 13px; font-weight: 600; }}
+            QFrame#styledMessageTitleBar {{ background: {panel}; border: none; border-bottom: 1px solid {border}; }}
+            QLabel#styledMessageTitle {{ color: {text}; background: transparent; border: none; font-size: 13px; font-weight: 600; }}
             QLabel#styledMessageAppIcon {{ background: transparent; border: none; }}
-            QToolButton#styledMessageClose {{ color: #eeeeee; background: transparent; border: none; border-radius: 4px; font-size: 22px; }}
-            QToolButton#styledMessageClose:hover {{ color: #ffffff; background: #c42b1c; }}
+
             QLabel#styledMessageText {{ color: {text}; font-size: 13px; background: transparent; }}
             QLabel#styledMessageInformation {{ color: {muted}; font-size: 12px; background: transparent; }}
             QPlainTextEdit#styledMessageDetails {{ color: {muted}; background: {panel}; border: 1px solid {border}; border-radius: 5px; padding: 7px; }}
-            QDialog#styledMessageBox QPushButton {{ min-width: 92px; min-height: 34px; padding: 0 14px; color: {text}; background: {button}; border: 1px solid #8060a8; border-radius: 5px; font-size: 13px; font-weight: 500; }}
-            QDialog#styledMessageBox QPushButton:hover {{ background: {button_hover}; border-color: #a985d2; }}
-            QDialog#styledMessageBox QPushButton:pressed {{ background: #735397; color: #ffffff; }}
-            QDialog#styledMessageBox QPushButton:default {{ background: #7959a0; color: #ffffff; border-color: #a985d2; }}
-        """
+            QDialog#styledMessageBox QPushButton {{ min-width: 92px; min-height: 34px; }}
+
+        """ + standard_buttons(dark, compact=True)
         super().setStyleSheet((self._external_stylesheet + "\n" + qss).strip())
 
     def _center_on_owner(self):

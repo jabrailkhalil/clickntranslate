@@ -46,6 +46,12 @@ Bind them like this:
 
 The launcher icon also carries right-click actions for the same commands.
 
+The channel now uses bounded admission, a separate dispatcher and a persistent
+owner lock. A successful second launch confirms queue admission, not completed
+OCR. Overload or uncertain delivery exits with code 75. See
+[command-channel implementation and tests](LINUX_IPC_RELIABILITY.md) (Russian)
+for limits, upgrade precautions and verification commands.
+
 ### Screen capture
 
 * **X11** — Qt reads the root window directly, exactly as on Windows.

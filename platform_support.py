@@ -1,7 +1,7 @@
 """Operating system specifics for Click'n'Translate.
 
-Everything that behaves differently on Windows and Linux lives here, so the rest
-of the app can stay platform-neutral. The Windows implementations reproduce what
+Shared platform selection for Windows, Linux and macOS lives here; native Mac
+bridges are in macos_desktop, macos_hotkeys and macos_ocr. The Windows implementations reproduce what
 1.5.5 already shipped; the Linux ones follow the conventions used by comparable
 Linux tools (NormCap, Flameshot):
 
@@ -122,7 +122,7 @@ def system_subprocess_env():
     is never mutated, so bundled helpers continue to use their private runtime.
     """
     env = os.environ.copy()
-    if not IS_LINUX:
+    if not (IS_LINUX or IS_MAC):
         return env
 
     bundled_roots = [
@@ -135,6 +135,8 @@ def system_subprocess_env():
 
     for variable in (
         "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FRAMEWORK_PATH",
         "LIBRARY_PATH",
         "PYTHONPATH",
         "GI_TYPELIB_PATH",
@@ -315,13 +317,18 @@ def copy_text(text):
 #: package it, so it needs no bundled installer.
 WINDOWS_OCR_ENGINES = ("windows", "tesseract", "rapidocr", "easyocr")
 LINUX_OCR_ENGINES = ("tesseract", "rapidocr", "easyocr")
+MAC_OCR_ENGINES = ("apple vision", "tesseract", "rapidocr", "easyocr")
 
 
 def available_ocr_engines():
+    if IS_MAC:
+        return MAC_OCR_ENGINES
     return WINDOWS_OCR_ENGINES if IS_WINDOWS else LINUX_OCR_ENGINES
 
 
 def default_ocr_engine():
+    if IS_MAC:
+        return "Apple Vision"
     return "Windows" if IS_WINDOWS else "Tesseract"
 
 
@@ -331,7 +338,20 @@ def supports_windows_ocr():
 
 def system_tesseract_command():
     """Tesseract found on PATH, or "" when it is not installed."""
-    return shutil.which("tesseract") or ""
+    return system_command("tesseract")
+
+
+def system_command(name):
+    """Finder launches do not inherit the user's Homebrew shell PATH."""
+    found = shutil.which(name)
+    if found:
+        return found
+    if IS_MAC:
+        for prefix in ("/opt/homebrew/bin", "/usr/local/bin"):
+            candidate = os.path.join(prefix, name)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+    return ""
 
 
 #: How a user installs Tesseract, per package manager. Linux distributions ship
@@ -346,6 +366,8 @@ TESSERACT_INSTALL_HINTS = (
 
 def tesseract_install_hint():
     """Install command for the detected package manager."""
+    if IS_MAC:
+        return "brew install tesseract tesseract-lang"
     for manager, hint in TESSERACT_INSTALL_HINTS:
         if shutil.which(manager):
             return hint
@@ -366,6 +388,8 @@ PYTHON_INSTALL_HINTS = (
 def python_install_hint(version):
     """Install command for a given Python version, e.g. "3.12"."""
     version = str(version or "")
+    if IS_MAC:
+        return f"brew install python@{version}"
     for manager, hint in PYTHON_INSTALL_HINTS:
         if shutil.which(manager):
             return hint.format(version=version, version_nodot=version.replace(".", ""))

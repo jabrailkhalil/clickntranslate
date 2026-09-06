@@ -1,6 +1,6 @@
 #define MyAppName "Click'n'Translate"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.7.0"
+  #define MyAppVersion "1.7.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"
@@ -43,6 +43,12 @@ VersionInfoCompany=Jabrail Digital
 VersionInfoDescription=Click'n'Translate Windows installer
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
+#ifdef SignRelease
+; Sign both the installer and its embedded uninstaller before compression.
+; The build_signed_installer.ps1 wrapper supplies and verifies cntsign.
+SignTool=cntsign
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

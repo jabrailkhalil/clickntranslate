@@ -9,7 +9,10 @@ import tempfile
 import time
 import types
 import zipfile
+import zlib
+import hashlib
 from languages import language_english_name, translator_api_code
+from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
 import platform_support
 import portable_paths
 
@@ -413,7 +416,15 @@ def _clean_hymt_output(output, prompt):
     return text.strip("\"' \r\n")
 
 
-def hymt_translate(text, source_code, target_code, status_callback=None):
+def hymt_translate(text, source_code, target_code, status_callback=None, *, cancel_callback=None, _cache=None):
+    # Bound each generation as well as its prompt; otherwise a long input can
+    # silently hit the output-token cap and return an incomplete translation.
+    return _translate_chunks(text, 1000, lambda chunk: _hymt_translate_chunk(
+        chunk, source_code, target_code, status_callback=status_callback,
+    ), cache=_cache, engine='hymt', cancel_callback=cancel_callback)
+
+
+def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
     runtime = _get_hymt_runtime()
     model_path = runtime.get("model")
     runner_path = runtime.get("runner")
@@ -536,6 +547,14 @@ def _check_argos_install_cancelled(cancel_callback):
         raise ArgosInstallCancelledError("Argos language-package installation was canceled.")
 
 
+def _argos_archive_valid(path):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return bool(archive.namelist()) and archive.testzip() is None
+    except (OSError, zipfile.BadZipFile, RuntimeError, EOFError, zlib.error, ValueError, NotImplementedError):
+        return False
+
+
 def _download_argos_package(
     available_package,
     label,
@@ -548,7 +567,7 @@ def _download_argos_package(
     filename = f"{arg_pkg.argospm_package_name(available_package)}.argosmodel"
     destination = os.path.join(downloads_dir, filename)
 
-    if os.path.isfile(destination) and zipfile.is_zipfile(destination):
+    if os.path.isfile(destination) and _argos_archive_valid(destination):
         size = os.path.getsize(destination)
         _emit_argos_progress(progress_callback, label, size, size)
         return destination
@@ -563,11 +582,14 @@ def _download_argos_package(
         _check_argos_install_cancelled(cancel_callback)
         downloaded_path = os.fspath(available_package.download())
         _check_argos_install_cancelled(cancel_callback)
-        if not zipfile.is_zipfile(downloaded_path):
+        if not _argos_archive_valid(downloaded_path):
             raise RuntimeError(f"Downloaded Argos package {label} is not a valid archive.")
         return downloaded_path
 
-    partial_path = destination + ".part"
+    # Two translation requests may prepare the same missing direction at once.
+    # Never let them truncate or remove each other's in-progress download.
+    descriptor, partial_path = tempfile.mkstemp(prefix=filename + '.', suffix='.part', dir=downloads_dir)
+    os.close(descriptor)
     last_error = None
     download_attempts = [url for url in links for _attempt in range(3)]
     for url in download_attempts:
@@ -581,7 +603,7 @@ def _download_argos_package(
                 url,
                 stream=True,
                 timeout=(20, 180),
-                headers={"User-Agent": "ClicknTranslate Argos package installer"},
+                headers={"User-Agent": "ClicknTranslate Argos package installer", "Accept-Encoding": "identity"},
             ) as response:
                 response.raise_for_status()
                 try:
@@ -604,7 +626,7 @@ def _download_argos_package(
                     f"Incomplete Argos package download for {label}: "
                     f"received {downloaded_bytes} of {total_bytes} bytes."
                 )
-            if not zipfile.is_zipfile(partial_path):
+            if not _argos_archive_valid(partial_path):
                 raise RuntimeError(f"Downloaded Argos package {label} is not a valid archive.")
             os.replace(partial_path, destination)
             return destination
@@ -807,12 +829,14 @@ def _install_argos_packages_local(
         )
         _check_argos_install_cancelled(cancel_callback)
         _emit_status(status_callback, f"Установка {label}…")
-        arg_pkg.install_from_path(download_path)
+        try:
+            arg_pkg.install_from_path(download_path)
+        finally:
+            # Even a failed batch can have changed files on disk.
+            _invalidate_argos_cache()
         installed.add(pair)
         completed.append(pair)
         _emit_status(status_callback, f"Пакет {label} установлен")
-    if completed:
-        _invalidate_argos_cache()
     return completed
 
 
@@ -823,21 +847,20 @@ def _uninstall_argos_packages_local(pairs, status_callback=None):
     requested = set(_normalize_argos_pairs(pairs))
     if not requested:
         return []
-    installed = {
-        (pkg.from_code, pkg.to_code): pkg
-        for pkg in arg_pkg.get_installed_packages()
-    }
+    installed = list(arg_pkg.get_installed_packages())
     removed = []
     for pair in sorted(requested):
-        package = installed.get(pair)
-        if package is None:
+        matching = [pkg for pkg in installed if (pkg.from_code, pkg.to_code) == pair]
+        if not matching:
             continue
         label = f"{pair[0].upper()}→{pair[1].upper()}"
         _emit_status(status_callback, f"Удаление {label}…")
-        arg_pkg.uninstall(package)
+        for package in matching:
+            try:
+                arg_pkg.uninstall(package)
+            finally:
+                _invalidate_argos_cache()
         removed.append(pair)
-    if removed:
-        _invalidate_argos_cache()
     return removed
 
 
@@ -898,10 +921,12 @@ def ensure_language_pair(
             )
             _check_argos_install_cancelled(cancel_callback)
             _emit_status(status_callback, f"Установка {label}…")
-            arg_pkg.install_from_path(download_path)
+            try:
+                arg_pkg.install_from_path(download_path)
+            finally:
+                _invalidate_argos_cache()
             print(f"Пакет {pair[0]}->{pair[1]} установлен.")
             _emit_status(status_callback, f"Пакет {label} установлен")
-        _invalidate_argos_cache()
         return True
     except ArgosInstallCancelledError:
         _emit_status(status_callback, "Установка языкового пакета Argos отменена")
@@ -1292,6 +1317,67 @@ def test_translation():
     else:
         print("Нет модели для EN->RU")
 
+class TranslationCancelledError(RuntimeError):
+    """Cancellation is not a provider failure and must never trigger fallback."""
+
+
+class ProviderRateLimitError(RuntimeError):
+    pass
+
+
+def _is_provider_rate_limit(error):
+    return isinstance(error, ProviderRateLimitError) or getattr(getattr(error, 'response', None), 'status_code', None) == 429
+
+
+def _check_translation_cancelled(callback):
+    if callback is not None and callback():
+        raise TranslationCancelledError('Translation canceled')
+
+
+def _libretranslate_server():
+    key = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_API_KEY', '').strip()
+    url = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_URL', '').strip().rstrip('/')
+    return url or ('https://libretranslate.com' if key else 'https://translate.disroot.org'), key
+
+
+class _TranslationCache:
+    def __init__(self, source, target):
+        self.source, self.target = source, target
+        try:
+            from main import get_data_file
+            self.data_dir = os.path.dirname(get_data_file('config.json'))
+        except Exception:
+            self.data_dir = None
+
+    @staticmethod
+    def _engine_key(engine, segment=False):
+        if engine == 'libretranslate':
+            # A custom LibreTranslate server may use different models.
+            url, _key = _libretranslate_server()
+            engine += ':' + hashlib.sha256(url.encode('utf-8')).hexdigest()[:16]
+        return ('segment-v2:' if segment else '') + engine
+
+    def get(self, text, engine, segment=False):
+        if self.data_dir:
+            try:
+                from cache_manager import get_cached_translation
+                result = get_cached_translation(self.data_dir, text, self.source, self.target,
+                    engine=self._engine_key(engine, segment), strict_engine=True)
+                return result if isinstance(result, str) and result.strip() else None
+            except Exception:
+                pass
+        return None
+
+    def save(self, text, result, engine, segment=False):
+        if self.data_dir and result:
+            try:
+                from cache_manager import save_cached_translation
+                save_cached_translation(self.data_dir, text, self.source, self.target, result,
+                    engine=self._engine_key(engine, segment))
+            except Exception:
+                pass
+
+
 def translate_text(
     text,
     source_code,
@@ -1301,85 +1387,47 @@ def translate_text(
     progress_callback=None,
     cancel_callback=None,
 ):
-    """Перевод текста с выбранным движком и автоматическим фоллбеком."""
+    """Translate with the selected engine; failures never change providers."""
     config = get_cached_translator_config()
     engine = (engine or config.get("translator_engine", "Google")).lower()
-    allow_provider_fallback = bool(config.get("allow_online_provider_fallback", False))
+    _check_translation_cancelled(cancel_callback)
     print(f"Using translator: {engine.upper()}")
 
     # Check translation cache first
-    try:
-        from main import get_data_file
-        import os
-        data_dir = os.path.dirname(get_data_file("config.json"))
-        from cache_manager import get_cached_translation, save_cached_translation
-        cached = get_cached_translation(data_dir, text, source_code, target_code, engine=engine)
-        if cached:
-            print(f"Using cached translation ({len(text)} chars)")
-            return cached
-    except Exception:
-        data_dir = None
+    cache = _TranslationCache(source_code, target_code)
+    cached = cache.get(text, engine)
+    if cached:
+        print(f"Using cached translation ({len(text)} chars)")
+        return cached
 
     online_engines = ['google', 'lingva', 'mymemory', 'libretranslate']
 
     def _call_online(name, txt, src, tgt):
         if name == 'google':
-            return google_translate(txt, src, tgt)
+            return google_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
         elif name == 'mymemory':
-            return mymemory_translate(txt, src, tgt)
+            return mymemory_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
         elif name == 'lingva':
-            return lingva_translate(txt, src, tgt)
+            return lingva_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
         elif name == 'libretranslate':
-            return libretranslate(txt, src, tgt)
+            return libretranslate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
         raise ValueError(f"Unknown engine: {name}")
 
-    def _cache_and_return(result):
+    def _cache_and_return(result, actual_engine=None):
         """Save translation to cache and return."""
-        if result and data_dir:
-            try:
-                save_cached_translation(data_dir, text, source_code, target_code, result, engine=engine)
-            except Exception:
-                pass
+        cache.save(text, result, actual_engine or engine)
         return result
 
     if engine == HYMT_ENGINE_KEY:
-        return _cache_and_return(hymt_translate(text, source_code, target_code, status_callback=status_callback))
-
-    def _online_order(preferred):
-        ordered = []
-        if preferred in online_engines:
-            ordered.append(preferred)
-        for name in online_engines:
-            if name not in ordered:
-                ordered.append(name)
-        return ordered
-
-    def _try_online(preferred, allow_fallback=False):
-        last_error = None
-        engines_to_try = _online_order(preferred) if allow_fallback else [preferred]
-        for name in engines_to_try:
-            try:
-                result = _call_online(name, text, source_code, target_code)
-                if result:
-                    return result
-            except Exception as exc:
-                last_error = exc
-                continue
-        if last_error:
-            raise last_error
-        return None
+        return _cache_and_return(hymt_translate(text, source_code, target_code, status_callback=status_callback,
+            cancel_callback=cancel_callback, _cache=cache))
 
     if engine in online_engines:
-        try:
-            return _cache_and_return(_try_online(engine, allow_fallback=allow_provider_fallback))
-        except Exception as online_error:
-            # Offline rescue only: never switch to another online provider silently.
-            argos_result = _try_argos_translate(
-                text, source_code, target_code, status_callback=status_callback, allow_install=False
-            )
-            if argos_result:
-                return _cache_and_return(argos_result)
-            raise online_error
+        _check_translation_cancelled(cancel_callback)
+        result = _call_online(engine, text, source_code, target_code)
+        if not result:
+            raise RuntimeError(f"{engine} returned an empty translation")
+        return _cache_and_return(result, engine)
 
     if engine == "argos":
         if not argos_runtime_available():
@@ -1403,14 +1451,7 @@ def translate_text(
             "Install the required direction in Settings > Language packages > Argos."
         )
 
-    # Unknown engine name: use an installed offline package if there is one.
-    argos_result = _try_argos_translate(
-        text, source_code, target_code, status_callback=status_callback, allow_install=False
-    )
-    if argos_result:
-        return _cache_and_return(argos_result)
-
-    return _cache_and_return(_try_online("google", allow_fallback=allow_provider_fallback))
+    raise ValueError(f"Unknown translation engine: {engine}")
 
 # Кэшированная сессия для HTTP запросов
 _http_session = None
@@ -1424,7 +1465,7 @@ def _get_http_session():
         _http_session.headers.update({'Connection': 'keep-alive'})
     return _http_session
 
-def _google_translate_chunk(text, source_code, target_code):
+def _google_translate_chunk(text, source_code, target_code, *, cancel_callback=None):
     """Translate a single chunk via Google API."""
     url = 'https://translate.googleapis.com/translate_a/single'
     source_api = translator_api_code(source_code, "google")
@@ -1445,6 +1486,7 @@ def _google_translate_chunk(text, source_code, target_code):
     # is deliberately limited to 429: other failures remain visible instead of
     # silently changing the behaviour selected by the user.
     if r.status_code == 429:
+        _check_translation_cancelled(cancel_callback)
         fallback_url = 'https://clients5.google.com/translate_a/t'
         fallback_params = {
             'client': 'dict-chrome-ex',
@@ -1466,50 +1508,50 @@ def _google_translate_chunk(text, source_code, target_code):
 
     r.raise_for_status()
     data = r.json()
-    return ''.join(seg[0] for seg in data[0] if seg and seg[0])
+    if not isinstance(data, list) or not data or not isinstance(data[0], list):
+        raise ValueError("Google returned an unexpected response")
+    segments = [seg[0] for seg in data[0] if isinstance(seg, list) and seg and isinstance(seg[0], str)]
+    return _validated_translation(''.join(segments), 'Google')
 
 
-def google_translate(text, source_code, target_code):
+def google_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
     """Google Translate через публичный endpoint с разбивкой длинного текста."""
-    # Normalize line endings
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-    # Cyrillic chars expand ~6x in URL encoding, latin ~1x
-    # Use conservative limit to avoid 400 errors
-    MAX_CHUNK = 1500
-    if len(text) <= MAX_CHUNK:
-        return _google_translate_chunk(text, source_code, target_code)
-    # Split by paragraphs, then sentences
-    parts = []
-    current = ""
-    for line in text.split('\n'):
-        if len(current) + len(line) + 1 > MAX_CHUNK:
-            if current:
-                parts.append(current)
-            if len(line) > MAX_CHUNK:
-                while len(line) > MAX_CHUNK:
-                    cut = line[:MAX_CHUNK].rfind('. ')
-                    if cut < MAX_CHUNK // 2:
-                        cut = line[:MAX_CHUNK].rfind(' ')
-                    if cut < MAX_CHUNK // 4:
-                        cut = MAX_CHUNK
-                    else:
-                        cut += 1
-                    parts.append(line[:cut])
-                    line = line[cut:]
-                current = line if line else ""
-            else:
-                current = line
-        else:
-            current = current + '\n' + line if current else line
-    if current:
-        parts.append(current)
-    translated_parts = []
-    for part in parts:
-        translated_parts.append(_google_translate_chunk(part, source_code, target_code))
-    return '\n'.join(translated_parts)
+    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['google'], lambda chunk: _google_translate_chunk(chunk, source_code, target_code, cancel_callback=cancel_callback),
+        cache=_cache, engine='google', cancel_callback=cancel_callback)
 
-def mymemory_translate(text, source_code, target_code):
-    """MyMemory - бесплатный API (до 5000 символов/день без регистрации)."""
+
+def _validated_translation(value, provider):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{provider} returned an empty or invalid translation")
+    return value
+
+
+def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='', cancel_callback=None):
+    """Translate the common request plan; retain completed parts after failure."""
+    translated = []
+    chunks = split_text(text, max_bytes=byte_limit)
+    for chunk in chunks:
+        _check_translation_cancelled(cancel_callback)
+        content = chunk.strip()
+        if not content:
+            translated.append(chunk)
+            continue
+        result = cache.get(content, engine, segment=True) if cache is not None else None
+        if not result:
+            result = _validated_translation(translate_chunk(content), 'Provider')
+            if cache is not None and len(chunks) > 1:
+                cache.save(content, result, engine, segment=True)
+        translated.append(restore_boundary_whitespace(chunk, result))
+    return ''.join(translated)
+
+def mymemory_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+    """Respect MyMemory's 500-byte UTF-8 limit without losing chunk separators."""
+    # https://mymemory.translated.net/doc/spec.php specifies bytes, not characters.
+    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['mymemory'], lambda chunk: _mymemory_translate_chunk(chunk, source_code, target_code),
+        cache=_cache, engine='mymemory', cancel_callback=cancel_callback)
+
+
+def _mymemory_translate_chunk(text, source_code, target_code):
     url = 'https://api.mymemory.translated.net/get'
     source_api = translator_api_code(source_code, "mymemory")
     target_api = translator_api_code(target_code, "mymemory")
@@ -1522,7 +1564,7 @@ def mymemory_translate(text, source_code, target_code):
     r.raise_for_status()
     data = r.json()
     if data.get('responseStatus') == 200:
-        return data['responseData']['translatedText']
+        return _validated_translation(data['responseData']['translatedText'], 'MyMemory')
     raise Exception(f"MyMemory error: {data.get('responseDetails', 'Unknown error')}")
 
 def _server_error_detail(response):
@@ -1537,8 +1579,13 @@ def _server_error_detail(response):
         pass
     return f"HTTP {response.status_code}"
 
-def lingva_translate(text, source_code, target_code):
-    """Lingva - прокси для Google Translate (более стабильный)."""
+def lingva_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['lingva'], lambda chunk: _lingva_translate_chunk(chunk, source_code, target_code, cancel_callback=cancel_callback),
+        cache=_cache, engine='lingva', cancel_callback=cancel_callback)
+
+
+def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=None):
+    """Translate through the public Lingva APIs."""
     # Список публичных инстансов Lingva
     instances = [
         # Active Vercel deployment. Keep it first: the older public domains
@@ -1552,26 +1599,62 @@ def lingva_translate(text, source_code, target_code):
     source_api = translator_api_code(source_code, "lingva")
     target_api = translator_api_code(target_code, "lingva")
     for base_url in instances:
+        _check_translation_cancelled(cancel_callback)
         try:
-            url = f'{base_url}/api/v1/{source_api}/{target_api}/{requests.utils.quote(text)}'
-            r = session.get(url, timeout=8)
+            if '/' in text:
+                # Some deployments decode %2F before routing REST requests,
+                # turning a file path into extra URL segments. GraphQL keeps
+                # the complete text in a JSON variable instead.
+                query = ('query ($source: String, $target: String, $text: String!) '
+                         '{ translation(source: $source, target: $target, query: $text) '
+                         '{ target { text } } }')
+                r = session.post(base_url + '/api/graphql', json={
+                    'query': query,
+                    'variables': {'source': source_api, 'target': target_api, 'text': text},
+                }, timeout=8)
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get('errors'):
+                        last_error = f"{base_url}: {data['errors'][0].get('message', 'GraphQL error')}"
+                        continue
+                    return _validated_translation(data['data']['translation']['target']['text'], 'Lingva')
+            else:
+                encoded_text = requests.utils.quote(text, safe='')
+                url = f'{base_url}/api/v1/{source_api}/{target_api}/{encoded_text}'
+                r = session.get(url, timeout=8)
             if r.status_code == 200:
                 data = r.json()
-                return data.get('translation', '')
+                return _validated_translation(data.get('translation'), 'Lingva')
             last_error = f"{base_url}: {_server_error_detail(r)}"
         except Exception as e:
             last_error = f"{base_url}: {e}"
             continue
     raise Exception(f"Lingva translate failed: {last_error}")
 
-def libretranslate(text, source_code, target_code):
+def libretranslate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['libretranslate'], lambda chunk: _libretranslate_chunk(chunk, source_code, target_code),
+        cache=_cache, engine='libretranslate', cancel_callback=cancel_callback)
+
+
+class _BatchNotSupportedError(RuntimeError):
+    pass
+
+
+def _libretranslate_chunk(text, source_code, target_code):
+    return _libretranslate_request(text, source_code, target_code)
+
+
+def _libretranslate_batch(texts, source_code, target_code):
+    return _libretranslate_request(list(texts), source_code, target_code)
+
+
+def _libretranslate_request(text, source_code, target_code):
     """LibreTranslate - открытый переводчик (публичные серверы)."""
-    # libretranslate.com требует API-ключ, argosopentech/terraprint отключены,
-    # поэтому первым идёт публичный инстанс, который отвечает без ключа.
-    instances = [
-        'https://translate.disroot.org',
-        'https://libretranslate.com',
-    ]
+    # The managed service requires a key; retrying it anonymously only masks
+    # the public server's actual error. A configured key goes to one selected
+    # server, never to a different public instance during a fallback.
+    server, api_key = _libretranslate_server()
+    instances = [server]
     session = _get_http_session()
     last_error = None
     source_api = translator_api_code(source_code, "libretranslate")
@@ -1585,15 +1668,107 @@ def libretranslate(text, source_code, target_code):
                 'target': target_api,
                 'format': 'text'
             }
+            if api_key:
+                payload['api_key'] = api_key
             r = session.post(url, json=payload, timeout=10)
             if r.status_code == 200:
                 data = r.json()
-                return data.get('translatedText', '')
+                if isinstance(text, list):
+                    result = data.get('translatedText')
+                    if not isinstance(result, list) or len(result) != len(text):
+                        raise ValueError('LibreTranslate returned an invalid batch response')
+                    return [_validated_translation(item, 'LibreTranslate') for item in result]
+                return _validated_translation(data.get('translatedText'), 'LibreTranslate')
             last_error = f"{base_url}: {_server_error_detail(r)}"
+            if isinstance(text, list) and r.status_code in (400, 413, 422):
+                raise _BatchNotSupportedError(last_error)
+            if r.status_code == 429:
+                raise ProviderRateLimitError(last_error)
+        except (_BatchNotSupportedError, ProviderRateLimitError):
+            raise
         except Exception as e:
             last_error = f"{base_url}: {e}"
             continue
     raise Exception(f"LibreTranslate failed: {last_error}")
+
+def iter_translate_texts(texts, source_code, target_code, *, engine=None,
+                         status_callback=None, cancel_callback=None):
+    """Yield (index, translation, error) in source order, retaining partial work.
+
+    Documents pass the shared provider plan here. LibreTranslate can send up
+    to four planned pieces in one request. Every request and cache lookup stays
+    with the selected engine, including after a provider failure.
+    """
+    config = get_cached_translator_config()
+    engine = (engine or config.get('translator_engine', 'Google')).lower()
+    texts = list(texts)
+    cache = _TranslationCache(source_code, target_code)
+    batch_size = 4 if engine == 'libretranslate' else 1
+    offset = 0
+    rate_limit_error = ''
+    while offset < len(texts):
+        _check_translation_cancelled(cancel_callback)
+        if rate_limit_error:
+            cached = cache.get(texts[offset], engine) if texts[offset].strip() else texts[offset]
+            yield offset, cached or '', '' if cached else rate_limit_error
+            offset += 1
+            continue
+        group = texts[offset:offset + batch_size]
+        if len(group) == 1 or any(len(text.encode('utf-8')) > 1500 for text in group):
+            text = group[0]
+            try:
+                result = translate_text(text, source_code, target_code, engine=engine,
+                    status_callback=status_callback, cancel_callback=cancel_callback)
+                error = ''
+            except TranslationCancelledError:
+                raise
+            except Exception as exc:
+                _check_translation_cancelled(cancel_callback)
+                result, error = '', str(exc)
+                if _is_provider_rate_limit(exc):
+                    rate_limit_error = error
+            yield offset, result, error
+            offset += 1
+            continue
+
+        results = {}
+        pending = []
+        for index, text in enumerate(group):
+            cached = cache.get(text, engine) if text.strip() else text
+            if cached is not None:
+                results[index] = (cached, '')
+            else:
+                pending.append(index)
+        try:
+            _check_translation_cancelled(cancel_callback)
+            if len(pending) > 1:
+                values = _libretranslate_batch([group[i].strip() for i in pending], source_code, target_code)
+            elif pending:
+                values = [_libretranslate_chunk(group[pending[0]].strip(), source_code, target_code)]
+            else:
+                values = []
+            for index, value in zip(pending, values):
+                translated = restore_boundary_whitespace(group[index], value)
+                cache.save(group[index], translated, engine)
+                results[index] = (translated, '')
+        except _BatchNotSupportedError:
+            # Instance owners can disable arrays or set a smaller batch limit.
+            # Remember it for this operation; never switch servers or leak keys.
+            batch_size = 1
+            continue
+        except TranslationCancelledError:
+            raise
+        except Exception as exc:
+            if _is_provider_rate_limit(exc):
+                rate_limit_error = str(exc)
+            for index in pending:
+                _check_translation_cancelled(cancel_callback)
+                results[index] = ('', str(exc))
+        for index in range(len(group)):
+            result, error = results[index]
+            yield offset + index, result, error
+        offset += len(group)
+
 
 if __name__ == '__main__':
     if _ensure_argos_available():

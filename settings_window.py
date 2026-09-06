@@ -1,3 +1,6 @@
+from button_styles import button_qss, button_palette, standard_buttons
+from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup
+from PyQt5 import sip
 import os
 import json
 import webbrowser
@@ -17,6 +20,7 @@ import logging
 import base64
 import importlib.util
 from pathlib import Path
+from package_installation import install_directory
 from urllib.parse import urlparse
 try:
     import winreg
@@ -26,16 +30,17 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider
+    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
 from PyQt5 import QtCore, QtGui, QtWidgets
 from styled_dialogs import (
     StyledMessageBox,
-    TOOLTIP_QSS,
+    tooltip_stylesheet,
     accent_check_pixmap,
     install_accent_controls,
+    set_widget_stylesheet,
     tooltip_text,
 )
 
@@ -72,7 +77,7 @@ def _invalidate_main_config_cache():
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
 
 def _frozen_executable_dir():
@@ -106,13 +111,15 @@ _WINDOWS_SERVICING_LOCK = threading.Lock()
 MICROSOFT_STORE_UPDATES_URI = "ms-windows-store://downloadsandupdates"
 TESSERACT_BUNDLE_RELEASE_TAG = "v1.3.2"
 TESSERACT_BUNDLE_NAME_WIN64 = "ClicknTranslate-tesseract-win64.zip"
+TESSERACT_BUNDLE_SHA256_WIN64 = "b4414878875a3ee10afca0ba2c9d47342becb970045b3db4da8e01fd86258da4"
 TESSERACT_BUNDLE_URL_WIN64 = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/"
     f"{TESSERACT_BUNDLE_RELEASE_TAG}/{TESSERACT_BUNDLE_NAME_WIN64}"
 )
 HYMT_MODEL_FILE = "HY-MT1.5-1.8B-Q4_K_M.gguf"
+HYMT_MODEL_REVISION = "265b2e615a7dc9b06c435dc878829ad99a512ba2"
 HYMT_MODEL_URL = (
-    "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/"
+    f"https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/{HYMT_MODEL_REVISION}/"
     f"{HYMT_MODEL_FILE}?download=true"
 )
 HYMT_MODEL_SHA256 = "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7"
@@ -180,8 +187,8 @@ EASYOCR_PIP_PACKAGES = (
     "packaging==26.2",
     "lazy-loader==0.5",
 )
-# The tree above is resolved for the interpreter the Windows installer downloads
-# (3.13). A distribution's Python is whatever the distribution ships — 3.10 on
+# The tree above is resolved for our Windows Python 3.12/3.13 runtimes.
+# A distribution's Python is whatever the distribution ships — 3.10 on
 # Ubuntu 22.04 — and most of those pins have no wheel for it, so the install died
 # with "No matching distribution found for scipy==1.18.0" before anything was
 # installed. For an interpreter we do not control, pin EasyOCR itself and leave
@@ -194,8 +201,8 @@ EASYOCR_PIP_PACKAGES_ANY_PYTHON = (
     "opencv-python-headless",
     "numpy<3",
 )
-# The version the exact pin set was resolved against.
-EASYOCR_PINNED_PYTHON = (3, 13)
+# Do not apply this lock to an untested future Python version either.
+EASYOCR_PINNED_PYTHONS = {(3, 12), (3, 13)}
 
 TRANSLATOR_ENGINE_OPTIONS = (
     ("google", "Google", "online"),
@@ -302,6 +309,10 @@ def _configure_engine_group_header(combo, index, foreground="#f4f6fb"):
     header_font = header_item.font()
     header_font.setBold(True)
     header_item.setFont(header_font)
+    header_item.setData(True, DropDownCombo.GROUP_HEADER_ROLE)
+    background = getattr(combo, '_popup_background', '')
+    if background:
+        foreground = '#f4f6fb' if QColor(background).lightness() < 128 else '#202124'
     header_item.setForeground(QBrush(QColor(foreground)))
 
 
@@ -371,6 +382,36 @@ class DropDownCombo(QComboBox):
     """
 
     POPUP_GAP = 3
+    GROUP_HEADER_ROLE = Qt.UserRole + 100
+
+    def set_group_header(self, index):
+        _configure_engine_group_header(self, index)
+
+    def paintEvent(self, event):
+        option = QtWidgets.QStyleOptionComboBox()
+        self.initStyleOption(option)
+        arrow = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                           QtWidgets.QStyle.SC_ComboBoxArrow, self)
+        option.subControls &= ~QtWidgets.QStyle.SC_ComboBoxArrow
+        painter = QtWidgets.QStylePainter(self)
+        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
+        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        dark = option.palette.color(QtGui.QPalette.Text).lightness() > 128
+        color = QtGui.QColor('#c5b3e9' if dark else '#674586')
+        if not self.isEnabled():
+            color.setAlpha(100)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        factor = float(self.window().property('ui_effective_scale') or 1)
+        pen = QtGui.QPen(color, 2 * factor)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+        center = QtCore.QRectF(arrow).center()
+        path = QtGui.QPainterPath()
+        path.moveTo(center.x() - 5 * factor, center.y() - 2.5 * factor)
+        path.lineTo(center.x(), center.y() + 2.5 * factor)
+        path.lineTo(center.x() + 5 * factor, center.y() - 2.5 * factor)
+        painter.drawPath(path)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -405,13 +446,33 @@ class DropDownCombo(QComboBox):
         track = "#17161c" if dark else "#e3dde7"
         handle = "#7A5FA1" if dark else "#9b87b6"
         handle_hover = "#9A7FC1" if dark else "#7A5FA1"
-        popup.setStyleSheet(f"background-color: {background};")
+        border = "#786989" if dark else "#897397"
+        # Disabled section labels store their own ForegroundRole. A stylesheet
+        # change alone leaves that brush in the previous theme (black on black
+        # after the first light -> dark switch).
+        for row in range(self.count()):
+            if self.itemData(row, self.GROUP_HEADER_ROLE):
+                foreground = QBrush(QColor(text))
+                if self.itemData(row, Qt.ForegroundRole) != foreground:
+                    self.setItemData(row, foreground, Qt.ForegroundRole)
+        for widget in (popup, view, view.viewport()):
+            palette = widget.palette()
+            for role, colour in ((QtGui.QPalette.Base, background),
+                                 (QtGui.QPalette.Window, background),
+                                 (QtGui.QPalette.Text, text),
+                                 (QtGui.QPalette.WindowText, text)):
+                palette.setColor(role, QColor(colour))
+            if widget.palette() != palette:
+                widget.setPalette(palette)
+        if popup.objectName() != "appComboPopup":
+            popup.setObjectName("appComboPopup")
+        set_widget_stylesheet(popup, f"QFrame#appComboPopup {{ background-color: {background}; border: 1px solid {border}; }}")
         popup.setAutoFillBackground(True)
         # The list is a top-level popup on Linux, so a parent selector such as
         # ``QComboBox QAbstractItemView`` does not reliably reach it.  Style the
         # view and its scrollbar directly: otherwise the proxy popup falls back
         # to the desktop's blue selection and native scrollbar.
-        view.setStyleSheet(f"""
+        set_widget_stylesheet(view, f"""
             QAbstractItemView {{
                 background-color: {background};
                 color: {text};
@@ -423,6 +484,10 @@ class DropDownCombo(QComboBox):
             QAbstractItemView::item {{
                 min-height: 24px;
                 padding: 3px 6px;
+            }}
+            QAbstractItemView::item:disabled {{
+                color: {text};
+                background-color: {background};
             }}
             QAbstractItemView::item:hover {{
                 background-color: {hover};
@@ -463,6 +528,8 @@ class DropDownCombo(QComboBox):
         if popup is None:
             return
         self._cap_popup_to_visible_rows(popup)
+        if position_embedded_combo_popup(self, popup, self.POPUP_GAP):
+            return
         top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
         below = top_left.y() + self.height() + self.POPUP_GAP
         screen = self._available_screen_rect()
@@ -618,12 +685,9 @@ class ResultWindowModeCombo(DropDownCombo):
             # combos label their Online/Offline groups.
             head = QtGui.QStandardItem(text)
             head.setFlags(Qt.NoItemFlags)
-            head_font = head.font()
-            head_font.setBold(True)
-            head.setFont(head_font)
-            head.setForeground(QBrush(QColor(header_color)))
             head.setSizeHint(QtCore.QSize(0, self.ROW_HEIGHT))
             self.model().appendRow(head)
+            _configure_engine_group_header(self, self.count() - 1, header_color)
 
         append_header(header)
         for mode in self._modes:
@@ -774,29 +838,73 @@ class ResultWindowModeCombo(DropDownCombo):
 
 
 class OpticallyCenteredPushButton(QPushButton):
-    """Paint a connected button's label at a deliberate optical centre.
+    """Fit and centre the actual glyphs inside a fixed action-grid cell.
 
-    IMPORTANT: changing ``padding-top`` or ``padding-bottom`` in the footer
-    button QSS does not visibly move the text with Qt's Windows stylesheet
-    engine.  Do not retry that ineffective fix.  The joined button frames must
-    remain stationary, so only ``CE_PushButtonLabel`` is translated here.
+    QSS padding and a fixed vertical offset depend on the platform font. Use
+    Qt's styled content rectangle and the ink bounds instead, including for
+    long translations and fallback fonts on Linux.
     """
 
-    def __init__(self, text="", parent=None, label_offset_y=-3):
+    def __init__(self, text="", parent=None, label_offset_y=0):
         super().__init__(text, parent)
         self._label_offset_y = int(label_offset_y)
+
+    def _label_area(self):
+        option = QtWidgets.QStyleOptionButton()
+        self.initStyleOption(option)
+        return self.style().subElementRect(
+            QtWidgets.QStyle.SE_PushButtonContents, option, self
+        ).adjusted(2, 1, -2, -1)
+
+    def label_layout(self):
+        self.ensurePolished()
+        area = self._label_area()
+        font = QtGui.QFont(self.font())
+        # Keep the normal 16px type whenever it fits. A long translated action
+        # may use a smaller font, but cannot move its cell or clip its neighbours.
+        size = font.pixelSize()
+        if size <= 0:
+            size = round(QtGui.QFontInfo(font).pixelSize())
+        peers = [self]
+        grid = self.parentWidget().layout() if self.parentWidget() else None
+        if isinstance(grid, QGridLayout) and grid.indexOf(self) >= 0:
+            row = grid.getItemPosition(grid.indexOf(self))[0]
+            peers = [
+                grid.itemAt(index).widget() for index in range(grid.count())
+                if grid.getItemPosition(index)[0] == row
+                and isinstance(grid.itemAt(index).widget(), OpticallyCenteredPushButton)
+            ]
+        for pixels in range(size, 11, -1):
+            font.setPixelSize(pixels)
+            metrics = QtGui.QFontMetricsF(font)
+            if all(
+                metrics.boundingRect(peer.text()).width() <= peer._label_area().width()
+                and metrics.boundingRect(peer.text()).height() <= peer._label_area().height()
+                for peer in peers
+            ):
+                break
+        return font, area
+
+    def label_color(self, option):
+        group = QtGui.QPalette.Active if self.isEnabled() else QtGui.QPalette.Disabled
+        return option.palette.color(group, QtGui.QPalette.ButtonText)
 
     def paintEvent(self, event):
         option = QtWidgets.QStyleOptionButton()
         self.initStyleOption(option)
         painter = QtWidgets.QStylePainter(self)
         painter.drawControl(QtWidgets.QStyle.CE_PushButtonBevel, option)
-        option.rect.translate(0, self._label_offset_y)
-        painter.drawControl(QtWidgets.QStyle.CE_PushButtonLabel, option)
+        font, area = self.label_layout()
+        painter.setFont(font)
+        painter.setPen(self.label_color(option))
+        bounds = QtGui.QFontMetricsF(font).boundingRect(self.text())
+        origin = QtCore.QRectF(area).center() - bounds.center()
+        origin.setY(origin.y() + self._label_offset_y)
+        painter.drawText(origin, self.text())
         painter.end()
 
 
-class LanguageSwapButton(QToolButton):
+class LanguageSwapButton(ScaledIconToolButton):
     """Consistent vector swap icon for every language-pair control.
 
     A Unicode swap glyph changes shape and vertical alignment with the active
@@ -813,15 +921,11 @@ class LanguageSwapButton(QToolButton):
 
     @staticmethod
     def _swap_pixmap(color):
-        ratio = max(
-            1.0,
-            float(QApplication.instance().devicePixelRatio())
-            if QApplication.instance() is not None else 1.0,
-        )
+        ratio = 4.0
         pixmap = QtGui.QPixmap(int(22 * ratio), int(16 * ratio))
-        pixmap.setDevicePixelRatio(ratio)
         pixmap.fill(Qt.transparent)
         painter = QtGui.QPainter(pixmap)
+        painter.scale(ratio, ratio)
         try:
             painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
             pen = QtGui.QPen(QtGui.QColor(color), 1.8)
@@ -840,7 +944,9 @@ class LanguageSwapButton(QToolButton):
         return pixmap
 
     def _refresh_swap_icon(self):
-        dark = self.palette().color(QtGui.QPalette.Window).lightness() < 128
+        # A transparent button has no usable Window colour. Its foreground
+        # follows the actual theme even on the borderless main-page controls.
+        dark = self.palette().color(QtGui.QPalette.Active, QtGui.QPalette.ButtonText).lightness() > 128
         normal = "#c5b3e9" if dark else "#6b4f96"
         active = "#e0d4f7" if dark else "#7a5fa1"
         disabled = QtGui.QColor(normal)
@@ -859,6 +965,99 @@ class LanguageSwapButton(QToolButton):
         super().changeEvent(event)
         if event.type() in (QtCore.QEvent.PaletteChange, QtCore.QEvent.StyleChange):
             self._refresh_swap_icon()
+
+
+def window_header_color(dark):
+    """The title bar and its attached navigation use one continuous surface."""
+    return "#1e1e1e" if dark else "#ddd7e2"
+
+
+class SettingsPageTabButton(OpticallyCenteredPushButton):
+    """A named destination that remains readable in the fixed viewport."""
+
+    def __init__(self, text, parent=None, dark=True):
+        super().__init__(text, parent)
+        self.setCheckable(True)
+        self.setAutoExclusive(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(26)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.set_dark(dark)
+
+    def set_dark(self, dark):
+        self._dark = bool(dark)
+        text = "#9b92a6" if dark else "#766d80"
+        active = "#f5efff" if dark else "#41275f"
+        self.setStyleSheet(f"""
+            QPushButton {{ background:transparent; color:{text};
+                border:1px solid transparent; border-radius:0;
+                padding:0 6px; font-size:13px; font-weight:500; }}
+            QPushButton:hover, QPushButton:checked, QPushButton:focus {{ color:{active}; }}
+        """)
+
+    def label_color(self, option):
+        # The label is painted separately from Qt's button bevel. Select its
+        # state colour explicitly; the base palette ignores :checked text.
+        if self.isChecked() or self.underMouse():
+            return QtGui.QColor("#f5efff" if self._dark else "#41275f")
+        if self.hasFocus():
+            return QtGui.QColor("#ccb6e7" if self._dark else "#624184")
+        return QtGui.QColor("#9b92a6" if self._dark else "#766d80")
+
+
+class SettingsPageNavigation(QFrame):
+    """A compact shelf attached to the title bar, sized by its tab labels."""
+
+    def __init__(self, parent=None, dark=True):
+        super().__init__(parent)
+        self.setObjectName("settingsPageNavigation")
+        self.setFixedHeight(32)
+        self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.set_dark(dark)
+
+    def set_dark(self, dark):
+        self._dark = bool(dark)
+        background = window_header_color(dark)
+        border = "#3b3542" if dark else "#c5bacf"
+        self.setStyleSheet(
+            "QFrame#settingsPageNavigation {"
+            f"background:{background}; border:1px solid {border}; border-top:none;"
+            "border-bottom-left-radius:11px; border-bottom-right-radius:11px;"
+            "}"
+        )
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        tabs = self.findChildren(SettingsPageTabButton, options=Qt.FindDirectChildrenOnly)
+        selected = next((tab for tab in tabs if tab.isChecked()), None)
+        if selected is None:
+            return
+        # Selection belongs to the shelf's lower contour, not to a separate
+        # button surface. At either end it follows the same rounded corner.
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        pen = QtGui.QPen(QColor("#b99adb" if self._dark else "#8057a5"), 2)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        path = QtGui.QPainterPath()
+        edge = self.height() - 1.0
+        radius = 11.0
+        rect = selected.geometry()
+        if selected is tabs[0]:
+            path.moveTo(1.0, edge - radius)
+            path.quadTo(1.0, edge, radius, edge)
+        else:
+            path.moveTo(rect.left(), edge)
+        if selected is tabs[-1]:
+            right = self.width() - 1.0
+            path.lineTo(right - radius, edge)
+            path.quadTo(right, edge, right, edge - radius)
+        else:
+            path.lineTo(rect.right(), edge)
+        painter.drawPath(path)
+        painter.end()
 
 
 class SettingsPageDotButton(QToolButton):
@@ -910,9 +1109,11 @@ def _populate_grouped_ocr_combo(
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     # The WinRT engine only exists on Windows; other systems start at Tesseract,
     # which their distribution packages.
-    engines = ("Windows", "Tesseract", "RapidOCR", "EasyOCR")
-    if not platform_support.supports_windows_ocr():
-        engines = tuple(engine for engine in engines if engine.lower() != "windows")
+    names = {"windows": "Windows", "apple vision": "Apple Vision", "tesseract": "Tesseract",
+             "rapidocr": "RapidOCR", "easyocr": "EasyOCR"}
+    engines = tuple(names[name] for name in platform_support.MAC_OCR_ENGINES) if platform_support.IS_MAC else (
+        ("Windows", "Tesseract", "RapidOCR", "EasyOCR") if platform_support.supports_windows_ocr()
+        else ("Tesseract", "RapidOCR", "EasyOCR"))
     engines = [
         engine
         for _index, engine in sorted(
@@ -973,6 +1174,9 @@ OCR_DETAIL_TEXT = {
 
 
 def _ocr_combo_tooltip(engine, lang):
+    if str(engine).lower() == "apple vision":
+        from macos_text import macos_text
+        return macos_text(lang, "vision_note")
     details = OCR_DETAIL_TEXT.get(lang, OCR_DETAIL_TEXT["en"])
     return details.get(str(engine or "").lower(), str(engine or ""))
 
@@ -1028,15 +1232,7 @@ PROGRESS_DIALOG_STYLE = """
         font-size: 15px;
         background: transparent;
     }
-    QPushButton {
-        background-color: #1e1e1e;
-        color: #ffffff;
-        border: 1px solid #6f5aa8;
-        padding: 5px 12px;
-    }
-    QPushButton:hover {
-        background-color: #333333;
-    }
+
     QProgressBar {
         border: 1px solid #555555;
         border-radius: 6px;
@@ -1049,17 +1245,9 @@ PROGRESS_DIALOG_STYLE = """
         background-color: #7a61b3;
         border-radius: 5px;
     }
-    QToolButton {
-        background-color: transparent;
-        color: #ffffff;
-        border: none;
-        font-size: 15px;
-        font-weight: bold;
-    }
-    QToolButton:hover {
-        background-color: #2b2440;
-    }
-"""
+
+""" + standard_buttons(True) + button_qss(True, "quiet", selector="QToolButton", icon=True)
+PROGRESS_DIALOG_STYLE += button_qss(True, "close", selector="QToolButton#progressClose", icon=True)
 
 
 def _configure_progress_dialog_window(dialog):
@@ -1163,6 +1351,7 @@ class UpdateProgressDialog(QDialog):
         self._minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self._minimize_button)
         self._close_button = QToolButton(self)
+        self._close_button.setObjectName("progressClose")
         self._close_button.setText("x")
         self._close_button.setToolTip(tooltip_text(settings_text(self._lang, "cancel")))
         self._close_button.setFixedSize(28, 24)
@@ -1282,7 +1471,7 @@ class TesseractInstallProgressDialog(QDialog):
         anchor_owner=None,
     ):
         transient_owner = anchor_owner if isinstance(anchor_owner, QWidget) else owner if isinstance(owner, QWidget) else None
-        super().__init__(transient_owner)
+        super().__init__(native_window_parent(transient_owner))
         self._owner = owner
         self._anchor_owner = transient_owner or owner
         self._title = title
@@ -1328,6 +1517,7 @@ class TesseractInstallProgressDialog(QDialog):
         self.minimize_button.clicked.connect(self._minimize_to_taskbar)
         title_row.addWidget(self.minimize_button)
         self.close_button = QToolButton(self)
+        self.close_button.setObjectName("progressClose")
         self.close_button.setText("×")
         self.close_button.setToolTip(tooltip_text(settings_text(self._lang, "cancel")))
         self.close_button.setFixedSize(28, 24)
@@ -1535,6 +1725,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR and updates",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
+        "game_intro": "Keep translating text as it changes in games, videos or applications. Choose screen areas to follow; the translation updates in place.",
+        "game_launch": "Choose areas and start translation",
         "game_languages": "Languages:",
         "game_swap_languages": "Swap dynamic translation languages",
         "game_scan_interval": "Scan interval:",
@@ -1649,6 +1841,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR и обновления",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
+        "game_intro": "Для меняющегося текста в играх, видео и приложениях. Выберите области экрана — перевод в них будет обновляться автоматически.",
+        "game_launch": "Выбрать области и запустить перевод",
         "game_languages": "Языки:",
         "game_swap_languages": "Поменять языки динамического перевода местами",
         "game_scan_interval": "Частота проверки:",
@@ -1763,6 +1957,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR y actualizaciones",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
+        "game_intro": "Traduce texto que cambia en juegos, vídeos o aplicaciones. Elige zonas de la pantalla; la traducción se actualiza en ellas automáticamente.",
+        "game_launch": "Elegir zonas e iniciar la traducción",
         "game_languages": "Idiomas:",
         "game_swap_languages": "Intercambiar idiomas de traducción dinámica",
         "game_scan_interval": "Intervalo de lectura:",
@@ -1876,6 +2072,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR und Updates",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
+        "game_intro": "Für wechselnden Text in Spielen, Videos und Anwendungen. Bildschirmbereiche auswählen; die Übersetzung wird dort automatisch aktualisiert.",
+        "game_launch": "Bereiche wählen und Übersetzung starten",
         "game_languages": "Sprachen:",
         "game_swap_languages": "Sprachen der dynamischen Übersetzung tauschen",
         "game_scan_interval": "Scanintervall:",
@@ -1989,6 +2187,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR et mises à jour",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
+        "game_intro": "Pour le texte qui change dans les jeux, vidéos et applications. Choisissez des zones de l’écran ; la traduction s’y actualise automatiquement.",
+        "game_launch": "Choisir les zones et lancer la traduction",
         "game_languages": "Langues :",
         "game_swap_languages": "Inverser les langues de la traduction dynamique",
         "game_scan_interval": "Intervalle d’analyse :",
@@ -2102,6 +2302,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR 与更新",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
+        "game_intro": "适用于游戏、视频和应用中不断变化的文字。选择屏幕区域，译文会在原位置自动更新。",
+        "game_launch": "选择区域并开始翻译",
         "game_languages": "语言：",
         "game_swap_languages": "交换动态翻译语言",
         "game_scan_interval": "扫描间隔：",
@@ -2198,6 +2400,29 @@ def settings_text(lang, key):
     return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
 
 
+for _scale_lang, _scale_labels in {
+    'en': ('Interface scale', 'Enlarge text, icons and controls in all app windows. Each window fits the available screen.', 'Decrease scale', 'Increase scale'),
+    'ru': ('Масштаб интерфейса', 'Увеличивает текст, иконки и элементы управления во всех окнах приложения. Размер каждого окна ограничен экраном.', 'Уменьшить масштаб', 'Увеличить масштаб'),
+    'de': ('Oberflächengröße', 'Vergrößert Text, Symbole und Bedienelemente in allen App-Fenstern. Jedes Fenster passt auf den Bildschirm.', 'Verkleinern', 'Vergrößern'),
+    'fr': ('Échelle de l’interface', 'Agrandit le texte, les icônes et les commandes dans toutes les fenêtres. Chaque fenêtre reste adaptée à l’écran.', 'Réduire le zoom', 'Augmenter le zoom'),
+    'es': ('Escala de la interfaz', 'Amplía el texto, los iconos y los controles de todas las ventanas. Cada ventana se ajusta a la pantalla.', 'Reducir escala', 'Aumentar escala'),
+    'zh': ('界面缩放', '放大所有应用窗口中的文字、图标和控件。每个窗口的大小都会适应屏幕。', '缩小界面', '放大界面'),
+}.items():
+    SETTINGS_TEXT[_scale_lang].update(ui_scale=_scale_labels[0], ui_scale_hint=_scale_labels[1],
+                                    ui_scale_decrease=_scale_labels[2], ui_scale_increase=_scale_labels[3])
+
+
+for _scale_lang, (_caption, _hint) in {
+    'en': ('Scale:', 'Enter a percentage and press Enter or leave the field. Escape cancels. Arrows change the scale by 5%.'),
+    'ru': ('Масштаб:', 'Введите процент и нажмите Enter или выйдите из поля. Escape отменяет ввод. Стрелки меняют масштаб на 5%.'),
+    'de': ('Skalierung:', 'Prozentwert eingeben und mit Enter oder Verlassen des Feldes übernehmen. Escape verwirft. Pfeile ändern um 5%.'),
+    'fr': ('Échelle :', 'Saisissez un pourcentage, puis Entrée ou quittez le champ. Échap annule. Les flèches changent de 5%.'),
+    'es': ('Escala:', 'Introduzca un porcentaje y pulse Intro o salga del campo. Escape cancela. Las flechas cambian un 5%.'),
+    'zh': ('缩放：', '输入百分比后按 Enter 或离开输入框生效。Escape 取消。箭头每次调整 5%。'),
+}.items():
+    SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
+
+
 SETTINGS_EXPORT_FORMAT = "clickntranslate-settings"
 SETTINGS_EXPORT_SCHEMA = 1
 
@@ -2254,6 +2479,7 @@ def validated_import_settings(payload, defaults):
         if valid:
             accepted[key] = value
     numeric_ranges = {
+        "ui_scale_percent": (MIN_SCALE, MAX_SCALE),
         "ocr_dim_strength": (0, 80),
         "game_capture_interval_ms": (450, 10000),
         "game_overlay_opacity": (45, 100),
@@ -2571,6 +2797,7 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.clear()
+            self.editingFinished.emit()
         else:
             super().keyPressEvent(event)
             seq_str = self.keySequence().toString()
@@ -2670,6 +2897,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "Install the engine first. Language packages will appear here after installation.",
         "repair_needed": "Needs repair",
         "remove_packages_confirm": "Remove selected {engine} packages: {packages}?",
+        "easy_shared_removal": "EasyOCR shares models between languages. Removing this package affects: {packages}.",
         "packages_removed": "Selected {engine} language packages were removed.",
         "remove_failed": "Failed to remove language packages:\n",
         "win_removing": "Windows OCR: removing {language} ({current}/{total})…",
@@ -2706,6 +2934,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "Сначала установите движок. После установки здесь появятся языковые пакеты.",
         "repair_needed": "Требуется восстановление",
         "remove_packages_confirm": "Удалить выбранные пакеты {engine}: {packages}?",
+        "easy_shared_removal": "EasyOCR использует общие модели для нескольких языков. Удаление пакета затронет: {packages}.",
         "packages_removed": "Выбранные языковые пакеты {engine} удалены.",
         "remove_failed": "Не удалось удалить языковые пакеты:\n",
         "win_removing": "Windows OCR: удаление {language} ({current}/{total})…",
@@ -2742,6 +2971,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "Instala primero el motor. Los paquetes de idioma aparecerán aquí después.",
         "repair_needed": "Requiere reparación",
         "remove_packages_confirm": "¿Eliminar los paquetes seleccionados de {engine}: {packages}?",
+        "easy_shared_removal": "EasyOCR comparte modelos entre idiomas. Eliminar este paquete afecta a: {packages}.",
         "packages_removed": "Se eliminaron los paquetes de idioma seleccionados de {engine}.",
         "remove_failed": "No se pudieron eliminar los paquetes:\n",
         "win_removing": "Windows OCR: eliminando {language} ({current}/{total})…",
@@ -2778,6 +3008,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "Installiere zuerst die Engine. Danach werden die Sprachpakete hier angezeigt.",
         "repair_needed": "Reparatur erforderlich",
         "remove_packages_confirm": "Ausgewählte {engine}-Pakete entfernen: {packages}?",
+        "easy_shared_removal": "EasyOCR verwendet gemeinsame Sprachmodelle. Das Entfernen betrifft: {packages}.",
         "packages_removed": "Die ausgewählten {engine}-Sprachpakete wurden entfernt.",
         "remove_failed": "Sprachpakete konnten nicht entfernt werden:\n",
         "win_removing": "Windows OCR: {language} wird entfernt ({current}/{total})…",
@@ -2814,6 +3045,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "Installez d’abord le moteur. Les modules de langue apparaîtront ensuite ici.",
         "repair_needed": "Réparation requise",
         "remove_packages_confirm": "Supprimer les modules {engine} sélectionnés : {packages} ?",
+        "easy_shared_removal": "EasyOCR partage ses modèles entre plusieurs langues. La suppression affecte : {packages}.",
         "packages_removed": "Les modules linguistiques {engine} sélectionnés ont été supprimés.",
         "remove_failed": "Impossible de supprimer les modules :\n",
         "win_removing": "Windows OCR : suppression de {language} ({current}/{total})…",
@@ -2850,6 +3082,7 @@ LANGUAGE_MANAGER_TEXT = {
         "engine_not_installed_body": "请先安装引擎。安装完成后，语言包会显示在这里。",
         "repair_needed": "需要修复",
         "remove_packages_confirm": "删除所选 {engine} 语言包：{packages}？",
+        "easy_shared_removal": "EasyOCR 的多种语言共用模型。删除此语言包将影响：{packages}。",
         "packages_removed": "已删除所选 {engine} 语言包。",
         "remove_failed": "无法删除语言包：\n",
         "win_removing": "Windows OCR：正在删除 {language}（{current}/{total}）…",
@@ -3024,7 +3257,7 @@ class OcrLanguageManagerDialog(QDialog):
     _runtime_probe_ready = QtCore.pyqtSignal(object)
 
     def __init__(self, owner):
-        super().__init__(owner)
+        super().__init__(native_window_parent(owner))
         self.owner = owner
         owner_parent = getattr(owner, "parent", None)
         if callable(owner_parent):
@@ -3235,20 +3468,8 @@ class OcrLanguageManagerDialog(QDialog):
                 font-size: 13px;
                 font-weight: 700;
             }}
-            QToolButton#languageManagerTitleClose {{
-                background: transparent;
-                color: {close_text};
-                border: none;
-                border-radius: 6px;
-                font-size: 18px;
-                font-weight: 500;
-                padding: 0px;
-            }}
-            QToolButton#languageManagerTitleClose:hover {{
-                background-color: #d44b55;
-                color: #ffffff;
-            }}
-        """ + TOOLTIP_QSS
+
+        """ + tooltip_stylesheet(dark) + standard_buttons(self._is_dark_theme(), compact=False)
         if dark:
             self.setStyleSheet(chrome_style + """
                 QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
@@ -3263,17 +3484,9 @@ class OcrLanguageManagerDialog(QDialog):
                 QTableWidget::item:disabled { color: #9ca0ad; }
                 QTableCornerButton::section { background: #24212e; border: 0; }
                 QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
-                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 600; }
-                QPushButton:hover { background-color: #8B70B2; }
-                QPushButton:disabled { background-color: #3a3645; color: #8f889c; }
-                QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
-                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
-                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
-                QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
-                QPushButton#languagePackageEngineRemove { background-color: transparent; color: #e0879a; border: 1px solid #6b3f4c; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
-                QPushButton#languagePackageEngineRemove:hover { background-color: #462b33; color: #ffd7de; }
-                QPushButton#languagePackageEngineRemove:pressed { background-color: #5a343e; }
-                QPushButton#languagePackageEngineRemove:disabled { color: #8f889c; border-color: #3a3645; }
+
+            QPushButton#languagePackageAction { min-height: 18px; }
+
                 QFrame#languagePackageEmptyState { background: #17181d; border: 1px solid #34313f; border-radius: 10px; }
                 QLabel#languagePackageEmptyTitle { color: #f4f6fb; font-size: 18px; font-weight: 700; }
                 QLabel#languagePackageEmptyBody { color: #aeb2bf; font-size: 13px; }
@@ -3288,7 +3501,7 @@ class OcrLanguageManagerDialog(QDialog):
                 QScrollBar::handle:horizontal { background: #67577b; min-width: 36px; border-radius: 5px; margin: 2px; }
                 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
-            """)
+            """ + standard_buttons(self._is_dark_theme(), compact=False))
         else:
             self.setStyleSheet(chrome_style + """
                 QDialog#languageManagerDialog { background-color: #f0edf3; color: #241f2a; border: 1px solid #bcb2c7; font-family: 'Segoe UI'; font-size: 13px; }
@@ -3296,17 +3509,9 @@ class OcrLanguageManagerDialog(QDialog):
                 QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
                 QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 7px; }
                 QHeaderView::section { background: #ddd7e2; color: #241f2a; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
-                QPushButton { background-color: #7A5FA1; color: #fff; border: none; border-radius: 7px; padding: 7px 12px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 600; }
-                QPushButton:hover { background-color: #8B70B2; }
-                QPushButton:disabled { background-color: #d8d4e2; color: #777; }
-                QPushButton#languagePackageAction { background-color: #7A5FA1; color: #ffffff; border: none; border-radius: 7px; padding: 7px 12px; min-height: 18px; }
-                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
-                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
-                QPushButton#languagePackageAction:disabled { background-color: #d8d4e2; color: #777777; }
-                QPushButton#languagePackageEngineRemove { background-color: transparent; color: #b03a52; border: 1px solid #e2b7c0; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
-                QPushButton#languagePackageEngineRemove:hover { background-color: #fbe9ed; color: #8f2a40; }
-                QPushButton#languagePackageEngineRemove:pressed { background-color: #f3d7de; }
-                QPushButton#languagePackageEngineRemove:disabled { color: #a39aad; border-color: #e6e1ec; }
+
+            QPushButton#languagePackageAction { min-height: 18px; }
+
                 QFrame#languagePackageEmptyState { background: #e9e3ed; border: 1px solid #bcb2c7; border-radius: 10px; }
                 QLabel#languagePackageEmptyTitle { color: #202124; font-size: 18px; font-weight: 700; }
                 QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
@@ -3321,7 +3526,7 @@ class OcrLanguageManagerDialog(QDialog):
                 QScrollBar::handle:horizontal { background: #9b87b6; min-width: 36px; border-radius: 5px; margin: 2px; }
                 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
-            """)
+            """ + standard_buttons(self._is_dark_theme(), compact=False))
 
     def _apply_package_tab_styles(self):
         dark = self._is_dark_theme()
@@ -3411,19 +3616,8 @@ class OcrLanguageManagerDialog(QDialog):
                 font-family: 'Segoe UI';
                 font-size: 13px;
             }}
-            QPushButton#languagePackageAction {{
-                background-color: #7A5FA1;
-                color: #ffffff;
-                border: none;
-                border-radius: 7px;
-                padding: 7px 14px;
-                font-family: 'Segoe UI';
-                font-size: 13px;
-                font-weight: 700;
-            }}
-            QPushButton#languagePackageAction:hover {{ background-color: #8B70B2; }}
-            QPushButton#languagePackageAction:pressed {{ background-color: #684d91; }}
-        """)
+
+        """ + standard_buttons(dark, compact=False))
 
     def _apply_package_scrollbar_style(self, table):
         if table is None:
@@ -3541,6 +3735,12 @@ class OcrLanguageManagerDialog(QDialog):
                 self._snap_table_to_whole_rows(table)
 
     def _build_tabs(self):
+        if platform_support.IS_MAC:
+            from macos_text import macos_text
+            note = macos_text(self.lang, "vision_note")
+            self.apple_vision_table = self._add_engine_tab(
+                self.ocr_tabs, "Apple Vision", note, self._populate_apple_vision_table, [])
+            self.apple_vision_table.setColumnHidden(0, True)
         # The Windows OCR tab drives Windows Features on Demand through elevated
         # PowerShell; there is no such engine or mechanism on other systems.
         if platform_support.supports_windows_ocr():
@@ -3550,9 +3750,9 @@ class OcrLanguageManagerDialog(QDialog):
                 language_manager_text(self.lang, "windows_note"),
                 self._populate_windows_table,
                 [
-                    (language_manager_text(self.lang, "install_selected"), self._install_selected_windows),
-                    (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_windows),
-                    (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings),
+                    (language_manager_text(self.lang, "install_selected"), self._install_selected_windows, "primary"),
+                    (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_windows, "danger"),
+                    (language_manager_text(self.lang, "windows_settings"), self._open_windows_settings, "secondary"),
                 ],
             )
         self.tesseract_table = self._add_engine_tab(
@@ -3561,8 +3761,8 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "tesseract_note"),
             self._populate_tesseract_table,
             [
-                (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract),
-                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_tesseract),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract, "primary"),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_tesseract, "danger"),
             ],
             missing_engine="Tesseract",
             install_engine_callback=self._install_tesseract_engine,
@@ -3574,8 +3774,8 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "easyocr_note"),
             self._populate_easyocr_table,
             [
-                (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr),
-                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_easyocr),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr, "primary"),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_easyocr, "danger"),
             ],
             missing_engine=EASYOCR_ENGINE_DISPLAY,
             install_engine_callback=self._install_easyocr_engine,
@@ -3623,8 +3823,8 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "argos_note"),
             self._populate_argos_table,
             [
-                (language_manager_text(self.lang, "install_selected"), self._install_selected_argos),
-                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_argos),
+                (language_manager_text(self.lang, "install_selected"), self._install_selected_argos, "primary"),
+                (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_argos, "danger"),
             ],
             header_labels=[
                 "",
@@ -3636,37 +3836,8 @@ class OcrLanguageManagerDialog(QDialog):
         )
 
     def _engine_remove_button_style(self):
-        """Its own sheet: a rule in the dialog's stylesheet is outranked by the
-        settings window this dialog is a child of, and the button came out
-        looking like an ordinary action."""
-        dark = self._is_dark_theme()
-        text = "#e0879a" if dark else "#b03a52"
-        border = "#6b3f4c" if dark else "#e2b7c0"
-        hover_bg = "#462b33" if dark else "#fbe9ed"
-        hover_text = "#ffd7de" if dark else "#8f2a40"
-        pressed = "#5a343e" if dark else "#f3d7de"
-        muted = "#8f889c" if dark else "#a39aad"
-        muted_border = "#3a3645" if dark else "#e6e1ec"
-        return f"""
-            QPushButton#languagePackageEngineRemove {{
-                background-color: transparent;
-                color: {text};
-                border: 1px solid {border};
-                border-radius: 7px;
-                padding: 5px 12px;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            QPushButton#languagePackageEngineRemove:hover {{
-                background-color: {hover_bg};
-                color: {hover_text};
-            }}
-            QPushButton#languagePackageEngineRemove:pressed {{ background-color: {pressed}; }}
-            QPushButton#languagePackageEngineRemove:disabled {{
-                color: {muted};
-                border-color: {muted_border};
-            }}
-        """
+        return button_qss(self._is_dark_theme(), "danger",
+                          selector="QPushButton#languagePackageEngineRemove", compact=True)
 
     def _add_engine_tab(
         self,
@@ -3792,22 +3963,12 @@ class OcrLanguageManagerDialog(QDialog):
         action_row.setContentsMargins(0, 0, 0, 0)
         action_row.addStretch()
         table._package_action_buttons = []
-        for text, callback in actions:
+        for text, callback, role in actions:
             button = QPushButton(text)
             button.setObjectName("languagePackageAction")
             button.setMinimumHeight(32)
-            button.setStyleSheet("""
-                QPushButton#languagePackageAction {
-                    background-color: #7A5FA1;
-                    color: #ffffff;
-                    border: none;
-                    border-radius: 7px;
-                    padding: 7px 12px;
-                }
-                QPushButton#languagePackageAction:hover { background-color: #8B70B2; }
-                QPushButton#languagePackageAction:pressed { background-color: #684d91; }
-                QPushButton#languagePackageAction:disabled { background-color: #3a3645; color: #8f889c; }
-            """)
+            button.setProperty("buttonRole", role)
+            button.setStyleSheet(button_qss(self._is_dark_theme(), role))
             button.clicked.connect(callback)
             table._package_action_buttons.append(button)
             action_row.addWidget(button)
@@ -4202,12 +4363,8 @@ class OcrLanguageManagerDialog(QDialog):
         tess_cmd = self.owner._find_available_tesseract_exe()
         if not tess_cmd:
             return "", []
-        tess_dir = os.path.dirname(tess_cmd)
-        candidate_dirs = [
-            os.path.join(tess_dir, "tessdata"),
-            os.path.join(os.path.dirname(tess_dir), "tessdata"),
-        ]
-        return tess_cmd, [path for path in candidate_dirs if os.path.isdir(path)]
+        import ocr
+        return tess_cmd, ocr._tesseract_data_directories(tess_cmd)
 
     def _tesseract_language_installed(self, tess_code, data_dirs):
         return any(os.path.isfile(os.path.join(path, f"{tess_code}.traineddata")) for path in data_dirs)
@@ -4266,7 +4423,8 @@ class OcrLanguageManagerDialog(QDialog):
         model_dir = self._easyocr_model_dir()
         if not os.path.isfile(os.path.join(model_dir, "craft_mlt_25k.pth")):
             return False
-        return all(self._easyocr_group_installed(group) for group in self._easyocr_model_groups_for_language(language_code))
+        groups = self._easyocr_model_groups_for_language(language_code)
+        return bool(groups) and all(self._easyocr_group_installed(group) for group in groups)
 
     def _populate_easyocr_table(self, table):
         checking = self._easyocr_status_cache is None
@@ -4302,6 +4460,14 @@ class OcrLanguageManagerDialog(QDialog):
                 "checked": installed,
                 "selectable": bool(engine_ready and not installed),
             })
+        self._set_language_rows(table, rows)
+
+    def _populate_apple_vision_table(self, table):
+        from macos_ocr import supported_languages
+        rows = [{"code": tag, "name": tag, "package": "macOS / Apple Vision",
+                 "status": self._status_installed(), "checked": True,
+                 "selectable": False, "show_checkbox": False}
+                for tag in supported_languages()]
         self._set_language_rows(table, rows)
 
     def _populate_rapidocr_table(self, table):
@@ -4905,11 +5071,25 @@ class OcrLanguageManagerDialog(QDialog):
                 packages=labels,
             )
         )
+        if engine == EASYOCR_ENGINE_DISPLAY:
+            affected = self._easyocr_removal_languages(codes)
+            if set(affected) - set(codes):
+                msg.setInformativeText(language_manager_text(
+                    self.lang, "easy_shared_removal", packages=", ".join(code.upper() for code in affected),
+                ))
         msg.setIcon(QMessageBox.Warning)
         remove_btn = msg.addButton(settings_text(self.lang, "remove"), QMessageBox.DestructiveRole)
         msg.addButton(settings_text(self.lang, "cancel"), QMessageBox.RejectRole)
         msg.exec_()
         return msg.clickedButton() == remove_btn
+
+    def _easyocr_removal_languages(self, codes):
+        groups = {group for code in codes for group in self._easyocr_model_groups_for_language(code)}
+        return [
+            language.code for language in APP_LANGUAGES
+            if groups.intersection(self._easyocr_model_groups_for_language(language.code))
+            and self._easyocr_language_installed(language.code)
+        ]
 
     def _remove_selected_windows(self):
         codes = self._highlighted_installed_codes(self.windows_table)
@@ -6283,6 +6463,17 @@ try {{
             _tess_cmd, data_dirs = self._tesseract_data_dirs()
             if not data_dirs:
                 raise RuntimeError("Tesseract tessdata folder was not found")
+            if platform_support.IS_LINUX or platform_support.IS_MAC:
+                import ocr
+                managed = ocr._tesseract_managed_data_dir(_tess_cmd)
+                for code in codes:
+                    filename = f'{tesseract_language_code(code)}.traineddata'
+                    if not managed or not os.path.isfile(os.path.join(managed, filename)):
+                        raise RuntimeError(
+                            f'{filename} belongs to the system Tesseract installation. '
+                            'Remove this language with your distribution package manager.'
+                        )
+                data_dirs = [managed]
             total = max(1, len(codes))
             for index, code in enumerate(codes, 1):
                 if self._cancel_requested.is_set():
@@ -6328,12 +6519,13 @@ try {{
                         raise RuntimeError(f"Unsafe EasyOCR model path: {target}")
                     if target.is_file():
                         target.unlink()
-            reset = getattr(self.owner, "_reset_easyocr_runtime_cache", None)
-            if callable(reset):
-                reset(clear_modules=True)
             self._finish_language_task(EASYOCR_ENGINE_DISPLAY)
         except Exception as exc:
             self._finish_language_task(EASYOCR_ENGINE_DISPLAY, str(exc))
+        finally:
+            reset = getattr(self.owner, "_reset_easyocr_runtime_cache", None)
+            if callable(reset):
+                reset(clear_modules=True)
 
     def _install_easyocr_worker(self, codes):
         try:
@@ -6419,6 +6611,66 @@ try {{
 
 
 class SettingsWindow(QWidget):
+    def _read_ui_scale_value(self):
+        controller = getattr(self.parent, '_ui_scale_controller', None)
+        try:
+            value = int(self.ui_scale_value.text().strip().rstrip('%'))
+        except ValueError:
+            value = controller.effective_percent if controller is not None else DEFAULT_SCALE
+        return max(MIN_SCALE, min(controller.maximum_percent if controller is not None else MAX_SCALE, value))
+
+    def _commit_ui_scale(self):
+        controller = getattr(self.parent, '_ui_scale_controller', None)
+        apply_scale = getattr(self.parent, 'set_ui_scale_percent', None)
+        value = self._read_ui_scale_value()
+        if controller is not None and controller.view.mouse_event_type == QtCore.QEvent.MouseButtonPress:
+            # Resizing on focus-out would interrupt the click that is moving
+            # focus from this editor to a button on native Windows.
+            self._ui_scale_commit_pending = True
+            return
+        if controller is not None and callable(apply_scale) and value != controller.effective_percent:
+            apply_scale(value, anchor_widget=self.ui_scale_value)
+        else:
+            self._refresh_ui_scale()
+
+    def _commit_deferred_ui_scale(self):
+        if not getattr(self, '_ui_scale_commit_pending', False):
+            return
+        self._ui_scale_commit_pending = False
+        if getattr(self, 'ui_scale_control', None) is None:
+            return
+        if self.ui_scale_decrease.isDown() or self.ui_scale_increase.isDown():
+            # The clicked arrow consumes the draft and applies its step once.
+            return
+        self._commit_ui_scale()
+
+    def _step_ui_scale(self, direction, anchor_widget=None):
+        controller = getattr(self.parent, '_ui_scale_controller', None)
+        apply_scale = getattr(self.parent, 'set_ui_scale_percent', None)
+        if controller is not None and callable(apply_scale):
+            value = max(MIN_SCALE, min(controller.maximum_percent, self._read_ui_scale_value() + direction * SCALE_STEP))
+            if value != controller.effective_percent:
+                apply_scale(value, anchor_widget=anchor_widget)
+            else:
+                self._refresh_ui_scale()
+
+    def _refresh_ui_scale(self, value=None, maximum=None):
+        controller = getattr(self.parent, '_ui_scale_controller', None)
+        if getattr(self, 'ui_scale_control', None) is None:
+            return
+        value = controller.effective_percent if controller is not None else DEFAULT_SCALE
+        blocker = QtCore.QSignalBlocker(self.ui_scale_value)
+        self.ui_scale_value.setText(f'{value}%')
+        del blocker
+        self._refresh_ui_scale_buttons()
+
+    def _refresh_ui_scale_buttons(self):
+        controller = getattr(self.parent, '_ui_scale_controller', None)
+        maximum = controller.maximum_percent if controller is not None else MAX_SCALE
+        value = self._read_ui_scale_value()
+        self.ui_scale_decrease.setEnabled(value > MIN_SCALE)
+        self.ui_scale_increase.setEnabled(value < maximum)
+
     def switch_startup(self, state):
         enabled = self.parent.set_autostart(self.autostart_checkbox.isChecked())
         self.autostart_checkbox.setChecked(enabled)
@@ -6439,6 +6691,9 @@ class SettingsWindow(QWidget):
             self.parent.autostart = value
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
+        complete = getattr(self.parent, "_complete_guide_setting", None)
+        if callable(complete):
+            complete(key)
 
     def _on_start_minimized_toggled(self, state):
         enabled = bool(state)
@@ -6505,7 +6760,7 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available or language.code == source:
                     continue
-                target_combo.addItem(language.short_label, language.code)
+                target_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
             index = target_combo.findData(preferred)
             target_combo.setCurrentIndex(index if index >= 0 else 0)
         finally:
@@ -6518,8 +6773,7 @@ class SettingsWindow(QWidget):
         if source_combo is None or target_combo is None:
             return
         current_source = str(
-            source_combo.currentData()
-            or self.parent.config.get("game_translate_source_language")
+            self.parent.config.get("game_translate_source_language")
             or "en"
         )
         config = dict(self.parent.config)
@@ -6529,6 +6783,12 @@ class SettingsWindow(QWidget):
             try:
                 from ocr import installed_ocr_language_codes
                 available = set(installed_ocr_language_codes(config=config))
+                if str(config.get("translator_engine", "google")).lower() == "argos":
+                    from ocr import _translation_targets_for_source
+                    available = {
+                        source for source in available
+                        if _translation_targets_for_source(source, config)
+                    }
             except Exception:
                 available = {language.code for language in APP_LANGUAGES}
         source_combo.blockSignals(True)
@@ -6537,7 +6797,7 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available:
                     continue
-                source_combo.addItem(language.short_label, language.code)
+                source_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
             index = source_combo.findData(current_source)
             source_combo.setCurrentIndex(index if index >= 0 else 0)
         finally:
@@ -6546,6 +6806,13 @@ class SettingsWindow(QWidget):
             self.parent.config.get("game_translate_target_language", "ru"),
             fast=fast,
         )
+
+    def _refresh_game_language_controls(self):
+        # Show the live saved pair immediately; reconcile optional packages
+        # after painting so opening this page stays responsive.
+        self._game_language_controls_verified = False
+        self._populate_game_language_controls(fast=True)
+        QtCore.QTimer.singleShot(80, self._verify_game_language_controls)
 
     def _verify_game_language_controls(self):
         """Do the slower installed-language probe after the feature page paints."""
@@ -6644,7 +6911,7 @@ class SettingsWindow(QWidget):
     def export_settings(self):
         lang = self.parent.current_interface_language
         path, _selected = QtWidgets.QFileDialog.getSaveFileName(
-            self,
+            native_window_parent(self),
             settings_text(lang, "export_settings"),
             self._settings_default_export_path(),
             settings_text(lang, "settings_file_filter"),
@@ -6688,7 +6955,7 @@ class SettingsWindow(QWidget):
     def import_settings(self):
         lang = self.parent.current_interface_language
         path, _selected = QtWidgets.QFileDialog.getOpenFileName(
-            self,
+            native_window_parent(self),
             settings_text(lang, "import_settings"),
             str(Path(self._settings_default_export_path()).parent),
             settings_text(lang, "settings_file_filter"),
@@ -6800,16 +7067,19 @@ class SettingsWindow(QWidget):
         self.setLayout(self.main_layout)
         self.init_ui()
         self.apply_theme()
+        controller = getattr(parent, '_ui_scale_controller', None)
+        if controller is not None:
+            controller.changed.connect(self._refresh_ui_scale)
+            controller.view.before_mouse_release.connect(self._commit_deferred_ui_scale)
 
     def clear_main_layout(self):
-        # Absolute fixed-window regions are not owned by main_layout. Hide
-        # their children explicitly as well: secondary screens and a language
-        # rebuild must never leave a cached footer button painted on top.
+        # Hide cached pages synchronously before Qt processes deferred deletes.
         for attribute in (
             "settings_updates_page",
             "settings_game_page",
             "settings_action_panel",
             "settings_page_footer",
+            "settings_pages",
         ):
             region = getattr(self, attribute, None)
             if region is None:
@@ -6851,13 +7121,16 @@ class SettingsWindow(QWidget):
                     self.clear_nested_layout(item.layout())
 
     def setup_new_layout(self):
-        # These fixed-window regions are absolute children rather than layout
-        # items, so remove them explicitly when rebuilding or relanguaging.
+        # Scale/screen signals can arrive while a secondary page replaces the form.
+        self.ui_scale_control = None
+        self.ui_scale_value = None
+        # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
             "settings_game_page",
             "settings_action_panel",
             "settings_page_footer",
+            "settings_pages",
         ):
             widget = getattr(self, attribute, None)
             if widget is None:
@@ -6881,14 +7154,14 @@ class SettingsWindow(QWidget):
         self.hotkeys_mode = False
         self._secondary_view_kind = None
         self.secondary_view_shell = None
-        self.main_layout.setContentsMargins(5, 5, 5, 5)
+        # The owner starts Settings at the title bar's lower edge. No top
+        # inset here: the navigation must touch that bar in either theme.
+        self.main_layout.setContentsMargins(5, 0, 5, 5)
         # Five general rows must finish clearly above the fixed action panel.
         # An 8px gap plus 38px rows produced a 46px rhythm and let the final
         # checkbox run into the buttons in the real embedded viewport.
         self.main_layout.setSpacing(4)
-        # This page is rendered inside a fixed 690x390 viewport. Keep the
-        # controls top-anchored so adding a selector on the right cannot move
-        # the checkbox column on the left.
+        # The stack receives the space left below the attached navigation.
         self.main_layout.setAlignment(Qt.AlignTop)
         lang = self.parent.current_interface_language
         self._ui_language = lang
@@ -6897,7 +7170,6 @@ class SettingsWindow(QWidget):
         # --- ГРУППА ЧЕКБОКСОВ ---
         # The layout margin already supplies the intended 5px top inset.
 
-        margin_top_val = "-12px" if self.parent.current_theme == "Темная" else "-6px"
         fixed_height = 34
         engine_combo_width = 180
         engine_control_height = 32
@@ -6907,22 +7179,26 @@ class SettingsWindow(QWidget):
         action_button_height = 29
         
         # --- СТРОКА 1: Запускать вместе с ОС + Движок OCR ---
-        row1 = QHBoxLayout()
-        row1.setContentsMargins(0, 0, 0, 0)
-        row1.setSpacing(8)
+        # One grid owns the three selector rows. Separate horizontal layouts
+        # with 300px checkbox minima and 90px labels overflowed with Linux
+        # fonts; the shared columns measure their current translated content.
+        form_grid = QGridLayout()
+        form_grid.setContentsMargins(0, 0, 0, 0)
+        form_grid.setHorizontalSpacing(8)
+        form_grid.setVerticalSpacing(self.main_layout.spacing())
+        form_grid.setColumnStretch(0, 1)
+        self.settings_form_grid = form_grid
         self.autostart_checkbox = QCheckBox(settings_text(lang, "autostart"))
         self.autostart_checkbox.setChecked(self.parent.config.get("autostart", False))
         self.autostart_checkbox.clicked.connect(self.switch_startup)
-        self.autostart_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:300px;")
+        self.autostart_checkbox.setStyleSheet("margin:0; padding:0;")
         self.autostart_checkbox.setFixedHeight(fixed_height)
-        row1.addWidget(self.autostart_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row1.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        form_grid.addWidget(self.autostart_checkbox, 0, 0)
         
         # Правые блоки обеих строк имеют одинаковую высоту и разметку.
         # Кнопка удаления живёт в расширенной правой секции самого списка.
         self.ocr_engine_label = QLabel("OCR:")
         self.ocr_engine_label.setStyleSheet("margin:0; padding:0;")
-        self.ocr_engine_label.setFixedWidth(90)
         self.ocr_engine_label.setFixedHeight(engine_control_height)
         self.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
@@ -6933,6 +7209,8 @@ class SettingsWindow(QWidget):
             "#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124"
         )
         installed_ocr_engines = {"Windows"} if platform_support.supports_windows_ocr() else set()
+        if platform_support.IS_MAC:
+            installed_ocr_engines.add("Apple Vision")
         if self._find_available_tesseract_exe():
             installed_ocr_engines.add("Tesseract")
         if self._rapidocr_runtime_installed():
@@ -6958,12 +7236,8 @@ class SettingsWindow(QWidget):
         self._apply_engine_combo_style(self.ocr_engine_combo)
         self.ocr_engine_combo.setFixedWidth(engine_combo_width)
         self.ocr_engine_combo.setFixedHeight(engine_control_height)
-        # Все три правых элемента имеют высоту 32 px и один вертикальный центр.
-        # Pin the controls to the row's top edge. Centering a 32px control in
-        # a stylesheet-sized checkbox row rounds differently after a language
-        # rebuild and produced a visible one-pixel jump on Windows.
-        row1.addWidget(self.ocr_engine_label, alignment=Qt.AlignTop)
-        row1.addWidget(self.ocr_engine_combo, alignment=Qt.AlignTop)
+        form_grid.addWidget(self.ocr_engine_label, 0, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.ocr_engine_combo, 0, 2, Qt.AlignVCenter)
         
         # Each popup item has its own concise explanation.  Avoid one giant
         # native tooltip covering most of the fixed settings window.
@@ -6977,24 +7251,18 @@ class SettingsWindow(QWidget):
         }
         self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
         self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
-        self.main_layout.addLayout(row1)
         
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
-        row2 = QHBoxLayout()
-        row2.setContentsMargins(0, 0, 0, 0)
-        row2.setSpacing(8)
         self.start_minimized_checkbox = QCheckBox(settings_text(lang, "start_minimized"))
         self.start_minimized_checkbox.setChecked(self.parent.config.get("start_minimized", False))
         self.start_minimized_checkbox.toggled.connect(self._on_start_minimized_toggled)
-        self.start_minimized_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:300px;")
+        self.start_minimized_checkbox.setStyleSheet("margin:0; padding:0;")
         self.start_minimized_checkbox.setFixedHeight(fixed_height)
-        row2.addWidget(self.start_minimized_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row2.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        form_grid.addWidget(self.start_minimized_checkbox, 1, 0)
         
         # Блок переводчика повторяет ту же сетку, чтобы колонки не сдвигались.
         self.translator_engine_label = QLabel(settings_text(lang, "translator_label"))
         self.translator_engine_label.setStyleSheet("margin:0; padding:0;")
-        self.translator_engine_label.setFixedWidth(90)
         self.translator_engine_label.setFixedHeight(engine_control_height)
         self.translator_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
@@ -7029,8 +7297,8 @@ class SettingsWindow(QWidget):
         self._apply_engine_combo_style(self.translator_combo)
         self.translator_combo.setFixedWidth(engine_combo_width)
         self.translator_combo.setFixedHeight(engine_control_height)
-        row2.addWidget(self.translator_engine_label, alignment=Qt.AlignTop)
-        row2.addWidget(self.translator_combo, alignment=Qt.AlignTop)
+        form_grid.addWidget(self.translator_engine_label, 1, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translator_combo, 1, 2, Qt.AlignVCenter)
         
         translator_picker_help = {
             "en": "Online providers need internet. Installed offline providers are listed separately.",
@@ -7043,7 +7311,6 @@ class SettingsWindow(QWidget):
         picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
         self.translator_combo.setToolTip(tooltip_text(picker_help))
         self.translator_engine_label.setToolTip(tooltip_text(picker_help))
-        self.main_layout.addLayout(row2)
 
         # --- Подготовим кнопку обновления (перенесена в группу кнопок ниже) ---
         # Убрали из этой строки
@@ -7054,38 +7321,17 @@ class SettingsWindow(QWidget):
         # Не оставляем пустую строку в левой колонке: третий основной чекбокс
         # продолжает последовательность, а управление результатом остаётся
         # выровнено с OCR и переводчиком справа.
-        row3 = QHBoxLayout()
-        row3.setContentsMargins(0, 0, 0, 0)
-        row3.setSpacing(8)
         self.copy_translated_checkbox = QCheckBox(settings_text(lang, "copy_translated_text"))
         self.copy_translated_checkbox.setChecked(self.parent.config.get("copy_translated_text", False))
         self.copy_translated_checkbox.toggled.connect(
             lambda state: self.auto_save_setting("copy_translated_text", state)
         )
-        # No min-width here: this row shares its line with the Show-window
-        # picker, and a fixed 260px clipped the longer languages against it.
-        # The width is set from the box's own size hint once the theme's font is
-        # in place — see _fit_copy_translated_checkbox.
-        self.copy_translated_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
-        )
+        self.copy_translated_checkbox.setStyleSheet("margin:0; padding:0;")
         self.copy_translated_checkbox.setFixedHeight(fixed_height)
-        row3.addWidget(self.copy_translated_checkbox, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        row3.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        form_grid.addWidget(self.copy_translated_checkbox, 2, 0)
 
         self.result_window_label = QLabel(settings_text(lang, "result_window_label"))
         self.result_window_label.setStyleSheet("margin:0; padding:0;")
-        result_label_font = self.result_window_label.font()
-        result_label_font.setPixelSize(16)
-        self.result_window_label.setFont(result_label_font)
-        # This label names what the drop-down controls, so it is longer than
-        # "OCR:" and sizes itself; the row is right-aligned, so the extra width
-        # grows into the empty middle of the window and the columns still line
-        # up with the two engine rows.
-        self.result_window_label.setFixedWidth(
-            max(80, QtGui.QFontMetrics(result_label_font).horizontalAdvance(
-                self.result_window_label.text()) + 4)
-        )
         self.result_window_label.setFixedHeight(engine_control_height)
         self.result_window_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
@@ -7143,30 +7389,81 @@ class SettingsWindow(QWidget):
         self.result_window_control.set_help_text(settings_text(lang, "result_window_tooltip"))
         self.result_window_label.setToolTip(tooltip_text(settings_text(lang, "result_window_tooltip")))
 
-        row3.addWidget(self.result_window_label, alignment=Qt.AlignTop)
-        row3.addWidget(self.result_window_control, alignment=Qt.AlignTop)
-        self.main_layout.addLayout(row3)
+        form_grid.addWidget(self.result_window_label, 2, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.result_window_control, 2, 2, Qt.AlignVCenter)
+        self.main_layout.addLayout(form_grid)
 
         # Остальные чекбоксы
         self.copy_history_checkbox = QCheckBox(settings_text(lang, "copy_history"))
         self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", False))
         self.copy_history_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_history", state))
-        self.copy_history_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.copy_history_checkbox.setStyleSheet("margin:0; padding:0;")
         self.copy_history_checkbox.setFixedHeight(fixed_height)
-        self.main_layout.addWidget(self.copy_history_checkbox, alignment=Qt.AlignLeft)
+        form_grid.addWidget(self.copy_history_checkbox, 3, 0, alignment=Qt.AlignLeft)
 
         self.history_checkbox = QCheckBox(settings_text(lang, "history"))
         self.history_checkbox.setChecked(self.parent.config.get("history", False))
         self.history_checkbox.toggled.connect(self.on_history_checkbox_toggled)
-        self.history_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.history_checkbox.setStyleSheet("margin:0; padding:0;")
         self.history_checkbox.setFixedHeight(fixed_height)
-        self.main_layout.addWidget(self.history_checkbox, alignment=Qt.AlignLeft)
+        form_grid.addWidget(self.history_checkbox, 4, 0, alignment=Qt.AlignLeft)
+
+        self.ui_scale_label = QLabel(settings_text(lang, 'ui_scale_caption'))
+        self.ui_scale_label.setObjectName('uiScaleLabel')
+        self.ui_scale_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.ui_scale_label.setFixedHeight(engine_control_height)
+        self.ui_scale_control = QWidget()
+        self.ui_scale_control.setObjectName('uiScaleControl')
+        self.ui_scale_control.setFixedSize(engine_combo_width, engine_control_height)
+        scale_outer = QHBoxLayout(self.ui_scale_control)
+        scale_outer.setContentsMargins(3, 2, 3, 2)
+        scale_field = QFrame()
+        scale_field.setObjectName('uiScaleField')
+        scale_outer.addWidget(scale_field)
+        scale_controls = QHBoxLayout(scale_field)
+        scale_controls.setContentsMargins(2, 0, 2, 0)
+        scale_controls.setSpacing(0)
+        self.ui_scale_decrease = QToolButton()
+        self.ui_scale_increase = QToolButton()
+        for button, name, glyph, direction in (
+            (self.ui_scale_decrease, 'uiScaleDecrease', '‹', -1),
+            (self.ui_scale_increase, 'uiScaleIncrease', '›', 1),
+        ):
+            button.setObjectName(name)
+            button.setText(glyph)
+            button.setFixedSize(28, 24)
+            button.setFocusPolicy(Qt.StrongFocus)
+            button.setCursor(Qt.PointingHandCursor)
+            button.setAutoRepeat(False)
+            description = settings_text(lang, 'ui_scale_decrease' if direction < 0 else 'ui_scale_increase')
+            button.setAccessibleName(description)
+            button.setToolTip(tooltip_text(f'{description} (5%)'))
+            button.clicked.connect(lambda checked=False, step=direction, anchor=button: self._step_ui_scale(step, anchor))
+        self.ui_scale_value = ScalePercentEdit()
+        self.ui_scale_value.setText(f'{DEFAULT_SCALE}%')
+        self.ui_scale_value.setObjectName('uiScaleValue')
+        self.ui_scale_value.setAccessibleName(settings_text(lang, 'ui_scale'))
+        self.ui_scale_value.setToolTip(tooltip_text(settings_text(lang, 'ui_scale_edit_hint')))
+        self.ui_scale_value.editingFinished.connect(self._commit_ui_scale)
+        self.ui_scale_value.textEdited.connect(lambda text: self._refresh_ui_scale_buttons())
+        self.ui_scale_value.cancel_requested.connect(self._refresh_ui_scale)
+        self.ui_scale_value.step_requested.connect(lambda step: self._step_ui_scale(step, self.ui_scale_value))
+        self.ui_scale_label.setBuddy(self.ui_scale_value)
+        scale_controls.addWidget(self.ui_scale_decrease)
+        scale_controls.addWidget(self.ui_scale_value, 1)
+        scale_controls.addWidget(self.ui_scale_increase)
+        form_grid.addWidget(self.ui_scale_label, 3, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_control, 3, 2, Qt.AlignVCenter)
+        scale_tooltip = tooltip_text(settings_text(lang, 'ui_scale_hint'))
+        self.ui_scale_control.setToolTip(scale_tooltip)
+        self.ui_scale_label.setToolTip(scale_tooltip)
+        self._refresh_ui_scale()
 
         # Чекбокс "Не сворачивать при OCR"
         self.keep_visible_checkbox = QCheckBox(settings_text(lang, "keep_visible_on_ocr"))
         self.keep_visible_checkbox.setChecked(self.parent.config.get("keep_visible_on_ocr", False))
         self.keep_visible_checkbox.toggled.connect(lambda state: self.auto_save_setting("keep_visible_on_ocr", state))
-        self.keep_visible_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.keep_visible_checkbox.setStyleSheet("margin:0; padding:0;")
         self.keep_visible_checkbox.setFixedHeight(fixed_height)
         self.main_layout.addWidget(self.keep_visible_checkbox, alignment=Qt.AlignLeft)
 
@@ -7174,7 +7471,7 @@ class SettingsWindow(QWidget):
         self.freeze_screen_checkbox = QCheckBox(settings_text(lang, "freeze_screen_on_ocr"))
         self.freeze_screen_checkbox.setChecked(self.parent.config.get("freeze_screen_on_ocr", False))
         self.freeze_screen_checkbox.toggled.connect(lambda state: self.auto_save_setting("freeze_screen_on_ocr", state))
-        self.freeze_screen_checkbox.setStyleSheet(f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val}; min-width:400px;")
+        self.freeze_screen_checkbox.setStyleSheet("margin:0; padding:0;")
         self.freeze_screen_checkbox.setFixedHeight(fixed_height)
         self.main_layout.addWidget(self.freeze_screen_checkbox, alignment=Qt.AlignLeft)
 
@@ -7204,25 +7501,7 @@ class SettingsWindow(QWidget):
         # Левая кнопка - закругление слева (фиолетовая)
         self.clear_cache_btn = OpticallyCenteredPushButton(settings_text(lang, "clear_cache"))
         self.clear_cache_btn.setObjectName("settingsClearCacheButton")
-        self.clear_cache_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #7A5FA1; 
-                color: #fff; 
-                border: none;
-                border-top-left-radius: 8px;
-                border-bottom-left-radius: 0px;
-                border-top-right-radius: 0px;
-                border-bottom-right-radius: 0px;
-                padding-top: 0px;
-                padding-bottom: 0px;
-                padding-left: 12px;
-                padding-right: 12px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #8B70B2; }
-        """)
+        self.clear_cache_btn.setStyleSheet("")
         self.clear_cache_btn.setFixedHeight(action_button_height)
         self.clear_cache_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.clear_cache_btn.clicked.connect(self.clear_all_cache)
@@ -7231,24 +7510,7 @@ class SettingsWindow(QWidget):
         # Средняя кнопка - без закругления (красная - сброс)
         self.reset_btn = OpticallyCenteredPushButton(settings_text(lang, "reset"))
         self.reset_btn.setObjectName("settingsResetButton")
-        self.reset_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #D44444; 
-                color: #fff; 
-                border: none;
-                border-radius: 0px;
-                border-left: 1px solid rgba(255,255,255,0.15);
-                border-right: 1px solid rgba(255,255,255,0.15);
-                padding-top: 0px;
-                padding-bottom: 0px;
-                padding-left: 12px;
-                padding-right: 12px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #E55555; }
-        """)
+        self.reset_btn.setStyleSheet("")
         self.reset_btn.setFixedHeight(action_button_height)
         self.reset_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.reset_btn.clicked.connect(self.reset_settings)
@@ -7257,25 +7519,7 @@ class SettingsWindow(QWidget):
         # Правая кнопка - закругление справа (фиолетовая - обновление)
         self.update_btn = OpticallyCenteredPushButton(settings_text(lang, "update"))
         self.update_btn.setObjectName("settingsUpdateButton")
-        self.update_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #7A5FA1; 
-                color: #fff; 
-                border: none;
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-                border-top-right-radius: 8px;
-                border-bottom-right-radius: 0px;
-                padding-top: 0px;
-                padding-bottom: 0px;
-                padding-left: 12px;
-                padding-right: 12px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #8B70B2; }
-        """)
+        self.update_btn.setStyleSheet("")
         self.update_btn.setFixedHeight(action_button_height)
         self.update_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.update_btn.clicked.connect(self.check_for_updates)
@@ -7287,20 +7531,7 @@ class SettingsWindow(QWidget):
         self.ocr_languages_btn.setObjectName("settingsLanguagePackagesButton")
         self.ocr_languages_btn.clicked.connect(self.show_ocr_language_manager)
         self.ocr_languages_btn.setToolTip(tooltip_text(settings_text(lang, "manage_ocr_languages")))
-        self.ocr_languages_btn.setStyleSheet("""
-            QPushButton {
-                padding: 0px 6px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 0px;
-                border-right: 1px solid rgba(255,255,255,0.1);
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-            }
-            QPushButton[packageTaskDone="true"] {
-                color: #59c879;
-            }
-        """)
+        self.ocr_languages_btn.setStyleSheet("")
         self.ocr_languages_btn.setFixedHeight(action_button_height)
         self.ocr_languages_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self._apply_language_package_task_status()
@@ -7311,17 +7542,7 @@ class SettingsWindow(QWidget):
         self.hotkeys_button.setObjectName("settingsHotkeysButton")
         self.hotkeys_button.clicked.connect(self.show_hotkeys_screen)
         # Hotkeys: текст еще выше
-        self.hotkeys_button.setStyleSheet("""
-            padding-top: 0px;
-            padding-bottom: 0px;
-            padding-left: 16px;
-            padding-right: 16px;
-            font-family: 'Segoe UI';
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 0px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        """)
+        self.hotkeys_button.setStyleSheet("")
         self.hotkeys_button.setFixedHeight(action_button_height)
         self.hotkeys_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -7330,17 +7551,7 @@ class SettingsWindow(QWidget):
         )
         self.translation_history_btn.setObjectName("settingsTranslationHistoryButton")
         self.translation_history_btn.clicked.connect(self.show_history_view)
-        self.translation_history_btn.setStyleSheet("""
-            QPushButton {
-                padding: 0px 6px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 0px;
-                border-left: 1px solid rgba(255,255,255,0.1);
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-            }
-        """)
+        self.translation_history_btn.setStyleSheet("")
         self.translation_history_btn.setFixedHeight(action_button_height)
         self.translation_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         action_grid.addWidget(self.translation_history_btn, 1, 2)
@@ -7351,37 +7562,14 @@ class SettingsWindow(QWidget):
         self.copy_history_btn.setObjectName("settingsCopyHistoryButton")
         self.copy_history_btn.clicked.connect(self.show_copy_history_view)
         # Copy history lives beside translation history in the upper tools row.
-        self.copy_history_btn.setStyleSheet("""
-            QPushButton {
-                padding: 0px 6px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 0px;
-                border-left: 1px solid rgba(255,255,255,0.1);
-                border-right: 1px solid rgba(255,255,255,0.1);
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-            }
-        """)
+        self.copy_history_btn.setStyleSheet("")
         self.copy_history_btn.setFixedHeight(action_button_height)
         self.copy_history_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
 
         action_grid.addWidget(self.copy_history_btn, 1, 1)
-        self.hotkeys_button.setStyleSheet("""
-            QPushButton {
-                padding: 0px 16px;
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                font-weight: bold;
-                border-top-left-radius: 0px;
-                border-top-right-radius: 0px;
-                border-bottom-left-radius: 8px;
-                border-bottom-right-radius: 8px;
-            }
-        """)
+        self.hotkeys_button.setStyleSheet("")
         self.hotkeys_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         action_grid.addWidget(self.hotkeys_button, 2, 0, 1, 3)
-        self._apply_action_panel_style()
         
         # --- Page 2: OCR behaviour and updates ---
         # Keep this as one clean page.  The fixed 700x400 window does not have
@@ -7402,6 +7590,8 @@ class SettingsWindow(QWidget):
         for checkbox in (self.keep_visible_checkbox, self.freeze_screen_checkbox):
             self.main_layout.removeWidget(checkbox)
             checkbox.setParent(self.settings_updates_page)
+            checkbox.setObjectName("settingsPageCheckbox")
+            checkbox.setStyleSheet("margin:0; padding:0;")
             checkbox.setFixedHeight(page_checkbox_height)
             updates_layout.addWidget(checkbox, alignment=Qt.AlignLeft)
 
@@ -7412,8 +7602,9 @@ class SettingsWindow(QWidget):
             bool(self.parent.config.get("dim_screen_during_ocr", False))
         )
         self.dim_screen_during_ocr_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+            "margin:0; padding:0;"
         )
+        self.dim_screen_during_ocr_checkbox.setObjectName("settingsPageCheckbox")
         self.dim_screen_during_ocr_checkbox.setFixedHeight(page_checkbox_height)
         dim_tooltip = settings_text(lang, "ocr_dim_strength_tooltip")
         self.dim_screen_during_ocr_checkbox.setToolTip(tooltip_text(dim_tooltip))
@@ -7470,8 +7661,9 @@ class SettingsWindow(QWidget):
             tooltip_text(settings_text(lang, "restore_clipboard_tooltip"))
         )
         self.restore_clipboard_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+            "margin:0; padding:0;"
         )
+        self.restore_clipboard_checkbox.setObjectName("settingsPageCheckbox")
         self.restore_clipboard_checkbox.setFixedHeight(page_checkbox_height)
         self.restore_clipboard_checkbox.toggled.connect(
             lambda state: self.auto_save_setting(
@@ -7490,8 +7682,9 @@ class SettingsWindow(QWidget):
             tooltip_text(settings_text(lang, "copy_notification_tooltip"))
         )
         self.copy_notification_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+            "margin:0; padding:0;"
         )
+        self.copy_notification_checkbox.setObjectName("settingsPageCheckbox")
         self.copy_notification_checkbox.setFixedHeight(page_checkbox_height)
         self.copy_notification_checkbox.toggled.connect(
             lambda state: self.auto_save_setting("notifications", bool(state))
@@ -7510,19 +7703,27 @@ class SettingsWindow(QWidget):
             lambda state: self.auto_save_setting("update_check_on_launch", bool(state))
         )
         self.update_check_on_launch_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
+            "margin:0; padding:0;"
         )
+        self.update_check_on_launch_checkbox.setObjectName("settingsPageCheckbox")
         self.update_check_on_launch_checkbox.setFixedHeight(page_checkbox_height)
         updates_layout.addWidget(
             self.update_check_on_launch_checkbox,
             alignment=Qt.AlignLeft | Qt.AlignVCenter,
         )
 
-        transfer_row = QHBoxLayout()
-        transfer_row.setContentsMargins(0, 2, 0, 0)
-        transfer_row.setSpacing(6)
+        self.settings_transfer_panel = QWidget(self.settings_updates_page)
+        self.settings_transfer_panel.setObjectName("settingsTransferPanel")
+        self.settings_transfer_panel.setAttribute(Qt.WA_StyledBackground, True)
+        self.settings_transfer_panel.setFixedHeight(action_button_height + 2)
+        transfer_row = QGridLayout(self.settings_transfer_panel)
+        transfer_row.setContentsMargins(1, 1, 1, 1)
+        transfer_row.setHorizontalSpacing(0)
+        transfer_row.setVerticalSpacing(0)
+        for column in range(3):
+            transfer_row.setColumnStretch(column, 1)
 
-        self.export_settings_btn = QPushButton(
+        self.export_settings_btn = OpticallyCenteredPushButton(
             settings_text(lang, "export_settings"), self.settings_updates_page
         )
         self.export_settings_btn.setObjectName("settingsTransferButton")
@@ -7531,7 +7732,7 @@ class SettingsWindow(QWidget):
         )
         self.export_settings_btn.clicked.connect(self.export_settings)
 
-        self.import_settings_btn = QPushButton(
+        self.import_settings_btn = OpticallyCenteredPushButton(
             settings_text(lang, "import_settings"), self.settings_updates_page
         )
         self.import_settings_btn.setObjectName("settingsTransferButton")
@@ -7540,7 +7741,7 @@ class SettingsWindow(QWidget):
         )
         self.import_settings_btn.clicked.connect(self.import_settings)
 
-        self.create_bug_report_btn = QPushButton(
+        self.create_bug_report_btn = OpticallyCenteredPushButton(
             settings_text(lang, "create_bug_report"), self.settings_updates_page
         )
         self.create_bug_report_btn.setObjectName("settingsBugReportButton")
@@ -7550,19 +7751,20 @@ class SettingsWindow(QWidget):
         self.create_bug_report_btn.clicked.connect(
             self._create_bug_report_from_settings
         )
-        for button in (
+        for column, button in enumerate((
             self.export_settings_btn,
             self.import_settings_btn,
             self.create_bug_report_btn,
-        ):
-            button.setFixedHeight(page_checkbox_height)
+        )):
+            button.setProperty("secondaryActionColumn", column)
+            button.setFixedHeight(action_button_height)
             button.setMinimumWidth(0)
             # Ignore translated size hints: all three buttons own exactly one
             # third of the fixed-width row in every interface language.
             button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-            transfer_row.addWidget(button, 1)
-        updates_layout.addLayout(transfer_row)
-        updates_layout.addStretch()
+            transfer_row.addWidget(button, 0, column)
+        updates_layout.addStretch(1)
+        updates_layout.addWidget(self.settings_transfer_panel)
         self.settings_updates_page.hide()
 
         # --- Page 3: dynamic translation ---
@@ -7572,17 +7774,21 @@ class SettingsWindow(QWidget):
         self.settings_game_page.setObjectName("settingsGamePage")
         self.settings_game_page.setAttribute(Qt.WA_StyledBackground, True)
         game_layout = QGridLayout(self.settings_game_page)
-        game_layout.setContentsMargins(8, 0, 8, 0)
+        game_layout.setContentsMargins(0, 0, 0, 0)
         game_layout.setHorizontalSpacing(12)
-        game_layout.setVerticalSpacing(3)
+        game_layout.setVerticalSpacing(4)
         game_layout.setColumnStretch(0, 1)
-        game_layout.setColumnMinimumWidth(1, 310)
+        game_layout.setColumnMinimumWidth(1, 340)
         game_layout.setAlignment(Qt.AlignTop)
 
-        self.game_settings_heading = QLabel(settings_text(lang, "game_settings_heading"))
+        self.game_settings_heading = QLabel(
+            settings_text(lang, "game_settings_heading"), self.settings_game_page
+        )
         self.game_settings_heading.setObjectName("gameSettingsHeading")
-        self.game_settings_heading.setFixedHeight(28)
-        game_layout.addWidget(self.game_settings_heading, 0, 0, 1, 2)
+        # The selected named tab supplies the heading; the page starts with
+        # an explanation of when to use this mode, followed by its controls.
+        self.game_settings_heading.setFixedHeight(0)
+        self.game_settings_heading.hide()
 
         def game_row(label_text):
             label = QLabel(label_text, self.settings_game_page)
@@ -7596,15 +7802,15 @@ class SettingsWindow(QWidget):
         )
         self.game_language_controls = QWidget(self.settings_game_page)
         self.game_language_controls.setObjectName("gameLanguageControls")
-        self.game_language_controls.setFixedSize(310, 32)
+        self.game_language_controls.setFixedSize(340, 32)
         language_row = QHBoxLayout(self.game_language_controls)
         language_row.setContentsMargins(0, 0, 0, 0)
         language_row.setSpacing(6)
         self.game_source_combo = DropDownCombo(self.settings_game_page)
         self.game_target_combo = DropDownCombo(self.settings_game_page)
         for combo in (self.game_source_combo, self.game_target_combo):
-            combo.setFixedSize(132, 32)
-            self._apply_engine_combo_style(combo)
+            combo.setFixedSize(147, 32)
+            self._apply_game_language_combo_style(combo)
         self.game_swap_button = LanguageSwapButton(self.settings_game_page)
         self.game_swap_button.setObjectName("gameLanguageSwap")
         self.game_swap_button.setFixedSize(34, 32)
@@ -7625,7 +7831,7 @@ class SettingsWindow(QWidget):
         game_interval = max(450, min(10000, game_interval))
         self.game_interval_controls = QWidget(self.settings_game_page)
         self.game_interval_controls.setObjectName("gameIntervalControls")
-        self.game_interval_controls.setFixedSize(310, 32)
+        self.game_interval_controls.setFixedSize(340, 32)
         interval_row = QHBoxLayout(self.game_interval_controls)
         interval_row.setContentsMargins(0, 0, 0, 0)
         interval_row.setSpacing(8)
@@ -7635,7 +7841,7 @@ class SettingsWindow(QWidget):
         self.game_scan_interval_slider.setSingleStep(50)
         self.game_scan_interval_slider.setPageStep(500)
         self.game_scan_interval_slider.setValue(game_interval)
-        self.game_scan_interval_slider.setFixedWidth(240)
+        self.game_scan_interval_slider.setFixedWidth(270)
         self.game_scan_interval_value = QLabel(f"{game_interval / 1000:.1f} s")
         self.game_scan_interval_value.setObjectName("gameSettingValue")
         self.game_scan_interval_value.setFixedWidth(62)
@@ -7655,7 +7861,7 @@ class SettingsWindow(QWidget):
         game_opacity = max(45, min(100, game_opacity))
         self.game_opacity_controls = QWidget(self.settings_game_page)
         self.game_opacity_controls.setObjectName("gameOpacityControls")
-        self.game_opacity_controls.setFixedSize(310, 32)
+        self.game_opacity_controls.setFixedSize(340, 32)
         opacity_row = QHBoxLayout(self.game_opacity_controls)
         opacity_row.setContentsMargins(0, 0, 0, 0)
         opacity_row.setSpacing(8)
@@ -7665,7 +7871,7 @@ class SettingsWindow(QWidget):
         self.game_overlay_opacity_slider.setSingleStep(1)
         self.game_overlay_opacity_slider.setPageStep(5)
         self.game_overlay_opacity_slider.setValue(game_opacity)
-        self.game_overlay_opacity_slider.setFixedWidth(240)
+        self.game_overlay_opacity_slider.setFixedWidth(270)
         self.game_overlay_opacity_value = QLabel(f"{game_opacity}%")
         self.game_overlay_opacity_value.setObjectName("gameSettingValue")
         self.game_overlay_opacity_value.setFixedWidth(62)
@@ -7685,9 +7891,8 @@ class SettingsWindow(QWidget):
             tooltip_text(settings_text(lang, "game_pause_inactive_tooltip"))
         )
         self.game_pause_inactive_checkbox.setFixedHeight(page_checkbox_height)
-        self.game_pause_inactive_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
-        )
+        self.game_pause_inactive_checkbox.setObjectName("settingsPageCheckbox")
+        self.game_pause_inactive_checkbox.setStyleSheet("margin:0; padding:0;")
         game_layout.addWidget(
             self.game_pause_inactive_checkbox, 4, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
         )
@@ -7699,21 +7904,30 @@ class SettingsWindow(QWidget):
             bool(self.parent.config.get("game_show_original_text", False))
         )
         self.game_show_original_checkbox.setFixedHeight(page_checkbox_height)
-        self.game_show_original_checkbox.setStyleSheet(
-            f"margin-left:0px; margin-bottom:0px; margin-top:{margin_top_val};"
-        )
+        self.game_show_original_checkbox.setObjectName("settingsPageCheckbox")
+        self.game_show_original_checkbox.setStyleSheet("margin:0; padding:0;")
         game_layout.addWidget(
             self.game_show_original_checkbox, 5, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
         )
 
         self.game_workflow_note = QLabel(
-            settings_text(lang, "game_workflow_note"), self.settings_game_page
+            settings_text(lang, "game_intro"), self.settings_game_page
         )
         self.game_workflow_note.setObjectName("gameWorkflowNote")
         self.game_workflow_note.setWordWrap(True)
-        self.game_workflow_note.setFixedHeight(42)
-        game_layout.addWidget(self.game_workflow_note, 6, 0, 1, 2)
-        game_layout.setRowStretch(7, 1)
+        self.game_workflow_note.setFixedHeight(44)
+        self.game_workflow_note.setToolTip(tooltip_text(settings_text(lang, "game_workflow_note")))
+        game_layout.addWidget(self.game_workflow_note, 0, 0, 1, 2)
+        game_layout.setRowStretch(6, 1)
+        self.game_launch_button = OpticallyCenteredPushButton(
+            settings_text(lang, "game_launch"), self.settings_game_page
+        )
+        self.game_launch_button.setObjectName("gameLaunchButton")
+        self.game_launch_button.setFixedHeight(32)
+        self.game_launch_button.setCursor(Qt.PointingHandCursor)
+        self.game_launch_button.setToolTip(tooltip_text(settings_text(lang, "game_workflow_note")))
+        self.game_launch_button.clicked.connect(self._launch_dynamic_translation)
+        game_layout.addWidget(self.game_launch_button, 7, 0, 1, 2)
 
         # Build the hidden page from the known application language catalog.
         # Probing EasyOCR/Tesseract packages before Settings has even painted
@@ -7738,33 +7952,70 @@ class SettingsWindow(QWidget):
         self.settings_game_page.hide()
 
         # --- Переключатель страниц ---
-        # The version moved to the persistent FAQ header.  Only the dots use
-        # this space now, so the connected buttons retain their lower border.
-        self.settings_page_footer = QWidget(self)
-        dots_layout = QHBoxLayout(self.settings_page_footer)
-        dots_layout.setContentsMargins(0, 0, 0, 0)
-        dots_layout.setSpacing(0)
-        dots_layout.setAlignment(Qt.AlignCenter)
-        self.settings_page_dots = []
+        # Named tabs expose each destination before the user opens it.
+        # Keep the old attribute aliases for guide/editor integrations.
         dark = self.parent.current_theme != "Светлая"
+        self.settings_page_footer = SettingsPageNavigation(self, dark=dark)
+        self.settings_page_navigation = self.settings_page_footer
+        dots_layout = QGridLayout(self.settings_page_footer)
+        dots_layout.setContentsMargins(8, 3, 8, 3)
+        dots_layout.setSpacing(2)
+        self.settings_page_dots = []
+        self.settings_page_tabs = self.settings_page_dots
         for index, text_key in enumerate((
             "settings_page_main",
             "settings_page_updates",
             "settings_page_game",
         )):
-            dot = SettingsPageDotButton(self.settings_page_footer, dark=dark)
+            dot = SettingsPageTabButton(settings_text(lang, text_key), self.settings_page_footer, dark=dark)
             dot.setAccessibleName(settings_text(lang, text_key))
             dot.setToolTip(tooltip_text(settings_text(lang, text_key)))
             dot.clicked.connect(
                 lambda _checked=False, page_index=index: self._set_settings_page(page_index)
             )
-            dots_layout.addWidget(dot)
+            dot.toggled.connect(
+                lambda _checked, navigation=self.settings_page_footer: navigation.update()
+            )
+            dots_layout.addWidget(dot, 0, index)
             self.settings_page_dots.append(dot)
-        self.settings_page_footer.setFixedHeight(16)
-        self.main_layout.addStretch()
+        self.settings_page_footer.setFixedHeight(32)
+
+        # Reserve the footer and action area through layouts, not overlays.
+        # All pages share one viewport; adding a row can no longer put it
+        # behind the action buttons or leave a hidden page accepting focus.
+        self.settings_general_page = QWidget(self)
+        general_layout = QVBoxLayout(self.settings_general_page)
+        general_layout.setContentsMargins(0, 0, 0, 0)
+        general_layout.setSpacing(4)
+        while self.main_layout.count():
+            item = self.main_layout.takeAt(0)
+            if item.layout() is not None:
+                general_layout.addLayout(item.layout())
+            elif item.widget() is not None:
+                general_layout.addWidget(item.widget())
+        general_layout.addStretch(1)
+        general_layout.addWidget(self.settings_action_panel)
+
+        self.settings_pages = QStackedWidget(self)
+        self.settings_pages.setObjectName("settingsPages")
+        self.settings_pages.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
+        for page in (
+            self.settings_general_page, self.settings_updates_page, self.settings_game_page
+        ):
+            self.settings_pages.addWidget(page)
+        self.main_layout.addWidget(self.settings_page_footer, 0, Qt.AlignHCenter)
+        self.main_layout.addWidget(self.settings_pages, 1)
+        # Apply shared styling only after every page has been recreated.
+        # Earlier calls could reach deleted controls from the previous visit.
+        self._apply_action_panel_style()
         self._position_settings_updates_page()
         self._set_settings_page(page_to_restore)
         QtCore.QTimer.singleShot(0, self._position_settings_updates_page)
+
+    def _launch_dynamic_translation(self):
+        launch = getattr(self.parent, "launch_game_translate", None)
+        if callable(launch):
+            launch()
 
     def _set_settings_page(self, index):
         updates_page = getattr(self, "settings_updates_page", None)
@@ -7773,6 +8024,7 @@ class SettingsWindow(QWidget):
             return
         index = max(0, min(int(index), 2))
         self._settings_page_index = index
+        self.settings_pages.setCurrentIndex(index)
         action_panel = getattr(self, "settings_action_panel", None)
         if index:
             if action_panel is not None:
@@ -7788,10 +8040,9 @@ class SettingsWindow(QWidget):
             updates_page.raise_()
         elif index == 2:
             game_page.raise_()
-            # Paint the page before reconciling optional OCR packages.  The
-            # user sees an immediate page change even on machines where
-            # loading flag icons or probing EasyOCR is slow.
-            QtCore.QTimer.singleShot(80, self._verify_game_language_controls)
+            # This widget is cached across visits. Both the pair and the
+            # installed engines may have changed from another screen.
+            self._refresh_game_language_controls()
         footer = getattr(self, "settings_page_footer", None)
         if footer is not None:
             footer.show()
@@ -7803,39 +8054,34 @@ class SettingsWindow(QWidget):
             complete({0: "settings_page_main", 1: "settings_page_updates", 2: "settings_page_game"}[index])
 
     def _position_settings_updates_page(self):
-        overlay = getattr(self, "settings_updates_page", None)
-        game_page = getattr(self, "settings_game_page", None)
-        footer = getattr(self, "settings_page_footer", None)
-        if overlay is None or game_page is None or footer is None:
+        """Apply the footer gap; the stack and page layouts own all geometry."""
+        pages = getattr(self, "settings_pages", None)
+        if pages is None or getattr(self, "_secondary_view_kind", None):
             return
-        margins = self.main_layout.contentsMargins()
-        top = margins.top()
-        left = margins.left()
-        right = self.width() - margins.right()
-        footer_top = self.height() - margins.bottom() - footer.height()
-        footer.setGeometry(
-            left,
-            footer_top,
-            max(0, right - left),
-            footer.height(),
-        )
-        footer_layout = footer.layout()
-        if footer_layout is not None:
-            footer_layout.invalidate()
-            footer_layout.activate()
-        fixed_gap = 6
-        action_panel = getattr(self, "settings_action_panel", None)
-        if action_panel is not None:
-            action_top = footer_top - fixed_gap - action_panel.height()
-            action_panel.setGeometry(
-                left,
-                action_top,
-                max(0, right - left),
-                action_panel.height(),
+        # Reserve a clear gap below the attached navigation. The developer
+        # layout editor can preview a draft gap without changing user settings.
+        layout_draft = getattr(self.parent, "_layout_editor_values", {}) or {}
+        settings_draft = layout_draft.get("settings", {}) or {}
+        try:
+            fixed_gap = max(
+                4,
+                min(
+                    64,
+                    int(settings_draft.get("actions_footer_gap", 12)),
+                ),
             )
-        bottom = max(top, footer_top - fixed_gap)
-        overlay.setGeometry(left, top, max(0, right - left), max(0, bottom - top))
-        game_page.setGeometry(left, top, max(0, right - left), max(0, bottom - top))
+        except (TypeError, ValueError):
+            fixed_gap = 12
+        self.main_layout.setSpacing(fixed_gap)
+        self.main_layout.activate()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if (getattr(self, "_settings_page_index", 0) == 2
+                and not getattr(self, "_secondary_view_kind", None)):
+            # The screen selector can change the pair while the app is in
+            # the tray, without navigating away from this cached page.
+            self._refresh_game_language_controls()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -7931,25 +8177,19 @@ class SettingsWindow(QWidget):
         dialog.activateWindow()
 
     def _fit_copy_translated_checkbox(self):
-        """Give the box room for its own label.
-
-        It shares a row with the Show-window picker, so anything past its width
-        is drawn over by that control — which is how "Копировать сразу
-        переведённый текст" ended up cut off. 260px is kept as a floor so the
-        English window looks exactly as it did.
-        """
+        """Measure the checkbox after the theme supplies its final font."""
         box = getattr(self, "copy_translated_checkbox", None)
         if box is None:
             return
         try:
-            box.setMinimumWidth(max(260, box.sizeHint().width()))
+            box.setMinimumWidth(box.sizeHint().width())
         except RuntimeError:
             pass
 
     def _apply_engine_combo_style(self, combo):
         if combo is None:
             return
-        combo.setStyleSheet(self._engine_combo_style())
+        set_widget_stylesheet(combo, self._engine_combo_style())
         if isinstance(combo, DropDownCombo):
             dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
             combo.set_popup_background("#20212a" if dark else "#f1edf4")
@@ -7959,7 +8199,7 @@ class SettingsWindow(QWidget):
         if combo is None:
             return
         dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        combo.setStyleSheet(
+        set_widget_stylesheet(combo,
             modern_combo_style(dark, font_size=13)
             + """
                 QComboBox {
@@ -8129,50 +8369,7 @@ class SettingsWindow(QWidget):
                 font-size: 14px;
                 padding: 44px 12px;
             }}
-            QPushButton#historyCopyButton,
-            QPushButton#historyDeleteButton {{
-                background: transparent;
-                border: 1px solid {colors['border']};
-                border-radius: 7px;
-                padding: 4px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            QPushButton#historyCopyButton {{ color: {colors['accent']}; }}
-            QPushButton#historyCopyButton:hover {{
-                color: #ffffff;
-                background-color: {colors['accent']};
-            }}
-            QPushButton#historyDeleteButton {{ color: {colors['danger']}; }}
-            QPushButton#historyDeleteButton:hover {{
-                color: #ffffff;
-                background-color: {colors['danger']};
-            }}
-            QPushButton#secondaryBackButton {{
-                background-color: {colors['accent']};
-                color: #ffffff;
-                border: none;
-                border-radius: 9px;
-                padding: 7px 22px;
-                font-size: 14px;
-                font-weight: 800;
-            }}
-            QPushButton#secondaryBackButton:hover {{
-                background-color: {colors['accent_hover']};
-            }}
-            QPushButton#secondaryClearButton {{
-                background-color: transparent;
-                color: {colors['danger']};
-                border: 1px solid {colors['danger']};
-                border-radius: 9px;
-                padding: 7px 16px;
-                font-size: 13px;
-                font-weight: 700;
-            }}
-            QPushButton#secondaryClearButton:hover {{
-                background-color: {colors['danger_hover']};
-                color: #ffffff;
-            }}
+
             QScrollBar:vertical {{
                 background: transparent;
                 width: 10px;
@@ -8197,7 +8394,7 @@ class SettingsWindow(QWidget):
             QScrollBar::sub-page:vertical {{
                 background: transparent;
             }}
-        """
+        """ + standard_buttons(self.parent.current_theme != "Светлая", compact=True)
 
     def _create_secondary_shell(self, title, count_label=None):
         shell = QFrame()
@@ -8322,15 +8519,15 @@ class SettingsWindow(QWidget):
             self.hotkey_labels.append(label)
         shell_layout.addWidget(hotkey_card)
 
-        self.copy_hotkey_input.keySequenceChanged.connect(self.save_copy_hotkey)
-        self.translate_hotkey_input.keySequenceChanged.connect(self.save_translate_hotkey)
-        self.fullscreen_translate_hotkey_input.keySequenceChanged.connect(self.save_fullscreen_translate_hotkey)
-        self.translate_selection_hotkey_input.keySequenceChanged.connect(self.save_translate_selection_hotkey)
-        self.translate_replace_selection_hotkey_input.keySequenceChanged.connect(
+        self.copy_hotkey_input.editingFinished.connect(self.save_copy_hotkey)
+        self.translate_hotkey_input.editingFinished.connect(self.save_translate_hotkey)
+        self.fullscreen_translate_hotkey_input.editingFinished.connect(self.save_fullscreen_translate_hotkey)
+        self.translate_selection_hotkey_input.editingFinished.connect(self.save_translate_selection_hotkey)
+        self.translate_replace_selection_hotkey_input.editingFinished.connect(
             self.save_translate_replace_selection_hotkey
         )
-        self.toggle_window_hotkey_input.keySequenceChanged.connect(self.save_toggle_window_hotkey)
-        self.game_translate_hotkey_input.keySequenceChanged.connect(self.save_game_translate_hotkey)
+        self.toggle_window_hotkey_input.editingFinished.connect(self.save_toggle_window_hotkey)
+        self.game_translate_hotkey_input.editingFinished.connect(self.save_game_translate_hotkey)
 
         remove_label = QLabel(settings_text(lang, "remove_hotkey"))
         remove_label.setObjectName("secondaryHint")
@@ -8381,8 +8578,53 @@ class SettingsWindow(QWidget):
         QtCore.QTimer.singleShot(0, activate_field)
         return True
 
+    def _checked_hotkey(self, key):
+        field = getattr(self, key + "_input")
+        hotkey = ClearableKeySequenceEdit._normalize_hotkey(
+            field.keySequence().toString(QKeySequence.PortableText))
+        labels = {
+            "copy_hotkey": "copy_hotkey_label",
+            "translate_hotkey": "translate_hotkey_label",
+            "fullscreen_translate_hotkey": "fullscreen_translate_label",
+            "translate_selection_hotkey": "selection_translate_label",
+            "translate_replace_selection_hotkey": "replace_selection_translate_label",
+            "toggle_window_hotkey": "toggle_window_hotkey_label",
+            "game_translate_hotkey": "game_translate_label",
+        }
+        lang = self.parent.current_interface_language
+        hint = getattr(self, "hotkey_hint_label", None)
+        for other, label in labels.items():
+            existing = ClearableKeySequenceEdit._normalize_hotkey(str(self.parent.config.get(other, "") or ""))
+            existing = QKeySequence(existing).toString(QKeySequence.PortableText)
+            if other != key and hotkey and existing.casefold() == hotkey.casefold():
+                blocker = QtCore.QSignalBlocker(field)
+                field.setKeySequence(QKeySequence(self.parent.config.get(key, "")))
+                del blocker
+                messages = {
+                    "ru": "{hotkey} уже занято: {action}",
+                    "en": "{hotkey} is already used: {action}",
+                    "de": "{hotkey} bereits belegt: {action}",
+                    "fr": "{hotkey} déjà utilisé : {action}",
+                    "es": "{hotkey} ya está en uso: {action}",
+                    "zh": "{hotkey} 已被占用：{action}",
+                }
+                message = messages.get(lang, messages["en"]).format(
+                    hotkey=hotkey, action=settings_text(lang, label).rstrip(":"))
+                if hint is not None:
+                    hint.setText(hint.fontMetrics().elidedText(message, Qt.ElideRight, max(100, hint.width())))
+                    hint.setToolTip(tooltip_text(message))
+                field.setToolTip(tooltip_text(message))
+                return None
+        if hint is not None:
+            hint.setText(settings_text(lang, "remove_hotkey"))
+            hint.setToolTip("")
+        field.setToolTip("")
+        return hotkey
+
     def save_copy_hotkey(self):
-        hotkey_str = self.copy_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("copy_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["copy_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8402,7 +8644,9 @@ class SettingsWindow(QWidget):
             self.parent.copy_hotkey_thread.start()
 
     def save_translate_hotkey(self):
-        hotkey_str = self.translate_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("translate_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["translate_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8419,7 +8663,9 @@ class SettingsWindow(QWidget):
             self.parent.translate_hotkey_thread.start()
 
     def save_fullscreen_translate_hotkey(self):
-        hotkey_str = self.fullscreen_translate_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("fullscreen_translate_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["fullscreen_translate_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8436,7 +8682,9 @@ class SettingsWindow(QWidget):
             self.parent.fullscreen_translate_hotkey_thread.start()
 
     def save_translate_selection_hotkey(self):
-        hotkey_str = self.translate_selection_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("translate_selection_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["translate_selection_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8453,7 +8701,9 @@ class SettingsWindow(QWidget):
             self.parent.translate_selection_hotkey_thread.start()
 
     def save_translate_replace_selection_hotkey(self):
-        hotkey_str = self.translate_replace_selection_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("translate_replace_selection_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["translate_replace_selection_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8475,7 +8725,9 @@ class SettingsWindow(QWidget):
             self.parent.translate_replace_selection_hotkey_thread.start()
 
     def save_toggle_window_hotkey(self):
-        hotkey_str = self.toggle_window_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("toggle_window_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["toggle_window_hotkey"] = hotkey_str
         self.parent.save_config()
         if platform_support.IS_LINUX:
@@ -8497,7 +8749,9 @@ class SettingsWindow(QWidget):
             self.parent.toggle_window_hotkey_thread.start()
 
     def save_game_translate_hotkey(self):
-        hotkey_str = self.game_translate_hotkey_input.keySequence().toString()
+        hotkey_str = self._checked_hotkey("game_translate_hotkey")
+        if hotkey_str is None:
+            return
         self.parent.config["game_translate_hotkey"] = hotkey_str
         self.parent.save_config()
         if hasattr(self.parent, "refresh_interface_language_ui"):
@@ -8523,9 +8777,12 @@ class SettingsWindow(QWidget):
     def back_from_hotkeys(self):
         self.init_ui()
         self.apply_theme()
+        schedule = getattr(self.parent, "_schedule_guide_step", None)
+        if callable(schedule):
+            schedule(0)
 
     def show_history_view(self):
-        self.clear_main_layout()
+        self.setup_new_layout()
         self.hotkeys_mode = False
         self._secondary_view_kind = "history"
         self.main_layout.setContentsMargins(10, 7, 10, 7)
@@ -8833,7 +9090,7 @@ class SettingsWindow(QWidget):
         self.apply_theme()
 
     def show_copy_history_view(self):
-        self.clear_main_layout()
+        self.setup_new_layout()
         self.hotkeys_mode = False
         self._secondary_view_kind = "copy_history"
         self.main_layout.setContentsMargins(10, 7, 10, 7)
@@ -9443,8 +9700,14 @@ class SettingsWindow(QWidget):
         """Download atomically with retry and HTTP Range resume support."""
         partial_path = destination_path + ".part"
         last_error = None
-        for attempt in range(1, max(1, int(max_attempts)) + 1):
+        validator = None
+        max_attempts = max(1, int(max_attempts))
+        for attempt in range(1, max_attempts + 1):
             if cancel_callback and cancel_callback():
+                try:
+                    os.remove(partial_path)
+                except FileNotFoundError:
+                    pass
                 raise UpdateCancelledError("Update canceled by the user.")
 
             try:
@@ -9453,8 +9716,13 @@ class SettingsWindow(QWidget):
                 downloaded_bytes = 0
 
             headers = _update_request_headers(url)
+            # iter_content decodes gzip, whereas byte ranges refer to the wire
+            # representation. Always request the actual file bytes.
+            headers["Accept-Encoding"] = "identity"
             if downloaded_bytes > 0:
                 headers["Range"] = f"bytes={downloaded_bytes}-"
+                if validator:
+                    headers["If-Range"] = validator
 
             try:
                 with requests.get(
@@ -9463,8 +9731,32 @@ class SettingsWindow(QWidget):
                     timeout=(20, timeout),
                     headers=headers,
                 ) as response:
+                    if getattr(response, "status_code", 200) == 416:
+                        # A stale partial must not trap every retry at the same
+                        # invalid offset. Start the next request from zero.
+                        if os.path.exists(partial_path):
+                            os.remove(partial_path)
+                        validator = None
+                        raise IOError("The partial file no longer matches the server file")
                     response.raise_for_status()
-                    resumed = downloaded_bytes > 0 and getattr(response, "status_code", 200) == 206
+                    status = getattr(response, "status_code", 200)
+                    content_range = response.headers.get("Content-Range") or ""
+                    range_match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", content_range.strip())
+                    if status == 206:
+                        if not range_match or not (
+                            int(range_match[1]) == downloaded_bytes
+                            and int(range_match[1]) <= int(range_match[2]) < int(range_match[3])
+                        ):
+                            if os.path.exists(partial_path):
+                                os.remove(partial_path)
+                            validator = None
+                            raise IOError("The server returned an invalid download range")
+                    encoding = (response.headers.get("Content-Encoding") or "identity").lower()
+                    if encoding != "identity":
+                        if os.path.exists(partial_path):
+                            os.remove(partial_path)
+                        raise IOError("The server compressed a binary download despite Accept-Encoding: identity")
+                    resumed = downloaded_bytes > 0 and status == 206
                     if downloaded_bytes > 0 and not resumed:
                         downloaded_bytes = 0
                         try:
@@ -9472,10 +9764,10 @@ class SettingsWindow(QWidget):
                         except OSError:
                             pass
 
-                    content_range = response.headers.get("Content-Range") or ""
-                    range_match = re.search(r"/(\d+)$", content_range)
-                    if range_match:
-                        total_bytes = int(range_match.group(1))
+                    etag = response.headers.get("ETag")
+                    validator = (etag if etag and not etag.startswith('W/') else None) or response.headers.get("Last-Modified")
+                    if status == 206:
+                        total_bytes = int(range_match[3])
                     else:
                         try:
                             remaining = int(
@@ -10476,67 +10768,42 @@ finally {
         os._exit(0)
 
     def _apply_action_panel_style(self):
-        """Paint the connected action grid as one complete framed control."""
-        panel = getattr(self, "settings_action_panel", None)
-        if panel is None:
-            return
+        """Connected actions use the same palette and states as dialog buttons."""
         dark = self.parent.current_theme != "Светлая"
-        separator = "#6b587d" if dark else "#a99ab7"
-        surface = "#15151a" if dark else "#e4dee8"
-        hover = "#242129" if dark else "#d8d0df"
-        text = "#ffffff" if dark else "#2b2531"
-        panel.setStyleSheet(
-            "QWidget#settingsActionPanel {"
-            f" background:{separator}; border:1px solid {separator};"
-            " border-radius:9px; }"
+        colors = button_palette(dark)
+        for name, object_name in (("settings_action_panel", "settingsActionPanel"),
+                                  ("settings_transfer_panel", "settingsTransferPanel")):
+            panel = getattr(self, name, None)
+            if panel is not None and not sip.isdeleted(panel):
+                set_widget_stylesheet(panel,
+                    f"QWidget#{object_name} {{ background:{colors['border']}; "
+                    f"border:1px solid {colors['border']}; border-radius:7px; }}"
+                )
+        # Only the outside corners are rounded; the layout supplies row dividers.
+        specs = (
+            ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
+            ("reset_btn", "danger", 1, (0, 0, 0, 0)),
+            ("update_btn", "secondary", 2, (0, 6, 0, 0)),
+            ("ocr_languages_btn", "secondary", 0, (0, 0, 0, 0)),
+            ("copy_history_btn", "secondary", 1, (0, 0, 0, 0)),
+            ("translation_history_btn", "secondary", 2, (0, 0, 0, 0)),
+            ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
+            ("export_settings_btn", "secondary", 0, (6, 0, 6, 0)),
+            ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
+            ("create_bug_report_btn", "secondary", 2, (0, 6, 0, 6)),
         )
-
-        top_specs = (
-            (getattr(self, "clear_cache_btn", None), "#7A5FA1", "#8B70B2", "8px", "0px"),
-            (getattr(self, "reset_btn", None), "#D44444", "#E55555", "0px", "0px"),
-            (getattr(self, "update_btn", None), "#7A5FA1", "#8B70B2", "0px", "8px"),
-        )
-        for column, (button, background, active, left_radius, right_radius) in enumerate(top_specs):
-            if button is None:
+        for name, role, column, corners in specs:
+            button = getattr(self, name, None)
+            if button is None or sip.isdeleted(button):
                 continue
-            divider = f"border-left:1px solid {separator};" if column else ""
-            button.setStyleSheet(f"""
-                QPushButton {{
-                    background:{background}; color:#ffffff; border:none;
-                    {divider}
-                    border-top-left-radius:{left_radius};
-                    border-top-right-radius:{right_radius};
-                    border-bottom-left-radius:0px; border-bottom-right-radius:0px;
-                    padding:0 8px; font-family:'Segoe UI';
-                    font-size: 16px; font-weight: 700;
-                }}
-                QPushButton:hover {{ background:{active}; }}
-            """)
-
-        middle_buttons = (
-            getattr(self, "ocr_languages_btn", None),
-            getattr(self, "copy_history_btn", None),
-            getattr(self, "translation_history_btn", None),
-        )
-        for column, button in enumerate(middle_buttons):
-            if button is not None:
-                divider = f"border-left:1px solid {separator};" if column else ""
-                button.setStyleSheet(f"""
-                    QPushButton {{ background:{surface}; color:{text}; border:none;
-                        {divider} border-radius:0; padding:0 6px;
-                        font-family:'Segoe UI'; font-size: 16px; font-weight: 700; }}
-                    QPushButton:hover {{ background:{hover}; }}
-                    QPushButton[packageTaskDone="true"] {{ color:#398f53; }}
-                """)
-        hotkeys = getattr(self, "hotkeys_button", None)
-        if hotkeys is not None:
-            hotkeys.setStyleSheet(f"""
-                QPushButton {{ background:{surface}; color:{text}; border:none;
-                    border-top-left-radius:0; border-top-right-radius:0;
-                    border-bottom-left-radius:8px; border-bottom-right-radius:8px;
-                    padding:0 12px; font-family:'Segoe UI';
-                    font-size: 16px; font-weight: 700; }}
-                QPushButton:hover {{ background:{hover}; }}
+            tl, tr, bl, br = corners
+            divider = f"border-left:1px solid {colors['border']};" if column else ""
+            set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f"""
+                QPushButton {{ border:none; {divider} padding:0 6px;
+                    border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
+                    border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
+                QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
+                QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
             """)
 
     def apply_theme(self):
@@ -10561,7 +10828,7 @@ finally {
             QWidget {{
                 background-color: {theme['background']};
             }}
-            {TOOLTIP_QSS}
+            {tooltip_stylesheet(dark)}
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
@@ -10581,16 +10848,7 @@ finally {
             QCheckBox:disabled {{
                 color: {disabled_text};
             }}
-            QPushButton {{
-                background-color: {theme['background']};
-                color: {theme['text_color']};
-                border: 2px solid #C5B3E9;
-                padding: 6px 4px;
-                font-size: 16px;
-            }}
-            QPushButton#saveReturnButton {{
-                border: 2px solid #C5B3E9;
-            }}
+
             QSlider#ocrDimStrengthSlider::groove:horizontal {{
                 height: 5px;
                 background: {slider_track};
@@ -10631,8 +10889,8 @@ finally {
             }}
             QLabel#gameSettingsLabel {{
                 color: {theme['text_color']};
-                font-size: 14px;
-                font-weight: 600;
+                font-size: 16px;
+                font-weight: 400;
             }}
             QLabel#gameSettingValue {{
                 color: {theme['text_color']};
@@ -10640,26 +10898,11 @@ finally {
                 font-weight: 700;
             }}
             QLabel#gameWorkflowNote {{
-                color: {disabled_text};
+                color: {theme['text_color']};
                 font-size: 13px;
-                font-weight: 600;
+                font-weight: 400;
             }}
-            QToolButton#gameLanguageSwap {{
-                color: #B78BE5;
-                background: transparent;
-                border: 1px solid #6C587E;
-                border-radius: 9px;
-                font-size: 17px;
-                font-weight: 800;
-            }}
-            QToolButton#gameLanguageSwap:hover {{
-                background: {report_hover};
-                border-color: #A97BDD;
-            }}
-            QToolButton#gameLanguageSwap:disabled {{
-                color: {disabled_text};
-                border-color: {slider_disabled};
-            }}
+
             QSlider#gameScanIntervalSlider::groove:horizontal,
             QSlider#gameOverlayOpacitySlider::groove:horizontal {{
                 height: 5px;
@@ -10680,26 +10923,35 @@ finally {
                 border: 1px solid #7A5FA1;
                 border-radius: 8px;
             }}
-            QPushButton#settingsBugReportButton,
-            QPushButton#settingsTransferButton {{
-                background: transparent;
-                color: {theme['text_color']};
-                border: 1px solid #C5B3E9;
-                border-radius: 8px;
-                padding: 0px 7px;
-                text-align: center;
-                font-size: 13px;
-                font-weight: 700;
+
+        """ + standard_buttons(dark, compact=True)
+        scale_background = '#17181d' if dark else '#e9e4ed'
+        scale_border = '#3d3948' if dark else '#d7cde7'
+        scale_ink = '#f4f6fb' if dark else '#202124'
+        style += button_qss(dark, 'quiet', 'QToolButton#uiScaleDecrease, QToolButton#uiScaleIncrease', icon=True, radius=4)
+        style += f"""
+            QWidget#uiScaleControl {{ background: transparent; }}
+            QFrame#uiScaleField {{
+                background: {scale_background};
+                border: 1px solid {scale_border}; border-radius: 7px;
             }}
-            QPushButton#settingsBugReportButton:hover,
-            QPushButton#settingsTransferButton:hover {{
-                background: {report_hover};
-                border-color: #9B78C8;
+            QLineEdit#uiScaleValue {{
+                color: {scale_ink}; background: transparent; border: none;
+                padding: 0; margin: 0; min-height: 0; font-size: 15px; font-weight: 400;
+            }}
+            QToolButton#uiScaleDecrease:disabled, QToolButton#uiScaleIncrease:disabled {{
+                background: transparent; border-color: transparent;
             }}
         """
-        self.setStyleSheet(style)
+        set_widget_stylesheet(self, style)
         self._apply_action_panel_style()
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
+        navigation = getattr(self, "settings_page_navigation", None)
+        if navigation is not None:
+            try:
+                navigation.set_dark(self.parent.current_theme != "Светлая")
+            except RuntimeError:
+                pass
         for dot in getattr(self, "settings_page_dots", ()):
             try:
                 dot.set_dark(self.parent.current_theme != "Светлая")
@@ -10717,7 +10969,10 @@ finally {
             combo = getattr(self, combo_name, None)
             if combo is not None:
                 try:
-                    self._apply_engine_combo_style(combo)
+                    if combo_name.startswith("game_"):
+                        self._apply_game_language_combo_style(combo)
+                    else:
+                        self._apply_engine_combo_style(combo)
                 except RuntimeError:
                     pass
         result_control = getattr(self, "result_window_control", None)
@@ -11073,7 +11328,7 @@ finally {
             return
 
         lang = self.parent.current_interface_language
-        if platform_support.IS_LINUX:
+        if not platform_support.IS_WINDOWS:
             # Linux distributions package Tesseract, so the app points at the
             # package manager instead of downloading an installer.
             self._show_linux_tesseract_hint(lang)
@@ -11134,8 +11389,8 @@ finally {
             self.start_easyocr_install()
             return
 
-        self._set_ocr_combo_silently(self.previous_ocr_engine or "Windows")
-        self.save_ocr_engine(self.previous_ocr_engine or "Windows")
+        self._set_ocr_combo_silently(self.previous_ocr_engine or platform_support.default_ocr_engine())
+        self.save_ocr_engine(self.previous_ocr_engine or platform_support.default_ocr_engine())
 
     def _handle_rapidocr_engine_change(self):
         self.previous_ocr_engine = self.parent.config.get("ocr_engine", platform_support.default_ocr_engine())
@@ -11157,8 +11412,8 @@ finally {
             self.start_rapidocr_install()
             return
 
-        self._set_ocr_combo_silently(self.previous_ocr_engine or "Windows")
-        self.save_ocr_engine(self.previous_ocr_engine or "Windows")
+        self._set_ocr_combo_silently(self.previous_ocr_engine or platform_support.default_ocr_engine())
+        self.save_ocr_engine(self.previous_ocr_engine or platform_support.default_ocr_engine())
 
     def _delete_local_tesseract_dir(self):
         tesseract_dir = self._local_tesseract_dir()
@@ -11356,6 +11611,9 @@ finally {
         self.start_tesseract_install()
 
     def start_tesseract_install(self, progress_owner=None):
+        if not platform_support.IS_WINDOWS:
+            self._show_linux_tesseract_hint(self.parent.current_interface_language)
+            return
         if (
             self._tesseract_install_in_progress
             or self._rapidocr_install_in_progress
@@ -11375,6 +11633,8 @@ finally {
         threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
 
     def _get_tesseract_bundle_url(self, is_x64=True):
+        if not platform_support.IS_WINDOWS:
+            raise RuntimeError("The bundled Tesseract installer is Windows-only.")
         if not is_x64:
             raise RuntimeError("Автоматическая установка Tesseract поддерживает только Windows x64.")
         return TESSERACT_BUNDLE_URL_WIN64
@@ -11395,7 +11655,6 @@ finally {
 
     def _install_tesseract_worker(self):
         temp_dir = ""
-        backup_dir = ""
         final_dir = self._local_tesseract_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
@@ -11427,6 +11686,7 @@ finally {
                 cancel_callback=lambda: self._tesseract_cancel_requested.is_set(),
             )
             self._check_tesseract_cancel_requested()
+            self._verify_file_sha256(bundle_path, TESSERACT_BUNDLE_SHA256_WIN64, TESSERACT_BUNDLE_NAME_WIN64)
             if not zipfile.is_zipfile(bundle_path):
                 raise RuntimeError("Downloaded Tesseract bundle is not a zip archive.")
 
@@ -11476,18 +11736,18 @@ finally {
             self._check_tesseract_cancel_requested()
             self._tesseract_install_phase = "applying"
             self._emit_tesseract_progress(engine_text(lang, "applying"), 96)
-            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
-            if os.path.isdir(final_dir):
-                backup_dir = f"{final_dir}.backup-{int(time.time())}"
-                shutil.move(final_dir, backup_dir)
-            shutil.move(install_dir, final_dir)
-            if backup_dir and os.path.isdir(backup_dir):
-                shutil.rmtree(backup_dir, ignore_errors=True)
-                backup_dir = ""
+            def validate_tesseract(path):
+                exe = self._find_tesseract_exe_under(path)
+                if not exe:
+                    raise RuntimeError("tesseract.exe not found after applying install")
+                subprocess.run(
+                    [exe, "--version"], check=True, capture_output=True, timeout=30,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
 
+            install_directory(install_dir, final_dir, validate_tesseract, preserve=("tessdata",),
+                              check_cancel=self._check_tesseract_cancel_requested)
             final_exe = self._find_tesseract_exe_under(final_dir)
-            if not final_exe:
-                raise RuntimeError("tesseract.exe not found after applying install")
 
             self._emit_tesseract_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(
@@ -11497,18 +11757,8 @@ finally {
                 QtCore.Q_ARG(str, final_exe)
             )
         except (TesseractInstallCancelledError, UpdateCancelledError):
-            if backup_dir and os.path.isdir(backup_dir) and not os.path.isdir(final_dir):
-                try:
-                    shutil.move(backup_dir, final_dir)
-                except Exception:
-                    pass
             QMetaObject.invokeMethod(self, "_on_tesseract_install_cancelled", Qt.QueuedConnection)
         except Exception as e:
-            if backup_dir and os.path.isdir(backup_dir) and not os.path.isdir(final_dir):
-                try:
-                    shutil.move(backup_dir, final_dir)
-                except Exception:
-                    pass
             QMetaObject.invokeMethod(
                 self,
                 "_on_tesseract_install_failed",
@@ -11609,7 +11859,7 @@ finally {
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -11624,7 +11874,7 @@ finally {
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -11659,6 +11909,7 @@ finally {
             errors="replace",
             timeout=timeout,
             creationflags=create_no_window,
+            env=platform_support.system_subprocess_env(),
         )
         return completed.returncode, (completed.stdout or "").strip()
 
@@ -11686,7 +11937,7 @@ finally {
         # and these wheels are imported by the frozen worker, so the ABI has to
         # match exactly.
         for name in (f"python{required}", "python", "python3"):
-            found = shutil.which(name)
+            found = platform_support.system_command(name)
             if found:
                 candidates.append([found])
 
@@ -11700,12 +11951,19 @@ finally {
                 version = self._python_command_version(candidate)
                 if version != required:
                     continue
+                if platform_support.IS_MAC:
+                    status, architecture = self._python_command_output(
+                        candidate, ["-c", "import platform; print(platform.machine())"], timeout=20)
+                    if status or architecture.splitlines()[-1:] != [platform.machine()]:
+                        # A Rosetta Python can have the right version but install
+                        # Intel wheels that the native arm64 helper cannot load.
+                        continue
                 if not self._python_command_has_pip(candidate):
                     continue
                 return candidate
             except Exception:
                 continue
-        if platform_support.IS_LINUX:
+        if not platform_support.IS_WINDOWS:
             # Windows falls back to a downloadable embedded interpreter; on Linux
             # the distribution provides one, so name the package to install.
             raise RuntimeError(
@@ -11720,7 +11978,7 @@ finally {
         )
 
     def _portable_pip_bootstrap_plan(self, is_x64=True):
-        if platform_support.IS_LINUX:
+        if not platform_support.IS_WINDOWS:
             # The bootstrap downloads the Windows embedded distribution; there is
             # no equivalent to ship for Linux.
             raise RuntimeError(
@@ -11828,14 +12086,21 @@ finally {
             return (0, 0)
 
     def _easyocr_requirements(self, pip_command):
+        if platform_support.IS_MAC:
+            # PyTorch stopped publishing Intel macOS wheels after 2.2.2.
+            import platform
+            if platform.machine().lower() in {"x86_64", "amd64"}:
+                return ("easyocr==1.7.2", "torch==2.2.2", "torchvision==0.17.2", "numpy<2",
+                        "opencv-python-headless<4.12")
+            return EASYOCR_PIP_PACKAGES_ANY_PYTHON
         version = self._pip_target_python_version(pip_command)
-        if version >= EASYOCR_PINNED_PYTHON:
+        if version in EASYOCR_PINNED_PYTHONS:
             return EASYOCR_PIP_PACKAGES
         logger.info(
-            "EasyOCR: target Python %s is older than %s, installing with resolved "
+            "EasyOCR: target Python %s is outside %s, installing with resolved "
             "dependencies instead of the pinned tree",
             ".".join(str(part) for part in version),
-            ".".join(str(part) for part in EASYOCR_PINNED_PYTHON),
+            sorted(EASYOCR_PINNED_PYTHONS),
         )
         return EASYOCR_PIP_PACKAGES_ANY_PYTHON
 
@@ -11851,22 +12116,14 @@ finally {
             python_command = self._find_rapidocr_install_python_command(engine_name, package_dir)
             return [*python_command, "-m", "pip"]
         except RuntimeError:
+            if not platform_support.IS_WINDOWS:
+                raise
             return self._prepare_portable_pip_command(
                 temp_dir,
                 engine_name,
                 cancel_callback=cancel_callback,
                 progress_callback=progress_callback,
             )
-
-    def _restore_rapidocr_backup(self, final_dir, backup_dir):
-        if not backup_dir or not os.path.isdir(backup_dir):
-            return
-        try:
-            if os.path.isdir(final_dir):
-                shutil.rmtree(final_dir, ignore_errors=True)
-            shutil.move(backup_dir, final_dir)
-        except Exception:
-            pass
 
     def start_rapidocr_install(self, progress_owner=None):
         if (
@@ -11894,7 +12151,6 @@ finally {
 
     def _install_rapidocr_worker(self):
         temp_dir = ""
-        backup_dir = ""
         final_dir = self._local_rapidocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
@@ -11928,6 +12184,7 @@ finally {
                 "--target",
                 package_root,
                 *RAPIDOCR_PIP_PACKAGES,
+                *(["onnxruntime==1.23.2"] if platform_support.IS_MAC else []),
             ]
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             process = subprocess.Popen(
@@ -11938,6 +12195,7 @@ finally {
                 encoding="utf-8",
                 errors="replace",
                 creationflags=create_no_window,
+                env=platform_support.system_subprocess_env(),
             )
             self._rapidocr_install_process = process
             output_tail = []
@@ -11966,27 +12224,21 @@ finally {
 
             self._rapidocr_install_phase = "applying"
             self._emit_rapidocr_progress(engine_text(lang, "applying"), 92)
-            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
-            if os.path.isdir(final_dir):
-                backup_dir = f"{final_dir}.backup-{int(time.time())}"
-                shutil.move(final_dir, backup_dir)
-            shutil.move(package_root, final_dir)
-            self._reset_rapidocr_runtime_cache(clear_modules=True)
-            importable, import_error = self._rapidocr_importable_status()
-            if not importable:
-                raise RuntimeError(f"RapidOCR was installed but could not be imported:\n{import_error}")
-            if backup_dir and os.path.isdir(backup_dir):
-                shutil.rmtree(backup_dir, ignore_errors=True)
-                backup_dir = ""
+            def validate_rapidocr(_path):
+                self._reset_rapidocr_runtime_cache(clear_modules=True)
+                importable, import_error = self._rapidocr_importable_status()
+                if not importable:
+                    raise RuntimeError(f"RapidOCR was installed but could not be imported:\n{import_error}")
+
+            install_directory(package_root, final_dir, validate_rapidocr,
+                              check_cancel=self._check_rapidocr_cancel_requested)
 
             self._emit_rapidocr_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(self, "_on_rapidocr_install_ready", Qt.QueuedConnection)
         except (RapidOCRInstallCancelledError, UpdateCancelledError):
-            self._restore_rapidocr_backup(final_dir, backup_dir)
             self._reset_rapidocr_runtime_cache(clear_modules=True)
             QMetaObject.invokeMethod(self, "_on_rapidocr_install_cancelled", Qt.QueuedConnection)
         except Exception as e:
-            self._restore_rapidocr_backup(final_dir, backup_dir)
             self._reset_rapidocr_runtime_cache(clear_modules=True)
             QMetaObject.invokeMethod(
                 self,
@@ -12100,7 +12352,7 @@ finally {
         self._finish_rapidocr_install_state()
         self._hide_rapidocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -12115,7 +12367,7 @@ finally {
         self._finish_rapidocr_install_state()
         self._hide_rapidocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -12165,7 +12417,6 @@ finally {
 
     def _install_easyocr_worker(self):
         temp_dir = ""
-        backup_dir = ""
         final_dir = self._local_easyocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
@@ -12211,6 +12462,7 @@ finally {
                 encoding="utf-8",
                 errors="replace",
                 creationflags=create_no_window,
+                env=platform_support.system_subprocess_env(),
             )
             self._easyocr_install_process = process
             output_tail = []
@@ -12239,27 +12491,21 @@ finally {
 
             self._easyocr_install_phase = "applying"
             self._emit_easyocr_progress(engine_text(lang, "applying"), 92)
-            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
-            if os.path.isdir(final_dir):
-                backup_dir = f"{final_dir}.backup-{int(time.time())}"
-                shutil.move(final_dir, backup_dir)
-            shutil.move(package_root, final_dir)
-            self._reset_easyocr_runtime_cache(clear_modules=True)
-            importable, import_error = self._easyocr_importable_status()
-            if not importable:
-                raise RuntimeError(f"EasyOCR was installed but could not be imported:\n{import_error}")
-            if backup_dir and os.path.isdir(backup_dir):
-                shutil.rmtree(backup_dir, ignore_errors=True)
-                backup_dir = ""
+            def validate_easyocr(_path):
+                self._reset_easyocr_runtime_cache(clear_modules=True)
+                importable, import_error = self._easyocr_importable_status()
+                if not importable:
+                    raise RuntimeError(f"EasyOCR was installed but could not be imported:\n{import_error}")
+
+            install_directory(package_root, final_dir, validate_easyocr, preserve=("models", "user_network"),
+                              check_cancel=self._check_easyocr_cancel_requested)
 
             self._emit_easyocr_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(self, "_on_easyocr_install_ready", Qt.QueuedConnection)
         except (EasyOCRInstallCancelledError, UpdateCancelledError):
-            self._restore_rapidocr_backup(final_dir, backup_dir)
             self._reset_easyocr_runtime_cache(clear_modules=True)
             QMetaObject.invokeMethod(self, "_on_easyocr_install_cancelled", Qt.QueuedConnection)
         except Exception as e:
-            self._restore_rapidocr_backup(final_dir, backup_dir)
             self._reset_easyocr_runtime_cache(clear_modules=True)
             QMetaObject.invokeMethod(
                 self,
@@ -12373,7 +12619,7 @@ finally {
         self._finish_easyocr_install_state()
         self._hide_easyocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -12388,7 +12634,7 @@ finally {
         self._finish_easyocr_install_state()
         self._hide_easyocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or "Windows"
+        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
         self._set_ocr_combo_silently(prev_engine)
         self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
@@ -12478,19 +12724,8 @@ finally {
         if self._hymt_cancel_requested.is_set():
             raise HyMTInstallCancelledError("Hy-MT installation canceled by user.")
 
-    def _restore_hymt_backup(self, final_dir, backup_dir):
-        if not backup_dir or not os.path.isdir(backup_dir):
-            return
-        try:
-            if os.path.isdir(final_dir):
-                shutil.rmtree(final_dir, ignore_errors=True)
-            shutil.move(backup_dir, final_dir)
-        except Exception:
-            pass
-
     def _install_hymt_worker(self):
         temp_dir = ""
-        backup_dir = ""
         final_dir = self._local_hymt_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
@@ -12617,19 +12852,12 @@ finally {
 
             self._hymt_install_phase = "applying"
             self._emit_hymt_progress(engine_text(lang, "applying"), 96)
-            os.makedirs(os.path.dirname(final_dir), exist_ok=True)
-            if os.path.isdir(final_dir):
-                backup_dir = f"{final_dir}.backup-{int(time.time())}"
-                shutil.move(final_dir, backup_dir)
-            shutil.move(package_root, final_dir)
+            def validate_hymt(path):
+                if not self._find_hymt_model_under(path) or not self._find_hymt_runner_under(path):
+                    raise RuntimeError("Hy-MT model or runner not found after applying install.")
 
-            final_model = self._find_hymt_model_under(final_dir)
-            final_runner = self._find_hymt_runner_under(final_dir)
-            if not final_model or not final_runner:
-                raise RuntimeError("Hy-MT model or runner not found after applying install.")
-            if backup_dir and os.path.isdir(backup_dir):
-                shutil.rmtree(backup_dir, ignore_errors=True)
-                backup_dir = ""
+            install_directory(package_root, final_dir, validate_hymt,
+                              check_cancel=self._check_hymt_cancel_requested)
 
             self._emit_hymt_progress(engine_text(lang, "done"), 100)
             QMetaObject.invokeMethod(
@@ -12638,10 +12866,8 @@ finally {
                 Qt.QueuedConnection
             )
         except (HyMTInstallCancelledError, UpdateCancelledError):
-            self._restore_hymt_backup(final_dir, backup_dir)
             QMetaObject.invokeMethod(self, "_on_hymt_install_cancelled", Qt.QueuedConnection)
         except Exception as e:
-            self._restore_hymt_backup(final_dir, backup_dir)
             QMetaObject.invokeMethod(
                 self,
                 "_on_hymt_install_failed",
@@ -12833,8 +13059,8 @@ finally {
             if not removed:
                 raise RuntimeError(error)
             if self.parent.config.get("ocr_engine") == RAPIDOCR_ENGINE_DISPLAY:
-                self._set_ocr_combo_silently("Windows")
-                self.save_ocr_engine("Windows")
+                self._set_ocr_combo_silently(platform_support.default_ocr_engine())
+                self.save_ocr_engine(platform_support.default_ocr_engine())
             QMessageBox.information(
                 self,
                 RAPIDOCR_ENGINE_DISPLAY,
@@ -12870,8 +13096,8 @@ finally {
             if not removed:
                 raise RuntimeError(error)
             if self.parent.config.get("ocr_engine") == EASYOCR_ENGINE_DISPLAY:
-                self._set_ocr_combo_silently("Windows")
-                self.save_ocr_engine("Windows")
+                self._set_ocr_combo_silently(platform_support.default_ocr_engine())
+                self.save_ocr_engine(platform_support.default_ocr_engine())
             QMessageBox.information(
                 self,
                 EASYOCR_ENGINE_DISPLAY,
@@ -12907,8 +13133,8 @@ finally {
             if not removed:
                 raise RuntimeError(error)
             if self.parent.config.get("ocr_engine") == "Tesseract":
-                self._set_ocr_combo_silently("Windows")
-                self.save_ocr_engine("Windows")
+                self._set_ocr_combo_silently(platform_support.default_ocr_engine())
+                self.save_ocr_engine(platform_support.default_ocr_engine())
             QMessageBox.information(
                 self,
                 "Tesseract",
@@ -13029,23 +13255,7 @@ finally {
         if hasattr(self, 'clear_cache_btn'):
             self.clear_cache_btn.setText(done_text)
             # Зеленый фон, но форма сохраняется (закругление только слева)
-            self.clear_cache_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50; 
-                    color: #fff; 
-                    border: none;
-                    border-top-left-radius: 8px;
-                    border-bottom-left-radius: 0px;
-                    border-top-right-radius: 0px;
-                    border-bottom-right-radius: 0px;
-                    padding-top: 0px;
-                    padding-bottom: 6px;
-                    padding-left: 12px;
-                    padding-right: 12px;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-            """)
+            self._apply_action_panel_style()
             
             def restore_button():
                 try:

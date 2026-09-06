@@ -14,6 +14,11 @@ import re
 import functools
 import threading
 
+from button_styles import button_qss
+from settings_window import DropDownCombo, LanguageSwapButton
+from window_appearance import style_capture_controls
+from ocr_text_layout import order_ocr_items, ocr_text_from_items
+
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
 from styled_dialogs import NativeDialogFrameFilter, StyledMessageBox, install_qt_exception_guard
@@ -428,6 +433,28 @@ _TESSDATA_DOWNLOAD_ATTEMPTS = 3
 _TESSDATA_RETRY_DELAY_SECONDS = 2
 
 
+def _tesseract_managed_data_dir(tess_cmd):
+    """Writable model storage for portable engines and Linux system binaries."""
+    tess_dir = os.path.dirname(tess_cmd)
+    for path in (os.path.join(tess_dir, 'tessdata'), os.path.join(os.path.dirname(tess_dir), 'tessdata')):
+        if os.path.isdir(path) and path not in _system_tessdata_dirs():
+            return path
+    if platform_support.IS_LINUX or platform_support.IS_MAC:
+        return os.path.join(get_portable_dir(), 'ocr', 'tessdata')
+    return ''
+
+
+def _tesseract_data_directories(tess_cmd):
+    tess_dir = os.path.dirname(tess_cmd)
+    candidates = [
+        _tesseract_managed_data_dir(tess_cmd),
+        os.path.join(tess_dir, 'tessdata'),
+        os.path.join(os.path.dirname(tess_dir), 'tessdata'),
+        *_system_tessdata_dirs(),
+    ]
+    return list(dict.fromkeys(path for path in candidates if path and os.path.isdir(path)))
+
+
 def _prepare_tesseract_data(
     tess_cmd,
     tess_lang,
@@ -435,17 +462,10 @@ def _prepare_tesseract_data(
     cancel_check=None,
     raise_on_error=False,
 ):
-    tess_dir = os.path.dirname(tess_cmd)
-    candidate_dirs = [
-        os.path.join(tess_dir, "tessdata"),
-        os.path.join(os.path.dirname(tess_dir), "tessdata"),
-    ]
-    tessdata_dir = ""
-    for td in candidate_dirs:
-        if os.path.isdir(td):
-            tessdata_dir = td
-            os.environ["TESSDATA_PREFIX"] = td
-            break
+    tessdata_dir = _tesseract_managed_data_dir(tess_cmd)
+    if tessdata_dir:
+        os.makedirs(tessdata_dir, exist_ok=True)
+        os.environ['TESSDATA_PREFIX'] = tessdata_dir
     if not tessdata_dir:
         os.environ.pop("TESSDATA_PREFIX", None)
         error = RuntimeError("Tesseract tessdata directory was not found.")
@@ -460,6 +480,8 @@ def _prepare_tesseract_data(
         import requests
         interface_language = get_cached_ocr_config().get("interface_language", "en")
         for lang_code in [code for code in tess_lang.split("+") if code]:
+            if not re.fullmatch(r'[A-Za-z0-9_]+', lang_code):
+                raise ValueError(f'Invalid Tesseract language code: {lang_code}')
             fname = f"{lang_code}.traineddata"
             target_path = os.path.join(tessdata_dir, fname)
             if os.path.isfile(target_path) and os.path.getsize(target_path) > 0:
@@ -600,9 +622,7 @@ def _configure_installed_tesseract_data(tess_cmd, tess_lang):
     tess_dir = os.path.dirname(tess_cmd or "")
     candidate_dirs = [
         os.environ.get("TESSDATA_PREFIX", ""),
-        os.path.join(tess_dir, "tessdata"),
-        os.path.join(os.path.dirname(tess_dir), "tessdata"),
-        *_system_tessdata_dirs(),
+        *_tesseract_data_directories(tess_cmd),
     ]
     for data_dir in candidate_dirs:
         if data_dir and required and all(os.path.isfile(os.path.join(data_dir, name)) for name in required):
@@ -628,7 +648,7 @@ def _tesseract_psm_order(width, height):
 
 def _configure_pytesseract_system_environment(pytesseract):
     """Make pytesseract launch the distro binary outside the AppImage runtime."""
-    if not platform_support.IS_LINUX:
+    if not (platform_support.IS_LINUX or platform_support.IS_MAC):
         return
     module = pytesseract.pytesseract
     original = getattr(module, "subprocess_args", None)
@@ -766,7 +786,7 @@ def _serialized_native_ocr_runtime(function):
 
 
 def _native_ocr_worker_enabled():
-    if sys.platform != "win32":
+    if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
         return False
     return bool(getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_USE_OCR_WORKER") == "1")
 
@@ -1153,8 +1173,7 @@ def _parse_rapidocr_output(output):
         for box, text, score in items
         if text and text.strip()
     ]
-    items.sort(key=lambda item: _rapidocr_box_origin(item[0]))
-    return items
+    return order_ocr_items(items)
 
 
 def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None):
@@ -1185,7 +1204,7 @@ def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check
                 logging.info(f"[OCR:{session_id}] RapidOCR interrupted after variant={label}; context={context}")
                 break
             items = _parse_rapidocr_output(output)
-            text = "\n".join(item[1] for item in items).strip()
+            text = ocr_text_from_items(items)
             confidences = [item[2] for item in items if item[2] > 0]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             reject_reason = ""
@@ -1416,8 +1435,7 @@ def _parse_easyocr_output(output):
         text = str(text or "").strip()
         if text:
             items.append((box, text, score))
-    items.sort(key=lambda item: _rapidocr_box_origin(item[0]))
-    return items
+    return order_ocr_items(items)
 
 
 def _recognize_easyocr_variants(pil_variants, language_code, context, session_id, status_callback=None, cancel_check=None):
@@ -1457,7 +1475,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
                 logging.info(f"[OCR:{session_id}] EasyOCR interrupted after variant={label}; context={context}")
                 break
             items = _parse_easyocr_output(output)
-            text = "\n".join(item[1] for item in items).strip()
+            text = ocr_text_from_items(items)
             confidences = [item[2] for item in items if item[2] > 0]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             reject_reason = ""
@@ -1654,8 +1672,7 @@ def _tesseract_installed_language_codes():
     reported = _tesseract_reported_languages(tess_cmd)
     data_dirs = [
         os.environ.get("TESSDATA_PREFIX", ""),
-        os.path.join(os.path.dirname(tess_cmd), "tessdata"),
-        os.path.join(os.path.dirname(os.path.dirname(tess_cmd)), "tessdata"),
+        *_tesseract_data_directories(tess_cmd),
     ]
     result = []
     for language in APP_LANGUAGES:
@@ -1717,6 +1734,9 @@ def installed_ocr_language_codes(engine=None, config=None):
     engine_name = usable_ocr_engine(
         engine or config.get("ocr_engine", platform_support.default_ocr_engine())
     ).strip().lower()
+    if engine_name == "apple vision":
+        from macos_ocr import language_codes
+        return language_codes()
     if engine_name in {"rapid", "rapidocr"}:
         return _rapidocr_installed_language_codes()
     if engine_name in {"easy", "easyocr"}:
@@ -2040,6 +2060,10 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
     """
     if screen is None:
         return QtGui.QPixmap()
+    if platform_support.IS_MAC:
+        from macos_desktop import permission_granted
+        if not permission_granted("screen"):
+            return QtGui.QPixmap()
     wants_region = width > 0 and height > 0
     if platform_support.IS_LINUX and platform_support.is_wayland():
         import linux_capture
@@ -2064,6 +2088,17 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
     if wants_region:
         return screen.grabWindow(0, x, y, width, height)
     return screen.grabWindow(0)
+
+
+def crop_frozen_pixmap(pixmap, logical_rect):
+    """Convert overlay coordinates to device pixels without losing Retina detail."""
+    ratio = float(pixmap.devicePixelRatioF() or 1.0)
+    logical_bounds = QtCore.QRect(0, 0, round(pixmap.width() / ratio), round(pixmap.height() / ratio))
+    clipped = logical_rect.intersected(logical_bounds)
+    if clipped.isEmpty():
+        return QtGui.QPixmap()
+    return pixmap.copy(QtCore.QRect(round(clipped.x() * ratio), round(clipped.y() * ratio),
+                                    round(clipped.width() * ratio), round(clipped.height() * ratio)))
 
 
 def load_image_from_pil(pil_image):
@@ -3286,6 +3321,36 @@ class RapidOCRWorker(QtCore.QThread):
         self.result_ready.emit(text)
 
 
+class AppleVisionOCRWorker(RapidOCRWorker):
+    def __init__(self, pil_variants, language_code, context, session_id, parent=None):
+        super().__init__(pil_variants, context, session_id, parent)
+        self.language_code = language_code
+
+    def run(self):
+        text = ""
+        try:
+            from macos_ocr import recognize_image
+            candidates = []
+            for label, image in self.pil_variants[:2]:
+                if self._is_cancelled():
+                    return
+                items = recognize_image(image, self.language_code)
+                confidence = sum(item[2] for item in items) / len(items) if items else 0.0
+                candidates.append(_make_auto_ocr_candidate(
+                    ocr_text_from_items(items), engine="apple vision",
+                    language_code=self.language_code, image_label=label,
+                    confidence=confidence, boxes_count=len(items)))
+            selected, reason = _select_best_auto_ocr_candidate(
+                candidates, session_id=self.session_id, context="Apple Vision")
+            text = selected.text if selected else ""
+            self.failure_reason = None if text else reason or "apple_vision_empty"
+        except Exception:
+            self.failure_reason = "apple_vision_error"
+            logging.exception("Apple Vision recognition failed")
+        if not self._is_cancelled():
+            self.result_ready.emit(text)
+
+
 class EasyOCRWorker(QtCore.QThread):
     result_ready = QtCore.pyqtSignal(str)
     status_update = QtCore.pyqtSignal(str)
@@ -3392,7 +3457,7 @@ class ScreenCaptureOverlay(QWidget):
         self._last_move_log_ts = 0.0
         
         # Используем текущий язык (уже загружен из конфига в __init__)
-        self.lang_combo = QtWidgets.QComboBox(self)
+        self.lang_combo = DropDownCombo(self)
         self.target_lang_combo = None
         self.translate_arrow_label = None
         available_source_codes = installed_ocr_language_codes(config=config)
@@ -3421,32 +3486,14 @@ class ScreenCaptureOverlay(QWidget):
                     language.short_label,
                     language.code,
                 )
-            self.translate_arrow_label = QtWidgets.QToolButton(self)
-            self.translate_arrow_label.setText("⇄")
+            self.translate_arrow_label = LanguageSwapButton(self)
             self.translate_arrow_label.setCursor(QtCore.Qt.ArrowCursor)
             self.translate_arrow_label.setToolTip(
                 ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
             )
-            self.translate_arrow_label.setStyleSheet("""
-                QToolButton {
-                    color: #d8e3f2;
-                    font-size: 17px;
-                    font-weight: 700;
-                    background-color: rgba(22, 25, 31, 244);
-                    border: 1px solid rgba(105, 123, 150, 130);
-                    border-radius: 12px;
-                }
-                QToolButton:hover {
-                    background-color: rgba(40, 47, 60, 252);
-                    border-color: rgba(160, 186, 220, 220);
-                }
-                QToolButton:disabled {
-                    color: rgba(118, 128, 143, 180);
-                    border-color: rgba(73, 82, 96, 110);
-                }
-            """)
+            self.translate_arrow_label.setStyleSheet(button_qss(True, selector="QToolButton", icon=True))
             self.translate_arrow_label.clicked.connect(self._swap_translate_languages)
-            self.target_lang_combo = QtWidgets.QComboBox(self)
+            self.target_lang_combo = DropDownCombo(self)
         else:
             for language in APP_LANGUAGES:
                 if language.code not in available_source_codes:
@@ -3755,7 +3802,7 @@ class ScreenCaptureOverlay(QWidget):
         selecting on a frozen screenshot, so Linux does the same here whatever
         the setting says. Windows composites always and keeps the setting.
         """
-        if platform_support.IS_LINUX:
+        if platform_support.IS_LINUX or platform_support.IS_MAC:
             return True
         return bool(self._freeze_screen_on_ocr)
 
@@ -3792,11 +3839,7 @@ class ScreenCaptureOverlay(QWidget):
                         f"shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
                     )
                 if not shot.isNull():
-                    painter = QtGui.QPainter(frozen_bg)
-                    try:
-                        painter.drawPixmap(0, 0, shot)
-                    finally:
-                        painter.end()
+                    frozen_bg = shot.copy()
                     drawn_any = True
 
             if drawn_any:
@@ -3834,6 +3877,7 @@ class ScreenCaptureOverlay(QWidget):
             self._last_ocr_capture_meta = {}
             logging.info(f"[OCR:{self._session_id}] Showing overlay; mode={self.mode}")
             config = get_cached_ocr_config()
+            style_capture_controls(self, config, (self.lang_combo, self.translate_arrow_label, self.target_lang_combo))
             self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
             self._dim_screen_during_ocr = bool(config.get("dim_screen_during_ocr", False))
             self._ocr_dim_strength = ocr_dim_strength(config)
@@ -4053,7 +4097,7 @@ class ScreenCaptureOverlay(QWidget):
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
                 painter.fillRect(rect, QtGui.QColor(0, 0, 0, 0))
                 if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
-                    painter.drawPixmap(rect, self._frozen_background, rect)
+                    painter.drawPixmap(rect, crop_frozen_pixmap(self._frozen_background, rect))
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
             else:
                 # В режиме без затемнения добавляем легкий полупрозрачный белый фон
@@ -4529,7 +4573,8 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.start()
 
     def _start_easyocr_worker(self, pil_variants, language_code, context, session_id):
-        self.ocr_worker = EasyOCRWorker(
+        worker_class = AppleVisionOCRWorker if self.get_ocr_engine().lower() == "apple vision" else EasyOCRWorker
+        self.ocr_worker = worker_class(
             pil_variants,
             language_code,
             context,
@@ -4588,9 +4633,12 @@ class ScreenCaptureOverlay(QWidget):
             and self._frozen_background is not None
             and not self._frozen_background.isNull()
         ):
-            frozen_rect = rect.intersected(self._frozen_background.rect())
+            ratio = float(self._frozen_background.devicePixelRatioF() or 1.0)
+            bounds = QtCore.QRect(0, 0, round(self._frozen_background.width() / ratio),
+                                 round(self._frozen_background.height() / ratio))
+            frozen_rect = rect.intersected(bounds)
             if not frozen_rect.isNull() and frozen_rect.width() > 0 and frozen_rect.height() > 0:
-                screenshot = self._frozen_background.copy(frozen_rect)
+                screenshot = crop_frozen_pixmap(self._frozen_background, frozen_rect)
                 grab_attempt = "frozen-background"
                 logging.info(
                     f"[OCR:{session_id}] Captured from frozen background; "
@@ -4843,7 +4891,7 @@ class ScreenCaptureOverlay(QWidget):
             self._start_rapidocr_worker(rapid_variants, "primary", session_id)
             return  # RapidOCR сам делает text detection + recognition и возвращает confidence
 
-        if ocr_engine_type in {"easyocr", "easy"}:
+        if ocr_engine_type in {"easyocr", "easy", "apple vision"}:
             easy_variants = [
                 (label, image.convert("RGB") if image.mode != "RGB" else image)
                 for label, image in ocr_pil_variants
@@ -4860,32 +4908,10 @@ class ScreenCaptureOverlay(QWidget):
             win_lang_tag = windows_ocr_tag(language_code)
             windows_engine = _get_windows_ocr_engine(win_lang_tag)
             if windows_engine is None:
-                tess_cmd = self.get_tesseract_cmd()
-                self._show_windows_ocr_missing_notice(
-                    language_code,
-                    win_lang_tag,
-                    fallback_available=bool(tess_cmd),
-                )
-                if not tess_cmd:
-                    logging.warning(
-                        f"[OCR:{session_id}] Windows OCR does not support {win_lang_tag} and Tesseract is not available; "
-                        "OCR stopped before worker start."
-                    )
-                    self.close()
-                    return
-                logging.info(
-                    f"[OCR:{session_id}] Windows OCR does not support {win_lang_tag} on this machine; "
-                    "using Tesseract directly."
-                )
-                tess_variants = [(label, image.convert('L') if image.mode != 'L' else image) for label, image in ocr_pil_variants]
-                self._start_tesseract_worker(
-                    tess_variants,
-                    language_code,
-                    "windows-unsupported-direct",
-                    session_id,
-                )
+                self._show_windows_ocr_missing_notice(language_code, win_lang_tag, fallback_available=False)
+                self.handle_ocr_result("", session_id)
                 return
-        
+
         windows_qimage_attempts = [("raw", raw_qimage)]
         for variant_label, variant_pil in ocr_pil_variants:
             windows_qimage_attempts.append((variant_label, pil_l_to_qimage(variant_pil)))
@@ -4899,16 +4925,10 @@ class ScreenCaptureOverlay(QWidget):
                 bitmap_attempts.append((attempt_label, bitmap))
 
         if not bitmap_attempts:
-            logging.error(f"[OCR:{session_id}] Failed to create SoftwareBitmap for every OCR attempt")
-            if self.get_tesseract_cmd():
-                logging.info(f"[OCR:{session_id}] Falling back to Tesseract after SoftwareBitmap conversion failure")
-                tess_variants = [(label, image.convert('L') if image.mode != 'L' else image) for label, image in ocr_pil_variants]
-                self._start_tesseract_worker(tess_variants, language_code, "windows-bitmap-fallback", session_id)
-            else:
-                self.handle_ocr_result("", session_id)
+            logging.error(f"[OCR:{session_id}] Could not create a Windows OCR bitmap")
+            self.handle_ocr_result("", session_id)
             return
-        
-        # Create worker with Tesseract fallback capability
+
         self.ocr_worker = OCRWorker(
             bitmap_attempts[0][1],
             language_code,
@@ -4916,14 +4936,6 @@ class ScreenCaptureOverlay(QWidget):
             attempts=bitmap_attempts,
             session_id=session_id,
         )
-        
-        # Pass the QImage for Tesseract fallback if needed
-        self.ocr_worker.fallback_pil_variants = [
-            (label, image.convert('L') if image.mode != 'L' else image)
-            for label, image in ocr_pil_variants
-        ]
-        self.ocr_worker.tesseract_cmd = self.get_tesseract_cmd()
-        self.ocr_worker.tesseract_fallback_enabled = bool(self.ocr_worker.tesseract_cmd)
         
         self._ocr_worker_session_id = session_id
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
@@ -4968,45 +4980,6 @@ class ScreenCaptureOverlay(QWidget):
 
     def _handle_ocr_result_inner(self, text):
         session_id = getattr(self, "_session_id", "unknown")
-        if not text and hasattr(self, 'ocr_worker') and hasattr(self.ocr_worker, 'qimage'):
-            # If Windows OCR failed, try Tesseract as fallback
-            logging.info(f"[OCR:{session_id}] Windows OCR returned empty result, attempting Tesseract fallback...")
-            try:
-                from PIL import Image
-
-                pil_variants = getattr(self.ocr_worker, "fallback_pil_variants", None)
-                if not pil_variants:
-                    # qimage уже предобработан (grayscale, масштаб, бордеры)
-                    qimage = self.ocr_worker.qimage
-                    w, h = qimage.width(), qimage.height()
-                    bpl = qimage.bytesPerLine()
-
-                    # Безопасная конвертация QImage → PIL
-                    if qimage.format() == QtGui.QImage.Format_Grayscale8:
-                        ptr = qimage.constBits()
-                        ptr.setsize(bpl * h)
-                        pil_image = Image.frombytes('L', (w, h), bytes(ptr), 'raw', 'L', bpl)
-                    else:
-                        qimg_rgba = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
-                        ptr = qimg_rgba.constBits()
-                        ptr.setsize(qimg_rgba.byteCount())
-                        pil_image = Image.frombuffer("RGBA", (w, h), bytes(ptr), "raw", "RGBA", 0, 1)
-                        pil_image = pil_image.convert('L')
-                    pil_variants = [("qimage", pil_image)]
-
-                lang_code = getattr(self.ocr_worker, "language_code", None) or _combo_data_to_ocr_language(
-                    self.lang_combo.currentData(),
-                    "ru",
-                )
-
-                tess_cmd = self.get_tesseract_cmd()
-                if tess_cmd:
-                    text = self._recognize_tesseract_variants(pil_variants, lang_code, "windows-empty-fallback")
-                else:
-                    logging.warning(f"[OCR:{session_id}] Tesseract not found for fallback.")
-            except Exception as e:
-                logging.exception(f"[OCR:{session_id}] Tesseract fallback failed: {e}")
-
         if text:
             if self.mode == "translate":
                 from translater import translate_text
@@ -5275,6 +5248,10 @@ def run_screen_capture(mode="ocr"):
         if app is None:
             app = QApplication([])
             install_qt_exception_guard()
+            from window_appearance import install_window_appearance
+            appearance_config = get_cached_ocr_config()
+            install_window_appearance(app, appearance_config.get('ui_scale_percent', 100),
+                                      appearance_config.get('theme', 'Темная'))
             app._native_dialog_frame_filter = NativeDialogFrameFilter(app)
             app.installEventFilter(app._native_dialog_frame_filter)
             logging.info("Запуск OCR приложения...")
@@ -5423,6 +5400,55 @@ def _translate_screen_texts(texts, translate_func, source_code, target_code):
     return translated_values
 
 
+def _recognize_image_layout(image, engine, language_code):
+    """Return positioned text for non-WinRT fullscreen OCR engines."""
+    if engine == "apple vision":
+        from macos_ocr import recognize_image
+        items = recognize_image(image, language_code)
+    elif engine == "tesseract":
+        import pytesseract
+        command = ScreenCaptureOverlay.get_tesseract_cmd()
+        if not command:
+            raise RuntimeError("Tesseract is not installed.")
+        pytesseract.pytesseract.tesseract_cmd = command
+        language = tesseract_language_code(language_code)
+        _configure_pytesseract_system_environment(pytesseract)
+        if not _configure_installed_tesseract_data(command, language):
+            raise RuntimeError(f"Tesseract language is not installed: {language}")
+        data = pytesseract.image_to_data(image, lang=language, output_type=pytesseract.Output.DICT, timeout=60)
+        groups = {}
+        for index, text in enumerate(data["text"]):
+            if not str(text).strip():
+                continue
+            key = tuple(data[name][index] for name in ("block_num", "par_num", "line_num"))
+            groups.setdefault(key, []).append(index)
+        lines = []
+        for indices in groups.values():
+            left = min(data["left"][i] for i in indices)
+            top = min(data["top"][i] for i in indices)
+            right = max(data["left"][i] + data["width"][i] for i in indices)
+            bottom = max(data["top"][i] + data["height"][i] for i in indices)
+            lines.append((left, top, right - left, bottom - top,
+                          " ".join(str(data["text"][i]) for i in indices)))
+        return lines
+    else:
+        response = _call_native_ocr_worker(
+            {"engine": engine, "action": "recognize", "allow_download": False,
+             "root_dir": _rapidocr_local_root() if engine == "rapidocr" else _easyocr_local_root(),
+             "language_codes": easyocr_language_codes(language_code) if engine == "easyocr" else []},
+            pil_variants=[("fullscreen", image)])
+        result = (response.get("results") or [{}])[0]
+        if result.get("error"):
+            raise RuntimeError(result["error"])
+        items = result.get("items") or []
+    lines = []
+    for box, text, _confidence in items:
+        left, top = min(point[0] for point in box), min(point[1] for point in box)
+        right, bottom = max(point[0] for point in box), max(point[1] for point in box)
+        lines.append((left, top, right - left, bottom - top, text))
+    return lines
+
+
 class FullScreenOCRWorker(QtCore.QThread):
     """OCR worker that returns text lines with bounding box positions."""
 
@@ -5432,15 +5458,21 @@ class FullScreenOCRWorker(QtCore.QThread):
     # tuples through QVariant.
     result_ready = QtCore.pyqtSignal(object)  # list of (x, y, w, h, text)
 
-    def __init__(self, bitmap, language_code="ru", parent=None):
+    def __init__(self, bitmap, language_code="ru", parent=None, *, engine="windows"):
         super().__init__(parent)
         self.bitmap = bitmap
         self.language_code = language_code
+        self.engine = engine
 
     def run(self):
         lines_data = []
         try:
             if self.isInterruptionRequested():
+                return
+            if self.engine != "windows":
+                lines_data = _recognize_image_layout(self.bitmap, self.engine, self.language_code)
+                if not self.isInterruptionRequested():
+                    self.result_ready.emit(lines_data)
                 return
             if not _WINRT_AVAILABLE:
                 logging.error("FullScreenOCR: WinRT not available")
@@ -5486,6 +5518,23 @@ class FullScreenOCRWorker(QtCore.QThread):
 
         if not self.isInterruptionRequested():
             self.result_ready.emit(lines_data)
+
+
+def create_position_ocr_worker(qimage, language_code, engine):
+    """Shared by single-shot and dynamic fullscreen modes; honor the picker."""
+    from PIL import Image
+    engine = usable_ocr_engine(engine).lower()
+    if engine == "windows":
+        bitmap = qimage_to_softwarebitmap(qimage)
+        if bitmap is None:
+            return None
+    else:
+        qimage = qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
+        buffer = qimage.bits()
+        buffer.setsize(qimage.byteCount())
+        bitmap = Image.frombytes("RGBA", (qimage.width(), qimage.height()), bytes(buffer),
+                                 "raw", "RGBA", qimage.bytesPerLine()).convert("RGB")
+    return FullScreenOCRWorker(bitmap, language_code, engine=engine)
 
 
 class FullScreenTranslateOverlay(QWidget):
@@ -5539,17 +5588,14 @@ class FullScreenTranslateOverlay(QWidget):
         # Full-screen OCR needs an installed Windows OCR language, while the
         # translation target depends on the selected translator. Keep these as
         # two independent controls so any valid direction can be chosen.
-        self.lang_combo = QtWidgets.QComboBox(self)
-        self.target_lang_combo = QtWidgets.QComboBox(self)
-        self.translate_arrow_label = QtWidgets.QToolButton(self)
-        self.translate_arrow_label.setText("⇄")
+        self.lang_combo = DropDownCombo(self)
+        self.target_lang_combo = DropDownCombo(self)
+        self.translate_arrow_label = LanguageSwapButton(self)
         self.translate_arrow_label.setCursor(QtCore.Qt.ArrowCursor)
         self.translate_arrow_label.setToolTip(
             ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
         )
         fullscreen_config = dict(config)
-        # Positional full-screen OCR uses Windows OCR's native line geometry.
-        fullscreen_config["ocr_engine"] = "Windows"
         available_sources = installed_ocr_language_codes(config=fullscreen_config)
         if str(config.get("translator_engine", "Google")).strip().lower() == "argos":
             available_sources = [
@@ -5576,24 +5622,7 @@ class FullScreenTranslateOverlay(QWidget):
             default_idx = 0
         self.lang_combo.setCurrentIndex(default_idx)
 
-        self.translate_arrow_label.setStyleSheet("""
-            QToolButton {
-                color: #d8e3f2;
-                font-size: 17px;
-                font-weight: 700;
-                background-color: rgba(22, 25, 31, 244);
-                border: 1px solid rgba(105, 123, 150, 130);
-                border-radius: 11px;
-            }
-            QToolButton:hover {
-                background-color: rgba(40, 47, 60, 252);
-                border-color: rgba(160, 186, 220, 220);
-            }
-            QToolButton:disabled {
-                color: rgba(118, 128, 143, 180);
-                border-color: rgba(73, 82, 96, 110);
-            }
-        """)
+        self.translate_arrow_label.setStyleSheet(button_qss(True, selector="QToolButton", icon=True))
         combo_style = """
             QComboBox {
                 background-color: rgba(25, 29, 37, 248);
@@ -5644,6 +5673,8 @@ class FullScreenTranslateOverlay(QWidget):
         controls_enabled = not no_source_languages and self.target_lang_combo.currentData() is not None
         self.lang_combo.setEnabled(not no_source_languages)
         self.target_lang_combo.setEnabled(controls_enabled)
+
+        style_capture_controls(self, config, (self.lang_combo, self.translate_arrow_label, self.target_lang_combo))
 
         # Позиционируем элементы по центру сверху
         total_w = (
@@ -5817,12 +5848,10 @@ class FullScreenTranslateOverlay(QWidget):
 
     def _start_ocr(self, run_id, source_code, target_code):
         qimage = self.screenshot.toImage()
-        bitmap = qimage_to_softwarebitmap(qimage)
-        if bitmap is None:
+        worker = create_position_ocr_worker(qimage, source_code, get_cached_ocr_config().get("ocr_engine"))
+        if worker is None:
             self._fail_translation(run_id, "ocr_init_failed")
             return
-
-        worker = FullScreenOCRWorker(bitmap, source_code)
         worker.translation_run_id = run_id
         worker.translation_source_code = source_code
         worker.translation_target_code = target_code

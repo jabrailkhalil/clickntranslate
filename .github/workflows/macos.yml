@@ -1,0 +1,62 @@
+name: macOS
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - '**.py'
+      - 'requirements-macos.txt'
+      - 'ClicknTranslate-macos.spec'
+      - 'packaging/macos/**'
+      - 'tools/*macos*'
+      - '.github/workflows/macos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      VENV: .venv-macos
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-macos.txt
+      - name: Install native dependencies
+        run: bash tools/setup_macos_env.sh
+      - name: Test platform behavior and selected engines
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          .venv-macos/bin/python -m pytest -q tests/test_macos_support.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py tests/test_document_services.py tests/test_single_instance.py
+      - name: Build and exercise native bundle
+        run: bash tools/build_macos_release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-release
+          path: |
+            releases/*-macos-${{ matrix.arch }}.*
+            build/macos/smoke.json
+            build/macos/smoke*.png
+          if-no-files-found: error
+      - name: Keep build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-diagnostics
+          path: build/macos/pyinstaller/**/warn-*.txt

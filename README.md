@@ -19,6 +19,14 @@ Fast online translation · Private offline engines · Four OCR options · Seven 
 
 ## New in 1.7.0
 
+The next version, **1.7.1**, is in development: [draft changes](docs/RELEASE_1.7.1.md)
+and [Windows signing status](docs/WINDOWS_SIGNING.md). Download links below remain
+on the published release.
+
+The 1.7.1 source also includes a **macOS port for Apple Silicon and Intel**:
+[setup, build instructions, and native validation status](docs/MACOS.md).
+Mac artifacts require the macOS build workflow; a signed public Mac release is not yet available.
+
 | Improvement | What it changes |
 | --- | --- |
 | **Dynamic multi-area translation** | Select one or several screen regions and keep their translated text updated in place |

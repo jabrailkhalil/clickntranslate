@@ -1,8 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 import re as _re
+import runpy as _runpy
 import sys as _sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+
+_app_version = _runpy.run_path('app_version.py')['APP_VERSION']
+_version_info = _runpy.run_path('tools/windows_version_info.py')['make_version_info']
 
 
 # The optional OCR engines are pip-installed at runtime into a private folder and
@@ -356,6 +360,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='ClicknTranslate',
+    version=_version_info(_app_version, 'ClicknTranslateApp.exe', "Click'n'Translate desktop application"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -378,6 +383,7 @@ worker_exe = EXE(
     [],
     exclude_binaries=True,
     name='ArgosWorker',
+    version=_version_info(_app_version, 'ArgosWorker.exe', "Click'n'Translate offline translation worker"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -397,6 +403,7 @@ ocr_worker_exe = EXE(
     [],
     exclude_binaries=True,
     name='OcrWorker',
+    version=_version_info(_app_version, 'OcrWorker.exe', "Click'n'Translate OCR worker"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,11 +1,10 @@
 param(
-    [string]$Version = "1.7.0.0",
+    [string]$Version = "1.7.1.0",
     [string]$OutputPath = "",
-    # Must name a zip that actually exists in the release.  Earlier versions
-    # defaulted to ClicknTranslate-v<ver>-win64.zip, which has never been
-    # published under that name, so the repair tool downloaded a 404.
-    [string]$PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/Click-n-Translate-1.7.0-windows-portable-x64.zip",
-    [string]$PackageSha256 = "1AAEE222B1D1D3024B022F9187E762719EA8582CD9DD56FD34BA19BF12C12528"
+    # The default URL follows Version. The digest must come from the final
+    # archive for that release; retaining an earlier release's hash breaks repair.
+    [string]$PackageUrl = "",
+    [string]$PackageSha256 = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,11 +12,16 @@ $ErrorActionPreference = "Stop"
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
     throw "Version must contain four numeric parts, for example 1.5.0.0."
 }
-if (-not [Uri]::IsWellFormedUriString($PackageUrl, [UriKind]::Absolute)) {
-    throw "PackageUrl must be an absolute URL."
-}
 if ($PackageSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
-    throw "PackageSha256 must be a 64-character SHA-256 digest."
+    throw "Supply PackageSha256: the 64-character SHA-256 digest of the final release archive, computed after signing."
+}
+$displayVersion = ($Version -split '\.')[0..2] -join '.'
+if (-not $PackageUrl) {
+    $PackageUrl = "https://github.com/jabrailkhalil/clickntranslate/releases/download/v$displayVersion/Click-n-Translate-$displayVersion-windows-portable-x64.zip"
+}
+if (-not [Uri]::IsWellFormedUriString($PackageUrl, [UriKind]::Absolute) -or
+    ([Uri]$PackageUrl).Scheme -notin @('https', 'file')) {
+    throw "PackageUrl must be an HTTPS URL or a local file URI for testing."
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -52,7 +56,6 @@ using System.Reflection;
 "@
     [System.IO.File]::WriteAllText($versionSource, $versionCode, [System.Text.UTF8Encoding]::new($false))
 
-    $displayVersion = ($Version -split '\.')[0..2] -join '.'
     $escapedPackageUrl = $PackageUrl.Replace('"', '""')
     $buildInfoCode = @"
 internal static class RepairBuildInfo

@@ -418,17 +418,12 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             self.assertLess(actions.index("translator"), actions.index("result_window"))
             self.assertLess(actions.index("result_window"), actions.index("language_packages"))
 
-    def test_guide_explains_every_main_shortcut_before_opening_settings(self):
+    def test_setup_guide_finishes_with_shortcuts_and_a_real_translation(self):
         shortcut_steps = [
             "shortcut_overview",
-            "shortcut_copy",
-            "shortcut_ocr",
-            "shortcut_fullscreen",
-            "shortcut_game",
             "shortcut_selection",
             "shortcut_replace",
-            "shortcut_toggle",
-            "document_translation",
+            "main_translate",
         ]
         for language_code in main.GUIDE_TEXT:
             actions = [
@@ -441,13 +436,10 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 shortcut_steps,
                 language_code,
             )
-            self.assertLess(actions.index("help"), first_shortcut, language_code)
-            self.assertLess(
-                actions.index("document_translation"),
-                actions.index("settings"),
-                language_code,
-            )
-            self.assertEqual(actions[-1], "back_home", language_code)
+            self.assertLess(actions.index("settings"), first_shortcut, language_code)
+            self.assertLess(actions.index("hotkeys"), first_shortcut, language_code)
+            self.assertLess(actions.index("back_home"), first_shortcut, language_code)
+            self.assertEqual(actions[-1], "main_translate", language_code)
 
     def test_russian_tour_uses_next_instead_of_skip(self):
         self.assertEqual(main.guide_text("ru")["skip"], "Далее")
@@ -456,8 +448,13 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         host = main.QWidget()
         host.resize(700, 400)
         host._guide_waiting_action = "language_packages"
-        host._guide_bubble = main.QFrame(host)
-        host._guide_bubble.setFixedSize(430, 190)
+        host._guide_bubble = main.SetupGuideCard(host)
+        host._guide_bubble.set_dark(True)
+        host._guide_bubble.title.setText("Language packages")
+        host._guide_bubble.body.setText("Install the languages needed for offline translation.")
+        host._guide_bubble.primary_button.setText("Open")
+        host._guide_bubble.skip_button.setText("Later")
+        host._guide_target_rect = lambda target: main.DarkThemeApp._guide_target_rect(host, target)
         buttons = []
         for index in range(3):
             button = main.QPushButton(host)

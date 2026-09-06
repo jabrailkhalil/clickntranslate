@@ -1,4 +1,4 @@
-"""Non-Qt companion process for optional native OCR engines on Windows."""
+"""Non-Qt companion process for optional native OCR engines."""
 
 import contextlib
 import importlib
@@ -9,6 +9,7 @@ import time
 import traceback
 
 from PIL import Image
+from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
 
 _DLL_HANDLES = []
@@ -100,13 +101,6 @@ def _rapidocr_engine():
     raise RuntimeError(f"RapidOCR constructor is unsupported: {last_type_error}")
 
 
-def _box_origin(box):
-    try:
-        return min(float(point[1]) for point in box), min(float(point[0]) for point in box)
-    except Exception:
-        return 0.0, 0.0
-
-
 def _parse_rapidocr_output(output):
     result = output[0] if isinstance(output, tuple) and output else output
     if result is None:
@@ -134,8 +128,7 @@ def _parse_rapidocr_output(output):
                 score = 0.0
             items.append((row[0], str(row[1] or ""), score))
     items = [(box, text.strip(), score) for box, text, score in items if text.strip()]
-    items.sort(key=lambda item: _box_origin(item[0]))
-    return items
+    return order_ocr_items(items)
 
 
 def _parse_easyocr_output(output):
@@ -149,17 +142,18 @@ def _parse_easyocr_output(output):
             score = 0.0
         items.append((row[0], str(row[1] or "").strip(), score))
     items = [item for item in items if item[1]]
-    items.sort(key=lambda item: _box_origin(item[0]))
-    return items
+    return order_ocr_items(items)
 
 
 def _result_for_items(label, items, elapsed_ms):
     confidences = [item[2] for item in items if item[2] > 0]
     return {
         "label": label,
-        "text": "\n".join(item[1] for item in items).strip(),
+        "text": ocr_text_from_items(items),
         "confidence": sum(confidences) / len(confidences) if confidences else 0.0,
         "boxes_count": len(items),
+        "items": [([[float(x), float(y)] for x, y in box], text, float(score))
+                  for box, text, score in items],
         "elapsed_ms": elapsed_ms,
         "error": "",
     }

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import translater
 from languages import detect_language_code
+from translation_chunks import provider_chunks, split_text, restore_boundary_whitespace
 
 
 DEFAULT_CHUNK_SIZE = 1800
@@ -22,37 +23,9 @@ class TranslationChunkResult:
     error: str = ""
 
 
-def split_text_chunks(text, max_chars=DEFAULT_CHUNK_SIZE):
-    text = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-    if not text:
-        return []
-
-    chunks = []
-    current = []
-    current_len = 0
-
-    for paragraph in _paragraph_units(text):
-        paragraph_len = len(paragraph)
-        if paragraph_len > max_chars:
-            if current:
-                chunks.append("\n\n".join(current).strip())
-                current = []
-                current_len = 0
-            chunks.extend(_split_long_unit(paragraph, max_chars))
-            continue
-
-        extra = 2 if current else 0
-        if current and current_len + paragraph_len + extra > max_chars:
-            chunks.append("\n\n".join(current).strip())
-            current = [paragraph]
-            current_len = paragraph_len
-        else:
-            current.append(paragraph)
-            current_len += paragraph_len + extra
-
-    if current:
-        chunks.append("\n\n".join(current).strip())
-
+def split_text_chunks(text, max_chars=DEFAULT_CHUNK_SIZE, engine=None):
+    chunks = (provider_chunks(text, engine, max_chars=max_chars) if engine is not None
+              else split_text(text, max_chars=max_chars))
     return [TranslationChunk(index=i, text=chunk) for i, chunk in enumerate(chunks)]
 
 
@@ -63,11 +36,15 @@ def translate_document_text(
     provider_engine=None,
     progress_callback=None,
     cancel_event=None,
-    max_chars=DEFAULT_CHUNK_SIZE,
+    max_chars=None,
 ):
-    chunks = split_text_chunks(text, max_chars=max_chars)
-    if not chunks:
+    text = str(text or '')
+    if not text.strip():
         return "", []
+    engine = (provider_engine or translater.get_cached_translator_config().get('translator_engine', 'Google')).lower()
+    # Plan to the actual provider budget once. No intermediate 1800-character
+    # blocks that the HTTP layer would split again at unrelated byte offsets.
+    chunks = split_text_chunks(text, max_chars=max_chars, engine=engine)
 
     if source_code == "auto":
         source_code = detect_language_code(text[:5000])
@@ -75,81 +52,30 @@ def translate_document_text(
     results = []
     translated_parts = []
     total = len(chunks)
-    for position, chunk in enumerate(chunks, start=1):
-        if cancel_event is not None and cancel_event.is_set():
-            break
+    _emit_progress(progress_callback, 0, total, f"Translating chunk 1/{total}")
 
-        _emit_progress(progress_callback, position - 1, total, f"Translating chunk {position}/{total}")
+    def status(message):
+        _emit_progress(progress_callback, len(results), total, str(message))
 
-        def _status(message, _position=position):
-            # Lets offline engines report language package downloads through the
-            # document progress bar.
-            _emit_progress(progress_callback, _position - 1, total, str(message))
-
-        try:
-            if provider_engine:
-                translated = translater.translate_text(
-                    chunk.text, source_code, target_code, status_callback=_status, engine=provider_engine
-                )
-            else:
-                translated = translater.translate_text(
-                    chunk.text, source_code, target_code, status_callback=_status
-                )
-            error = ""
-        except Exception as exc:
-            error = str(exc)
-            translated = f"[Translation failed for chunk {position}: {error}]"
-
-        result = TranslationChunkResult(
-            index=chunk.index,
-            source_text=chunk.text,
-            translated_text=translated,
-            error=error,
-        )
-        results.append(result)
-        translated_parts.append(translated)
-        _emit_progress(progress_callback, position, total, f"Translated chunk {position}/{total}")
-
-    return "\n\n".join(translated_parts).strip(), results
+    try:
+        for index, translated, error in translater.iter_translate_texts(
+            [chunk.text for chunk in chunks], source_code, target_code, engine=engine,
+            status_callback=status, cancel_callback=cancel_event.is_set if cancel_event is not None else None,
+        ):
+            chunk = chunks[index]
+            if error:
+                translated = f"[Translation failed for chunk {index + 1}: {error}]"
+            translated = restore_boundary_whitespace(chunk.text, translated)
+            results.append(TranslationChunkResult(index, chunk.text, translated, error))
+            translated_parts.append(translated)
+            _emit_progress(progress_callback, len(results), total, f"Translated chunk {index + 1}/{total}")
+    except translater.TranslationCancelledError:
+        pass
+    return ''.join(translated_parts), results
 
 
 def make_cancel_event():
     return threading.Event()
-
-
-def _paragraph_units(text):
-    parts = []
-    current = []
-    for line in text.split("\n"):
-        if line.strip():
-            current.append(line.rstrip())
-        elif current:
-            parts.append("\n".join(current).strip())
-            current = []
-    if current:
-        parts.append("\n".join(current).strip())
-    return parts or [text]
-
-
-def _split_long_unit(text, max_chars):
-    result = []
-    remaining = text.strip()
-    while len(remaining) > max_chars:
-        cut = _best_cut(remaining, max_chars)
-        result.append(remaining[:cut].strip())
-        remaining = remaining[cut:].strip()
-    if remaining:
-        result.append(remaining)
-    return result
-
-
-def _best_cut(text, max_chars):
-    window = text[:max_chars]
-    for marker in (". ", "! ", "? ", "; ", "\n", " "):
-        cut = window.rfind(marker)
-        if cut >= max_chars // 2:
-            return cut + len(marker)
-    return max_chars
 
 
 def _emit_progress(callback, done, total, message):

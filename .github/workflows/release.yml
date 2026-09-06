@@ -9,6 +9,9 @@ permissions:
   contents: write
 
 jobs:
+  macos:
+    uses: ./.github/workflows/macos.yml
+
   linux:
     runs-on: ubuntu-latest
     env:
@@ -49,22 +52,29 @@ jobs:
           if-no-files-found: error
 
   draft:
-    needs: linux
+    needs: [linux, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: linux-release
+          pattern: '*release'
+          merge-multiple: true
           path: release-assets
       - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: Click'n'Translate 1.7.0
+          name: Click'n'Translate ${{ github.ref_name }}
           body: |
             | Version | Purpose |
             |---|---|
+            | 1.7.1 | Clearer main-window sections, consistent controls and settings tabs, improved setup guide, Linux startup reliability, and Windows signing preparation. Signature status must be verified on the final artifacts. |
             | 1.7.0 | Dynamic multi-area translation, mutually exclusive live modes, complete default hotkeys, settings transfer, guided onboarding, safe bug reports, and extensive UI reliability fixes. |
             | 1.6.1 | Faster engine switching, refined language controls, startup diagnostics, and UI polish. |
             | 1.6.0 | Reliable updater path handling, cross-platform CI, and complete release metadata. |
-          files: release-assets/*
+          files: |
+            release-assets/*.AppImage
+            release-assets/*.tar.gz
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.sha256

@@ -18,6 +18,8 @@ import sys
 import threading
 import time
 
+from button_styles import button_qss
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import platform_support
@@ -201,6 +203,9 @@ def game_frames_are_different(previous, current, threshold=4.0):
 
 
 def _foreground_window():
+    if platform_support.IS_MAC:
+        from macos_desktop import foreground_window_number
+        return foreground_window_number()
     if not platform_support.IS_WINDOWS:
         return 0
     try:
@@ -210,6 +215,10 @@ def _foreground_window():
 
 
 def _window_rect(handle):
+    if platform_support.IS_MAC and handle:
+        from macos_desktop import window_info
+        bounds = window_info(handle).get('kCGWindowBounds', {})
+        return QtCore.QRect(*(round(bounds.get(key, 0)) for key in ('X', 'Y', 'Width', 'Height')))
     if not platform_support.IS_WINDOWS or not handle:
         return QtCore.QRect()
     try:
@@ -229,6 +238,9 @@ def _window_rect(handle):
 
 
 def _window_is_minimized(handle):
+    if platform_support.IS_MAC and handle:
+        from macos_desktop import window_info
+        return not bool(window_info(handle).get('kCGWindowIsOnscreen', False))
     if not platform_support.IS_WINDOWS or not handle:
         return False
     try:
@@ -238,6 +250,9 @@ def _window_is_minimized(handle):
 
 
 def _window_belongs_to_this_process(handle):
+    if platform_support.IS_MAC and handle:
+        from macos_desktop import window_info
+        return window_info(handle).get('kCGWindowOwnerPID') == os.getpid()
     if not platform_support.IS_WINDOWS or not handle:
         return False
     try:
@@ -334,8 +349,9 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.setCursor(QtCore.Qt.CrossCursor)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
-        self.source_combo = QtWidgets.QComboBox(self)
-        self.target_combo = QtWidgets.QComboBox(self)
+        from settings_window import DropDownCombo
+        self.source_combo = DropDownCombo(self)
+        self.target_combo = DropDownCombo(self)
         self.swap_button = LanguageSwapButton(self)
         self.undo_button = QtWidgets.QPushButton(game_text(self._language, "undo"), self)
         self.start_button = QtWidgets.QPushButton(self)
@@ -385,25 +401,20 @@ class GameRegionSelector(QtWidgets.QWidget):
             combo.setFixedSize(112, 44)
         self.swap_button.setFixedSize(34, 44)
         self.swap_button.setStyleSheet(
-            "QToolButton { color:#c6a4ee; background:rgba(25,22,31,248);"
-            " border:1px solid #665276; border-radius:10px; font-size:17px; font-weight:800; }"
-            "QToolButton:hover { background:#342b40; border-color:#b596dd; }"
+            button_qss(True, selector="QToolButton", icon=True)
         )
         selector_button_qss = (
-            "QPushButton { color:#f8f5fb; background:rgba(25,22,31,248);"
-            " border:1px solid #665276; border-radius:10px; padding:0 12px;"
-            " font:700 13px 'Segoe UI'; }"
-            "QPushButton:hover { background:#342b40; border-color:#b596dd; }"
-            "QPushButton:disabled { color:#776e7f; border-color:#44394e; background:rgba(20,18,24,220); }"
+            button_qss(True, compact=True)
         )
         self.undo_button.setStyleSheet(selector_button_qss)
         self.start_button.setStyleSheet(
-            selector_button_qss
-            + "QPushButton:enabled { background:#76549b; border-color:#b596dd; }"
-            + "QPushButton:enabled:hover { background:#8964af; }"
+            button_qss(True, "primary", compact=True)
         )
         self.undo_button.setFixedSize(92, 44)
         self.start_button.setFixedSize(142, 44)
+        from window_appearance import style_capture_controls
+        style_capture_controls(self, self._config,
+                               (self.source_combo, self.swap_button, self.target_combo, self.undo_button, self.start_button))
         self._layout_controls()
         self.source_combo.currentIndexChanged.connect(self._source_changed)
         self.target_combo.currentIndexChanged.connect(self._persist_pair)
@@ -417,8 +428,10 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.activateWindow()
 
     def _layout_controls(self):
-        widths = (112, 34, 112, 92, 142)
-        gaps = (8, 8, 14, 8)
+        widths = tuple(widget.width() for widget in
+                       (self.source_combo, self.swap_button, self.target_combo, self.undo_button, self.start_button))
+        factor = float(self.property('ui_effective_scale') or 1)
+        gaps = tuple(round(gap * factor) for gap in (8, 8, 14, 8))
         total = sum(widths) + sum(gaps)
         x = max(10, (self.width() - total) // 2)
         y = 48
@@ -789,9 +802,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             QLabel#gameOriginal {{ color: {source}; font: 600 12px 'Segoe UI'; }}
             QLabel#gameTranslation {{ color: {text}; font: 700 18px 'Segoe UI'; padding: 2px 0; }}
             QLabel#gameStatus {{ color: {muted}; font: 600 11px 'Segoe UI'; }}
-            QToolButton {{ color: {text}; background: transparent; border: none; border-radius: 7px; font: 800 16px 'Segoe UI'; }}
-            QToolButton:hover {{ background: {hover}; }}
-        """)
+
+        """ + button_qss(dark, "quiet", selector="QToolButton", icon=True))
 
     def _set_status(self, key, active=True):
         self.status_label.setText(game_text(self.language, key))
@@ -827,7 +839,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     def _target_is_active(self):
         if not bool(self.config.get("game_pause_when_inactive", True)):
             return True
-        if not self.target_window or not platform_support.IS_WINDOWS:
+        if not self.target_window or not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
             return True
         if _window_is_minimized(self.target_window):
             return False
@@ -889,6 +901,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def _start_ocr(self, qimage):
         from ocr import (
+            AppleVisionOCRWorker,
             EasyOCRWorker,
             OCRWorker,
             RapidOCRWorker,
@@ -900,7 +913,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         )
 
         variants = _prepare_game_ocr_variants(qimage)
-        engine = usable_ocr_engine(self.config.get("ocr_engine", "Windows"))
+        engine = usable_ocr_engine(self.config.get("ocr_engine", platform_support.default_ocr_engine()))
         session = _new_ocr_session_id("game")
         worker = None
         if engine.lower() == "windows":
@@ -925,8 +938,9 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 )
         elif engine.lower() == "rapidocr":
             worker = RapidOCRWorker(variants, "game-continuous", session)
-        elif engine.lower() == "easyocr":
-            worker = EasyOCRWorker(
+        elif engine.lower() in {"easyocr", "apple vision"}:
+            worker_class = AppleVisionOCRWorker if engine.lower() == "apple vision" else EasyOCRWorker
+            worker = worker_class(
                 variants,
                 self.source_language,
                 "game-continuous",
@@ -1271,7 +1285,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _target_is_active(self):
         if not bool(self.config.get("game_pause_when_inactive", True)):
             return True
-        if not self.target_window or not platform_support.IS_WINDOWS:
+        if not self.target_window or not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
             return True
         if _window_is_minimized(self.target_window):
             return False
@@ -1344,23 +1358,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._start_position_ocr(image)
 
     def _start_position_ocr(self, image):
-        from ocr import (
-            FullScreenOCRWorker,
-            ScreenCaptureOverlay,
-            qimage_to_softwarebitmap,
-        )
-
-        worker = None
-        if platform_support.supports_windows_ocr():
-            bitmap = qimage_to_softwarebitmap(image)
-            if bitmap is not None:
-                worker = FullScreenOCRWorker(bitmap, self.source_language)
-        else:
-            command = ScreenCaptureOverlay.get_tesseract_cmd()
-            if command:
-                worker = GameTesseractPositionWorker(
-                    image, self.source_language, command
-                )
+        from ocr import create_position_ocr_worker
+        worker = create_position_ocr_worker(image, self.source_language, self.config.get("ocr_engine"))
         if worker is None:
             self._set_status("ocr_error", error=True)
             return

@@ -124,6 +124,9 @@ def _internal_worker_portable_root():
 
 
 def portable_base_dir():
+    if platform_support.IS_MAC:
+        from macos_desktop import user_data_dir
+        return user_data_dir()
     if platform_support.IS_LINUX:
         return _linux_portable_base_dir()
     if is_windows_packaged():

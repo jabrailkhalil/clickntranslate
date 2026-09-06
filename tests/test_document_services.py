@@ -67,7 +67,7 @@ class TestDocumentTranslation(unittest.TestCase):
     def test_translate_document_text_returns_partial_failures(self):
         calls = []
 
-        def fake_translate(text, source, target, status_callback=None):
+        def fake_translate(text, source, target, status_callback=None, **_kwargs):
             calls.append(text)
             if len(calls) == 2:
                 raise RuntimeError("provider down")
@@ -89,7 +89,7 @@ class TestDocumentTranslation(unittest.TestCase):
     def test_translate_document_text_can_override_provider(self):
         seen_engines = []
 
-        def fake_translate(text, source, target, status_callback=None, engine=None):
+        def fake_translate(text, source, target, status_callback=None, engine=None, **_kwargs):
             seen_engines.append(engine)
             return text
 
@@ -106,7 +106,7 @@ class TestDocumentTranslation(unittest.TestCase):
     def test_translate_document_text_reports_engine_status_through_progress(self):
         messages = []
 
-        def fake_translate(text, source, target, status_callback=None, engine=None):
+        def fake_translate(text, source, target, status_callback=None, engine=None, **_kwargs):
             if status_callback:
                 status_callback("Загрузка EN→RU…")
             return text

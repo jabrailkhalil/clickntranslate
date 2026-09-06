@@ -291,14 +291,14 @@ def _legacy_translation_cache_key(text, source_code, target_code, engine=None):
     return f"{source_code}:{target_code}:{text}"
 
 
-def get_cached_translation(data_dir, text, source_code, target_code, engine=None):
+def get_cached_translation(data_dir, text, source_code, target_code, engine=None, *, strict_engine=False):
     """Look up a cached translation. Returns translated text or None."""
     cache = _load_translation_cache(data_dir)
     keys = [_translation_cache_key(text, source_code, target_code, engine)]
-    if engine and engine != "hymt":
+    if engine and engine != "hymt" and not strict_engine:
         keys.append(_translation_cache_key(text, source_code, target_code))
     keys.append(_legacy_translation_cache_key(text, source_code, target_code, engine))
-    if engine and engine != "hymt":
+    if engine and engine != "hymt" and not strict_engine:
         keys.append(_legacy_translation_cache_key(text, source_code, target_code))
     entry = None
     for key in keys:

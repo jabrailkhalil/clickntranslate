@@ -52,7 +52,7 @@ class OcrEngineComboTest(unittest.TestCase):
 
 class DefaultEngineTest(unittest.TestCase):
     def test_default_engine_matches_the_platform(self):
-        expected = "Windows" if platform_support.IS_WINDOWS else "Tesseract"
+        expected = "Apple Vision" if platform_support.IS_MAC else "Windows" if platform_support.IS_WINDOWS else "Tesseract"
         self.assertEqual(platform_support.default_ocr_engine(), expected)
 
     def test_default_engine_is_always_offered(self):

@@ -360,15 +360,16 @@ class ArgosOnlineFallbackTest(unittest.TestCase):
 
         google_mock.assert_not_called()
 
-    def test_failed_online_engine_falls_back_to_installed_argos_package(self):
+    def test_failed_online_engine_does_not_switch_to_installed_argos_package(self):
         config = {"translator_engine": "google"}
         with no_translation_cache():
             with mock.patch.object(translater, "get_cached_translator_config", return_value=config):
                 with mock.patch.object(translater, "google_translate", side_effect=RuntimeError("google down")):
                     with mock.patch.object(translater, "_try_argos_translate", return_value="привет") as argos_mock:
-                        self.assertEqual(translater.translate_text("hello", "en", "ru"), "привет")
+                        with self.assertRaisesRegex(RuntimeError, "google down"):
+                            translater.translate_text("hello", "en", "ru")
 
-        self.assertFalse(argos_mock.call_args.kwargs["allow_install"])
+        argos_mock.assert_not_called()
 
 
 class ArgosLanguagePairPlanTest(unittest.TestCase):

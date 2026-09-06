@@ -1,3 +1,4 @@
+from button_styles import button_qss, standard_buttons
 import json
 import getpass
 import os
@@ -79,17 +80,26 @@ import urllib.parse
 import webbrowser
 
 try:
-    from PyQt5 import QtCore, QtGui
+    from PyQt5 import QtCore, QtGui, QtWidgets
     from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QGridLayout, QComboBox,
                                  QWidget, QPushButton, QSystemTrayIcon, QMenu, QMessageBox, QLineEdit, QTextEdit, QTextBrowser, QDialog, QHBoxLayout, QCheckBox, QSpacerItem, QSizePolicy, QFrame, QGraphicsDropShadowEffect, QFileDialog, QProgressBar, QSplitter, QToolButton)
     from PyQt5.QtCore import Qt, QTimer, QSize
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics
 except Exception:
     _show_dependency_error()
+from ui_scaling import DEFAULT_SCALE, ScaledIconButton, configure_qt_platform
+from header_icons import header_icon
+configure_qt_platform()
+
+from guide_setup import (
+    GUIDE_SETTING_STEPS, GUIDE_SETUP_ORDER, GUIDE_CHAPTER_BY_ACTION, GUIDE_SETUP_INTRO,
+    GUIDE_LINUX_BODIES,
+    SetupGuideCard, setup_labels, setting_body,
+)
 from styled_dialogs import (
     NativeDialogFrameFilter,
     StyledMessageBox,
-    TOOLTIP_QSS,
+    tooltip_stylesheet,
     install_qt_exception_guard,
     install_tooltip_style,
     tooltip_text,
@@ -103,6 +113,8 @@ from settings_window import (
     SettingsWindow,
     TesseractInstallProgressDialog,
     modern_combo_style,
+    settings_text,
+    window_header_color,
     update_text,
 )
 from app_version import APP_VERSION
@@ -150,10 +162,30 @@ DEFAULT_TOGGLE_WINDOW_HOTKEY = "Ctrl+Shift+Space"
 DEFAULT_GAME_HOTKEY = "Ctrl+Alt+G"
 HOTKEY_DEFAULTS_REVISION = 5
 STARTUP_NEWS_ID = "community-1000-downloads-gaming"
+LAYOUT_EDITOR_MODE = "--layout-editor" in sys.argv
+
+# Defaults used by the normal application and by the developer-only visual
+# layout editor.  A draft created by the editor is deliberately not loaded by
+# ordinary launches; once a layout is approved, these small values can be
+# copied here without shipping a per-machine designer file.
+MAIN_HOTKEY_DEFAULT_ORDER = (
+    "ocr",
+    "copy",
+    "fullscreen",
+    "toggle",
+    "selection",
+    "game",
+    "replace",
+    None,
+)
+MAIN_HOTKEY_HORIZONTAL_SPACING = 28
+MAIN_ENGINE_STATUS_WIDTH = 672
+SETTINGS_ACTIONS_FOOTER_GAP = 6
 
 # --- Единственная константа с дефолтной конфигурацией ---
 DEFAULT_CONFIG = {
     "theme": "Темная",
+    "ui_scale_percent": DEFAULT_SCALE,
     "interface_language": "en",
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
@@ -252,6 +284,14 @@ def merge_config_defaults(config):
     missing_keys = tuple(key for key in DEFAULT_CONFIG if key not in source)
     merged = DEFAULT_CONFIG.copy()
     merged.update(source)
+    if platform_support.IS_MAC and str(merged.get("ocr_engine", "")).lower() not in platform_support.available_ocr_engines():
+        # Importing Windows settings cannot retain a WinRT selection on a Mac.
+        # Persist the visible native default before constructing any UI/workers.
+        merged["ocr_engine"] = platform_support.default_ocr_engine()
+        if "ocr_engine" not in missing_keys:
+            missing_keys += ("ocr_engine",)
+    from ui_scaling import normalize_ui_scale
+    merged["ui_scale_percent"] = normalize_ui_scale(merged["ui_scale_percent"])
     # The experimental whole-screen Dynamic workflow was removed because it
     # produced unrelated OCR fragments.  Existing installations migrate to the
     # reliable multi-area workflow without keeping a hidden obsolete choice.
@@ -706,23 +746,17 @@ SW_SHOW = 5
 SW_RESTORE = 9
 
 _SHOW_WINDOW_MESSAGE_ID = 0
+_CLOSE_WINDOW_MESSAGE_ID = 0
 if sys.platform == "win32":
     try:
         _SHOW_WINDOW_MESSAGE_ID = ctypes.windll.user32.RegisterWindowMessageW(SINGLE_INSTANCE_SHOW_MESSAGE)
+        from instance_lifecycle import CLOSE_MESSAGE
+        _CLOSE_WINDOW_MESSAGE_ID = ctypes.windll.user32.RegisterWindowMessageW(CLOSE_MESSAGE)
     except Exception:
         _SHOW_WINDOW_MESSAGE_ID = 0
 
 _main_window_ref = None
 _single_instance_event_filter = None
-
-def _normalize_process_path(path):
-    if not path:
-        return ""
-    try:
-        return os.path.normcase(os.path.abspath(path))
-    except Exception:
-        return os.path.normcase(str(path))
-
 
 def _current_process_path():
     if getattr(sys, "frozen", False):
@@ -730,81 +764,87 @@ def _current_process_path():
     return os.path.abspath(sys.argv[0])
 
 
-def _is_clickntranslate_process(process_info):
-    exe = process_info.get("exe") or ""
-    name = (process_info.get("name") or "").lower()
-    exe_name = os.path.basename(exe).lower()
-    if exe_name in ("clickntranslate.exe", "clickntranslateapp.exe") or name in ("clickntranslate.exe", "clickntranslateapp.exe"):
-        return True
-    cmdline = process_info.get("cmdline") or []
-    return any(os.path.basename(str(arg)).lower() == "main.py" for arg in cmdline)
-
-
 def _running_clickntranslate_instances():
-    current_pid = os.getpid()
-    current_path = _normalize_process_path(_current_process_path())
-    instances = []
-    for proc in psutil.process_iter(["pid", "name", "exe", "cmdline"]):
-        try:
-            info = proc.info
-            pid = int(info.get("pid") or 0)
-            if pid == current_pid or not _is_clickntranslate_process(info):
-                continue
-            exe_path = info.get("exe") or ""
-            if not exe_path:
-                cmdline = info.get("cmdline") or []
-                exe_path = next((str(arg) for arg in cmdline if str(arg).lower().endswith(".exe")), "")
-            instances.append(
-                {
-                    "pid": pid,
-                    "path": exe_path,
-                    "same_path": bool(exe_path and _normalize_process_path(exe_path) == current_path),
-                }
-            )
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
-            continue
-    return instances
-
-
-def _other_install_instances():
-    return [item for item in _running_clickntranslate_instances() if not item["same_path"]]
+    from instance_lifecycle import running_instances
+    return running_instances(_current_process_path())
 
 
 def _started_from_autostart():
     return "--autostart" in sys.argv
 
 
+_startup_qt_app = None
+_show_after_instance_replacement = False
+
+
+def _ensure_startup_application():
+    """Create Qt once, before a duplicate-launch prompt if it is needed."""
+    global _startup_qt_app
+    app = QApplication.instance()
+    if app is None:
+        if platform_support.IS_LINUX or platform_support.IS_MAC:
+            QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+            QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+        app = QApplication([])
+    _startup_qt_app = app
+    if not getattr(app, '_startup_appearance_ready', False):
+        from ui_scaling import configure_interface_font
+        from window_appearance import install_window_appearance
+        configure_interface_font()
+        config = get_cached_config()
+        install_qt_exception_guard()
+        install_window_appearance(app, config.get('ui_scale_percent', DEFAULT_SCALE),
+                                  config.get('theme', DEFAULT_CONFIG['theme']))
+        app._native_dialog_frame_filter = NativeDialogFrameFilter(app)
+        app.installEventFilter(app._native_dialog_frame_filter)
+        app.setQuitOnLastWindowClosed(False)
+        app._startup_appearance_ready = True
+    return app
+
+
 def _confirm_close_other_install(instances):
     if _started_from_autostart():
-        return True
-    paths = "\n".join(f"- {item.get('path') or 'unknown path'}" for item in instances[:5])
-    text = (
-        "Click'n'Translate is already running from another folder:\n\n"
-        f"{paths}\n\n"
-        "Close the old running copy and start this one?"
-    )
-    try:
-        result = ctypes.windll.user32.MessageBoxW(None, text, APP_WINDOW_TITLE, 0x00000004 | 0x00000030)
-        return result == 6
-    except Exception:
         return False
+    _ensure_startup_application()
+    from startup_dialogs import ask_replacement
+    return ask_replacement(get_cached_config().get('interface_language', 'en'), APP_VERSION)
 
 
-def _terminate_instances(instances):
-    processes = []
-    for item in instances:
-        try:
-            proc = psutil.Process(item["pid"])
-            proc.terminate()
-            processes.append(proc)
-        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
-            continue
-    gone, alive = psutil.wait_procs(processes, timeout=5)
-    for proc in alive:
-        try:
-            proc.kill()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
-            pass
+def _show_instance_replacement_error():
+    _ensure_startup_application()
+    from startup_dialogs import show_replacement_error
+    show_replacement_error(get_cached_config().get('interface_language', 'en'))
+
+
+def _replace_existing_instance():
+    global _show_after_instance_replacement
+    instances = _running_clickntranslate_instances()
+    if not _confirm_close_other_install(instances):
+        return False
+    if not instances:
+        _show_instance_replacement_error()
+        raise SystemExit(75)
+    from instance_lifecycle import close_instances
+    from startup_dialogs import close_with_progress
+    closed = close_with_progress(
+        get_cached_config().get('interface_language', 'en'),
+        lambda: close_instances(instances, _current_process_path()),
+    )
+    if not closed:
+        _show_instance_replacement_error()
+        raise SystemExit(75)
+    _show_after_instance_replacement = True
+    return closed
+
+
+def _request_running_instance_exit():
+    target = _main_window_ref
+    if target is None or getattr(target, '_instance_exit_requested', False):
+        return
+    target._instance_exit_requested = True
+    target.force_quit = True
+    target.close()
+    QApplication.instance().quit()
 
 
 def _show_running_instance():
@@ -830,16 +870,30 @@ def _show_running_instance():
 class _SingleInstanceMessageFilter(QtCore.QAbstractNativeEventFilter):
     """Глобальный фильтр системного сообщения активации уже запущенного экземпляра."""
     def nativeEventFilter(self, eventType, message):
-        event_name = eventType.decode("utf-8", "ignore") if isinstance(eventType, bytes) else str(eventType)
+        event_name = bytes(eventType).decode("utf-8", "ignore") if isinstance(eventType, (bytes, bytearray, QtCore.QByteArray)) else str(eventType)
         if _SHOW_WINDOW_MESSAGE_ID and event_name in ("windows_generic_MSG", "windows_dispatcher_MSG"):
             try:
                 msg = wintypes.MSG.from_address(int(message))
                 if msg.message == _SHOW_WINDOW_MESSAGE_ID:
                     QTimer.singleShot(0, _show_running_instance)
                     return True, 0
+                if _CLOSE_WINDOW_MESSAGE_ID and msg.message == _CLOSE_WINDOW_MESSAGE_ID:
+                    QTimer.singleShot(0, _request_running_instance_exit)
+                    return True, 0
             except Exception:
                 pass
         return False, 0
+
+
+def _bring_existing_to_front():
+    if not _SHOW_WINDOW_MESSAGE_ID:
+        return False
+    try:
+        from instance_lifecycle import show_instances
+        show_instances(_running_clickntranslate_instances())
+        return bool(ctypes.windll.user32.PostMessageW(HWND_BROADCAST, _SHOW_WINDOW_MESSAGE_ID, 0, 0))
+    except Exception:
+        return False
 
 # --- Диспетчер для безопасного вызова UI из потоков хоткеев ---
 class _HotkeyDispatcher(QtCore.QObject):
@@ -848,6 +902,9 @@ class _HotkeyDispatcher(QtCore.QObject):
 hotkey_dispatcher = _HotkeyDispatcher()
 
 def simulate_copy():
+    if platform_support.IS_MAC:
+        from macos_desktop import send_edit_shortcut
+        return send_edit_shortcut("c")
     # Эмуляция нажатия Ctrl+C для копирования выделенного текста
     VK_CONTROL = 0x11
     VK_C = 0x43
@@ -861,6 +918,9 @@ def simulate_copy():
 
 def simulate_paste():
     """Send Ctrl+V after the caller has verified the target selection."""
+    if platform_support.IS_MAC:
+        from macos_desktop import send_edit_shortcut
+        return send_edit_shortcut("v")
     VK_CONTROL = 0x11
     VK_V = 0x56
     KEYEVENTF_KEYUP = 0x0002
@@ -883,6 +943,9 @@ def _windows_foreground_window():
 
 def _clipboard_sequence_number():
     """Windows increments this value whenever clipboard contents change."""
+    if platform_support.IS_MAC:
+        from macos_desktop import clipboard_sequence
+        return clipboard_sequence()
     if not platform_support.IS_WINDOWS:
         return None
     try:
@@ -915,10 +978,15 @@ def replace_selected_text_in_foreground(original_text, translated_text,
     both conditions still hold. The caller falls back to a normal clipboard
     copy for every non-success result.
     """
-    if not platform_support.IS_WINDOWS:
+    if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
         return False, "unsupported"
-    expected = int(expected_window_handle or 0)
-    if not expected or _windows_foreground_window() != expected:
+    expected = expected_window_handle
+    if platform_support.IS_MAC:
+        from macos_desktop import same_foreground_target
+        still_focused = lambda: same_foreground_target(expected)
+    else:
+        still_focused = lambda: bool(expected) and _windows_foreground_window() == expected
+    if not still_focused():
         return False, "focus_changed"
 
     marker = f"__CLICKNTRANSLATE_SELECTION_{time.time_ns()}__"
@@ -928,7 +996,7 @@ def replace_selected_text_in_foreground(original_text, translated_text,
     simulate_copy()
     changed = _wait_for_clipboard_change(previous)
 
-    if _windows_foreground_window() != expected:
+    if not still_focused():
         return False, "focus_changed"
     try:
         selected_now = str(pyperclip.paste() or "")
@@ -941,10 +1009,17 @@ def replace_selected_text_in_foreground(original_text, translated_text,
 
     if not platform_support.copy_text(translated_text):
         return False, "clipboard_unavailable"
-    if _windows_foreground_window() != expected:
+    if not still_focused():
         return False, "focus_changed"
     time.sleep(0.04)
-    simulate_paste()
+    if not still_focused():
+        return False, "focus_changed"
+    if platform_support.IS_MAC:
+        from macos_desktop import send_edit_shortcut
+        if not send_edit_shortcut("v", validate_target=still_focused):
+            return False, "focus_changed"
+    else:
+        simulate_paste()
     return True, "replaced"
 
 def get_app_dir():
@@ -1127,13 +1202,38 @@ class HotkeyListenerThread(threading.Thread):
         self.daemon = True  # поток завершается вместе с основным приложением
         self._stop_event = threading.Event()
         self._registered = False
+        self._mac_registration = None
         self.modifiers, self.vk = self.parse_hotkey(self.hotkey_str)
         if self.vk is None:
             print("Неверный формат горячей клавиши.")
     
+    def start(self):
+        if not platform_support.IS_MAC:
+            return super().start()
+        try:
+            from macos_hotkeys import registry
+            self._mac_registration = registry().register(
+                self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self.callback))
+        except Exception:
+            logging.exception("Could not register macOS shortcut")
+            hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+
+    def is_alive(self):
+        if platform_support.IS_MAC:
+            return self._mac_registration is not None
+        return super().is_alive()
+
+    def join(self, timeout=None):
+        if not platform_support.IS_MAC:
+            return super().join(timeout)
+
     def stop(self):
         """Остановить поток и отменить регистрацию горячей клавиши."""
         self._stop_event.set()
+        if self._mac_registration is not None:
+            from macos_hotkeys import registry
+            registry().unregister(self._mac_registration)
+            self._mac_registration = None
         if self._registered:
             try:
                 ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id)
@@ -1142,6 +1242,12 @@ class HotkeyListenerThread(threading.Thread):
                 pass
 
     def parse_hotkey(self, hotkey_str):
+        if platform_support.IS_MAC:
+            from macos_hotkeys import parse_hotkey
+            try:
+                return parse_hotkey(hotkey_str)
+            except ValueError:
+                return 0, None
         modifiers = 0
         vk = None
         main_keys = []
@@ -1877,6 +1983,17 @@ DOCUMENT_TEXT = {
 }
 
 
+for _doc_language, _doc_cancel_text in {
+    'en': ('Stop', 'Stopping after the current request…', 'Translation stopped'),
+    'ru': ('Остановить', 'Остановка после текущего запроса…', 'Перевод остановлен'),
+    'es': ('Detener', 'Deteniendo tras la solicitud actual…', 'Traducción detenida'),
+    'de': ('Stoppen', 'Wird nach der aktuellen Anfrage gestoppt…', 'Übersetzung gestoppt'),
+    'fr': ('Arrêter', 'Arrêt après la requête en cours…', 'Traduction arrêtée'),
+    'zh': ('停止', '当前请求完成后停止…', '翻译已停止'),
+}.items():
+    DOCUMENT_TEXT[_doc_language].update(zip(('cancel_translation', 'canceling_translation', 'translation_canceled'), _doc_cancel_text))
+
+
 def doc_text(lang, key):
     text = DOCUMENT_TEXT.get(lang, DOCUMENT_TEXT["en"])
     return text.get(key, DOCUMENT_TEXT["en"].get(key, key))
@@ -1950,32 +2067,17 @@ def provider_display_name(engine, lang, include_kind=False):
 
 
 def document_translation_icon(theme_name):
-    source = QPixmap(resource_path("icons/docs.png"))
-    if source.isNull():
-        return QIcon()
-    if theme_name != "Темная":
-        return QIcon(source)
-
-    # docs.png is the exact black alpha silhouette selected for the light
-    # theme. SourceIn changes only its visible pixels, so the dark-theme icon
-    # is the same asset pixel-for-pixel, simply rendered in white.
-    white = QPixmap(source.size())
-    white.fill(Qt.transparent)
-    painter = QPainter(white)
-    painter.drawPixmap(0, 0, source)
-    painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
-    painter.fillRect(white.rect(), QColor("#ffffff"))
-    painter.end()
-    return QIcon(white)
+    return header_icon('document', theme_name)
 
 
 def send_arrow_icon(theme_name):
     """Messenger-style solid arrow with a concave tail, rendered sharply."""
     dark = theme_name == "Темная"
     color = QColor("#8db6e8" if dark else "#587faa")
-    pixmap = QPixmap(24, 24)
+    pixmap = QPixmap(96, 96)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
+    painter.scale(4, 4)
     painter.setRenderHint(QPainter.Antialiasing)
     painter.setPen(Qt.NoPen)
     painter.setBrush(QBrush(color))
@@ -1995,10 +2097,11 @@ def send_arrow_icon(theme_name):
 def document_expand_icon(theme_name):
     """Quiet four-corner icon used to move long input into document mode."""
     dark = theme_name == "Темная"
-    color = QColor("#8f99a8" if dark else "#687386")
-    pixmap = QPixmap(24, 24)
+    color = QColor("#c5b3e9" if dark else "#674586")
+    pixmap = QPixmap(96, 96)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
+    painter.scale(4, 4)
     painter.setRenderHint(QPainter.Antialiasing)
     pen = QPen(color, 1.8)
     pen.setCapStyle(Qt.RoundCap)
@@ -2108,7 +2211,10 @@ WELCOME_TEXT = {
 
 
 def welcome_text(lang):
-    return WELCOME_TEXT.get(lang, WELCOME_TEXT["en"])
+    return {
+        **WELCOME_TEXT.get(lang, WELCOME_TEXT["en"]),
+        "guide": GUIDE_SETUP_INTRO.get(lang, GUIDE_SETUP_INTRO["en"])[2],
+    }
 
 
 STARTUP_NEWS_TEXT = {
@@ -2416,14 +2522,14 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Start with Windows", "Enable this so Click'n'Translate is ready after you sign in."),
         "start_minimized": ("Start in shadow mode", "Enable this so automatic startup opens the compact shadow view instead of the full window."),
         "actions_panel": ("Settings actions", "Clear cache removes temporary files; Reset restores behaviour settings without changing the interface language; Update checks releases. The second row opens language packages and both histories; the last row opens hotkeys."),
-        "settings_page_updates": ("More settings", "Use the middle dot to open OCR behaviour, updates, settings transfer and diagnostics."),
+        "settings_page_updates": ("More settings", "Open the OCR and updates tab for screen capture behaviour, updates, settings transfer and diagnostics."),
         "ocr_behavior": ("OCR behaviour", "Here you control window visibility, frozen or dimmed capture, clipboard restoration and quiet notifications."),
         "export_settings": ("Export settings", "Save your complete configuration to a JSON file for backup or another computer."),
         "import_settings": ("Import settings", "Restore a configuration file. The interface returns to the first settings page afterwards."),
         "bug_report": ("Bug report", "Creates a safe diagnostic folder and opens it. Describe the problem and send the ZIP to the developer via Telegram or GitHub."),
-        "settings_page_game": ("Dynamic translation settings", "Use the last dot to configure the live selected-area translator."),
+        "settings_page_game": ("Dynamic translation settings", "Open the Dynamic translation tab to configure and start translation of changing screen areas."),
         "game_controls": ("Dynamic mode", "Choose its language pair, refresh interval and overlay opacity. It can pause when the bound app is inactive and optionally keep the original text visible."),
-        "settings_page_main": ("General settings", "Use the first dot to return to the compact general page."),
+        "settings_page_main": ("General settings", "Open the General settings tab to return to engines, startup options and history."),
     },
     "ru": {
         "main_translate": ("Отправить на перевод", "Стрелка отправляет текст из главного поля на перевод — как кнопка отправки в мессенджере."),
@@ -2431,14 +2537,14 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Запуск вместе с ОС", "Включите, чтобы Click'n'Translate был готов сразу после входа в Windows."),
         "start_minimized": ("Запуск в режиме тени", "Включите, чтобы при автозапуске открывался компактный режим тени, а не полное окно."),
         "actions_panel": ("Кнопки настроек", "«Очистить кэш» удаляет временные файлы; «Сброс» возвращает настройки поведения, но не меняет язык интерфейса; «Обновление» проверяет релизы. Ниже — языковые пакеты, обе истории и настройка горячих клавиш."),
-        "settings_page_updates": ("Дополнительные настройки", "Нажмите среднюю точку: здесь поведение OCR, обновления, перенос настроек и диагностика."),
+        "settings_page_updates": ("Дополнительные настройки", "Откройте вкладку «OCR и обновления»: здесь захват экрана, перенос настроек и диагностика."),
         "ocr_behavior": ("Поведение OCR", "Здесь настраиваются видимость окна, заморозка или затемнение захвата, восстановление буфера и тихие уведомления."),
         "export_settings": ("Экспорт настроек", "Сохраните всю конфигурацию в JSON для резервной копии или переноса на другой компьютер."),
         "import_settings": ("Импорт настроек", "Восстановите конфигурацию из файла. После импорта настройки откроются с первой страницы."),
         "bug_report": ("Баг-репорт", "Создаёт безопасную папку с диагностикой и открывает её. Опишите проблему и отправьте ZIP разработчику в Telegram или GitHub."),
-        "settings_page_game": ("Настройки динамического перевода", "Нажмите последнюю точку, чтобы настроить динамический перевод выбранных областей."),
+        "settings_page_game": ("Настройки динамического перевода", "Во вкладке «Динамический перевод» можно настроить и запустить перевод меняющегося текста на экране."),
         "game_controls": ("Динамический режим", "Выберите пару языков, частоту обновления и прозрачность. Режим можно ставить на паузу, когда целевое окно неактивно, и показывать исходный текст."),
-        "settings_page_main": ("Основные настройки", "Нажмите первую точку, чтобы вернуться на компактную основную страницу."),
+        "settings_page_main": ("Основные настройки", "Откройте вкладку «Основные настройки», чтобы вернуться к движкам, запуску и истории."),
     },
     "es": {
         "main_translate": ("Enviar traducción", "La flecha envía el texto del campo principal, como el botón de enviar de un chat."),
@@ -2446,14 +2552,14 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Iniciar con Windows", "Actívalo para que Click'n'Translate esté listo al iniciar sesión."),
         "start_minimized": ("Iniciar en modo sombra", "Actívalo para que el inicio automático abra la vista compacta."),
         "actions_panel": ("Acciones de ajustes", "Borrar caché elimina temporales; Restablecer recupera el comportamiento sin cambiar el idioma; Actualizar busca versiones. Debajo están paquetes, historiales y atajos."),
-        "settings_page_updates": ("Más ajustes", "Pulsa el punto central para abrir OCR, actualizaciones, transferencia y diagnóstico."),
+        "settings_page_updates": ("Más ajustes", "Abre la pestaña OCR y actualizaciones para configurar la captura, transferencia y diagnóstico."),
         "ocr_behavior": ("Comportamiento OCR", "Controla visibilidad, captura congelada u oscurecida, restauración del portapapeles y avisos silenciosos."),
         "export_settings": ("Exportar ajustes", "Guarda toda la configuración en JSON para copiarla o usarla en otro equipo."),
         "import_settings": ("Importar ajustes", "Restaura un archivo de configuración y vuelve a la primera página."),
         "bug_report": ("Informe de error", "Crea y abre una carpeta de diagnóstico segura. Describe el fallo y envía el ZIP por Telegram o GitHub."),
-        "settings_page_game": ("Ajustes de traducción dinámica", "Pulsa el último punto para configurar la traducción de zonas seleccionadas."),
+        "settings_page_game": ("Ajustes de traducción dinámica", "Abre la pestaña Traducción dinámica para configurar e iniciar la traducción de zonas que cambian."),
         "game_controls": ("Modo dinámico", "Elige idiomas, intervalo y opacidad. Puede pausarse cuando la aplicación vinculada está inactiva y mostrar el original."),
-        "settings_page_main": ("Ajustes generales", "Pulsa el primer punto para volver a la página compacta."),
+        "settings_page_main": ("Ajustes generales", "Abre la pestaña Ajustes generales para volver a motores, inicio e historiales."),
     },
     "de": {
         "main_translate": ("Übersetzung senden", "Der Pfeil sendet den Text wie die Senden-Taste in einem Messenger."),
@@ -2461,14 +2567,14 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Mit Windows starten", "Aktivieren, damit Click'n'Translate nach der Anmeldung bereit ist."),
         "start_minimized": ("Im Schattenmodus starten", "Aktivieren, damit der Autostart die kompakte Ansicht öffnet."),
         "actions_panel": ("Einstellungsaktionen", "Cache leeren entfernt Temporäres; Zurücksetzen stellt Verhalten wieder her, ohne die Sprache zu ändern; Aktualisieren sucht Releases. Darunter: Pakete, Verläufe und Hotkeys."),
-        "settings_page_updates": ("Weitere Einstellungen", "Der mittlere Punkt öffnet OCR-Verhalten, Updates, Übertragung und Diagnose."),
+        "settings_page_updates": ("Weitere Einstellungen", "Der Tab OCR und Updates enthält Aufnahmeverhalten, Übertragung und Diagnose."),
         "ocr_behavior": ("OCR-Verhalten", "Hier steuern Sie Sichtbarkeit, eingefrorene oder abgedunkelte Aufnahme, Zwischenablage und stille Hinweise."),
         "export_settings": ("Einstellungen exportieren", "Die komplette Konfiguration als JSON sichern oder auf einen anderen PC übertragen."),
         "import_settings": ("Einstellungen importieren", "Eine Konfiguration laden; danach erscheint wieder die erste Seite."),
         "bug_report": ("Fehlerbericht", "Erstellt und öffnet einen sicheren Diagnoseordner. Problem beschreiben und ZIP per Telegram oder GitHub senden."),
-        "settings_page_game": ("Dynamische Übersetzung", "Der letzte Punkt öffnet den Übersetzer für ausgewählte Bereiche."),
+        "settings_page_game": ("Dynamische Übersetzung", "Im Tab Dynamische Übersetzung lässt sich die Übersetzung wechselnder Bildschirmbereiche einstellen und starten."),
         "game_controls": ("Dynamischer Modus", "Sprachpaar, Intervall und Deckkraft wählen. Bei inaktiver Ziel-App pausieren und Originaltext anzeigen sind optional."),
-        "settings_page_main": ("Allgemeine Einstellungen", "Der erste Punkt führt zur kompakten Hauptseite zurück."),
+        "settings_page_main": ("Allgemeine Einstellungen", "Der Tab Allgemeine Einstellungen führt zu Engines, Startoptionen und Verläufen zurück."),
     },
     "fr": {
         "main_translate": ("Envoyer la traduction", "La flèche envoie le texte comme le bouton d’envoi d’une messagerie."),
@@ -2476,14 +2582,14 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Démarrer avec Windows", "Activez cette option pour que Click'n'Translate soit prêt à la connexion."),
         "start_minimized": ("Démarrer en mode ombre", "Activez-la pour que le démarrage automatique ouvre la vue compacte."),
         "actions_panel": ("Actions des réglages", "Vider le cache supprime les temporaires ; Réinitialiser restaure le comportement sans changer la langue ; Mise à jour cherche les versions. Dessous : modules, historiques et raccourcis."),
-        "settings_page_updates": ("Autres réglages", "Le point central ouvre OCR, mises à jour, transfert et diagnostic."),
+        "settings_page_updates": ("Autres réglages", "L’onglet OCR et mises à jour contient les réglages de capture, transfert et diagnostic."),
         "ocr_behavior": ("Comportement OCR", "Réglez visibilité, capture figée ou assombrie, restauration du presse-papiers et notifications discrètes."),
         "export_settings": ("Exporter les réglages", "Enregistrez toute la configuration en JSON pour une sauvegarde ou un autre PC."),
         "import_settings": ("Importer les réglages", "Restaurez un fichier de configuration puis revenez à la première page."),
         "bug_report": ("Rapport de bug", "Crée et ouvre un dossier de diagnostic sûr. Décrivez le bug et envoyez le ZIP par Telegram ou GitHub."),
-        "settings_page_game": ("Réglages de traduction dynamique", "Le dernier point configure la traduction des zones sélectionnées."),
+        "settings_page_game": ("Réglages de traduction dynamique", "L’onglet Traduction dynamique permet de régler et lancer la traduction des zones qui changent."),
         "game_controls": ("Mode dynamique", "Choisissez langues, fréquence et opacité. Il peut se mettre en pause quand l’application liée est inactive et afficher l’original."),
-        "settings_page_main": ("Réglages généraux", "Le premier point revient à la page compacte."),
+        "settings_page_main": ("Réglages généraux", "L’onglet Réglages généraux revient aux moteurs, au démarrage et aux historiques."),
     },
     "zh": {
         "main_translate": ("发送翻译", "箭头会像聊天软件的发送按钮一样提交主输入框中的文字。"),
@@ -2491,29 +2597,19 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("随 Windows 启动", "启用后，登录系统时 Click'n'Translate 会自动就绪。"),
         "start_minimized": ("以影子模式启动", "启用后，自动启动时会打开紧凑视图。"),
         "actions_panel": ("设置操作", "清理缓存会删除临时文件；重置会恢复行为设置但保留界面语言；更新会检查新版本。下方还有语言包、两种历史记录和快捷键。"),
-        "settings_page_updates": ("更多设置", "点击中间圆点可打开 OCR 行为、更新、设置迁移和诊断。"),
+        "settings_page_updates": ("更多设置", "打开“OCR 与更新”选项卡，可设置捕获行为、迁移设置和诊断。"),
         "ocr_behavior": ("OCR 行为", "可设置窗口可见性、冻结或变暗捕获画面、恢复剪贴板和静默通知。"),
         "export_settings": ("导出设置", "将完整配置保存为 JSON，以便备份或迁移到另一台电脑。"),
         "import_settings": ("导入设置", "从文件恢复配置；完成后会返回设置第一页。"),
         "bug_report": ("错误报告", "创建并打开安全的诊断文件夹。请描述问题，并通过 Telegram 或 GitHub 发送 ZIP。"),
-        "settings_page_game": ("动态翻译设置", "点击最后一个圆点，配置选定区域的实时翻译。"),
+        "settings_page_game": ("动态翻译设置", "打开“动态翻译”选项卡，配置并启动屏幕区域中变化文字的翻译。"),
         "game_controls": ("动态模式", "选择语言对、刷新间隔和透明度；还可在绑定应用失去焦点时暂停，并显示原文。"),
-        "settings_page_main": ("常规设置", "点击第一个圆点返回紧凑的常规页面。"),
+        "settings_page_main": ("常规设置", "打开“常规设置”选项卡，返回引擎、启动选项和历史记录。"),
     },
 }
 
 
-GUIDE_TOUR_ORDER = (
-    "language", "theme", "help", "shortcut_overview", "shortcut_copy",
-    "shortcut_ocr", "shortcut_fullscreen", "shortcut_game",
-    "shortcut_selection", "shortcut_replace", "shortcut_toggle",
-    "document_translation", "main_translate", "shadow_mode", "settings",
-    "autostart", "start_minimized", "ocr_engine", "translator",
-    "result_window", "actions_panel", "language_packages", "hotkeys",
-    "settings_page_updates", "ocr_behavior", "export_settings",
-    "import_settings", "bug_report", "settings_page_game", "game_controls",
-    "settings_page_main", "back_home",
-)
+GUIDE_TOUR_ORDER = GUIDE_SETUP_ORDER
 
 
 def guide_text(lang):
@@ -2523,11 +2619,26 @@ def guide_text(lang):
     extras = GUIDE_TOUR_EXTRAS.get(language, GUIDE_TOUR_EXTRAS["en"])
     steps = []
     for action in GUIDE_TOUR_ORDER:
-        if action in existing:
+        if action == "settings":
+            title, body, _button = GUIDE_SETUP_INTRO[language]
+            steps.append((action, title, body))
+        elif action in GUIDE_SETTING_STEPS:
+            key = {"notifications": "copy_notification",
+                   "game_pause_when_inactive": "game_pause_inactive",
+                   "game_show_original_text": "game_show_original"}.get(action, action)
+            title = settings_text(language, key)
+            steps.append((action, title, setting_body(language, action)))
+        elif action in existing:
             steps.append(existing[action])
         elif action in extras:
             title, body = extras[action]
             steps.append((action, title, body))
+    if platform_support.IS_MAC:
+        from macos_text import macos_text
+        steps = [(action, title, (
+            "Apple Vision / Tesseract / RapidOCR / EasyOCR.\n" + macos_text(language, "vision_note")
+            if action == "ocr_engine" else body.replace("Ctrl+", "Cmd+")))
+            for action, title, body in steps]
     return {**base, "steps": steps}
 
 
@@ -3647,12 +3758,8 @@ class ArgosPackageInstallDialog(QDialog):
                 QLabel#argosRouteLabel { color: #ffffff; font-size: 21px; font-weight: 900; }
                 QLabel#argosDialogBody { color: #ece8f2; font-size: 13px; }
                 QLabel#argosDialogDetail { color: #aaa4b4; font-size: 12px; }
-                QPushButton { border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
-                QPushButton#argosCancelButton { background: #232229; color: #ddd8e5; border: 1px solid #484250; }
-                QPushButton#argosCancelButton:hover { background: #302e38; }
-                QPushButton#argosInstallButton { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; }
-                QPushButton#argosInstallButton:hover { background: #8B70B2; }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
         else:
             self.setStyleSheet("""
                 QDialog { background: #ece7f0; color: #24212a; }
@@ -3664,12 +3771,8 @@ class ArgosPackageInstallDialog(QDialog):
                 QLabel#argosRouteLabel { color: #24212a; font-size: 21px; font-weight: 900; }
                 QLabel#argosDialogBody { color: #35303d; font-size: 13px; }
                 QLabel#argosDialogDetail { color: #6f6877; font-size: 12px; }
-                QPushButton { border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
-                QPushButton#argosCancelButton { background: #e5dfe9; color: #4a4353; border: 1px solid #bcb2c7; }
-                QPushButton#argosCancelButton:hover { background: #d8d0df; }
-                QPushButton#argosInstallButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; }
-                QPushButton#argosInstallButton:hover { background: #8B70B2; }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
 
 
 ARGOS_ERROR_DIALOG_TEXT = {
@@ -3807,9 +3910,8 @@ class ArgosTranslationErrorDialog(QDialog):
                 QLabel#argosErrorBody { color: #ece8f2; font-size: 13px; }
                 QLabel#argosErrorDetailsCaption { color: #9992a8; font-size: 10px; font-weight: 800; }
                 QTextEdit#argosErrorDetails { background: #19181e; color: #c9c3d0; border: 1px solid #3a3547; border-radius: 7px; padding: 5px 7px; selection-background-color: #7A5FA1; }
-                QPushButton#argosErrorCloseButton { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
-                QPushButton#argosErrorCloseButton:hover { background: #8B70B2; }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
         else:
             self.setStyleSheet("""
                 QDialog { background: #ece7f0; color: #24212a; }
@@ -3820,9 +3922,8 @@ class ArgosTranslationErrorDialog(QDialog):
                 QLabel#argosErrorBody { color: #35303d; font-size: 13px; }
                 QLabel#argosErrorDetailsCaption { color: #766e80; font-size: 10px; font-weight: 800; }
                 QTextEdit#argosErrorDetails { background: #f1edf4; color: #4a4353; border: 1px solid #bcb2c7; border-radius: 7px; padding: 5px 7px; selection-background-color: #a98cca; }
-                QPushButton#argosErrorCloseButton { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; }
-                QPushButton#argosErrorCloseButton:hover { background: #8B70B2; }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
 
 TRANSLATION_RESULT_DIALOG_TEXT = {
     "en": {
@@ -3880,6 +3981,28 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
         "swap": "交换语言",
     },
 }
+
+
+for _lang, _edited in {
+    "ru": "Текст изменён — можно скопировать",
+    "en": "Text edited — ready to copy",
+    "de": "Text bearbeitet — bereit zum Kopieren",
+    "fr": "Texte modifié — prêt à copier",
+    "es": "Texto editado — listo para copiar",
+    "zh": "文本已修改，可以复制",
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang]["edited"] = _edited
+
+
+for _lang, _labels in {
+    "ru": ("Перевод", "Исходный текст", "Исходный текст изменён — нажмите «Перевести»"),
+    "en": ("Translation", "Source text", "Source text edited — click Translate"),
+    "de": ("Übersetzung", "Ausgangstext", "Ausgangstext geändert — Übersetzen drücken"),
+    "fr": ("Traduction", "Texte source", "Texte source modifié — cliquez sur Traduire"),
+    "es": ("Traducción", "Texto original", "Texto original editado — pulsa Traducir"),
+    "zh": ("译文", "原文", "原文已修改，请点击翻译"),
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(result_tab=_labels[0], source_tab=_labels[1], source_edited=_labels[2])
 
 
 class TranslateOnEnterTextEdit(QTextEdit):
@@ -4045,12 +4168,60 @@ class TranslationResultDialog(QDialog):
         header.addWidget(self.title_close_button, alignment=Qt.AlignTop)
         layout.addLayout(header)
 
+        controls = QHBoxLayout()
+        controls.setSpacing(8)
+        self.text_tabs = QtWidgets.QTabBar(self)
+        self.text_tabs.setObjectName("translationResultTabs")
+        self.text_tabs.setExpanding(False)
+        self.text_tabs.addTab(self.text["result_tab"])
+        if self.pair_row_available:
+            self.text_tabs.addTab(self.text["source_tab"])
+        controls.addWidget(self.text_tabs, 1)
+        from ui_scaling import ScalePercentEdit
+        self.scale_decrease = QToolButton(self)
+        self.scale_decrease.setText("‹")
+        self.scale_decrease.setFixedSize(26, 28)
+        self.scale_decrease.setToolTip(settings_text(self.lang, "ui_scale_decrease"))
+        self.scale_value = ScalePercentEdit(self)
+        self.scale_value.setObjectName("translationResultScale")
+        self.scale_value.setFixedSize(52, 28)
+        self.scale_value.setAccessibleName(settings_text(self.lang, "ui_scale"))
+        self.scale_value.setToolTip(tooltip_text(settings_text(self.lang, "ui_scale_edit_hint")))
+        self.scale_increase = QToolButton(self)
+        self.scale_increase.setText("›")
+        self.scale_increase.setFixedSize(26, 28)
+        self.scale_increase.setToolTip(settings_text(self.lang, "ui_scale_increase"))
+        self.scale_control = QFrame(self)
+        self.scale_control.setObjectName("translationResultScaleControl")
+        scale_layout = QHBoxLayout(self.scale_control)
+        scale_layout.setContentsMargins(2, 0, 2, 0)
+        scale_layout.setSpacing(0)
+        for control in (self.scale_decrease, self.scale_value, self.scale_increase):
+            scale_layout.addWidget(control)
+        controls.addWidget(self.scale_control)
+        self.scale_decrease.clicked.connect(lambda: self._step_scale(-1, self.scale_decrease))
+        self.scale_increase.clicked.connect(lambda: self._step_scale(1, self.scale_increase))
+        self._scale_commit_timer = QTimer(self)
+        self._scale_commit_timer.setSingleShot(True)
+        self._scale_commit_timer.timeout.connect(self._commit_scale)
+        self.scale_value.editingFinished.connect(self._commit_scale)
+        self.scale_value.cancel_requested.connect(self._refresh_scale_caption)
+        self.scale_value.step_requested.connect(self._step_scale)
+        layout.addLayout(controls)
+        self.editors = QtWidgets.QStackedWidget(self)
         self.text_edit = QTextEdit(self)
         self.text_edit.setObjectName("translationResultText")
         self.text_edit.setPlainText(self.translated_text)
-        self.text_edit.setReadOnly(True)
+        self.text_edit.setReadOnly(False)
         self.text_edit.setMinimumHeight(110)
-        layout.addWidget(self.text_edit, stretch=1)
+        self.editors.addWidget(self.text_edit)
+        self.source_edit = QTextEdit(self)
+        self.source_edit.setObjectName("translationResultText")
+        self.source_edit.setPlainText(self.source_text)
+        self.source_edit.textChanged.connect(self._edited_source)
+        self.editors.addWidget(self.source_edit)
+        layout.addWidget(self.editors, stretch=1)
+        self.text_tabs.currentChanged.connect(self._change_text_tab)
 
         if self.pair_row_available:
             layout.addLayout(self._build_pair_row())
@@ -4068,7 +4239,7 @@ class TranslationResultDialog(QDialog):
         self.google_button.setObjectName("translationResultGoogle")
         self.google_button.setMinimumSize(108, 38)
         self.google_button.setAutoDefault(False)
-        self.google_button.clicked.connect(self._open_google)
+        self.google_button.clicked.connect(self._primary_action)
         buttons.addWidget(self.google_button)
 
         # The status already says whether auto-copy happened.  Keeping this
@@ -4089,6 +4260,73 @@ class TranslationResultDialog(QDialog):
         buttons.addWidget(self.close_button)
         layout.addLayout(buttons)
 
+        self.text_edit.textChanged.connect(self._edited_result)
+        self.setSizeGripEnabled(True)
+        self.refresh_theme(theme)
+        self._refresh_scale_caption()
+
+    def _edited_source(self):
+        self.source_text = self.source_edit.toPlainText()
+        self.status_label.setText(self.text["source_edited"])
+
+    def _change_text_tab(self, index):
+        self.editors.setCurrentIndex(index)
+        self.google_button.setText(ui_text(self.lang, "translate_button") if index else ui_text(self.lang, "google"))
+        self.copy_button.setVisible(index == 0)
+
+    def _primary_action(self):
+        if self.text_tabs.currentIndex() == 1:
+            self._start_retranslate()
+        else:
+            self._open_google()
+
+    def _appearance_manager(self):
+        from window_appearance import install_window_appearance
+        app = QApplication.instance()
+        manager = getattr(app, '_dialog_appearance', None)
+        if manager is None:
+            config = getattr(self.parentWidget(), 'config', {})
+            manager = install_window_appearance(app, config.get('ui_scale_percent', DEFAULT_SCALE), self.theme)
+        return manager
+
+    def _refresh_scale_caption(self):
+        manager = getattr(QApplication.instance(), '_dialog_appearance', None)
+        value = manager.window_percent(self) if manager else DEFAULT_SCALE
+        if self.property('ui_effective_scale') is not None:
+            value = round(float(self.property('ui_effective_scale')) * 80)
+        blocker = QtCore.QSignalBlocker(self.scale_value)
+        self.scale_value.setText(f'{value}%')
+        del blocker
+        self.scale_decrease.setEnabled(value > 80)
+        maximum = self.property('ui_maximum_scale_percent')
+        self.scale_increase.setEnabled(value < (maximum if maximum is not None else 200))
+
+    def _commit_scale(self):
+        if QApplication.mouseButtons() != Qt.NoButton:
+            self._scale_commit_timer.start(30)
+            return
+        try:
+            value = int(self.scale_value.text().strip().rstrip('%'))
+        except ValueError:
+            self._refresh_scale_caption()
+            return
+        self._appearance_manager().set_window_percent(self, value, self.scale_value)
+
+    def _step_scale(self, direction, anchor_widget=None):
+        self._scale_commit_timer.stop()
+        manager = self._appearance_manager()
+        try:
+            value = int(self.scale_value.text().strip().rstrip('%'))
+        except ValueError:
+            value = manager.window_percent(self)
+        manager.set_window_percent(self, value + direction * 5, anchor_widget or self.scale_value)
+
+    def _edited_result(self):
+        self.translated_text = self.text_edit.toPlainText()
+        self.status_label.setText(self.text["edited"])
+
+    def refresh_theme(self, theme):
+        self.theme = theme
         if theme == "Темная":
             self.setStyleSheet("""
                 QDialog#translationResultRoot { background: transparent; }
@@ -4096,28 +4334,19 @@ class TranslationResultDialog(QDialog):
                 QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
                 QLabel#translationResultEyebrow { color: #a994d2; font-size: 10px; font-weight: 800; }
                 QLabel#translationResultTitle { color: #ffffff; font-size: 20px; font-weight: 800; }
-                QToolButton#translationResultTitleClose { background: transparent; color: #c8c2d0; border: none; border-radius: 7px; font-size: 22px; }
-                QToolButton#translationResultTitleClose:hover { background: #302a39; color: #ffffff; }
+
                 QTextEdit#translationResultText { background: #19181e; color: #f5f2fb; border: 1px solid #3a3547; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #7A5FA1; }
                 QComboBox#translationResultCombo { background: #1d1c23; color: #f0ecf6; border: 1px solid #443e52; border-radius: 8px; padding: 4px 9px; font-size: 13px; font-weight: 700; }
                 QComboBox#translationResultCombo:disabled { color: #7d7688; border: 1px solid #332e3d; }
                 QComboBox#translationResultCombo::drop-down { border: none; width: 18px; }
                 QComboBox#translationResultCombo QAbstractItemView { background: #1d1c23; color: #f0ecf6; border: 1px solid #494056; selection-background-color: #7A5FA1; outline: none; }
-                QToolButton#translationResultSwap { background: #2b2733; color: #e7e1ef; border: 1px solid #6d5a82; border-radius: 8px; font-size: 16px; font-weight: 800; }
-                QToolButton#translationResultSwap:hover { background: #393143; }
-                QToolButton#translationResultSwap:disabled { color: #7d7688; border: 1px solid #332e3d; }
+
                 QLabel#translationResultStatus { color: #aaa4b4; font-size: 12px; }
-                QPushButton { border-radius: 8px; padding: 7px 10px; font-size: 13px; font-weight: 700; }
-                QPushButton#translationResultGoogle { background: #232229; color: #ddd8e5; border: 1px solid #484250; }
-                QPushButton#translationResultGoogle:hover { background: #302e38; }
-                QPushButton#translationResultCopy { background: #2b2733; color: #efeaf6; border: 1px solid #6d5a82; }
-                QPushButton#translationResultCopy:hover { background: #393143; }
-                QPushButton#translationResultClose { background: #7A5FA1; color: #ffffff; border: 1px solid #8f73b8; }
-                QPushButton#translationResultClose:hover { background: #8B70B2; }
+
                 QScrollBar:vertical { background: #17161c; width: 10px; margin: 2px; }
                 QScrollBar::handle:vertical { background: #665677; min-height: 30px; border-radius: 4px; }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            """)
+            """ + standard_buttons(theme != "Светлая", compact=False))
         else:
             self.setStyleSheet("""
                 QDialog#translationResultRoot { background: transparent; }
@@ -4125,35 +4354,40 @@ class TranslationResultDialog(QDialog):
                 QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
                 QLabel#translationResultEyebrow { color: #725594; font-size: 10px; font-weight: 800; }
                 QLabel#translationResultTitle { color: #24212a; font-size: 20px; font-weight: 800; }
-                QToolButton#translationResultTitleClose { background: transparent; color: #655d6e; border: none; border-radius: 7px; font-size: 22px; }
-                QToolButton#translationResultTitleClose:hover { background: #eee8f3; color: #24212a; }
+
                 QTextEdit#translationResultText { background: #f1edf4; color: #24212a; border: 1px solid #bcb2c7; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #a98cca; }
                 QComboBox#translationResultCombo { background: #e5dfe9; color: #332e3c; border: 1px solid #bcb2c7; border-radius: 8px; padding: 4px 9px; font-size: 13px; font-weight: 700; }
                 QComboBox#translationResultCombo:disabled { color: #9d96a6; border: 1px solid #e2dae9; }
                 QComboBox#translationResultCombo::drop-down { border: none; width: 18px; }
                 QComboBox#translationResultCombo QAbstractItemView { background: #f1edf4; color: #332e3c; border: 1px solid #bcb2c7; selection-background-color: #a98cca; outline: none; }
-                QToolButton#translationResultSwap { background: #eee8f3; color: #44364f; border: 1px solid #bba8ca; border-radius: 8px; font-size: 16px; font-weight: 800; }
-                QToolButton#translationResultSwap:hover { background: #e3d8eb; }
-                QToolButton#translationResultSwap:disabled { color: #9d96a6; border: 1px solid #e2dae9; }
+
                 QLabel#translationResultStatus { color: #6f6877; font-size: 12px; }
-                QPushButton { border-radius: 8px; padding: 7px 10px; font-size: 13px; font-weight: 700; }
-                QPushButton#translationResultGoogle { background: #e5dfe9; color: #4a4353; border: 1px solid #bcb2c7; }
-                QPushButton#translationResultGoogle:hover { background: #f0ecf4; }
-                QPushButton#translationResultCopy { background: #eee8f3; color: #44364f; border: 1px solid #bba8ca; }
-                QPushButton#translationResultCopy:hover { background: #e3d8eb; }
-                QPushButton#translationResultClose { background: #7A5FA1; color: #ffffff; border: 1px solid #725594; }
-                QPushButton#translationResultClose:hover { background: #8B70B2; }
+
                 QScrollBar:vertical { background: #f3f0f6; width: 10px; margin: 2px; }
                 QScrollBar::handle:vertical { background: #a28cb5; min-height: 30px; border-radius: 4px; }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            """)
+            """ + standard_buttons(theme != "Светлая", compact=False))
+
+        dark = theme == "Темная"
+        ink, muted, edge = ("#f1edf5", "#b1a6bf", "#88729f") if dark else ("#302837", "#77677e", "#897397")
+        self.setStyleSheet(self.styleSheet() + f"""
+            QTabBar#translationResultTabs::tab {{ color: {muted}; background: transparent; padding: 5px 8px; border: none; border-bottom: 2px solid transparent; font-size: 12px; }}
+            QTabBar#translationResultTabs::tab:selected {{ color: {ink}; border-bottom-color: {edge}; }}
+            QFrame#translationResultScaleControl {{ border: 1px solid {edge}; border-radius: 6px; }}
+            QLineEdit#translationResultScale {{ color: {ink}; background: transparent; border: none; font-size: 12px; }}
+        """)
+        for button in (self.scale_decrease, self.scale_increase):
+            button.setStyleSheet(button_qss(dark, "quiet", selector="QToolButton", icon=True, radius=4))
+        for combo in (self.source_combo, self.target_combo):
+            if combo is not None:
+                combo.set_popup_background("#1d1c23" if theme == "Темная" else "#f1edf4")
 
     def _build_pair_row(self):
         """Language pair selectors that re-translate the original text in place."""
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        self.source_combo = QComboBox(self)
+        self.source_combo = DropDownCombo(self)
         self.source_combo.setObjectName("translationResultCombo")
         self.source_combo.setMinimumHeight(34)
         for language in APP_LANGUAGES:
@@ -4168,7 +4402,7 @@ class TranslationResultDialog(QDialog):
         self.swap_button.clicked.connect(self._swap_languages)
         row.addWidget(self.swap_button)
 
-        self.target_combo = QComboBox(self)
+        self.target_combo = DropDownCombo(self)
         self.target_combo.setObjectName("translationResultCombo")
         self.target_combo.setMinimumHeight(34)
         self._fill_target_combo(self.target_code)
@@ -4238,6 +4472,8 @@ class TranslationResultDialog(QDialog):
                 )
 
     def _start_retranslate(self):
+        if not self.source_text.strip() or not self.pair_row_available:
+            return
         # Remember the UI choice immediately.  Persistence must not depend on
         # the network request succeeding (or even starting).
         self._remember_language_pair()
@@ -4245,6 +4481,9 @@ class TranslationResultDialog(QDialog):
             return
         self._retranslating = True
         self._set_pair_row_enabled(False)
+        self.source_edit.setReadOnly(True)
+        self.text_edit.setReadOnly(True)
+        self.google_button.setEnabled(False)
         self.status_label.setText(ui_text(self.lang, "translating"))
         source_code, target_code = self.source_code, self.target_code
         source_text = self.source_text
@@ -4269,11 +4508,15 @@ class TranslationResultDialog(QDialog):
     def _on_retranslated(self, translated_text, error):
         self._retranslating = False
         self._set_pair_row_enabled(True)
+        self.source_edit.setReadOnly(False)
+        self.text_edit.setReadOnly(False)
+        self.google_button.setEnabled(True)
         if error or not translated_text:
             self.status_label.setText(error or ui_text(self.lang, "translation_error"))
             return
         self.translated_text = translated_text
         self.text_edit.setPlainText(translated_text)
+        self.text_tabs.setCurrentIndex(0)
         if self.auto_copy:
             platform_support.copy_text(translated_text)
             save_copy_history(translated_text)
@@ -4411,57 +4654,7 @@ class WelcomeDialog(QDialog):
                 font-size: 12px;
                 font-weight: 700;
             }
-            QPushButton#welcomeLang,
-            QPushButton#welcomeClose {
-                background: rgba(255, 255, 255, 16);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 42);
-                border-radius: 12px;
-            }
-            QPushButton#welcomeLang:hover,
-            QPushButton#welcomeClose:hover {
-                background: rgba(197, 179, 233, 60);
-                border: 1px solid rgba(223, 212, 255, 150);
-            }
-            QPushButton#welcomeTelegram {
-                background: rgba(42, 171, 238, 26);
-                color: #d9f2ff;
-                border: 1px solid rgba(42, 171, 238, 110);
-                border-radius: 13px;
-                padding: 10px 16px;
-                font-size: 14px;
-                font-weight: 800;
-            }
-            QPushButton#welcomeTelegram:hover {
-                background: rgba(42, 171, 238, 48);
-            }
-            QPushButton#welcomeStart {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #c5b3e9, stop:1 #8f6fd1);
-                color: #111827;
-                border: none;
-                border-radius: 13px;
-                padding: 10px 22px;
-                font-size: 15px;
-                font-weight: 900;
-            }
-            QPushButton#welcomeStart:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #dfd4ff, stop:1 #a681eb);
-            }
-            QPushButton#welcomeSkip {
-                background: rgba(255, 255, 255, 12);
-                color: #d8d2e8;
-                border: 1px solid rgba(197, 179, 233, 72);
-                border-radius: 13px;
-                padding: 10px 18px;
-                font-size: 14px;
-                font-weight: 800;
-            }
-            QPushButton#welcomeSkip:hover {
-                background: rgba(197, 179, 233, 34);
-                color: #ffffff;
-            }
+
             QCheckBox {
                 color: #bdb4d1;
                 font-size: 13px;
@@ -4478,7 +4671,7 @@ class WelcomeDialog(QDialog):
                 background: #c5b3e9;
                 border: 1px solid #c5b3e9;
             }
-        """)
+        """ + standard_buttons(True, compact=False))
 
         if self.layout() is None:
             self.main_layout = QVBoxLayout(self)
@@ -4717,7 +4910,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
     _document_done_signal = QtCore.pyqtSignal(str, object)
 
     def __init__(self, parent_app, initial_path=None):
-        super().__init__(parent_app, drag_height=92)
+        super().__init__(parent_app, drag_height=64)
         self.parent_app = parent_app
         self.lang = getattr(parent_app, "current_interface_language", "en")
         self.theme_name = getattr(parent_app, "current_theme", DEFAULT_CONFIG["theme"])
@@ -4727,6 +4920,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translation_results = []
         self.translation_error_message_visible = False
         self.translation_running = False
+        self._translation_cancel_event = None
         self._active_translation_source_text = ""
         self._active_translation_target_code = ""
 
@@ -4756,6 +4950,20 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         super().showEvent(event)
         self._apply_native_frame_theme()
 
+    def _request_translation_cancel(self):
+        if self.translation_running and self._translation_cancel_event is not None:
+            self._translation_cancel_event.set()
+            self.translate_file_button.setEnabled(False)
+            self._set_status(doc_text(self.lang, 'canceling_translation'))
+
+    def reject(self):
+        self._request_translation_cancel()
+        super().reject()
+
+    def closeEvent(self, event):
+        self._request_translation_cancel()
+        super().closeEvent(event)
+
     def _build_ui(self):
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(10, 10, 10, 10)
@@ -4777,8 +4985,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         header.setObjectName("docTopBar")
         header.setAttribute(Qt.WA_StyledBackground, True)
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(18, 10, 18, 10)
-        header_layout.setSpacing(8)
+        header_layout.setContentsMargins(18, 12, 18, 16)
+        header_layout.setSpacing(14)
 
         header_top = QHBoxLayout()
         header_top.setSpacing(12)
@@ -4794,9 +5002,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         self.status_pill = QLabel(doc_text(self.lang, "no_file"))
         self.status_pill.setObjectName("docStatusPill")
-        self.status_pill.setAlignment(Qt.AlignCenter)
-        self.status_pill.setMinimumWidth(128)
-        header_top.addWidget(self.status_pill)
+        self.status_pill.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.status_pill.setWordWrap(True)
+        self.status_pill.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         self.doc_minimize_button = QToolButton(self)
         self.doc_minimize_button.setObjectName("docWindowButton")
@@ -4804,7 +5012,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
         self.doc_minimize_button.setFixedSize(34, 32)
         self.doc_minimize_button.clicked.connect(self.showMinimized)
-        header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignTop)
+        header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignVCenter)
 
         self.doc_close_button = QToolButton(self)
         self.doc_close_button.setObjectName("docWindowClose")
@@ -4812,32 +5020,35 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.doc_close_button.setFixedSize(34, 32)
         self.doc_close_button.clicked.connect(self.close)
-        header_top.addWidget(self.doc_close_button, alignment=Qt.AlignTop)
+        header_top.addWidget(self.doc_close_button, alignment=Qt.AlignVCenter)
         header_layout.addLayout(header_top)
 
-        control_row = QHBoxLayout()
+        control_row = QGridLayout()
         control_row.setSpacing(10)
-        self.source_field_label = QLabel(doc_text(self.lang, "source") + ":")
+        control_row.setColumnStretch(0, 2)
+        control_row.setColumnStretch(2, 2)
+        control_row.setColumnStretch(3, 1)
+        self.source_field_label = QLabel(doc_text(self.lang, "source"))
         self.source_field_label.setObjectName("docFieldLabel")
-        control_row.addWidget(self.source_field_label)
-        self.source_combo = QComboBox()
+        control_row.addWidget(self.source_field_label, 0, 0)
+        self.source_combo = DropDownCombo()
         self.source_combo.addItems(LANGUAGES[self.lang])
         self.source_combo.setMinimumWidth(150)
-        control_row.addWidget(self.source_combo)
+        control_row.addWidget(self.source_combo, 1, 0)
 
         self.language_arrow = LanguageSwapButton()
         self.language_arrow.setObjectName("docLanguageSwap")
-        self.language_arrow.setFixedSize(32, 32)
+        self.language_arrow.setFixedSize(34, 34)
         self.language_arrow.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
         )
         self.language_arrow.clicked.connect(self._swap_document_languages)
-        control_row.addWidget(self.language_arrow)
+        control_row.addWidget(self.language_arrow, 1, 1, Qt.AlignVCenter)
 
-        self.target_field_label = QLabel(doc_text(self.lang, "target") + ":")
+        self.target_field_label = QLabel(doc_text(self.lang, "target"))
         self.target_field_label.setObjectName("docFieldLabel")
-        control_row.addWidget(self.target_field_label)
-        self.target_combo = QComboBox()
+        control_row.addWidget(self.target_field_label, 0, 2)
+        self.target_combo = DropDownCombo()
         self.target_combo.addItems(LANGUAGES[self.lang])
         target_code = str(
             get_cached_config().get("main_translation_target_language", "ru") or "ru"
@@ -4856,19 +5067,18 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 self.target_combo.setCurrentIndex(target_index)
                 break
         self.target_combo.setMinimumWidth(150)
-        control_row.addWidget(self.target_combo)
+        control_row.addWidget(self.target_combo, 1, 2)
 
-        self.provider_field_label = QLabel(doc_text(self.lang, "provider") + ":")
+        self.provider_field_label = QLabel(doc_text(self.lang, "provider"))
         self.provider_field_label.setObjectName("docFieldLabel")
-        control_row.addWidget(self.provider_field_label)
-        self.provider_combo = QComboBox()
+        control_row.addWidget(self.provider_field_label, 0, 3)
+        self.provider_combo = DropDownCombo()
         self.provider_combo.setMinimumWidth(170)
         self._populate_provider_combo()
         self.provider_combo.currentIndexChanged.connect(self._on_document_provider_changed)
         self.source_combo.currentIndexChanged.connect(self._on_document_source_changed)
         self.target_combo.currentIndexChanged.connect(self._update_document_swap_button)
-        control_row.addWidget(self.provider_combo)
-        control_row.addStretch(1)
+        control_row.addWidget(self.provider_combo, 1, 3)
         header_layout.addLayout(control_row)
         layout.addWidget(header)
 
@@ -4894,45 +5104,62 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         toolbar.addWidget(self.remove_button)
 
         toolbar.addStretch(1)
+        actions_frame.setLayout(toolbar)
+        layout.addWidget(actions_frame)
+
+        footer = QFrame()
+        footer.setObjectName("docFooter")
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(18, 0, 18, 14)
+        footer_layout.setSpacing(8)
+        action_row = QHBoxLayout()
+        action_row.setSpacing(8)
+        action_row.addWidget(self.status_pill, 1)
 
         self.translate_selected_button = QPushButton(doc_text(self.lang, "translate_selected"))
         self.translate_selected_button.setObjectName("docButton")
         self.translate_selected_button.clicked.connect(self.translate_selected_text)
-        toolbar.addWidget(self.translate_selected_button)
+        action_row.addWidget(self.translate_selected_button)
 
         self.translate_file_button = QPushButton(doc_text(self.lang, "translate_file"))
         self.translate_file_button.setObjectName("docPrimaryButton")
         self.translate_file_button.clicked.connect(self.translate_file)
-        toolbar.addWidget(self.translate_file_button)
+        action_row.addWidget(self.translate_file_button)
 
         self.save_button = QPushButton(doc_text(self.lang, "save_translation"))
         self.save_button.setObjectName("docButton")
         self.save_button.clicked.connect(self.save_translation)
-        toolbar.addWidget(self.save_button)
-        actions_frame.setLayout(toolbar)
-        layout.addWidget(actions_frame)
+        action_row.addWidget(self.save_button)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setObjectName("docProgress")
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setMaximumHeight(5)
-        layout.addWidget(self.progress_bar)
+        self.progress_bar.setFixedHeight(3)
+        progress_policy = self.progress_bar.sizePolicy()
+        progress_policy.setRetainSizeWhenHidden(True)
+        self.progress_bar.setSizePolicy(progress_policy)
+        footer_layout.addWidget(self.progress_bar)
+        footer_layout.addLayout(action_row)
 
         content_frame = QFrame()
         content_frame.setObjectName("docContent")
         content_frame.setAttribute(Qt.WA_StyledBackground, True)
         content_layout = QVBoxLayout(content_frame)
-        content_layout.setContentsMargins(14, 14, 14, 14)
+        content_layout.setContentsMargins(18, 6, 18, 10)
         content_layout.setSpacing(0)
         splitter = QSplitter(Qt.Horizontal)
+        self.document_splitter = splitter
         splitter.setObjectName("docSplitter")
+        splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(14)
         splitter.addWidget(self._reader_column(doc_text(self.lang, "original"), True))
         splitter.addWidget(self._reader_column(doc_text(self.lang, "translated"), False))
         splitter.setSizes([490, 490])
         content_layout.addWidget(splitter, 1)
         layout.addWidget(content_frame, 1)
+        layout.addWidget(footer)
         # Language/provider filtering also updates metadata and action state,
         # so run it only after both editor panes and every action button exist.
         self._refresh_document_provider_languages()
@@ -4941,8 +5168,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         frame = QFrame()
         frame.setObjectName("docPane")
         frame.setAttribute(Qt.WA_StyledBackground, True)
+        frame.setMinimumWidth(240)
         column = QVBoxLayout(frame)
-        column.setContentsMargins(0, 0, 0, 0)
+        # One continuous outer border; the header/editor never paint over it.
+        column.setContentsMargins(1, 1, 1, 1)
         column.setSpacing(0)
 
         header = QFrame()
@@ -4976,22 +5205,18 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def _apply_dialog_theme(self):
         is_dark = self.theme_name == DEFAULT_CONFIG["theme"]
-        bg = "#0E1116" if is_dark else "#e7e2ea"
-        top = "#151A22" if is_dark else "#ddd7e2"
-        toolbar = "#10151D" if is_dark else "#e3dde7"
-        pane = "#111821" if is_dark else "#ece7f0"
-        editor = "#0B0F15" if is_dark else "#f1edf4"
-        control = "#1D2430" if is_dark else "#ded8e3"
-        control_hover = "#26303F" if is_dark else "#d2cad9"
-        border = "#2D3746" if is_dark else "#b9afc4"
-        soft_border = "#222B38" if is_dark else "#d4ccd9"
-        fg = "#F3F6FA" if is_dark else "#241f2a"
-        muted = "#9CA8B8" if is_dark else "#655b70"
-        faint = "#6F7B8B" if is_dark else "#776b82"
-        accent = "#8F6FD1" if is_dark else "#6D55BE"
-        accent_hover = "#A98BE7" if is_dark else "#5D47A6"
-        accent_text = "#0E1116" if is_dark else "#FFFFFF"
-        danger = "#EB6D72" if is_dark else "#B84D57"
+        bg = "#161319" if is_dark else "#f0edf3"
+        top = "#211d28" if is_dark else "#e9e4ed"
+        pane = "#211d28" if is_dark else "#f2edf6"
+        editor = "#1a171e" if is_dark else "#faf8fc"
+        control = "#211d28" if is_dark else "#faf8fc"
+        control_hover = "#302737" if is_dark else "#e7ddee"
+        border = "#584963" if is_dark else "#b3a5be"
+        soft_border = "#433a4c" if is_dark else "#bdb3c7"
+        fg = "#f1edf5" if is_dark else "#302639"
+        muted = "#b5acbf" if is_dark else "#655b70"
+        accent = "#a985d2" if is_dark else "#79569b"
+        accent_text = "#161319" if is_dark else "#FFFFFF"
         if hasattr(self, "doc_icon_label"):
             self.doc_icon_label.setPixmap(document_translation_icon(self.theme_name).pixmap(30, 30))
         self.setStyleSheet(f"""
@@ -4999,7 +5224,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 background: transparent;
                 color: {fg};
             }}
-            {TOOLTIP_QSS}
+            {tooltip_stylesheet(is_dark)}
             QFrame#docWindowFrame {{
                 background-color: {bg};
                 border: 1px solid {border};
@@ -5016,33 +5241,33 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 border-top-right-radius: 12px;
             }}
             QFrame#docToolBar {{
-                background-color: {toolbar};
-                border-bottom: 1px solid {soft_border};
+                background: transparent;
+                border: none;
             }}
-            QFrame#docContent {{
-                background-color: {bg};
+            QFrame#docContent, QFrame#docFooter {{
+                background: transparent;
+                border: none;
             }}
             QFrame#docPane {{
-                background-color: {pane};
-                border: none;
-                border-radius: 7px;
+                background-color: {editor};
+                border: 1px solid {border};
+                border-radius: 8px;
             }}
             QFrame#docPaneHeader {{
                 background-color: {pane};
-                border: 1px solid {border};
+                border: none;
                 border-bottom: 1px solid {soft_border};
                 border-top-left-radius: 7px;
                 border-top-right-radius: 7px;
             }}
             QLabel#docHeaderIcon {{
-                background-color: {control};
-                border: 1px solid {border};
-                border-radius: 10px;
+                background: transparent;
+                border: none;
             }}
             QLabel#docTitle {{
                 color: {fg};
                 font-size: 18px;
-                font-weight: 900;
+                font-weight: 700;
             }}
             QLabel#docProvider {{
                 color: {muted};
@@ -5050,112 +5275,37 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 font-weight: 600;
             }}
             QLabel#docStatusPill {{
-                color: {fg};
-                background-color: {control};
-                border: 1px solid {border};
-                border-radius: 11px;
-                padding: 5px 10px;
+                color: {muted};
+                background: transparent;
+                border: none;
+                padding: 0 12px 0 0;
                 font-size: 12px;
-                font-weight: 800;
+                font-weight: 400;
             }}
-            QToolButton#docLanguageSwap {{
-                color: {accent};
-                background-color: {control};
-                border: 1px solid {border};
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 900;
-            }}
-            QToolButton#docLanguageSwap:hover {{
-                background-color: {control_hover};
-                border-color: {accent};
-            }}
-            QToolButton#docLanguageSwap:disabled {{
-                color: {faint};
-                border-color: {soft_border};
-            }}
+
             QLabel#docFieldLabel {{
                 color: {muted};
                 font-size: 12px;
-                font-weight: 800;
+                font-weight: 600;
             }}
             QLabel#docPaneTitle {{
                 color: {fg};
                 font-size: 13px;
-                font-weight: 900;
-            }}
-            QToolButton#docWindowButton,
-            QToolButton#docWindowClose {{
-                background: transparent;
-                color: {muted};
-                border: none;
-                border-radius: 7px;
-                font-size: 20px;
                 font-weight: 700;
             }}
-            QToolButton#docWindowButton:hover {{
-                background-color: {control_hover};
-                color: {fg};
-            }}
-            QToolButton#docWindowClose:hover {{
-                background-color: #d44b55;
-                color: #ffffff;
-            }}
-            QPushButton {{
-                min-height: 28px;
-            }}
-            QPushButton#docButton {{
-                background-color: {control};
-                color: {fg};
-                border: 1px solid {border};
-                border-radius: 5px;
-                padding: 6px 11px;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            QPushButton#docButton:hover {{
-                background-color: {control_hover};
-                border-color: {accent};
-            }}
-            QPushButton#docPrimaryButton {{
-                background-color: {accent};
-                color: {accent_text};
-                border: 1px solid {accent};
-                border-radius: 5px;
-                padding: 6px 14px;
-                font-size: 12px;
-                font-weight: 900;
-            }}
-            QPushButton#docPrimaryButton:hover {{
-                background-color: {accent_hover};
-                border-color: {accent_hover};
-            }}
-            QPushButton#docDangerButton {{
-                background-color: transparent;
-                color: {danger};
-                border: 1px solid {border};
-                border-radius: 5px;
-                padding: 6px 11px;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            QPushButton#docDangerButton:hover {{
-                background-color: {control_hover};
-                border-color: {danger};
-            }}
-            QPushButton:disabled {{
-                color: #777777;
-                background-color: {control};
-                border-color: {soft_border};
-            }}
+
+            QPushButton {{ min-height: 28px; }}
+
             QComboBox {{
                 background-color: {control};
                 color: {fg};
                 border: 1px solid {border};
                 border-radius: 5px;
                 padding: 5px 8px;
+                min-height: 22px;
                 font-size: 13px;
             }}
+            QComboBox::drop-down {{ border: none; background: transparent; width: 22px; }}
             QComboBox:hover {{
                 border-color: {accent};
             }}
@@ -5168,23 +5318,17 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             QTextEdit#docEditor {{
                 background-color: {editor};
                 color: {fg};
-                border-left: 1px solid {border};
-                border-right: 1px solid {border};
-                border-bottom: 1px solid {border};
-                border-top: none;
+                border: none;
+                border-radius: 0;
                 border-bottom-left-radius: 7px;
                 border-bottom-right-radius: 7px;
                 padding: 14px;
                 font-size: 14px;
-                line-height: 1.4;
                 selection-background-color: {accent};
                 selection-color: {accent_text};
             }}
             QTextEdit#docEditor:focus {{
-                border-left: 1px solid {border};
-                border-right: 1px solid {border};
-                border-bottom: 1px solid {border};
-                border-top: none;
+                border: none;
             }}
             QScrollBar:vertical {{
                 background: transparent;
@@ -5208,18 +5352,23 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 background-color: {control};
                 border: none;
                 border-radius: 0;
-                max-height: 5px;
+                max-height: 3px;
                 text-align: center;
             }}
             QProgressBar#docProgress::chunk {{
                 background-color: {accent};
                 border-radius: 0;
             }}
-            QSplitter#docSplitter::handle {{
-                background-color: transparent;
-                width: 10px;
+            QSplitter#docSplitter {{ background: transparent; border: none; }}
+            QSplitter#docSplitter::handle:horizontal {{
+                background: transparent;
+                width: 14px;
             }}
-        """)
+        """ + standard_buttons(is_dark, compact=False))
+
+        for combo in (self.source_combo, self.target_combo, self.provider_combo):
+            combo.setMaxVisibleItems(9)
+            combo.set_popup_background(pane)
 
     def _apply_native_frame_theme(self):
         apply_windows_dark_frame(self, self.theme_name == DEFAULT_CONFIG["theme"])
@@ -5257,12 +5406,12 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
         self.remove_button.setText(doc_text(self.lang, "remove_file"))
-        self.translate_file_button.setText(doc_text(self.lang, "translate_file"))
+        self.translate_file_button.setText(doc_text(self.lang, "cancel_translation" if self.translation_running else "translate_file"))
         self.translate_selected_button.setText(doc_text(self.lang, "translate_selected"))
         self.save_button.setText(doc_text(self.lang, "save_translation"))
         self.open_button.setText(doc_text(self.lang, "open_session"))
-        self.source_field_label.setText(doc_text(self.lang, "source") + ":")
-        self.target_field_label.setText(doc_text(self.lang, "target") + ":")
+        self.source_field_label.setText(doc_text(self.lang, "source"))
+        self.target_field_label.setText(doc_text(self.lang, "target"))
         self.original_label.setText(doc_text(self.lang, "original"))
         self.translated_label.setText(doc_text(self.lang, "translated"))
         self.original_view.setPlaceholderText(doc_text(self.lang, "drop_hint"))
@@ -5285,18 +5434,19 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_combo_to_language_code(self.target_combo, target_code)
         self.target_combo.blockSignals(False)
 
-        self.provider_field_label.setText(doc_text(self.lang, "provider") + ":")
+        self.provider_field_label.setText(doc_text(self.lang, "provider"))
         provider_engine = self._provider_engine()
         self._populate_provider_combo(provider_engine)
         if self.translation_running:
-            self.current_status = doc_text(self.lang, "translating")
+            canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
+            self.current_status = doc_text(self.lang, "canceling_translation" if canceling else "translating")
         elif self.current_document:
             self.current_status = doc_text(self.lang, "loaded")
         elif self.session_payload:
             self.current_status = doc_text(self.lang, "session_loaded")
         else:
             self.current_status = doc_text(self.lang, "no_file")
-        self.status_pill.setText(self.current_status)
+        self._set_status(self.current_status)
         # Relanguaging changes several complex controls in place. Re-polish the
         # complete dialog afterwards so their pane/window borders cannot keep
         # a partially invalidated stylesheet state.
@@ -5373,6 +5523,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def _on_document_error(self, message):
         self.translation_running = False
+        self._translation_cancel_event = None
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self._set_busy(False)
@@ -5397,6 +5548,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_busy(False)
 
     def translate_file(self):
+        if self.translation_running:
+            self._request_translation_cancel()
+            return
         if not self.current_document and not self.original_view.toPlainText().strip():
             QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_file"))
             return
@@ -5414,6 +5568,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not text or self.translation_running:
             return
         self.translation_running = True
+        self._translation_cancel_event = threading.Event()
+        cancel_event = self._translation_cancel_event
         self.translated_text = ""
         self.translation_results = []
         self.translation_error_message_visible = False
@@ -5425,6 +5581,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         source_code = self._source_code()
         target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
+        provider_engine = self._provider_engine()
         self._active_translation_source_text = text
         self._active_translation_target_code = target_code
 
@@ -5437,8 +5594,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                     text,
                     source_code,
                     target_code,
-                    provider_engine=self._provider_engine(),
+                    provider_engine=provider_engine,
                     progress_callback=progress,
+                    cancel_event=cancel_event,
                 )
                 self._document_done_signal.emit(translated, results)
             except Exception as exc:
@@ -5447,6 +5605,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_translation_progress(self, done, total, message):
+        if self._translation_cancel_event is not None and self._translation_cancel_event.is_set():
+            return
         if total:
             self.progress_bar.setValue(max(0, min(100, int(done * 100 / total))))
             self._set_status(f"{doc_text(self.lang, 'translating')}: {done}/{total}")
@@ -5455,6 +5615,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self._set_status(message)
 
     def _on_translation_done(self, translated, results):
+        canceled = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
+        self._translation_cancel_event = None
         self.translation_running = False
         self.translation_results = list(results or [])
         friendly_failure = self._friendly_provider_failure_text(self.translation_results)
@@ -5462,10 +5624,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translated_text = friendly_failure or (translated or "")
         self.translated_view.setPlainText(self.translated_text)
         self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(100)
+        if not canceled:
+            self.progress_bar.setValue(100)
         self._set_busy(False)
         failed = sum(1 for result in self.translation_results if getattr(result, "error", ""))
-        if friendly_failure:
+        if canceled:
+            self._set_status(doc_text(self.lang, 'translation_canceled'))
+        elif friendly_failure:
             self._set_status(doc_text(self.lang, "provider_unavailable_title"))
         elif failed:
             self._set_status(f"{doc_text(self.lang, 'translate_failed')}: {failed}")
@@ -5610,13 +5775,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             if not options:
                 continue
             self.provider_combo.addItem(f"  {groups[kind]}", None)
-            header = self.provider_combo.model().item(self.provider_combo.count() - 1)
-            if header is not None:
-                header.setEnabled(False)
-                font = header.font()
-                font.setBold(True)
-                header.setFont(font)
-                header.setForeground(QBrush(QColor("#AFA6BE")))
+            self.provider_combo.set_group_header(self.provider_combo.count() - 1)
             for engine, _name, _kind in options:
                 self.provider_combo.addItem(provider_display_name(engine, self.lang), engine)
 
@@ -5718,7 +5877,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         for attribute in ("translate_selected_button", "translate_file_button"):
             button = getattr(self, attribute, None)
             if button is not None:
-                button.setEnabled(ready)
+                canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
+                button.setEnabled((not canceling if attribute == 'translate_file_button' else False)
+                                  if self.translation_running else ready)
         self._update_document_swap_button()
 
     def _on_document_provider_changed(self):
@@ -5802,6 +5963,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.current_status = str(status)
         if hasattr(self, "status_pill"):
             self.status_pill.setText(self.current_status)
+            self.status_pill.setToolTip(tooltip_text(self.current_status))
 
     def load_plain_text(self, text):
         """Open text from the compact composer without pretending it is a file."""
@@ -5823,11 +5985,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_status(doc_text(self.lang, "loaded"))
 
     def _set_busy(self, busy, loading=False):
+        self.progress_bar.setVisible(busy)
         has_translation = bool(str(self.translated_text or "").strip())
         self.attach_button.setEnabled(not busy)
         self.open_button.setEnabled(not busy)
         self.remove_button.setEnabled(not busy)
-        self.translate_file_button.setEnabled(not busy)
+        canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
+        self.translate_file_button.setEnabled(not loading and (not busy or (self.translation_running and not canceling)))
+        self.translate_file_button.setText(doc_text(self.lang, 'cancel_translation' if self.translation_running else 'translate_file'))
         self.translate_selected_button.setEnabled(not busy)
         self.save_button.setEnabled(not busy and has_translation and not self.translation_error_message_visible)
         self.source_combo.setEnabled(not busy)
@@ -5853,16 +6018,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         super().dropEvent(event)
 
 
-def styled_transparent_button_qss():
-    """Chromeless button style that still carries the tooltip rule.
-
-    Qt resolves a tooltip against the stylesheet of the widget it belongs to. A
-    widget with its own sheet therefore loses the app-wide QToolTip rule and
-    gets the platform default — a black box with square corners — while widgets
-    without one show the app's purple rounded tooltip. Every per-widget sheet
-    that belongs to something with a tooltip has to carry it.
-    """
-    return "QPushButton { background-color: transparent; border: none; }" + TOOLTIP_QSS
+def styled_transparent_button_qss(dark=True):
+    return button_qss(dark, "quiet", icon=True)
 
 
 class GuideSpotlight(QWidget):
@@ -5962,10 +6119,13 @@ HOTKEY_LANGUAGE_HOTKEY_KEYS = {
 
 HOTKEY_LANGUAGE_TEXT = {
     "en": {
+        "mode_direction": "Languages for the selected mode",
+        "text_section": "Text translation",
+        "hotkey_section": "Keyboard shortcuts",
         "title": "Languages for hotkeys",
         "body": "Each translation shortcut keeps its own language pair.",
         "bar_hint": "Hotkey languages — choose a mode, then its direction",
-        "bar_caption": "Mode:",
+        "bar_caption": "Languages:",
         "mode_language_heading": "Translation languages by mode",
         "mode": "Action",
         "from": "From",
@@ -5981,10 +6141,13 @@ HOTKEY_LANGUAGE_TEXT = {
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
     "ru": {
+        "mode_direction": "Языки выбранного режима",
+        "text_section": "Перевод текста",
+        "hotkey_section": "Горячие клавиши",
         "title": "Языки горячих клавиш",
         "body": "Для каждого режима сохраняется своя пара языков.",
         "bar_hint": "Языки горячих клавиш — выберите режим, затем направление",
-        "bar_caption": "Режим:",
+        "bar_caption": "Языки режима:",
         "mode_language_heading": "Языки перевода в режимах",
         "mode": "Режим",
         "from": "С языка",
@@ -6000,10 +6163,13 @@ HOTKEY_LANGUAGE_TEXT = {
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
     "es": {
+        "mode_direction": "Idiomas del modo seleccionado",
+        "text_section": "Traducir texto",
+        "hotkey_section": "Atajos de teclado",
         "title": "Idiomas de los atajos",
         "body": "Cada atajo de traducción conserva su propio par de idiomas.",
         "bar_hint": "Idiomas de atajos — elija el modo y la dirección",
-        "bar_caption": "Modo:",
+        "bar_caption": "Idiomas:",
         "mode_language_heading": "Idiomas de traducción por modo",
         "mode": "Acción",
         "from": "De",
@@ -6019,10 +6185,13 @@ HOTKEY_LANGUAGE_TEXT = {
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
     "de": {
+        "mode_direction": "Sprachen für den gewählten Modus",
+        "text_section": "Text übersetzen",
+        "hotkey_section": "Tastenkürzel",
         "title": "Sprachen für Tastenkürzel",
         "body": "Jedes Übersetzungs-Tastenkürzel behält sein eigenes Sprachpaar.",
         "bar_hint": "Tastenkürzel-Sprachen — Modus und Richtung wählen",
-        "bar_caption": "Modus:",
+        "bar_caption": "Sprachen:",
         "mode_language_heading": "Übersetzungssprachen nach Modus",
         "mode": "Aktion",
         "from": "Von",
@@ -6038,10 +6207,13 @@ HOTKEY_LANGUAGE_TEXT = {
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
     "fr": {
+        "mode_direction": "Langues du mode sélectionné",
+        "text_section": "Traduire du texte",
+        "hotkey_section": "Raccourcis clavier",
         "title": "Langues des raccourcis",
         "body": "Chaque raccourci de traduction conserve sa propre paire de langues.",
         "bar_hint": "Langues des raccourcis — choisissez le mode et la direction",
-        "bar_caption": "Mode :",
+        "bar_caption": "Langues :",
         "mode_language_heading": "Langues de traduction par mode",
         "mode": "Action",
         "from": "De",
@@ -6057,10 +6229,13 @@ HOTKEY_LANGUAGE_TEXT = {
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
     "zh": {
+        "mode_direction": "所选模式的翻译语言",
+        "text_section": "文本翻译",
+        "hotkey_section": "键盘快捷键",
         "title": "快捷键语言",
         "body": "每个翻译快捷键都会保存自己的语言对。",
         "bar_hint": "快捷键语言 — 选择模式和翻译方向",
-        "bar_caption": "模式：",
+        "bar_caption": "翻译语言：",
         "mode_language_heading": "各模式的翻译语言",
         "mode": "操作",
         "from": "源语言",
@@ -6079,6 +6254,8 @@ HOTKEY_LANGUAGE_TEXT = {
 
 
 def hotkey_language_text(lang, key):
+    if key in HOTKEY_LANGUAGE_MODES:
+        return main_hotkey_compact_caption(lang, key)
     return HOTKEY_LANGUAGE_TEXT.get(lang, HOTKEY_LANGUAGE_TEXT["en"]).get(
         key, HOTKEY_LANGUAGE_TEXT["en"].get(key, key)
     )
@@ -6150,6 +6327,7 @@ def main_hotkey_tooltip(lang, key):
 HOTKEY_SETTINGS_PROMPT_TEXT = {
     "en": {
         "title": "Hotkey settings",
+        "edit_hint": "Click anywhere on this row to configure the hotkey.",
         "set": "Set a hotkey for “{action}” in Settings?",
         "change": "Change the “{action}” hotkey ({hotkey}) in Settings?",
         "open": "Open settings",
@@ -6157,6 +6335,7 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
     "ru": {
         "title": "Настройка клавиш",
+        "edit_hint": "Нажмите в любом месте строки, чтобы настроить горячую клавишу.",
         "set": "Назначить горячую клавишу для режима «{action}»?",
         "change": "Изменить горячую клавишу режима «{action}» ({hotkey})?",
         "open": "Открыть настройки",
@@ -6164,6 +6343,7 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
     "es": {
         "title": "Configurar atajo",
+        "edit_hint": "Haz clic en cualquier parte de esta fila para configurar el atajo.",
         "set": "¿Asignar un atajo para «{action}» en Ajustes?",
         "change": "¿Cambiar el atajo de «{action}» ({hotkey}) en Ajustes?",
         "open": "Abrir ajustes",
@@ -6171,6 +6351,7 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
     "de": {
         "title": "Tastenkürzel einstellen",
+        "edit_hint": "Klicken Sie auf die Zeile, um das Tastenkürzel einzustellen.",
         "set": "Tastenkürzel für „{action}“ in den Einstellungen festlegen?",
         "change": "Tastenkürzel für „{action}“ ({hotkey}) ändern?",
         "open": "Einstellungen öffnen",
@@ -6178,6 +6359,7 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
     "fr": {
         "title": "Réglage du raccourci",
+        "edit_hint": "Cliquez n’importe où sur cette ligne pour configurer le raccourci.",
         "set": "Attribuer un raccourci à « {action} » dans les réglages ?",
         "change": "Modifier le raccourci de « {action} » ({hotkey}) ?",
         "open": "Ouvrir les réglages",
@@ -6185,6 +6367,7 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
     "zh": {
         "title": "快捷键设置",
+        "edit_hint": "点击此行的任意位置即可设置快捷键。",
         "set": "要在设置中为“{action}”分配快捷键吗？",
         "change": "要修改“{action}”的快捷键（{hotkey}）吗？",
         "open": "打开设置",
@@ -6192,16 +6375,14 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
     },
 }
 
-# The main window is a quick reference, not the hotkey editor. These compact
-# captions keep its three-column legend readable at 150% Windows scaling; the
-# full localized action name remains in the tooltip and accessibility text.
+# Full action names share a line with their shortcuts in two aligned columns.
 MAIN_HOTKEY_COMPACT_CAPTIONS = {
-    "en": {"copy": "Copy", "ocr": "OCR", "fullscreen": "Screen", "selection": "Select", "replace": "Replace", "toggle": "Window", "game": "Dynamic"},
-    "ru": {"copy": "Копир.", "ocr": "OCR", "fullscreen": "Экран", "selection": "Выдел.", "replace": "Замена", "toggle": "Окно", "game": "Динамич."},
-    "es": {"copy": "Copiar", "ocr": "OCR", "fullscreen": "Pantalla", "selection": "Selecc.", "replace": "Reempl.", "toggle": "Ventana", "game": "Dinámico"},
-    "de": {"copy": "Kopie", "ocr": "OCR", "fullscreen": "Vollbild", "selection": "Auswahl", "replace": "Ersetz.", "toggle": "Fenster", "game": "Dynamisch"},
-    "fr": {"copy": "Copier", "ocr": "OCR", "fullscreen": "Écran", "selection": "Sélect.", "replace": "Rempl.", "toggle": "Fenêtre", "game": "Dynamique"},
-    "zh": {"copy": "复制", "ocr": "OCR", "fullscreen": "全屏", "selection": "选区", "replace": "替换", "toggle": "窗口", "game": "动态"},
+    "en": {"copy": "Copy text", "ocr": "Translate area", "fullscreen": "Translate screen", "selection": "Translate selection", "replace": "Replace with translation", "toggle": "Show or hide window", "game": "Dynamic translation", "recognition": "Text recognition"},
+    "ru": {"copy": "Копировать текст", "ocr": "Перевести область", "fullscreen": "Перевести экран", "selection": "Перевести выделение", "replace": "Заменить переводом", "toggle": "Показать или скрыть окно", "game": "Динамический перевод", "recognition": "Распознавание"},
+    "es": {"copy": "Copiar texto", "ocr": "Traducir área", "fullscreen": "Traducir pantalla", "selection": "Traducir selección", "replace": "Reemplazar con traducción", "toggle": "Mostrar u ocultar ventana", "game": "Traducción dinámica", "recognition": "Reconocimiento"},
+    "de": {"copy": "Text kopieren", "ocr": "Bereich übersetzen", "fullscreen": "Bildschirm übersetzen", "selection": "Auswahl übersetzen", "replace": "Auswahl ersetzen", "toggle": "Fenster ein- oder ausblenden", "game": "Dynamische Übersetzung", "recognition": "Texterkennung"},
+    "fr": {"copy": "Copier le texte", "ocr": "Traduire une zone", "fullscreen": "Traduire l’écran", "selection": "Traduire la sélection", "replace": "Remplacer par la traduction", "toggle": "Afficher/masquer la fenêtre", "game": "Traduction dynamique", "recognition": "Reconnaissance"},
+    "zh": {"copy": "复制文字", "ocr": "翻译屏幕区域", "fullscreen": "翻译整个屏幕", "selection": "翻译选中文字", "replace": "用译文替换选区", "toggle": "显示或隐藏窗口", "game": "动态翻译", "recognition": "文字识别"},
 }
 
 
@@ -6217,26 +6398,25 @@ def hotkey_settings_prompt_text(lang, key):
     return text.get(key, HOTKEY_SETTINGS_PROMPT_TEXT["en"].get(key, key))
 
 
-class ClickableHotkeyValue(QLabel):
-    """Keyboard badge that behaves as a real accessible navigation control."""
+class HotkeyReferenceRow(QPushButton):
+    """One hit target and keyboard focus stop for the action and its shortcut."""
 
-    clicked = QtCore.pyqtSignal()
-
-    def __init__(self, text="", parent=None):
-        super().__init__(text, parent)
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setAutoDefault(False)
 
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton and self.rect().contains(event.pos()):
-            self.clicked.emit()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
+    def sizeHint(self):
+        # QPushButton normally measures its own text. This button's content
+        # is a layout, so measure both labels and their spacing instead.
+        layout = self.layout()
+        return layout.totalSizeHint() if layout is not None else super().sizeHint()
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
-            self.clicked.emit()
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if not event.isAutoRepeat():
+                self.click()
             event.accept()
             return
         super().keyPressEvent(event)
@@ -6344,12 +6524,8 @@ class HotkeyLanguageDialog(QDialog):
             QFrame#hotkeyLanguageCard {{ background: {card}; border: 1px solid {border}; border-radius: 14px; }}
             QLabel#hotkeyLanguageTitle {{ color: {text}; font-size: 18px; font-weight: 800; border: none; }}
             QLabel#hotkeyLanguageBody, QLabel#hotkeyLanguageStatus {{ color: {muted}; font-size: 12px; border: none; }}
-            QToolButton#hotkeyLanguageClose {{ color: {text}; background: transparent; border: none; border-radius: 7px; font-size: 22px; }}
-            QToolButton#hotkeyLanguageClose:hover {{ background: {hover}; }}
-            QToolButton#hotkeyLanguageSwap {{ color: {text}; background: {hover}; border: 1px solid {border}; border-radius: 8px; font-size: 17px; font-weight: 800; }}
-            QPushButton#hotkeyLanguageDone {{ color: #ffffff; background: #7A5FA1; border: 1px solid #9477bc; border-radius: 8px; padding: 4px 18px; font-weight: 700; }}
-            QPushButton#hotkeyLanguageDone:hover {{ background: #8B70B2; }}
-        """)
+
+        """ + standard_buttons(dark, compact=False))
         combo_style = modern_combo_style(dark, font_size=14)
         for combo in (self.mode_combo, self.source_combo, self.target_combo):
             combo.setStyleSheet(combo_style)
@@ -6388,11 +6564,10 @@ class HotkeyLanguageDialog(QDialog):
             "" if ready else hotkey_language_text(self.lang, "no_pairs")
         )
         self.owner.config["hotkey_language_editor_mode"] = mode
-        if ready:
-            self._persist_pair()
-        else:
-            self.owner.save_config()
-            self.owner._refresh_selection_pair_hint()
+        # Loading a mode has the same read-only pair semantics as the inline
+        # selector. Only edits to source/target may save a replacement pair.
+        self.owner.save_config()
+        self.owner._refresh_selection_pair_hint()
 
     def _fill_targets(self, preferred, pairs=None):
         pairs = pairs or self.owner._available_hotkey_translation_pairs(
@@ -6498,8 +6673,14 @@ class DarkThemeApp(QMainWindow):
 
         self.load_config()
 
+        from ui_scaling import MainWindowScaleController
+        self._ui_scale_controller = MainWindowScaleController(self)
+        self.ui_root = self._ui_scale_controller.canvas
+
         # Показать приветственное окно, если не отключено
-        welcome_was_due = bool(self.config.get("show_update_info", True))
+        welcome_was_due = bool(
+            self.config.get("show_update_info", True) and not LAYOUT_EDITOR_MODE
+        )
         if welcome_was_due:
             dlg = WelcomeDialog(self)
             if dlg.exec_() == QDialog.Accepted:
@@ -6518,7 +6699,7 @@ class DarkThemeApp(QMainWindow):
                 self.save_config()
 
         self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        self.ui_root.setCentralWidget(self.central_widget)
         self.central_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.central_widget.customContextMenuRequested.connect(
             lambda pos: self.show_main_context_menu(self.central_widget.mapToGlobal(pos))
@@ -6558,7 +6739,10 @@ class DarkThemeApp(QMainWindow):
         self._guide_step_timer.timeout.connect(self._show_guide_step)
         self.init_ui()
 
-        self.create_tray_icon()
+        self._ui_scale_controller.set_percent(self.config.get("ui_scale_percent", DEFAULT_SCALE))
+
+        if not LAYOUT_EDITOR_MODE:
+            self.create_tray_icon()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -6569,19 +6753,21 @@ class DarkThemeApp(QMainWindow):
                     force=True,
                 ),
             )
-        if not welcome_was_due:
+        if not welcome_was_due and not LAYOUT_EDITOR_MODE:
             QTimer.singleShot(350, self._maybe_show_startup_news)
-        QTimer.singleShot(700, self._maybe_start_first_run_guide)
+        if not LAYOUT_EDITOR_MODE:
+            QTimer.singleShot(700, self._maybe_start_first_run_guide)
         # Late enough that it never competes with start-up for the network or
         # the user's attention, and after the first-run guide has had its turn.
-        QTimer.singleShot(9000, self._maybe_check_updates_on_launch)
+        if not LAYOUT_EDITOR_MODE:
+            QTimer.singleShot(9000, self._maybe_check_updates_on_launch)
 
         # Подписка на события хоткеев из потоков
         try:
             hotkey_dispatcher.triggered.connect(self._invoke_callback_safely)
         except Exception:
             pass
-        if getattr(self, "_autostart_sync_pending", False):
+        if getattr(self, "_autostart_sync_pending", False) and not LAYOUT_EDITOR_MODE:
             QTimer.singleShot(0, self._start_deferred_autostart_sync)
 
         # Подписка на ошибки регистрации хоткеев
@@ -6595,31 +6781,39 @@ class DarkThemeApp(QMainWindow):
         # рабочим столом, а Wayland их вовсе запрещает. Пользователь назначает
         # команды (clickntranslate --ocr и т.д.) в настройках своей среды —
         # см. single_instance.py.
-        copy_hotkey = "" if platform_support.IS_LINUX else self.config.get("copy_hotkey", "")
+        copy_hotkey = (
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("copy_hotkey", "")
+        )
         if copy_hotkey:
             self.copy_hotkey_thread = HotkeyListenerThread(copy_hotkey, self.launch_copy, hotkey_id=1)
             self.copy_hotkey_thread.start()
-        translate_hotkey = "" if platform_support.IS_LINUX else self.config.get("translate_hotkey", "")
+        translate_hotkey = (
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("translate_hotkey", "")
+        )
         if translate_hotkey:
             self.translate_hotkey_thread = HotkeyListenerThread(translate_hotkey, self.launch_translate, hotkey_id=2)
             self.translate_hotkey_thread.start()
 
         fullscreen_translate_hotkey = (
-            "" if platform_support.IS_LINUX else self.config.get("fullscreen_translate_hotkey", "")
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("fullscreen_translate_hotkey", "")
         )
         if fullscreen_translate_hotkey:
             self.fullscreen_translate_hotkey_thread = HotkeyListenerThread(fullscreen_translate_hotkey, self.launch_fullscreen_translate, hotkey_id=3)
             self.fullscreen_translate_hotkey_thread.start()
 
         translate_selection_hotkey = (
-            "" if platform_support.IS_LINUX else self.config.get("translate_selection_hotkey", "")
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("translate_selection_hotkey", "")
         )
         if translate_selection_hotkey:
             self.translate_selection_hotkey_thread = HotkeyListenerThread(translate_selection_hotkey, self.launch_translate_selection, hotkey_id=4)
             self.translate_selection_hotkey_thread.start()
 
         translate_replace_selection_hotkey = (
-            "" if platform_support.IS_LINUX
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
             else self.config.get("translate_replace_selection_hotkey", "")
         )
         if translate_replace_selection_hotkey:
@@ -6631,7 +6825,8 @@ class DarkThemeApp(QMainWindow):
             self.translate_replace_selection_hotkey_thread.start()
 
         toggle_window_hotkey = (
-            "" if platform_support.IS_LINUX else self.config.get("toggle_window_hotkey", "")
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("toggle_window_hotkey", "")
         )
         if toggle_window_hotkey:
             self.toggle_window_hotkey_thread = HotkeyListenerThread(
@@ -6642,7 +6837,8 @@ class DarkThemeApp(QMainWindow):
             self.toggle_window_hotkey_thread.start()
 
         game_translate_hotkey = (
-            "" if platform_support.IS_LINUX else self.config.get("game_translate_hotkey", "")
+            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            else self.config.get("game_translate_hotkey", "")
         )
         if game_translate_hotkey:
             self.game_translate_hotkey_thread = HotkeyListenerThread(
@@ -6784,6 +6980,27 @@ class DarkThemeApp(QMainWindow):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+
+    def set_ui_scale_percent(self, value, anchor_widget=None):
+        from ui_scaling import normalize_ui_scale
+        self.config["ui_scale_percent"] = normalize_ui_scale(value)
+        actual = self._ui_scale_controller.set_percent(value, anchor_widget)
+        self.save_config()
+        from window_appearance import refresh_window_appearance
+        refresh_window_appearance(percent=self.config['ui_scale_percent'])
+        return actual
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        controller = getattr(self, '_ui_scale_controller', None)
+        if controller is not None:
+            controller.canvas.show()
+
+    def hideEvent(self, event):
+        controller = getattr(self, '_ui_scale_controller', None)
+        if controller is not None:
+            controller.canvas.hide()
+        super().hideEvent(event)
         ocr_module = sys.modules.get("ocr")
         invalidate_ocr = getattr(ocr_module, "invalidate_ocr_config_cache", None)
         if callable(invalidate_ocr):
@@ -6975,8 +7192,6 @@ class DarkThemeApp(QMainWindow):
             engine = self.config.get(
                 "ocr_engine", platform_support.default_ocr_engine()
             )
-            if mode == "fullscreen" and platform_support.supports_windows_ocr():
-                engine = "Windows"
             installed_sources = set(
                 installed_ocr_language_codes(engine=engine, config=self.config)
             )
@@ -7114,14 +7329,9 @@ class DarkThemeApp(QMainWindow):
             return
         self.config["hotkey_language_editor_mode"] = mode
         self._refresh_hotkey_language_controls()
-        source_combo = getattr(self, "hotkey_source_combo", None)
-        target_combo = getattr(self, "hotkey_target_combo", None)
-        if source_combo is not None and target_combo is not None:
-            source = source_combo.currentData()
-            target = target_combo.currentData()
-            if source and target:
-                self._set_hotkey_translation_pair(mode, str(source), str(target))
-                return
+        # Selecting which mode to edit is navigation. A temporary fallback
+        # (for example while a language package is absent) must not replace
+        # that mode's saved pair until the user actually edits its languages.
         self.save_config()
 
     def _on_hotkey_source_changed(self, *_args):
@@ -7274,7 +7484,7 @@ class DarkThemeApp(QMainWindow):
         )
 
     def _refresh_direction_summary(self):
-        """Show a short heading; keep the detailed direction map in its tooltip."""
+        """Keep the direction map in the single-row language bar's hover help."""
         label = getattr(self, "direction_summary", None)
         if label is None:
             return
@@ -7290,6 +7500,9 @@ class DarkThemeApp(QMainWindow):
                     f"{ui_text(self.current_interface_language, 'direction_hint')}"
                 )
             )
+            bar = getattr(self, "hotkey_language_bar", None)
+            if bar is not None:
+                bar.setToolTip(label.toolTip())
         except RuntimeError:
             return
 
@@ -7373,6 +7586,14 @@ class DarkThemeApp(QMainWindow):
 
     def sync_autostart_state(self, repair_stale=False):
         """Sync config with the real Startup folder shortcut."""
+        if platform_support.IS_MAC:
+            import macos_desktop
+            enabled = macos_desktop.autostart_enabled()
+            if not enabled and repair_stale and self.config.get("autostart"):
+                enabled = macos_desktop.set_autostart(True)
+            self.autostart = self.config["autostart"] = enabled
+            self.config["autostart_backend"] = "macos_launchagent"
+            return enabled
         if platform_support.IS_LINUX:
             import linux_desktop
 
@@ -7417,6 +7638,12 @@ class DarkThemeApp(QMainWindow):
 
     def set_autostart(self, enable: bool):
         try:
+            if platform_support.IS_MAC:
+                import macos_desktop
+                self.autostart = macos_desktop.set_autostart(bool(enable))
+                self.config["autostart"] = self.autostart
+                self.config["autostart_backend"] = "macos_launchagent"
+                return self.autostart
             if platform_support.IS_LINUX:
                 import linux_desktop
 
@@ -7447,68 +7674,74 @@ class DarkThemeApp(QMainWindow):
             return False
 
     def init_ui(self):
-        self.title_bar = QLabel(self)
+        self.title_bar = QLabel(self.ui_root)
         self.title_bar.setText(INTERFACE_TEXT[self.current_interface_language]["title"])
-        self.title_bar.setGeometry(0, 0, self.width(), 40)
+        self.title_bar.setGeometry(0, 0, self.ui_root.width(), 40)
         self.title_bar.setAlignment(Qt.AlignCenter)
 
-        self.flag_button = QPushButton(self)
-        self.flag_button.setStyleSheet(styled_transparent_button_qss())
-        self.flag_button.setGeometry(10, 5, 30, 30)
+        self.flag_button = ScaledIconButton(self.ui_root)
+        self.flag_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.flag_button.clicked.connect(self.show_interface_language_menu)
         self.update_interface_language_button()
 
-        self.theme_button = QPushButton(self)
+        self.theme_button = ScaledIconButton(self.ui_root)
         self.update_theme_icon()
         self.theme_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "theme")))
-        self.theme_button.setStyleSheet(styled_transparent_button_qss())
-        self.theme_button.setGeometry(50, 5, 30, 30)
+        self.theme_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.theme_button.clicked.connect(self.toggle_theme)
 
-        self.minimize_button = QPushButton(self)
+        self.minimize_button = QPushButton(self.ui_root)
         self.minimize_button.setText("‒")
         self.minimize_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "minimize")))
-        self.minimize_button.setStyleSheet(styled_transparent_button_qss())
-        self.minimize_button.setGeometry(self.width() - 70, 5, 30, 30)
+        self.minimize_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.minimize_button.clicked.connect(self.minimize_to_taskbar)
 
-        self.document_button = QPushButton(self)
+        self.document_button = ScaledIconButton(self.ui_root)
         self.document_button.setAccessibleName(
             doc_text(self.current_interface_language, "title")
         )
         self.document_button.setToolTip(
             tooltip_text(doc_text(self.current_interface_language, "title"))
         )
-        self.document_button.setStyleSheet(styled_transparent_button_qss())
-        self.document_button.setGeometry(self.width() - 190, 5, 30, 30)
-        self.document_button.setIconSize(QSize(26, 26))
+        self.document_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.document_button.clicked.connect(
             lambda _checked=False: self.open_document_translation()
         )
 
         # Кнопка помощи (FAQ)
-        self.help_button = QPushButton(self)
+        self.help_button = ScaledIconButton(self.ui_root)
         self.help_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "help")))
-        self.help_button.setStyleSheet(styled_transparent_button_qss())
-        self.help_button.setGeometry(self.width() - 155, 5, 30, 30)
+        self.help_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.help_button.clicked.connect(self.show_help_dialog)
         self.update_help_icon()
 
-        self.settings_button = QPushButton(self)
+        self.settings_button = ScaledIconButton(self.ui_root)
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
-        self.settings_button.setStyleSheet(styled_transparent_button_qss())
-        self.settings_button.setGeometry(self.width() - 120, 5, 30, 30)
+        self.settings_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.settings_button.clicked.connect(self.show_settings)
 
-        self.close_button = QPushButton(self)
+        self.close_button = QPushButton(self.ui_root)
         self.close_button.setText("×")
         self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
-        self.close_button.setStyleSheet(styled_transparent_button_qss())
-        self.close_button.setGeometry(self.width() - 40, 5, 30, 30)
+        self.close_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.close_button.clicked.connect(self.close)
 
+        self._layout_title_buttons()
         self.show_main_screen()
         self.apply_theme()
+
+    def _layout_title_buttons(self):
+        """One grid for the fixed canvas, with the right group anchored to its edge."""
+        size, gap, inset = 30, 6, 10
+        left = (self.flag_button, self.theme_button)
+        right = (self.document_button, self.help_button, self.settings_button,
+                 self.minimize_button, self.close_button)
+        right_width = len(right) * size + (len(right) - 1) * gap
+        y = (self.title_bar.height() - size) // 2
+        for buttons, start in ((left, inset), (right, self.ui_root.width() - inset - right_width)):
+            for index, button in enumerate(buttons):
+                button.setGeometry(start + index * (size + gap), y, size, size)
+                button.setIconSize(QSize(24, 24))
 
     def create_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
@@ -7779,7 +8012,7 @@ class DarkThemeApp(QMainWindow):
         if action in ("settings", "back_home"):
             return getattr(self, "settings_button", None)
         if action == "shortcut_overview":
-            return getattr(self, "hotkey_language_bar", None)
+            return getattr(self, "hotkey_mode_combo", None)
         if action.startswith("shortcut_"):
             key = action.removeprefix("shortcut_")
             return (getattr(self, "main_hotkey_references", None) or {}).get(key)
@@ -7793,10 +8026,8 @@ class DarkThemeApp(QMainWindow):
         settings_window = getattr(self, "settings_window", None)
         if settings_window is None:
             return None
-        if action == "autostart":
-            return getattr(settings_window, "autostart_checkbox", None)
-        if action == "start_minimized":
-            return getattr(settings_window, "start_minimized_checkbox", None)
+        if action in GUIDE_SETTING_STEPS:
+            return getattr(settings_window, GUIDE_SETTING_STEPS[action][0], None)
         if action == "ocr_engine":
             return getattr(settings_window, "ocr_engine_combo", None)
         if action == "translator":
@@ -7824,43 +8055,90 @@ class DarkThemeApp(QMainWindow):
             dots = getattr(settings_window, "settings_page_dots", ())
             return dots[2] if len(dots) > 2 else None
         if action == "game_controls":
-            return getattr(settings_window, "settings_game_page", None)
+            return getattr(settings_window, "game_language_controls", None)
         if action == "settings_page_main":
             dots = getattr(settings_window, "settings_page_dots", ())
             return dots[0] if dots else None
         return None
 
     def _prepare_guide_settings_page(self, action):
-        settings_window = getattr(self, "settings_window", None)
-        if settings_window is None:
-            return
-        page_zero = {
-            "autostart", "start_minimized", "ocr_engine", "translator",
-            "result_window", "actions_panel", "language_packages", "hotkeys",
-        }
-        page_one = {
-            "ocr_behavior", "export_settings", "import_settings", "bug_report",
-        }
-        page_two = {"game_controls"}
-        if action in page_zero and settings_window._settings_page_index != 0:
-            settings_window._set_settings_page(0)
-        elif action in page_one and settings_window._settings_page_index != 1:
-            settings_window._set_settings_page(1)
-        elif action in page_two and settings_window._settings_page_index != 2:
-            settings_window._set_settings_page(2)
+        # Recover the correct screen when the user explored elsewhere. Suppress
+        # completion signals emitted while rebuilding or selecting a page.
+        self._guide_preparing = True
+        changed = False
+        try:
+            settings = getattr(self, "settings_window", None)
+            main_action = action == "settings" or action.startswith("shortcut_") or action == "main_translate"
+            if main_action:
+                if settings is not None:
+                    self.show_main_screen()
+                    changed = True
+            else:
+                if settings is None or getattr(settings, "_secondary_view_kind", None):
+                    self.show_settings()
+                    changed = True
+                settings = self.settings_window
+                page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
+                if action in {"ocr_engine", "translator", "result_window", "language_packages", "hotkeys"}:
+                    page = 0
+                elif action == "game_controls":
+                    page = 2
+                if page is not None and settings._settings_page_index != page:
+                    settings._set_settings_page(page)
+                    changed = True
+            self.main_layout.activate()
+            if getattr(self, "settings_window", None) is not None:
+                self.settings_window.layout().activate()
+        finally:
+            self._guide_preparing = False
+        return changed
 
-    def _guide_step_requires_click(self, action):
-        if action == "autostart":
+    def _guide_setting_ready(self, action):
+        if action == "result_window":
+            return not result_window_hidden_modes(self.config)
+        if action in GUIDE_SETTING_STEPS:
+            desired = GUIDE_SETTING_STEPS[action][2]
+            return bool(self.config.get(action, DEFAULT_CONFIG.get(action))) == desired
+        return False
+
+    def _complete_guide_setting(self, key):
+        if key in GUIDE_SETTING_STEPS:
+            self._complete_guide_step(key)
+
+    def _guide_navigate(self, action):
+        if action == "settings":
+            self.show_settings()
+        elif action == "back_home":
+            self.show_main_screen()
+        elif action.startswith("settings_page_"):
+            page = {"settings_page_main": 0, "settings_page_updates": 1, "settings_page_game": 2}[action]
+            self.settings_window._set_settings_page(page)
+
+    def _apply_guide_step(self):
+        if not self._guide_active:
+            self._hide_guide_bubble()
+            return
+        action = self._guide_current_action()
+        if not self._guide_primary_btn.isEnabled() or self._guide_waiting_action != action:
+            return
+        recommendation = action in GUIDE_SETTING_STEPS or action == "result_window"
+        if recommendation and not self._guide_setting_ready(action):
             target = self._guide_target_widget(action)
-            return bool(target is not None and not target.isChecked())
-        if action == "start_minimized":
-            target = self._guide_target_widget(action)
-            return bool(target is not None and not target.isChecked())
-        return action in {
-            "language", "theme", "help", "settings", "back_home",
-            "ocr_engine", "translator", "result_window",
-            "settings_page_updates", "settings_page_game", "settings_page_main",
-        }
+            if action == "result_window":
+                target.set_checked_modes(RESULT_WINDOW_MODES)
+                self.settings_window._save_result_window_modes()
+            else:
+                # click() uses the same persistence/backend path as a real
+                # checkbox click, including verifying OS autostart registration.
+                target.click()
+            if self._guide_current_action() != action:
+                return  # The setting's saved signal already advanced once.
+            if not self._guide_setting_ready(action):
+                self._guide_hint.setText(setup_labels(self.current_interface_language)["failed"])
+                self._position_guide_bubble(target)
+                return
+        self._complete_guide_step(action)
+        self._guide_navigate(action)
 
     def _show_guide_step(self):
         if not self._guide_active:
@@ -7869,33 +8147,58 @@ class DarkThemeApp(QMainWindow):
         if self._guide_step_index >= len(steps):
             self._finish_first_run_guide()
             return
-
         action, title, body = steps[self._guide_step_index]
-        self._prepare_guide_settings_page(action)
+        settings = getattr(self, "settings_window", None)
+        if action == "back_home" and getattr(settings, "_secondary_view_kind", None) == "hotkeys":
+            # Let the user finish editing shortcuts unobstructed. Home resumes
+            # the tour through its normal completion signal.
+            self._guide_waiting_action = action
+            self._hide_guide_bubble()
+            return
+        if self._prepare_guide_settings_page(action):
+            # Newly shown children receive their final Qt layout on the next
+            # event turn. Measure only then, never from stale/default geometry.
+            self._schedule_guide_step(0)
+            return
         target = self._guide_target_widget(action)
         if target is None or not target.isVisible():
             self._schedule_guide_step(250)
             return
-
         self._highlight_guide_target(target, action)
         self._ensure_guide_bubble()
-        text = guide_text(self.current_interface_language)
-        self._guide_progress.setText(text["progress"].format(
-            current=self._guide_step_index + 1,
-            total=len(steps),
-        ))
+        labels = setup_labels(self.current_interface_language)
+        self._guide_bubble.set_dark(self.current_theme != "Светлая")
+        self._guide_bubble.chapter.setText(labels[GUIDE_CHAPTER_BY_ACTION[action]])
+        self._guide_progress.setText(f"{self._guide_step_index + 1} / {len(steps)}")
+        self._guide_bubble.progress_bar.setRange(0, len(steps))
+        self._guide_bubble.progress_bar.setValue(self._guide_step_index + 1)
+        if action in GUIDE_SETTING_STEPS:
+            title = target.text()
+        if platform_support.IS_LINUX:
+            bodies = GUIDE_LINUX_BODIES.get(self.current_interface_language, GUIDE_LINUX_BODIES["en"])
+            body = bodies.get(action, body)
         self._guide_title.setText(title)
         self._guide_body.setText(body)
-        if action == "document_translation":
-            hint = text.get("document_hint", text["click_hint"])
-        elif not self._guide_step_requires_click(action):
-            hint = text.get("read_hint", text["click_hint"])
+        recommendation = action in GUIDE_SETTING_STEPS or action == "result_window"
+        ready = self._guide_setting_ready(action)
+        desired = GUIDE_SETTING_STEPS.get(action, (None, None, True))[2]
+        if recommendation:
+            hint = labels["ready" if ready else "recommended" if desired else "recommended_off"]
+            primary = labels["next" if ready else "enable" if desired else "disable"]
         else:
-            hint = text["click_hint"]
+            hint = labels["inspect"]
+            primary = labels["open" if action in {"settings", "back_home"} or action.startswith("settings_page_") else "next"]
+            if action == "settings":
+                primary = GUIDE_SETUP_INTRO.get(self.current_interface_language, GUIDE_SETUP_INTRO["en"])[2]
         self._guide_hint.setText(hint)
-        if hasattr(self, "_guide_skip_btn"):
-            self._guide_skip_btn.setText(text["skip"])
-            self._guide_skip_btn.setEnabled(True)
+        self._guide_hint.show()
+        self._guide_skip_btn.setText(labels["later"])
+        self._guide_skip_btn.setVisible(recommendation)
+        self._guide_skip_btn.setEnabled(True)
+        self._guide_primary_btn.setText(primary)
+        self._guide_primary_btn.setEnabled(True)
+        self._guide_bubble.close_button.setToolTip(labels["close"])
+        self._guide_bubble.close_button.setAccessibleName(labels["close"])
         self._position_guide_bubble(target)
         self._guide_bubble.show()
         self._guide_bubble.raise_()
@@ -7903,133 +8206,27 @@ class DarkThemeApp(QMainWindow):
     def _ensure_guide_bubble(self):
         if self._guide_bubble is not None:
             return
-        self._guide_bubble = QFrame(self)
-        self._guide_bubble.setObjectName("firstRunGuideBubble")
-        self._guide_bubble.setFixedSize(430, 190)
-        self._guide_bubble.setStyleSheet("""
-            QFrame#firstRunGuideBubble {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #151927, stop:1 #26183a);
-                border: 1px solid rgba(197, 179, 233, 185);
-                border-radius: 16px;
-            }
-            QLabel#firstRunGuideProgress {
-                color: #c5b3e9;
-                font-size: 12px;
-                font-weight: 900;
-            }
-            QLabel#firstRunGuideTitle {
-                color: #ffffff;
-                font-size: 18px;
-                font-weight: 900;
-            }
-            QLabel#firstRunGuideBody {
-                color: #d8d2e8;
-                font-size: 14px;
-                line-height: 1.35;
-            }
-            QLabel#firstRunGuideHint {
-                color: #c5b3e9;
-                background: transparent;
-                border: none;
-                padding: 5px 0px;
-                font-size: 13px;
-                font-weight: 900;
-            }
-            QPushButton#firstRunGuideSkip {
-                background: rgba(255, 255, 255, 14);
-                color: #d8d2e8;
-                border: 1px solid rgba(197, 179, 233, 70);
-                border-radius: 9px;
-                padding: 5px 12px;
-                font-size: 13px;
-                font-weight: 900;
-            }
-            QPushButton#firstRunGuideSkip:hover {
-                background: rgba(197, 179, 233, 42);
-                color: #ffffff;
-            }
-        """)
-        layout = QVBoxLayout(self._guide_bubble)
-        layout.setContentsMargins(15, 11, 15, 11)
-        layout.setSpacing(5)
-
-        top_row = QHBoxLayout()
-        self._guide_title = QLabel()
-        self._guide_title.setObjectName("firstRunGuideTitle")
-        self._guide_title.setWordWrap(False)
-        top_row.addWidget(self._guide_title)
-        top_row.addStretch()
-        self._guide_progress = QLabel()
-        self._guide_progress.setObjectName("firstRunGuideProgress")
-        top_row.addWidget(self._guide_progress)
-        layout.addLayout(top_row)
-
-        self._guide_body = QLabel()
-        self._guide_body.setObjectName("firstRunGuideBody")
-        self._guide_body.setWordWrap(True)
-        self._guide_body.setMinimumHeight(86)
-        layout.addWidget(self._guide_body)
-
-        bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(8)
-
-        self._guide_hint = QLabel()
-        self._guide_hint.setObjectName("firstRunGuideHint")
-        self._guide_hint.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self._guide_hint.setMinimumWidth(150)
-        self._guide_hint.setMaximumWidth(215)
-        bottom_row.addWidget(self._guide_hint)
-        bottom_row.addStretch()
-
-        self._guide_skip_btn = QPushButton()
-        self._guide_skip_btn.setObjectName("firstRunGuideSkip")
-        self._guide_skip_btn.setMinimumWidth(118)
-        self._guide_skip_btn.setMaximumWidth(165)
+        self._guide_bubble = SetupGuideCard(getattr(self, 'ui_root', self))
+        self._guide_progress = self._guide_bubble.progress
+        self._guide_title = self._guide_bubble.title
+        self._guide_body = self._guide_bubble.body
+        self._guide_hint = self._guide_bubble.hint
+        self._guide_skip_btn = self._guide_bubble.skip_button
+        self._guide_primary_btn = self._guide_bubble.primary_button
         self._guide_skip_btn.clicked.connect(self.skip_current_guide_step)
-        bottom_row.addWidget(self._guide_skip_btn)
-        layout.addLayout(bottom_row)
+        self._guide_primary_btn.clicked.connect(self._apply_guide_step)
+        self._guide_bubble.close_button.clicked.connect(self.skip_first_run_guide)
 
     def _position_guide_bubble(self, target):
-        if self._guide_bubble is None:
-            return
-        target_pos = target.mapTo(self, QtCore.QPoint(0, 0))
-        target_rect = QtCore.QRect(target_pos, target.size())
-        bubble_w = self._guide_bubble.width()
-        bubble_h = self._guide_bubble.height()
-        margin = 12
-        top_margin = 48
-        gap = 12
-        action = getattr(self, "_guide_waiting_action", None)
+        self._guide_bubble.place(self._guide_target_rect(target))
 
-        # The lower settings actions occupy almost the whole window width. Put
-        # their guide card in the free upper band instead of covering the row
-        # the user is supposed to click.
-        if action in (
-            "actions_panel", "language_packages", "hotkeys", "ocr_behavior",
-            "export_settings", "import_settings", "bug_report", "game_controls",
-        ):
-            x = (self.width() - bubble_w) // 2
-            y = top_margin
-        elif target_rect.center().x() > self.width() // 2:
-            # Engine and result pickers live on the right. Their card fits to
-            # the left without hiding the selected control or its popup.
-            x = target_rect.left() - bubble_w - gap
-            y = target_rect.center().y() - bubble_h // 2
-        elif target_rect.top() < 55:
-            # Header controls stay visible above the guide.
-            x = target_rect.center().x() - bubble_w // 2
-            y = target_rect.bottom() + gap
-        elif target_rect.top() - bubble_h - gap >= top_margin:
-            x = target_rect.center().x() - bubble_w // 2
-            y = target_rect.top() - bubble_h - gap
-        else:
-            x = target_rect.center().x() - bubble_w // 2
-            y = target_rect.bottom() + gap
-
-        x = max(margin, min(x, self.width() - bubble_w - margin))
-        y = max(top_margin, min(y, self.height() - bubble_h - margin))
-        self._guide_bubble.move(x, y)
+    def _guide_target_rect(self, target):
+        size = target.size()
+        if isinstance(target, QCheckBox):
+            # A grid cell may span the whole window. Highlight the actual
+            # checkbox and caption, leaving unused cell space for the card.
+            size.setWidth(min(size.width(), target.sizeHint().width()))
+        return QtCore.QRect(target.mapTo(getattr(self, 'ui_root', self), QtCore.QPoint(0, 0)), size)
 
     def _highlight_guide_target(self, target, action):
         if self._guide_target_animation is not None:
@@ -8051,8 +8248,6 @@ class DarkThemeApp(QMainWindow):
             target.removeEventFilter(self)
         except Exception:
             pass
-        if action in ("ocr_engine", "translator", "result_window"):
-            target.installEventFilter(self)
 
         # No glow here any more. It was a blurred drop shadow animated in a
         # forever loop, re-rendered in software on every frame for as long as the
@@ -8063,8 +8258,8 @@ class DarkThemeApp(QMainWindow):
 
     def _spotlight_guide_target(self, target):
         if self._guide_spotlight is None:
-            self._guide_spotlight = GuideSpotlight(self)
-        rect = QtCore.QRect(target.mapTo(self, QtCore.QPoint(0, 0)), target.size())
+            self._guide_spotlight = GuideSpotlight(getattr(self, 'ui_root', self))
+        rect = self._guide_target_rect(target)
         self._guide_spotlight.spotlight(rect)
         # The card explains the step, so it stays above the dimming.
         if self._guide_bubble is not None:
@@ -8075,13 +8270,20 @@ class DarkThemeApp(QMainWindow):
             self._guide_spotlight.clear()
 
     def _complete_guide_step(self, action):
-        if not self._guide_active:
+        if not self._guide_active or getattr(self, "_guide_preparing", False):
             return
-        if action != self._guide_current_action():
+        if action != self._guide_current_action() or action != self._guide_waiting_action:
             return
-        button = getattr(self, "_guide_skip_btn", None)
-        if button is not None:
-            button.setEnabled(False)
+        if (action in GUIDE_SETTING_STEPS or action == "result_window") and not self._guide_setting_ready(action):
+            return
+        self._advance_guide_step()
+
+    def _advance_guide_step(self):
+        # Both buttons describe the old step until the next card is rendered.
+        for name in ("_guide_skip_btn", "_guide_primary_btn"):
+            button = getattr(self, name, None)
+            if button is not None:
+                button.setEnabled(False)
         self._guide_step_index += 1
         self._schedule_guide_step(120)
 
@@ -8089,24 +8291,11 @@ class DarkThemeApp(QMainWindow):
         if not self._guide_active:
             return
         button = getattr(self, "_guide_skip_btn", None)
-        if button is not None:
-            if not button.isEnabled():
-                return
-            # The old card remains visible until the next target has been
-            # prepared. Disable it during that short transition so a double
-            # click cannot advance two or three steps at once.
-            button.setEnabled(False)
+        if button is not None and not button.isEnabled():
+            return
         action = self._guide_current_action()
-        self._guide_step_index += 1
-        if action == "settings" and getattr(self, "settings_window", None) is None:
-            self.show_settings()
-        elif action == "settings_page_updates" and getattr(self, "settings_window", None) is not None:
-            self.settings_window._set_settings_page(1)
-        elif action == "settings_page_game" and getattr(self, "settings_window", None) is not None:
-            self.settings_window._set_settings_page(2)
-        elif action == "settings_page_main" and getattr(self, "settings_window", None) is not None:
-            self.settings_window._set_settings_page(0)
-        self._schedule_guide_step(80)
+        self._advance_guide_step()
+        self._guide_navigate(action)
 
     def skip_first_run_guide(self):
         self.config["first_run_guide_completed"] = True
@@ -8138,41 +8327,28 @@ class DarkThemeApp(QMainWindow):
     def _finish_first_run_guide(self):
         if not self._guide_active:
             return
-        self.config["first_run_guide_completed"] = True
-        self.config["first_run_guide_pending"] = False
-        self.save_config()
-        self._guide_active = False
-        self._guide_waiting_action = None
-        self._guide_step_timer.stop()
-
-        if self._guide_effect_widget is not None:
-            try:
-                self._guide_effect_widget.removeEventFilter(self)
-                self._guide_effect_widget.setGraphicsEffect(None)
-            except Exception:
-                pass
-        self._guide_effect_widget = None
-        if self._guide_target_animation is not None:
-            try:
-                self._guide_target_animation.stop()
-            except Exception:
-                pass
-            self._guide_target_animation = None
-        self._clear_guide_spotlight()
-
+        self.skip_first_run_guide()
         self._ensure_guide_bubble()
-        text = guide_text(self.current_interface_language)
-        self._guide_progress.setText("")
-        self._guide_title.setText(text["done_title"])
-        self._guide_body.setText(text["done_body"])
-        self._guide_hint.setText("")
-        self._guide_bubble.move(
-            max(12, (self.width() - self._guide_bubble.width()) // 2),
-            max(48, (self.height() - self._guide_bubble.height()) // 2),
-        )
+        labels = setup_labels(self.current_interface_language)
+        self._guide_bubble.set_dark(self.current_theme != "Светлая")
+        self._guide_bubble.chapter.setText(labels["completed"])
+        actions = (*GUIDE_SETTING_STEPS, "result_window")
+        ready = sum(self._guide_setting_ready(action) for action in actions)
+        # This counter always measures tour steps. Settings are a separate
+        # result in the body, including when recommendations were skipped.
+        step_count = len(self._guide_steps())
+        self._guide_progress.setText(f"{step_count} / {step_count}")
+        self._guide_bubble.progress_bar.setRange(0, step_count)
+        self._guide_bubble.progress_bar.setValue(step_count)
+        self._guide_title.setText(labels["done"])
+        self._guide_body.setText(labels["done_body"].format(ready=ready, total=len(actions)))
+        self._guide_hint.hide()
+        self._guide_skip_btn.hide()
+        self._guide_primary_btn.setText(labels["finish_button"])
+        self._guide_primary_btn.setEnabled(True)
+        self._guide_bubble.place()
         self._guide_bubble.show()
         self._guide_bubble.raise_()
-        QTimer.singleShot(1800, self._hide_guide_bubble)
 
     def _hide_guide_bubble(self):
         self._clear_guide_spotlight()
@@ -8180,18 +8356,10 @@ class DarkThemeApp(QMainWindow):
             self._guide_bubble.hide()
 
     def eventFilter(self, watched, event):
-        if (
-            self._guide_active
-            and watched is self._guide_effect_widget
-            and event.type() == QtCore.QEvent.MouseButtonPress
-            and self._guide_waiting_action in ("ocr_engine", "translator", "result_window")
-        ):
-            action = self._guide_waiting_action
-            QTimer.singleShot(180, lambda: self._complete_guide_step(action))
         return super().eventFilter(watched, event)
 
     def nativeEvent(self, eventType, message):
-        event_name = eventType.decode("utf-8", "ignore") if isinstance(eventType, bytes) else str(eventType)
+        event_name = bytes(eventType).decode("utf-8", "ignore") if isinstance(eventType, (bytes, bytearray, QtCore.QByteArray)) else str(eventType)
         if _SHOW_WINDOW_MESSAGE_ID and event_name in ("windows_generic_MSG", "windows_dispatcher_MSG"):
             try:
                 msg = wintypes.MSG.from_address(int(message))
@@ -8221,6 +8389,7 @@ class DarkThemeApp(QMainWindow):
         """
         actions = {
             "show": lambda: _show_running_instance(),
+            "quit": _request_running_instance_exit,
             "toggle": self.toggle_window_visibility,
             "ocr": self.launch_ocr,
             "copy": self.launch_copy,
@@ -8237,6 +8406,8 @@ class DarkThemeApp(QMainWindow):
         hotkey_dispatcher.triggered.emit(callback)
 
     def launch_ocr(self):
+        if not self._ensure_capture_permission():
+            return
         print("launch_ocr called")
         if hasattr(self, "source_lang"):
             src_text = self.source_lang.currentText().lower()
@@ -8259,6 +8430,8 @@ class DarkThemeApp(QMainWindow):
             self.hide()
 
     def launch_copy(self):
+        if not self._ensure_capture_permission():
+            return
         print("launch_copy called")
         try:
             from ocr import run_screen_capture
@@ -8276,6 +8449,8 @@ class DarkThemeApp(QMainWindow):
                 self.hide()
 
     def launch_translate(self):
+        if not self._ensure_capture_permission():
+            return
         print("launch_translate called")
         try:
             from ocr import run_screen_capture
@@ -8293,6 +8468,8 @@ class DarkThemeApp(QMainWindow):
                 self.hide()
 
     def launch_fullscreen_translate(self):
+        if not self._ensure_capture_permission():
+            return
         print("launch_fullscreen_translate called")
         try:
             from ocr import run_fullscreen_translate
@@ -8316,6 +8493,8 @@ class DarkThemeApp(QMainWindow):
 
     def launch_game_translate(self):
         """Toggle the game workflow selected in Settings."""
+        if not self._ensure_capture_permission():
+            return
         try:
             from game_mode import game_mode_active, toggle_game_mode
 
@@ -8326,6 +8505,12 @@ class DarkThemeApp(QMainWindow):
             QTimer.singleShot(0 if already_active else 180, toggle_game_mode)
         except Exception:
             logging.exception("Could not launch dynamic translation")
+
+    def _ensure_capture_permission(self):
+        if platform_support.IS_MAC:
+            from macos_desktop import ensure_permission
+            return ensure_permission("screen", self, self.current_interface_language)
+        return True
 
     # Signal to show/hide status tooltip
     _show_status_signal = QtCore.pyqtSignal(str)
@@ -8340,7 +8525,7 @@ class DarkThemeApp(QMainWindow):
         self._status_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self._status_label.setAttribute(Qt.WA_NoSystemBackground, True)
         self._status_label.setStyleSheet(
-            TOOLTIP_QSS.replace("QToolTip", "QLabel")
+            tooltip_stylesheet().replace("QToolTip", "QLabel")
             + "\nQLabel { font-size: 14px; }"
         )
         self._status_label.hide()
@@ -8421,16 +8606,23 @@ class DarkThemeApp(QMainWindow):
 
     def _launch_translate_selection(self, replace_selection=False):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
+        if platform_support.IS_MAC:
+            from macos_desktop import ensure_permission
+            if not ensure_permission("accessibility", self, self.current_interface_language):
+                return
         print("launch_translate_selection called")
         source_code, target_code = (
             self._replace_selected_text_translation_pair()
             if replace_selection
             else self._selected_text_translation_pair()
         )
-        replace_selection = bool(replace_selection and platform_support.IS_WINDOWS)
+        replace_selection = bool(replace_selection and (platform_support.IS_WINDOWS or platform_support.IS_MAC))
         # Capture this before translation starts. The worker verifies it again
         # immediately before pasting, after also re-copying the same selection.
         selection_window = _windows_foreground_window() if replace_selection else 0
+        if platform_support.IS_MAC and replace_selection:
+            from macos_desktop import foreground_target
+            selection_window = foreground_target()
 
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
@@ -8441,7 +8633,7 @@ class DarkThemeApp(QMainWindow):
                     self.config.get("restore_clipboard_after_selection", True)
                 )
                 if (
-                    platform_support.IS_WINDOWS
+                    (platform_support.IS_WINDOWS or platform_support.IS_MAC)
                     and clipboard_before_capture is not None
                     and (force or restore_enabled)
                 ):
@@ -8460,7 +8652,7 @@ class DarkThemeApp(QMainWindow):
                         clipboard_before_capture = None
                     # Release all modifier keys first
                     KEYEVENTF_KEYUP = 0x0002
-                    for vk in (0x11, 0x12, 0x10, 0x5B, 0x5C):
+                    for vk in ((0x11, 0x12, 0x10, 0x5B, 0x5C) if platform_support.IS_WINDOWS else ()):
                         ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
                     time.sleep(0.35)
                     # Clear clipboard, then Ctrl+C to capture selection
@@ -8624,6 +8816,8 @@ class DarkThemeApp(QMainWindow):
 
     def apply_theme(self):
         theme = THEMES[self.current_theme]
+        from window_appearance import refresh_window_appearance
+        refresh_window_appearance(percent=self.config.get('ui_scale_percent', DEFAULT_SCALE), theme=self.current_theme)
         # Remember the stylesheet already installed on the fixed main window.
         # Reapplying it while the cached Settings tree is merely hidden makes
         # Qt repolish hundreds of controls and caused the visible pause on Back.
@@ -8634,6 +8828,14 @@ class DarkThemeApp(QMainWindow):
         scrollbar_handle = '#7A5FA1'  # Фиолетовый
         scrollbar_handle_hover = '#9A7FC1'
         is_dark = self.current_theme != "Светлая"
+        shadow_surface = "#302938" if is_dark else "#e2d8ec"
+        shadow_border = "#8c739f" if is_dark else "#927aa8"
+        status_label = getattr(self, '_status_label', None)
+        if status_label is not None:
+            status_label.setStyleSheet(
+                tooltip_stylesheet(is_dark).replace('QToolTip', 'QLabel')
+                + '\nQLabel { font-size: 14px; }'
+            )
         # This is passive status information, not another control. A single
         # quiet divider separates it from the shortcuts without creating a
         # button- or card-shaped target.
@@ -8645,7 +8847,7 @@ class DarkThemeApp(QMainWindow):
             QMainWindow {{
                 background-color: {theme['background']};
             }}
-            {TOOLTIP_QSS}
+            {tooltip_stylesheet(is_dark)}
             QLabel {{
                 color: {theme['text_color']};
                 font-size: 16px;
@@ -8653,7 +8855,11 @@ class DarkThemeApp(QMainWindow):
             QFrame#mainEngineStatusPanel {{
                 background: transparent;
                 border: none;
-                border-left: 1px solid {engine_panel_divider};
+                border-radius: 0;
+            }}
+            QFrame#mainEngineStatusSeparator {{
+                background: {engine_panel_divider};
+                border: none;
                 border-radius: 0;
             }}
             QFrame#mainSectionDivider {{
@@ -8666,10 +8872,14 @@ class DarkThemeApp(QMainWindow):
                 color: {engine_panel_text};
                 background: transparent;
                 border: none;
-                font-size: 13px;
-                font-weight: 500;
+                font-size: 12px;
+                font-weight: 400;
                 margin: 0;
                 padding: 0;
+            }}
+            QLabel#mainShortcutSectionTitle {{
+                color:{engine_panel_text}; background:transparent; border:none;
+                font-size:12px; font-weight:500;
             }}
             QComboBox {{
                 background-color: {theme['button_background']};
@@ -8734,13 +8944,7 @@ class DarkThemeApp(QMainWindow):
             QComboBox QAbstractItemView QScrollBar::sub-page:vertical {{
                 background: transparent;
             }}
-            QPushButton {{
-                background-color: {theme['button_background']};
-                color: {theme['text_color']};
-                border: 2px solid #C5B3E9;
-                padding: 10px;
-                font-size: 14px;
-            }}
+
             QLineEdit, QTextEdit {{
                 background-color: {theme['button_background']};
                 color: {theme['text_color']};
@@ -8775,84 +8979,50 @@ class DarkThemeApp(QMainWindow):
             QTextEdit QScrollBar::add-page:vertical, QTextEdit QScrollBar::sub-page:vertical {{
                 background: none;
             }}
-        """
+        """ + standard_buttons(is_dark, compact=False)
+        # Keep the shadow action in the live window theme. A private stylesheet
+        # on the button kept its creation-time colours after a theme switch.
+        style_sheet += (
+            button_qss(is_dark, selector="QPushButton#mainShadowButton", compact=True)
+            + f"QPushButton#mainShadowButton {{ background:{shadow_surface}; border-color:{shadow_border};"
+            " min-height:28px; min-width:142px; }"
+        )
         self.setStyleSheet(style_sheet)
+        controller = getattr(self, '_ui_scale_controller', None)
+        if controller is not None:
+            controller.apply_theme(style_sheet, theme['background'])
+            from ui_scaling import normalize_ui_scale
+            requested = normalize_ui_scale(self.config.get('ui_scale_percent', DEFAULT_SCALE))
+            if controller.requested_percent != requested:
+                controller.set_percent(requested)
         self._apply_main_combo_theme(is_dark)
+        self._apply_main_hotkey_theme()
         # The theme decides the font, and the font decides how wide the mode
         # picker has to be to show its longest entry.
         self._fit_hotkey_mode_combo()
         if hasattr(self, "title_bar"):
-            header_bg = "#ddd7e2" if self.current_theme == "Светлая" else theme['button_background']
+            header_bg = window_header_color(self.current_theme != "Светлая")
             self.title_bar.setStyleSheet(
                 f"font-size: 18px; font-weight: bold; color: {theme['text_color']}; background-color: {header_bg};"
             )
 
+        for name in ("flag_button", "theme_button", "document_button", "help_button", "settings_button"):
+            control = getattr(self, name, None)
+            if control is not None:
+                control.setStyleSheet(styled_transparent_button_qss(is_dark))
+
         if hasattr(self, "minimize_button") and hasattr(self, "close_button"):
-            if self.current_theme == "Светлая":
-                self.minimize_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #000000;
-                        font-size: 16px;
-                        border: none;
-                    }
-                    QPushButton:hover {
-                        color: #00aa00;
-                    }
-                """)
-                self.close_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #000000;
-                        font-size: 20px;
-                        border: none;
-                    }
-                    QPushButton:hover {
-                        color: #aa0000;
-                    }
-                """)
-            else:
-                self.minimize_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: white;
-                        font-size: 16px;
-                        border: none;
-                    }
-                    QPushButton:hover {
-                        color: #00ff00;
-                    }
-                """)
-                self.close_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: white;
-                        font-size: 20px;
-                        border: none;
-                    }
-                    QPushButton:hover {
-                        color: #ff3333;
-                    }
-                """)
+            self.minimize_button.setStyleSheet(button_qss(is_dark, "quiet", icon=True))
+            self.close_button.setStyleSheet(button_qss(is_dark, "close", icon=True))
         # Обновить иконку кнопки помощи
         self.update_help_icon()
         self.update_theme_icon()
         self.update_document_icon()
         if hasattr(self, "settings_button"):
-            if self.settings_window is None:
-                if self.current_theme == "Темная":
-                    self.settings_button.setIcon(QIcon(resource_path("icons/settings_light.png")))
-                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
-                else:
-                    self.settings_button.setIcon(QIcon(resource_path("icons/settings_dark.png")))
-                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
-            else:
-                if self.current_theme == "Темная":
-                    self.settings_button.setIcon(QIcon(resource_path("icons/light_home.png")))
-                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
-                else:
-                    self.settings_button.setIcon(QIcon(resource_path("icons/dark_home.png")))
-                    self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
+            kind = 'settings' if self.settings_window is None else 'home'
+            self.settings_button.setIcon(header_icon(kind, self.current_theme))
+            tooltip_key = 'settings' if kind == 'settings' else 'back'
+            self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language][tooltip_key]))
 
     def _apply_main_combo_theme(self, is_dark):
         """Restyle live main-page selectors and forget deleted Qt wrappers.
@@ -8866,39 +9036,11 @@ class DarkThemeApp(QMainWindow):
         hotkey_bar = getattr(self, "hotkey_language_bar", None)
         if isinstance(hotkey_bar, QFrame):
             try:
-                bar_background = "#17151c" if is_dark else "#e9e3ed"
-                bar_border = "#4f4162" if is_dark else "#cdbce1"
-                hint_color = "#c4a8e8" if is_dark else "#735396"
-                hotkey_bar.setStyleSheet(f"""
-                    QFrame#hotkeyLanguageBar {{
-                        background: {bar_background};
-                        border: 1px solid {bar_border};
-                        border-radius: 9px;
-                    }}
-                    QLabel#hotkeyLanguageBarHint {{
-                        color: {hint_color};
-                        background: transparent;
-                        border: none;
-                        font-size: 13px;
-                        font-weight: 700;
-                    }}
-                    QToolButton#hotkeyLanguageBarSwap {{
-                        color: {hint_color};
-                        background: {'#211d29' if is_dark else '#eee7f5'};
-                        border: 1px solid {bar_border};
-                        border-radius: 8px;
-                        font-size: 16px;
-                        font-weight: 800;
-                    }}
-                    QToolButton#hotkeyLanguageBarSwap:hover {{
-                        background: {'#30283b' if is_dark else '#e1d4ee'};
-                        border-color: {hint_color};
-                    }}
-                    QToolButton#hotkeyLanguageBarSwap:disabled {{
-                        color: {'#665d70' if is_dark else '#aaa0b5'};
-                        border-color: {'#37313e' if is_dark else '#ddd6e4'};
-                    }}
-                """ + TOOLTIP_QSS)
+                hotkey_bar.setStyleSheet(
+                    "QFrame#hotkeyLanguageBar { background:transparent; border:none; }"
+                    + tooltip_stylesheet(is_dark)
+                    + button_qss(is_dark, "quiet", selector="QToolButton#hotkeyLanguageBarSwap", icon=True)
+                )
             except RuntimeError:
                 self.hotkey_language_bar = None
         for combo_name in (
@@ -8911,16 +9053,21 @@ class DarkThemeApp(QMainWindow):
             combo = getattr(self, combo_name, None)
             if isinstance(combo, DropDownCombo):
                 try:
-                    font_size = 13 if combo_name.startswith("hotkey_") else 16
+                    font_size = 13
                     combo_style = modern_combo_style(is_dark, font_size=font_size)
-                    if combo_name.startswith("hotkey_"):
-                        accent = "#775e96" if is_dark else "#aa8bcc"
-                        hover = "#b395d9" if is_dark else "#8462aa"
-                        combo_style += f"""
-                            QComboBox {{ border: 1px solid {accent}; }}
-                            QComboBox:hover, QComboBox:focus {{ border: 1px solid {hover}; }}
-                        """
+                    field = "#25212c" if is_dark else "#f0ebf5"
+                    field_border = "#62566e" if is_dark else "#a999bb"
+                    hover = "#312938" if is_dark else "#e7ddee"
+                    focus = "#c5ace3" if is_dark else "#79569b"
+                    combo_style += f"""
+                        QComboBox {{ background:{field}; border:1px solid {field_border};
+                            margin:0; min-height:22px; max-height:22px; }}
+                        QComboBox:hover, QComboBox:on {{ background:{hover}; border-color:{focus}; }}
+                        QComboBox:focus {{ border-color:{field_border}; }}
+                        QComboBox[keyboardFocus="true"]:focus {{ background:{hover}; border-color:{focus}; }}
+                    """
                     combo.setStyleSheet(combo_style)
+                    combo.setFixedHeight(30)
                     combo.set_popup_background(popup_background)
                 except RuntimeError:
                     # The corresponding page is already gone; show_main_screen
@@ -8929,75 +9076,61 @@ class DarkThemeApp(QMainWindow):
         main_swap = getattr(self, "main_language_swap", None)
         if isinstance(main_swap, QToolButton):
             try:
-                background = "#211d29" if is_dark else "#f1ebf6"
-                hover = "#342b40" if is_dark else "#e3d7ed"
-                border = "#5e4d70" if is_dark else "#c8b5d7"
-                text = "#c4a8e8" if is_dark else "#735396"
-                disabled = "#665d70" if is_dark else "#aaa0b5"
-                main_swap.setStyleSheet(f"""
-                    QToolButton {{
-                        color: {text}; background: {background};
-                        border: 1px solid {border}; border-radius: 9px;
-                        font-size: 17px; font-weight: 800;
-                    }}
-                    QToolButton:hover {{ background: {hover}; border-color: {text}; }}
-                    QToolButton:disabled {{ color: {disabled}; border-color: {disabled}; }}
-                """)
+                main_swap.setStyleSheet(button_qss(is_dark, "quiet", selector="QToolButton", icon=True))
             except RuntimeError:
                 self.main_language_swap = None
         self._apply_main_translate_button_theme(is_dark)
 
     def _apply_main_translate_button_theme(self, is_dark):
-        """Style the input and action as one chat-like composer."""
+        """Keep the language toolbar and composer inside one translation panel."""
         button = getattr(self, "translate_button", None)
         if not isinstance(button, QPushButton):
             return
         try:
             composer = getattr(self, "main_composer", None)
-            background = "#17161b" if is_dark else "#efebf2"
-            border = "#4b4256" if is_dark else "#cfc5da"
+            background = "#1d1922" if is_dark else "#ffffff"
+            border = "#62566e" if is_dark else "#927cab"
+            divider = "#433a4c" if is_dark else "#d7cde3"
             input_text = "#f2eff6" if is_dark else "#27222d"
-            muted = "#948d9e" if is_dark else "#77707e"
+            muted = "#b5acbf" if is_dark else "#655b70"
+            section = getattr(self, "main_text_section", None)
+            if isinstance(section, QFrame):
+                section.setStyleSheet(
+                    "QFrame#mainTextSection {"
+                    f" background:{background}; border:1px solid {border}; border-radius:10px; }}"
+                    "QLabel#mainTextSectionTitle {"
+                    f" color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600; }}"
+                )
+            shortcuts = getattr(self, "main_shortcut_section", None)
+            if isinstance(shortcuts, QFrame):
+                shortcuts.setStyleSheet(
+                    "QFrame#mainShortcutSection {"
+                    f" background:{background}; border:1px solid {border}; border-radius:10px; }}"
+                    "QLabel#mainShortcutSectionTitle {"
+                    f" color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600; }}"
+                )
             if isinstance(composer, QFrame):
                 composer.setStyleSheet(
                     "QFrame#mainComposer {"
-                    f" background-color: {background}; border: 1px solid {border};"
-                    " border-radius: 14px; }"
-                    "QFrame#mainComposer:hover {"
-                    " border-color: #6f5a86; }"
+                    " background:transparent; border:1px solid transparent; border-radius:0;"
+                    f" border-top:1px solid {divider}; }}"
                     "QTextEdit#mainComposerInput {"
                     f" background: transparent; color: {input_text};"
                     f" selection-background-color: #7A5FA1; border: none;"
                     " padding: 7px 9px; font-size: 14px; }"
                     "QTextEdit#mainComposerInput:disabled {"
                     f" color: {muted}; }}"
-                    + TOOLTIP_QSS
+                    + tooltip_stylesheet(is_dark)
                 )
             button.setStyleSheet(
-                "QPushButton#mainTranslateButton {"
-                " border: none; border-radius: 7px; padding: 0;"
-                " background-color: transparent; }"
-                "QPushButton#mainTranslateButton:hover {"
-                " background-color: rgba(122, 95, 161, 42); }"
-                "QPushButton#mainTranslateButton:pressed {"
-                " background-color: rgba(122, 95, 161, 72); }"
-                "QPushButton#mainTranslateButton:disabled {"
-                " background-color: transparent; }"
-                + TOOLTIP_QSS
+                button_qss(is_dark, "quiet", icon=True) + tooltip_stylesheet(is_dark)
             )
             button.setIcon(send_arrow_icon("Темная" if is_dark else "Светлая"))
             button.setIconSize(QSize(24, 24))
             expand_button = getattr(self, "document_expand_button", None)
             if isinstance(expand_button, QPushButton):
                 expand_button.setStyleSheet(
-                    "QPushButton#mainDocumentExpandButton {"
-                    " border: none; border-radius: 7px; padding: 0;"
-                    " background-color: transparent; }"
-                    "QPushButton#mainDocumentExpandButton:hover {"
-                    " background-color: rgba(122, 95, 161, 34); }"
-                    "QPushButton#mainDocumentExpandButton:pressed {"
-                    " background-color: rgba(122, 95, 161, 62); }"
-                    + TOOLTIP_QSS
+                    button_qss(is_dark, selector="QPushButton#mainDocumentExpandButton", icon=True) + tooltip_stylesheet(is_dark)
                 )
                 expand_button.setIcon(
                     document_expand_icon("Темная" if is_dark else "Светлая")
@@ -9011,22 +9144,24 @@ class DarkThemeApp(QMainWindow):
                     f" color: {heading_color}; background: transparent;"
                     " border: none; padding: 0 3px; margin: 0;"
                     " font-size: 14px; font-weight: 700; }"
-                    + TOOLTIP_QSS
+                    + tooltip_stylesheet(is_dark)
                 )
         except RuntimeError:
             self.translate_button = None
 
     def update_theme_icon(self):
-        icon_path = resource_path("icons/sun.png") if self.current_theme == "Темная" else resource_path("icons/moon.png")
-        self.theme_button.setIcon(QIcon(icon_path))
+        icons = getattr(self, '_theme_icons', None)
+        if icons is None:
+            icons = self._theme_icons = {}
+        if self.current_theme not in icons:
+            icon_path = resource_path("icons/sun.png") if self.current_theme == "Темная" else resource_path("icons/moon.png")
+            icons[self.current_theme] = QIcon(icon_path)
+        self.theme_button.setIcon(icons[self.current_theme])
 
     def update_help_icon(self):
         """Обновить иконку кнопки помощи в зависимости от темы."""
         if hasattr(self, "help_button"):
-            if self.current_theme == "Темная":
-                self.help_button.setIcon(QIcon(resource_path("icons/faq_black_theme.png")))
-            else:
-                self.help_button.setIcon(QIcon(resource_path("icons/faq_white_theme.png")))
+            self.help_button.setIcon(header_icon('help', self.current_theme))
 
     def update_document_icon(self):
         title_button = getattr(self, "document_button", None)
@@ -9052,7 +9187,6 @@ class DarkThemeApp(QMainWindow):
             self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
             self.save_config()
             self.apply_theme()
-            self.update_theme_icon()
             if self.settings_window is not None:
                 self.settings_window.apply_theme()
             if self.document_dialog is not None:
@@ -9060,26 +9194,25 @@ class DarkThemeApp(QMainWindow):
         finally:
             self.setUpdatesEnabled(True)
         self._refresh_theme_paint_tree()
-        QTimer.singleShot(0, self._refresh_theme_paint_tree)
         self._complete_guide_step("theme")
 
     def _refresh_theme_paint_tree(self):
-        """Drop cached style geometry and repaint the complete fixed window."""
+        """Schedule one complete frame after the theme transaction.
+
+        setStyleSheet already repolishes its descendants. Repeating that walk
+        twice also touched hidden Settings controls and delayed every toggle.
+        """
         try:
-            widgets = [self]
-            widgets.extend(self.findChildren(QWidget))
-            for widget in widgets:
-                style = widget.style()
-                if style is not None:
-                    style.unpolish(widget)
-                    style.polish(widget)
-                widget.updateGeometry()
-                widget.update()
-            central = self.centralWidget()
+            root = getattr(self, 'ui_root', self)
+            central = self.central_widget
             if central is not None and central.layout() is not None:
                 central.layout().invalidate()
                 central.layout().activate()
-            self.repaint()
+            root.update()
+            controller = getattr(self, '_ui_scale_controller', None)
+            if controller is not None:
+                controller.view.viewport().update()
+            self.update()
         except RuntimeError:
             pass
 
@@ -9275,18 +9408,8 @@ class DarkThemeApp(QMainWindow):
                     border: 1px solid rgba(197, 179, 233, 105);
                     border-radius: 16px;
                 }
-                QToolButton#helpTitleClose {
-                    background: transparent;
-                    color: #cfc7dd;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 22px;
-                }
-                QToolButton#helpTitleClose:hover {
-                    background: #d44b55;
-                    color: #ffffff;
-                }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
             text_edit.setStyleSheet("""
                 QTextEdit {
                     background-color: rgba(9, 12, 20, 165);
@@ -9329,18 +9452,8 @@ class DarkThemeApp(QMainWindow):
                     border: 1px solid #cdbce1;
                     border-radius: 16px;
                 }
-                QToolButton#helpTitleClose {
-                    background: transparent;
-                    color: #4b4057;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 22px;
-                }
-                QToolButton#helpTitleClose:hover {
-                    background: #d44b55;
-                    color: #ffffff;
-                }
-            """)
+
+            """ + standard_buttons(theme != "Светлая", compact=False))
             text_edit.setStyleSheet("""
                 QTextEdit {
                     background-color: #f3eff5;
@@ -9387,56 +9500,13 @@ class DarkThemeApp(QMainWindow):
         guide_btn = QPushButton(help_action_text(lang, "guide"))
         guide_btn.setObjectName("helpGuideButton")
         guide_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        guide_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #c5b3e9, stop:1 #8f6fd1);
-                color: #111827;
-                border: none;
-                border-radius: 12px;
-                padding: 10px 22px;
-                font-size: 14px;
-                font-weight: 900;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #dfd4ff, stop:1 #a681eb);
-            }
-        """)
+        guide_btn.setStyleSheet(button_qss(theme != "Светлая", "primary"))
         guide_btn.clicked.connect(lambda: self._close_help_and_start_guide(dialog))
         button_grid.addWidget(guide_btn, 0, 0, 1, 3)
 
         telegram_btn = QPushButton(help_action_text(lang, "telegram"))
         telegram_btn.setObjectName("helpTelegramButton")
-        secondary_button_style = """
-            QPushButton {
-                background: rgba(255, 255, 255, 12);
-                color: #efe8ff;
-                border: 1px solid rgba(197, 179, 233, 92);
-                border-radius: 12px;
-                padding: 10px 16px;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            QPushButton:hover {
-                background: rgba(197, 179, 233, 48);
-                border-color: #c5b3e9;
-            }
-        """ if theme == "Темная" else """
-            QPushButton {
-                background: rgba(122, 95, 161, 10);
-                color: #4d3865;
-                border: 1px solid #c8b8dc;
-                border-radius: 12px;
-                padding: 10px 16px;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            QPushButton:hover {
-                background: #eee6f6;
-                border-color: #8f70b3;
-            }
-        """
+        secondary_button_style = button_qss(theme != "Светлая")
         telegram_btn.setStyleSheet(secondary_button_style)
         telegram_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         telegram_btn.clicked.connect(
@@ -9460,34 +9530,7 @@ class DarkThemeApp(QMainWindow):
 
         # Кнопка закрытия
         close_btn = QPushButton(help_action_text(lang, "close"))
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 18);
-                color: #efe8ff;
-                border: 1px solid rgba(197, 179, 233, 92);
-                border-radius: 12px;
-                padding: 10px 26px;
-                font-size: 14px;
-                font-weight: 900;
-            }
-            QPushButton:hover {
-                background-color: rgba(197, 179, 233, 48);
-            }
-        """ if theme == "Темная" else """
-            QPushButton {
-                background-color: rgba(122, 95, 161, 10);
-                color: #4d3865;
-                border: 1px solid #c8b8dc;
-                border-radius: 12px;
-                padding: 10px 26px;
-                font-size: 14px;
-                font-weight: 900;
-            }
-            QPushButton:hover {
-                background-color: #eee6f6;
-                border-color: #8f70b3;
-            }
-        """)
+        close_btn.setStyleSheet(secondary_button_style)
         close_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         close_btn.clicked.connect(dialog.close)
         button_grid.addWidget(close_btn, 1, 2)
@@ -9517,6 +9560,8 @@ class DarkThemeApp(QMainWindow):
                 )
             elif platform_support.IS_LINUX:
                 subprocess.Popen(["xdg-open", str(report_path.parent)])
+            elif platform_support.IS_MAC:
+                subprocess.Popen(["/usr/bin/open", str(report_path.parent)])
         except Exception:
             logging.exception("Could not reveal the diagnostic report")
 
@@ -9557,10 +9602,7 @@ class DarkThemeApp(QMainWindow):
         QTimer.singleShot(250, self._maybe_start_first_run_guide)
 
     def set_settings_button_to_home(self):
-        if self.current_theme == "Темная":
-            self.settings_button.setIcon(QIcon(resource_path("icons/light_home.png")))
-        else:
-            self.settings_button.setIcon(QIcon(resource_path("icons/dark_home.png")))
+        self.settings_button.setIcon(header_icon('home', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
         try:
             self.settings_button.clicked.disconnect()
@@ -9569,10 +9611,7 @@ class DarkThemeApp(QMainWindow):
         self.settings_button.clicked.connect(self.show_main_screen)
 
     def set_settings_button_to_settings(self):
-        if self.current_theme == "Темная":
-            self.settings_button.setIcon(QIcon(resource_path("icons/settings_light.png")))
-        else:
-            self.settings_button.setIcon(QIcon(resource_path("icons/settings_dark.png")))
+        self.settings_button.setIcon(header_icon('settings', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
         try:
             self.settings_button.clicked.disconnect()
@@ -9582,57 +9621,81 @@ class DarkThemeApp(QMainWindow):
 
     @staticmethod
     def _create_main_hotkey_pair(caption, sequence, compact=False):
-        """A non-compressing caption/value pair for the fixed main window.
+        """Keep an action and its shortcut on the same baseline.
 
-        The former rich-text QLabel combined two shortcuts with HTML spaces.
-        QHBoxLayout was allowed to squeeze that single label when the engine
-        name on the right requested room, clipping shortcut characters. Two
-        real labels have exact size hints and keep every key visible.
+        The grid owns the row width; the key keeps its measured width and
+        the caption receives the remaining space. No separate card surfaces.
         """
-        pair = QWidget()
+        if platform_support.IS_MAC and sequence and sequence != "—":
+            sequence = QtGui.QKeySequence(sequence).toString(QtGui.QKeySequence.NativeText)
+        pair = HotkeyReferenceRow()
         pair.setObjectName("mainHotkeyPair")
+        pair.setAccessibleName(f"{caption}: {sequence}")
         layout = QHBoxLayout(pair)
         # QFontMetrics.horizontalAdvance excludes a glyph's anti-aliased edge
         # overhang. With an exactly-sized bold label the final C/F/Q loses its
         # rightmost pixels, so keep a small optical safety area at the end.
         trailing_glyph_room = 2 if compact else 4
-        layout.setContentsMargins(0, 0, trailing_glyph_room, 0)
-        layout.setSpacing(3)
+        if compact:
+            layout.setContentsMargins(6, 0, 6, 0)
+        else:
+            layout.setContentsMargins(0, 0, trailing_glyph_room, 0)
+        layout.setSpacing(10 if compact else 3)
 
-        caption_label = QLabel(f"{caption}:")
+        caption_label = QLabel(caption if compact else f"{caption}:")
         caption_label.setObjectName("mainHotkeyCaption")
         caption_label.setStyleSheet(
-            "font-size: 11px; color: #99919f; padding: 0; margin: 0;"
+            "font-size: 13px; color: #99919f; padding: 0; margin: 0;"
             if compact else
             "font-size: 14px; color: #99919f; padding: 0; margin: 0;"
         )
         caption_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        value_label = ClickableHotkeyValue(str(sequence))
+        caption_label.setWordWrap(False)
+        value_label = QLabel(str(sequence))
         value_label.setObjectName("mainHotkeyValue")
         value_label.setStyleSheet(
-            "font-size: 11px; color: #9f7aca; font-weight: bold; "
-            "background-color: rgba(122, 95, 161, 22); "
-            "border: 1px solid rgba(122, 95, 161, 105); border-radius: 5px; "
-            "padding: 1px 2px; margin: 0;"
+            "font-size: 12px; color: #9f7aca; font-weight: bold; "
+            "background: transparent; border: none; "
+            "padding: 0; margin: 0;"
             if compact else
             "font-size: 13px; color: #9f7aca; font-weight: bold; "
             "background-color: rgba(122, 95, 161, 22); "
             "border: 1px solid rgba(122, 95, 161, 105); border-radius: 5px; "
             "padding: 1px 4px; margin: 0;"
         )
-        value_label.setAlignment(Qt.AlignCenter)
+        value_label.setAlignment((Qt.AlignRight | Qt.AlignVCenter) if compact else Qt.AlignCenter)
         value_label.setAccessibleName(f"{caption}: {sequence}")
-        layout.addWidget(caption_label)
+        layout.addWidget(caption_label, 1 if compact else 0)
         layout.addWidget(value_label)
-
         for label in (caption_label, value_label):
-            label.setFixedHeight(22)
+            # Mouse and keyboard input belong to the row, including clicks
+            # directly on either label. Avoid two handlers for one gesture.
+            label.setAttribute(Qt.WA_TransparentForMouseEvents)
+            label.setFocusPolicy(Qt.NoFocus)
+
+        if compact:
+            for label in (caption_label, value_label):
+                label.ensurePolished()
+            row_height = max(caption_label.sizeHint().height(), value_label.sizeHint().height())
+            caption_label.setFixedHeight(row_height)
+            value_label.setFixedHeight(row_height)
+            pair.setFixedHeight(row_height + 1)
+        else:
+            for label in (caption_label, value_label):
+                label.setFixedHeight(22)
+            pair.setFixedHeight(22)
+        for label in (caption_label, value_label):
             label.ensurePolished()
-        pair.setFixedHeight(22)
-        pair.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        pair.setSizePolicy(QSizePolicy.Expanding if compact else QSizePolicy.Fixed, QSizePolicy.Fixed)
         pair.ensurePolished()
         layout.activate()
-        pair.setFixedWidth(pair.sizeHint().width())
+        if compact:
+            # Account for real glyph widths instead of assigning key columns
+            # a language-dependent constant.
+            value_label.setFixedWidth(value_label.sizeHint().width() + 2)
+            pair.setMinimumWidth(pair.sizeHint().width())
+        else:
+            pair.setFixedWidth(pair.sizeHint().width())
         layout.invalidate()
         layout.activate()
         pair.trailing_glyph_room = trailing_glyph_room
@@ -9641,10 +9704,59 @@ class DarkThemeApp(QMainWindow):
         pair.value_label = value_label
         return pair
 
+    def _apply_main_hotkey_theme(self):
+        dark = self.current_theme != "Светлая"
+        caption = "#b9b1c2" if dark else "#62566e"
+        shortcut = "#c5b3df" if dark else "#74558f"
+        divider = "#312b39" if dark else "#d9d0e1"
+        hover = "#282230" if dark else "#e4dcea"
+        pressed = "#382c45" if dark else "#d7c8e3"
+        focus = "#b99adb" if dark else "#8057a5"
+        area = getattr(self, "main_hotkey_area", None)
+        if isinstance(area, QFrame):
+            try:
+                surface = "#121116" if dark else "#f8f5fb"
+                edge = "#62566e" if dark else "#a999bb"
+                area.setStyleSheet(f"""
+                    QFrame#mainHotkeyArea {{ background:{surface}; border:none;
+                        border-top:1px solid {edge};
+                        border-bottom-left-radius:9px; border-bottom-right-radius:9px; }}
+                """)
+            except RuntimeError:
+                area = None
+        for pair in getattr(self, "main_hotkey_references", {}).values():
+            try:
+                pair.setStyleSheet(f"""
+                    QPushButton#mainHotkeyPair {{ background:transparent; border:none;
+                        border-bottom:1px solid {divider}; border-radius:0; padding:0; }}
+                    QPushButton#mainHotkeyPair[lastShortcutRow="true"] {{ border-bottom-color:transparent; }}
+                    QPushButton#mainHotkeyPair:hover {{ background:{hover}; }}
+                    QPushButton#mainHotkeyPair[keyboardFocus="true"]:focus {{ background:{hover}; border-bottom-color:{focus}; }}
+                    QPushButton#mainHotkeyPair:pressed {{ background:{pressed}; border-bottom-color:{focus}; }}
+                """)
+                pair.caption_label.setStyleSheet(
+                    f"font-size: 13px; color:{caption}; background:transparent; border:none; padding:0; margin:0;"
+                )
+                pair.value_label.setStyleSheet(
+                    f"font-size: 12px; font-weight:bold; color:{shortcut}; background:transparent; border:none; padding:0; margin:0;"
+                )
+                row_height = max(pair.caption_label.sizeHint().height(), pair.value_label.sizeHint().height())
+                for label in (pair.caption_label, pair.value_label):
+                    label.setFixedHeight(row_height)
+                pair.setFixedHeight(row_height + 1)
+            except RuntimeError:
+                continue
+
+        if isinstance(area, QFrame) and area.layout() is not None:
+            area.ensurePolished()
+            area.layout().invalidate()
+            # Let the row fonts, layout margins and separator determine height.
+            area.setFixedHeight(area.sizeHint().height())
+
     def _connect_main_hotkey_pair(self, pair, config_key, action_name):
-        """Open the exact hotkey editor requested by a main-screen badge."""
-        pair.value_label.clicked.connect(
-            lambda key=config_key, action=action_name: self._offer_hotkey_settings(
+        """Use one handler for the row, its caption, and its shortcut."""
+        pair.clicked.connect(
+            lambda _checked=False, key=config_key, action=action_name: self._offer_hotkey_settings(
                 key, action
             )
         )
@@ -9710,7 +9822,8 @@ class DarkThemeApp(QMainWindow):
         if active_settings is not None:
             self._cached_settings_window = active_settings
         self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
-        self.main_layout.setSpacing(5)
+        self.main_layout.setContentsMargins(14, 48, 14, 14)
+        self.main_layout.setSpacing(8)
         self.settings_window = None
         self.set_settings_button_to_settings()
 
@@ -9722,6 +9835,17 @@ class DarkThemeApp(QMainWindow):
             "ocr_engine", platform_support.default_ocr_engine()
         )
         
+        self.main_text_section = QFrame()
+        self.main_text_section.setObjectName("mainTextSection")
+        text_section_layout = QVBoxLayout(self.main_text_section)
+        text_section_layout.setContentsMargins(8, 2, 8, 2)
+        text_section_layout.setSpacing(6)
+        self.main_shortcut_section = QFrame()
+        self.main_shortcut_section.setObjectName("mainShortcutSection")
+        shortcut_section_layout = QVBoxLayout(self.main_shortcut_section)
+        shortcut_section_layout.setContentsMargins(0, 2, 0, 2)
+        shortcut_section_layout.setSpacing(6)
+
         self.label = None
         self._hotkey_language_controls_loading = True
         # The window had three competing rows of language pickers and put the
@@ -9730,23 +9854,26 @@ class DarkThemeApp(QMainWindow):
         # direction, type, translate — then the hotkey settings, then reference.
         self.hotkey_language_bar = QFrame()
         self.hotkey_language_bar.setObjectName("hotkeyLanguageBar")
+        self.hotkey_language_bar.setFixedHeight(30)
         hotkey_bar_layout = QVBoxLayout(self.hotkey_language_bar)
-        hotkey_bar_layout.setContentsMargins(7, 3, 7, 3)
+        hotkey_bar_layout.setContentsMargins(8, 0, 8, 0)
         hotkey_bar_layout.setSpacing(3)
-        self.direction_summary = QLabel()
+        self.direction_summary = QLabel(self.hotkey_language_bar)
         self.direction_summary.setObjectName("mainDirectionSummary")
         self.direction_summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.direction_summary.setFixedHeight(22)
-        hotkey_bar_layout.addWidget(self.direction_summary)
+        self.direction_summary.hide()
         hotkey_row = QHBoxLayout()
         hotkey_row.setContentsMargins(0, 0, 0, 0)
         hotkey_row.setSpacing(6)
-        # The mode combo includes the action and its current shortcut (or an
-        # em dash while unassigned), so a separate explanatory sentence would
-        # repeat the row. The fuller explanation stays in the tooltip.
-        hotkey_caption = QLabel(hotkey_language_text(self.current_interface_language, "bar_caption"))
-        hotkey_caption.setObjectName("hotkeyLanguageBarHint")
-        hotkey_row.addWidget(hotkey_caption)
+        hotkey_caption = QLabel(hotkey_language_text(self.current_interface_language, "hotkey_section"))
+        hotkey_caption.setObjectName("mainShortcutSectionTitle")
+        hotkey_caption.setFixedHeight(18)
+        hotkey_caption.setAlignment(Qt.AlignCenter)
+        shortcut_header = QHBoxLayout()
+        shortcut_header.setContentsMargins(0, 0, 0, 0)
+        shortcut_header.setSpacing(8)
+        shortcut_header.addWidget(hotkey_caption, 1)
         self.hotkey_language_bar.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "bar_hint"))
         )
@@ -9763,10 +9890,17 @@ class DarkThemeApp(QMainWindow):
                 Qt.ToolTipRole,
             )
         self.hotkey_mode_combo.setFixedWidth(160)
+        shortcut_header.setContentsMargins(8, 0, 8, 0)
+        shortcut_section_layout.addLayout(shortcut_header)
         self.hotkey_source_combo = DropDownCombo()
         self.hotkey_source_combo.setMaxVisibleItems(9)
         self.hotkey_target_combo = DropDownCombo()
         self.hotkey_target_combo.setMaxVisibleItems(9)
+        for combo in (self.hotkey_source_combo, self.hotkey_target_combo):
+            # The mode and its language pair share one row. Catalog size hints
+            # must not push either selector outside the panel.
+            combo.setMinimumWidth(0)
+            combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.hotkey_language_swap = LanguageSwapButton()
         self.hotkey_language_swap.setObjectName("hotkeyLanguageBarSwap")
         self.hotkey_language_swap.setFixedSize(30, 30)
@@ -9793,14 +9927,23 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.setSpacing(6)
         self.main_language_swap = LanguageSwapButton()
         self.main_language_swap.setObjectName("mainLanguageSwap")
-        self.main_language_swap.setFixedSize(34, 34)
+        self.main_language_swap.setFixedSize(30, 30)
         self.main_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
         )
+        text_section_title = QLabel(hotkey_language_text(self.current_interface_language, "text_section"))
+        text_section_title.setObjectName("mainTextSectionTitle")
+        text_section_title.setAlignment(Qt.AlignCenter)
+        text_section_title.setFixedHeight(18)
+        text_section_layout.addWidget(text_section_title)
+        for combo in (self.source_lang, self.target_lang):
+            combo.setFixedHeight(30)
+            combo.setMinimumWidth(0)
+            combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         language_picker_layout.addWidget(self.source_lang, 1)
         language_picker_layout.addWidget(self.main_language_swap)
         language_picker_layout.addWidget(self.target_lang, 1)
-        self.main_layout.addLayout(language_picker_layout)
+        text_section_layout.addLayout(language_picker_layout)
         self._apply_main_combo_theme(self.current_theme == "Темная")
         self._restore_main_translation_languages()
         self._refresh_selection_pair_hint()
@@ -9820,9 +9963,9 @@ class DarkThemeApp(QMainWindow):
         self.main_language_swap.clicked.connect(self._swap_main_translation_languages)
         self.main_composer = QFrame()
         self.main_composer.setObjectName("mainComposer")
-        self.main_composer.setFixedHeight(76)
+        self.main_composer.setMinimumHeight(74)
         composer_layout = QGridLayout(self.main_composer)
-        composer_layout.setContentsMargins(3, 3, 4, 5)
+        composer_layout.setContentsMargins(3, 2, 4, 4)
         composer_layout.setSpacing(0)
         composer_layout.setColumnStretch(0, 1)
         # Keep both actions in a narrow rail of their own. Long input never
@@ -9839,7 +9982,8 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setToolTip(doc_text(self.current_interface_language, "main_file_tooltip"))
         # This is what the window is for, so it gets the room the second
         # language row and the hint line used to take.
-        self.text_input.setFixedHeight(68)
+        self.text_input.setMinimumHeight(66)
+        self.text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
         self.text_input.setAcceptDrops(False)
@@ -9847,7 +9991,13 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setContextMenuPolicy(Qt.CustomContextMenu)
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
+        self._composer_expand_timer = QTimer(self.text_input)
+        self._composer_expand_timer.setSingleShot(True)
+        self._composer_expand_timer.timeout.connect(self._update_document_expand_visibility)
         self.text_input.textChanged.connect(self._schedule_document_expand_visibility)
+        self.text_input.document().documentLayout().documentSizeChanged.connect(
+            self._schedule_document_expand_visibility
+        )
         composer_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
@@ -9857,7 +10007,7 @@ class DarkThemeApp(QMainWindow):
         composer_actions_layout.setContentsMargins(0, 0, 0, 0)
         composer_actions_layout.setSpacing(0)
 
-        self.document_expand_button = QPushButton()
+        self.document_expand_button = ScaledIconButton()
         self.document_expand_button.setObjectName("mainDocumentExpandButton")
         self.document_expand_button.setAccessibleName(
             doc_text(self.current_interface_language, "title")
@@ -9878,7 +10028,7 @@ class DarkThemeApp(QMainWindow):
         translate_action_text = ui_text(
             self.current_interface_language, "translate_button"
         )
-        self.translate_button = QPushButton()
+        self.translate_button = ScaledIconButton()
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setObjectName("mainTranslateButton")
         self.translate_button.setAccessibleName(translate_action_text)
@@ -9899,18 +10049,13 @@ class DarkThemeApp(QMainWindow):
                     ui_text(self.current_interface_language, "install_argos_packages_hint")
                 )
             )
-        self.main_layout.addWidget(self.main_composer)
+        text_section_layout.addWidget(self.main_composer, 1)
+        self.main_layout.addWidget(self.main_text_section, 1)
 
         self._refresh_direction_summary()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
 
-        # Everything below this line is settings and reference, not the task.
-        divider = QFrame()
-        divider.setObjectName("mainSectionDivider")
-        divider.setFrameShape(QFrame.HLine)
-        divider.setFixedHeight(1)
-        self.main_layout.addWidget(divider)
-        self.main_layout.addWidget(self.hotkey_language_bar)
+        shortcut_section_layout.addWidget(self.hotkey_language_bar)
 
         # --- Блок хоткеев (показываем всегда) ---
         not_set = "—"
@@ -9935,34 +10080,53 @@ class DarkThemeApp(QMainWindow):
         }
         tr_name = tr_names.get(translator_engine, translator_engine.capitalize())
 
-        # Restore the proven three-row reference grid. Full-size captions stay
-        # readable in every language, and all seven shortcuts remain on the
-        # same side of the divider. Only passive engine status belongs beyond it.
-        hotkey_grid = QGridLayout()
-        hotkey_grid.setContentsMargins(0, 0, 0, 0)
-        hotkey_grid.setHorizontalSpacing(12)
-        hotkey_grid.setVerticalSpacing(2)
+        # Two columns of inline references align actions and keys. Engine
+        # status has its own footer and cannot squeeze the shortcut columns.
+        layout_draft = getattr(self, "_layout_editor_values", {}) or {}
+        main_draft = layout_draft.get("main", {}) or {}
+        try:
+            hotkey_spacing = max(
+                0,
+                min(
+                    40,
+                    int(
+                        main_draft.get(
+                            "hotkey_horizontal_spacing",
+                            MAIN_HOTKEY_HORIZONTAL_SPACING,
+                        )
+                    ),
+                ),
+            )
+        except (TypeError, ValueError):
+            hotkey_spacing = MAIN_HOTKEY_HORIZONTAL_SPACING
+
+        self.main_hotkey_area = QFrame()
+        self.main_hotkey_area.setObjectName("mainHotkeyArea")
+        hotkey_grid = QGridLayout(self.main_hotkey_area)
+        hotkey_grid.setContentsMargins(0, 3, 0, 0)
+        hotkey_grid.setHorizontalSpacing(hotkey_spacing)
+        hotkey_grid.setVerticalSpacing(0)
 
         r1_copy = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_copy"), copy_hk
+            main_hotkey_compact_caption(lang, "copy"), copy_hk, compact=True
         )
         r1_translate = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_ocr_translate"), translate_hk
+            main_hotkey_compact_caption(lang, "ocr"), translate_hk, compact=True
         )
         r1_toggle = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_toggle"), toggle_hk
+            main_hotkey_compact_caption(lang, "toggle"), toggle_hk, compact=True
         )
         r2_fullscreen = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_fullscreen"), fs_hk
+            main_hotkey_compact_caption(lang, "fullscreen"), fs_hk, compact=True
         )
         r2_selection = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_selection"), sel_hk
+            main_hotkey_compact_caption(lang, "selection"), sel_hk, compact=True
         )
         r2_replace = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_replace"), replace_hk
+            main_hotkey_compact_caption(lang, "replace"), replace_hk, compact=True
         )
         game_reference = self._create_main_hotkey_pair(
-            ui_text(lang, "hotkey_gaming"), game_hk
+            main_hotkey_compact_caption(lang, "game"), game_hk, compact=True
         )
         self.main_hotkey_references = {
             "copy": r1_copy,
@@ -9983,9 +10147,10 @@ class DarkThemeApp(QMainWindow):
             ("selection", r2_selection),
             ("replace", r2_replace),
         ):
-            help_value = tooltip_text(main_hotkey_tooltip(lang, help_key))
+            help_text = f"{hotkey_settings_prompt_text(lang, 'edit_hint')}\n{main_hotkey_tooltip(lang, help_key)}"
+            help_value = tooltip_text(help_text)
             pair.setToolTip(help_value)
-            pair.setAccessibleDescription(main_hotkey_tooltip(lang, help_key))
+            pair.setAccessibleDescription(help_text)
             for label in pair.findChildren(QLabel):
                 label.setToolTip(help_value)
 
@@ -10001,39 +10166,95 @@ class DarkThemeApp(QMainWindow):
         for pair, config_key, action_name in hotkey_bindings:
             self._connect_main_hotkey_pair(pair, config_key, action_name)
 
-        self._align_main_hotkey_pair_group(r1_copy, r2_fullscreen, r1_toggle)
-        self._align_main_hotkey_pair_group(r1_translate, r2_selection, r2_replace)
-
-        ocr_summary = QLabel(f"OCR: <b>{ocr_engine}</b>")
+        ocr_summary = QLabel(f"{main_hotkey_compact_caption(lang, 'recognition')}: {ocr_engine}")
         ocr_summary.setObjectName("mainOcrSummary")
         translator_summary = QLabel(
-            f"{ui_text(lang, 'translator')}: <b>{tr_name}</b>"
+            f"{ui_text(lang, 'translator')}: {tr_name}"
         )
         translator_summary.setObjectName("mainTranslatorSummary")
         for summary in (ocr_summary, translator_summary):
-            summary.setTextFormat(Qt.RichText)
-            summary.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            summary.setTextFormat(Qt.PlainText)
+            summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            summary.setMinimumWidth(0)
+            summary.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         engine_status_panel = QFrame()
         engine_status_panel.setObjectName("mainEngineStatusPanel")
+        translator_summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # Retain the editor's width cap for the left status area. Equal grid
+        # stretches on both sides keep the shadow action at the window center.
+        try:
+            engine_status_width = max(
+                480,
+                min(
+                    MAIN_ENGINE_STATUS_WIDTH,
+                    int(
+                        main_draft.get(
+                            "engine_status_width", MAIN_ENGINE_STATUS_WIDTH
+                        )
+                    ),
+                ),
+            )
+        except (TypeError, ValueError):
+            engine_status_width = MAIN_ENGINE_STATUS_WIDTH
+        engine_status_panel.setMaximumWidth(engine_status_width)
+        engine_status_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        engine_status_panel.setFixedHeight(30)
         engine_status_layout = QVBoxLayout(engine_status_panel)
-        engine_status_layout.setContentsMargins(12, 0, 2, 0)
+        engine_status_layout.setContentsMargins(0, 0, 8, 0)
         engine_status_layout.setSpacing(0)
-        engine_status_layout.addStretch(1)
-        engine_status_layout.addWidget(ocr_summary)
-        engine_status_layout.addWidget(translator_summary)
-        engine_status_layout.addStretch(1)
+        engine_status_layout.addWidget(translator_summary, 1)
 
-        hotkey_grid.setColumnStretch(3, 1)
-        hotkey_grid.addWidget(r1_copy, 0, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r1_translate, 0, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(game_reference, 0, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r2_fullscreen, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r2_selection, 1, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r1_toggle, 2, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(r2_replace, 2, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        hotkey_grid.addWidget(engine_status_panel, 0, 3, 3, 1)
-        self.main_layout.addLayout(hotkey_grid)
+        for column in range(2):
+            hotkey_grid.setColumnStretch(column, 1)
+        draft_order = main_draft.get("hotkey_order", MAIN_HOTKEY_DEFAULT_ORDER)
+        known_order = [key for key in MAIN_HOTKEY_DEFAULT_ORDER if key is not None]
+        requested = list(draft_order) if isinstance(draft_order, (list, tuple)) else []
+        slot_order = []
+        used = set()
+        for key in requested[:8]:
+            if key is None:
+                slot_order.append(None)
+            elif key in known_order and key not in used:
+                slot_order.append(key)
+                used.add(key)
+            else:
+                slot_order.append(None)
+        for key in known_order:
+            if key not in used:
+                try:
+                    empty_index = slot_order.index(None)
+                except ValueError:
+                    slot_order.append(key)
+                else:
+                    slot_order[empty_index] = key
+                used.add(key)
+        slot_order = (slot_order + [None] * 8)[:8]
+        self.main_hotkey_slot_order = list(slot_order)
+        for slot, key in enumerate(slot_order):
+            if key is None:
+                continue
+            row, column = divmod(slot, 2)
+            self.main_hotkey_references[key].setProperty("lastShortcutRow", row == 3)
+            hotkey_grid.addWidget(
+                self.main_hotkey_references[key],
+                row,
+                column,
+                alignment=Qt.AlignVCenter,
+            )
+        self.main_hotkey_grid = hotkey_grid
+        self.main_engine_status_panel = engine_status_panel
+        shortcut_section_layout.addWidget(self.main_hotkey_area)
+        self.main_layout.addWidget(self.main_shortcut_section)
+
+        self.main_footer = QWidget()
+        self.main_footer.setObjectName("mainFooter")
+        footer_layout = QGridLayout(self.main_footer)
+        footer_layout.setContentsMargins(0, 0, 0, 0)
+        footer_layout.setSpacing(12)
+        footer_layout.setColumnStretch(0, 1)
+        footer_layout.setColumnStretch(2, 1)
+        footer_layout.addWidget(engine_status_panel, 0, 0)
 
         # Кнопка старт (shadow mode) в самом низу
         start_text = ui_text(self.current_interface_language, "shadow_mode")
@@ -10041,26 +10262,22 @@ class DarkThemeApp(QMainWindow):
         # Secondary: it sends the window away, which is not what someone opening
         # this window came to do. It used to be the only filled button here.
         self.start_button.setObjectName("mainShadowButton")
-        # Light violet is legible on the dark theme and nearly invisible on the
-        # light one, so the outline follows the theme.
-        shadow_ink = "#C5B3E9" if self.current_theme != "Светлая" else "#6b4f96"
-        self.start_button.setStyleSheet(
-            "QPushButton#mainShadowButton {"
-            f" border: 1px solid {shadow_ink}; border-radius: 8px; font-size: 14px;"
-            f" padding: 5px 0; background: transparent; color: {shadow_ink}; }}"
-            "QPushButton#mainShadowButton:hover { background-color: rgba(122, 95, 161, 38); }"
-        )
-        self.main_layout.addWidget(self.start_button)
+        footer_layout.addWidget(self.start_button, 0, 1)
+        ocr_summary.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        footer_layout.addWidget(ocr_summary, 0, 2)
+        self.main_layout.addWidget(self.main_footer)
         self.start_button.clicked.connect(self.minimize_to_tray)
         # The new widgets inherit the QMainWindow stylesheet.  Reapplying the
         # same theme here would also repolish the hidden cached Settings page
         # and was the source of the pause when returning to the main screen.
         if getattr(self, "_applied_main_theme", None) != self.current_theme:
             self.apply_theme()
+        self._fit_hotkey_mode_combo()
+        self._apply_main_hotkey_theme()
         self._complete_guide_step("back_home")
 
     def _fit_hotkey_mode_combo(self):
-        """Fit the short mode names without stealing room from both languages."""
+        """Measure full mode names before dividing the remaining language space."""
         combo = getattr(self, "hotkey_mode_combo", None)
         if combo is None:
             return
@@ -10073,12 +10290,16 @@ class DarkThemeApp(QMainWindow):
             combo.setMinimumWidth(0)
             combo.setMaximumWidth(16777215)
             needed = combo.sizeHint().width()
-            combo.setFixedWidth(min(200, max(160, needed)))
+            combo.setFixedWidth(max(160, needed))
         except RuntimeError:
             pass
 
     def show_settings(self):
-        self.clear_layout()
+        active_settings = getattr(self, "settings_window", None)
+        self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
+        # Derive the attachment edge from the actual title bar. The settings
+        # layout owns the shelf and the pages beneath it; nothing overlays them.
+        self.main_layout.setContentsMargins(14, self.title_bar.geometry().bottom() + 1, 14, 14)
         self.main_layout.setSpacing(8)
         from settings_window import SettingsWindow
         settings = getattr(self, "_cached_settings_window", None)
@@ -10091,7 +10312,10 @@ class DarkThemeApp(QMainWindow):
             settings = SettingsWindow(self)
             self._cached_settings_window = settings
         else:
-            if getattr(settings, "_ui_language", None) != self.current_interface_language:
+            if (getattr(settings, "_secondary_view_kind", None)
+                    or getattr(settings, "_ui_language", None) != self.current_interface_language):
+                # Secondary screens replace the page stack. Recreate the
+                # general view before touching any old page references.
                 settings.update_language()
             elif getattr(settings, "_ui_theme", None) != self.current_theme:
                 settings.apply_theme()
@@ -10166,8 +10390,13 @@ class DarkThemeApp(QMainWindow):
             elif item.layout():
                 self._clear_nested_layout(item.layout())
 
-    def _schedule_document_expand_visibility(self):
-        QTimer.singleShot(0, self._update_document_expand_visibility)
+    def _schedule_document_expand_visibility(self, *_args):
+        timer = getattr(self, "_composer_expand_timer", None)
+        if isinstance(timer, QTimer):
+            try:
+                timer.start(0)
+            except RuntimeError:
+                pass
 
     def _composer_visual_line_count(self):
         editor = getattr(self, "text_input", None)
@@ -10346,21 +10575,26 @@ class DarkThemeApp(QMainWindow):
             return
         super().keyPressEvent(event)
 
+    def _main_mouse_global_position(self, event):
+        controller = getattr(self, '_ui_scale_controller', None)
+        position = controller.view.mouse_global_position if controller is not None else None
+        return position if position is not None else event.globalPos()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
-            self.show_main_context_menu(event.globalPos())
+            self.show_main_context_menu(self._main_mouse_global_position(event))
             event.accept()
             return
         if event.button() == Qt.LeftButton and event.y() <= 40:
             self._is_dragging = True
-            self._drag_start_position = event.globalPos() - self.frameGeometry().topLeft()
+            self._drag_start_position = self._main_mouse_global_position(event) - self.frameGeometry().topLeft()
             event.accept()
             return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._is_dragging:
-            self.move(event.globalPos() - self._drag_start_position)
+            self.move(self._main_mouse_global_position(event) - self._drag_start_position)
             event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -10482,7 +10716,9 @@ class DarkThemeApp(QMainWindow):
             # ordinary application shutdown path.
             pass
         self.save_config()
-        self.tray_icon.hide()  # Убираем иконку из трея
+        tray_icon = getattr(self, "tray_icon", None)
+        if tray_icon is not None:
+            tray_icon.hide()  # Убираем иконку из трея
         event.accept()
 
     def exit_app(self):
@@ -10858,6 +11094,11 @@ def _warm_up_ocr_after_window_is_visible():
 
 
 if __name__ == "__main__":
+    if "--smoke-test" in sys.argv:
+        if not platform_support.IS_MAC:
+            raise SystemExit("The native bundle smoke check is for macOS.")
+        from macos_smoke import run
+        raise SystemExit(run(sys.modules[__name__], sys.argv[sys.argv.index("--smoke-test") + 1]))
     # ONNX Runtime and torch can fail to initialize after Qt on Windows. The
     # optional RapidOCR/EasyOCR engines therefore run in the non-Qt worker.
     if sys.platform == "win32":
@@ -10882,11 +11123,21 @@ if __name__ == "__main__":
             break
 
     _command_server = None
-    if platform_support.IS_LINUX:
+    if (platform_support.IS_LINUX or platform_support.IS_MAC) and not LAYOUT_EDITOR_MODE:
         import single_instance
 
-        if single_instance.send_command(_requested_shortcut_action or "show"):
-            sys.exit(0)  # уже запущен: команда доставлена
+        _forward_status = single_instance.send_command_status(_requested_shortcut_action or "show")
+        if _forward_status is single_instance.CommandStatus.ACCEPTED:
+            if _requested_shortcut_action or _started_from_autostart():
+                sys.exit(0)  # A desktop action is forwarded without an interactive prompt.
+            if not _replace_existing_instance():
+                sys.exit(0)
+            invalidate_config_cache()
+            _forward_status = single_instance.CommandStatus.UNAVAILABLE
+        if _forward_status is not single_instance.CommandStatus.UNAVAILABLE:
+            logging.error("Existing instance did not acknowledge command: %s", _forward_status.value)
+            print("Click'n'Translate is busy or the command could not be confirmed.", file=sys.stderr)
+            sys.exit(75)
 
         def _dispatch_shortcut_command(command):
             window = _main_window_ref
@@ -10897,51 +11148,43 @@ if __name__ == "__main__":
             except Exception:
                 logging.exception(f"Shortcut command failed: {command}")
 
-        _command_server = single_instance.CommandServer(_dispatch_shortcut_command)
+        _command_server = single_instance.CommandServer(_dispatch_shortcut_command, start_ready=False)
         if not _command_server.bind():
-            # Сокет занят живым экземпляром, который не ответил на команду.
-            sys.exit(0)
+            # The first connect admitted nothing. Another launch may have won
+            # ownership meanwhile; forwarding once here cannot replay that call.
+            _forward_status = single_instance.send_command_status(_requested_shortcut_action or "show")
+            if _forward_status is single_instance.CommandStatus.ACCEPTED:
+                if _requested_shortcut_action or _started_from_autostart():
+                    sys.exit(0)
+                if not _replace_existing_instance():
+                    sys.exit(0)
+                invalidate_config_cache()
+                if not _command_server.bind():
+                    _show_instance_replacement_error()
+                    sys.exit(75)
+            else:
+                logging.error("Could not claim or forward to the command socket: %s", _forward_status.value)
+                print("Click'n'Translate could not forward the command to the existing instance.", file=sys.stderr)
+                sys.exit(75)
         _command_server.start()
 
-    # Single instance через Windows mutex
-    def is_already_running():
-        """Проверить через mutex, запущен ли уже экземпляр программы."""
-        try:
-            # Создаем уникальный mutex
-            kernel32 = ctypes.windll.kernel32
-            mutex = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
-            if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
-                kernel32.CloseHandle(mutex)
-                return True
-            # Сохраняем handle чтобы mutex жил пока программа работает
-            global _single_instance_mutex
-            _single_instance_mutex = mutex
-            return False
-        except Exception:
-            return False
-
-    def bring_existing_to_front():
-        """Отправить запущенному экземпляру команду раскрыть главное окно."""
-        if not _SHOW_WINDOW_MESSAGE_ID:
-            return False
-        try:
-            return bool(ctypes.windll.user32.PostMessageW(HWND_BROADCAST, _SHOW_WINDOW_MESSAGE_ID, 0, 0))
-        except Exception:
-            return False
-
-    # Проверяем single instance (не разрешаем запуск нескольких копий)
-    if is_already_running():
-        # Пытаемся показать существующее окно
-        other_install = _other_install_instances()
-        if other_install and _confirm_close_other_install(other_install):
-            _terminate_instances(other_install)
-            if is_already_running():
-                bring_existing_to_front()
+    # The named mutex is held for this process's lifetime, including startup.
+    _instance_guard = None
+    if platform_support.IS_WINDOWS and not LAYOUT_EDITOR_MODE:
+        from instance_lifecycle import WindowsInstanceGuard
+        _instance_guard = WindowsInstanceGuard()
+        if not _instance_guard.acquire():
+            if _started_from_autostart() or not _replace_existing_instance():
+                _bring_existing_to_front()
                 sys.exit(0)
-        else:
-            bring_existing_to_front()
-            sys.exit(0)
-    
+            if not _instance_guard.acquire():
+                # Another launch may win ownership while the old copy closes.
+                # Never silently continue with a second GUI or close that new owner.
+                _show_instance_replacement_error()
+                _bring_existing_to_front()
+                sys.exit(75)
+            invalidate_config_cache()
+
     # Читаем конфиг
     start_minimized = False
     try:
@@ -10951,26 +11194,10 @@ if __name__ == "__main__":
             start_minimized = config.get("start_minimized", False)
     except Exception:
         pass
+    app = _ensure_startup_application()
     if platform_support.IS_LINUX:
-        # Windows gets per-monitor DPI awareness from the exe manifest. Qt on
-        # Linux has to be told before the application exists, or the UI renders
-        # unscaled on HiDPI screens. Capture already derives its own scale from
-        # the pixmap's devicePixelRatio, so the overlays stay aligned.
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-
-    app = QApplication([])
-    if platform_support.IS_LINUX:
-        # Lets the desktop match this window to its .desktop entry, which is
-        # what gives the dock and the window switcher the right icon.
         app.setDesktopFileName(platform_support.DESKTOP_ENTRY_NAME.replace(".desktop", ""))
-    install_qt_exception_guard()
-    # Windows that do not set their own stylesheet would otherwise show the
-    # system tooltip, which does not match the rest of the app.
-    install_tooltip_style(app)
-    _native_dialog_frame_filter = NativeDialogFrameFilter(app)
-    app.installEventFilter(_native_dialog_frame_filter)
-    app.setQuitOnLastWindowClosed(False)
+    app.setQuitOnLastWindowClosed(LAYOUT_EDITOR_MODE)
     if _SHOW_WINDOW_MESSAGE_ID:
         try:
             _single_instance_event_filter = _SingleInstanceMessageFilter()
@@ -10990,10 +11217,20 @@ if __name__ == "__main__":
 
     window = DarkThemeApp()
     _main_window_ref = window
+    if platform_support.IS_MAC:
+        from macos_desktop import install_dock_reopen_handler
+        app._mac_reopen_handler = install_dock_reopen_handler(
+            app, lambda: window.handle_shortcut_command("show"))
+    if _command_server is not None:
+        _command_server.set_ready()
     # После обновления главное окно всегда показывается: пользователь должен
     # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
-    show_after_update = "--show-after-update" in sys.argv
-    if window.start_minimized and not show_after_update:
+    show_after_update = "--show-after-update" in sys.argv or _show_after_instance_replacement
+    if LAYOUT_EDITOR_MODE:
+        window.show()
+        from layout_editor import start_layout_editor
+        _layout_editor_panel = start_layout_editor(window)
+    elif window.start_minimized and not show_after_update:
         window.minimize_to_tray()
     else:
         window.show()
@@ -11021,13 +11258,15 @@ if __name__ == "__main__":
             0, lambda: window.handle_shortcut_command(_requested_shortcut_action)
         )
 
-    threading.Thread(
-        target=_warm_up_ocr_after_window_is_visible,
-        name="ClicknTranslateStartupWarmup",
-        daemon=True,
-    ).start()
+    if not LAYOUT_EDITOR_MODE:
+        threading.Thread(
+            target=_warm_up_ocr_after_window_is_visible,
+            name="ClicknTranslateStartupWarmup",
+            daemon=True,
+        ).start()
     try:
         app.exec_()
     finally:
         if _command_server is not None:
             _command_server.stop()
+            _command_server.join(timeout=2.0)

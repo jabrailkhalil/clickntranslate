@@ -232,6 +232,31 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Alt+G")
         self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
 
+    def test_duplicate_hotkey_keeps_previous_binding_and_names_the_owner(self):
+        self.settings.show_hotkeys_screen()
+        self.parent.current_interface_language = "ru"
+        original = self.parent.config["translate_hotkey"]
+        editor = self.settings.translate_hotkey_input
+        editor.setKeySequence(sw.QKeySequence("Ctrl+Alt+C"))
+        with mock.patch.object(self.parent, "save_config") as save:
+            self.settings.save_translate_hotkey()
+        self.assertEqual(self.parent.config["translate_hotkey"], original)
+        self.assertEqual(editor.keySequence().toString(), original)
+        self.assertEqual(self.parent.config["copy_hotkey"], "Ctrl+Alt+C")
+        self.assertIn("занято", editor.toolTip())
+        self.assertIn("Ctrl+Alt+C", self.settings.hotkey_hint_label.text())
+        save.assert_not_called()
+
+    def test_clearing_a_hotkey_releases_the_combination_for_another_action(self):
+        self.settings.show_hotkeys_screen()
+        with mock.patch.object(sw.platform_support, "IS_LINUX", True):
+            self.settings.copy_hotkey_input.clear()
+            self.settings.copy_hotkey_input.editingFinished.emit()
+            self.settings.translate_hotkey_input.setKeySequence(sw.QKeySequence("Ctrl+Alt+C"))
+            self.settings.translate_hotkey_input.editingFinished.emit()
+        self.assertEqual(self.parent.config["copy_hotkey"], "")
+        self.assertEqual(self.parent.config["translate_hotkey"], "Ctrl+Alt+C")
+
     def test_replace_selection_hotkey_restarts_its_own_listener(self):
         self.settings.show_hotkeys_screen()
         old_thread = mock.Mock()

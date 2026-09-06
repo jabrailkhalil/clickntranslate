@@ -1,6 +1,9 @@
 param(
-    [string]$Version = "1.7.0",
-    [switch]$SkipPyInstaller
+    [string]$Version = "1.7.1",
+    [switch]$SkipPyInstaller,
+    [string]$CertificateThumbprint = "",
+    [ValidateSet('CurrentUser', 'LocalMachine')][string]$CertificateStoreLocation = 'CurrentUser',
+    [switch]$RequireSignature
 )
 
 Set-StrictMode -Version Latest
@@ -18,16 +21,37 @@ $stageRoot = Join-Path $releasesRoot ("ClicknTranslate-v" + $Version + "-win64-s
 $packageRoot = Join-Path $stageRoot "ClicknTranslate"
 $innerRoot = Join-Path $packageRoot "app"
 
+if ($RequireSignature -and -not $CertificateThumbprint) {
+    throw "A signing certificate is required for a signed release. See docs/WINDOWS_SIGNING.md."
+}
+if ($CertificateThumbprint) {
+    & (Join-Path $PSScriptRoot 'sign_windows.ps1') -Mode Check `
+        -CertificateThumbprint $CertificateThumbprint -CertificateStoreLocation $CertificateStoreLocation
+}
+
 if (-not $SkipPyInstaller) {
-    & (Join-Path $repoRoot ".venv\Scripts\python.exe") -m PyInstaller `
-        (Join-Path $repoRoot "ClicknTranslate.spec") --clean --noconfirm
-    if ($LASTEXITCODE -ne 0) {
-        throw "PyInstaller failed with exit code $LASTEXITCODE."
+    Push-Location $repoRoot
+    try {
+        & (Join-Path $repoRoot ".venv\Scripts\python.exe") -m PyInstaller `
+            (Join-Path $repoRoot "ClicknTranslate.spec") --clean --noconfirm
+        if ($LASTEXITCODE -ne 0) {
+            throw "PyInstaller failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
     }
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $distRoot "ClicknTranslate.exe"))) {
     throw "The PyInstaller output is missing: $distRoot"
+}
+
+foreach ($relativePath in @('ClicknTranslate.exe', '_internal\ArgosWorker.exe', '_internal\OcrWorker.exe')) {
+    $frozen = Get-Item -LiteralPath (Join-Path $distRoot $relativePath)
+    if ($frozen.VersionInfo.FileVersion -ne $fileVersion) {
+        throw "The frozen build is stale or lacks version resources: $relativePath. Rebuild version $fileVersion."
+    }
 }
 
 $resolvedReleases = [System.IO.Path]::GetFullPath($releasesRoot).TrimEnd('\') + '\'
@@ -74,10 +98,21 @@ foreach ($relativePath in $required) {
     }
 }
 
+$signatureReport = Join-Path $stageRoot 'windows-signatures.json'
+$signingMode = if ($CertificateThumbprint) { 'Sign' } else { 'Audit' }
+& (Join-Path $PSScriptRoot 'sign_windows.ps1') -Mode $signingMode -PackageRoot $packageRoot `
+    -CertificateThumbprint $CertificateThumbprint -CertificateStoreLocation $CertificateStoreLocation `
+    -ReportPath $signatureReport | Out-Host
+if (-not $CertificateThumbprint) {
+    Write-Warning 'This is an unsigned stage. Do not describe it as a signed release.'
+}
+
 [pscustomobject]@{
     Version = $Version
     Stage = $stageRoot
     Package = $packageRoot
+    SignatureReport = $signatureReport
+    Signed = [bool]$CertificateThumbprint
     LauncherVersion = (Get-Item -LiteralPath (Join-Path $packageRoot "ClicknTranslate.exe")).VersionInfo.FileVersion
     PackageBytes = (Get-ChildItem -LiteralPath $packageRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum
 }

@@ -26,6 +26,7 @@ def test_import_accepts_known_type_safe_values_and_ignores_unknown_ones():
         "interface_language": "de",
         "theme": "Светлая",
         "autostart": True,
+        "ui_scale_percent": 85,
         "ocr_dim_strength": 70,
         "unknown_future_option": "ignored",
     })
@@ -36,12 +37,14 @@ def test_import_accepts_known_type_safe_values_and_ignores_unknown_ones():
         "interface_language": "de",
         "theme": "Светлая",
         "autostart": True,
+        "ui_scale_percent": 85,
         "ocr_dim_strength": 70,
     }
 
 
 def test_import_clamps_numeric_controls_to_their_ui_ranges():
     payload = settings_export_payload({
+        "ui_scale_percent": 50,
         "ocr_dim_strength": 900,
         "game_capture_interval_ms": 1,
         "game_overlay_opacity": -20,
@@ -50,6 +53,7 @@ def test_import_clamps_numeric_controls_to_their_ui_ranges():
 
     imported = validated_import_settings(payload, main.DEFAULT_CONFIG)
 
+    assert imported["ui_scale_percent"] == 80
     assert imported["ocr_dim_strength"] == 80
     assert imported["game_capture_interval_ms"] == 450
     assert imported["game_overlay_opacity"] == 45

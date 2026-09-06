@@ -46,8 +46,14 @@ class GuideSpotlightTest(unittest.TestCase):
         return self.host.grab().toImage()
 
     @staticmethod
-    def _luma(image, x, y):
-        colour = image.pixel(x, y)
+    def _pixel(image, x, y):
+        # Widget coordinates are logical pixels; grabs use physical pixels.
+        ratio = image.devicePixelRatio()
+        return image.pixel(round(x * ratio), round(y * ratio))
+
+    @classmethod
+    def _luma(cls, image, x, y):
+        colour = cls._pixel(image, x, y)
         return ((colour >> 16) & 0xFF) + ((colour >> 8) & 0xFF) + (colour & 0xFF)
 
     def test_everything_but_the_target_is_dimmed(self):
@@ -73,7 +79,7 @@ class GuideSpotlightTest(unittest.TestCase):
         image = self._shot(spotlight)
 
         edge = TARGET.left() - spotlight.PADDING
-        band = [image.pixel(x, TARGET.center().y()) for x in range(edge - 4, edge + 4)]
+        band = [self._pixel(image, x, TARGET.center().y()) for x in range(edge - 4, edge + 4)]
         # The accent is a light violet: blue high, and blue above red.
         self.assertTrue(
             any((c & 0xFF) > 0x90 and (c & 0xFF) > ((c >> 16) & 0xFF) for c in band),

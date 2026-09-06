@@ -103,18 +103,36 @@ class TestUpdateRepair(unittest.TestCase):
             self.assertFalse(list(temporary_path.glob(".clickntranslate_repair_backup_*")))
             self.assertTrue(launcher_path.read_bytes().startswith(b"MZ"))
 
-    def test_release_repair_uses_pinned_https_package(self):
+    def test_release_repair_keeps_installer_permissions(self):
         source = (ROOT / "tools" / "build_update_repair.ps1").read_text(encoding="utf-8")
         repair_source = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
         repair_manifest = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
-        self.assertIn("https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/", source)
-        self.assertIn("Click-n-Translate-1.7.0-windows-portable-x64.zip", source)
-        self.assertNotIn("SHA256_PENDING", source)
-        self.assertRegex(source, r'\$PackageSha256 = "[0-9A-F]{64}"')
         self.assertIn("ClicknTranslateUpdateRepair.manifest", source)
         self.assertIn('level="requireAdministrator"', repair_manifest)
         self.assertIn('Verb = "runas"', repair_source)
         self.assertIn("CanWriteInstallRoot(installRoot)", repair_source)
+
+    def test_release_repair_refuses_missing_digest_and_insecure_url_before_build(self):
+        powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+        with tempfile.TemporaryDirectory(prefix="repair_validation_") as temporary:
+            output = Path(temporary) / "repair.exe"
+            cases = (
+                ([], "Supply PackageSha256"),
+                (["-PackageUrl", "https://example.com/release.zip"], "Supply PackageSha256"),
+                (["-PackageUrl", "http://example.com/release.zip",
+                  "-PackageSha256", "a" * 64], "HTTPS URL"),
+            )
+            for arguments, message in cases:
+                with self.subTest(arguments=arguments):
+                    result = subprocess.run(
+                        [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                         str(ROOT / "tools" / "build_update_repair.ps1"),
+                         "-OutputPath", str(output), *arguments],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
+                    self.assertFalse(output.exists())
 
     def test_checksum_failure_leaves_installed_version_untouched(self):
         powershell = shutil.which("powershell.exe") or shutil.which("powershell")
