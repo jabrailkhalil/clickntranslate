@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 import main
 import platform_support
@@ -18,6 +18,8 @@ _APP = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 @pytest.fixture
 def appearance():
     app = _APP
+    from qt_layout_test_support import ensure_layout_fonts
+    ensure_layout_fonts(app)
     app.setQuitOnLastWindowClosed(False)
     manager = install_window_appearance(app, 100, 'Темная')
     with mock.patch.object(manager, 'available_geometry', return_value=QtCore.QRect(0, 0, 3840, 2160)):
@@ -26,6 +28,8 @@ def appearance():
     del app._dialog_appearance
     app.setProperty('ui_theme', None)
     for window in list(manager._windows):
+        if sip.isdeleted(window):
+            continue
         window.close()
         window.deleteLater()
     manager.deleteLater()
@@ -71,31 +75,28 @@ def test_local_result_scale_keeps_global_setting_and_edits(appearance):
     assert dialog.scale_value.text() == '142%'
 
 
-def test_copy_and_search_use_edited_result(appearance):
+def test_copy_uses_edited_result(appearance):
     dialog = result_dialog()
     dialog.show()
     dialog.text_edit.setPlainText('Дополненный перевод')
     with mock.patch.object(platform_support, 'copy_text') as copy, \
-            mock.patch.object(main, 'save_copy_history'), \
-            mock.patch.object(main.webbrowser, 'open') as browse:
+            mock.patch.object(main, 'save_copy_history'):
         dialog.copy_button.click()
-        dialog.google_button.click()
     copy.assert_called_once_with('Дополненный перевод')
-    assert main.urllib.parse.quote('Дополненный перевод') in browse.call_args.args[0]
 
 
 def test_source_can_be_extended_and_retranslated(appearance):
     dialog = result_dialog()
     dialog.show()
-    dialog.text_tabs.setCurrentIndex(1)
     dialog.source_edit.setPlainText('Hola mundo')
-    assert dialog.google_button.text() == 'Перевести'
+    assert dialog.translate_button.text() == 'Перевести'
     with mock.patch.object(main.threading, 'Thread', side_effect=lambda target, **kw: SimpleNamespace(start=target)), \
+            mock.patch.object(main, 'save_translation_history'), \
             mock.patch.object(translater, 'translate_text', return_value='Hello world') as translate:
-        dialog.google_button.click()
-    translate.assert_called_once_with('Hola mundo', 'es', 'en')
+        dialog.translate_button.click()
+    translate.assert_called_once_with('Hola mundo', 'es', 'en', engine=mock.ANY, cancel_callback=mock.ANY)
     assert dialog.text_edit.toPlainText() == 'Hello world'
-    assert dialog.text_tabs.currentIndex() == 0
+    assert dialog.source_edit.isVisible() and dialog.text_edit.isVisible()
     assert not dialog.text_edit.isReadOnly()
 
 

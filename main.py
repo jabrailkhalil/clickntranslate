@@ -4005,6 +4005,18 @@ for _lang, _labels in {
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(result_tab=_labels[0], source_tab=_labels[1], source_edited=_labels[2])
 
 
+for _lang, _labels in {
+    "ru": ("Переводчик", "Введите или вставьте текст", "Здесь появится перевод", "Поменять языки и текст местами"),
+    "en": ("Translator", "Type or paste text", "Your translation appears here", "Swap languages and text"),
+    "de": ("Übersetzer", "Text eingeben oder einfügen", "Hier erscheint die Übersetzung", "Sprachen und Texte tauschen"),
+    "fr": ("Traducteur", "Saisissez ou collez du texte", "La traduction apparaît ici", "Inverser les langues et les textes"),
+    "es": ("Traductor", "Escribe o pega texto", "La traducción aparecerá aquí", "Intercambiar idiomas y textos"),
+    "zh": ("翻译器", "输入或粘贴文本", "译文将显示在这里", "交换语言和文本"),
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
+        ("workspace_title", "source_placeholder", "result_placeholder", "swap_texts"), _labels))
+
+
 class TranslateOnEnterTextEdit(QTextEdit):
     """Enter translates, Shift+Enter starts a new line.
 
@@ -4082,101 +4094,63 @@ class CenteredFramelessDialog(QDialog):
 
 
 class TranslationResultDialog(QDialog):
-    """Frameless themed translation result window with consistent actions."""
+    """Editable source and result, with requests bound to an exact input revision."""
 
-    _retranslated_signal = QtCore.pyqtSignal(str, str)
+    _retranslated_signal = QtCore.pyqtSignal(int, str, str)
 
     def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная",
                  source_text="", source_lang="", target_lang="", result_mode="main"):
         super().__init__(parent)
         self.translated_text = str(translated_text or "")
+        self.source_text = str(source_text or "")
         self.auto_copy = bool(auto_copy)
         self.lang = lang if lang in TRANSLATION_RESULT_DIALOG_TEXT else "en"
         self.text = TRANSLATION_RESULT_DIALOG_TEXT[self.lang]
+        self.result_mode = str(result_mode or "main").lower()
+        config = self._current_config()
+        self.source_code = str(source_lang or config.get("main_translation_source_language", "en")).lower()
+        if get_language(self.source_code) is None:
+            self.source_code = "en"
+        self.target_code = default_target_for_source(
+            self.source_code, str(target_lang or config.get("main_translation_target_language", "ru")).lower())
+        self.pair_row_available = True
         self._drag_position = None
         self._stack_offset = QtCore.QPoint()
-
-        # Re-translating needs the original text plus a valid pair; callers that
-        # cannot supply them (older paths, plain copy) simply get no pair row.
-        self.source_text = str(source_text or "")
-        self.source_code = str(source_lang or "").lower()
-        self.target_code = str(target_lang or "").lower()
-        self.result_mode = str(result_mode or "main").lower()
-        self.pair_row_available = bool(
-            self.source_text.strip()
-            and get_language(self.source_code) is not None
-            and get_language(self.target_code) is not None
-            and self.source_code != self.target_code
-        )
+        self._centered_once = False
+        self._closed = False
         self._retranslating = False
-        self.source_combo = None
-        self.target_combo = None
-        self.swap_button = None
+        self._request_id = 0
+        self._pending_request = None
+        self._cancel_event = None
+        self._panel_orientation = None
+        self._status_message = ""
 
         self.setObjectName("translationResultRoot")
-        self.setWindowTitle(self.text["title"])
+        self.setWindowTitle(self.text["workspace_title"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-
-        visual_lines = max(self.translated_text.count("\n") + 1, (len(self.translated_text) // 56) + 1)
-        extra = 51 if self.pair_row_available else 0
-        self.resize(480, min(540 + extra, max(315 + extra, 275 + extra + min(10, visual_lines) * 20)))
+        self.setMinimumSize(400, 370)
+        self.resize(760, 470)
+        self.setSizeGripEnabled(True)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 12, 12, 12)
-        outer.setSpacing(0)
-        frame = QFrame(self)
-        frame.setObjectName("translationResultFrame")
-        outer.addWidget(frame)
-
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(22, 18, 22, 20)
-        layout.setSpacing(13)
+        outer.setContentsMargins(8, 8, 8, 8)
+        self.frame = QFrame(self)
+        self.frame.setObjectName("translationResultFrame")
+        outer.addWidget(self.frame)
+        layout = QVBoxLayout(self.frame)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
 
         header = QHBoxLayout()
         header.setSpacing(12)
-        icon = QLabel("T")
-        icon.setObjectName("translationResultIcon")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(42, 42)
-        header.addWidget(icon)
-
-        heading = QVBoxLayout()
-        heading.setSpacing(1)
-        eyebrow = QLabel(self.text["eyebrow"])
-        eyebrow.setObjectName("translationResultEyebrow")
-        eyebrow.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.title_label = QLabel(self.text["title"])
+        self.title_label = QLabel(self.text["workspace_title"])
         self.title_label.setObjectName("translationResultTitle")
-        self.title_label.setWordWrap(True)
-        self.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        heading.addWidget(eyebrow)
-        heading.addWidget(self.title_label)
-        # Give the heading the stretch, not a blank spacer beside it. With both
-        # labels set to QSizePolicy.Ignored and a separate stretch item, Qt was
-        # allowed to assign the entire heading a width of zero; the result
-        # window then showed only the T icon and close button in every language.
-        header.addLayout(heading, 1)
-
-        self.title_close_button = QToolButton(self)
-        self.title_close_button.setObjectName("translationResultTitleClose")
-        self.title_close_button.setText("×")
-        self.title_close_button.setFixedSize(32, 32)
-        self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
-        self.title_close_button.clicked.connect(self.accept)
-        header.addWidget(self.title_close_button, alignment=Qt.AlignTop)
-        layout.addLayout(header)
-
-        controls = QHBoxLayout()
-        controls.setSpacing(8)
-        self.text_tabs = QtWidgets.QTabBar(self)
-        self.text_tabs.setObjectName("translationResultTabs")
-        self.text_tabs.setExpanding(False)
-        self.text_tabs.addTab(self.text["result_tab"])
-        if self.pair_row_available:
-            self.text_tabs.addTab(self.text["source_tab"])
-        controls.addWidget(self.text_tabs, 1)
+        header.addWidget(self.title_label)
+        self.engine_label = QLabel(str(config.get("translator_engine", "Google")))
+        self.engine_label.setObjectName("translationResultEngine")
+        header.addWidget(self.engine_label, 1)
         from ui_scaling import ScalePercentEdit
         self.scale_decrease = QToolButton(self)
         self.scale_decrease.setText("‹")
@@ -4198,7 +4172,7 @@ class TranslationResultDialog(QDialog):
         scale_layout.setSpacing(0)
         for control in (self.scale_decrease, self.scale_value, self.scale_increase):
             scale_layout.addWidget(control)
-        controls.addWidget(self.scale_control)
+        header.addWidget(self.scale_control)
         self.scale_decrease.clicked.connect(lambda: self._step_scale(-1, self.scale_decrease))
         self.scale_increase.clicked.connect(lambda: self._step_scale(1, self.scale_increase))
         self._scale_commit_timer = QTimer(self)
@@ -4207,78 +4181,354 @@ class TranslationResultDialog(QDialog):
         self.scale_value.editingFinished.connect(self._commit_scale)
         self.scale_value.cancel_requested.connect(self._refresh_scale_caption)
         self.scale_value.step_requested.connect(self._step_scale)
-        layout.addLayout(controls)
-        self.editors = QtWidgets.QStackedWidget(self)
-        self.text_edit = QTextEdit(self)
-        self.text_edit.setObjectName("translationResultText")
-        self.text_edit.setPlainText(self.translated_text)
-        self.text_edit.setReadOnly(False)
-        self.text_edit.setMinimumHeight(110)
-        self.editors.addWidget(self.text_edit)
-        self.source_edit = QTextEdit(self)
-        self.source_edit.setObjectName("translationResultText")
-        self.source_edit.setPlainText(self.source_text)
-        self.source_edit.textChanged.connect(self._edited_source)
-        self.editors.addWidget(self.source_edit)
-        layout.addWidget(self.editors, stretch=1)
-        self.text_tabs.currentChanged.connect(self._change_text_tab)
+        self.title_close_button = QToolButton(self)
+        self.title_close_button.setObjectName("translationResultTitleClose")
+        self.title_close_button.setText("×")
+        self.title_close_button.setFixedSize(32, 32)
+        self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.title_close_button.clicked.connect(self.accept)
+        header.addWidget(self.title_close_button)
+        layout.addLayout(header)
 
-        if self.pair_row_available:
-            layout.addLayout(self._build_pair_row())
+        self.source_combo = self._language_combo()
+        for language in APP_LANGUAGES:
+            self.source_combo.addItem(language.display_name(self.lang), language.code)
+        self.source_combo.setCurrentIndex(self.source_combo.findData(self.source_code))
+        self.target_combo = self._language_combo()
+        self._fill_target_combo(self.target_code)
+        self.source_edit = self._text_editor("translationSourceText", self.source_text, self.text["source_placeholder"])
+        self.text_edit = self._text_editor("translationResultText", self.translated_text, self.text["result_placeholder"])
+        self.source_text = self.source_edit.toPlainText()
+        self.translated_text = self.text_edit.toPlainText()
+        self.source_panel = self._editor_panel(self.text["source_tab"], self.source_combo, self.source_edit)
+        self.result_panel = self._editor_panel(self.text["result_tab"], self.target_combo, self.text_edit)
+        self.swap_button = LanguageSwapButton(self)
+        self.swap_button.setObjectName("translationResultSwap")
+        self.swap_button.setFixedSize(34, 34)
+        self.swap_button.setToolTip(tooltip_text(self.text["swap_texts"]))
+        self.swap_button.setAccessibleName(self.text["swap_texts"])
+        self.swap_button.clicked.connect(self._swap_languages)
+        self.editors = QWidget(self)
+        self.body_grid = QGridLayout(self.editors)
+        self.body_grid.setContentsMargins(0, 0, 0, 0)
+        self.body_grid.setSpacing(10)
+        layout.addWidget(self.editors, 1)
 
-        self.status_label = QLabel(self.text["auto_copied"] if auto_copy else self.text["ready"])
+        # A single line with a full tooltip keeps a long server error from
+        # taking space away from both editors or pushing the buttons offscreen.
+        self.status_label = QLabel(self)
         self.status_label.setObjectName("translationResultStatus")
-        self.status_label.setWordWrap(True)
+        self.status_label.setTextFormat(Qt.PlainText)
         self.status_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         layout.addWidget(self.status_label)
 
         buttons = QHBoxLayout()
-        buttons.setSpacing(10)
-        buttons.addStretch()
-        self.google_button = QPushButton(ui_text(self.lang, "google"))
-        self.google_button.setObjectName("translationResultGoogle")
-        self.google_button.setMinimumSize(108, 38)
-        self.google_button.setAutoDefault(False)
-        self.google_button.clicked.connect(self._primary_action)
-        buttons.addWidget(self.google_button)
-
-        # The status already says whether auto-copy happened.  Keeping this
-        # action simply labelled "Copy" avoids a needlessly wide dialog in
-        # languages where "Copy again" is a long phrase.
-        self.copy_button = QPushButton(ui_text(self.lang, "copy"))
-        self.copy_button.setObjectName("translationResultCopy")
-        self.copy_button.setMinimumSize(128, 38)
-        self.copy_button.setAutoDefault(False)
-        self.copy_button.clicked.connect(self._copy_result)
-        buttons.addWidget(self.copy_button)
-
+        buttons.setSpacing(8)
         self.close_button = QPushButton(ui_text(self.lang, "close"))
         self.close_button.setObjectName("translationResultClose")
-        self.close_button.setMinimumSize(108, 38)
-        self.close_button.setAutoDefault(False)
         self.close_button.clicked.connect(self.accept)
         buttons.addWidget(self.close_button)
+        buttons.addStretch(1)
+        self.copy_button = QPushButton(ui_text(self.lang, "copy"))
+        self.copy_button.setObjectName("translationResultCopyText")
+        self.copy_button.clicked.connect(self._copy_result)
+        buttons.addWidget(self.copy_button)
+        self.translate_button = QPushButton(ui_text(self.lang, "translate_button"))
+        self.translate_button.setProperty("buttonRole", "primary")
+        self.translate_button.clicked.connect(self._start_retranslate)
+        buttons.addWidget(self.translate_button)
+        for button in (self.close_button, self.copy_button, self.translate_button):
+            button.setMinimumHeight(36)
+            button.setAutoDefault(False)
         layout.addLayout(buttons)
+        self.translate_shortcuts = []
+        for key in ("Ctrl+Return", "Ctrl+Enter"):
+            shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(key), self)
+            shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(self._start_retranslate)
+            self.translate_shortcuts.append(shortcut)
+        self.translate_button.setToolTip(tooltip_text(
+            ui_text(self.lang, "translate_button") + " · " + QtGui.QKeySequence("Ctrl+Return").toString(QtGui.QKeySequence.NativeText)))
 
+        self.source_edit.textChanged.connect(self._edited_source)
         self.text_edit.textChanged.connect(self._edited_result)
-        self.setSizeGripEnabled(True)
+        self.source_combo.currentIndexChanged.connect(self._on_source_changed)
+        self.target_combo.currentIndexChanged.connect(self._on_target_changed)
+        self._retranslated_signal.connect(self._on_retranslated)
         self.refresh_theme(theme)
+        self._reflow_editors()
         self._refresh_scale_caption()
+        self._update_actions()
+        self._set_status(self.text["auto_copied"] if auto_copy else self.text["ready"])
+        self.source_edit.setFocus(Qt.OtherFocusReason)
+
+    def _current_config(self):
+        config = getattr(self.parentWidget(), "config", None)
+        return config if isinstance(config, dict) else get_cached_config()
+
+    def _language_combo(self):
+        combo = DropDownCombo(self)
+        combo.setObjectName("translationResultCombo")
+        combo.setMinimumHeight(34)
+        combo.setMinimumWidth(0)
+        combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        combo.setMaxVisibleItems(9)
+        return combo
+
+    def _text_editor(self, name, text, placeholder):
+        editor = QTextEdit(self)
+        editor.setObjectName(name)
+        editor.setAcceptRichText(False)
+        editor.setPlainText(text)
+        editor.setPlaceholderText(placeholder)
+        editor.setMinimumSize(0, 65)
+        editor.setLineWrapMode(QTextEdit.WidgetWidth)
+        editor.setWordWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+        editor.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        editor.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        return editor
+
+    def _editor_panel(self, caption, combo, editor):
+        panel = QFrame(self)
+        panel.setObjectName("translationEditorPanel")
+        panel.setMinimumWidth(140)
+        contents = QVBoxLayout(panel)
+        contents.setContentsMargins(10, 10, 10, 10)
+        contents.setSpacing(8)
+        label = QLabel(caption)
+        label.setObjectName("translationEditorCaption")
+        label.setBuddy(editor)
+        contents.addWidget(label)
+        contents.addWidget(combo)
+        contents.addWidget(editor, 1)
+        return panel
+
+    def _reflow_editors(self):
+        if not hasattr(self, "body_grid"):
+            return
+        factor = float(self.property("ui_effective_scale") or 1)
+        horizontal = self.editors.width() >= round(620 * factor)
+        if horizontal == self._panel_orientation:
+            return
+        self._panel_orientation = horizontal
+        for widget in (self.source_panel, self.swap_button, self.result_panel):
+            self.body_grid.removeWidget(widget)
+        for position in range(3):
+            self.body_grid.setColumnStretch(position, 0)
+            self.body_grid.setRowStretch(position, 0)
+        self.body_grid.addWidget(self.source_panel, 0, 0)
+        if horizontal:
+            self.body_grid.addWidget(self.swap_button, 0, 1, Qt.AlignCenter)
+            self.body_grid.addWidget(self.result_panel, 0, 2)
+            self.body_grid.setColumnStretch(0, 1)
+            self.body_grid.setColumnStretch(2, 1)
+            self.body_grid.setRowStretch(0, 1)
+        else:
+            self.body_grid.addWidget(self.swap_button, 1, 0, Qt.AlignCenter)
+            self.body_grid.addWidget(self.result_panel, 2, 0)
+            self.body_grid.setColumnStretch(0, 1)
+            self.body_grid.setRowStretch(0, 1)
+            self.body_grid.setRowStretch(2, 1)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow_editors()
+        if hasattr(self, "status_label"):
+            self._render_status()
+
+    def _set_status(self, message):
+        self._status_message = str(message)
+        self._render_status()
+
+    def _render_status(self):
+        line = " ".join(self._status_message.splitlines())
+        self.status_label.setText(self.status_label.fontMetrics().elidedText(
+            line, Qt.ElideRight, max(1, self.status_label.contentsRect().width())) if self.isVisible() else line)
+        self.status_label.setToolTip(tooltip_text(self._status_message))
+
+    def _update_actions(self):
+        self.translate_button.setEnabled(bool(self.source_text.strip()) and not self._retranslating)
+        self.copy_button.setEnabled(bool(self.translated_text))
+        self.swap_button.setEnabled(bool(self.source_text or self.translated_text))
+
+    def _invalidate_request(self):
+        self._request_id += 1
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        self._cancel_event = None
+        self._pending_request = None
+        self._retranslating = False
 
     def _edited_source(self):
-        self.source_text = self.source_edit.toPlainText()
-        self.status_label.setText(self.text["source_edited"])
+        current = self.source_edit.toPlainText()
+        if current == self.source_text:
+            return  # Font/theme changes can notify the document without editing its text.
+        self._invalidate_request()
+        self.source_text = current
+        self._update_actions()
+        self._set_status(self.text["source_edited"])
 
-    def _change_text_tab(self, index):
-        self.editors.setCurrentIndex(index)
-        self.google_button.setText(ui_text(self.lang, "translate_button") if index else ui_text(self.lang, "google"))
-        self.copy_button.setVisible(index == 0)
+    def _edited_result(self):
+        current = self.text_edit.toPlainText()
+        if current == self.translated_text:
+            return
+        self._invalidate_request()
+        self.translated_text = current
+        self._update_actions()
+        self._set_status(self.text["edited"])
 
-    def _primary_action(self):
-        if self.text_tabs.currentIndex() == 1:
-            self._start_retranslate()
-        else:
-            self._open_google()
+    def _fill_target_combo(self, preferred_code):
+        codes = [language.code for language in APP_LANGUAGES if language.code != self.source_code]
+        if preferred_code not in codes:
+            preferred_code = default_target_for_source(self.source_code, preferred_code)
+        blocker = QtCore.QSignalBlocker(self.target_combo)
+        self.target_combo.clear()
+        for code in codes:
+            self.target_combo.addItem(language_display_name(code, self.lang), code)
+        self.target_combo.setCurrentIndex(max(0, self.target_combo.findData(preferred_code)))
+        self.target_code = self.target_combo.currentData() or preferred_code
+        del blocker
+
+    def _on_source_changed(self, *_args):
+        new_source = self.source_combo.currentData()
+        if not new_source or new_source == self.source_code:
+            return
+        self._invalidate_request()
+        self.source_code = new_source
+        self._fill_target_combo(self.target_code)
+        self._start_retranslate()
+
+    def _on_target_changed(self, *_args):
+        new_target = self.target_combo.currentData()
+        if not new_target or new_target == self.target_code:
+            return
+        self._invalidate_request()
+        self.target_code = new_target
+        self._start_retranslate()
+
+    def _swap_languages(self):
+        self._invalidate_request()
+        source, result = self.source_edit.toPlainText(), self.text_edit.toPlainText()
+        old_source, old_target = self.source_code, self.target_code
+        with QtCore.QSignalBlocker(self.source_combo), QtCore.QSignalBlocker(self.source_edit), QtCore.QSignalBlocker(self.text_edit):
+            self.source_code = old_target
+            self.source_combo.setCurrentIndex(self.source_combo.findData(old_target))
+            self._fill_target_combo(old_source)
+            self.source_edit.setPlainText(result)
+            self.text_edit.setPlainText(source)
+        self.source_text, self.translated_text = result, source
+        self._update_actions()
+        self._start_retranslate()
+
+    def _start_retranslate(self):
+        if self._closed or self._retranslating:
+            return
+        self._remember_language_pair()
+        self._update_actions()
+        if not self.source_text.strip():
+            self._set_status(self.text["source_placeholder"])
+            return
+        self._request_id += 1
+        request_id = self._request_id
+        cancelled = threading.Event()
+        self._cancel_event = cancelled
+        config = self._current_config()
+        engine = str(config.get("translator_engine", "Google"))
+        self.engine_label.setText(engine)
+        source_text, source_code, target_code = self.source_text, self.source_code, self.target_code
+        self._pending_request = (source_text, source_code, target_code)
+        self._retranslating = True
+        self._update_actions()
+        self._set_status(ui_text(self.lang, "translating"))
+        error_label = ui_text(self.lang, "translation_error")
+
+        def worker():
+            try:
+                from translater import translate_text
+                result = translate_text(source_text, source_code, target_code,
+                                        engine=engine, cancel_callback=cancelled.is_set)
+                error = "" if result else error_label
+            except Exception as exc:
+                result, error = "", f"{error_label}: {exc}"
+            if cancelled.is_set():
+                return
+            try:
+                self._retranslated_signal.emit(request_id, str(result or ""), error)
+            except RuntimeError:
+                pass  # The window was deleted after the request was cancelled.
+
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as exc:
+            self._on_retranslated(request_id, "", f"{error_label}: {exc}")
+
+    @QtCore.pyqtSlot(int, str, str)
+    def _on_retranslated(self, request_id, translated_text, error):
+        if self._closed or request_id != self._request_id or self._pending_request is None:
+            return
+        original, _source, target = self._pending_request
+        self._retranslating = False
+        self._pending_request = None
+        self._cancel_event = None
+        if error or not translated_text:
+            self._update_actions()
+            self._set_status(error or ui_text(self.lang, "translation_error"))
+            return
+        with QtCore.QSignalBlocker(self.text_edit):
+            self.text_edit.setPlainText(translated_text)
+        self.translated_text = translated_text
+        self._update_actions()
+        save_translation_history(original, translated_text, target)
+        if self.auto_copy:
+            platform_support.copy_text(translated_text)
+            save_copy_history(translated_text)
+        self._set_status(self.text["auto_copied"] if self.auto_copy else self.text["ready"])
+
+    def _copy_result(self):
+        platform_support.copy_text(self.translated_text)
+        save_copy_history(self.translated_text)
+        self._set_status(self.text["copied"])
+
+    def done(self, result):
+        self._closed = True
+        self._invalidate_request()
+        super().done(result)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._centered_once:
+            self._centered_once = True
+            self._center_on_parent()
+            QTimer.singleShot(0, self._center_on_parent)
+        QTimer.singleShot(0, self._reflow_editors)
+        QTimer.singleShot(0, self._render_status)
+
+    def refresh_theme(self, theme):
+        self.theme = theme
+        dark = theme != "Светлая"
+        background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
+        ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        self.setStyleSheet(f"""
+            QDialog#translationResultRoot {{ background:transparent; }}
+            QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
+            QLabel#translationResultTitle {{ color:{ink}; font-size:18px; font-weight:700; }}
+            QLabel#translationResultEngine, QLabel#translationResultStatus {{ color:{muted}; font-size:12px; }}
+            QFrame#translationEditorPanel {{ background:{surface}; border:1px solid {edge}; border-radius:8px; }}
+            QLabel#translationEditorCaption {{ color:{muted}; font-size:12px; font-weight:600; }}
+            QTextEdit {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:16px; selection-background-color:#7a5fa1; }}
+            QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
+            QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
+            QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
+            QFrame#translationResultScaleControl {{ border:1px solid {edge}; border-radius:6px; }}
+            QLineEdit#translationResultScale {{ color:{ink}; background:transparent; border:0; font-size:12px; }}
+            QScrollBar:vertical {{ background:{surface}; width:10px; margin:2px; }}
+            QScrollBar::handle:vertical {{ background:{edge}; min-height:24px; border-radius:4px; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
+        """ + standard_buttons(dark, compact=False))
+        for button in (self.scale_decrease, self.scale_increase):
+            button.setStyleSheet(button_qss(dark, "quiet", selector="QToolButton", icon=True, radius=4))
+        for combo in (self.source_combo, self.target_combo):
+            combo.set_popup_background(surface)
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
@@ -4302,6 +4552,8 @@ class TranslationResultDialog(QDialog):
         self.scale_increase.setEnabled(value < (maximum if maximum is not None else 200))
 
     def _commit_scale(self):
+        if self._closed:
+            return
         if QApplication.mouseButtons() != Qt.NoButton:
             self._scale_commit_timer.start(30)
             return
@@ -4321,144 +4573,6 @@ class TranslationResultDialog(QDialog):
             value = manager.window_percent(self)
         manager.set_window_percent(self, value + direction * 5, anchor_widget or self.scale_value)
 
-    def _edited_result(self):
-        self.translated_text = self.text_edit.toPlainText()
-        self.status_label.setText(self.text["edited"])
-
-    def refresh_theme(self, theme):
-        self.theme = theme
-        if theme == "Темная":
-            self.setStyleSheet("""
-                QDialog#translationResultRoot { background: transparent; }
-                QFrame#translationResultFrame { background: #111216; border: 1px solid #494056; border-radius: 14px; }
-                QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
-                QLabel#translationResultEyebrow { color: #a994d2; font-size: 10px; font-weight: 800; }
-                QLabel#translationResultTitle { color: #ffffff; font-size: 20px; font-weight: 800; }
-
-                QTextEdit#translationResultText { background: #19181e; color: #f5f2fb; border: 1px solid #3a3547; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #7A5FA1; }
-                QComboBox#translationResultCombo { background: #1d1c23; color: #f0ecf6; border: 1px solid #443e52; border-radius: 8px; padding: 4px 9px; font-size: 13px; font-weight: 700; }
-                QComboBox#translationResultCombo:disabled { color: #7d7688; border: 1px solid #332e3d; }
-                QComboBox#translationResultCombo::drop-down { border: none; width: 18px; }
-                QComboBox#translationResultCombo QAbstractItemView { background: #1d1c23; color: #f0ecf6; border: 1px solid #494056; selection-background-color: #7A5FA1; outline: none; }
-
-                QLabel#translationResultStatus { color: #aaa4b4; font-size: 12px; }
-
-                QScrollBar:vertical { background: #17161c; width: 10px; margin: 2px; }
-                QScrollBar::handle:vertical { background: #665677; min-height: 30px; border-radius: 4px; }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            """ + standard_buttons(theme != "Светлая", compact=False))
-        else:
-            self.setStyleSheet("""
-                QDialog#translationResultRoot { background: transparent; }
-                QFrame#translationResultFrame { background: #ece7f0; border: 1px solid #bcb2c7; border-radius: 14px; }
-                QLabel#translationResultIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
-                QLabel#translationResultEyebrow { color: #725594; font-size: 10px; font-weight: 800; }
-                QLabel#translationResultTitle { color: #24212a; font-size: 20px; font-weight: 800; }
-
-                QTextEdit#translationResultText { background: #f1edf4; color: #24212a; border: 1px solid #bcb2c7; border-radius: 10px; padding: 12px; font-size: 17px; selection-background-color: #a98cca; }
-                QComboBox#translationResultCombo { background: #e5dfe9; color: #332e3c; border: 1px solid #bcb2c7; border-radius: 8px; padding: 4px 9px; font-size: 13px; font-weight: 700; }
-                QComboBox#translationResultCombo:disabled { color: #9d96a6; border: 1px solid #e2dae9; }
-                QComboBox#translationResultCombo::drop-down { border: none; width: 18px; }
-                QComboBox#translationResultCombo QAbstractItemView { background: #f1edf4; color: #332e3c; border: 1px solid #bcb2c7; selection-background-color: #a98cca; outline: none; }
-
-                QLabel#translationResultStatus { color: #6f6877; font-size: 12px; }
-
-                QScrollBar:vertical { background: #f3f0f6; width: 10px; margin: 2px; }
-                QScrollBar::handle:vertical { background: #a28cb5; min-height: 30px; border-radius: 4px; }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            """ + standard_buttons(theme != "Светлая", compact=False))
-
-        dark = theme == "Темная"
-        ink, muted, edge = ("#f1edf5", "#b1a6bf", "#88729f") if dark else ("#302837", "#77677e", "#897397")
-        self.setStyleSheet(self.styleSheet() + f"""
-            QTabBar#translationResultTabs::tab {{ color: {muted}; background: transparent; padding: 5px 8px; border: none; border-bottom: 2px solid transparent; font-size: 12px; }}
-            QTabBar#translationResultTabs::tab:selected {{ color: {ink}; border-bottom-color: {edge}; }}
-            QFrame#translationResultScaleControl {{ border: 1px solid {edge}; border-radius: 6px; }}
-            QLineEdit#translationResultScale {{ color: {ink}; background: transparent; border: none; font-size: 12px; }}
-        """)
-        for button in (self.scale_decrease, self.scale_increase):
-            button.setStyleSheet(button_qss(dark, "quiet", selector="QToolButton", icon=True, radius=4))
-        for combo in (self.source_combo, self.target_combo):
-            if combo is not None:
-                combo.set_popup_background("#1d1c23" if theme == "Темная" else "#f1edf4")
-
-    def _build_pair_row(self):
-        """Language pair selectors that re-translate the original text in place."""
-        row = QHBoxLayout()
-        row.setSpacing(8)
-
-        self.source_combo = DropDownCombo(self)
-        self.source_combo.setObjectName("translationResultCombo")
-        self.source_combo.setMinimumHeight(34)
-        for language in APP_LANGUAGES:
-            self.source_combo.addItem(language.display_name(self.lang), language.code)
-        self.source_combo.setCurrentIndex(max(0, self.source_combo.findData(self.source_code)))
-        row.addWidget(self.source_combo, stretch=1)
-
-        self.swap_button = LanguageSwapButton(self)
-        self.swap_button.setObjectName("translationResultSwap")
-        self.swap_button.setFixedSize(34, 34)
-        self.swap_button.setToolTip(tooltip_text(self.text["swap"]))
-        self.swap_button.clicked.connect(self._swap_languages)
-        row.addWidget(self.swap_button)
-
-        self.target_combo = DropDownCombo(self)
-        self.target_combo.setObjectName("translationResultCombo")
-        self.target_combo.setMinimumHeight(34)
-        self._fill_target_combo(self.target_code)
-        row.addWidget(self.target_combo, stretch=1)
-
-        self.source_combo.currentIndexChanged.connect(self._on_source_changed)
-        self.target_combo.currentIndexChanged.connect(self._on_target_changed)
-        self._retranslated_signal.connect(self._on_retranslated)
-        return row
-
-    def _fill_target_combo(self, preferred_code):
-        """Rebuild the target list for the current source, skipping the source."""
-        codes = [language.code for language in APP_LANGUAGES if language.code != self.source_code]
-        if preferred_code not in codes:
-            preferred_code = default_target_for_source(self.source_code, preferred_code)
-        self.target_combo.blockSignals(True)
-        try:
-            self.target_combo.clear()
-            for code in codes:
-                self.target_combo.addItem(language_display_name(code, self.lang), code)
-            self.target_combo.setCurrentIndex(max(0, self.target_combo.findData(preferred_code)))
-            self.target_code = self.target_combo.currentData() or preferred_code
-        finally:
-            self.target_combo.blockSignals(False)
-
-    def _on_source_changed(self, *_args):
-        new_source = self.source_combo.currentData()
-        if not new_source or new_source == self.source_code:
-            return
-        self.source_code = new_source
-        self._fill_target_combo(self.target_code)
-        self._start_retranslate()
-
-    def _on_target_changed(self, *_args):
-        new_target = self.target_combo.currentData()
-        if not new_target or new_target == self.target_code:
-            return
-        self.target_code = new_target
-        self._start_retranslate()
-
-    def _swap_languages(self):
-        old_source, old_target = self.source_code, self.target_code
-        self.source_code = old_target
-        self.source_combo.blockSignals(True)
-        try:
-            self.source_combo.setCurrentIndex(max(0, self.source_combo.findData(old_target)))
-        finally:
-            self.source_combo.blockSignals(False)
-        self._fill_target_combo(old_source)
-        self._start_retranslate()
-
-    def _set_pair_row_enabled(self, enabled):
-        for widget in (self.source_combo, self.target_combo, self.swap_button):
-            if widget is not None:
-                widget.setEnabled(enabled)
-
     def _remember_language_pair(self):
         """Keep the pair selected here in sync with future app translations."""
         owner = self.parentWidget()
@@ -4470,69 +4584,6 @@ class TranslationResultDialog(QDialog):
                 logging.getLogger("clickntranslate.result").exception(
                     "Could not remember the translation-result language pair"
                 )
-
-    def _start_retranslate(self):
-        if not self.source_text.strip() or not self.pair_row_available:
-            return
-        # Remember the UI choice immediately.  Persistence must not depend on
-        # the network request succeeding (or even starting).
-        self._remember_language_pair()
-        if self._retranslating:
-            return
-        self._retranslating = True
-        self._set_pair_row_enabled(False)
-        self.source_edit.setReadOnly(True)
-        self.text_edit.setReadOnly(True)
-        self.google_button.setEnabled(False)
-        self.status_label.setText(ui_text(self.lang, "translating"))
-        source_code, target_code = self.source_code, self.target_code
-        source_text = self.source_text
-
-        def worker():
-            try:
-                from translater import translate_text
-
-                result = translate_text(source_text, source_code, target_code)
-                error = "" if result else ui_text(self.lang, "translation_error")
-            except Exception as exc:
-                result, error = "", f"{ui_text(self.lang, 'translation_error')}: {exc}"
-            try:
-                self._retranslated_signal.emit(str(result or ""), error)
-            except RuntimeError:
-                # The dialog was closed while the request was still in flight.
-                pass
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    @QtCore.pyqtSlot(str, str)
-    def _on_retranslated(self, translated_text, error):
-        self._retranslating = False
-        self._set_pair_row_enabled(True)
-        self.source_edit.setReadOnly(False)
-        self.text_edit.setReadOnly(False)
-        self.google_button.setEnabled(True)
-        if error or not translated_text:
-            self.status_label.setText(error or ui_text(self.lang, "translation_error"))
-            return
-        self.translated_text = translated_text
-        self.text_edit.setPlainText(translated_text)
-        self.text_tabs.setCurrentIndex(0)
-        if self.auto_copy:
-            platform_support.copy_text(translated_text)
-            save_copy_history(translated_text)
-            self.status_label.setText(self.text["auto_copied"])
-        else:
-            self.status_label.setText(self.text["ready"])
-        self.copy_button.setText(ui_text(self.lang, "copy"))
-
-    def _copy_result(self):
-        platform_support.copy_text(self.translated_text)
-        save_copy_history(self.translated_text)
-        self.status_label.setText(self.text["copied"])
-        self.copy_button.setText(ui_text(self.lang, "copy"))
-
-    def _open_google(self):
-        webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(self.translated_text))
 
     def _center_on_parent(self):
         self.ensurePolished()
@@ -4554,11 +4605,6 @@ class TranslationResultDialog(QDialog):
             frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
         self.move(frame.topLeft())
 
-    def showEvent(self, event):
-        self._center_on_parent()
-        super().showEvent(event)
-        QTimer.singleShot(0, self._center_on_parent)
-
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and event.pos().y() <= 78:
             self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
@@ -4576,7 +4622,6 @@ class TranslationResultDialog(QDialog):
     def mouseReleaseEvent(self, event):
         self._drag_position = None
         super().mouseReleaseEvent(event)
-
 
 class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
