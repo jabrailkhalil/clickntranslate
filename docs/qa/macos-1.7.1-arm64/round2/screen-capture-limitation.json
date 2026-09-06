@@ -1,10 +1,13 @@
 {
-  "screen_capture": "blocked",
-  "reason": "CGSSessionScreenIsLocked is true; current QScreen captures are fully transparent",
+  "screen_capture": "passed after unlock",
   "earlier_unlocked_captures": [
     "light-tooltip-screen-unlocked.png",
     "light-menu-screen-unlocked.png",
     "light-message-screen-unlocked.png"
   ],
-  "native_background_checks": "passed separately in source and installed smoke"
+  "native_background_checks": "passed separately in source and installed smoke",
+  "earlier_attempt": "blocked by screen lock; empty output was not counted",
+  "final_capture": "Eight real QScreen crops: tooltip, menu, status and message, light/dark, DPR 2; visually reviewed",
+  "final_report": "popup-native-capture.json",
+  "earlier_reason": "CGSSessionScreenIsLocked is true; current QScreen captures are fully transparent"
 }

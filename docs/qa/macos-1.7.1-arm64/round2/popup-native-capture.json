@@ -1,0 +1,90 @@
+{
+  "light-tooltip": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      480,
+      132
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "light-status": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      332,
+      82
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "light-menu": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      340,
+      164
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "light-message": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      1266,
+      404
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "dark-tooltip": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      480,
+      132
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "dark-status": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      332,
+      82
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "dark-menu": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      340,
+      164
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  },
+  "dark-message": {
+    "native_opaque": false,
+    "native_background_alpha": 0,
+    "pixmap_dpr": 2.0,
+    "screen_dpr": 2.0,
+    "pixel_size": [
+      1266,
+      404
+    ],
+    "capture": "actual QScreen crop of own fixture"
+  }
+}

@@ -12,8 +12,11 @@ Cocoa popup fixes into Click’n’Translate 1.7.1 arm64. See
 - `light-*-screen-unlocked.png`: actual screen crops after the native
   transparency fix, before the final lifetime change. These show why checking
   only a Qt pixmap was insufficient. They are earlier source fixtures.
-- `screen-capture-limitation.json`: a later screen-capture attempt was empty
-  because the Mac was locked; it was not counted as a pass.
+- `final-screen-*.png` and `popup-native-capture.json`: eight final screen
+  captures of isolated Cocoa fixtures after unlock, with DPR 2 and transparent
+  native window backgrounds. Both themes were visually reviewed.
+- `screen-capture-limitation.json`: the earlier locked-screen capture was not
+  counted; the retry after unlock passed.
 - `workspace-live-*`: real source-window Google requests and a controlled
   LibreTranslate HTTP 503. Qt-local input, no physical keyboard or external-app
   clipboard test. These fixtures use isolated configuration and no auto-copy.
