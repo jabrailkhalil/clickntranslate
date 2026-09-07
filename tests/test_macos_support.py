@@ -115,6 +115,9 @@ def test_native_paste_rechecks_focus_after_releasing_modifiers(mac, monkeypatch,
         return target_unchanged
     assert desktop.send_edit_shortcut('v', validate_target=validate) == target_unchanged
     assert events == ([(9, True), (9, False)] if target_unchanged else [])
+    assert quartz.CGEventSetFlags.call_args_list == (
+        [mock.call((9, True), 256), mock.call((9, False), 0)] if target_unchanged else []
+    )
 
 
 def test_optional_ocr_install_skips_rosetta_python_for_native_worker(mac, monkeypatch):

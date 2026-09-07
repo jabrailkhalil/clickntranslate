@@ -1,0 +1,61 @@
+{
+  "tesseract": {
+    "status": "passed",
+    "directory": "/Users/jabrail/Library/Application Support/ClicknTranslate/ocr/tesseract",
+    "removed": true,
+    "events": [
+      [
+        "_on_tesseract_install_ready",
+        [
+          "/Users/jabrail/Library/Application Support/ClicknTranslate/ocr/tesseract/runtime-9beae66ab2c749b083f4839821de2175/bin/tesseract"
+        ]
+      ]
+    ],
+    "language_count": 125,
+    "seconds": 41.21
+  },
+  "easyocr": {
+    "status": "passed",
+    "directory": "/Users/jabrail/Library/Application Support/ClicknTranslate/ocr/easyocr",
+    "removed": true,
+    "events": [
+      [
+        "_on_easyocr_install_ready",
+        []
+      ]
+    ],
+    "english_models_ready": true,
+    "russian_models_ready": true,
+    "seconds": 137.2
+  },
+  "hymt": {
+    "status": "passed",
+    "directory": "/Users/jabrail/Library/Application Support/ClicknTranslate/translators/hymt",
+    "removed": true,
+    "events": [
+      [
+        "_on_hymt_install_ready",
+        []
+      ]
+    ],
+    "translation": "Тестирование завершено.",
+    "seconds": 75.2
+  },
+  "argos": {
+    "status": "passed",
+    "removed": [
+      [
+        "en",
+        "ru"
+      ]
+    ],
+    "reinstalled": [
+      [
+        "en",
+        "ru"
+      ]
+    ],
+    "translation": "Тест завершен.",
+    "seconds": 3.9
+  }
+}

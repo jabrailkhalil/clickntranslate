@@ -819,7 +819,7 @@ class MainWindowGeometryTest(unittest.TestCase):
                         language,
                     )
                     self.assertTrue(self.window.main_footer.isAncestorOf(engine))
-                    self.assertLessEqual(engine_position.y() + engine.height(), self.window.height() - 14)
+                    self.assertLessEqual(engine_position.y() + engine.height(), self.window.ui_root.height() - 14)
                     for key, pair in refs.items():
                         for label in (pair.caption_label, pair.value_label):
                             if label.wordWrap():

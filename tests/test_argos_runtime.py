@@ -456,17 +456,5 @@ class ArgosPackagingTest(unittest.TestCase):
         qt_at = main_source.index("from PyQt5 import QtCore")
         self.assertLess(preload_at, qt_at)
 
-    def test_main_requires_preinstalled_argos_packages(self):
-        main_source = (ROOT / "main.py").read_text(encoding="utf-8")
-        start = main_source.index("    def _start_argos_translation")
-        end = main_source.index("    @QtCore.pyqtSlot(str)\n    def _on_argos_translation_done", start)
-        implementation = main_source[start:end]
-        self.assertIn("argos_installed_translation_pairs_fast", implementation)
-        self.assertIn("install_argos_packages_hint", implementation)
-        self.assertNotIn("_confirm_argos_package_install", implementation)
-        self.assertNotIn("progress_callback", implementation)
-        self.assertIn("threading.Thread(target=worker, daemon=True).start()", implementation)
-
-
 if __name__ == "__main__":
     unittest.main()

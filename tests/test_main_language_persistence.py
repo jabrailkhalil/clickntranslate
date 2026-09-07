@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 import main  # noqa: E402
 from PyQt5.QtCore import QEvent  # noqa: E402
+from PyQt5.QtTest import QTest
 
 
 def test_main_language_popup_uses_the_app_scrollbar_style():
@@ -32,6 +33,8 @@ class _LanguageHarness:
     _capture_main_translation_languages = main.DarkThemeApp._capture_main_translation_languages
     _restore_main_translation_languages = main.DarkThemeApp._restore_main_translation_languages
     _save_main_translation_languages = main.DarkThemeApp._save_main_translation_languages
+    _swap_main_translation_languages = main.DarkThemeApp._swap_main_translation_languages
+    _update_main_language_swap = main.DarkThemeApp._update_main_language_swap
     _hotkey_language_editor_mode = main.DarkThemeApp._hotkey_language_editor_mode
     _hotkey_for_translation_mode = main.DarkThemeApp._hotkey_for_translation_mode
     _available_hotkey_translation_pairs = (
@@ -95,6 +98,28 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         self.assertEqual(harness.target_lang.currentText(), "Italian")
         self.assertEqual(harness.config["main_translation_source_language"], "pt")
         self.assertEqual(harness.config["main_translation_target_language"], "it")
+
+    def test_arrow_swaps_argos_direction_without_a_reverse_package(self):
+        harness = _LanguageHarness({
+            "translator_engine": "argos",
+            "main_translation_source_language": "en",
+            "main_translation_target_language": "ru",
+        }, "ru")
+        button = main.LanguageSwapButton()
+        harness.main_language_swap = button
+        button.clicked.connect(harness._swap_main_translation_languages)
+        with mock.patch.object(main.translater, "argos_installed_translation_pairs_fast",
+                               return_value={("en", "ru")}):
+            harness._restore_main_translation_languages()
+            button.show()
+            self.app.processEvents()
+            for expected in (("ru", "en"), ("en", "ru")):
+                self.assertTrue(button.isEnabled())
+                QTest.mouseClick(button, main.Qt.LeftButton)
+                self.assertEqual(harness._configured_main_translation_pair(), expected)
+            self.assertEqual(harness.save_count, 2)
+            self.assertEqual(harness.config["translator_engine"], "argos")
+        button.close()
 
     def test_pair_survives_interface_language_change_as_codes(self):
         config = {

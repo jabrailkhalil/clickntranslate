@@ -124,13 +124,12 @@ class TesseractDataDiscoveryTest(unittest.TestCase):
 class TesseractDiscoveryTest(unittest.TestCase):
     def test_path_lookup_comes_before_the_windows_install_locations(self):
         """On Linux the distribution package on PATH is the only candidate."""
-        source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
-        start = source.index("def _find_available_tesseract_exe")
-        body = source[start:start + 900]
-
-        which_index = body.index('shutil.which("tesseract")')
-        program_files_index = body.index("Program Files")
-        self.assertLess(which_index, program_files_index)
+        from types import SimpleNamespace
+        from settings_window import SettingsWindow
+        owner = SimpleNamespace(_find_local_tesseract_exe=lambda: '')
+        with mock.patch.object(platform_support, 'IS_WINDOWS', False), \
+             mock.patch.object(platform_support, 'system_tesseract_command', return_value='/usr/bin/tesseract'):
+            self.assertEqual(SettingsWindow._find_available_tesseract_exe(owner), '/usr/bin/tesseract')
 
 
 if __name__ == "__main__":

@@ -7077,18 +7077,9 @@ class DarkThemeApp(QMainWindow):
             invalidate_ocr()
 
     def _available_main_translation_pairs(self):
-        engine = str(self.config.get("translator_engine", "Google")).strip().lower()
-        if engine == "argos":
-            try:
-                installed = translater.argos_installed_translation_pairs_fast()
-            except Exception:
-                installed = set()
-            app_codes = {language.code for language in APP_LANGUAGES}
-            return {
-                (source, target)
-                for source, target in installed
-                if source in app_codes and target in app_codes
-            }
+        # Direction editing must not depend on downloaded Argos packages.
+        # Otherwise installing EN→RU silently disables both reverse arrows.
+        # Translation prepares missing packages through the explicit progress flow.
         return {
             (source.code, target.code)
             for source in APP_LANGUAGES
@@ -9282,7 +9273,14 @@ class DarkThemeApp(QMainWindow):
         # otherwise exposes the parent with the new palette while cached child
         # backing stores still contain the old one, leaving dark rectangles in
         # the light theme until another repaint happens.
-        self.setUpdatesEnabled(False)
+        # The scaled canvas is a separate top-level widget embedded in a
+        # graphics proxy: disabling the native owner alone does not freeze it.
+        roots = list(dict.fromkeys((self, getattr(self, 'ui_root', self),
+                                    *QApplication.topLevelWidgets())))
+        frozen = [(widget, widget.updatesEnabled()) for widget in roots
+                  if widget.isVisible() or widget is self or widget is getattr(self, 'ui_root', None)]
+        for widget, _enabled in frozen:
+            widget.setUpdatesEnabled(False)
         try:
             self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
             self.save_config()
@@ -9292,7 +9290,8 @@ class DarkThemeApp(QMainWindow):
             if self.document_dialog is not None:
                 self.document_dialog.refresh_theme(self.current_theme)
         finally:
-            self.setUpdatesEnabled(True)
+            for widget, enabled in reversed(frozen):
+                widget.setUpdatesEnabled(enabled)
         self._refresh_theme_paint_tree()
         self._complete_guide_step("theme")
 
@@ -9311,6 +9310,9 @@ class DarkThemeApp(QMainWindow):
             root.update()
             controller = getattr(self, '_ui_scale_controller', None)
             if controller is not None:
+                controller.view.resetCachedContent()
+                controller.scene.invalidate(controller.scene.sceneRect())
+                controller.proxy.update()
                 controller.view.viewport().update()
             self.update()
         except RuntimeError:
@@ -10975,21 +10977,22 @@ class DarkThemeApp(QMainWindow):
         except Exception as exc:
             self._show_argos_translation_error(str(exc), pair_label)
             return
-        if not package_installed:
-            self._show_argos_translation_error(
-                ui_text(self.current_interface_language, "install_argos_packages_hint"),
-                pair_label,
-            )
+        if not package_installed and not self._confirm_argos_package_install(pair_label):
             return
 
         self._argos_translation_running = True
-        self._argos_install_required = False
-        self._argos_cancel_enabled = False
+        self._argos_install_required = not package_installed
+        self._argos_cancel_enabled = not package_installed
         self._argos_active_pair = pair_label
         self._argos_active_request = (text, source_code, target_code)
         self._argos_cancel_requested.clear()
         if hasattr(self, "translate_button"):
             self.translate_button.setEnabled(False)
+        if not package_installed:
+            self._show_argos_progress(
+                ui_text(self.current_interface_language, "argos_preparing").format(pair=pair_label),
+                determinate=False,
+            )
         def worker():
             try:
                 translated_text = translater.translate_text(
@@ -10997,6 +11000,9 @@ class DarkThemeApp(QMainWindow):
                     source_code,
                     target_code,
                     engine="argos",
+                    status_callback=self._argos_status_signal.emit if not package_installed else None,
+                    progress_callback=self._argos_progress_signal.emit if not package_installed else None,
+                    cancel_callback=self._argos_cancel_requested.is_set,
                 )
                 self._argos_translation_done_signal.emit(str(translated_text or ""))
             except translater.ArgosInstallCancelledError:

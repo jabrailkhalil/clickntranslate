@@ -1,0 +1,1 @@
+Executable=/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate

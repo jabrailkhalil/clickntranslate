@@ -75,12 +75,25 @@ before reporting success. A failed replacement restores the previous package.
 The model, runtime, manifest and licenses stay in application data under
 `translators/hymt`; users do not need Homebrew, a compiler or manual file placement.
 The progress window supports cancellation and stays attached to its owner.
+Translation passes the vendor's plain instruction to llama-cli's chat template,
+closes stdin and uses a 4096-token context for bounded input chunks. Echoed prompts
+are removed, control-token output is an error, and older malformed cache entries
+are ignored. No Hy-MT error switches providers.
 
 Argos is bundled in its helper; Language packages downloads selected directional
-pairs automatically. Apple Vision and RapidOCR are already ready in the app.
+pairs automatically. Main-window and hotkey direction arrows remain usable before
+the reverse package is installed. Translating with a missing Argos route asks to
+install it and continues the same request with progress; cancellation preserves
+the draft and the selected provider. Apple Vision and RapidOCR are already ready in the app.
 Google, MyMemory, Lingva and LibreTranslate use their configured network services
 and do not need local engine packages; a service requiring a key/server must still
 be configured by its user. No installation or provider error selects a substitute.
+
+Theme changes freeze the native main window, its separate graphics canvas and
+visible dialogs together. Scene, canvas and viewport backgrounds are updated
+in one transaction and the viewport is fully repainted, preventing old-theme
+strips after scaling. Synthetic Cmd+C/Cmd+V releases the Command event flag before
+the next edit command while retaining the foreground-target safety checks.
 
 ## Native behavior
 

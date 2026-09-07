@@ -471,6 +471,52 @@ def translation_draft_check(main, app, window, report_path, screenshots):
     return {'cases': records, 'scope': 'Native Qt typing and worker delivery; controlled provider replies'}
 
 
+def main_direction_and_theme_check(main, app, window):
+    """Exercise the actual scaled buttons, including Argos before model setup."""
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtTest import QTest
+    previous = dict(window.config)
+    results = {'direction_clicks': 0, 'theme_frames': 0}
+    try:
+        window.config.update(translator_engine='argos', main_translation_source_language='en',
+                             main_translation_target_language='ru', hotkey_language_editor_mode='selection',
+                             selection_translate_source_language='en', selection_translate_target_language='ru')
+        window.show_main_screen()
+        controller = window._ui_scale_controller
+        def click(widget):
+            QTest.mouseClick(controller.view.viewport(), Qt.LeftButton,
+                             pos=controller.map_widget_to_view(widget))
+            app.processEvents()
+        for percent in (80, 100, 137, 200):
+            window.set_ui_scale_percent(percent)
+            app.processEvents()
+            for expected in (('ru', 'en'), ('en', 'ru')):
+                click(window.main_language_swap)
+                assert window._configured_main_translation_pair() == expected
+                click(window.hotkey_language_swap)
+                assert window._configured_hotkey_translation_pair('selection') == expected
+                assert window.config['translator_engine'] == 'argos'
+                results['direction_clicks'] += 2
+        for page in ('main', 'settings'):
+            window.show_main_screen() if page == 'main' else window.show_settings()
+            for _ in range(4):
+                click(window.theme_button)
+                expected = main.THEMES[window.current_theme]['background']
+                for delay in (0, 40):
+                    QTest.qWait(delay)
+                    picture = window.grab().toImage()
+                    for x in (1, picture.width() - 2):
+                        assert picture.pixelColor(x, picture.height() // 2).name() == expected
+                    assert controller.scene.backgroundBrush().color().name() == expected
+                    results['theme_frames'] += 1
+        return results
+    finally:
+        window.config.update(previous)
+        window.current_theme = previous.get('theme', window.current_theme)
+        window.apply_theme()
+        window.show_main_screen()
+
+
 def run(main, report_path):
     import macos_desktop
     import macos_ocr
@@ -532,6 +578,7 @@ def run(main, report_path):
             placement_results = dialog_placement_check(main, app, window, report_path, screenshots)
             popup_results = popup_screenshots(app, window, report_path, screenshots)
             draft_results = translation_draft_check(main, app, window, report_path, screenshots)
+            direction_theme_results = main_direction_and_theme_check(main, app, window)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -564,6 +611,7 @@ def run(main, report_path):
                 "window_placement": placement_results,
                 "shadow_mode": shadow_results,
                 "translation_drafts": draft_results,
+                "main_direction_and_theme": direction_theme_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

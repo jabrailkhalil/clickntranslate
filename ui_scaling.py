@@ -267,6 +267,9 @@ class MainWindowScaleController(QObject):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
+        # A single compact canvas needs one complete frame when its theme or
+        # scale changes. Partial proxy updates can retain strips of the old theme.
+        self.view.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.view.setFocusPolicy(Qt.StrongFocus)
         self.scene = QGraphicsScene(self.view)
         self.view.setScene(self.scene)
@@ -361,7 +364,7 @@ class MainWindowScaleController(QObject):
             }}
             QWidget#mainUiViewport {{ background-color: {color.name()}; }}
         ''')
-        for widget in (self.owner, self.view, self.view.viewport()):
+        for widget in (self.owner, self.canvas, self.view, self.view.viewport()):
             palette = widget.palette()
             palette.setColor(QPalette.Window, color)
             if widget is not self.owner:
@@ -369,6 +372,7 @@ class MainWindowScaleController(QObject):
             widget.setPalette(palette)
         self.view.viewport().setAutoFillBackground(True)
         self.view.setBackgroundBrush(color)
+        self.scene.setBackgroundBrush(color)
 
     def map_widget_to_view(self, widget, point=None):
         point = point if point is not None else widget.rect().center()

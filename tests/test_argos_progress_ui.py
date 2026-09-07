@@ -55,16 +55,30 @@ class ArgosProgressUiTest(unittest.TestCase):
             translate_button=mock.Mock(),
         )
 
-    def test_missing_pair_directs_user_to_language_manager_without_download(self):
+    def test_missing_pair_prepares_the_selected_direction_and_continues_translation(self):
         dummy = self._dummy()
         with mock.patch.object(main.translater, "argos_installed_translation_pairs_fast", return_value=set()):
-            with mock.patch.object(main.translater, "translate_text") as translate:
-                main.DarkThemeApp._start_argos_translation(dummy, "Привет", "ru", "en")
+            with mock.patch.object(main.translater, "translate_text", return_value="Hello") as translate:
+                with mock.patch.object(main.threading, "Thread", _ImmediateThread):
+                    main.DarkThemeApp._start_argos_translation(dummy, "Привет", "ru", "en")
 
-        dummy._confirm_argos_package_install.assert_not_called()
-        dummy._show_argos_progress.assert_not_called()
-        dummy._show_argos_translation_error.assert_called_once()
+        dummy._confirm_argos_package_install.assert_called_once_with("RU→EN")
+        dummy._show_argos_progress.assert_called_once()
+        dummy._show_argos_translation_error.assert_not_called()
+        self.assertEqual(translate.call_args.args, ("Привет", "ru", "en"))
+        self.assertEqual(translate.call_args.kwargs["engine"], "argos")
+        self.assertTrue(callable(translate.call_args.kwargs["progress_callback"]))
+        self.assertEqual(dummy._argos_translation_done_signal.values, [("Hello",)])
+
+    def test_declining_missing_package_keeps_text_and_does_not_start_translation(self):
+        dummy = self._dummy()
+        dummy._confirm_argos_package_install.return_value = False
+        with mock.patch.object(main.translater, "argos_installed_translation_pairs_fast", return_value=set()), \
+             mock.patch.object(main.translater, "translate_text") as translate:
+            main.DarkThemeApp._start_argos_translation(dummy, "Привет", "ru", "en")
         translate.assert_not_called()
+        dummy._show_argos_progress.assert_not_called()
+        dummy.translate_button.setEnabled.assert_not_called()
         self.assertFalse(dummy._argos_translation_running)
 
     def test_installed_pair_skips_download_prompt_and_progress_window(self):

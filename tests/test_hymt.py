@@ -130,12 +130,16 @@ class TestHyMTTranslatorHelpers(unittest.TestCase):
         self.assertIn("Translate the following segment into English", prompt)
         self.assertNotIn("from Russian", prompt)
         self.assertIn("Привет", prompt)
+        self.assertNotIn("<｜hy_", prompt)
 
     def test_hymt_uses_utf8_prompt_file_and_removes_it(self):
         captured = {}
         prompt_text = "Привет, мир!"
 
         def fake_run(cmd, **_kwargs):
+            self.assertIn("--no-escape", cmd)
+            self.assertEqual(cmd[cmd.index('-c') + 1], '4096')
+            self.assertEqual(_kwargs['stdin'], translater.subprocess.DEVNULL)
             prompt_path = cmd[cmd.index("-f") + 1]
             captured["path"] = prompt_path
             captured["prompt"] = open(prompt_path, "r", encoding="utf-8").read()
@@ -153,6 +157,20 @@ class TestHyMTTranslatorHelpers(unittest.TestCase):
         self.assertEqual(result, "Hello, world!")
         self.assertIn(prompt_text, captured["prompt"])
         self.assertFalse(os.path.exists(captured["path"]))
+
+    def test_control_token_output_is_an_error(self):
+        with self.assertRaisesRegex(RuntimeError, "control tokens"):
+            translater._clean_hymt_output("> <｜hy_begin▁of▁sentence｜>", "Translate the text")
+
+    def test_truncated_cli_prompt_echo_is_not_part_of_translation(self):
+        prompt = translater._build_hymt_prompt('Open the window. ' * 80, 'en', 'ru')
+        output = 'Loading model...\n\n> ' + prompt[:500] + ' ... (truncated)\n\nОткройте окно.\n\nExiting...'
+        self.assertEqual(translater._clean_hymt_output(output, prompt), 'Откройте окно.')
+
+    def test_hymt_ignores_cache_from_duplicated_chat_template(self):
+        self.assertEqual(translater._TranslationCache._engine_key('hymt'), 'hymt:prompt-v2')
+        self.assertEqual(translater._TranslationCache._engine_key('hymt', True),
+                         'segment-v2:hymt:prompt-v2')
 
     def test_clean_hymt_output_removes_prompt_and_special_tokens(self):
         prompt = "<｜hy_begin▁of▁sentence｜><｜hy_User｜>Translate<｜hy_Assistant｜>"

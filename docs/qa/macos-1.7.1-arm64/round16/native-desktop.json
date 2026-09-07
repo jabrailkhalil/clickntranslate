@@ -1,0 +1,62 @@
+{
+  "scope": "Own Cocoa fixture; real Quartz input, Carbon delivery and screen pixels. No physical keyboard.",
+  "retina_ocr": {
+    "status": "passed",
+    "result": {
+      "logical": [
+        800,
+        170
+      ],
+      "pixels": [
+        1600,
+        340
+      ],
+      "dpr": 2.0,
+      "fullscreen_crop_matches": true,
+      "screens": 1,
+      "apple vision": {
+        "text": "CLICK TRANSLATE",
+        "boxes": 1
+      },
+      "tesseract": {
+        "text": "CLICK TRANSLATE",
+        "boxes": 1
+      },
+      "rapidocr": {
+        "text": "CLICK TRANSLATE",
+        "boxes": 1
+      },
+      "easyocr": {
+        "text": "CLICK TRANSLATE",
+        "boxes": 1
+      }
+    }
+  },
+  "quartz_hotkeys": {
+    "status": "failed",
+    "error": "Traceback (most recent call last):\n  File \"/Users/jabrail/Desktop/click/clickntranslate/build/macos/round16/native_desktop.py\", line 24, in check\n    try: report[name] = {'status': 'passed', 'result': action()}\n                                                       ^^^^^^^^\n  File \"/Users/jabrail/Desktop/click/clickntranslate/build/macos/round16/native_desktop.py\", line 61, in hotkeys\n    assert len(calls) == generation * 2 + 1, calls\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+  },
+  "selection_replacement": {
+    "status": "passed",
+    "result": {
+      "replacement": [
+        [
+          true,
+          "replaced"
+        ]
+      ],
+      "changed_focus": [
+        false,
+        "focus_changed"
+      ]
+    }
+  },
+  "dynamic_window_tracking": {
+    "status": "passed",
+    "result": {
+      "moved": true,
+      "minimized": true,
+      "restored": true
+    }
+  }
+}

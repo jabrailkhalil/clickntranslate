@@ -1,0 +1,658 @@
+{
+  "input_scope": "QTest mouse events through the real scaled Cocoa viewport",
+  "argos_reverse_click_install_translate": {
+    "prompts": [
+      "RU → EN"
+    ],
+    "result": "Hello, world! Test complete.",
+    "source_preserved": "Привет, мир! Тест завершён.",
+    "provider": "argos"
+  },
+  "swap_back": "passed",
+  "theme_frames": [
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "main",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 80,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 100,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 137,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 0,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Светлая",
+      "delay_ms": 40,
+      "edges": [
+        "#f0edf3",
+        "#f0edf3"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 0,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    },
+    {
+      "page": "settings",
+      "scale": 200,
+      "theme": "Темная",
+      "delay_ms": 40,
+      "edges": [
+        "#121212",
+        "#121212"
+      ]
+    }
+  ],
+  "permissions": {
+    "screen": true,
+    "accessibility": true
+  }
+}

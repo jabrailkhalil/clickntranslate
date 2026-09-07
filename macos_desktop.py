@@ -216,7 +216,10 @@ def send_edit_shortcut(key, validate_target=None):
         return False
     for pressed in (True, False):
         event = Quartz.CGEventCreateKeyboardEvent(None, code, pressed)
-        Quartz.CGEventSetFlags(event, Quartz.kCGEventFlagMaskCommand)
+        # Leaving Command on the key-up event also leaves it in Quartz's
+        # combined session flags. The following Cmd+V then mistakes our own
+        # synthetic Cmd+C for a modifier the user is still holding.
+        Quartz.CGEventSetFlags(event, Quartz.kCGEventFlagMaskCommand if pressed else 0)
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
     return True
 

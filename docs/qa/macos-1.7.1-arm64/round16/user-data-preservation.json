@@ -1,0 +1,5 @@
+{
+  "comparison": "fresh data after normal shutdown vs after package cycle and installed smoke",
+  "changed_existing_files": [],
+  "packages": "Tesseract/EasyOCR/Hy-MT/EN-RU reinstalled; RU-EN added; original additional models preserved"
+}

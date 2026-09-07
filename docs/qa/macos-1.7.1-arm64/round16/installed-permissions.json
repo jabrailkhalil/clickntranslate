@@ -1,0 +1,17 @@
+{
+  "time": "2026-09-07T19:52:56.541778+00:00",
+  "pid": 63319,
+  "executable": "/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate",
+  "bundle": "/Applications/ClicknTranslate.app",
+  "permissions": {
+    "screen": true,
+    "accessibility": false
+  },
+  "capture": {
+    "attempted": true,
+    "nonempty": true,
+    "width": 2560,
+    "height": 1600,
+    "dpr": 2.0
+  }
+}

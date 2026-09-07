@@ -645,3 +645,29 @@ class UiScalingTest(unittest.TestCase):
                 ratio = picture.devicePixelRatio()
                 color = picture.pixelColor(round(point.x() * ratio), round(point.y() * ratio))
                 self.assertEqual(color.lightness() > 128, self.window.current_theme == 'Светлая')
+
+    def test_theme_transaction_freezes_the_proxy_canvas_and_open_dialog(self):
+        from PyQt5.QtWidgets import QDialog
+        self.window.show_settings()
+        dialog = QDialog(self.window)
+        dialog.show()
+        self.settle()
+        settings = self.window.settings_window
+        original = settings.apply_theme
+        observed = []
+
+        def apply_and_inspect():
+            observed.append((self.window.updatesEnabled(), self.window.ui_root.updatesEnabled(),
+                             dialog.updatesEnabled()))
+            original()
+        with mock.patch.object(settings, 'apply_theme', side_effect=apply_and_inspect):
+            self.window.toggle_theme()
+        self.assertEqual(observed, [(False, False, False)])
+        self.assertTrue(self.window.updatesEnabled())
+        self.assertTrue(self.window.ui_root.updatesEnabled())
+        self.assertTrue(dialog.updatesEnabled())
+        expected = main.THEMES[self.window.current_theme]['background']
+        self.assertEqual(self.controller.scene.backgroundBrush().color().name(), expected)
+        self.assertEqual(self.window.ui_root.palette().color(QPalette.Window).name(), expected)
+        dialog.close()
+        dialog.deleteLater()

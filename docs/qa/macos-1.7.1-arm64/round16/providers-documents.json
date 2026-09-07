@@ -1,0 +1,170 @@
+{
+  "Google_short": {
+    "status": "passed",
+    "result": {
+      "provider": "Google",
+      "input_length": 46,
+      "output_length": 40,
+      "sample": "Привет, мир! Нативный тест Mac завершен."
+    },
+    "seconds": 1.14
+  },
+  "Google_long": {
+    "status": "passed",
+    "result": {
+      "provider": "Google",
+      "input_length": 2379,
+      "output_length": 2134,
+      "sample": "Откройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готов"
+    },
+    "seconds": 2.01
+  },
+  "MyMemory_short": {
+    "status": "passed",
+    "result": {
+      "provider": "MyMemory",
+      "input_length": 46,
+      "output_length": 46,
+      "sample": "Здравствуйте, мир! Нативный тест Mac завершен."
+    },
+    "seconds": 0.84
+  },
+  "MyMemory_long": {
+    "status": "passed",
+    "result": {
+      "provider": "MyMemory",
+      "input_length": 2379,
+      "output_length": 2134,
+      "sample": "Откройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готов"
+    },
+    "seconds": 0.73
+  },
+  "Lingva_short": {
+    "status": "passed",
+    "result": {
+      "provider": "Lingva",
+      "input_length": 46,
+      "output_length": 40,
+      "sample": "Привет, мир! Нативный тест Mac завершен."
+    },
+    "seconds": 1.3
+  },
+  "Lingva_long": {
+    "status": "passed",
+    "result": {
+      "provider": "Lingva",
+      "input_length": 2379,
+      "output_length": 2134,
+      "sample": "Откройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готов"
+    },
+    "seconds": 1.74
+  },
+  "LibreTranslate_short": {
+    "status": "passed",
+    "result": {
+      "provider": "LibreTranslate",
+      "input_length": 46,
+      "output_length": 34,
+      "sample": "Привет, мир! Тест на Mac завершен."
+    },
+    "seconds": 1.07
+  },
+  "LibreTranslate_long": {
+    "status": "passed",
+    "result": {
+      "provider": "LibreTranslate",
+      "input_length": 2379,
+      "output_length": 2134,
+      "sample": "Откройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готов"
+    },
+    "seconds": 4.79
+  },
+  "Argos_short": {
+    "status": "passed",
+    "result": {
+      "provider": "Argos",
+      "input_length": 46,
+      "output_length": 34,
+      "sample": "Привет, мир! Тест на Mac завершен."
+    },
+    "seconds": 0.64
+  },
+  "Argos_long": {
+    "status": "passed",
+    "result": {
+      "provider": "Argos",
+      "input_length": 2379,
+      "output_length": 2134,
+      "sample": "Откройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готово.\nОткройте документ и прочитайте следующий абзац. Окно готов"
+    },
+    "seconds": 5.63
+  },
+  "document_txt": {
+    "status": "passed",
+    "result": {
+      "source_characters": 84,
+      "translated_characters": 78,
+      "exports": [
+        "txt",
+        "md",
+        "session"
+      ],
+      "chunks": 1
+    },
+    "seconds": 1.57
+  },
+  "document_docx": {
+    "status": "passed",
+    "result": {
+      "source_characters": 84,
+      "translated_characters": 78,
+      "exports": [
+        "txt",
+        "md",
+        "session"
+      ],
+      "chunks": 1
+    },
+    "seconds": 0.0
+  },
+  "document_pdf": {
+    "status": "passed",
+    "result": {
+      "source_characters": 98,
+      "translated_characters": 92,
+      "exports": [
+        "txt",
+        "md",
+        "session"
+      ],
+      "chunks": 1
+    },
+    "seconds": 1.47
+  },
+  "document_cancel": {
+    "status": "passed",
+    "result": "cancelled before provider call",
+    "seconds": 0.0
+  },
+  "hymt_short": {
+    "status": "passed",
+    "result": {
+      "provider": "hymt",
+      "input_length": 46,
+      "output_length": 48,
+      "sample": "Привет, мир! Нативная проверка на Mac завершена."
+    },
+    "seconds": 3.57
+  },
+  "hymt_long": {
+    "status": "passed",
+    "seconds": 533.23,
+    "result": {
+      "provider": "hymt",
+      "input_length": 2188,
+      "output_length": 2635,
+      "all_25_numbered_items_present": true,
+      "sample": "Пункт 1: Откройте документ 1 и прочитайте его пункт 1. Сохраните документ 1 перед закрытием окна.\n\nПункт 2: Откройте документ 2 и прочитайте его пункт 2. Сохраните документ 2 перед"
+    }
+  }
+}

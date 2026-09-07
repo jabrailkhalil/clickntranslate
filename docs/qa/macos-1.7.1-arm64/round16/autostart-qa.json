@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "entry": {
+    "Label": "io.github.jabrailkhalil.clickntranslate",
+    "LimitLoadToSessionType": "Aqua",
+    "ProgramArguments": [
+      "/usr/bin/open",
+      "-a",
+      "/Applications/ClicknTranslate.app",
+      "--args",
+      "--autostart"
+    ],
+    "RunAtLoad": true
+  },
+  "disabled": true,
+  "removed": true,
+  "unrelated_agents_unchanged": true,
+  "next_login": "not performed; active user session preserved"
+}

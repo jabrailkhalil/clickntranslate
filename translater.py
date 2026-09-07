@@ -364,7 +364,10 @@ def _build_hymt_prompt(text, source_code, target_code):
             f"Translate the following segment into {target_name}, "
             f"without additional explanation.\n\n{text}"
         )
-    return f"<｜hy_begin▁of▁sentence｜><｜hy_User｜>{user_text}<｜hy_Assistant｜>"
+    # llama-cli applies the model's chat template itself. Supplying Tencent's
+    # special tokens here nests two conversations and can produce token-only
+    # output instead of a translation, especially for longer input.
+    return user_text
 
 
 def _clean_hymt_output(output, prompt):
@@ -373,6 +376,12 @@ def _clean_hymt_output(output, prompt):
         return ""
     if prompt and prompt in text:
         text = text.rsplit(prompt, 1)[-1].strip()
+    elif prompt:
+        # Recent llama-cli versions echo only the first 500 characters even
+        # with --no-display-prompt. Remove only an echo matching our own input.
+        echo = re.search(r"(?m)^> ([\s\S]*?) \.\.\. \(truncated\)\r?\n\r?\n", text)
+        if echo and prompt.startswith(echo.group(1)):
+            text = text[echo.end():].strip()
     markers = [
         "<｜hy_Assistant｜>",
         "<|assistant|>",
@@ -420,6 +429,8 @@ def _clean_hymt_output(output, prompt):
         lines.append(line)
     text = "\n".join(lines).strip()
     text = re.sub(r"^translation\s*:\s*", "", text, flags=re.IGNORECASE).strip()
+    if re.search(r"<｜hy_[^>]*｜>", text):
+        raise RuntimeError("Hy-MT returned model control tokens instead of a translation.")
     return text.strip("\"' \r\n")
 
 
@@ -463,6 +474,7 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
             cmd,
             cwd=runner_dir,
             env=env,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -487,6 +499,7 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
             "-m", model_path,
             "-f", prompt_path,
             "-n", str(max_tokens),
+            "-c", "4096",
             "--temp", "0",
             "--top-p", "1",
             "--no-display-prompt",
@@ -496,6 +509,7 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
             "--no-show-timings",
             "--log-disable",
             "--simple-io",
+            "--no-escape",
         ]
 
         result = _run(base_cmd)
@@ -507,6 +521,7 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
                     "-m", model_path,
                     "-f", prompt_path,
                     "-n", str(max_tokens),
+                    "-c", "4096",
                     "--temp", "0",
                     "--top-p", "1",
                     "--no-display-prompt",
@@ -1358,6 +1373,9 @@ class _TranslationCache:
 
     @staticmethod
     def _engine_key(engine, segment=False):
+        if engine == 'hymt':
+            # Ignore translations produced with the old, duplicated template.
+            engine = 'hymt:prompt-v2'
         if engine == 'libretranslate':
             # A custom LibreTranslate server may use different models.
             url, _key = _libretranslate_server()

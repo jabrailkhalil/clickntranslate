@@ -925,7 +925,8 @@ class TestTesseractInstallerHelpers(unittest.TestCase):
             with open(exe_path, "wb") as f:
                 f.write(b"exe")
 
-            found = sw.SettingsWindow._find_tesseract_exe_under(dummy, root)
+            with mock.patch.object(sw.platform_support, 'IS_MAC', False):
+                found = sw.SettingsWindow._find_tesseract_exe_under(dummy, root)
 
             self.assertEqual(found, exe_path)
         finally:

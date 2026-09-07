@@ -1,0 +1,16 @@
+{
+  "initial": {
+    "source": "Hello, world!",
+    "translation": "Привет, мир!",
+    "ocr": "Apple Vision",
+    "translator": "argos"
+  },
+  "updated": {
+    "source": "The test is complete.",
+    "translation": "Тест завершен."
+  },
+  "status": "passed",
+  "moved": true,
+  "minimized_pauses": true,
+  "pause_resume": true
+}

@@ -1,0 +1,1 @@
+Executable=/Users/jabrail/Desktop/click/clickntranslate/build/macos/round16/previous.app/Contents/MacOS/ClicknTranslate

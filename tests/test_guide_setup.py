@@ -192,7 +192,11 @@ class GuideSetupTest(unittest.TestCase):
                         self.assertTrue(target.isVisible())
                         card = self.window._guide_bubble
                         self.assertTrue(card.isVisible())
-                        self.assertTrue(self.window.rect().contains(card.geometry()), card.geometry())
+                        self.assertTrue(self.window.ui_root.rect().contains(card.geometry()), card.geometry())
+                        controller = self.window._ui_scale_controller
+                        visible_card = QRect(controller.map_widget_to_view(card, card.rect().topLeft()),
+                                             controller.map_widget_to_view(card, card.rect().bottomRight()))
+                        self.assertTrue(controller.view.viewport().rect().contains(visible_card), visible_card)
                         target_rect = self.window._guide_target_rect(target)
                         self.assertFalse(card.geometry().intersects(target_rect), (card.geometry(), target_rect))
                         for label in (card.title, card.body, card.hint):
