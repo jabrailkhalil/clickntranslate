@@ -22,8 +22,13 @@ def signing_directory():
     return Path.home() / 'Library/Application Support/ClicknTranslateBuild/signing'
 
 
-def run(command):
-    result = subprocess.run([str(item) for item in command], capture_output=True, text=True)
+def run(command, *, timeout=120):
+    try:
+        result = subprocess.run([str(item) for item in command], capture_output=True,
+                                text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # TimeoutExpired includes command arguments, which can contain passwords.
+        raise RuntimeError(f'{Path(command[0]).name} timed out after {timeout}s') from None
     if result.returncode:
         # Never include the command: keychain/password arguments are private.
         raise RuntimeError(f'{Path(command[0]).name} failed: {result.stderr.strip() or result.stdout.strip()}')

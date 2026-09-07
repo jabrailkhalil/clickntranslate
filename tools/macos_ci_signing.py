@@ -98,22 +98,27 @@ def cleanup():
     if str(keychain) in current:
         commands.append(['/usr/bin/security', 'list-keychains', '-d', 'user', '-s',
                          *[item for item in current if item != str(keychain)]])
-    certificate = directory / 'certificate.pem'
-    if certificate.exists():
-        commands.extend([
-            ['/usr/bin/sudo', '-n', '/usr/bin/security', 'remove-trusted-cert', '-d', certificate],
-            ['/usr/bin/sudo', '-n', '/usr/bin/security', 'delete-certificate', '-Z', EXPECTED_SHA1, SYSTEM_KEYCHAIN],
-        ])
     if keychain.exists():
         commands.append(['/usr/bin/security', 'delete-keychain', keychain])
     try:
         for command in commands:
             try:
-                run(command)
+                print('Cleaning temporary keychain: ' + command[1], flush=True)
+                run(command, timeout=20)
             except RuntimeError as error:
                 errors.append(str(error))
     finally:
         shutil.rmtree(directory)
+    # Remove private material first, even if a system trust operation stalls.
+    for action, arguments in (
+        ('remove-trusted-cert', ['-d', CERTIFICATE]),
+        ('delete-certificate', ['-Z', EXPECTED_SHA1, SYSTEM_KEYCHAIN]),
+    ):
+        try:
+            print('Cleaning public certificate: ' + action, flush=True)
+            run(['/usr/bin/sudo', '-n', '/usr/bin/security', action, *arguments], timeout=20)
+        except RuntimeError as error:
+            errors.append(str(error))
     if errors:
         raise RuntimeError('Private files removed; keychain/trust cleanup reported: ' + '; '.join(errors))
     return {'cleaned': True}
