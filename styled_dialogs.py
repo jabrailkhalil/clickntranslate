@@ -9,24 +9,38 @@ import re
 import sys
 from pathlib import Path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 
 # One definition for every tooltip in the application.  It used to be pasted
 # into four separate stylesheets, so any widget outside those four got the
 # system default instead and the popups did not match each other.
-TOOLTIP_QSS = """
-    QToolTip {
-        background-color: #17131f;
-        color: #f7f3ff;
-        border: 1px solid #7a5fa1;
+def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
+    """Use the same theme-aware surface for native tips and status popups."""
+    if dark is None:
+        dark = _uses_dark_theme()
+    background, foreground, border = (
+        ("#211d28", "#f7f3ff", "#7a5fa1") if dark else
+        ("#faf7fc", "#302639", "#a18caf")
+    )
+    if use_palette:
+        background, foreground, border = 'palette(tool-tip-base)', 'palette(tool-tip-text)', 'palette(mid)'
+    return f"""
+    QToolTip {{
+        background-color: {background};
+        color: {foreground};
+        border: 1px solid {border};
         border-radius: 8px;
         padding: 7px 11px;
         font-family: 'Segoe UI';
         font-size: 13px;
         opacity: 245;
-    }
+    }}
 """
+
+
+# Kept for callers that inspect the shared style; runtime uses the function.
+TOOLTIP_QSS = tooltip_stylesheet(True)
 
 # Qt only word-wraps a tooltip when the text looks like rich text
 # (QTipLabel does `setWordWrap(Qt::mightBeRichText(text))`).  A long plain
@@ -61,12 +75,32 @@ class _RoundedTooltipFilter(QtCore.QObject):
     """
 
     def eventFilter(self, watched, event):
-        rounded_popup = _is_rounded_popup(watched)
-        if event.type() == QtCore.QEvent.Polish and rounded_popup:
+        event_type = event.type()
+        if event_type not in (
+            QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
+            QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
+        ):
+            return False
+        if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
+            return False
+        is_tooltip = _is_tooltip(watched)
+        if is_tooltip and event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show):
+            # QTipLabel is reused across unrelated windows. Its previous owner
+            # and stylesheet must not leave a dark tooltip in the light theme.
+            _apply_tooltip_theme(watched)
+        if is_tooltip and event_type in (
+            QtCore.QEvent.Show, QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
+        ):
+            # Moving between controls calls QTipLabel::setStyleSheet("/* */")
+            # even while the same tip stays visible. Apply after Qt finishes
+            # assigning its new owner, without reentering stylesheet polish.
+            QtCore.QTimer.singleShot(0, lambda widget=watched: _apply_tooltip_theme(widget))
+        rounded_popup = is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
+        if event_type == QtCore.QEvent.Polish and rounded_popup:
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
             watched.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        if rounded_popup and event.type() in (
+        if rounded_popup and event_type in (
             QtCore.QEvent.Polish,
             QtCore.QEvent.Show,
             QtCore.QEvent.Resize,
@@ -89,6 +123,18 @@ def _is_tooltip(widget) -> bool:
         return False
 
 
+def _apply_tooltip_theme(widget) -> None:
+    try:
+        if sip.isdeleted(widget):
+            return
+        style = tooltip_stylesheet(_uses_dark_theme(widget))
+        if widget.styleSheet() != style:
+            widget.setStyleSheet(style)
+    except RuntimeError:
+        # A pending hover can be cancelled before the queued update runs.
+        pass
+
+
 def _is_rounded_popup(widget) -> bool:
     try:
         return _is_tooltip(widget) or bool(
@@ -101,6 +147,8 @@ def _is_rounded_popup(widget) -> bool:
 def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
     """Clip a tooltip-sized top-level window to true rounded corners."""
     try:
+        if sip.isdeleted(widget):
+            return
         rect = widget.rect()
         if rect.width() < 2 or rect.height() < 2:
             return
@@ -116,20 +164,34 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
 _TOOLTIP_FILTER = None
 
 
-def install_tooltip_style(app=None) -> None:
+def install_tooltip_style(app=None, dark=None) -> None:
     """Apply the shared tooltip look to every window, including unstyled ones."""
     global _TOOLTIP_FILTER
 
     app = app or QtWidgets.QApplication.instance()
     if app is None:
         return
-    if _TOOLTIP_FILTER is None:
+    if not hasattr(app, '_rounded_tooltip_filter'):
         _TOOLTIP_FILTER = _RoundedTooltipFilter(app)
         app.installEventFilter(_TOOLTIP_FILTER)
+        app._rounded_tooltip_filter = _TOOLTIP_FILTER
+    if dark is None:
+        dark = _uses_dark_theme()
     existing = app.styleSheet() or ""
-    if "QToolTip" in existing:
-        return
-    app.setStyleSheet(existing + TOOLTIP_QSS)
+    # The application rule stays constant. Replacing the entire application
+    # stylesheet on every theme switch also repolishes rich-text documents and
+    # can accidentally turn their already scaled font into a new baseline.
+    style = re.sub(r'QToolTip\s*\{[^}]*\}', '', existing).rstrip() + '\n' + tooltip_stylesheet(use_palette=True)
+    if style != existing:
+        app.setStyleSheet(style)
+    palette = QtWidgets.QToolTip.palette()
+    palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor('#211d28' if dark else '#faf7fc'))
+    palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor('#f7f3ff' if dark else '#302639'))
+    palette.setColor(QtGui.QPalette.Mid, QtGui.QColor('#7a5fa1' if dark else '#a18caf'))
+    QtWidgets.QToolTip.setPalette(palette)
+    for widget in app.topLevelWidgets():
+        if _is_tooltip(widget):
+            widget.setStyleSheet(tooltip_stylesheet(dark))
 
 
 def install_qt_exception_guard() -> None:
@@ -170,7 +232,7 @@ def _theme_value(widget) -> str:
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         try:
-            for attr in ("current_theme", "theme"):
+            for attr in ("current_theme", "theme", "theme_name"):
                 value = getattr(current, attr, None)
                 if isinstance(value, str) and value:
                     return value.lower()
@@ -196,7 +258,8 @@ def _uses_dark_theme(widget=None) -> bool:
     value = _theme_value(widget)
     if not value:
         app = QtWidgets.QApplication.instance()
-        value = _theme_value(app.activeWindow()) if app is not None else ""
+        value = str(app.property('ui_theme') or _theme_value(app.activeWindow())) if app is not None else ""
+    value = value.lower()
     if any(marker in value for marker in ("свет", "light")):
         return False
     if any(marker in value for marker in ("тем", "dark")):

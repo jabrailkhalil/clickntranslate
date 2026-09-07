@@ -8623,6 +8623,10 @@ class DarkThemeApp(QMainWindow):
             thread.start()
 
     def apply_theme(self):
+        app = QApplication.instance()
+        if app is not None:
+            app.setProperty('ui_theme', self.current_theme)
+            install_tooltip_style(app, self.current_theme != "Светлая")
         theme = THEMES[self.current_theme]
         # Remember the stylesheet already installed on the fixed main window.
         # Reapplying it while the cached Settings tree is merely hidden makes
