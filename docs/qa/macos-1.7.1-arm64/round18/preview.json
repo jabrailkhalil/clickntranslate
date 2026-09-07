@@ -1,0 +1,44 @@
+{
+  "light": {
+    "picker": {
+      "width": 218,
+      "height": 250,
+      "dpr": 2.0
+    },
+    "control": {
+      "width": 96,
+      "height": 36,
+      "dpr": 2.0
+    },
+    "notice": {
+      "width": 264,
+      "height": 25,
+      "dpr": 2.0
+    },
+    "tooltip": {
+      "width": 170,
+      "height": 90
+    }
+  },
+  "dark": {
+    "picker": {
+      "width": 218,
+      "height": 250,
+      "dpr": 2.0
+    },
+    "control": {
+      "width": 96,
+      "height": 36,
+      "dpr": 2.0
+    },
+    "notice": {
+      "width": 264,
+      "height": 25,
+      "dpr": 2.0
+    },
+    "tooltip": {
+      "width": 170,
+      "height": 90
+    }
+  }
+}

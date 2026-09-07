@@ -1,0 +1,9 @@
+{
+  "installed": "/Applications/ClicknTranslate.app",
+  "pid": 68304,
+  "native_launch": true,
+  "show_accepted": true,
+  "installed_executable_matches_tested_build": true,
+  "executable_sha256": "c528d2dab801c73e41ab0c02a923126240918dc961e731c3e500db443820f6be",
+  "changed_existing_data_files": []
+}

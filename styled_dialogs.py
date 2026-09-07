@@ -34,9 +34,9 @@ def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
         color: {foreground};
         border: 1px solid {border};
         border-radius: 8px;
-        padding: 7px 11px;
+        padding: 4px 8px;
         font-family: 'Segoe UI';
-        font-size: 13px;
+        font-size: 12px;
         opacity: 245;
     }}
 """
@@ -50,9 +50,9 @@ TOOLTIP_QSS = tooltip_stylesheet(True)
 # string is therefore laid out on one endless line and runs off the screen,
 # which is why the engine-picker hint was clipped.  Anything longer than this
 # gets wrapped to a fixed width; short labels stay snug so "Close" does not
-# become a 320px box.
+# become a fixed-width box.
 TOOLTIP_WRAP_THRESHOLD = 44
-TOOLTIP_WRAP_WIDTH = 320
+TOOLTIP_WRAP_WIDTH = 280
 
 
 def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
@@ -193,8 +193,7 @@ class StatusPopup(QtWidgets.QLabel):
         self._refresh_theme()
 
     def _refresh_theme(self):
-        set_widget_stylesheet(self, tooltip_stylesheet().replace('QToolTip', 'QLabel')
-                              + '\nQLabel { font-size: 14px; }')
+        set_widget_stylesheet(self, tooltip_stylesheet().replace('QToolTip', 'QLabel'))
 
     def showEvent(self, event):
         self._refresh_theme()

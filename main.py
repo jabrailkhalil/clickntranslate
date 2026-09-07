@@ -8916,7 +8916,6 @@ class DarkThemeApp(QMainWindow):
         if status_label is not None:
             status_label.setStyleSheet(
                 tooltip_stylesheet(is_dark).replace('QToolTip', 'QLabel')
-                + '\nQLabel { font-size: 14px; }'
             )
         # This is passive status information, not another control. A single
         # quiet divider separates it from the shortcuts without creating a

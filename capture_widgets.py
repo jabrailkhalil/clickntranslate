@@ -19,35 +19,35 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         metrics = QtGui.QFontMetrics(self.combo.font())
-        return QtCore.QSize(max(244, metrics.horizontalAdvance(self.label(index)) + 88), 40)
+        return QtCore.QSize(max(196, metrics.horizontalAdvance(self.label(index)) + 70), 30)
 
     def paint(self, painter, option, index):
         palette = self.combo.colors
         chosen = index.row() == self.combo.currentIndex()
         hover = bool(option.state & (QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected))
         enabled = bool(index.flags() & QtCore.Qt.ItemIsEnabled)
-        rect = QtCore.QRectF(option.rect).adjusted(4, 2, -4, -2)
+        rect = QtCore.QRectF(option.rect).adjusted(3, 2, -3, -2)
         painter.save()
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         if chosen or hover:
             painter.setPen(QtCore.Qt.NoPen)
             painter.setBrush(QtGui.QColor(palette['selected'] if chosen else palette['hover']))
-            painter.drawRoundedRect(rect, 7, 7)
+            painter.drawRoundedRect(rect, 6, 6)
         icon = index.data(QtCore.Qt.DecorationRole)
         if isinstance(icon, QtGui.QIcon):
-            icon.paint(painter, QtCore.QRect(int(rect.left()) + 10, int(rect.center().y()) - 11, 22, 22))
+            icon.paint(painter, QtCore.QRect(int(rect.left()) + 7, int(rect.center().y()) - 9, 18, 18))
         font = self.combo.font()
         font.setWeight(QtGui.QFont.DemiBold if chosen else QtGui.QFont.Normal)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(palette['text'] if enabled else palette['muted']))
-        label_rect = rect.adjusted(44, 0, -30, 0)
+        label_rect = rect.adjusted(34, 0, -26, 0)
         label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, int(label_rect.width()))
         painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
         if chosen and enabled:
             pen = QtGui.QPen(QtGui.QColor(palette['accent']), 1.8, QtCore.Qt.SolidLine,
                             QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
             painter.setPen(pen)
-            x, y = rect.right() - 17, rect.center().y()
+            x, y = rect.right() - 14, rect.center().y()
             path = QtGui.QPainterPath(QtCore.QPointF(x - 4, y))
             path.lineTo(x - 1, y + 3)
             path.lineTo(x + 5, y - 4)
@@ -56,7 +56,7 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
 
 
 class CaptureLanguageCombo(DropDownCombo):
-    POPUP_GAP = 7
+    POPUP_GAP = 5
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -78,20 +78,20 @@ class CaptureLanguageCombo(DropDownCombo):
                             hover='#f0e9f7', selected='#e9ddf4', accent='#765099'))
         c = self.colors
         font = QtWidgets.QApplication.font()
-        font.setPixelSize(14)
+        font.setPixelSize(12)
         self.setFont(font)
-        self.setIconSize(QtCore.QSize(22, 22))
-        self.setFixedSize(112, 44)
+        self.setIconSize(QtCore.QSize(18, 18))
+        self.setFixedSize(96, 36)
         palette = self.palette()
         for role in (QtGui.QPalette.Text, QtGui.QPalette.WindowText, QtGui.QPalette.ButtonText):
             palette.setColor(role, QtGui.QColor(c['text']))
         self.setPalette(palette)
         self.setStyleSheet(f"""
             QComboBox {{ background:{c['surface']}; color:{c['text']}; border:1px solid {c['border']};
-                border-radius:10px; padding:4px 25px 4px 12px; font-size:14px; font-weight:600; }}
+                border-radius:8px; padding:3px 20px 3px 8px; font-size:12px; font-weight:600; }}
             QComboBox:hover, QComboBox:on {{ border-color:{c['accent']}; background:{c['hover']}; }}
             QComboBox:disabled {{ color:{c['muted']}; }}
-            QComboBox::drop-down {{ width:20px; border:0; background:transparent; }}
+            QComboBox::drop-down {{ width:18px; border:0; background:transparent; }}
             QComboBox::down-arrow {{ image:none; }}
         """)
         self._paint_popup_frame()
@@ -109,7 +109,7 @@ class CaptureLanguageCombo(DropDownCombo):
         popup.setAutoFillBackground(False)
         set_widget_stylesheet(popup, f"""
             QFrame#captureLanguagePopup {{ background:{c['surface']}; border:1px solid {c['border']};
-                border-radius:10px; padding:6px; }}
+                border-radius:8px; padding:4px; }}
         """)
         set_widget_stylesheet(view, f"""
             QAbstractItemView {{ background:transparent; color:{c['text']}; border:0; outline:none; }}
@@ -130,6 +130,6 @@ class CaptureLanguageCombo(DropDownCombo):
             painter.setRenderHint(QtGui.QPainter.Antialiasing)
             painter.setPen(QtGui.QPen(QtGui.QColor(self.colors['border']), 1))
             painter.setBrush(QtGui.QColor(self.colors['surface']))
-            painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), 10, 10)
+            painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), 8, 8)
             return True
         return super().eventFilter(watched, event)

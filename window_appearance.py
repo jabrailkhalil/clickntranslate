@@ -441,7 +441,7 @@ def style_capture_controls(overlay, config, controls):
             style = button_qss(dark, 'secondary',
                                selector='QToolButton' if isinstance(widget, QtWidgets.QToolButton) else 'QPushButton',
                                icon=isinstance(widget, QtWidgets.QToolButton), compact=True)
-            widget.setFixedSize(max(36, widget.property('capture_base_size').width()), 44)
+            widget.setFixedSize(max(36, widget.property('capture_base_size').width()), 36)
             widget.setIconSize(widget.property('capture_base_icon'))
         widget.setStyleSheet(style)
         palette = widget.palette()
