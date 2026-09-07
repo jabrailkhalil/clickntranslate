@@ -1,0 +1,31 @@
+{
+  "before_fix": {
+    "native_report": "python3.12-2026-09-07-164513.ips",
+    "exception": {
+      "codes": "0x0000000000000001, 0x0005000000000018",
+      "rawCodes": [
+        1,
+        1407374883553304
+      ],
+      "type": "EXC_BAD_ACCESS",
+      "signal": "SIGSEGV",
+      "subtype": "KERN_INVALID_ADDRESS at 0x0005000000000018 -> 0x0000000000000018 (possible pointer authentication failure)"
+    },
+    "frames": [
+      "sip_api_get_address",
+      "cleanup_qobject(_sipSimpleWrapper*, void*)",
+      "sip_api_visit_wrappers",
+      "cleanup_on_exit(_object*, _object*)",
+      "cfunction_vectorcall_NOARGS.llvm.10486576392999470509",
+      "atexit_callfuncs.llvm.10633584658541858660",
+      "Py_FinalizeEx",
+      "Py_Exit",
+      "_PyErr_PrintEx.llvm.13203855161173102422",
+      "_PyRun_SimpleFileObject",
+      "_PyRun_AnyFileObject",
+      "pymain_run_file_obj"
+    ]
+  },
+  "fix": "Return from the Qt quit callback; hide widgets and dispose native owner trees before Python interpreter shutdown. Popup children stay with their owners.",
+  "validation": "Three subprocess exit tests in the full Cocoa suite, final source smoke, and installed direct process exit."
+}

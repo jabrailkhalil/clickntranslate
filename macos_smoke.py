@@ -427,6 +427,50 @@ def extended_screenshots(main, app, window, report_path, screenshots):
             app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
 
+def translation_draft_check(main, app, window, report_path, screenshots):
+    """Exercise typing and async delivery inside the source and frozen GUI."""
+    import time
+    import translater
+    from PyQt5.QtTest import QTest
+
+    records = []
+    for name, reply in (('success', 'Новый перевод'), ('empty', '  \n'),
+                        ('error', RuntimeError('Selected provider unavailable'))):
+        dialog = main.TranslationResultDialog(window, 'Previous result', auto_copy=False,
+                    lang='ru', theme=window.current_theme, source_text='Previous source',
+                    source_lang='en', target_lang='ru')
+        dialog.show()
+        app.processEvents()
+        dialog.text_edit.selectAll()
+        QTest.keyClicks(dialog.text_edit, 'My new draft')
+        provider = mock.Mock(side_effect=reply) if isinstance(reply, Exception) else mock.Mock(return_value=reply)
+        with mock.patch.object(translater, 'translate_text', provider), \
+                mock.patch.object(main, 'save_translation_history'):
+            dialog.translate_button.click()
+            deadline = time.monotonic() + 5
+            while dialog._retranslating and time.monotonic() < deadline:
+                QTest.qWait(10)
+            assert not dialog._retranslating
+        assert provider.call_args.args == ('My new draft', 'en', 'ru')
+        assert provider.call_args.kwargs['engine'] == window.config['translator_engine']
+        assert dialog.source_edit.toPlainText() == 'My new draft'
+        assert dialog.text_edit.toPlainText() == (reply if name == 'success' else 'My new draft')
+        filename = f'{report_path.stem}-draft-{name}.png'
+        picture = dialog.grab()
+        assert picture.save(str(report_path.with_name(filename)))
+        screenshots.append({'file': filename, 'width': picture.width(), 'height': picture.height(),
+                            'dpr': picture.devicePixelRatioF()})
+        if name == 'success':
+            dialog.text_edit.undo()
+            assert dialog.text_edit.toPlainText() == 'My new draft'
+        records.append({'response': name, 'draft_preserved': True,
+                        'selected_engine': provider.call_args.kwargs['engine']})
+        dialog.close()
+        dialog.deleteLater()
+        app.processEvents()
+    return {'cases': records, 'scope': 'Native Qt typing and worker delivery; controlled provider replies'}
+
+
 def run(main, report_path):
     import macos_desktop
     import macos_ocr
@@ -487,6 +531,7 @@ def run(main, report_path):
             dropdown_results = dropdown_screenshots(main, app, window, report_path, screenshots)
             placement_results = dialog_placement_check(main, app, window, report_path, screenshots)
             popup_results = popup_screenshots(app, window, report_path, screenshots)
+            draft_results = translation_draft_check(main, app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -518,9 +563,11 @@ def run(main, report_path):
                 "hotkey_event_delivery": hotkey_delivery,
                 "window_placement": placement_results,
                 "shadow_mode": shadow_results,
+                "translation_drafts": draft_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()
             window.deleteLater()
             app.processEvents()
+            main.dispose_native_application(app)
     return 0

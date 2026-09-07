@@ -8,6 +8,7 @@ import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 import main
+from ui_scaling import BASE_SCALE
 import platform_support
 import translater
 from window_appearance import install_window_appearance
@@ -50,12 +51,12 @@ def test_dialogs_follow_global_scale_without_accumulating_changes(appearance):
     for percent in (80, 100, 150, 100, 80):
         appearance.refresh(percent=percent)
         appearance.app.processEvents()
-        expected = baseline * (percent / 80)
+        expected = baseline * (percent / BASE_SCALE)
         assert abs(dialog.width() - expected.width()) <= 2
         assert abs(dialog.height() - expected.height()) <= 2
         assert dialog.text_edit.toPlainText() == 'Hello'
         assert dialog.scale_value.text() == f'{percent}%'
-    assert dialog.title_close_button.size() == QtCore.QSize(32, 32)
+    assert dialog.title_close_button.size() == QtCore.QSize(32, 32) * (80 / BASE_SCALE)
 
 
 def test_local_result_scale_keeps_global_setting_and_edits(appearance):
@@ -267,7 +268,7 @@ def test_help_html_keeps_its_font_size_across_theme_and_scale_changes(appearance
     cursor = browser.textCursor()
     cursor.movePosition(QtGui.QTextCursor.Start)
     cursor.movePosition(QtGui.QTextCursor.NextCharacter)
-    assert cursor.charFormat().fontPointSize() == 14
+    assert cursor.charFormat().fontPointSize() == 14 * 80 / BASE_SCALE
 
 
 def test_document_layout_and_private_qt_fonts_do_not_accumulate_scale(appearance):
@@ -291,7 +292,7 @@ def test_document_layout_and_private_qt_fonts_do_not_accumulate_scale(appearance
             appearance.app.processEvents()
             splitter = dialog.document_splitter
             left, right = splitter.widget(0), splitter.widget(1)
-            assert right.x() - left.width() >= round(14 * percent / 80)
+            assert right.x() - left.width() >= round(14 * percent / BASE_SCALE)
             assert left.y() == right.y() and left.height() == right.height()
         assert container_fonts() == baseline
 
@@ -310,4 +311,4 @@ def test_new_theme_icon_replaces_the_scaled_previous_icon(appearance):
     dialog.show()
     appearance.refresh(theme='Светлая')
     assert icon.pixmap().toImage().pixelColor(0, 0) == QtGui.QColor('black')
-    assert icon.pixmap().width() == 25
+    assert icon.pixmap().width() == round(20 * 100 / BASE_SCALE)

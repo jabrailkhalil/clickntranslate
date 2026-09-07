@@ -3473,6 +3473,11 @@ class OcrLanguageManagerDialog(QDialog):
             QTabWidget::pane, QTabWidget > QStackedWidget {{
                 background-color: {page_background};
             }}
+            QTabWidget::pane {{
+                border: none;
+                border-top: 1px solid {'#494056' if dark else '#bcb2c7'};
+                top: 0px;
+            }}
             QFrame#languageManagerTitleBar {{
                 background-color: {title_background};
                 border: none;
@@ -3496,7 +3501,6 @@ class OcrLanguageManagerDialog(QDialog):
                 QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #111216; }
                 QLabel { color: #f4f6fb; font-family: 'Segoe UI'; font-size: 13px; }
-                QTabWidget::pane { border: 1px solid #34313f; }
                 QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
                 QTabBar::tab:selected { background: #7A5FA1; }
                 QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 7px; }
@@ -3560,8 +3564,10 @@ class OcrLanguageManagerDialog(QDialog):
         # tab sized for a 6pt default and painted at 14px, so the labels ran
         # over each other. Set the font on the bar and the two agree.
         self._apply_tab_bar_font(self.tabs.tabBar(), 14, bold=True)
+        self.tabs.tabBar().setDrawBase(False)
         for inner in (self.ocr_tabs, self.translation_tabs):
             self._apply_tab_bar_font(inner.tabBar(), 13, bold=True)
+            inner.tabBar().setDrawBase(False)
 
         self.tabs.tabBar().setStyleSheet(f"""
             QTabBar::tab {{

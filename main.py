@@ -87,7 +87,7 @@ try:
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics
 except Exception:
     _show_dependency_error()
-from ui_scaling import DEFAULT_SCALE, ScaledIconButton, configure_qt_platform
+from ui_scaling import BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton, configure_qt_platform
 from header_icons import header_icon
 configure_qt_platform()
 
@@ -801,6 +801,26 @@ def _ensure_startup_application():
         app.setQuitOnLastWindowClosed(False)
         app._startup_appearance_ready = True
     return app
+
+
+def dispose_native_application(app):
+    """Destroy Cocoa widgets while Qt is alive, before SIP's atexit traversal."""
+    if not platform_support.IS_MAC:
+        return
+    from PyQt5 import sip
+    if sip.isdeleted(app):
+        return
+    # SIP's shutdown visitor can encounter a wrapper freed when it deletes a
+    # parent. Flush the Qt-owned trees explicitly before interpreter teardown.
+    windows = app.topLevelWidgets()
+    for widget in windows:
+        if not sip.isdeleted(widget):
+            widget.hide()
+    for widget in windows:
+        if not sip.isdeleted(widget) and widget.parentWidget() is None and widget.graphicsProxyWidget() is None:
+            widget.deleteLater()
+    app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    sip.delete(app)
 
 
 def _confirm_close_other_install(instances):
@@ -4339,7 +4359,8 @@ class TranslationResultDialog(QDialog):
         self.status_label.setToolTip(tooltip_text(self._status_message))
 
     def _update_actions(self):
-        self.translate_button.setEnabled(bool(self.source_text.strip()) and not self._retranslating)
+        draft = self.translated_text if getattr(self, '_translate_edited_result', False) and self.translated_text.strip() else self.source_text
+        self.translate_button.setEnabled(bool(draft.strip()) and not self._retranslating)
         self.copy_button.setEnabled(bool(self.translated_text))
         self.swap_button.setEnabled(bool(self.source_text or self.translated_text))
 
@@ -4357,6 +4378,7 @@ class TranslationResultDialog(QDialog):
             return  # Font/theme changes can notify the document without editing its text.
         self._invalidate_request()
         self.source_text = current
+        self._translate_edited_result = False
         self._update_actions()
         self._set_status(self.text["source_edited"])
 
@@ -4366,6 +4388,7 @@ class TranslationResultDialog(QDialog):
             return
         self._invalidate_request()
         self.translated_text = current
+        self._translate_edited_result = True
         self._update_actions()
         self._set_status(self.text["edited"])
 
@@ -4409,12 +4432,24 @@ class TranslationResultDialog(QDialog):
             self.source_edit.setPlainText(result)
             self.text_edit.setPlainText(source)
         self.source_text, self.translated_text = result, source
+        self._translate_edited_result = False
         self._update_actions()
         self._start_retranslate()
 
     def _start_retranslate(self):
         if self._closed or self._retranslating:
             return
+        # Finish an input-method composition before taking the editable draft.
+        QApplication.inputMethod().commit()
+        self._edited_source()
+        if getattr(self, '_translate_edited_result', False):
+            # The user's latest typed draft can be in either editable pane.
+            # Keep it visible as the source before replacing the result.
+            draft = self.text_edit.toPlainText()
+            if draft.strip():
+                self._replace_editor_text(self.source_edit, draft)
+                self.source_text = draft
+            self._translate_edited_result = False
         self._remember_language_pair()
         self._update_actions()
         if not self.source_text.strip():
@@ -4439,7 +4474,7 @@ class TranslationResultDialog(QDialog):
                 from translater import translate_text
                 result = translate_text(source_text, source_code, target_code,
                                         engine=engine, cancel_callback=cancelled.is_set)
-                error = "" if result else error_label
+                error = "" if str(result or "").strip() else error_label
             except Exception as exc:
                 result, error = "", f"{error_label}: {exc}"
             if cancelled.is_set():
@@ -4462,12 +4497,11 @@ class TranslationResultDialog(QDialog):
         self._retranslating = False
         self._pending_request = None
         self._cancel_event = None
-        if error or not translated_text:
+        if error or not translated_text.strip():
             self._update_actions()
             self._set_status(error or ui_text(self.lang, "translation_error"))
             return
-        with QtCore.QSignalBlocker(self.text_edit):
-            self.text_edit.setPlainText(translated_text)
+        self._replace_editor_text(self.text_edit, translated_text)
         self.translated_text = translated_text
         self._update_actions()
         save_translation_history(original, translated_text, target)
@@ -4475,6 +4509,17 @@ class TranslationResultDialog(QDialog):
             platform_support.copy_text(translated_text)
             save_copy_history(translated_text)
         self._set_status(self.text["auto_copied"] if self.auto_copy else self.text["ready"])
+
+    @staticmethod
+    def _replace_editor_text(editor, text):
+        # Keep the previous text and manual edits available through Undo.
+        # setPlainText() silently discards the document's undo history.
+        with QtCore.QSignalBlocker(editor):
+            cursor = editor.textCursor()
+            cursor.beginEditBlock()
+            cursor.select(QtGui.QTextCursor.Document)
+            cursor.insertText(text)
+            cursor.endEditBlock()
 
     def _copy_result(self):
         platform_support.copy_text(self.translated_text)
@@ -4535,13 +4580,13 @@ class TranslationResultDialog(QDialog):
         manager = getattr(QApplication.instance(), '_dialog_appearance', None)
         value = manager.window_percent(self) if manager else DEFAULT_SCALE
         if self.property('ui_effective_scale') is not None:
-            value = round(float(self.property('ui_effective_scale')) * 80)
+            value = round(float(self.property('ui_effective_scale')) * BASE_SCALE)
         blocker = QtCore.QSignalBlocker(self.scale_value)
         self.scale_value.setText(f'{value}%')
         del blocker
-        self.scale_decrease.setEnabled(value > 80)
+        self.scale_decrease.setEnabled(value > MIN_SCALE)
         maximum = self.property('ui_maximum_scale_percent')
-        self.scale_increase.setEnabled(value < (maximum if maximum is not None else 200))
+        self.scale_increase.setEnabled(value < (maximum if maximum is not None else MAX_SCALE))
 
     def _commit_scale(self):
         if self._closed:
@@ -10778,8 +10823,7 @@ class DarkThemeApp(QMainWindow):
         self.close()
         # Явно завершаем приложение Qt
         QApplication.instance().quit()
-        # Принудительный выход из процесса Python
-        sys.exit(0)
+        # Return from the Qt callback so exec_() can finish the normal cleanup.
 
     def _confirm_argos_package_install(self, pair_label):
         dialog = ArgosPackageInstallDialog(
@@ -11324,3 +11368,5 @@ if __name__ == "__main__":
         if _command_server is not None:
             _command_server.stop()
             _command_server.join(timeout=2.0)
+        if platform_support.IS_MAC:
+            dispose_native_application(app)

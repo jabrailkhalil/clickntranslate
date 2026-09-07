@@ -77,6 +77,13 @@ Qt stores portable shortcut names as `Ctrl` for Command and `Meta` for physical
 Control on macOS. Registration uses that same mapping; the shortcut editor and
 main-window references show native Mac labels.
 
+On macOS, 100% interface scale now means the original 700×400 main window
+(previously 80%). Other windows use the same baseline and fit within the screen.
+Both panes of the translation window are editable. Translate uses the most
+recently edited pane; a draft entered in Translation is first kept in Source,
+then translated with the selected language pair and provider. Errors preserve
+the draft, and Command-Z can restore the preceding result.
+
 Screen capture asks for **Screen Recording** access; copying and replacing a
 selection asks for **Accessibility**. The application explains the permission
 in its own themed dialog, then opens System Settings on the user's click.

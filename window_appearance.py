@@ -7,7 +7,7 @@ import weakref
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import sip
 
-from ui_scaling import BASE_SCALE, DEFAULT_SCALE, normalize_ui_scale, center_window, window_position_context
+from ui_scaling import BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, normalize_ui_scale, center_window, window_position_context
 
 
 _PIXELS = re.compile(r'(-?\d+(?:\.\d+)?)px\b')
@@ -223,9 +223,9 @@ class DialogAppearance(QtCore.QObject):
             base = state['size']
             fitting_factor = min(max(1, available.width() - 24) / max(1, base.width()),
                                  max(1, available.height() - 32) / max(1, base.height()))
-            maximum_percent = min(200, math.floor(fitting_factor * BASE_SCALE))
+            maximum_percent = min(MAX_SCALE, math.floor(fitting_factor * BASE_SCALE))
             factor = min(self.window_percent(window) / BASE_SCALE,
-                         maximum_percent / BASE_SCALE if maximum_percent >= 80 else fitting_factor)
+                         maximum_percent / BASE_SCALE if maximum_percent >= MIN_SCALE else fitting_factor)
             widgets = [window] + [w for w in window.findChildren(QtWidgets.QWidget) if w.window() is window]
             # Snapshot before changing any parent font or stylesheet.
             for widget in widgets:

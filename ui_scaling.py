@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
 
 
 BASE_WIDTH, BASE_HEIGHT = 700, 400
-# The original 700x400 canvas is now 80%; the default 100% is 875x500.
-BASE_SCALE = 80
+# On macOS, 100% uses the original 700x400 canvas (previously labelled 80%).
+BASE_SCALE = 100 if sys.platform == 'darwin' else 80
 MIN_SCALE, DEFAULT_SCALE, MAX_SCALE, SCALE_STEP = 80, 100, 200, 5
 
 

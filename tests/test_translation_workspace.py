@@ -80,6 +80,43 @@ def test_worker_thread_delivers_result_to_the_gui(app, workspace, monkeypatch):
     main.save_translation_history.assert_called_once()
 
 
+@pytest.mark.parametrize('reply', ['Новый перевод', '', '   \n', RuntimeError('Provider unavailable')])
+def test_typing_in_result_translates_that_draft_and_keeps_it_visible(workspace, requests, monkeypatch, reply):
+    translate = mock.Mock(side_effect=reply) if isinstance(reply, Exception) else mock.Mock(return_value=reply)
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    workspace.source_edit.clear()
+    workspace.text_edit.selectAll()
+    QTest.keyClicks(workspace.text_edit, 'My new draft')
+    assert workspace.translate_button.isEnabled()
+    workspace.translate_button.click()
+    assert workspace.source_edit.toPlainText() == 'My new draft'
+    assert workspace.text_edit.toPlainText() == 'My new draft'
+    requests.pop()()
+    assert translate.call_args.args == ('My new draft', 'en', 'ru')
+    assert translate.call_args.kwargs['engine'] == 'Lingva'
+    assert workspace.source_edit.toPlainText() == 'My new draft'
+    if reply == 'Новый перевод':
+        assert workspace.text_edit.toPlainText() == reply
+        workspace.text_edit.undo()
+        assert workspace.text_edit.toPlainText() == 'My new draft'
+    else:
+        assert workspace.text_edit.toPlainText() == 'My new draft'
+        assert workspace.status_label.text()
+        main.save_translation_history.assert_not_called()
+
+
+def test_latest_source_edit_takes_priority_over_an_earlier_result_edit(workspace, requests, monkeypatch):
+    translate = mock.Mock(return_value='Ответ')
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    workspace.text_edit.setPlainText('Earlier result draft')
+    workspace.source_edit.setPlainText('Latest source draft')
+    workspace.translate_button.click()
+    requests.pop()()
+    assert translate.call_args.args[0] == 'Latest source draft'
+    workspace.text_edit.undo()
+    assert workspace.text_edit.toPlainText() == 'Earlier result draft'
+
+
 def test_clearing_source_keeps_result_and_disables_empty_requests(workspace, requests):
     workspace.source_edit.clear()
     workspace.translate_button.click()

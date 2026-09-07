@@ -110,9 +110,9 @@ class LinuxForwardingStartupTest(unittest.TestCase):
         code = compile(ast.fix_missing_locations(ast.Module(body=shutdown, type_ignores=[])),
                        str(ROOT / "main.py"), "exec")
         server = mock.Mock()
-        exec(code, {"_command_server": server})
+        exec(code, {"_command_server": server, "platform_support": mock.Mock(IS_MAC=False)})
         self.assertEqual(server.mock_calls, [mock.call.stop(), mock.call.join(timeout=2.0)])
-        exec(code, {"_command_server": None})
+        exec(code, {"_command_server": None, "platform_support": mock.Mock(IS_MAC=False)})
 
 
 if __name__ == "__main__":

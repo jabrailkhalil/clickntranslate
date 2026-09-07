@@ -1,0 +1,106 @@
+[
+  {
+    "theme": "Светлая",
+    "requested_percent": 80,
+    "main_size": [
+      560,
+      320
+    ],
+    "dialog_size": [
+      512,
+      446
+    ],
+    "dialog_percent": 0.8
+  },
+  {
+    "theme": "Светлая",
+    "requested_percent": 100,
+    "main_size": [
+      700,
+      400
+    ],
+    "dialog_size": [
+      640,
+      558
+    ],
+    "dialog_percent": 1.0
+  },
+  {
+    "theme": "Светлая",
+    "requested_percent": 130,
+    "main_size": [
+      910,
+      520
+    ],
+    "dialog_size": [
+      832,
+      725
+    ],
+    "dialog_percent": 1.3
+  },
+  {
+    "theme": "Светлая",
+    "requested_percent": 200,
+    "main_size": [
+      1211,
+      692
+    ],
+    "dialog_size": [
+      851,
+      742
+    ],
+    "dialog_percent": 1.33
+  },
+  {
+    "theme": "Темная",
+    "requested_percent": 80,
+    "main_size": [
+      560,
+      320
+    ],
+    "dialog_size": [
+      512,
+      446
+    ],
+    "dialog_percent": 0.8
+  },
+  {
+    "theme": "Темная",
+    "requested_percent": 100,
+    "main_size": [
+      700,
+      400
+    ],
+    "dialog_size": [
+      640,
+      558
+    ],
+    "dialog_percent": 1.0
+  },
+  {
+    "theme": "Темная",
+    "requested_percent": 130,
+    "main_size": [
+      910,
+      520
+    ],
+    "dialog_size": [
+      832,
+      725
+    ],
+    "dialog_percent": 1.3
+  },
+  {
+    "theme": "Темная",
+    "requested_percent": 200,
+    "main_size": [
+      1211,
+      692
+    ],
+    "dialog_size": [
+      851,
+      742
+    ],
+    "dialog_percent": 1.33
+  }
+]

@@ -1,0 +1,2113 @@
+{
+  "macos": "14.3",
+  "architecture": "arm64",
+  "python": "3.12.14",
+  "qt": "5.15.14",
+  "pyqt": "5.15.11",
+  "screenshots": [
+    {
+      "file": "installed-direct-dark-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-main-source_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-main-target_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-main-hotkey_mode_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-main-hotkey_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-main-hotkey_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-settings-ocr_engine_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-settings-translator_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-settings-result_window_control.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-settings-game_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-settings-game_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-result-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 490,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-result-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 488,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-document-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-document-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-80-document-provider_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 306,
+      "height": 124,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-main-source_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-main-target_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-main-hotkey_mode_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-main-hotkey_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-main-hotkey_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-settings-ocr_engine_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-settings-translator_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-settings-result_window_control.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-settings-game_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-settings-game_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-result-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-result-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-document-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 764,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-document-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 766,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-100-document-provider_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 382,
+      "height": 164,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-main-source_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-main-target_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-main-hotkey_mode_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-main-hotkey_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-main-hotkey_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-settings-ocr_engine_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-settings-translator_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-settings-result_window_control.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-settings-game_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-settings-game_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-result-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 874,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-result-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 872,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-document-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 810,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-document-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 810,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-dark-150-document-provider_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 404,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-main-source_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-main-target_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-main-hotkey_mode_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-main-hotkey_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-main-hotkey_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-settings-ocr_engine_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-settings-translator_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-settings-result_window_control.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-settings-game_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-settings-game_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1120,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-result-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 490,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-result-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 488,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-document-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-document-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 220,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-80-document-provider_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 306,
+      "height": 124,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-main-source_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-main-target_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-main-hotkey_mode_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-main-hotkey_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-main-hotkey_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-settings-ocr_engine_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-settings-translator_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-settings-result_window_control.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-settings-game_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-settings-game_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-result-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-result-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-document-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 764,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-document-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 766,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-100-document-provider_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 382,
+      "height": 164,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-main-source_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-main-target_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-main-hotkey_mode_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-main-hotkey_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-main-hotkey_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-settings-ocr_engine_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-settings-translator_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-settings-result_window_control.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-settings-game_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-settings-game_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 2100,
+      "height": 1200,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-result-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 874,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-result-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 872,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-document-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 810,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-document-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 810,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-combo-light-150-document-provider_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 150,
+      "width": 404,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-packages.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1024,
+      "height": 892,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-update.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 688,
+      "height": 254,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-install.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 688,
+      "height": 254,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-argos-confirm.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 816,
+      "height": 496,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-argos-error.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 832,
+      "height": 512,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-result.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1216,
+      "height": 836,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-document.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1728,
+      "height": 1120,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-80-message.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 800,
+      "height": 198,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-packages.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1280,
+      "height": 1116,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-update.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 860,
+      "height": 314,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-install.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 860,
+      "height": 314,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-argos-confirm.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1020,
+      "height": 620,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-argos-error.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1040,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1520,
+      "height": 1046,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-document.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2160,
+      "height": 1400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-100-message.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1000,
+      "height": 252,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-packages.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1664,
+      "height": 1450,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-update.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1118,
+      "height": 398,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-install.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1118,
+      "height": 398,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-argos-confirm.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1326,
+      "height": 806,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-argos-error.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1352,
+      "height": 832,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-result.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1976,
+      "height": 1360,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-document.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 2290,
+      "height": 1484,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-dark-130-message.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1300,
+      "height": 322,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-packages.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1024,
+      "height": 892,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-update.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 688,
+      "height": 254,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-install.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 688,
+      "height": 254,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-argos-confirm.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 816,
+      "height": 496,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-argos-error.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 832,
+      "height": 512,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-result.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1216,
+      "height": 836,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-document.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1728,
+      "height": 1120,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-80-message.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 800,
+      "height": 198,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-packages.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1280,
+      "height": 1116,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-update.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 860,
+      "height": 314,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-install.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 860,
+      "height": 314,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-argos-confirm.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1020,
+      "height": 620,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-argos-error.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1040,
+      "height": 640,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-result.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1520,
+      "height": 1046,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-document.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 2160,
+      "height": 1400,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-100-message.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1000,
+      "height": 252,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-packages.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1664,
+      "height": 1450,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-update.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1118,
+      "height": 398,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-install.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1118,
+      "height": 398,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-argos-confirm.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1326,
+      "height": 806,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-argos-error.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1352,
+      "height": 832,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-result.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1976,
+      "height": 1360,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-document.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 2290,
+      "height": 1484,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-position-light-130-message.png",
+      "requested_percent": 130,
+      "effective_percent": 130,
+      "width": 1300,
+      "height": 322,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-dark-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-light-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-draft-success.png",
+      "width": 1976,
+      "height": 1360,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-draft-empty.png",
+      "width": 1976,
+      "height": 1360,
+      "dpr": 2.0
+    },
+    {
+      "file": "installed-direct-draft-error.png",
+      "width": 1976,
+      "height": 1360,
+      "dpr": 2.0
+    }
+  ],
+  "gui": "ok",
+  "settings": "ok",
+  "theme": "ok",
+  "hotkey_registration": "ok",
+  "hotkey_conflict_and_reregister": "ok",
+  "permission_preflight": {
+    "screen": true,
+    "accessibility": true
+  },
+  "vision": "ok",
+  "vision_languages": [
+    "en-US",
+    "fr-FR",
+    "it-IT",
+    "de-DE",
+    "es-ES",
+    "pt-BR",
+    "zh-Hans",
+    "zh-Hant",
+    "yue-Hans",
+    "yue-Hant",
+    "ko-KR",
+    "ja-JP",
+    "ru-RU",
+    "uk-UA",
+    "th-TH",
+    "vi-VT"
+  ],
+  "native_popup_surfaces": {
+    "dark_tooltip": "transparent Cocoa background; painted surface",
+    "dark_status": "transparent Cocoa background; painted surface",
+    "dark_menu": "transparent Cocoa background; painted surface",
+    "light_tooltip": "transparent Cocoa background; painted surface",
+    "light_status": "transparent Cocoa background; painted surface",
+    "light_menu": "transparent Cocoa background; painted surface"
+  },
+  "dropdowns": {
+    "cases": 90,
+    "openings": 180,
+    "checks": "stable anchor, available bounds, last row reachable",
+    "names": [
+      "dark-80-main-source_lang",
+      "dark-80-main-target_lang",
+      "dark-80-main-hotkey_mode_combo",
+      "dark-80-main-hotkey_source_combo",
+      "dark-80-main-hotkey_target_combo",
+      "dark-80-settings-ocr_engine_combo",
+      "dark-80-settings-translator_combo",
+      "dark-80-settings-result_window_control",
+      "dark-80-settings-game_source_combo",
+      "dark-80-settings-game_target_combo",
+      "dark-80-result-source_combo",
+      "dark-80-result-target_combo",
+      "dark-80-document-source_combo",
+      "dark-80-document-target_combo",
+      "dark-80-document-provider_combo",
+      "dark-100-main-source_lang",
+      "dark-100-main-target_lang",
+      "dark-100-main-hotkey_mode_combo",
+      "dark-100-main-hotkey_source_combo",
+      "dark-100-main-hotkey_target_combo",
+      "dark-100-settings-ocr_engine_combo",
+      "dark-100-settings-translator_combo",
+      "dark-100-settings-result_window_control",
+      "dark-100-settings-game_source_combo",
+      "dark-100-settings-game_target_combo",
+      "dark-100-result-source_combo",
+      "dark-100-result-target_combo",
+      "dark-100-document-source_combo",
+      "dark-100-document-target_combo",
+      "dark-100-document-provider_combo",
+      "dark-150-main-source_lang",
+      "dark-150-main-target_lang",
+      "dark-150-main-hotkey_mode_combo",
+      "dark-150-main-hotkey_source_combo",
+      "dark-150-main-hotkey_target_combo",
+      "dark-150-settings-ocr_engine_combo",
+      "dark-150-settings-translator_combo",
+      "dark-150-settings-result_window_control",
+      "dark-150-settings-game_source_combo",
+      "dark-150-settings-game_target_combo",
+      "dark-150-result-source_combo",
+      "dark-150-result-target_combo",
+      "dark-150-document-source_combo",
+      "dark-150-document-target_combo",
+      "dark-150-document-provider_combo",
+      "light-80-main-source_lang",
+      "light-80-main-target_lang",
+      "light-80-main-hotkey_mode_combo",
+      "light-80-main-hotkey_source_combo",
+      "light-80-main-hotkey_target_combo",
+      "light-80-settings-ocr_engine_combo",
+      "light-80-settings-translator_combo",
+      "light-80-settings-result_window_control",
+      "light-80-settings-game_source_combo",
+      "light-80-settings-game_target_combo",
+      "light-80-result-source_combo",
+      "light-80-result-target_combo",
+      "light-80-document-source_combo",
+      "light-80-document-target_combo",
+      "light-80-document-provider_combo",
+      "light-100-main-source_lang",
+      "light-100-main-target_lang",
+      "light-100-main-hotkey_mode_combo",
+      "light-100-main-hotkey_source_combo",
+      "light-100-main-hotkey_target_combo",
+      "light-100-settings-ocr_engine_combo",
+      "light-100-settings-translator_combo",
+      "light-100-settings-result_window_control",
+      "light-100-settings-game_source_combo",
+      "light-100-settings-game_target_combo",
+      "light-100-result-source_combo",
+      "light-100-result-target_combo",
+      "light-100-document-source_combo",
+      "light-100-document-target_combo",
+      "light-100-document-provider_combo",
+      "light-150-main-source_lang",
+      "light-150-main-target_lang",
+      "light-150-main-hotkey_mode_combo",
+      "light-150-main-hotkey_source_combo",
+      "light-150-main-hotkey_target_combo",
+      "light-150-settings-ocr_engine_combo",
+      "light-150-settings-translator_combo",
+      "light-150-settings-result_window_control",
+      "light-150-settings-game_source_combo",
+      "light-150-settings-game_target_combo",
+      "light-150-result-source_combo",
+      "light-150-result-target_combo",
+      "light-150-document-source_combo",
+      "light-150-document-target_combo",
+      "light-150-document-provider_combo"
+    ]
+  },
+  "hotkey_event_delivery": {
+    "callbacks": 10,
+    "registrations": 2,
+    "repeat_suppression": "passed",
+    "release_and_reregister": "passed",
+    "delivery": "Carbon SendEventToEventTarget, own process"
+  },
+  "window_placement": {
+    "cases": 48,
+    "checks": "native owner center and available screen bounds",
+    "results": [
+      {
+        "window": "packages",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          104,
+          52,
+          512,
+          446
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          188,
+          211,
+          344,
+          127
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          188,
+          211,
+          344,
+          127
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          156,
+          137,
+          408,
+          276
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          152,
+          133,
+          416,
+          284
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          56,
+          66,
+          608,
+          418
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          0,
+          25,
+          864,
+          560
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "dark",
+        "scale": 80,
+        "geometry": [
+          160,
+          225,
+          400,
+          99
+        ]
+      },
+      {
+        "window": "packages",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          110,
+          36,
+          640,
+          558
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          215,
+          236,
+          430,
+          157
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          215,
+          236,
+          430,
+          157
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          175,
+          146,
+          510,
+          338
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          170,
+          141,
+          520,
+          348
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          50,
+          53,
+          760,
+          523
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          0,
+          25,
+          1080,
+          700
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "dark",
+        "scale": 100,
+        "geometry": [
+          180,
+          252,
+          500,
+          126
+        ]
+      },
+      {
+        "window": "packages",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          119,
+          25,
+          832,
+          725
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          255,
+          275,
+          559,
+          199
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          255,
+          275,
+          559,
+          199
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          203,
+          159,
+          663,
+          431
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          197,
+          153,
+          676,
+          444
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          41,
+          35,
+          988,
+          680
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          0,
+          25,
+          1145,
+          742
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "dark",
+        "scale": 130,
+        "geometry": [
+          210,
+          294,
+          650,
+          161
+        ]
+      },
+      {
+        "window": "packages",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          104,
+          52,
+          512,
+          446
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          188,
+          211,
+          344,
+          127
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          188,
+          211,
+          344,
+          127
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          156,
+          137,
+          408,
+          276
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          152,
+          133,
+          416,
+          284
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          56,
+          66,
+          608,
+          418
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          0,
+          25,
+          864,
+          560
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "light",
+        "scale": 80,
+        "geometry": [
+          160,
+          225,
+          400,
+          99
+        ]
+      },
+      {
+        "window": "packages",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          110,
+          36,
+          640,
+          558
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          215,
+          236,
+          430,
+          157
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          215,
+          236,
+          430,
+          157
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          175,
+          146,
+          510,
+          338
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          170,
+          141,
+          520,
+          348
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          50,
+          53,
+          760,
+          523
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          0,
+          25,
+          1080,
+          700
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "light",
+        "scale": 100,
+        "geometry": [
+          180,
+          252,
+          500,
+          126
+        ]
+      },
+      {
+        "window": "packages",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          119,
+          25,
+          832,
+          725
+        ]
+      },
+      {
+        "window": "update",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          255,
+          275,
+          559,
+          199
+        ]
+      },
+      {
+        "window": "install",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          255,
+          275,
+          559,
+          199
+        ]
+      },
+      {
+        "window": "argos-confirm",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          203,
+          159,
+          663,
+          431
+        ]
+      },
+      {
+        "window": "argos-error",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          197,
+          153,
+          676,
+          444
+        ]
+      },
+      {
+        "window": "result",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          41,
+          35,
+          988,
+          680
+        ]
+      },
+      {
+        "window": "document",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          0,
+          25,
+          1145,
+          742
+        ]
+      },
+      {
+        "window": "message",
+        "theme": "light",
+        "scale": 130,
+        "geometry": [
+          210,
+          294,
+          650,
+          161
+        ]
+      }
+    ]
+  },
+  "shadow_mode": {
+    "cases": 13,
+    "states": [
+      {
+        "state": "startup-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "open-from-menu",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "shadow-button",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "menu-click-keeps-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "menu-rebuilt-in-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "result-in-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "hotkey-restores",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "hotkey-hides-to-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "close-to-shadow",
+        "activation_policy": 1,
+        "window_visible": false,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "titlebar-minimize-in-dock",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": true,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "restore-from-dock",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "no-tray-dock-fallback",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": true,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      },
+      {
+        "state": "final-restore",
+        "activation_policy": 0,
+        "window_visible": true,
+        "minimized": false,
+        "tray_geometry": [
+          -4586,
+          0,
+          38,
+          24
+        ],
+        "tray_on_screen": false
+      }
+    ],
+    "shadow_hotkey_callbacks": 10,
+    "scope": "own Cocoa NSApplication and QSystemTrayIcon; Qt actions, no physical menu-bar click"
+  },
+  "translation_drafts": {
+    "cases": [
+      {
+        "response": "success",
+        "draft_preserved": true,
+        "selected_engine": "Google"
+      },
+      {
+        "response": "empty",
+        "draft_preserved": true,
+        "selected_engine": "Google"
+      },
+      {
+        "response": "error",
+        "draft_preserved": true,
+        "selected_engine": "Google"
+      }
+    ],
+    "scope": "Native Qt typing and worker delivery; controlled provider replies"
+  }
+}

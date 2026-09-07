@@ -1,0 +1,5 @@
+{
+  "application": "/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate",
+  "native_process_returncode": 0,
+  "scope": "Direct installed frozen Cocoa process after all smoke scenarios; LaunchServices checked separately"
+}

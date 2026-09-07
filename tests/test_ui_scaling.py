@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QApplication, QGraphicsItem
 
 import main
 from qt_layout_test_support import ensure_layout_fonts
-from ui_scaling import MainWindowScaleController, configure_qt_platform, maximum_ui_scale, native_window_parent, normalize_ui_scale
+from ui_scaling import BASE_SCALE, MainWindowScaleController, configure_qt_platform, maximum_ui_scale, native_window_parent, normalize_ui_scale
 
 REAL_SAVE_CONFIG = main.DarkThemeApp.save_config
 
@@ -54,9 +54,9 @@ class ScaleValueTest(unittest.TestCase):
 
     def test_screen_limit_uses_both_dimensions_in_logical_pixels(self):
         self.assertEqual(maximum_ui_scale(QRect(0, 0, 1920, 1080)), 200)
-        self.assertEqual(maximum_ui_scale(QRect(0, 0, 1280, 720)), 144)
-        self.assertEqual(maximum_ui_scale(QRect(-1280, 0, 1280, 640)), 128)
-        self.assertEqual(maximum_ui_scale(QRect(0, 0, 700, 400)), 80)
+        self.assertEqual(maximum_ui_scale(QRect(0, 0, 1280, 720)), 180 if sys.platform == "darwin" else 144)
+        self.assertEqual(maximum_ui_scale(QRect(-1280, 0, 1280, 640)), 160 if sys.platform == "darwin" else 128)
+        self.assertEqual(maximum_ui_scale(QRect(0, 0, 700, 400)), 100 if sys.platform == "darwin" else 80)
 
 
 class UiScalingTest(unittest.TestCase):
@@ -116,9 +116,12 @@ class UiScalingTest(unittest.TestCase):
         original = [widget.geometry() for widget in widgets]
         icon = self.window.settings_button
         self.assertFalse(icon.icon().isNull())
-        for percent, width, height in ((80, 700, 400), (100, 875, 500), (125, 1094, 625),
+        sizes = ((80, 560, 320), (100, 700, 400), (125, 875, 500),
+                 (137, 959, 548), (150, 1050, 600), (200, 1400, 800),
+                 (125, 875, 500), (80, 560, 320)) if sys.platform == "darwin" else ((80, 700, 400), (100, 875, 500), (125, 1094, 625),
                                        (137, 1199, 685), (150, 1312, 750), (200, 1750, 1000),
-                                       (125, 1094, 625), (80, 700, 400)):
+                                       (125, 1094, 625), (80, 700, 400))
+        for percent, width, height in sizes:
             with self.subTest(percent=percent):
                 self.window.set_ui_scale_percent(percent)
                 self.settle()
@@ -127,7 +130,7 @@ class UiScalingTest(unittest.TestCase):
                 self.assertEqual([widget.geometry() for widget in widgets], original)
                 left = self.controller.map_widget_to_view(icon, QPoint())
                 right = self.controller.map_widget_to_view(icon, QPoint(icon.width(), 0))
-                self.assertAlmostEqual(right.x() - left.x(), icon.width() * percent / 80, delta=1)
+                self.assertAlmostEqual(right.x() - left.x(), icon.width() * percent / BASE_SCALE, delta=1)
                 self.assertTrue(icon.isVisible())
 
     def test_clicks_and_multiline_typing_reach_the_scaled_controls(self):
@@ -196,7 +199,7 @@ class UiScalingTest(unittest.TestCase):
                 requests.clear()
                 self.window.grab()
                 self.assertTrue(requests)
-                needed = button.iconSize().width() * percent / 80 * button.devicePixelRatioF()
+                needed = button.iconSize().width() * percent / BASE_SCALE * button.devicePixelRatioF()
                 self.assertGreaterEqual(max(size.width() for size in requests), needed)
 
     def test_arrow_clicks_and_keyboard_activation_apply_exact_five_percent_steps(self):
@@ -207,7 +210,7 @@ class UiScalingTest(unittest.TestCase):
         self.click(settings.ui_scale_increase)
         self.assertEqual(self.window.config['ui_scale_percent'], 130)
         self.assertEqual(settings.ui_scale_value.text(), '130%')
-        self.assertEqual(self.window.width(), 1138)
+        self.assertEqual(self.window.width(), round(700 * 130 / BASE_SCALE))
         QTest.keyClick(self.controller.view.viewport(), Qt.Key_Space)
         self.settle()
         self.assertEqual(self.window.config['ui_scale_percent'], 135)
@@ -348,7 +351,7 @@ class UiScalingTest(unittest.TestCase):
         self.available.return_value = QRect(-1280, 0, 1280, 640)
         self.controller.refresh()
         self.settle()
-        self.assertEqual(self.controller.effective_percent, 128)
+        self.assertEqual(self.controller.effective_percent, 160 if sys.platform == 'darwin' else 128)
         self.assertTrue(self.available.return_value.contains(self.window.geometry()))
         self.assertEqual(self.window.config['ui_scale_percent'], 200)
         self.available.return_value = QRect(0, 0, 2560, 1440)
@@ -382,7 +385,7 @@ class UiScalingTest(unittest.TestCase):
         self.settle()
         self.assertTrue(self.window.text_input.isVisible())
         self.assertEqual(self.window.text_input.toPlainText(), 'keep this text')
-        self.assertEqual(self.window.width(), 1312)
+        self.assertEqual(self.window.width(), round(700 * 150 / BASE_SCALE))
 
     def test_saved_scale_is_loaded_by_a_new_window(self):
         with mock.patch.object(self.window, 'save_config', side_effect=lambda: REAL_SAVE_CONFIG(self.window)):
@@ -391,8 +394,8 @@ class UiScalingTest(unittest.TestCase):
         restarted = main.DarkThemeApp()
         try:
             self.assertEqual(restarted._ui_scale_controller.effective_percent, 137)
-            self.assertEqual(restarted.width(), 1199)
-            self.assertEqual(restarted.height(), 685)
+            self.assertEqual(restarted.width(), round(700 * 137 / BASE_SCALE))
+            self.assertEqual(restarted.height(), round(400 * 137 / BASE_SCALE))
         finally:
             restarted.force_quit = True
             restarted.close()
@@ -428,20 +431,21 @@ class UiScalingTest(unittest.TestCase):
         point = self.controller.map_widget_to_view(button)
         geometry = self.window.geometry()
         self.window.save_config.reset_mock()
+        QTest.mouseMove(viewport, point)
         QTest.mousePress(viewport, Qt.LeftButton, pos=point)
         QTest.qWait(350)
         self.assertEqual(self.window.geometry(), geometry)
-        self.assertEqual(self.controller.proxy.scale(), 1.25)
+        self.assertEqual(self.controller.proxy.scale(), 100 / BASE_SCALE)
         self.assertEqual(self.controller.proxy.cacheMode(), QGraphicsItem.NoCache)
         self.window.save_config.assert_not_called()
         QTest.mouseRelease(viewport, Qt.LeftButton, pos=point)
         self.settle()
-        self.assertEqual(self.window.width(), 919)
-        self.assertEqual(self.window.height(), 525)
-        self.assertEqual(self.controller.proxy.scale(), 1.3125)
+        self.assertEqual(self.window.width(), round(700 * 105 / BASE_SCALE))
+        self.assertEqual(self.window.height(), round(400 * 105 / BASE_SCALE))
+        self.assertEqual(self.controller.proxy.scale(), 105 / BASE_SCALE)
         self.window.save_config.assert_called_once_with()
         QTest.qWait(100)
-        self.assertEqual(self.window.width(), 919)
+        self.assertEqual(self.window.width(), round(700 * 105 / BASE_SCALE))
 
     def test_buttons_follow_the_screen_limit_and_allow_returning_to_smaller_sizes(self):
         self.window.show_settings()
@@ -451,19 +455,19 @@ class UiScalingTest(unittest.TestCase):
         for value in (95, 90, 85, 80):
             self.click(settings.ui_scale_decrease)
             self.assertEqual(settings.ui_scale_value.text(), f'{value}%')
-        self.assertEqual((self.window.width(), self.window.height()), (700, 400))
+        self.assertEqual((self.window.width(), self.window.height()), (round(700 * 80 / BASE_SCALE), round(400 * 80 / BASE_SCALE)))
         self.assertFalse(settings.ui_scale_decrease.isEnabled())
         self.assertTrue(settings.ui_scale_increase.isEnabled())
         self.window.set_ui_scale_percent(200)
         self.assertFalse(settings.ui_scale_increase.isEnabled())
         self.available.return_value = QRect(0, 0, 1280, 640)
         self.controller.refresh()
-        self.assertEqual(settings.ui_scale_value.text(), '128%')
+        self.assertEqual(settings.ui_scale_value.text(), '160%' if sys.platform == 'darwin' else '128%')
         self.assertFalse(settings.ui_scale_increase.isEnabled())
         self.click(settings.ui_scale_decrease)
-        self.assertEqual(settings.ui_scale_value.text(), '123%')
+        self.assertEqual(settings.ui_scale_value.text(), '155%' if sys.platform == 'darwin' else '123%')
         self.assertTrue(settings.ui_scale_increase.isEnabled())
-        self.assertEqual(self.window.config['ui_scale_percent'], 123)
+        self.assertEqual(self.window.config['ui_scale_percent'], 155 if sys.platform == 'darwin' else 123)
 
     def test_repeated_clicks_keep_every_control_in_its_region(self):
         self.window.show_settings()
@@ -475,7 +479,7 @@ class UiScalingTest(unittest.TestCase):
                                   (settings.ui_scale_decrease, range(145, 99, -5))):
             for percent in values:
                 self.click(direction)
-                self.assertEqual(self.window.width(), round(700 * percent / 80))
+                self.assertEqual(self.window.width(), round(700 * percent / BASE_SCALE))
                 self.assertEqual(settings.ui_scale_value.text(), f'{percent}%')
                 self.assertEqual(self.controller.proxy.cacheMode(), QGraphicsItem.NoCache)
                 self.assertEqual([widget.geometry() for widget in
@@ -505,17 +509,17 @@ class UiScalingTest(unittest.TestCase):
         self.click(editor)
         QTest.keyClicks(viewport, '137')
         self.assertEqual(editor.text(), '137')
-        self.assertEqual(self.window.width(), 875)
+        self.assertEqual(self.window.width(), round(700 * 100 / BASE_SCALE))
         QTest.keyClick(viewport, Qt.Key_Return)
         self.settle()
         self.assertEqual(self.window.config['ui_scale_percent'], 137)
-        self.assertEqual(self.window.width(), 1199)
+        self.assertEqual(self.window.width(), round(700 * 137 / BASE_SCALE))
         self.assertEqual(editor.text(), '137%')
         QTest.keyClick(viewport, Qt.Key_A, Qt.ControlModifier)
         QTest.keyClicks(viewport, '160')
         QTest.keyClick(viewport, Qt.Key_Escape)
         self.assertEqual(editor.text(), '137%')
-        self.assertEqual(self.window.width(), 1199)
+        self.assertEqual(self.window.width(), round(700 * 137 / BASE_SCALE))
         QTest.keyClick(viewport, Qt.Key_Up)
         self.assertEqual(self.window.config['ui_scale_percent'], 142)
 
@@ -529,7 +533,7 @@ class UiScalingTest(unittest.TestCase):
         editor = self.window.settings_window.ui_scale_value
         viewport = self.controller.view.viewport()
         self.click(editor)
-        for text, expected in (('999', 128), ('', 128), ('70', 80), ('90', 90), ('118%', 118)):
+        for text, expected in (('999', 160 if sys.platform == 'darwin' else 128), ('', 160 if sys.platform == 'darwin' else 128), ('70', 80), ('90', 90), ('118%', 118)):
             QTest.keyClick(viewport, Qt.Key_A, Qt.ControlModifier)
             QTest.keyClick(viewport, Qt.Key_Backspace)
             QTest.keyClicks(viewport, text)
