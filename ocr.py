@@ -1413,14 +1413,16 @@ def _get_easyocr_reader(language_code, download_enabled=False):
 
 
 def easyocr_available(language_code="en", download_enabled=False):
+    global _EASY_OCR_IMPORT_ERROR
     if _native_ocr_worker_enabled():
-        available, _error = _probe_native_ocr_worker(
+        available, error = _probe_native_ocr_worker(
             "easyocr",
             _easyocr_local_root(),
             language_codes=easyocr_language_codes(language_code),
             initialize=True,
             allow_download=download_enabled,
         )
+        _EASY_OCR_IMPORT_ERROR = None if available else error
         return available
     return _get_easyocr_reader(language_code, download_enabled=download_enabled) is not None
 

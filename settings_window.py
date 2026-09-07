@@ -4802,7 +4802,7 @@ class OcrLanguageManagerDialog(QDialog):
                 language_manager_text(self.lang, "already", engine=HYMT_ENGINE_DISPLAY),
             )
             return
-        self.owner.start_hymt_install()
+        self.owner.start_hymt_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_hymt_install_in_progress"))
 
     def _install_tesseract_engine(self):
@@ -6551,7 +6551,8 @@ try {{
                     True,
                 )
                 if not ocr.easyocr_available(code, download_enabled=True):
-                    raise RuntimeError(f"EasyOCR could not prepare models for {language_name}")
+                    detail = ocr._EASY_OCR_IMPORT_ERROR or "Unknown model installation error"
+                    raise RuntimeError(f"EasyOCR could not prepare models for {language_name}:\n{detail}")
             self._emit_language_progress(language_manager_text(self.lang, "easy_done"), 100, True)
             self._finish_language_task("EasyOCR")
         except Exception as exc:
@@ -11441,6 +11442,8 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
+            if platform_support.IS_MAC:
+                self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
             self.start_rapidocr_install()
             return
 
@@ -11577,12 +11580,12 @@ finally {
         runner_names = ", ".join(translater.hymt_runner_names())
         is_ru = lang == "ru"
         message = (
-            "Автоматическая установка Hy-MT доступна только в Windows.\n\n"
+            "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\n"
             f"Положите модель {HYMT_MODEL_FILE} и исполняемый файл llama.cpp "
             f"({runner_names}) в папку:\n{target_dir}"
             if is_ru
             else
-            "The automatic Hy-MT download is available on Windows only.\n\n"
+            "Automatic Hy-MT installation is available on Windows and macOS.\n\n"
             f"Put the {HYMT_MODEL_FILE} model and a llama.cpp runner "
             f"({runner_names}) in:\n{target_dir}"
         )
@@ -11612,7 +11615,7 @@ finally {
             return
 
         lang = self.parent.current_interface_language
-        if not platform_support.IS_WINDOWS:
+        if platform_support.IS_LINUX:
             # The pinned llama.cpp archive is the Windows build, so instead of
             # downloading something that cannot run, explain how to supply a
             # local runner. Hy-MT still works once one is in place.
@@ -11632,6 +11635,8 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
+            if platform_support.IS_MAC:
+                self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
             self.start_hymt_install()
             return
 
@@ -11844,7 +11849,7 @@ finally {
             self.progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             self.progress.canceled.connect(self._request_tesseract_install_cancel)
             try:
-                owner_window = self.window()
+                owner_window = (getattr(self, "_tesseract_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
                 progress_frame = self.progress.frameGeometry()
                 progress_frame.moveCenter(owner_center)
@@ -12350,7 +12355,7 @@ finally {
             self.rapidocr_progress.setMinimumWidth(430)
             self.rapidocr_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             try:
-                owner_window = self.window()
+                owner_window = (getattr(self, "_rapidocr_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
                 progress_frame = self.rapidocr_progress.frameGeometry()
                 progress_frame.moveCenter(owner_center)
@@ -12425,9 +12430,10 @@ finally {
         self._finish_rapidocr_install_state()
         self._hide_rapidocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if not platform_support.IS_MAC:
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
@@ -12487,6 +12493,25 @@ finally {
             False
         )
         threading.Thread(target=self._install_easyocr_worker, daemon=True).start()
+
+    def _prepare_easyocr_models(self):
+        """An explicit Mac engine install also prepares the active OCR language."""
+        import ocr
+
+        config = getattr(getattr(self, "parent", None), "config", {}) or {}
+        lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
+        code = config.get("last_ocr_language") or config.get("ocr_language") or lang
+        known_codes = {language.code for language in APP_LANGUAGES}
+        if code not in known_codes:
+            code = lang if lang in known_codes else "en"
+        for code in dict.fromkeys((code, "en")):
+            self._check_easyocr_cancel_requested()
+            language = next(item for item in APP_LANGUAGES if item.code == code)
+            self._emit_easyocr_progress(
+                language_manager_text(lang, "easy_down", language=language.display_name(lang)), 96, False)
+            if not ocr.easyocr_available(code, download_enabled=True):
+                raise RuntimeError(f"EasyOCR ({code}): {ocr._EASY_OCR_IMPORT_ERROR or 'Model installation failed'}")
+        self._check_easyocr_cancel_requested()
 
     def _install_easyocr_worker(self):
         temp_dir = ""
@@ -12569,6 +12594,8 @@ finally {
                 importable, import_error = self._easyocr_importable_status()
                 if not importable:
                     raise RuntimeError(f"EasyOCR was installed but could not be imported:\n{import_error}")
+                if platform_support.IS_MAC:
+                    self._prepare_easyocr_models()
 
             install_directory(package_root, final_dir, validate_easyocr, preserve=("models", "user_network"),
                               check_cancel=self._check_easyocr_cancel_requested)
@@ -12617,7 +12644,7 @@ finally {
             self.easyocr_progress.setMinimumWidth(430)
             self.easyocr_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             try:
-                owner_window = self.window()
+                owner_window = (getattr(self, "_easyocr_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
                 progress_frame = self.easyocr_progress.frameGeometry()
                 progress_frame.moveCenter(owner_center)
@@ -12718,7 +12745,7 @@ finally {
             engine_text(lang, "install_cancelled", engine="EasyOCR"),
         )
 
-    def start_hymt_install(self):
+    def start_hymt_install(self, progress_owner=None):
         if (
             self._hymt_install_in_progress
             or self._tesseract_install_in_progress
@@ -12731,6 +12758,7 @@ finally {
         self._hymt_install_phase = "starting"
         self._hymt_cancel_requested.clear()
         self._hymt_temp_dir = ""
+        self._hymt_progress_owner = progress_owner
         self.translator_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_hymt_progress(
@@ -12740,23 +12768,22 @@ finally {
         threading.Thread(target=self._install_hymt_worker, daemon=True).start()
 
     def _get_hymt_download_plan(self, is_x64=True):
-        if not platform_support.IS_WINDOWS:
-            # The pinned llama.cpp archive and its checksum are the Windows x64
-            # build. Rather than ship an unverified binary for another system,
-            # Linux users point the app at their own llama.cpp (see
-            # _show_linux_hymt_hint).
+        if platform_support.IS_MAC:
+            from macos_hymt import runtime_plan
+            runtime = runtime_plan()
+        elif not platform_support.IS_WINDOWS:
+            # Linux distributions require their own compatible llama.cpp.
             raise RuntimeError(
-                "The automatic Hy-MT download is available on Windows only. "
+                "Automatic Hy-MT installation is available on Windows and macOS. "
                 "Place a llama.cpp runner and the GGUF model in translators/hymt."
             )
-        if not is_x64:
+        elif not is_x64:
             raise RuntimeError("Автоматическая установка Hy-MT поддерживает только Windows x64.")
+        else:
+            runtime = {"name": HYMT_RUNTIME_ARCHIVE_NAME_WIN64,
+                       "url": HYMT_RUNTIME_URL_WIN64, "sha256": HYMT_RUNTIME_SHA256}
         return {
-            "runtime": {
-                "name": HYMT_RUNTIME_ARCHIVE_NAME_WIN64,
-                "url": HYMT_RUNTIME_URL_WIN64,
-                "sha256": HYMT_RUNTIME_SHA256,
-            },
+            "runtime": runtime,
             "model": {
                 "name": HYMT_MODEL_FILE,
                 "url": HYMT_MODEL_URL,
@@ -12834,19 +12861,25 @@ finally {
             )
             self._check_hymt_cancel_requested()
             self._verify_file_sha256(runtime_zip_path, plan["runtime"]["sha256"], plan["runtime"]["name"])
-            if not zipfile.is_zipfile(runtime_zip_path):
+            if not platform_support.IS_MAC and not zipfile.is_zipfile(runtime_zip_path):
                 raise RuntimeError("Downloaded Hy-MT runtime is not a zip archive.")
 
             extract_text = engine_text(lang, "hymt_extract")
             self._hymt_install_phase = "extracting"
             self._emit_hymt_progress(extract_text, 13)
-            with zipfile.ZipFile(runtime_zip_path, "r") as zip_ref:
-                zip_ref.extractall(runtime_dir)
+            if platform_support.IS_MAC:
+                from macos_hymt import extract_runtime, validate_runner
+                extract_runtime(runtime_zip_path, runtime_dir)
+            else:
+                with zipfile.ZipFile(runtime_zip_path, "r") as zip_ref:
+                    zip_ref.extractall(runtime_dir)
             self._check_hymt_cancel_requested()
 
             runner_path = self._find_hymt_runner_under(package_root)
             if not runner_path:
-                raise RuntimeError("Hy-MT runtime must contain llama-cli.exe, llama-run.exe, or hymt.exe.")
+                raise RuntimeError("Hy-MT runtime does not contain a compatible llama.cpp executable.")
+            if platform_support.IS_MAC:
+                validate_runner(runner_path)
 
             model_text = engine_text(lang, "hymt_model")
             model_path = os.path.join(package_root, plan["model"]["name"])
@@ -12896,7 +12929,7 @@ finally {
                     + "\n\nModel source: "
                     + HYMT_MODEL_URL
                     + "\nRuntime source: "
-                    + HYMT_RUNTIME_URL_WIN64
+                    + plan["runtime"]["url"]
                     + "\n"
                 )
 
@@ -12929,6 +12962,8 @@ finally {
             def validate_hymt(path):
                 if not self._find_hymt_model_under(path) or not self._find_hymt_runner_under(path):
                     raise RuntimeError("Hy-MT model or runner not found after applying install.")
+                if platform_support.IS_MAC:
+                    validate_runner(self._find_hymt_runner_under(path))
 
             install_directory(package_root, final_dir, validate_hymt,
                               check_cancel=self._check_hymt_cancel_requested)
@@ -12960,17 +12995,19 @@ finally {
                 self,
                 title=HYMT_ENGINE_DISPLAY,
                 in_progress_attr="_hymt_install_in_progress",
-                cancel_callback=self._request_hymt_install_cancel
+                cancel_callback=self._request_hymt_install_cancel,
+                anchor_owner=getattr(self, "_hymt_progress_owner", None),
             )
             self.hymt_progress.setCancelButtonText(engine_text(lang, "cancel"))
-            self.hymt_progress.setWindowModality(Qt.NonModal)
+            self.hymt_progress.setWindowModality(
+                Qt.WindowModal if getattr(self, "_hymt_progress_owner", None) is not None else Qt.NonModal)
             self.hymt_progress.setAutoClose(False)
             self.hymt_progress.setAutoReset(False)
             self.hymt_progress.setMinimumDuration(0)
             self.hymt_progress.setMinimumWidth(430)
             self.hymt_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
             try:
-                owner_window = self.window()
+                owner_window = (getattr(self, "_hymt_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
                 progress_frame = self.hymt_progress.frameGeometry()
                 progress_frame.moveCenter(owner_center)
@@ -13013,6 +13050,7 @@ finally {
         self._hymt_install_in_progress = False
         self._hymt_install_phase = "idle"
         self._hymt_cancel_requested.clear()
+        self._hymt_progress_owner = None
         if hasattr(self, "translator_combo"):
             self.translator_combo.setEnabled(True)
         self._restore_parent_topmost_after_tesseract_install()
@@ -13037,9 +13075,10 @@ finally {
         self._finish_hymt_install_state()
         self._hide_hymt_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_translator_engine or "google"
-        self._set_translator_combo_silently(prev_engine)
-        self.auto_save_setting("translator_engine", prev_engine)
+        if not platform_support.IS_MAC:
+            prev_engine = self.previous_translator_engine or "google"
+            self._set_translator_combo_silently(prev_engine)
+            self.auto_save_setting("translator_engine", prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,

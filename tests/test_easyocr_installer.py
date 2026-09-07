@@ -172,3 +172,27 @@ def test_mac_easyocr_install_error_does_not_select_another_ocr(monkeypatch):
     sw.SettingsWindow._on_easyocr_install_failed(owner, 'download failed')
     owner.save_ocr_engine.assert_not_called()
     assert 'download failed' in warning.call_args.args[-1]
+
+
+@pytest.mark.parametrize('code,expected', [('ru', ['ru', 'en']), ('en', ['en']),
+                                         ('auto', ['ru', 'en'])])
+def test_mac_easyocr_install_prepares_active_language_models(monkeypatch, code, expected):
+    import ocr
+    available = mock.Mock(return_value=True)
+    monkeypatch.setattr(ocr, 'easyocr_available', available)
+    owner = SimpleNamespace(parent=SimpleNamespace(current_interface_language='ru',
+        config={'last_ocr_language': code}), _check_easyocr_cancel_requested=mock.Mock(),
+        _emit_easyocr_progress=mock.Mock())
+    sw.SettingsWindow._prepare_easyocr_models(owner)
+    assert available.call_args_list == [mock.call(code, download_enabled=True) for code in expected]
+
+
+def test_native_easyocr_model_error_reaches_installer(monkeypatch):
+    import ocr
+    monkeypatch.setattr(ocr, '_native_ocr_worker_enabled', lambda: True)
+    monkeypatch.setattr(ocr, '_probe_native_ocr_worker', lambda *a, **kw: (False, 'Download checksum mismatch'))
+    monkeypatch.setattr(ocr, '_EASY_OCR_IMPORT_ERROR', None)
+    owner = SimpleNamespace(parent=SimpleNamespace(current_interface_language='en', config={}),
+        _check_easyocr_cancel_requested=mock.Mock(), _emit_easyocr_progress=mock.Mock())
+    with pytest.raises(RuntimeError, match='Download checksum mismatch'):
+        sw.SettingsWindow._prepare_easyocr_models(owner)

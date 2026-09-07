@@ -4,6 +4,8 @@ import threading
 import tempfile
 import unittest
 import zipfile
+import io
+import tarfile
 from types import SimpleNamespace
 from unittest import mock
 
@@ -79,8 +81,15 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
 
                 def _download_file(self, url, destination_path, **_kwargs):
                     if url == "runtime":
-                        with zipfile.ZipFile(destination_path, "w") as zf:
-                            zf.writestr(platform_support.executable_name("llama-cli"), b"exe")
+                        if platform_support.IS_MAC:
+                            payload = b"#!/bin/sh\nexit 0\n"
+                            with tarfile.open(destination_path, "w:gz") as archive:
+                                entry = tarfile.TarInfo("bin/llama-cli")
+                                entry.size, entry.mode = len(payload), 0o755
+                                archive.addfile(entry, io.BytesIO(payload))
+                        else:
+                            with zipfile.ZipFile(destination_path, "w") as zf:
+                                zf.writestr(platform_support.executable_name("llama-cli"), b"exe")
                     elif url == "model":
                         with open(destination_path, "wb") as f:
                             f.write(b"gguf")

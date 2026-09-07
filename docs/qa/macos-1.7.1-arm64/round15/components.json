@@ -1,0 +1,77 @@
+{
+  "easyocr_model_install_seconds": 26.5,
+  "easyocr": {
+    "results": [
+      {
+        "label": "test",
+        "text": "CLICK TRANSLATE",
+        "confidence": 0.8366981188499252,
+        "boxes_count": 1,
+        "items": [
+          [
+            [
+              [
+                31.0,
+                39.0
+              ],
+              [
+                587.0,
+                39.0
+              ],
+              [
+                587.0,
+                103.0
+              ],
+              [
+                31.0,
+                103.0
+              ]
+            ],
+            "CLICK TRANSLATE",
+            0.8366981188499252
+          ]
+        ],
+        "elapsed_ms": 716.598957995302,
+        "error": ""
+      }
+    ],
+    "error": ""
+  },
+  "rapidocr": {
+    "results": [
+      {
+        "label": "test",
+        "text": "CLICK TRANSLATE",
+        "confidence": 0.9678421258926392,
+        "boxes_count": 1,
+        "items": [
+          [
+            [
+              [
+                28.0,
+                37.0
+              ],
+              [
+                589.0,
+                37.0
+              ],
+              [
+                589.0,
+                103.0
+              ],
+              [
+                28.0,
+                103.0
+              ]
+            ],
+            "CLICK TRANSLATE",
+            0.9678421258926392
+          ]
+        ],
+        "elapsed_ms": 675.70383400016,
+        "error": ""
+      }
+    ],
+    "error": ""
+  }
+}

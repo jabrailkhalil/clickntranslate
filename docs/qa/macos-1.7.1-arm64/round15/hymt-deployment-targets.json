@@ -1,0 +1,101 @@
+{
+  "llama-mtmd-debug": [
+    "14.0"
+  ],
+  "llama-tokenize": [
+    "14.0"
+  ],
+  "llama-cli": [
+    "14.0"
+  ],
+  "rpc-server": [
+    "14.0"
+  ],
+  "llama-batched-bench": [
+    "14.0"
+  ],
+  "llama-minicpmv-cli": [
+    "14.0"
+  ],
+  "libllama.0.0.9048.dylib": [
+    "14.0"
+  ],
+  "llama-debug-template-parser": [
+    "14.0"
+  ],
+  "libggml-metal.0.11.0.dylib": [
+    "14.0"
+  ],
+  "llama-results": [
+    "14.0"
+  ],
+  "libggml.0.11.0.dylib": [
+    "14.0"
+  ],
+  "llama-gguf-split": [
+    "14.0"
+  ],
+  "llama-perplexity": [
+    "14.0"
+  ],
+  "llama-imatrix": [
+    "14.0"
+  ],
+  "libggml-cpu.0.11.0.dylib": [
+    "14.0"
+  ],
+  "llama-fit-params": [
+    "14.0"
+  ],
+  "libggml-blas.0.11.0.dylib": [
+    "14.0"
+  ],
+  "libggml-rpc.0.11.0.dylib": [
+    "14.0"
+  ],
+  "llama-qwen2vl-cli": [
+    "14.0"
+  ],
+  "llama-gemma3-cli": [
+    "14.0"
+  ],
+  "libmtmd.0.0.9048.dylib": [
+    "14.0"
+  ],
+  "libggml-base.0.11.0.dylib": [
+    "14.0"
+  ],
+  "llama-mtmd-cli": [
+    "14.0"
+  ],
+  "llama-cvector-generator": [
+    "14.0"
+  ],
+  "llama-completion": [
+    "14.0"
+  ],
+  "llama-bench": [
+    "14.0"
+  ],
+  "llama-template-analysis": [
+    "14.0"
+  ],
+  "llama-server": [
+    "14.0"
+  ],
+  "libllama-common.0.0.9048.dylib": [
+    "14.0"
+  ],
+  "llama-llava-cli": [
+    "14.0"
+  ],
+  "llama-tts": [
+    "14.0"
+  ],
+  "llama-quantize": [
+    "14.0"
+  ],
+  "llama-export-lora": [
+    "14.0"
+  ]
+}

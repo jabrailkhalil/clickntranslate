@@ -4,13 +4,14 @@ The source implements macOS support for Apple Silicon (`arm64`) and Intel
 (`x86_64`). The build targets macOS 13.4 or newer and Python 3.12. Separate native
 builds avoid requiring Rosetta or a mixture of incompatible native libraries.
 
-**Status (2026-09-06):** built on an Apple Silicon Mac running macOS 14.3,
+**Status (2026-09-07):** built on an Apple Silicon Mac running macOS 14.3,
 installed from DMG, and tested with native Cocoa, LaunchServices, Vision,
 the optional OCR engines and translation providers. See [the native QA report](MACOS_QA.md)
 for evidence and the remaining manual checks. Intel, macOS 13.4 runtime behavior,
 and several permission/input/display scenarios remain unverified. This is a
 self-signed development build, without Developer ID or notarization; it is
-not yet a trusted public release. The two-architecture CI has not been dispatched.
+not yet a notarized public release. Permanent release signing has been checked
+on both GitHub runner architectures; this does not establish Intel runtime QA.
 
 For the next agent testing on a real Mac, see [the handoff checklist](MACOS_HANDOFF.md).
 It includes source-transfer instructions, exact commands, required manual checks,
@@ -56,11 +57,30 @@ native Python with pip already exists, the installer reuses it; otherwise it
 prepares a private Python of the same minor version and architecture as the
 application using the verified Micromamba bootstrap. The temporary Python and
 package cache are removed when installation finishes. Errors preserve the
-selected OCR engine and any previously installed models. Intel Macs use the last supported
+selected OCR engine and any previously installed models. An explicit Mac engine
+install also downloads and validates models for the current OCR language and
+English; additional languages are installed from Language packages. Recognition
+itself never starts an unrequested model download. Intel Macs use the last supported
 PyTorch Intel wheel family (2.2.2 / torchvision 0.17.2); Apple Silicon uses native
 wheels resolved by pip. The Windows embedded-Python, Tesseract and Hy-MT installers
-are never downloaded on macOS. Hy-MT requires a separately installed compatible
-llama.cpp executable and model; its Windows automatic installer remains unavailable.
+are never downloaded on macOS.
+
+Hy-MT installs automatically from Settings or Language packages on both Mac
+architectures with **macOS 14 or newer**. The official runner requires 14.0;
+older systems receive a clear version error before downloading. The rest of the
+app retains its 13.4 minimum. The installer downloads the official llama.cpp b9048 native
+archive and Tencent's pinned HY-MT1.5-1.8B Q4_K_M GGUF model, checks their SHA-256
+hashes, preserves executable permissions and library links, and starts the runner
+before reporting success. A failed replacement restores the previous package.
+The model, runtime, manifest and licenses stay in application data under
+`translators/hymt`; users do not need Homebrew, a compiler or manual file placement.
+The progress window supports cancellation and stays attached to its owner.
+
+Argos is bundled in its helper; Language packages downloads selected directional
+pairs automatically. Apple Vision and RapidOCR are already ready in the app.
+Google, MyMemory, Lingva and LibreTranslate use their configured network services
+and do not need local engine packages; a service requiring a key/server must still
+be configured by its user. No installation or provider error selects a substitute.
 
 ## Native behavior
 

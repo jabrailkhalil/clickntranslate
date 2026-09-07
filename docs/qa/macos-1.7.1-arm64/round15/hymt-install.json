@@ -1,0 +1,16 @@
+{
+  "seconds": 94.67,
+  "events": [
+    [
+      "_on_hymt_install_ready",
+      []
+    ]
+  ],
+  "directory": "/Users/jabrail/Library/Application Support/ClicknTranslate/translators/hymt",
+  "translation": {
+    "input": "Hello, world!",
+    "output": "\u041f\u0440\u0438\u0432\u0435\u0442, \u043c\u0438\u0440!",
+    "seconds": 18.63,
+    "engine": "hymt"
+  }
+}

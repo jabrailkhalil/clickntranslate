@@ -1,0 +1,44 @@
+{
+  "vision": [
+    [
+      [
+        [
+          36.00000209999996,
+          46.00000035714285
+        ],
+        [
+          582.0000021,
+          46.00000035714285
+        ],
+        [
+          582.0000021,
+          96.00000035714285
+        ],
+        [
+          36.00000209999996,
+          96.00000035714285
+        ]
+      ],
+      "CLICK TRANSLATE",
+      1.0
+    ]
+  ],
+  "tesseract": "CLICK TRANSLATE",
+  "tesseract_language_install_remove": {
+    "isolated_models": true,
+    "events": [
+      [
+        [
+          "Tesseract"
+        ],
+        {}
+      ],
+      [
+        [
+          "Tesseract"
+        ],
+        {}
+      ]
+    ]
+  }
+}

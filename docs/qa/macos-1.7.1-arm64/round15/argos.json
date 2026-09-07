@@ -1,0 +1,11 @@
+{
+  "previously_installed": false,
+  "installed": [
+    [
+      "en",
+      "ru"
+    ]
+  ],
+  "output": "Привет, мир!",
+  "seconds": 12.24
+}

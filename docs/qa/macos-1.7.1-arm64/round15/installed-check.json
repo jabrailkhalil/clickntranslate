@@ -1,0 +1,20 @@
+{
+  "app": "/Applications/ClicknTranslate.app",
+  "running": true,
+  "embedded_modules": [
+    "macos_hymt",
+    "macos_python",
+    "macos_tesseract",
+    "settings_window",
+    "ocr",
+    "translater"
+  ],
+  "embedded_hymt_plan": {
+    "name": "llama-b9048-bin-macos-arm64.tar.gz",
+    "sha256": "7c48ae58b9b63853cff08b8c64d54a226e49481b1f0e6b6869b3ba447731063d",
+    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b9048/llama-b9048-bin-macos-arm64.tar.gz"
+  },
+  "designated_requirement": "designated => identifier \"io.github.jabrailkhalil.clickntranslate\" and certificate root = H\"e5e6a8042f96479e560aed29881a6f06d4d374a2\"\nExecutable=/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate",
+  "notarized": false,
+  "ui_smoke_repeated": false
+}
