@@ -54,9 +54,9 @@ class ScaleValueTest(unittest.TestCase):
 
     def test_screen_limit_uses_both_dimensions_in_logical_pixels(self):
         self.assertEqual(maximum_ui_scale(QRect(0, 0, 1920, 1080)), 200)
-        self.assertEqual(maximum_ui_scale(QRect(0, 0, 1280, 720)), 180 if sys.platform == "darwin" else 144)
-        self.assertEqual(maximum_ui_scale(QRect(-1280, 0, 1280, 640)), 160 if sys.platform == "darwin" else 128)
-        self.assertEqual(maximum_ui_scale(QRect(0, 0, 700, 400)), 100 if sys.platform == "darwin" else 80)
+        self.assertEqual(maximum_ui_scale(QRect(0, 0, 1280, 720)), 200 if sys.platform == "darwin" else 144)
+        self.assertEqual(maximum_ui_scale(QRect(-1280, 0, 1280, 640)), 200 if sys.platform == "darwin" else 128)
+        self.assertEqual(maximum_ui_scale(QRect(0, 0, 700, 400)), 125 if sys.platform == "darwin" else 80)
 
 
 class UiScalingTest(unittest.TestCase):
@@ -116,9 +116,9 @@ class UiScalingTest(unittest.TestCase):
         original = [widget.geometry() for widget in widgets]
         icon = self.window.settings_button
         self.assertFalse(icon.icon().isNull())
-        sizes = ((80, 560, 320), (100, 700, 400), (125, 875, 500),
-                 (137, 959, 548), (150, 1050, 600), (200, 1400, 800),
-                 (125, 875, 500), (80, 560, 320)) if sys.platform == "darwin" else ((80, 700, 400), (100, 875, 500), (125, 1094, 625),
+        sizes = ((80, 448, 256), (100, 560, 320), (125, 700, 400),
+                 (137, 767, 438), (150, 840, 480), (200, 1120, 640),
+                 (125, 700, 400), (80, 448, 256)) if sys.platform == "darwin" else ((80, 700, 400), (100, 875, 500), (125, 1094, 625),
                                        (137, 1199, 685), (150, 1312, 750), (200, 1750, 1000),
                                        (125, 1094, 625), (80, 700, 400))
         for percent, width, height in sizes:
@@ -348,7 +348,7 @@ class UiScalingTest(unittest.TestCase):
 
     def test_screen_changes_clamp_size_without_losing_the_preference(self):
         self.window.set_ui_scale_percent(200)
-        self.available.return_value = QRect(-1280, 0, 1280, 640)
+        self.available.return_value = QRect(-1024, 0, 1024, 512) if sys.platform == 'darwin' else QRect(-1280, 0, 1280, 640)
         self.controller.refresh()
         self.settle()
         self.assertEqual(self.controller.effective_percent, 160 if sys.platform == 'darwin' else 128)
@@ -462,12 +462,12 @@ class UiScalingTest(unittest.TestCase):
         self.assertFalse(settings.ui_scale_increase.isEnabled())
         self.available.return_value = QRect(0, 0, 1280, 640)
         self.controller.refresh()
-        self.assertEqual(settings.ui_scale_value.text(), '160%' if sys.platform == 'darwin' else '128%')
+        self.assertEqual(settings.ui_scale_value.text(), '200%' if sys.platform == 'darwin' else '128%')
         self.assertFalse(settings.ui_scale_increase.isEnabled())
         self.click(settings.ui_scale_decrease)
-        self.assertEqual(settings.ui_scale_value.text(), '155%' if sys.platform == 'darwin' else '123%')
+        self.assertEqual(settings.ui_scale_value.text(), '195%' if sys.platform == 'darwin' else '123%')
         self.assertTrue(settings.ui_scale_increase.isEnabled())
-        self.assertEqual(self.window.config['ui_scale_percent'], 155 if sys.platform == 'darwin' else 123)
+        self.assertEqual(self.window.config['ui_scale_percent'], 195 if sys.platform == 'darwin' else 123)
 
     def test_repeated_clicks_keep_every_control_in_its_region(self):
         self.window.show_settings()
@@ -533,7 +533,7 @@ class UiScalingTest(unittest.TestCase):
         editor = self.window.settings_window.ui_scale_value
         viewport = self.controller.view.viewport()
         self.click(editor)
-        for text, expected in (('999', 160 if sys.platform == 'darwin' else 128), ('', 160 if sys.platform == 'darwin' else 128), ('70', 80), ('90', 90), ('118%', 118)):
+        for text, expected in (('999', 200 if sys.platform == 'darwin' else 128), ('', 200 if sys.platform == 'darwin' else 128), ('70', 80), ('90', 90), ('118%', 118)):
             QTest.keyClick(viewport, Qt.Key_A, Qt.ControlModifier)
             QTest.keyClick(viewport, Qt.Key_Backspace)
             QTest.keyClicks(viewport, text)

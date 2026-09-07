@@ -14,7 +14,11 @@ mkdir -p build/macos releases
 APP="dist/ClicknTranslate.app"
 codesign --verify --deep --strict --verbose=2 "$APP"
 "$PYTHON" tools/check_macos_compatibility.py "$APP"
-"$PYTHON" tools/smoke_macos_bundle.py "$APP"
+if [[ "${CLICKNTRANSLATE_SKIP_SMOKE:-0}" == "1" ]]; then
+  echo "Smoke tests skipped by explicit request; this build has not been runtime-tested."
+else
+  "$PYTHON" tools/smoke_macos_bundle.py "$APP"
+fi
 
 # Notarize only with an explicitly configured Developer ID and keychain profile.
 # The profile is provisioned separately via `xcrun notarytool store-credentials`.

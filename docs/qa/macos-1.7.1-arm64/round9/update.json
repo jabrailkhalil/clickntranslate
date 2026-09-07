@@ -1,0 +1,36 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "default_percent": 100,
+  "main_window_logical_size": [
+    560,
+    320
+  ],
+  "slider_height": 24,
+  "build_command": "CLICKNTRANSLATE_SKIP_SMOKE=1 bash tools/build_macos_release.sh",
+  "build_exit_code": 0,
+  "tests": "Not run; explicitly deferred by the user",
+  "installation": {
+    "installed": "/Applications/ClicknTranslate.app",
+    "previous_app_preserved": true,
+    "launch_requested": true,
+    "runtime_tests": "deferred by user request"
+  },
+  "artifacts": [
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166054946,
+      "sha256": "a32c2d7da152718930177590cd9a8320e26584b425eb65660c9fe721e7584d97"
+    },
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153497942,
+      "sha256": "fa41aeef5dccbcf40bbd0115eb599287f2dad11e0ec2d628c8ed9c4cc760f613"
+    }
+  ],
+  "signature": {
+    "kind": "ad hoc",
+    "notarized": false,
+    "designated_requirement": "# designated => cdhash H\"d10f3101f26d45467462903921654f106161fa1c\""
+  }
+}

@@ -77,8 +77,8 @@ Qt stores portable shortcut names as `Ctrl` for Command and `Meta` for physical
 Control on macOS. Registration uses that same mapping; the shortcut editor and
 main-window references show native Mac labels.
 
-On macOS, 100% interface scale now means the original 700×400 main window
-(previously 80%). Other windows use the same baseline and fit within the screen.
+On macOS, 100% interface scale now means a compact 560×320 main window
+(80% of the preceding Mac build). Other windows use the same baseline and fit within the screen.
 Both panes of the translation window are editable. Translate uses the most
 recently edited pane; a draft entered in Translation is first kept in Source,
 then translated with the selected language pair and provider. Errors preserve
@@ -105,6 +105,10 @@ No downloaded files are written inside the `.app` bundle. The login item is
 ```bash
 bash tools/build_macos_release.sh
 ```
+
+For an explicitly requested build without runtime tests, use
+`CLICKNTRANSLATE_SKIP_SMOKE=1 bash tools/build_macos_release.sh`.
+Such a build must be recorded as untested; the default still runs the bundle smoke check.
 
 Run on the target architecture. The script builds `dist/ClicknTranslate.app`,
 checks its three embedded Python archives and code signatures, exercises the

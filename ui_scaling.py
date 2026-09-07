@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
 
 
 BASE_WIDTH, BASE_HEIGHT = 700, 400
-# On macOS, 100% uses the original 700x400 canvas (previously labelled 80%).
-BASE_SCALE = 100 if sys.platform == 'darwin' else 80
+# The compact Mac default is 560x320; keep the logical canvas unchanged.
+BASE_SCALE = 125 if sys.platform == 'darwin' else 80
 MIN_SCALE, DEFAULT_SCALE, MAX_SCALE, SCALE_STEP = 80, 100, 200, 5
 
 
