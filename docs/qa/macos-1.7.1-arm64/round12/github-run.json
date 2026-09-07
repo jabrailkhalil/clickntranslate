@@ -1,0 +1,23 @@
+{
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34148141318",
+  "headSha": "2d23dad29a0c2054cd74784cd7197b018f2469a6",
+  "jobs": [
+    {
+      "name": "macos-signing / build (macos-15, arm64)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "macos-signing / build (macos-15-intel, x86_64)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test",
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ]
+}

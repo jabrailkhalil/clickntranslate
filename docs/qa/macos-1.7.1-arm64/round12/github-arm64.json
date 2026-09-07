@@ -1,0 +1,9 @@
+{
+  "architecture": "arm64",
+  "macos": "15.7.9",
+  "sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "requirement": "designated => identifier \"io.github.jabrailkhalil.clickntranslate\" and certificate root = H\"e5e6a8042f96479e560aed29881a6f06d4d374a2\"",
+  "changed_code_same_identity": true,
+  "ad_hoc_rejected": true,
+  "notarized": false
+}
