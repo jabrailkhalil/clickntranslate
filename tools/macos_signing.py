@@ -13,6 +13,12 @@ import tempfile
 
 
 def signing_directory():
+    override = os.environ.get('CLICKNTRANSLATE_SIGNING_DIR')
+    if override:
+        directory = Path(override).expanduser()
+        if not directory.is_absolute():
+            raise RuntimeError('CLICKNTRANSLATE_SIGNING_DIR must be an absolute path.')
+        return directory
     return Path.home() / 'Library/Application Support/ClicknTranslateBuild/signing'
 
 

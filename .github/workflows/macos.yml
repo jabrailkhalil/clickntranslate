@@ -2,7 +2,21 @@ name: macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      signing_only:
+        description: Verify the permanent signer without building or running the app
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      signing_only:
+        type: boolean
+        default: false
+    secrets:
+      MACOS_SIGNING_KEYCHAIN_BASE64:
+        required: false
+      MACOS_SIGNING_KEYCHAIN_PASSWORD:
+        required: false
   pull_request:
     paths:
       - '**.py'
@@ -11,6 +25,7 @@ on:
       - 'packaging/macos/**'
       - 'tools/*macos*'
       - '.github/workflows/macos.yml'
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: read
@@ -30,27 +45,43 @@ jobs:
     env:
       VENV: .venv-macos
       PYTHONUTF8: '1'
+      CLICKNTRANSLATE_SIGNING_DIR: ${{ runner.temp }}/clickntranslate-signing
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+          cache: ${{ !inputs.signing_only && 'pip' || '' }}
           cache-dependency-path: requirements-macos.txt
+      - name: Restore permanent release signer
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only)
+        env:
+          MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
+          MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
+        run: python tools/macos_ci_signing.py restore
+      - name: Verify signer survives a binary update
+        if: inputs.signing_only
+        run: python tools/macos_ci_signing.py probe --report build/macos/signing-probe.json
       - name: Install native dependencies
+        if: '!inputs.signing_only'
         run: bash tools/setup_macos_env.sh
       - name: Test platform behavior and selected engines
+        if: '!inputs.signing_only'
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
           .venv-macos/bin/python -m pytest -q tests/test_macos_support.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py tests/test_document_services.py tests/test_single_instance.py
       - name: Build and exercise native bundle
+        if: '!inputs.signing_only'
         env:
-          # Ephemeral QA can be ad hoc; tagged releases must not silently ship
-          # a different identity. Provision the same private signer for release CI.
+          # PR/manual QA never receives the private key. Tags must use it.
           CLICKNTRANSLATE_ALLOW_ADHOC: ${{ startsWith(github.ref, 'refs/tags/') && '0' || '1' }}
         run: bash tools/build_macos_release.sh
+      - name: Verify final release certificate
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.signing_only
+        run: python tools/macos_ci_signing.py verify --app dist/ClicknTranslate.app --report build/macos/release-signature.json
       - uses: actions/upload-artifact@v4
+        if: '!inputs.signing_only'
         with:
           name: macos-${{ matrix.arch }}-release
           path: |
@@ -58,6 +89,18 @@ jobs:
             build/macos/smoke.json
             build/macos/smoke*.png
           if-no-files-found: error
+      - name: Keep public signing verification
+        if: inputs.signing_only || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-signing
+          path: |
+            build/macos/signing-probe.json
+            build/macos/release-signature.json
+          if-no-files-found: error
+      - name: Remove private signer from runner
+        if: always() && github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only)
+        run: python tools/macos_ci_signing.py cleanup
       - name: Keep build diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4

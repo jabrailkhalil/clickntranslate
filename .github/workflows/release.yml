@@ -11,6 +11,9 @@ permissions:
 jobs:
   macos:
     uses: ./.github/workflows/macos.yml
+    secrets:
+      MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
+      MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
 
   linux:
     runs-on: ubuntu-latest

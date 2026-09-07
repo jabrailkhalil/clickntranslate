@@ -160,11 +160,48 @@ the smoke-test screenshots. Local native testing does not imply that both CI
 architectures have already passed.
 
 Ephemeral PR/manual CI permits explicitly marked ad-hoc QA builds through
-`CLICKNTRANSLATE_ALLOW_ADHOC=1`. Tagged release builds do not: they need the same
-private signing identity provisioned securely on the runner. The private key
-has not been uploaded to GitHub or configured in Actions secrets in this session.
-Restoring a private signing-directory backup reuses the certificate under another
-builder's home directory. Do not generate a fresh certificate per CI run.
+`CLICKNTRANSLATE_ALLOW_ADHOC=1`. Tagged release builds restore the permanent
+encrypted keychain from two repository Actions secrets:
+`MACOS_SIGNING_KEYCHAIN_BASE64` and `MACOS_SIGNING_KEYCHAIN_PASSWORD`.
+The same certificate signs both arm64 and Intel releases. Its public certificate
+is `packaging/macos/release-certificate.pem`; the pinned SHA-1 fingerprint is
+`E5E6A8042F96479E560AED29881A6F06D4D374A2`. Missing secrets or a mismatched signer
+fail the release; there is no ad-hoc fallback. PR jobs never restore the key.
+
+To provision or restore these secrets from the original builder, authenticate
+the official GitHub CLI as a repository administrator, then run:
+
+```bash
+gh auth login --hostname github.com --web --scopes workflow
+.venv-macos/bin/python tools/macos_ci_signing.py upload
+```
+
+The uploader reads the existing private directory, sends secret values to `gh`
+through stdin, and does not print them or write them into the repository. GitHub
+CLI encrypts them before upload. The encrypted keychain is transferred intact
+because the private key was made nonextractable; no new key is generated.
+Keep the original private directory backed up separately. Do not replace its
+certificate on another builder: that would change the macOS permission identity.
+
+CI restores the signer under `RUNNER_TEMP/clickntranslate-signing` using
+`CLICKNTRANSLATE_SIGNING_DIR`. Only the disposable runner receives administrator
+trust for this leaf, scoped to codeSign and `/usr/bin/codesign`. An `always()`
+cleanup removes the temporary private files, keychain and trust. Artifacts contain
+only public verification reports and release files, never the private keychain.
+
+For a small native check on both runner architectures without an application
+build or test suite, dispatch the existing `tests` workflow on the Mac branch:
+
+```bash
+gh workflow run tests.yml --ref codex/macos-1.7.1 -f macos_signing_only=true
+```
+
+It signs two different tiny executables and verifies they retain the same
+certificate requirement, then rejects a valid ad-hoc replacement. The `macOS`
+workflow also exposes `signing_only` once available on the default branch.
+Tags must point to a commit containing these workflows; configuring a feature
+branch does not update an older tag or automatically publish a new release.
+See `MACOS_QA.md` for the actual provisioning and runner verification status.
 
 For distribution, supply a Developer ID Application identity already present in
 the macOS keychain as `MACOS_CODESIGN_IDENTITY`. With a separately provisioned

@@ -5,12 +5,18 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      macos_signing_only:
+        description: Check the permanent Mac signer only (no application test suite)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   test:
+    if: '!inputs.macos_signing_only'
     strategy:
       fail-fast: false
       matrix:
@@ -40,3 +46,12 @@ jobs:
           fi
       - name: Run tests
         run: python -m pytest -q
+
+  macos-signing:
+    if: github.event_name == 'workflow_dispatch' && inputs.macos_signing_only
+    uses: ./.github/workflows/macos.yml
+    with:
+      signing_only: true
+    secrets:
+      MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
+      MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
