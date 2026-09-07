@@ -1,0 +1,16 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-07 19:22:24.653 Df tccd[390:ccbbe] [com.apple.TCC:access] Failed to match existing code requirement for subject io.github.jabrailkhalil.clickntranslate and service kTCCServiceScreenCapture
+	cdhash H"829c6343eaef8da6bd8b6f99ea268a32d94da7f5"
+	cdhash H"e8a163cb0a5a257f130aee436057b4302f880730"
+2026-09-07 19:29:09.670 Df tccd[390:cffe4] [com.apple.TCC:access] Failed to match existing code requirement for subject io.github.jabrailkhalil.clickntranslate and service kTCCServiceScreenCapture
+	cdhash H"829c6343eaef8da6bd8b6f99ea268a32d94da7f5"
+	cdhash H"e8a163cb0a5a257f130aee436057b4302f880730"
+2026-09-07 19:29:10.823 Df tccd[390:cffe4] [com.apple.TCC:access] Failed to match existing code requirement for subject io.github.jabrailkhalil.clickntranslate and service kTCCServiceScreenCapture
+	cdhash H"829c6343eaef8da6bd8b6f99ea268a32d94da7f5"
+	cdhash H"e8a163cb0a5a257f130aee436057b4302f880730"
+2026-09-07 19:29:36.975 Df tccd[390:d0395] [com.apple.TCC:access] Failed to match existing code requirement for subject io.github.jabrailkhalil.clickntranslate and service kTCCServiceScreenCapture
+	cdhash H"829c6343eaef8da6bd8b6f99ea268a32d94da7f5"
+	cdhash H"e8a163cb0a5a257f130aee436057b4302f880730"
+2026-09-07 19:37:47.568 Df tccd[390:d1f08] [com.apple.TCC:access] Failed to match existing code requirement for subject io.github.jabrailkhalil.clickntranslate and service kTCCServiceScreenCapture
+	cdhash H"829c6343eaef8da6bd8b6f99ea268a32d94da7f5"
+	cdhash H"e8a163cb0a5a257f130aee436057b4302f880730"

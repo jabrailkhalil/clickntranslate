@@ -9,9 +9,17 @@ PYTHON="${VENV:-.venv-macos}/bin/python"
 VERSION="$("$PYTHON" -c 'from app_version import APP_VERSION; print(APP_VERSION)')"
 ARCH="$("$PYTHON" -c 'import platform; print(platform.machine())')"
 mkdir -p build/macos releases
+LOCAL_SIGNING=0
+if [[ -z "${MACOS_CODESIGN_IDENTITY:-}" && "${CLICKNTRANSLATE_ALLOW_ADHOC:-0}" != "1" ]]; then
+  "$PYTHON" tools/macos_signing.py check > build/macos/signing.json
+  LOCAL_SIGNING=1
+fi
 "$PYTHON" -c "from PIL import Image; Image.open('icons/icon.png').convert('RGBA').save('build/macos/icon.icns')"
 "$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller ClicknTranslate-macos.spec
 APP="dist/ClicknTranslate.app"
+if [[ "$LOCAL_SIGNING" == "1" ]]; then
+  "$PYTHON" tools/macos_signing.py sign "$APP" > build/macos/signing.json
+fi
 codesign --verify --deep --strict --verbose=2 "$APP"
 "$PYTHON" tools/check_macos_compatibility.py "$APP"
 if [[ "${CLICKNTRANSLATE_SKIP_SMOKE:-0}" == "1" ]]; then

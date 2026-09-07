@@ -45,6 +45,10 @@ jobs:
         run: |
           .venv-macos/bin/python -m pytest -q tests/test_macos_support.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py tests/test_document_services.py tests/test_single_instance.py
       - name: Build and exercise native bundle
+        env:
+          # Ephemeral QA can be ad hoc; tagged releases must not silently ship
+          # a different identity. Provision the same private signer for release CI.
+          CLICKNTRANSLATE_ALLOW_ADHOC: ${{ startsWith(github.ref, 'refs/tags/') && '0' || '1' }}
         run: bash tools/build_macos_release.sh
       - uses: actions/upload-artifact@v4
         with:

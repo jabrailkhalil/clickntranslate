@@ -8,8 +8,8 @@ builds avoid requiring Rosetta or a mixture of incompatible native libraries.
 installed from DMG, and tested with native Cocoa, LaunchServices, Vision,
 the optional OCR engines and translation providers. See [the native QA report](MACOS_QA.md)
 for evidence and the remaining manual checks. Intel, macOS 13.4 runtime behavior,
-and several permission/input/display scenarios remain unverified. This is an
-ad-hoc signed development build, without Developer ID or notarization; it is
+and several permission/input/display scenarios remain unverified. This is a
+self-signed development build, without Developer ID or notarization; it is
 not yet a trusted public release. The two-architecture CI has not been dispatched.
 
 For the next agent testing on a real Mac, see [the handoff checklist](MACOS_HANDOFF.md).
@@ -93,6 +93,13 @@ in its own themed dialog, then opens System Settings on the user's click.
 Rejecting a request stops the action; startup never asks for these permissions.
 Source launches can appear as Python or Terminal in the permission list.
 
+Local builds now reuse one persistent signing certificate. Ad-hoc signatures
+previously tied Screen Recording grants to each executable's changing hash;
+System Settings could show an enabled switch while TCC rejected the replacement.
+After migrating from an older ad-hoc build, remove the old app entry once and
+allow the installed `/Applications/ClicknTranslate.app` again. Subsequent builds
+must keep the same certificate. Never reset permissions automatically at startup.
+
 Data, settings, caches and downloaded models live in:
 
 ```text
@@ -108,6 +115,23 @@ No downloaded files are written inside the `.app` bundle. The login item is
 ```bash
 bash tools/build_macos_release.sh
 ```
+
+For a free local signing identity, provision it once before the first build:
+
+```bash
+.venv-macos/bin/python tools/macos_signing.py setup
+```
+
+macOS may ask to approve this certificate for the signing tool. The private
+identity is stored outside the repository at
+`~/Library/Application Support/ClicknTranslateBuild/signing/`. Keep a private
+backup of that directory; never upload it, its keychain or password to Git.
+It uses one self-signed RSA certificate, a separate encrypted keychain and a
+password file readable only by its owner. Trust is scoped to the current user,
+the code-signing policy and `/usr/bin/codesign`; SSL, system roots and Gatekeeper
+rules are unchanged. The normal build reuses this identity automatically and
+fails if it is missing or inconsistent instead of silently switching to ad hoc.
+This does not require a paid Apple account and does not provide notarization.
 
 For an explicitly requested build without runtime tests, use
 `CLICKNTRANSLATE_SKIP_SMOKE=1 bash tools/build_macos_release.sh`.
@@ -134,6 +158,13 @@ change its inputs run it as well. The release workflow calls both Mac builds
 before creating a draft release; it uploads only package/checksum assets, not
 the smoke-test screenshots. Local native testing does not imply that both CI
 architectures have already passed.
+
+Ephemeral PR/manual CI permits explicitly marked ad-hoc QA builds through
+`CLICKNTRANSLATE_ALLOW_ADHOC=1`. Tagged release builds do not: they need the same
+private signing identity provisioned securely on the runner. The private key
+has not been uploaded to GitHub or configured in Actions secrets in this session.
+Restoring a private signing-directory backup reuses the certificate under another
+builder's home directory. Do not generate a fresh certificate per CI run.
 
 For distribution, supply a Developer ID Application identity already present in
 the macOS keychain as `MACOS_CODESIGN_IDENTITY`. With a separately provisioned

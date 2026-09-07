@@ -81,6 +81,42 @@ def permission_granted(kind):
     raise ValueError(f"Unknown macOS permission: {kind}")
 
 
+def write_permission_report(output_path, capture=False):
+    """Diagnose the installed identity without running OCR or the full UI suite.
+
+    A capture check is explicit, respects the OS grant, and saves dimensions
+    only. No screenshot pixels, clipboard content or recognized text are saved.
+    """
+    import json
+    from datetime import datetime, timezone
+    report = {'time': datetime.now(timezone.utc).isoformat(), 'pid': os.getpid(),
+              'executable': sys.executable, 'bundle': app_bundle(),
+              'permissions': {kind: permission_granted(kind) for kind in ('screen', 'accessibility')}}
+    if capture:
+        report['capture'] = {'attempted': False, 'reason': 'Screen Recording is not granted'}
+        if report['permissions']['screen']:
+            from PyQt5 import QtWidgets, sip
+            app = QtWidgets.QApplication.instance()
+            created = app is None
+            if created:
+                app = QtWidgets.QApplication([])
+            screen = app.primaryScreen()
+            pixmap = screen.grabWindow(0) if screen is not None else None
+            report['capture'] = {
+                'attempted': True, 'nonempty': pixmap is not None and not pixmap.isNull(),
+                'width': pixmap.width() if pixmap is not None else 0,
+                'height': pixmap.height() if pixmap is not None else 0,
+                'dpr': pixmap.devicePixelRatioF() if pixmap is not None else 0,
+            }
+            del pixmap
+            if created:
+                sip.delete(app)
+    path = Path(output_path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+    return report
+
+
 def ensure_permission(kind, parent=None, language="en"):
     """Explain a missing permission in the app's style, only on a user action.
 

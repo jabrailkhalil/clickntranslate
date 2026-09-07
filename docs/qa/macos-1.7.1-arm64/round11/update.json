@@ -1,0 +1,60 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "signature": {
+    "kind": "persistent local self-signed certificate",
+    "paid": false,
+    "notarized": false,
+    "designated_requirement": "designated => identifier \"io.github.jabrailkhalil.clickntranslate\" and certificate root = H\"e5e6a8042f96479e560aed29881a6f06d4d374a2\""
+  },
+  "installed_after_user_restart": {
+    "time": "2026-09-07T17:01:26.221758+00:00",
+    "pid": 48933,
+    "executable": "/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate",
+    "bundle": "/Applications/ClicknTranslate.app",
+    "permissions": {
+      "screen": true,
+      "accessibility": false
+    },
+    "capture": {
+      "attempted": true,
+      "nonempty": true,
+      "width": 2560,
+      "height": 1600,
+      "dpr": 2.0
+    }
+  },
+  "identity_stability": {
+    "before": "designated => identifier \"io.github.jabrailkhalil.clickntranslate.signing-probe\" and certificate root = H\"e5e6a8042f96479e560aed29881a6f06d4d374a2\"",
+    "after_changed_executable": "designated => identifier \"io.github.jabrailkhalil.clickntranslate.signing-probe\" and certificate root = H\"e5e6a8042f96479e560aed29881a6f06d4d374a2\"",
+    "unchanged_requirement": true,
+    "valid_ad_hoc_replacement_rejected": true,
+    "keychain_search_list": "\"/Users/jabrail/Library/Keychains/login.keychain-db\""
+  },
+  "installation": {
+    "installed": "/Applications/ClicknTranslate.app",
+    "previous_app": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/ClicknTranslate-preserved-20260907-195808.app",
+    "data_backup": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/user-data-preserved-20260907-195808",
+    "gracefully_stopped": [
+      46542
+    ],
+    "config_modified": false,
+    "screen_permission_reset": "only io.github.jabrailkhalil.clickntranslate; after final signature installed",
+    "other_permissions_reset": false
+  },
+  "build": "One PyInstaller build with smoke skipped; final signing and packaging repeated once to preserve the previous non-hardened runtime behavior",
+  "tests": "Focused identity and installed capture checks only; full suites deferred by user",
+  "artifacts": [
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166077446,
+      "sha256": "bcdf4efc4214215abe454c132f21d49399b0a62c9dd6443dcf85852a635539ba"
+    },
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153507058,
+      "sha256": "c04171e7efffd08dca31a2ac4d371c89bf39a5fc97cef53c0c3c7a64121b4b82"
+    }
+  ],
+  "ci": "PR/manual QA may explicitly use ad hoc. Tagged builds now require persistent signing; private CI credentials have not been uploaded."
+}

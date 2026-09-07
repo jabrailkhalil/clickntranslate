@@ -11195,6 +11195,15 @@ def _warm_up_ocr_after_window_is_visible():
 
 
 if __name__ == "__main__":
+    if "--macos-permission-report" in sys.argv:
+        if not platform_support.IS_MAC:
+            raise SystemExit("The permission diagnostic requires macOS.")
+        from macos_desktop import write_permission_report
+        report_index = sys.argv.index("--macos-permission-report") + 1
+        if report_index >= len(sys.argv):
+            raise SystemExit("--macos-permission-report requires an output JSON path.")
+        write_permission_report(sys.argv[report_index], capture="--macos-capture-check" in sys.argv)
+        raise SystemExit(0)
     if "--smoke-test" in sys.argv:
         if not platform_support.IS_MAC:
             raise SystemExit("The native bundle smoke check is for macOS.")
