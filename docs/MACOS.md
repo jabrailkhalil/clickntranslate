@@ -186,7 +186,10 @@ certificate on another builder: that would change the macOS permission identity.
 CI restores the signer under `RUNNER_TEMP/clickntranslate-signing` using
 `CLICKNTRANSLATE_SIGNING_DIR`. Only the disposable runner receives administrator
 trust for this leaf, scoped to codeSign and `/usr/bin/codesign`. An `always()`
-cleanup removes the temporary private files, keychain and trust. Artifacts contain
+cleanup removes the temporary private files, keychain and public certificate.
+The scoped public trust record disappears when GitHub discards the VM;
+`remove-trusted-cert` hangs in these headless runners. Self-hosted runners are
+refused by the signing helper. Artifacts contain
 only public verification reports and release files, never the private keychain.
 
 For a small native check on both runner architectures without an application

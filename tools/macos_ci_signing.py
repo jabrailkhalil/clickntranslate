@@ -37,8 +37,9 @@ def validate_certificate():
 def ci_directory():
     # Cleanup and administrator trust are restricted to an ephemeral Actions
     # runner. Never apply these operations to a developer's signing directory.
-    if os.environ.get('GITHUB_ACTIONS') != 'true' or not os.environ.get('RUNNER_TEMP'):
-        raise RuntimeError('This operation requires a GitHub Actions runner.')
+    if (os.environ.get('GITHUB_ACTIONS') != 'true' or not os.environ.get('RUNNER_TEMP')
+            or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted'):
+        raise RuntimeError('This operation requires a disposable GitHub-hosted runner.')
     expected = Path(os.environ['RUNNER_TEMP']).resolve() / 'clickntranslate-signing'
     directory = signing_directory()
     if directory.is_symlink() or directory.resolve() != expected:
@@ -109,19 +110,17 @@ def cleanup():
                 errors.append(str(error))
     finally:
         shutil.rmtree(directory)
-    # Remove private material first, even if a system trust operation stalls.
-    for action, arguments in (
-        ('remove-trusted-cert', ['-d', CERTIFICATE]),
-        ('delete-certificate', ['-Z', EXPECTED_SHA1, SYSTEM_KEYCHAIN]),
-    ):
-        try:
-            print('Cleaning public certificate: ' + action, flush=True)
-            run(['/usr/bin/sudo', '-n', '/usr/bin/security', action, *arguments], timeout=20)
-        except RuntimeError as error:
-            errors.append(str(error))
+    # remove-trusted-cert hangs in the headless macOS 15 admin domain, even as
+    # root. Delete the public certificate; the narrowly scoped trust record
+    # disappears with the hosted VM. Self-hosted runners are explicitly refused.
+    try:
+        run(['/usr/bin/sudo', '-n', '/usr/bin/security', 'delete-certificate',
+             '-Z', EXPECTED_SHA1, SYSTEM_KEYCHAIN], timeout=20)
+    except RuntimeError as error:
+        errors.append(str(error))
     if errors:
         raise RuntimeError('Private files removed; keychain/trust cleanup reported: ' + '; '.join(errors))
-    return {'cleaned': True}
+    return {'cleaned': True, 'public_trust_record': 'discarded with disposable hosted runner'}
 
 
 def requirement():
