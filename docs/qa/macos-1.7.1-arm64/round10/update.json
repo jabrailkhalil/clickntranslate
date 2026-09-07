@@ -1,0 +1,66 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "fix": "Defer native Qt status menu until after consuming mouseDown; manual Mac launch always shows window",
+  "build_command": "CLICKNTRANSLATE_SKIP_SMOKE=1 bash tools/build_macos_release.sh",
+  "build_exit_code": 0,
+  "checks": {
+    "full_suite": "Deferred by user request",
+    "native_status_click": {
+      "native_menu_opened": true,
+      "event_loop_resumed": true
+    },
+    "manual_launch": [
+      {
+        "pid": 46207,
+        "cmdline": [
+          "/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate"
+        ],
+        "hidden": false,
+        "policy": 0,
+        "visible_windows": [
+          {
+            "bounds": {
+              "X": 328.0,
+              "Height": 320.0,
+              "Y": 253.0,
+              "Width": 560.0
+            },
+            "layer": 8
+          }
+        ]
+      }
+    ]
+  },
+  "installation": {
+    "installed": "/Applications/ClicknTranslate.app",
+    "previous_app": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/ClicknTranslate-preserved-20260907-192219.app",
+    "user_data_backup": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/user-data-preserved-20260907-192219",
+    "stopped": [
+      {
+        "pid": 43456,
+        "command_status": "ok",
+        "method": "SIGTERM after queued quit could not run in native mouse tracking"
+      }
+    ],
+    "launch": "open -a /Applications/ClicknTranslate.app",
+    "config_modified": false
+  },
+  "artifacts": [
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166890543,
+      "sha256": "53adc7d507574970cdd73c26c7665696f44e21cf9cec1274992137dd56ed52cb"
+    },
+    {
+      "file": "Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153500987,
+      "sha256": "d01f205463ca3eaf422109d1119f2ce5d6833dd5f0103de32cbeba41132746b9"
+    }
+  ],
+  "signature": {
+    "kind": "ad hoc",
+    "notarized": false,
+    "designated_requirement": "# designated => cdhash H\"e8a163cb0a5a257f130aee436057b4302f880730\""
+  }
+}

@@ -68,8 +68,11 @@ On macOS, **Shadow mode** and the main window's Close button leave the applicati
 in the top menu bar and remove it from the Dock. The status menu provides Open,
 Copy Text, Translate, Translate Screen, Dynamic Translation and Quit. Clicking the
 status icon opens this menu; Open restores the main window and Dock icon. The
-ordinary minimize button still minimizes into the Dock. Starting with the saved
-`start_minimized` option also uses menu-bar-only shadow mode. Translation results
+ordinary minimize button still minimizes into the Dock. Automatic login startup
+with `start_minimized` uses menu-bar-only shadow mode; manually opening the app
+in Finder/Launchpad always shows its window. Qt's native status menu opens after
+the button's mouse-down event is consumed, avoiding a second mouse-tracking loop
+that can otherwise block reopening after the menu closes. Translation results
 can appear while the main window remains hidden. If Ice or another menu-bar manager
 hides the icon, move it into that manager's visible section.
 

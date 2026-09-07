@@ -1,0 +1,64 @@
+Analysis of sampling ClicknTranslate (pid 43456) every 1 millisecond
+Process:         ClicknTranslate [43456]
+Path:            /Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate
+Load Address:    0x1025fc000
+Identifier:      io.github.jabrailkhalil.clickntranslate
+Version:         1.7.1 (1.7.1)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  ??? [1]
+
+Date/Time:       2026-09-07 19:14:56.132 +0300
+Launch Time:     2026-09-07 17:26:03.458 +0300
+OS Version:      macOS 14.3 (23D56)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         175.3M
+Physical footprint (peak):  182.3M
+Idle exit:                  untracked
+----
+
+Call graph:
+    848 Thread_753581   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 848 start  (in dyld) + 2360  [0x18332d0e0]
+    +   848 ???  (in ClicknTranslate)  load address 0x1025fc000 + 0x3c40  [0x1025ffc40]
+    +     848 ???  (in ClicknTranslate)  load address 0x1025fc000 + 0x3324  [0x1025ff324]
+    +       848 PyEval_EvalCode  (in libpython3.12.dylib) + 216  [0x104619754]
+    +         848 _PyEval_EvalFrameDefault  (in libpython3.12.dylib) + 166504  [0x1045ad260]
+    +           848 cfunction_call  (in libpython3.12.dylib) + 108  [0x10475a2f8]
+    +             848 meth_QApplication_exec_(_object*, _object*)  (in QtWidgets.abi3.so) + 88  [0x10d67de54]
+    +               848 QCoreApplication::exec()  (in QtCore) + 132  [0x105d5bf9c]
+    +                 848 QEventLoop::exec(QFlags<QEventLoop::ProcessEventsFlag>)  (in QtCore) + 544  [0x105d57e54]
+    +                   848 ???  (in libqcocoa.dylib)  load address 0x10c778000 + 0x3d5d4  [0x10c7b55d4]
+    +                     848 -[NSApplication run]  (in AppKit) + 512  [0x186f5c3a0]
+    +                       848 -[NSApplication _handleEvent:]  (in AppKit) + 60  [0x1873a35bc]
+    +                         848 ???  (in libqcocoa.dylib)  load address 0x10c778000 + 0x40a68  [0x10c7b8a68]
+    +                           848 -[NSApplication(NSEventRouting) sendEvent:]  (in AppKit) + 1604  [0x187752f60]
+    +                             848 -[NSStatusBarWindow sendEvent:]  (in AppKit) + 704  [0x187748acc]
+    +                               848 -[NSWindow(NSEventRouting) sendEvent:]  (in AppKit) + 284  [0x1870940ac]
+    +                                 848 -[NSWindow(NSEventRouting) _reallySendEvent:isDelayedEvent:]  (in AppKit) + 400  [0x187094410]
+    +                                   848 _routeRightMouseDownEvent  (in AppKit) + 256  [0x187a99ea8]
+    +                                     848 -[NSStatusBarButton rightMouseDown:]  (in AppKit) + 168  [0x187745dec]
+    +                                       848 -[NSStatusBarButtonCell trackMouse:inRect:ofView:untilMouseUp:]  (in AppKit) + 336  [0x187746958]
+    +                                         848 -[NSButtonCell trackMouse:inRect:ofView:untilMouseUp:]  (in AppKit) + 488  [0x18710a9cc]
+    +                                           848 -[NSCell trackMouse:inRect:ofView:untilMouseUp:]  (in AppKit) + 144  [0x18710ab14]
+    +                                             848 NSControlTrackMouse  (in AppKit) + 1088  [0x18710af80]
+    +                                               848 -[NSDragEventTracker trackEvent:usingHandler:]  (in AppKit) + 1240  [0x18710bac4]
+    +                                                 848 -[NSWindow(NSEventRouting) trackEventsMatchingMask:timeout:mode:handler:]  (in AppKit) + 216  [0x18710c700]
+    +                                                   848 -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]  (in AppKit) + 716  [0x187753eec]
+    +                                                     848 _DPSNextEvent  (in AppKit) + 660  [0x186f68ed0]
+    +                                                       848 _BlockUntilNextEventMatchingListInModeWithFilter  (in HIToolbox) + 76  [0x18dd51fdc]
+    +                                                         848 ReceiveNextEventCommon  (in HIToolbox) + 648  [0x18dd52284]
+    +                                                           848 RunCurrentEventLoopInMode  (in HIToolbox) + 292  [0x18dd52448]
+    +                                                             848 CFRunLoopRunSpecific  (in CoreFoundation) + 608  [0x18378993c]
+    +                                                               848 __CFRunLoopRun  (in CoreFoundation) + 1208  [0x18378a44c]
+    +                                                                 848 __CFRunLoopServiceMachPort  (in CoreFoundation) + 160  [0x18378bb84]
+    +                                                                   848 mach_msg  (in libsystem_kernel.dylib) + 24  [0x18366dbf8]
+    +                                                                     848 mach_msg_overwrite  (in libsystem_kernel.dylib) + 476  [0x1836764b0]
+    +                                                                       848 mach_msg2_internal  (in libsystem_kernel.dylib) + 80  [0x18367fcf0]
+    +                                                                         848 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x18366d874]
+    848 Thread_753867
+    + 848 thread_start  (in libsystem_pthread.dylib) + 8  [0x1836a8e3c]
+    +   848 _pthread_start  (in libsystem_pthread.dylib) + 136  [0x1836ae034]
+    +     848 pythread_wrapper.llvm.6885892144854894556  (in libpython3.12.dylib) + 48  [0x104ce20bc]

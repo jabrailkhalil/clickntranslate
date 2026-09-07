@@ -204,6 +204,54 @@ def restore_minimized_window(window):
         view.window().deminiaturize_(None)
 
 
+def install_status_item_click_handler(tray_icon):
+    """Open Qt's native menu outside NSStatusBarButton's mouse tracking loop.
+
+    Qt 5 opens NSMenu synchronously on mouseDown. The menu can consume the
+    mouseUp, leaving NSButton tracking forever after the menu closes. Only
+    intercept our own status button; Command-drag must still reach AppKit.
+    """
+    import AppKit
+    import weakref
+    from PyQt5 import QtCore, sip
+
+    tray_ref = weakref.ref(tray_icon)
+    application = AppKit.NSApplication.sharedApplication()
+
+    def handle_event(event):
+        tray = tray_ref()
+        if (tray is None or sip.isdeleted(tray) or not tray.isVisible()
+                or event.modifierFlags() & AppKit.NSEventModifierFlagCommand):
+            return event
+        window = event.window()
+        if window is None:
+            return event
+        content = window.contentView()
+        if content is None:
+            return event
+        point = content.convertPoint_fromView_(event.locationInWindow(), None)
+        view = content.hitTest_(point)
+        while view is not None and not isinstance(view, AppKit.NSStatusBarButton):
+            view = view.superview()
+        if view is None or view.target() is None or view.action() is None:
+            return event
+        target, action = view.target(), view.action()
+
+        def open_menu():
+            current = tray_ref()
+            if current is not None and not sip.isdeleted(current) and current.isVisible():
+                application.sendAction_to_from_(action, target, view)
+
+        QtCore.QTimer.singleShot(0, open_menu)
+        return None  # NSButton must not start its own nested tracking loop.
+
+    mask = (AppKit.NSEventMaskLeftMouseDown | AppKit.NSEventMaskRightMouseDown
+            | AppKit.NSEventMaskOtherMouseDown)
+    monitor = AppKit.NSEvent.addLocalMonitorForEventsMatchingMask_handler_(mask, handle_event)
+    tray_icon.destroyed.connect(lambda: AppKit.NSEvent.removeMonitor_(monitor))
+    return monitor
+
+
 def install_dock_reopen_handler(app, show_window):
     import Foundation
     import objc

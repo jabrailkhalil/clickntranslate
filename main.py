@@ -886,7 +886,7 @@ def _show_running_instance():
     try:
         target.show_window_from_tray(force_show=True)
     except Exception:
-        pass
+        logging.exception("Could not restore the running application window")
 
 class _SingleInstanceMessageFilter(QtCore.QAbstractNativeEventFilter):
     """Глобальный фильтр системного сообщения активации уже запущенного экземпляра."""
@@ -7819,6 +7819,9 @@ class DarkThemeApp(QMainWindow):
         self.update_tray_menu()
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
         self.tray_icon.show()
+        if platform_support.IS_MAC and QApplication.instance().platformName() == "cocoa":
+            from macos_desktop import install_status_item_click_handler
+            self._mac_status_click_monitor = install_status_item_click_handler(self.tray_icon)
         # GNOME has no tray unless an AppIndicator extension is installed, and
         # some window managers have none at all. Without this check the window
         # would hide into a tray that does not exist.
@@ -11328,7 +11331,8 @@ if __name__ == "__main__":
         window.show()
         from layout_editor import start_layout_editor
         _layout_editor_panel = start_layout_editor(window)
-    elif window.start_minimized and not show_after_update:
+    elif (window.start_minimized and not show_after_update
+          and (not platform_support.IS_MAC or _started_from_autostart())):
         window.minimize_to_tray()
     else:
         window.show()
