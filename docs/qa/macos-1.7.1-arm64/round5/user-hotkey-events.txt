@@ -1,0 +1,4 @@
+2026-09-07 12:28:55.812 [INFO] [MainThread] root:113 - macOS shortcut pressed: id=2
+2026-09-07 12:28:55.952 [DEBUG] [MainThread] root:109 - macOS shortcut released: id=2
+2026-09-07 12:29:08.344 [INFO] [MainThread] root:113 - macOS shortcut pressed: id=2
+2026-09-07 12:29:08.428 [DEBUG] [MainThread] root:109 - macOS shortcut released: id=2

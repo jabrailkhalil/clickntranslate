@@ -1,0 +1,981 @@
+{
+  "macos": "14.3",
+  "architecture": "arm64",
+  "python": "3.12.14",
+  "qt": "5.15.14",
+  "pyqt": "5.15.11",
+  "screenshots": [
+    {
+      "file": "permission-check-dark-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-main-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-settings-100.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-main-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-settings-150.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-main-source_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-main-target_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-main-hotkey_mode_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-main-hotkey_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-main-hotkey_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-settings-ocr_engine_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-settings-translator_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-settings-result_window_control.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-settings-game_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-settings-game_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-result-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-result-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-document-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 764,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-document-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 766,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-80-document-provider_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 382,
+      "height": 164,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-main-source_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-main-target_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-main-hotkey_mode_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-main-hotkey_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-main-hotkey_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-settings-ocr_engine_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-settings-translator_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-settings-result_window_control.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-settings-game_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-settings-game_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-result-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 770,
+      "height": 346,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-result-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 768,
+      "height": 346,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-document-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 804,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-document-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 806,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-100-document-provider_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 402,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-main-source_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-main-target_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-main-hotkey_mode_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-main-hotkey_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-main-hotkey_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-settings-ocr_engine_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-settings-translator_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-settings-result_window_control.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-settings-game_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-settings-game_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-result-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 868,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-result-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 868,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-document-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 804,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-document-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 806,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-dark-150-document-provider_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 402,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-main-source_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-main-target_lang.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-main-hotkey_mode_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-main-hotkey_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-main-hotkey_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-settings-ocr_engine_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-settings-translator_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-settings-result_window_control.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-settings-game_source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-settings-game_target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 1400,
+      "height": 800,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-result-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-result-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 612,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-document-source_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 764,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-document-target_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 766,
+      "height": 292,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-80-document-provider_combo.png",
+      "requested_percent": 80,
+      "effective_percent": 80,
+      "width": 382,
+      "height": 164,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-main-source_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-main-target_lang.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-main-hotkey_mode_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-main-hotkey_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-main-hotkey_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-settings-ocr_engine_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-settings-translator_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-settings-result_window_control.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-settings-game_source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-settings-game_target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 1750,
+      "height": 1000,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-result-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 770,
+      "height": 346,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-result-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 768,
+      "height": 346,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-document-source_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 804,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-document-target_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 806,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-100-document-provider_combo.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 402,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-main-source_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-main-target_lang.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-main-hotkey_mode_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-main-hotkey_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-main-hotkey_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-settings-ocr_engine_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-settings-translator_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-settings-result_window_control.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-settings-game_source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-settings-game_target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 2416,
+      "height": 1380,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-result-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 868,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-result-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 868,
+      "height": 400,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-document-source_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 804,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-document-target_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 806,
+      "height": 310,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-combo-light-150-document-provider_combo.png",
+      "requested_percent": 150,
+      "effective_percent": 138,
+      "width": 402,
+      "height": 174,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-dark-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-tooltip.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 418,
+      "height": 116,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-status.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 616,
+      "height": 66,
+      "dpr": 2.0
+    },
+    {
+      "file": "permission-check-light-menu.png",
+      "requested_percent": 100,
+      "effective_percent": 100,
+      "width": 354,
+      "height": 88,
+      "dpr": 2.0
+    }
+  ],
+  "gui": "ok",
+  "settings": "ok",
+  "theme": "ok",
+  "hotkey_registration": "ok",
+  "hotkey_conflict_and_reregister": "ok",
+  "permission_preflight": {
+    "screen": false,
+    "accessibility": false
+  },
+  "vision": "ok",
+  "vision_languages": [
+    "en-US",
+    "fr-FR",
+    "it-IT",
+    "de-DE",
+    "es-ES",
+    "pt-BR",
+    "zh-Hans",
+    "zh-Hant",
+    "yue-Hans",
+    "yue-Hant",
+    "ko-KR",
+    "ja-JP",
+    "ru-RU",
+    "uk-UA",
+    "th-TH",
+    "vi-VT"
+  ],
+  "native_popup_surfaces": {
+    "dark_tooltip": "transparent Cocoa background; painted surface",
+    "dark_status": "transparent Cocoa background; painted surface",
+    "dark_menu": "transparent Cocoa background; painted surface",
+    "light_tooltip": "transparent Cocoa background; painted surface",
+    "light_status": "transparent Cocoa background; painted surface",
+    "light_menu": "transparent Cocoa background; painted surface"
+  },
+  "dropdowns": {
+    "cases": 90,
+    "openings": 180,
+    "checks": "stable anchor, available bounds, last row reachable",
+    "names": [
+      "dark-80-main-source_lang",
+      "dark-80-main-target_lang",
+      "dark-80-main-hotkey_mode_combo",
+      "dark-80-main-hotkey_source_combo",
+      "dark-80-main-hotkey_target_combo",
+      "dark-80-settings-ocr_engine_combo",
+      "dark-80-settings-translator_combo",
+      "dark-80-settings-result_window_control",
+      "dark-80-settings-game_source_combo",
+      "dark-80-settings-game_target_combo",
+      "dark-80-result-source_combo",
+      "dark-80-result-target_combo",
+      "dark-80-document-source_combo",
+      "dark-80-document-target_combo",
+      "dark-80-document-provider_combo",
+      "dark-100-main-source_lang",
+      "dark-100-main-target_lang",
+      "dark-100-main-hotkey_mode_combo",
+      "dark-100-main-hotkey_source_combo",
+      "dark-100-main-hotkey_target_combo",
+      "dark-100-settings-ocr_engine_combo",
+      "dark-100-settings-translator_combo",
+      "dark-100-settings-result_window_control",
+      "dark-100-settings-game_source_combo",
+      "dark-100-settings-game_target_combo",
+      "dark-100-result-source_combo",
+      "dark-100-result-target_combo",
+      "dark-100-document-source_combo",
+      "dark-100-document-target_combo",
+      "dark-100-document-provider_combo",
+      "dark-150-main-source_lang",
+      "dark-150-main-target_lang",
+      "dark-150-main-hotkey_mode_combo",
+      "dark-150-main-hotkey_source_combo",
+      "dark-150-main-hotkey_target_combo",
+      "dark-150-settings-ocr_engine_combo",
+      "dark-150-settings-translator_combo",
+      "dark-150-settings-result_window_control",
+      "dark-150-settings-game_source_combo",
+      "dark-150-settings-game_target_combo",
+      "dark-150-result-source_combo",
+      "dark-150-result-target_combo",
+      "dark-150-document-source_combo",
+      "dark-150-document-target_combo",
+      "dark-150-document-provider_combo",
+      "light-80-main-source_lang",
+      "light-80-main-target_lang",
+      "light-80-main-hotkey_mode_combo",
+      "light-80-main-hotkey_source_combo",
+      "light-80-main-hotkey_target_combo",
+      "light-80-settings-ocr_engine_combo",
+      "light-80-settings-translator_combo",
+      "light-80-settings-result_window_control",
+      "light-80-settings-game_source_combo",
+      "light-80-settings-game_target_combo",
+      "light-80-result-source_combo",
+      "light-80-result-target_combo",
+      "light-80-document-source_combo",
+      "light-80-document-target_combo",
+      "light-80-document-provider_combo",
+      "light-100-main-source_lang",
+      "light-100-main-target_lang",
+      "light-100-main-hotkey_mode_combo",
+      "light-100-main-hotkey_source_combo",
+      "light-100-main-hotkey_target_combo",
+      "light-100-settings-ocr_engine_combo",
+      "light-100-settings-translator_combo",
+      "light-100-settings-result_window_control",
+      "light-100-settings-game_source_combo",
+      "light-100-settings-game_target_combo",
+      "light-100-result-source_combo",
+      "light-100-result-target_combo",
+      "light-100-document-source_combo",
+      "light-100-document-target_combo",
+      "light-100-document-provider_combo",
+      "light-150-main-source_lang",
+      "light-150-main-target_lang",
+      "light-150-main-hotkey_mode_combo",
+      "light-150-main-hotkey_source_combo",
+      "light-150-main-hotkey_target_combo",
+      "light-150-settings-ocr_engine_combo",
+      "light-150-settings-translator_combo",
+      "light-150-settings-result_window_control",
+      "light-150-settings-game_source_combo",
+      "light-150-settings-game_target_combo",
+      "light-150-result-source_combo",
+      "light-150-result-target_combo",
+      "light-150-document-source_combo",
+      "light-150-document-target_combo",
+      "light-150-document-provider_combo"
+    ]
+  },
+  "hotkey_event_delivery": {
+    "callbacks": 10,
+    "registrations": 2,
+    "repeat_suppression": "passed",
+    "release_and_reregister": "passed",
+    "delivery": "Carbon SendEventToEventTarget, own process"
+  }
+}

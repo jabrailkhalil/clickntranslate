@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-07",
+  "application": "/Applications/ClicknTranslate.app",
+  "code_commit": "240e36dfcb4e46849f62abbe7cc2dc9be8637904",
+  "binary_rebuilt": false,
+  "designated_requirement": "# designated => cdhash H\"829c6343eaef8da6bd8b6f99ea268a32d94da7f5\"",
+  "fresh_process_permission_before_repair": {
+    "screen": false,
+    "accessibility": false
+  },
+  "repair_command": "tccutil reset ScreenCapture io.github.jabrailkhalil.clickntranslate",
+  "repair_exit_code": 0,
+  "scope": "ScreenCapture for this bundle only; Accessibility, other apps and application data unchanged",
+  "manual_step": "System Settings and Finder opened; user asked to add current /Applications copy and enable Screen Recording",
+  "status": "awaiting user grant and native recheck"
+}
