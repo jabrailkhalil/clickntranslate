@@ -15,7 +15,8 @@ import functools
 import threading
 
 from button_styles import button_qss
-from settings_window import DropDownCombo, LanguageSwapButton
+from settings_window import LanguageSwapButton
+from capture_widgets import CaptureLanguageCombo as DropDownCombo
 from window_appearance import style_capture_controls
 from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
@@ -3527,107 +3528,11 @@ class ScreenCaptureOverlay(QWidget):
         default_index = idx if idx >= 0 else 0
         self.lang_combo.setCurrentIndex(default_index)
         
-        # Матовый dark-style: ровный popup, читаемые подписи, тонкий кастомный scrollbar.
-        self.lang_combo.setIconSize(QtCore.QSize(30, 30))
-        combo_style = """
-            QComboBox {
-                background-color: rgba(25, 29, 37, 248);
-                color: #f6f8fb;
-                border: 1px solid rgba(110, 130, 158, 155);
-                border-radius: 11px;
-                padding: 7px 9px 7px 9px;
-                font-size: 15px;
-                font-weight: 750;
-                font-family: 'Segoe UI Semibold', 'Segoe UI', Arial, sans-serif;
-                letter-spacing: 0.2px;
-            }
-            QComboBox:hover {
-                background-color: rgba(31, 37, 48, 252);
-                border: 1px solid rgba(145, 171, 205, 190);
-            }
-            QComboBox:pressed {
-                background-color: rgba(18, 21, 27, 255);
-                border: 1px solid rgba(116, 160, 216, 210);
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 0px;
-                subcontrol-origin: padding;
-                subcontrol-position: right center;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border: none;
-                width: 0px;
-                height: 0px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #11151c;
-                color: #f5f7fa;
-                border: 1px solid rgba(92, 112, 140, 210);
-                border-radius: 12px;
-                padding: 7px 3px 7px 5px;
-                selection-background-color: #30455f;
-                selection-color: #ffffff;
-                outline: none;
-            }
-            QComboBox QAbstractItemView::item {
-                min-height: 32px;
-                padding: 4px 7px 4px 7px;
-                border-radius: 9px;
-                margin: 2px 4px 2px 1px;
-                color: #f2f5fa;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #243044;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #365172;
-                color: #ffffff;
-            }
-            QComboBox QAbstractItemView QScrollBar:vertical {
-                background: transparent;
-                border: none;
-                width: 6px;
-                margin: 9px 3px 9px 1px;
-            }
-            QComboBox QAbstractItemView QScrollBar::handle:vertical {
-                background-color: rgba(154, 171, 194, 190);
-                border-radius: 3px;
-                min-height: 38px;
-            }
-            QComboBox QAbstractItemView QScrollBar::handle:vertical:hover {
-                background-color: rgba(205, 218, 235, 230);
-            }
-            QComboBox QAbstractItemView QScrollBar::add-line:vertical,
-            QComboBox QAbstractItemView QScrollBar::sub-line:vertical {
-                height: 0px;
-                background: transparent;
-                border: none;
-            }
-            QComboBox QAbstractItemView QScrollBar::add-page:vertical,
-            QComboBox QAbstractItemView QScrollBar::sub-page:vertical {
-                background: transparent;
-            }
-        """
-        self.lang_combo.setStyleSheet(combo_style)
-        self.lang_combo.view().setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.lang_combo.view().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.lang_combo.view().setTextElideMode(QtCore.Qt.ElideNone)
+        # CaptureLanguageCombo owns the shared compact field and language list.
         if self.target_lang_combo is not None:
-            self.target_lang_combo.setIconSize(QtCore.QSize(30, 30))
-            self.target_lang_combo.setStyleSheet(combo_style)
-            self.target_lang_combo.view().setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-            self.target_lang_combo.view().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            self.target_lang_combo.view().setTextElideMode(QtCore.Qt.ElideNone)
             self._populate_translate_target_combo(self.current_target_language)
-        # Размер зависит от режима
-        combo_width = 102
-        self.lang_combo.setFixedSize(combo_width, 46)
         if self.translate_arrow_label is not None:
-            self.translate_arrow_label.setFixedSize(30, 46)
-        if self.target_lang_combo is not None:
-            self.target_lang_combo.setFixedSize(combo_width, 46)
+            self.translate_arrow_label.setFixedSize(36, 44)
         self.lang_combo.move((self.width() - self.lang_combo.width()) // 2, 20)
         # Показываем комбобокс выбора конкретного языка.
         self.lang_combo.setVisible(True if not defer_show else False)
@@ -5644,48 +5549,7 @@ class FullScreenTranslateOverlay(QWidget):
         self.lang_combo.setCurrentIndex(default_idx)
 
         self.translate_arrow_label.setStyleSheet(button_qss(True, selector="QToolButton", icon=True))
-        combo_style = """
-            QComboBox {
-                background-color: rgba(25, 29, 37, 248);
-                color: #f6f8fb;
-                border: 1px solid rgba(110, 130, 158, 155);
-                border-radius: 11px;
-                padding: 7px 9px;
-                font-size: 15px;
-                font-weight: 750;
-                font-family: 'Segoe UI Semibold', 'Segoe UI', Arial, sans-serif;
-            }
-            QComboBox:hover {
-                background-color: rgba(31, 37, 48, 252);
-                border: 1px solid rgba(145, 171, 205, 190);
-            }
-            QComboBox::drop-down { border: none; width: 0px; }
-            QComboBox::down-arrow { image: none; width: 0px; height: 0px; }
-            QComboBox QAbstractItemView {
-                background-color: #11151c;
-                color: #f5f7fa;
-                border: 1px solid rgba(92, 112, 140, 210);
-                border-radius: 12px;
-                padding: 7px 3px 7px 5px;
-                selection-background-color: #365172;
-                outline: none;
-            }
-            QComboBox QAbstractItemView::item {
-                min-height: 32px;
-                padding: 4px 7px;
-                border-radius: 9px;
-                margin: 2px 4px 2px 1px;
-            }
-            QComboBox QAbstractItemView::item:hover { background-color: #243044; }
-        """
-        for combo in (self.lang_combo, self.target_lang_combo):
-            combo.setIconSize(QtCore.QSize(30, 30))
-            combo.setStyleSheet(combo_style)
-            combo.view().setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-            combo.view().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            combo.view().setTextElideMode(QtCore.Qt.ElideNone)
-            combo.setFixedSize(112, 48)
-        self.translate_arrow_label.setFixedSize(32, 48)
+        self.translate_arrow_label.setFixedSize(36, 44)
         self._populate_fullscreen_target_combo(saved_tgt)
 
         self.lang_combo.currentIndexChanged.connect(self._on_fullscreen_source_changed)

@@ -517,6 +517,60 @@ def main_direction_and_theme_check(main, app, window):
         window.show_main_screen()
 
 
+def capture_picker_and_notice_check(main, app, window, report_path, screenshots):
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    from PyQt5.QtTest import QTest
+    from capture_widgets import CaptureLanguageCombo
+    from languages import LANGUAGES, language_icon_path
+
+    previous = dict(window.config)
+    old_theme = window.current_theme
+    owner = QtWidgets.QWidget()
+    combo = CaptureLanguageCombo(owner)
+    for language in LANGUAGES:
+        combo.addItem(QtGui.QIcon(main.resource_path(language_icon_path(language.code))),
+                      language.short_label, language.code)
+    combo.setCurrentIndex(combo.findData('en'))
+    owner.resize(150, 70)
+    owner.move(280, 180)
+    try:
+        window.config['notifications'] = True
+        window.minimize_to_tray()
+        for theme, name in (('Светлая', 'light'), ('Темная', 'dark')):
+            window.current_theme = theme
+            window.apply_theme()
+            window._copy_notification_signal.emit('ru')
+            QTest.qWait(50)
+            notice = window._copy_notice
+            assert notice.isVisible() and not window.isVisible()
+            assert notice.testAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+            assert notice.screen().availableGeometry().contains(notice.geometry())
+            owner.show()
+            combo.set_capture_theme(theme == 'Темная', 'ru')
+            combo.showPopup()
+            QTest.qWait(50)
+            for kind, widget in (('copy-notice', notice), ('capture-picker', combo.view().window())):
+                picture = widget.grab()
+                filename = f'{report_path.stem}-{name}-{kind}.png'
+                assert picture.save(str(report_path.with_name(filename)))
+                screenshots.append({'file': filename, 'width': picture.width(), 'height': picture.height(),
+                                    'dpr': picture.devicePixelRatioF()})
+            combo.hidePopup()
+            owner.hide()
+            notice.hide()
+        return {'themes': 2, 'notice_visible_in_shadow': True, 'system_tray_notification_used': False,
+                'picker': 'full language names, selected checkmark, rounded themed surface'}
+    finally:
+        combo.hidePopup()
+        owner.close()
+        owner.deleteLater()
+        window._copy_notice.hide()
+        window.config.update(previous)
+        window.current_theme = old_theme
+        window.apply_theme()
+        window.show_window_from_tray(force_show=True)
+
+
 def run(main, report_path):
     import macos_desktop
     import macos_ocr
@@ -579,6 +633,7 @@ def run(main, report_path):
             popup_results = popup_screenshots(app, window, report_path, screenshots)
             draft_results = translation_draft_check(main, app, window, report_path, screenshots)
             direction_theme_results = main_direction_and_theme_check(main, app, window)
+            capture_notice_results = capture_picker_and_notice_check(main, app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -612,6 +667,7 @@ def run(main, report_path):
                 "shadow_mode": shadow_results,
                 "translation_drafts": draft_results,
                 "main_direction_and_theme": direction_theme_results,
+                "capture_picker_and_notice": capture_notice_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

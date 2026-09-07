@@ -211,6 +211,35 @@ class StatusPopup(QtWidgets.QLabel):
         super().paintEvent(event)
 
 
+class CopyNotificationPopup(StatusPopup):
+    """Quiet copy confirmation that also works without system notifications."""
+
+    def __init__(self):
+        super().__init__()
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        self.setWordWrap(False)
+        self._dismiss = QtCore.QTimer(self)
+        self._dismiss.setSingleShot(True)
+        self._dismiss.timeout.connect(self.hide)
+
+    def show_message(self, message, duration_ms=1800):
+        self._refresh_theme()
+        self.setText('✓  ' + str(message))
+        screen = (QtWidgets.QApplication.screenAt(QtGui.QCursor.pos())
+                  or QtWidgets.QApplication.primaryScreen())
+        if screen is None:
+            return
+        bounds = screen.availableGeometry().adjusted(18, 18, -18, -18)
+        self.setMaximumWidth(min(360, bounds.width()))
+        self.adjustSize()
+        self.move(bounds.right() - self.width() + 1, bounds.bottom() - self.height() + 1)
+        self.show()
+        self.raise_()
+        # Repeated copies extend the current notice instead of an older timer
+        # hiding a newer one. This window never takes keyboard focus.
+        self._dismiss.start(duration_ms)
+
+
 def install_tooltip_style(app=None, dark=None) -> None:
     """Apply the shared tooltip look to every window, including unstyled ones."""
     global _TOOLTIP_FILTER

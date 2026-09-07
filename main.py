@@ -6715,7 +6715,7 @@ class DarkThemeApp(QMainWindow):
         configure_interface_style()
         super().__init__()
         self._launch_update_signal.connect(self._on_launch_update_found)
-        self._copy_notification_signal.connect(self._show_copy_notification)
+        self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
         self._argos_status_signal.connect(self._on_argos_status)
         self._argos_progress_signal.connect(self._on_argos_progress)
@@ -8618,6 +8618,8 @@ class DarkThemeApp(QMainWindow):
 
     def _init_status_tooltip(self):
         """Initialize floating status tooltip."""
+        from styled_dialogs import CopyNotificationPopup
+        self._copy_notice = CopyNotificationPopup()
         self._status_label = StatusPopup()
         self._status_label.hide()
         self._show_status_signal.connect(self._on_show_status)
@@ -8644,18 +8646,7 @@ class DarkThemeApp(QMainWindow):
         message = TRANSLATION_RESULT_DIALOG_TEXT.get(
             lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
         )["copied"]
-        tray = getattr(self, "tray_icon", None)
-        if tray is not None and self.has_tray():
-            tray.showMessage(
-                "Click'n'Translate",
-                message,
-                QSystemTrayIcon.Information,
-                1800,
-            )
-            return
-        # Desktops without a system tray still get a quiet in-app hint.
-        self._show_status_signal.emit(message)
-        QTimer.singleShot(1400, self._hide_status_signal.emit)
+        self._copy_notice.show_message(message)
 
     def _read_primary_selection(self):
         """Text currently highlighted anywhere on a Linux desktop.

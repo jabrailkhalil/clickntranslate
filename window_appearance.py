@@ -413,6 +413,7 @@ def style_capture_controls(overlay, config, controls):
     """Keep screen controls compact, opaque and independent of the app's zoom."""
     from button_styles import button_qss
     from settings_window import DropDownCombo, modern_combo_style
+    from capture_widgets import CaptureLanguageCombo
     controls = [widget for widget in controls if widget is not None]
     dark = config.get('theme', 'Темная') != 'Светлая'
     for widget in controls:
@@ -421,6 +422,9 @@ def style_capture_controls(overlay, config, controls):
             widget.setProperty('capture_base_icon', widget.iconSize())
     overlay.setProperty('ui_effective_scale', 1.0)
     for widget in controls:
+        if isinstance(widget, CaptureLanguageCombo):
+            widget.set_capture_theme(dark, config.get('interface_language', 'en'))
+            continue
         if isinstance(widget, QtWidgets.QComboBox):
             style = modern_combo_style(dark, 14) + """
                 QComboBox { margin:0; padding:3px 20px 3px 7px; }

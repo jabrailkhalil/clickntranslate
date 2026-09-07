@@ -349,7 +349,7 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.setCursor(QtCore.Qt.CrossCursor)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
-        from settings_window import DropDownCombo
+        from capture_widgets import CaptureLanguageCombo as DropDownCombo
         self.source_combo = DropDownCombo(self)
         self.target_combo = DropDownCombo(self)
         self.swap_button = LanguageSwapButton(self)

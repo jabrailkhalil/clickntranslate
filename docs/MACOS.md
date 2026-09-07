@@ -95,6 +95,12 @@ in one transaction and the viewport is fully repainted, preventing old-theme
 strips after scaling. Synthetic Cmd+C/Cmd+V releases the Command event flag before
 the next edit command while retaining the foreground-target safety checks.
 
+Copy confirmations use a quiet, non-activating application popup on the current
+screen, including shadow mode. They respect the notification checkbox and do not
+depend on macOS Notification Center or the presence of a system-tray icon.
+The shared OCR language picker shows localized full names and a selected checkmark;
+area, fullscreen and dynamic capture use the same themed control on all platforms.
+
 ## Native behavior
 
 | Feature | Implementation |

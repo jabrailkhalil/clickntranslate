@@ -1,0 +1,28 @@
+[
+  {
+    "theme": "Светлая",
+    "ocr": "Tesseract",
+    "recognized": "COPY CONFIRMED\n",
+    "popup": {
+      "visible": true,
+      "opaque": false,
+      "background_alpha": 0.0
+    },
+    "notification_visible_in_shadow": true,
+    "notification_takes_focus": false,
+    "system_notification_required": false
+  },
+  {
+    "theme": "Темная",
+    "ocr": "Tesseract",
+    "recognized": "COPY CONFIRMED\n",
+    "popup": {
+      "visible": true,
+      "opaque": false,
+      "background_alpha": 0.0
+    },
+    "notification_visible_in_shadow": true,
+    "notification_takes_focus": false,
+    "system_notification_required": false
+  }
+]

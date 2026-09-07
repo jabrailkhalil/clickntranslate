@@ -5,6 +5,8 @@ from unittest import mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtTest import QTest
+from styled_dialogs import CopyNotificationPopup
 
 import main
 
@@ -29,6 +31,7 @@ class _NotificationHarness:
         self.config = {"notifications": enabled}
         self.current_interface_language = "en"
         self.tray_icon = mock.Mock()
+        self._copy_notice = CopyNotificationPopup()
         self._show_status_signal = SimpleNamespace(emit=mock.Mock())
         self._hide_status_signal = SimpleNamespace(emit=mock.Mock())
 
@@ -36,22 +39,39 @@ class _NotificationHarness:
         return True
 
 
-def test_notification_setting_uses_the_tray_with_localized_copy_text():
+def test_notification_is_visible_even_when_a_tray_exists():
+    _app()
     harness = _NotificationHarness(enabled=True)
-    harness._show_copy_notification("ru")
-    harness.tray_icon.showMessage.assert_called_once_with(
-        "Click'n'Translate",
-        main.TRANSLATION_RESULT_DIALOG_TEXT["ru"]["copied"],
-        main.QSystemTrayIcon.Information,
-        1800,
-    )
-
     disabled = _NotificationHarness(enabled=False)
-    disabled._show_copy_notification("en")
-    disabled.tray_icon.showMessage.assert_not_called()
+    try:
+        harness._show_copy_notification("ru")
+        assert harness._copy_notice.isVisible()
+        assert main.TRANSLATION_RESULT_DIALOG_TEXT['ru']['copied'] in harness._copy_notice.text()
+        assert harness._copy_notice.screen().availableGeometry().contains(harness._copy_notice.geometry())
+        assert harness._copy_notice.testAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        harness.tray_icon.showMessage.assert_not_called()
+        disabled._show_copy_notification("en")
+        assert not disabled._copy_notice.isVisible()
+        disabled._show_copy_notification("en", force=True)
+        assert disabled._copy_notice.isVisible()
+    finally:
+        harness._copy_notice.close()
+        disabled._copy_notice.close()
 
-    disabled._show_copy_notification("en", force=True)
-    disabled.tray_icon.showMessage.assert_called_once()
+
+def test_repeated_copy_extends_notice_instead_of_old_timeout_hiding_it():
+    _app()
+    popup = CopyNotificationPopup()
+    try:
+        popup.show_message('First', duration_ms=80)
+        QTest.qWait(50)
+        popup.show_message('Second', duration_ms=160)
+        QTest.qWait(60)
+        assert popup.isVisible() and 'Second' in popup.text()
+        QTest.qWait(140)
+        assert not popup.isVisible()
+    finally:
+        popup.close()
 
 
 def test_copy_notification_dispatch_is_opt_in_and_thread_safe_signal_based():

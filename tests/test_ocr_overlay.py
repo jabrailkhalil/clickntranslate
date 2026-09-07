@@ -240,7 +240,10 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 self.assertEqual(overlay.target_lang_combo.currentData(), "en")
                 self.assertIsNotNone(overlay.translate_arrow_label)
                 self.assertFalse(hasattr(overlay, "go_button"))
-                single_shot.assert_called_once()
+                # Rounded popup surfaces also queue their native appearance.
+                # The fullscreen OCR request itself must still be queued once.
+                self.assertEqual(single_shot.call_args_list.count(
+                    mock.call(0, overlay._restart_translation_from_controls)), 1)
 
                 with mock.patch.object(overlay, "_start_ocr") as start_ocr:
                     overlay._restart_translation_from_controls()
