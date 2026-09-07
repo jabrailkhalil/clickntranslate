@@ -7018,6 +7018,7 @@ class DarkThemeApp(QMainWindow):
         super().showEvent(event)
         controller = getattr(self, '_ui_scale_controller', None)
         if controller is not None:
+            self._set_macos_dock_visible(True)
             controller.canvas.show()
 
     def hideEvent(self, event):
@@ -7783,11 +7784,23 @@ class DarkThemeApp(QMainWindow):
     def has_tray(self):
         return bool(getattr(self, "tray_available", True))
 
+    def _set_macos_dock_visible(self, visible):
+        app = QApplication.instance()
+        if platform_support.IS_MAC and app is not None and app.platformName() == "cocoa":
+            try:
+                from macos_desktop import set_dock_visible
+                set_dock_visible(visible)
+            except Exception:
+                logging.exception("Could not change macOS Dock visibility")
+
     def update_tray_menu(self):
         lang = self.current_interface_language
-        tray_menu = QMenu()
+        previous_menu = getattr(self, "_tray_menu", None)
+        tray_menu = QMenu(self)
         open_action = tray_menu.addAction(ui_text(lang, "tray_open"))
-        open_action.triggered.connect(lambda: self.show_window_from_tray(force_show=True))
+        # Leave native NSMenu tracking before changing the activation policy.
+        open_action.triggered.connect(
+            lambda: QTimer.singleShot(0, lambda: self.show_window_from_tray(force_show=True)))
         copy_action = tray_menu.addAction(ui_text(lang, "tray_copy"))
         copy_action.triggered.connect(self.launch_copy)
         translate_action = tray_menu.addAction(ui_text(lang, "tray_translate"))
@@ -7800,8 +7813,15 @@ class DarkThemeApp(QMainWindow):
         exit_action = tray_menu.addAction(ui_text(lang, "tray_exit"))
         exit_action.triggered.connect(self.exit_app)
         self.tray_icon.setContextMenu(tray_menu)
+        self._tray_menu = tray_menu
+        if previous_menu is not None:
+            previous_menu.deleteLater()
 
     def on_tray_icon_activated(self, reason):
+        if platform_support.IS_MAC and self.tray_icon.contextMenu() is not None:
+            # Cocoa opens the menu on mouse press. Do not also toggle the main
+            # window underneath it; its Open action restores the application.
+            return
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             self.show_window_from_tray()
 
@@ -7812,15 +7832,29 @@ class DarkThemeApp(QMainWindow):
                 self.raise_()
                 self.activateWindow()
                 return
-            self._window_hide_destination = "tray"
-            self.hide()
+            self.minimize_to_tray()
             return
-        self.setWindowState(Qt.WindowNoState)
-        self.showNormal()
+        position = getattr(self, "_window_restore_position", None)
+        if position is None:
+            position = self.pos()
+        self._set_macos_dock_visible(True)
+        native_mac = platform_support.IS_MAC and QApplication.instance().platformName() == "cocoa"
+        if native_mac:
+            from macos_desktop import restore_minimized_window
+            restore_minimized_window(self)
+        else:
+            self.setWindowState(Qt.WindowNoState)
+            self.showNormal()
         self.show()
         self.raise_()
         self.activateWindow()
-        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        if not native_mac:
+            self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        # Changing AppKit's activation policy may relocate a hidden Qt window.
+        # Restoring from shadow mode must keep the position chosen by the user.
+        if platform_support.IS_MAC:
+            self.move(position)
+        self._window_restore_position = None
         if sys.platform == "win32":
             try:
                 hwnd = int(self.winId())
@@ -7834,6 +7868,9 @@ class DarkThemeApp(QMainWindow):
     def minimize_to_taskbar(self):
         """Minimize normally and remember where the toggle key should return."""
         self._window_hide_destination = "taskbar"
+        if platform_support.IS_MAC and not self.isMinimized():
+            self._window_restore_position = self.pos()
+        self._set_macos_dock_visible(True)
         self.showMinimized()
 
     def toggle_window_visibility(self):
@@ -7847,7 +7884,7 @@ class DarkThemeApp(QMainWindow):
             self.show_window_from_tray(force_show=True)
             return
         if self._window_hide_destination == "tray" and self.has_tray():
-            self.hide()
+            self.minimize_to_tray()
             return
         self.minimize_to_taskbar()
 
@@ -10663,8 +10700,7 @@ class DarkThemeApp(QMainWindow):
         if not self.force_quit and self.has_tray():
             # Сворачиваем в трей вместо закрытия
             event.ignore()
-            self._window_hide_destination = "tray"
-            self.hide()
+            self.minimize_to_tray()
             # Опционально: показать уведомление при первом сворачивании (можно добавить позже)
             return
         if not self.force_quit and not self.has_tray():
@@ -10992,7 +11028,10 @@ class DarkThemeApp(QMainWindow):
             self.minimize_to_taskbar()
             return
         self._window_hide_destination = "tray"
+        if platform_support.IS_MAC and not self.isMinimized():
+            self._window_restore_position = self.pos()
         self.hide()
+        self._set_macos_dock_visible(False)
 
 _translation_result_dialogs = []
 

@@ -1,0 +1,12 @@
+{
+  "unchanged_non_log_files": [
+    "data/copy_history.json",
+    "data/config.json",
+    "data/translation_history.json",
+    "argos/data/argos-translate/index.json",
+    "data/cache/translation_cache.json"
+  ],
+  "missing_files": [],
+  "changed_files": [],
+  "backup_created": true
+}

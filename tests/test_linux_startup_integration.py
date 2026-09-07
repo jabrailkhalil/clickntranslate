@@ -93,13 +93,15 @@ class HighDpiTest(unittest.TestCase):
 
 class TrayFallbackTest(unittest.TestCase):
     def test_minimize_without_a_tray_keeps_the_window_reachable(self):
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
-        minimize_at = source.index("def minimize_to_tray")
-        body = source[minimize_at:minimize_at + 400]
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import main
 
-        self.assertIn("if not self.has_tray():", body)
-        self.assertIn("minimize_to_taskbar()", body)
-        self.assertLess(body.index("has_tray"), body.index("self.hide()"))
+        window = SimpleNamespace(has_tray=lambda: False,
+                                 minimize_to_taskbar=Mock(), hide=Mock())
+        main.DarkThemeApp.minimize_to_tray(window)
+        window.minimize_to_taskbar.assert_called_once_with()
+        window.hide.assert_not_called()
 
     def test_closing_without_a_tray_quits_instead_of_vanishing(self):
         source = (ROOT / "main.py").read_text(encoding="utf-8")

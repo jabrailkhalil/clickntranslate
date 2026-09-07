@@ -59,6 +59,76 @@ def hotkey_dispatch_check():
             'release_and_reregister': 'passed', 'delivery': 'Carbon SendEventToEventTarget, own process'}
 
 
+def shadow_mode_check(main, app, window):
+    """Check real Dock policies and the live status item across window actions."""
+    import AppKit
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtTest import QTest
+    from PyQt5.QtWidgets import QSystemTrayIcon
+
+    nsapp = AppKit.NSApplication.sharedApplication()
+    position = window.pos()
+    providers = {key: window.config.get(key) for key in ('ocr_engine', 'translator_engine')}
+    results = []
+
+    def check(name, policy, visible, minimized=False):
+        QTest.qWait(160)
+        assert int(nsapp.activationPolicy()) == policy, (name, nsapp.activationPolicy())
+        assert window.isVisible() == visible, name
+        assert window.isMinimized() == minimized, name
+        assert window.tray_icon.isVisible() and not window.tray_icon.icon().isNull(), name
+        rect = window.tray_icon.geometry()
+        assert not rect.isEmpty(), (name, rect)
+        menu = window.tray_icon.contextMenu()
+        assert menu is window._tray_menu and menu.parent() is window
+        assert len([action for action in menu.actions() if not action.isSeparator()]) == 6
+        if visible and not minimized:
+            assert window.pos() == position, (name, window.pos(), position)
+        results.append({'state': name, 'activation_policy': policy, 'window_visible': visible,
+                        'minimized': minimized,
+                        'tray_geometry': [rect.x(), rect.y(), rect.width(), rect.height()],
+                        'tray_on_screen': any(screen.geometry().intersects(rect) for screen in app.screens())})
+
+    # Same path used by --autostart with start_minimized, before the first show.
+    window.minimize_to_tray()
+    check('startup-shadow', 1, False)
+    window._tray_menu.actions()[0].trigger()
+    check('open-from-menu', 0, True)
+    window.start_button.click()
+    check('shadow-button', 1, False)
+    window.on_tray_icon_activated(QSystemTrayIcon.Trigger)
+    check('menu-click-keeps-shadow', 1, False)
+    window.update_tray_menu()
+    check('menu-rebuilt-in-shadow', 1, False)
+    dialog = main.TranslationResultDialog(window, 'Привет', auto_copy=False, source_text='Hello')
+    dialog.show()
+    check('result-in-shadow', 1, False)
+    assert dialog.isVisible()
+    dialog.close()
+    dialog.deleteLater()
+    shadow_hotkeys = hotkey_dispatch_check()
+    window.toggle_window_visibility()
+    check('hotkey-restores', 0, True)
+    window.toggle_window_visibility()
+    check('hotkey-hides-to-shadow', 1, False)
+    window.show_window_from_tray(force_show=True)
+    window.close()
+    check('close-to-shadow', 1, False)
+    window.show_window_from_tray(force_show=True)
+    window.minimize_to_taskbar()
+    check('titlebar-minimize-in-dock', 0, True, True)
+    window.toggle_window_visibility()
+    check('restore-from-dock', 0, True)
+    with mock.patch.object(window, 'tray_available', False):
+        window.minimize_to_tray()
+        check('no-tray-dock-fallback', 0, True, True)
+    window.show_window_from_tray(force_show=True)
+    check('final-restore', 0, True)
+    assert providers == {key: window.config.get(key) for key in providers}
+    return {'cases': len(results), 'states': results, 'shadow_hotkey_callbacks': shadow_hotkeys['callbacks'],
+            'scope': 'own Cocoa NSApplication and QSystemTrayIcon; Qt actions, no physical menu-bar click'}
+
+
 def dialog_placement_check(main, app, window, report_path, screenshots):
     """Exercise real secondary windows with a displaced/scaled native owner."""
     from PyQt5 import QtCore
@@ -378,6 +448,7 @@ def run(main, report_path):
             app = main._ensure_startup_application()
             app._mac_reopen_handler = macos_desktop.install_dock_reopen_handler(app, lambda: None)
             window = main.DarkThemeApp()
+            shadow_results = shadow_mode_check(main, app, window)
             window.show()
             for _ in range(5):
                 app.processEvents()
@@ -446,6 +517,7 @@ def run(main, report_path):
                 "dropdowns": dropdown_results,
                 "hotkey_event_delivery": hotkey_delivery,
                 "window_placement": placement_results,
+                "shadow_mode": shadow_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

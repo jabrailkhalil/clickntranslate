@@ -185,6 +185,25 @@ def send_edit_shortcut(key, validate_target=None):
     return True
 
 
+def set_dock_visible(visible):
+    """Keep the status item usable while shadow mode opts out of the Dock."""
+    import AppKit
+    application = AppKit.NSApplication.sharedApplication()
+    policy = (AppKit.NSApplicationActivationPolicyRegular if visible
+              else AppKit.NSApplicationActivationPolicyAccessory)
+    if application.activationPolicy() != policy and not application.setActivationPolicy_(policy):
+        raise RuntimeError("macOS could not change the application's Dock visibility.")
+
+
+def restore_minimized_window(window):
+    """Let AppKit restore its frame without Qt forcing a subsequent zoom."""
+    import ctypes
+    import objc
+    if window.isMinimized():
+        view = objc.objc_object(c_void_p=ctypes.c_void_p(int(window.winId())))
+        view.window().deminiaturize_(None)
+
+
 def install_dock_reopen_handler(app, show_window):
     import Foundation
     import objc

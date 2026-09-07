@@ -1,0 +1,69 @@
+....F.........                                                           [100%]
+=================================== FAILURES ===================================
+________ test_native_shadow_startup_menu_hotkey_close_and_dock_minimize ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x102f5d220>
+
+    @pytest.mark.skipif(sys.platform != 'darwin', reason='requires native AppKit')
+    def test_native_shadow_startup_menu_hotkey_close_and_dock_minimize(monkeypatch):
+        import AppKit
+        import main
+        from PyQt5 import QtCore, QtWidgets
+        from macos_smoke import shadow_mode_check
+
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        if app.platformName() != 'cocoa':
+            pytest.skip('requires Cocoa status item and activation policy')
+        app.setQuitOnLastWindowClosed(False)
+        nsapp = AppKit.NSApplication.sharedApplication()
+        original_policy = nsapp.activationPolicy()
+        monkeypatch.setattr(main, 'LAYOUT_EDITOR_MODE', True)
+        monkeypatch.setattr(main, 'get_cached_config', lambda: dict(main.DEFAULT_CONFIG))
+        monkeypatch.setattr(main.DarkThemeApp, 'save_config', lambda self: None)
+        monkeypatch.setattr(main.DarkThemeApp, 'sync_autostart_state', lambda self, **kwargs: False)
+        monkeypatch.setattr(main.DarkThemeApp, '_maybe_start_first_run_guide', lambda self: None)
+        window = main.DarkThemeApp()
+        window.create_tray_icon()
+        try:
+            # A deliberately moved window must not jump when AppKit restores it.
+            window.move(window.screen().availableGeometry().topLeft() + QtCore.QPoint(40, 50))
+>           result = shadow_mode_check(main, app, window)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_macos_shadow_mode.py:56:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+macos_smoke.py:121: in shadow_mode_check
+    check('restore-from-dock', 0, True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+name = 'restore-from-dock', policy = 0, visible = True, minimized = False
+
+    def check(name, policy, visible, minimized=False):
+        QTest.qWait(160)
+        assert int(nsapp.activationPolicy()) == policy, (name, nsapp.activationPolicy())
+        assert window.isVisible() == visible, name
+        assert window.isMinimized() == minimized, name
+        assert window.tray_icon.isVisible() and not window.tray_icon.icon().isNull(), name
+        rect = window.tray_icon.geometry()
+        assert not rect.isEmpty(), (name, rect)
+        menu = window.tray_icon.contextMenu()
+        assert menu is window._tray_menu and menu.parent() is window
+        assert len([action for action in menu.actions() if not action.isSeparator()]) == 6
+        if visible and not minimized:
+>           assert window.pos() == position, (name, window.pos(), position)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: ('restore-from-dock', PyQt5.QtCore.QPoint(258, 113), PyQt5.QtCore.QPoint(40, 75))
+
+macos_smoke.py:86: AssertionError
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_macos_shadow_mode.py::test_native_shadow_startup_menu_hotkey_close_and_dock_minimize
+1 failed, 13 passed, 2 warnings in 3.24s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

@@ -1,0 +1,8 @@
+{
+  "type": "ad hoc",
+  "designated_requirement": "cdhash fd0782eb3b69cbcf0884bb9e05276bf6daf9e31d",
+  "previous_designated_requirement": "cdhash de3952efe90457c57be5e7bc6f59a53d155e20b6",
+  "notarized": false,
+  "signing_identities": 0,
+  "gatekeeper": "rejected"
+}

@@ -185,11 +185,12 @@ def test_window_toggle_preserves_tray_or_taskbar_destination():
         _window_hide_destination="tray",
         has_tray=lambda: True,
         hide=mock.Mock(),
+        minimize_to_tray=mock.Mock(),
         minimize_to_taskbar=mock.Mock(),
         show_window_from_tray=mock.Mock(),
     )
     main.DarkThemeApp.toggle_window_visibility(tray_window)
-    tray_window.hide.assert_called_once_with()
+    tray_window.minimize_to_tray.assert_called_once_with()
     tray_window.minimize_to_taskbar.assert_not_called()
 
     taskbar_window = SimpleNamespace(

@@ -58,10 +58,20 @@ llama.cpp executable and model; its Windows automatic installer remains unavaila
 | Selected text | Cmd+C / Cmd+V through Quartz; Accessibility permission requested on use |
 | Safe replacement | Foreground process and focused AX window checked; selected text re-read before paste; changed focus falls back to copying the completed translation |
 | Dynamic window tracking | Quartz window geometry, foreground window and visibility |
-| Dock reopen | Handles the reopen Apple event without replacing Qt's delegate |
+| Shadow mode / menu bar | Keeps the status icon and hotkeys active, hides the main window and Dock icon; Open restores the normal app |
+| Dock reopen | Handles the reopen Apple event without replacing Qt's delegate; native deminiaturization preserves the window position |
 | Single instance | Existing Unix command channel; Darwin peer PID validation |
 | Login startup | Per-user LaunchAgent, enabled only through the existing setting |
 | Updates | Opens the release page; does not modify a signed running bundle |
+
+On macOS, **Shadow mode** and the main window's Close button leave the application
+in the top menu bar and remove it from the Dock. The status menu provides Open,
+Copy Text, Translate, Translate Screen, Dynamic Translation and Quit. Clicking the
+status icon opens this menu; Open restores the main window and Dock icon. The
+ordinary minimize button still minimizes into the Dock. Starting with the saved
+`start_minimized` option also uses menu-bar-only shadow mode. Translation results
+can appear while the main window remains hidden. If Ice or another menu-bar manager
+hides the icon, move it into that manager's visible section.
 
 Qt stores portable shortcut names as `Ctrl` for Command and `Meta` for physical
 Control on macOS. Registration uses that same mapping; the shortcut editor and

@@ -1,0 +1,1 @@
+{"window_visible": false, "tray_visible": true, "tray_available": true, "tray_geometry": [-4630, 0, 38, 24], "activation_policy": 0}

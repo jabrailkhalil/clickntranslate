@@ -1,0 +1,654 @@
+{
+  "date": "2026-09-07",
+  "host": {
+    "macos": "14.3",
+    "architecture": "arm64",
+    "model": "MacBookAir10,1",
+    "chip": "Apple M1",
+    "ram_gb": 8,
+    "retina_dpr": 2
+  },
+  "tests": {
+    "cocoa_full": {
+      "passed": 1065,
+      "skipped": 72,
+      "subtests_passed": 892,
+      "seconds": 155.77
+    },
+    "offscreen_targeted": {
+      "passed": 59,
+      "skipped": 3,
+      "seconds": 0.94
+    },
+    "shadow_targeted": {
+      "passed": 14,
+      "seconds": 3.79
+    }
+  },
+  "build": {
+    "command": "bash tools/build_macos_release.sh",
+    "exit_code": 0,
+    "macho_files": 224,
+    "minimum_macos": "13.4"
+  },
+  "smoke": {
+    "source": {
+      "screenshots": 152,
+      "shadow_mode": {
+        "cases": 13,
+        "states": [
+          {
+            "state": "startup-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "open-from-menu",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "shadow-button",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-click-keeps-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-rebuilt-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "result-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-restores",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-hides-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "close-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "titlebar-minimize-in-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "restore-from-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "no-tray-dock-fallback",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "final-restore",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4663,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          }
+        ],
+        "shadow_hotkey_callbacks": 10,
+        "scope": "own Cocoa NSApplication and QSystemTrayIcon; Qt actions, no physical menu-bar click"
+      },
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "regular_hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": true,
+        "accessibility": true
+      },
+      "vision": "ok"
+    },
+    "build": {
+      "screenshots": 152,
+      "shadow_mode": {
+        "cases": 13,
+        "states": [
+          {
+            "state": "startup-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "open-from-menu",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "shadow-button",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-click-keeps-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-rebuilt-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "result-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-restores",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-hides-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "close-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "titlebar-minimize-in-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "restore-from-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "no-tray-dock-fallback",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "final-restore",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4630,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          }
+        ],
+        "shadow_hotkey_callbacks": 10,
+        "scope": "own Cocoa NSApplication and QSystemTrayIcon; Qt actions, no physical menu-bar click"
+      },
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "regular_hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": false,
+        "accessibility": false
+      },
+      "vision": "ok"
+    },
+    "installed": {
+      "screenshots": 152,
+      "shadow_mode": {
+        "cases": 13,
+        "states": [
+          {
+            "state": "startup-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "open-from-menu",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "shadow-button",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-click-keeps-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "menu-rebuilt-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "result-in-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-restores",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "hotkey-hides-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "close-to-shadow",
+            "activation_policy": 1,
+            "window_visible": false,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "titlebar-minimize-in-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "restore-from-dock",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "no-tray-dock-fallback",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": true,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          },
+          {
+            "state": "final-restore",
+            "activation_policy": 0,
+            "window_visible": true,
+            "minimized": false,
+            "tray_geometry": [
+              -4592,
+              0,
+              38,
+              24
+            ],
+            "tray_on_screen": false
+          }
+        ],
+        "shadow_hotkey_callbacks": 10,
+        "scope": "own Cocoa NSApplication and QSystemTrayIcon; Qt actions, no physical menu-bar click"
+      },
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "regular_hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": false,
+        "accessibility": false
+      },
+      "vision": "ok"
+    }
+  },
+  "signing": {
+    "type": "ad hoc",
+    "designated_requirement": "cdhash fd0782eb3b69cbcf0884bb9e05276bf6daf9e31d",
+    "previous_designated_requirement": "cdhash de3952efe90457c57be5e7bc6f59a53d155e20b6",
+    "notarized": false,
+    "signing_identities": 0,
+    "gatekeeper": "rejected"
+  },
+  "installation": {
+    "installed": "/Applications/ClicknTranslate.app",
+    "dmg_copy": "passed",
+    "deep_signature": "passed",
+    "bundle_executable": "ClicknTranslate",
+    "background_only": false,
+    "minimum_macos": "13.4",
+    "gatekeeper_returncode": 3,
+    "gatekeeper": "/Applications/ClicknTranslate.app: rejected"
+  },
+  "lifecycle": {
+    "application": "/Applications/ClicknTranslate.app",
+    "normal_launch": "passed",
+    "ipc_show": "accepted",
+    "second_autostart_launch_returncode": 0,
+    "single_process_remains": true,
+    "pid": 38562,
+    "scope": "LaunchServices and app IPC; no physical Dock click"
+  },
+  "artifacts": [
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166083860,
+      "sha256": "c13ed363ed7783c4e1db4d86aa7a2dd70cc203f157061f9642e9a80dce4724ab"
+    },
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153491443,
+      "sha256": "a8222ec42bcace6148083f1b255357e7790cedd7227690084342b797b831a52e"
+    }
+  ],
+  "data_preservation": {
+    "unchanged_non_log_files": [
+      "data/copy_history.json",
+      "data/config.json",
+      "data/translation_history.json",
+      "argos/data/argos-translate/index.json",
+      "data/cache/translation_cache.json"
+    ],
+    "missing_files": [],
+    "changed_files": [],
+    "backup_created": true
+  },
+  "limitations": [
+    "Own Qt actions and native AppKit/Carbon state; no physical menu-bar, mouse or Dock automation.",
+    "Ice initially hid the status item off-screen; user confirmed seeing it after revealing the hidden area. Ice settings unchanged.",
+    "Installed app Screen Recording/Accessibility preflight still false; ad hoc signature, not notarized, Gatekeeper rejected. No TCC changes this cycle.",
+    "Intel and macOS 13.4 runtime not tested."
+  ]
+}
