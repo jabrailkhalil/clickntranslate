@@ -45,8 +45,9 @@ jobs:
     env:
       VENV: .venv-macos
       PYTHONUTF8: '1'
-      CLICKNTRANSLATE_SIGNING_DIR: ${{ runner.temp }}/clickntranslate-signing
     steps:
+      - name: Select isolated signing directory
+        run: echo "CLICKNTRANSLATE_SIGNING_DIR=$RUNNER_TEMP/clickntranslate-signing" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
