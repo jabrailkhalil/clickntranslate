@@ -11416,6 +11416,8 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
+            if platform_support.IS_MAC:
+                self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
             self.start_easyocr_install()
             return
 
@@ -12170,6 +12172,11 @@ finally {
             python_command = self._find_rapidocr_install_python_command(engine_name, package_dir)
             return [*python_command, "-m", "pip"]
         except RuntimeError:
+            if platform_support.IS_MAC:
+                return self._prepare_macos_pip_command(
+                    temp_dir, engine_name, cancel_callback=cancel_callback,
+                    progress_callback=progress_callback,
+                )
             if not platform_support.IS_WINDOWS:
                 raise
             return self._prepare_portable_pip_command(
@@ -12178,6 +12185,18 @@ finally {
                 cancel_callback=cancel_callback,
                 progress_callback=progress_callback,
             )
+
+    def _prepare_macos_pip_command(self, temp_dir, engine_name,
+                                   cancel_callback=None, progress_callback=None):
+        from macos_python import prepare_pip_command
+        def check_cancel():
+            if cancel_callback and cancel_callback():
+                raise UpdateCancelledError(f"{engine_name} installation canceled by user.")
+        def download(url, destination, **kwargs):
+            self._download_file(url, destination, timeout=180,
+                                cancel_callback=cancel_callback, **kwargs)
+        return prepare_pip_command(temp_dir, engine_name, download,
+                                   check_cancel, progress_callback)
 
     def start_rapidocr_install(self, progress_owner=None):
         if (
@@ -12673,9 +12692,10 @@ finally {
         self._finish_easyocr_install_state()
         self._hide_easyocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if not platform_support.IS_MAC:
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,

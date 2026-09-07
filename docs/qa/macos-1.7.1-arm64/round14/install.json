@@ -1,0 +1,22 @@
+{
+  "seconds": 131.13,
+  "events": [
+    [
+      "_on_easyocr_install_ready",
+      []
+    ]
+  ],
+  "automatic_python_bootstrap": true,
+  "temp_directory_removed": true,
+  "import": {
+    "returncode": 0,
+    "response": {
+      "available": true,
+      "error": ""
+    },
+    "stderr": ""
+  },
+  "temporary_directories_remaining": 0,
+  "python_minor": "3.12",
+  "architecture": "arm64"
+}

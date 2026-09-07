@@ -116,3 +116,59 @@ def test_engine_installer_prefers_existing_matching_python():
 
     assert result == [r"C:\Python312\python.exe", "-m", "pip"]
     dummy._prepare_portable_pip_command.assert_not_called()
+
+
+def test_mac_installer_prepares_private_python_when_system_python_is_missing(monkeypatch):
+    monkeypatch.setattr(platform_support, 'IS_MAC', True)
+    monkeypatch.setattr(platform_support, 'IS_WINDOWS', False)
+    command = ['/private/temporary/python', '-I', '-m', 'pip']
+    owner = SimpleNamespace(
+        _find_rapidocr_install_python_command=mock.Mock(side_effect=RuntimeError('missing')),
+        _prepare_macos_pip_command=mock.Mock(return_value=command),
+        _prepare_portable_pip_command=mock.Mock(),
+    )
+    cancel, progress = mock.Mock(), mock.Mock()
+    result = sw.SettingsWindow._prepare_engine_pip_command(
+        owner, '/private/temporary', 'EasyOCR', '/app-data/ocr/easyocr', cancel, progress)
+    assert result == command
+    owner._prepare_macos_pip_command.assert_called_once_with(
+        '/private/temporary', 'EasyOCR', cancel_callback=cancel, progress_callback=progress)
+    owner._prepare_portable_pip_command.assert_not_called()
+
+
+@pytest.mark.parametrize('identity', [
+    {'version': '3.11', 'architecture': 'arm64'},
+    {'version': f'{sys.version_info.major}.{sys.version_info.minor}', 'architecture': 'x86_64'},
+])
+def test_mac_bootstrap_rejects_wrong_python_version_or_rosetta(tmp_path, monkeypatch, identity):
+    import hashlib
+    import json
+    import macos_python as bootstrap
+    monkeypatch.setattr(platform_support, 'IS_MAC', True)
+    monkeypatch.setattr(bootstrap.platform, 'machine', lambda: 'arm64')
+    payload = b'verified test micromamba'
+    monkeypatch.setitem(bootstrap.MICROMAMBA_SHA256, 'osx-arm64', hashlib.sha256(payload).hexdigest())
+    def download(_url, destination, **_kwargs):
+        Path(destination).write_bytes(payload)
+    execute = mock.Mock()
+    monkeypatch.setattr(bootstrap, '_run_install', execute)
+    monkeypatch.setattr(bootstrap.subprocess, 'run', mock.Mock(return_value=SimpleNamespace(
+        returncode=0, stdout=json.dumps(identity), stderr='')))
+    with pytest.raises(RuntimeError, match='does not match'):
+        bootstrap.prepare_pip_command(tmp_path, 'EasyOCR', download, lambda: None)
+    command = execute.call_args.args[0]
+    assert command[command.index('--platform') + 1] == 'osx-arm64'
+
+
+def test_mac_easyocr_install_error_does_not_select_another_ocr(monkeypatch):
+    monkeypatch.setattr(platform_support, 'IS_MAC', True)
+    owner = SimpleNamespace(
+        parent=SimpleNamespace(current_interface_language='ru'),
+        _finish_easyocr_install_state=mock.Mock(), _hide_easyocr_progress=mock.Mock(),
+        _restore_settings_view=mock.Mock(), save_ocr_engine=mock.Mock(),
+    )
+    warning = mock.Mock()
+    monkeypatch.setattr(sw.QMessageBox, 'warning', warning)
+    sw.SettingsWindow._on_easyocr_install_failed(owner, 'download failed')
+    owner.save_ocr_engine.assert_not_called()
+    assert 'download failed' in warning.call_args.args[-1]

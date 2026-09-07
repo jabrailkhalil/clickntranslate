@@ -50,8 +50,13 @@ Homebrew when Finder starts the app without the shell's PATH. The package
 manager can manage models inside the private Tesseract runtime; it never deletes
 system/Homebrew models. Runtime downloads are separate from the signed `.app`.
 
-RapidOCR is bundled in the OCR helper. Optional EasyOCR needs a matching Python
-3.12 with pip for installation from Settings. Intel Macs use the last supported
+RapidOCR is bundled in the OCR helper. Optional EasyOCR installs from Settings
+without requiring Homebrew or a separate Python installation. If a matching
+native Python with pip already exists, the installer reuses it; otherwise it
+prepares a private Python of the same minor version and architecture as the
+application using the verified Micromamba bootstrap. The temporary Python and
+package cache are removed when installation finishes. Errors preserve the
+selected OCR engine and any previously installed models. Intel Macs use the last supported
 PyTorch Intel wheel family (2.2.2 / torchvision 0.17.2); Apple Silicon uses native
 wheels resolved by pip. The Windows embedded-Python, Tesseract and Hy-MT installers
 are never downloaded on macOS. Hy-MT requires a separately installed compatible

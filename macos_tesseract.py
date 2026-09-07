@@ -37,7 +37,7 @@ def managed_command(root):
     return ''
 
 
-def _run_install(command, env, log_path, check_cancel):
+def _run_install(command, env, log_path, check_cancel, *, engine_name='Tesseract'):
     # A file avoids pipe backpressure while keeping cancellation responsive.
     with open(log_path, 'wb') as output:
         process = subprocess.Popen(command, env=env, stdout=output,
@@ -47,7 +47,7 @@ def _run_install(command, env, log_path, check_cancel):
             while process.poll() is None:
                 check_cancel()
                 if time.monotonic() > deadline:
-                    raise RuntimeError('Tesseract installation timed out. Please retry.')
+                    raise RuntimeError(f'{engine_name} installation timed out. Please retry.')
                 time.sleep(0.15)
         finally:
             if process.poll() is None:
@@ -60,7 +60,7 @@ def _run_install(command, env, log_path, check_cancel):
     check_cancel()
     if process.returncode:
         detail = Path(log_path).read_text(errors='replace')[-3000:]
-        raise RuntimeError(f'Tesseract installation failed ({process.returncode}):\n{detail}')
+        raise RuntimeError(f'{engine_name} installation failed ({process.returncode}):\n{detail}')
 
 
 def install(root, download, check_cancel, progress):
