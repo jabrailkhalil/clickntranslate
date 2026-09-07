@@ -35,10 +35,20 @@ Runtime's current wheel is tagged 13.0 but its binaries require 13.4.
 
 Apple Vision is the default OCR engine and works locally without model downloads.
 The language list comes from the installed macOS version. Tesseract, RapidOCR
-and EasyOCR are also selectable. Tesseract can be installed using
-`brew install tesseract tesseract-lang`; the application also finds Homebrew
-when Finder launches it without the shell's PATH. Managed Tesseract models are
-stored in application data; the app does not remove system/Homebrew models.
+and EasyOCR are also selectable. The Tesseract Install button now installs a
+private native runtime directly into application data, without Homebrew, sudo
+or another Python installation. It downloads the pinned, SHA-256-checked official
+Micromamba 2.9.0-0 executable and installs Tesseract 5.5.3 from conda-forge for
+the current Mac architecture. Micromamba and its package cache are temporary;
+no shell initialization is performed. A validated installation manifest is
+published atomically; failed/cancelled installation preserves the previous
+runtime and its models. Errors do not change the selected OCR engine.
+
+Existing system installations remain supported, including
+`brew install tesseract tesseract-lang`. Both the settings window and OCR find
+Homebrew when Finder starts the app without the shell's PATH. The package
+manager can manage models inside the private Tesseract runtime; it never deletes
+system/Homebrew models. Runtime downloads are separate from the signed `.app`.
 
 RapidOCR is bundled in the OCR helper. Optional EasyOCR needs a matching Python
 3.12 with pip for installation from Settings. Intel Macs use the last supported

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+    "bytes": 166168539,
+    "sha256": "fe00f75e7645321da761c2fb4695adbd64eb4641704c8eb35d4f46db5e42cfc6"
+  },
+  {
+    "path": "releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+    "bytes": 153518821,
+    "sha256": "d7f57f15fc3ee11d79d06da8d474c3ced30fd3db21f13aa34d32b22123ca7921"
+  }
+]

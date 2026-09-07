@@ -11145,6 +11145,9 @@ finally {
     def _find_tesseract_exe_under(self, root_dir):
         if not root_dir or not os.path.isdir(root_dir):
             return ""
+        if platform_support.IS_MAC:
+            from macos_tesseract import managed_command
+            return managed_command(root_dir)
         direct_path = os.path.join(root_dir, "tesseract.exe")
         if os.path.isfile(direct_path):
             return direct_path
@@ -11161,9 +11164,11 @@ finally {
         local_exe = self._find_local_tesseract_exe()
         if local_exe:
             return local_exe
-        path_exe = shutil.which("tesseract")
+        path_exe = platform_support.system_tesseract_command()
         if path_exe:
             return path_exe
+        if not platform_support.IS_WINDOWS:
+            return ""
         for path in [
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
             r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
@@ -11351,7 +11356,7 @@ finally {
             return
 
         lang = self.parent.current_interface_language
-        if not platform_support.IS_WINDOWS:
+        if platform_support.IS_LINUX:
             # Linux distributions package Tesseract, so the app points at the
             # package manager instead of downloading an installer.
             self._show_linux_tesseract_hint(lang)
@@ -11369,6 +11374,8 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
+            if platform_support.IS_MAC:
+                self.save_ocr_engine("Tesseract")
             self.start_tesseract_install()
             return
 
@@ -11634,7 +11641,7 @@ finally {
         self.start_tesseract_install()
 
     def start_tesseract_install(self, progress_owner=None):
-        if not platform_support.IS_WINDOWS:
+        if platform_support.IS_LINUX:
             self._show_linux_tesseract_hint(self.parent.current_interface_language)
             return
         if (
@@ -11653,7 +11660,30 @@ finally {
         self.ocr_engine_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
-        threading.Thread(target=self._install_tesseract_worker, daemon=True).start()
+        worker = self._install_macos_tesseract_worker if platform_support.IS_MAC else self._install_tesseract_worker
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _install_macos_tesseract_worker(self):
+        from macos_tesseract import install
+        lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
+        def progress(phase, percent):
+            key = {'download': 'downloading_engine', 'install': 'applying',
+                   'verify': 'applying', 'done': 'done'}[phase]
+            self._emit_tesseract_progress(engine_text(lang, key, engine="Tesseract"),
+                                          percent, phase != 'install')
+        def download(url, destination, **kwargs):
+            self._download_file(url, destination, timeout=180,
+                                cancel_callback=self._tesseract_cancel_requested.is_set, **kwargs)
+        try:
+            executable = install(self._local_tesseract_dir(), download,
+                                 self._check_tesseract_cancel_requested, progress)
+            QMetaObject.invokeMethod(self, "_on_tesseract_install_ready", Qt.QueuedConnection,
+                                     QtCore.Q_ARG(str, executable))
+        except (TesseractInstallCancelledError, UpdateCancelledError):
+            QMetaObject.invokeMethod(self, "_on_tesseract_install_cancelled", Qt.QueuedConnection)
+        except Exception as error:
+            QMetaObject.invokeMethod(self, "_on_tesseract_install_failed", Qt.QueuedConnection,
+                                     QtCore.Q_ARG(str, str(error)))
 
     def _get_tesseract_bundle_url(self, is_x64=True):
         if not platform_support.IS_WINDOWS:
@@ -11882,9 +11912,10 @@ finally {
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if not platform_support.IS_MAC:
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,

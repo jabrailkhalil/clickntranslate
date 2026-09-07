@@ -436,6 +436,12 @@ _TESSDATA_RETRY_DELAY_SECONDS = 2
 def _tesseract_managed_data_dir(tess_cmd):
     """Writable model storage for portable engines and Linux system binaries."""
     tess_dir = os.path.dirname(tess_cmd)
+    if platform_support.IS_MAC:
+        from pathlib import Path
+        app_engines = Path(get_portable_dir()) / 'ocr/tesseract'
+        packaged_data = Path(tess_dir).parent / 'share/tessdata'
+        if packaged_data.is_dir() and packaged_data.resolve().is_relative_to(app_engines.resolve()):
+            return str(packaged_data)
     for path in (os.path.join(tess_dir, 'tessdata'), os.path.join(os.path.dirname(tess_dir), 'tessdata')):
         if os.path.isdir(path) and path not in _system_tessdata_dirs():
             return path
@@ -450,6 +456,8 @@ def _tesseract_data_directories(tess_cmd):
         _tesseract_managed_data_dir(tess_cmd),
         os.path.join(tess_dir, 'tessdata'),
         os.path.join(os.path.dirname(tess_dir), 'tessdata'),
+        os.path.join(os.path.dirname(tess_dir), 'share', 'tessdata'),
+        os.path.join(get_portable_dir(), 'ocr', 'tessdata'),
         *_system_tessdata_dirs(),
     ]
     return list(dict.fromkeys(path for path in candidates if path and os.path.isdir(path)))
@@ -4297,9 +4305,16 @@ class ScreenCaptureOverlay(QWidget):
         if cls._tesseract_cmd_cache is not None:
             return cls._tesseract_cmd_cache
 
-        tess_cmd = shutil.which("tesseract")
+        tess_cmd = platform_support.system_tesseract_command()
         app_root = get_portable_dir()
         local_root = os.path.join(app_root, "ocr", "tesseract")
+
+        if not platform_support.IS_WINDOWS:
+            if platform_support.IS_MAC:
+                from macos_tesseract import managed_command
+                tess_cmd = managed_command(local_root) or tess_cmd
+            cls._tesseract_cmd_cache = tess_cmd or None
+            return tess_cmd
 
         # 1) Check direct path
         direct_cmd = os.path.join(local_root, "tesseract.exe")
