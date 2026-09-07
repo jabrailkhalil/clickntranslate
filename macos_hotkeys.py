@@ -9,6 +9,12 @@ import logging
 import threading
 
 
+# CarbonEvents.h: these are hotkey events, not raw key-down/up event numbers.
+HOTKEY_PRESSED = 5
+HOTKEY_RELEASED = 6
+HOTKEY_EXCLUSIVE = 1
+
+
 # Physical ANSI key positions, matching the layout-independent Windows hotkeys.
 # Spell out the sparse portion instead of treating macOS codes as ASCII.
 KEY_CODES = {"a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5,
@@ -83,7 +89,8 @@ class HotkeyRegistry:
             function = getattr(lib, name)
             function.restype, function.argtypes = result, args
         self._callback = callback_type(self._handle_event)  # retain for Carbon
-        types = (_EventType * 2)(_EventType(_fourcc("keyb"), 6), _EventType(_fourcc("keyb"), 7))
+        types = (_EventType * 2)(_EventType(_fourcc("keyb"), HOTKEY_PRESSED),
+                                _EventType(_fourcc("keyb"), HOTKEY_RELEASED))
         self._handler = C.c_void_p()
         status = lib.InstallEventHandler(lib.GetApplicationEventTarget(), self._callback,
                                          2, types, None, C.byref(self._handler))
@@ -96,14 +103,20 @@ class HotkeyRegistry:
                                                None, C.sizeof(identity), None, C.byref(identity))
         if status or identity.signature != self.signature or identity.id not in self.callbacks:
             return -9874  # eventNotHandledErr
-        if self.library.GetEventKind(event) == 7:
+        kind = self.library.GetEventKind(event)
+        if kind == HOTKEY_RELEASED:
             self.pressed.discard(identity.id)
-        elif identity.id not in self.pressed:
-            self.pressed.add(identity.id)
-            try:
-                self.callbacks[identity.id]()
-            except Exception:
-                logging.exception("macOS shortcut callback failed")
+            logging.debug("macOS shortcut released: id=%d", identity.id)
+        elif kind == HOTKEY_PRESSED:
+            if identity.id not in self.pressed:
+                self.pressed.add(identity.id)
+                logging.info("macOS shortcut pressed: id=%d", identity.id)
+                try:
+                    self.callbacks[identity.id]()
+                except Exception:
+                    logging.exception("macOS shortcut callback failed")
+        else:
+            return -9874
         return 0
 
     def register(self, text, callback):
@@ -113,8 +126,11 @@ class HotkeyRegistry:
         self._next_id += 1
         identifier = self._next_id
         reference = C.c_void_p()
+        # Non-exclusive registration can succeed but deliver nothing while
+        # another app owns this shortcut exclusively. Report the conflict.
         status = self.library.RegisterEventHotKey(key, modifiers, _HotkeyID(self.signature, identifier),
-                                                  self.library.GetApplicationEventTarget(), 0, C.byref(reference))
+                                                  self.library.GetApplicationEventTarget(), HOTKEY_EXCLUSIVE,
+                                                  C.byref(reference))
         if status:
             raise RuntimeError(f"Shortcut is unavailable: {text} (macOS {status}).")
         self.references[identifier], self.callbacks[identifier] = reference, callback

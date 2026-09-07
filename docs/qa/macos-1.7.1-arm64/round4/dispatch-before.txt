@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/Users/jabrail/Desktop/click/clickntranslate/macos_smoke.py", line 46, in hotkey_dispatch_check
+    assert len(calls) == generation * 5
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

@@ -159,6 +159,7 @@ def test_carbon_callback_ignores_repeat_and_foreign_events():
     callback = mock.Mock()
     registry.callbacks, registry.pressed = {1: callback}, set()
     identity = hotkeys._HotkeyID(registry.signature, 1)
+    # Literal values from Apple's SDK, not the implementation's constants.
     kind = [6]
 
     def parameter(*args):
@@ -167,16 +168,67 @@ def test_carbon_callback_ignores_repeat_and_foreign_events():
 
     registry.library = SimpleNamespace(GetEventParameter=parameter, GetEventKind=lambda _: kind[0])
     registry._handle_event(None, None, None)
+    callback.assert_not_called()  # releasing cannot execute an action
+    kind[0] = 5
+    registry._handle_event(None, None, None)
     registry._handle_event(None, None, None)
     callback.assert_called_once()
-    kind[0] = 7
-    registry._handle_event(None, None, None)
     kind[0] = 6
     registry._handle_event(None, None, None)
+    kind[0] = 5
+    registry._handle_event(None, None, None)
+    assert callback.call_count == 2
+    kind[0] = 7
+    assert registry._handle_event(None, None, None) == -9874
     assert callback.call_count == 2
     identity.signature = 0
     assert registry._handle_event(None, None, None) == -9874
     assert callback.call_count == 2
+
+
+@pytest.mark.skipif(sys.platform != 'darwin', reason='requires native Carbon')
+def test_native_carbon_delivers_press_release_and_reregister(app):
+    if app.platformName() != 'cocoa':
+        pytest.skip('requires the Cocoa event target')
+    from macos_smoke import hotkey_dispatch_check
+    assert hotkey_dispatch_check()['callbacks'] == 10
+
+
+@pytest.mark.skipif(sys.platform != 'darwin', reason='requires native Carbon')
+def test_native_hotkey_conflict_with_another_process_is_reported(app):
+    if app.platformName() != 'cocoa':
+        pytest.skip('requires the Cocoa event target')
+    import selectors
+    import subprocess
+    script = '''
+import sys
+from PyQt5.QtWidgets import QApplication
+from macos_hotkeys import registry
+app = QApplication([])
+identifier = registry().register('Ctrl+Alt+Shift+F17', lambda: None)
+print('ready', flush=True)
+sys.stdin.readline()
+registry().unregister(identifier)
+'''
+    process = subprocess.Popen([sys.executable, '-c', script], text=True,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               cwd=str(Path(__file__).resolve().parents[1]))
+    try:
+        with selectors.DefaultSelector() as ready:
+            ready.register(process.stdout, selectors.EVENT_READ)
+            assert ready.select(timeout=15), 'Carbon fixture did not start'
+        assert process.stdout.readline().strip() == 'ready'
+        with pytest.raises(RuntimeError, match='unavailable'):
+            hotkeys.registry().register('Ctrl+Alt+Shift+F17', lambda: None)
+    finally:
+        try:
+            process.communicate('\n', timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+    assert process.returncode == 0
+    identifier = hotkeys.registry().register('Ctrl+Alt+Shift+F17', lambda: None)
+    hotkeys.registry().unregister(identifier)
 
 
 def test_vision_coordinates_keep_pixel_detail_and_flip_origin():

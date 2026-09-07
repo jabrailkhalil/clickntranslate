@@ -8,6 +8,57 @@ import tempfile
 from unittest import mock
 
 
+def hotkey_dispatch_check():
+    """Deliver Carbon events to this process's installed handler, without input synthesis."""
+    import ctypes as C
+    from macos_hotkeys import registry, _HotkeyID, _fourcc
+
+    owner = registry()
+    lib = owner.library
+    for name, result, args in (
+        ('CreateEvent', C.c_int32, [C.c_void_p, C.c_uint32, C.c_uint32, C.c_double,
+                                  C.c_uint32, C.POINTER(C.c_void_p)]),
+        ('SetEventParameter', C.c_int32, [C.c_void_p, C.c_uint32, C.c_uint32, C.c_uint32, C.c_void_p]),
+        ('SendEventToEventTarget', C.c_int32, [C.c_void_p, C.c_void_p]),
+        ('ReleaseEvent', None, [C.c_void_p]),
+    ):
+        function = getattr(lib, name)
+        function.restype, function.argtypes = result, args
+    calls = []
+
+    def send(identifier, kind):
+        event = C.c_void_p()
+        identity = _HotkeyID(owner.signature, identifier)
+        assert lib.CreateEvent(None, _fourcc('keyb'), kind, 0, 0, C.byref(event)) == 0
+        try:
+            assert lib.SetEventParameter(event, _fourcc('----'), _fourcc('hkid'),
+                                         C.sizeof(identity), C.byref(identity)) == 0
+            return lib.SendEventToEventTarget(event, lib.GetApplicationEventTarget())
+        finally:
+            lib.ReleaseEvent(event)
+
+    # Event numbers below come from Apple's CarbonEvents.h, independently of
+    # the implementation. Registration alone never tests handler delivery.
+    for generation in range(2):
+        identifier = owner.register('Ctrl+Alt+Shift+F18', lambda: calls.append('pressed'))
+        try:
+            assert send(identifier, 6) == 0  # release before any press is harmless
+            assert len(calls) == generation * 5
+            for press in range(5):
+                assert send(identifier, 5) == 0
+                assert len(calls) == generation * 5 + press + 1, 'Press was not delivered'
+                assert send(identifier, 5) == 0  # held key does not repeat the action
+                assert len(calls) == generation * 5 + press + 1
+                assert send(identifier, 6) == 0
+                assert identifier not in owner.pressed, 'Release left shortcut stuck'
+        finally:
+            owner.unregister(identifier)
+        assert send(identifier, 5) != 0  # removed IDs cannot trigger callbacks
+    assert len(calls) == 10
+    return {'callbacks': 10, 'registrations': 2, 'repeat_suppression': 'passed',
+            'release_and_reregister': 'passed', 'delivery': 'Carbon SendEventToEventTarget, own process'}
+
+
 def popup_screenshots(app, window, report_path, screenshots):
     """Check the real NSWindow background as well as Qt's painted corners."""
     import ctypes
@@ -315,6 +366,7 @@ def run(main, report_path):
             registry().unregister(hotkey)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             registry().unregister(hotkey)
+            hotkey_delivery = hotkey_dispatch_check()
             image = Image.new("RGB", (900, 130), "white")
             font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 54)
             ImageDraw.Draw(image).text((30, 25), "CLICK TRANSLATE", font=font, fill="black")
@@ -331,6 +383,7 @@ def run(main, report_path):
                 "vision": "ok", "vision_languages": macos_ocr.supported_languages(),
                 "native_popup_surfaces": popup_results,
                 "dropdowns": dropdown_results,
+                "hotkey_event_delivery": hotkey_delivery,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

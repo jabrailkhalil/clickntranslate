@@ -1,0 +1,10 @@
+{
+  "previous": {
+    "path": "build/macos/previous-install-lokfxcy_/ClicknTranslate.app",
+    "requirement": "# designated => cdhash H\"9c4393597a9521d608cca3607434aca7f3aae81b\""
+  },
+  "installed": {
+    "path": "/Applications/ClicknTranslate.app",
+    "requirement": "# designated => cdhash H\"829c6343eaef8da6bd8b6f99ea268a32d94da7f5\""
+  }
+}

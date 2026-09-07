@@ -1,0 +1,7 @@
+{
+  "header": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Versions/A/Headers/CarbonEvents.h",
+  "constants": {
+    "kEventHotKeyPressed": 5,
+    "kEventHotKeyReleased": 6
+  }
+}

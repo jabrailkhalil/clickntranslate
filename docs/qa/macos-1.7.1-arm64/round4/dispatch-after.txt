@@ -1,0 +1,7 @@
+{
+  "callbacks": 10,
+  "registrations": 2,
+  "repeat_suppression": "passed",
+  "release_and_reregister": "passed",
+  "delivery": "Carbon SendEventToEventTarget, own process"
+}

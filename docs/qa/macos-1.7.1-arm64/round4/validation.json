@@ -1,0 +1,60 @@
+{
+  "date": "2026-09-07",
+  "base_commit": "d8826d81d9c8033b3828a050660aa106939a5d8b",
+  "host": {
+    "macos": "14.3",
+    "architecture": "arm64",
+    "cpu": "Apple M1",
+    "qt_platform": "cocoa",
+    "retina_dpr": 2
+  },
+  "tests": {
+    "cocoa": {
+      "passed": 1040,
+      "skipped": 72,
+      "subtests": 892,
+      "seconds": 140.06
+    },
+    "macos_support_offscreen": {
+      "passed": 46,
+      "skipped": 2
+    }
+  },
+  "carbon": {
+    "callbacks": 10,
+    "registrations": 2,
+    "repeat_suppression": "passed",
+    "release_and_reregister": "passed",
+    "delivery": "Carbon SendEventToEventTarget, own process"
+  },
+  "installed": {
+    "launchservices": "ok",
+    "screenshots": 104,
+    "dropdown_openings": 180,
+    "permissions": {
+      "screen": false,
+      "accessibility": false
+    }
+  },
+  "build": {
+    "command": "bash tools/build_macos_release.sh",
+    "exit_code": 0,
+    "signature": "ad hoc",
+    "notarized": false,
+    "minimum_macos": "13.4",
+    "mach_o_files": 224
+  },
+  "physical_keyboard": "user verification requested; not yet confirmed",
+  "artifacts": [
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166076178,
+      "sha256": "c891e11ef0b83711f30350a03b126aa5f8b5b068f1e4b86f379494af7be3121f"
+    },
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153479667,
+      "sha256": "18b85600f0d796dc635e1da9432c00ea8b016fab69a3e9f86857f64a285424d0"
+    }
+  ]
+}

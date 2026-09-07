@@ -1,0 +1,30 @@
+{
+  "copy_hotkey": {
+    "shortcut": "Ctrl+Alt+C",
+    "result": "registered exclusive"
+  },
+  "translate_hotkey": {
+    "shortcut": "Ctrl+Alt+T",
+    "result": "registered exclusive"
+  },
+  "fullscreen_translate_hotkey": {
+    "shortcut": "Ctrl+Alt+F",
+    "result": "registered exclusive"
+  },
+  "translate_selection_hotkey": {
+    "shortcut": "Ctrl+Alt+Q",
+    "result": "registered exclusive"
+  },
+  "translate_replace_selection_hotkey": {
+    "shortcut": "Ctrl+Shift+Q",
+    "result": "registered exclusive"
+  },
+  "game_translate_hotkey": {
+    "shortcut": "Ctrl+Alt+G",
+    "result": "registered exclusive"
+  },
+  "toggle_window_hotkey": {
+    "shortcut": "Ctrl+Shift+Space",
+    "result": "registered exclusive"
+  }
+}
