@@ -1,0 +1,136 @@
+{
+  "date": "2026-09-07",
+  "host": {
+    "macos": "14.3",
+    "build": "23D56",
+    "architecture": "arm64",
+    "model": "MacBookAir10,1",
+    "chip": "Apple M1",
+    "ram_gb": 8,
+    "dpr": 2
+  },
+  "tests": {
+    "cocoa_full": {
+      "passed": 1060,
+      "skipped": 72,
+      "subtests_passed": 892,
+      "seconds": 140.93
+    },
+    "offscreen_targeted": {
+      "passed": 81,
+      "subtests_passed": 117,
+      "seconds": 29.51
+    },
+    "new_position_tests": 20
+  },
+  "smoke": {
+    "source": {
+      "screenshots": 152,
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": true,
+        "accessibility": true
+      },
+      "vision": "ok",
+      "native_popup_surfaces": {
+        "dark_tooltip": "transparent Cocoa background; painted surface",
+        "dark_status": "transparent Cocoa background; painted surface",
+        "dark_menu": "transparent Cocoa background; painted surface",
+        "light_tooltip": "transparent Cocoa background; painted surface",
+        "light_status": "transparent Cocoa background; painted surface",
+        "light_menu": "transparent Cocoa background; painted surface"
+      }
+    },
+    "build": {
+      "screenshots": 152,
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": false,
+        "accessibility": false
+      },
+      "vision": "ok",
+      "native_popup_surfaces": {
+        "dark_tooltip": "transparent Cocoa background; painted surface",
+        "dark_status": "transparent Cocoa background; painted surface",
+        "dark_menu": "transparent Cocoa background; painted surface",
+        "light_tooltip": "transparent Cocoa background; painted surface",
+        "light_status": "transparent Cocoa background; painted surface",
+        "light_menu": "transparent Cocoa background; painted surface"
+      }
+    },
+    "installed": {
+      "screenshots": 152,
+      "window_placement_cases": 48,
+      "dropdown_openings": 180,
+      "hotkey_callbacks": 10,
+      "permission_preflight": {
+        "screen": false,
+        "accessibility": false
+      },
+      "vision": "ok",
+      "native_popup_surfaces": {
+        "dark_tooltip": "transparent Cocoa background; painted surface",
+        "dark_status": "transparent Cocoa background; painted surface",
+        "dark_menu": "transparent Cocoa background; painted surface",
+        "light_tooltip": "transparent Cocoa background; painted surface",
+        "light_status": "transparent Cocoa background; painted surface",
+        "light_menu": "transparent Cocoa background; painted surface"
+      }
+    }
+  },
+  "build": {
+    "command": "bash tools/build_macos_release.sh",
+    "exit_code": 0,
+    "macho_files": 224,
+    "minimum_macos": "13.4"
+  },
+  "signing": {
+    "signature": "ad hoc",
+    "designated_requirement": "cdhash de3952efe90457c57be5e7bc6f59a53d155e20b6",
+    "previous_designated_requirement": "cdhash 829c6343eaef8da6bd8b6f99ea268a32d94da7f5",
+    "notarized": false,
+    "gatekeeper": "rejected"
+  },
+  "installation": {
+    "installed": "/Applications/ClicknTranslate.app",
+    "dmg_copy": "passed",
+    "deep_signature": "passed",
+    "bundle_executable": "ClicknTranslate",
+    "background_only": false,
+    "minimum_macos": "13.4",
+    "gatekeeper_returncode": 3,
+    "gatekeeper": "/Applications/ClicknTranslate.app: rejected"
+  },
+  "lifecycle": {
+    "application": "/Applications/ClicknTranslate.app",
+    "normal_launch": "passed",
+    "ipc_show": "accepted",
+    "second_autostart_launch_returncode": 0,
+    "single_process_remains": true,
+    "pid": 35050,
+    "scope": "LaunchServices and app IPC; no physical Dock click"
+  },
+  "artifacts": [
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166081363,
+      "sha256": "1dc8caab17eaa10a05f27c80dd76fdc42b1946a4d8d14c8cd215688c01f2cde3"
+    },
+    {
+      "file": "releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153481104,
+      "sha256": "3a681beaa01f8bbff9aaf8f16e9263345154e0042db8b49b915be24244c93831"
+    }
+  ],
+  "limitations": [
+    "Own Qt/Cocoa windows and internal events; physical mouse, keyboard and Dock interaction not exercised in this cycle.",
+    "Second physical monitor not available; negative monitor coordinates covered by geometry tests.",
+    "Current installed app Screen Recording and Accessibility preflight are false after changing ad hoc signature. No permissions reset or trust bypass in this cycle.",
+    "Previous installed process 31815 captured nonempty Retina screen images after permission repair; metadata evidence does not prove OCR or Accessibility.",
+    "Intel and macOS 13.4 runtime not exercised."
+  ]
+}

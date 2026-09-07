@@ -1,0 +1,11 @@
+{
+  "scope": "Selected metadata only, before centering rebuild; no recognized user text included",
+  "evidence": [
+    "2026-09-07 14:47:26.337 [INFO] [MainThread] root:113 - macOS shortcut pressed: id=2",
+    "2026-09-07 14:47:26.412 [DEBUG] [MainThread] root:3835 - [OCR:20260907-144726-346-translate-31815] Frozen grab attempt full screen; screen=name='', geometry=(x=0, y=0, w=1280, h=800), available=(x=0, y=25, w=1216, h=775), dpr=2.000, logicalDpi=72.0, physicalDpi=113.5, shot_null=False, shot_size=2560x1600, dpr=2.000",
+    "2026-09-07 14:47:26.444 [DEBUG] [MainThread] root:109 - macOS shortcut released: id=2",
+    "2026-09-07 14:49:24.314 [INFO] [MainThread] root:113 - macOS shortcut pressed: id=1",
+    "2026-09-07 14:49:24.429 [DEBUG] [MainThread] root:3835 - [OCR:20260907-144924-327-copy-31815] Frozen grab attempt full screen; screen=name='', geometry=(x=0, y=0, w=1280, h=800), available=(x=0, y=25, w=1216, h=775), dpr=2.000, logicalDpi=72.0, physicalDpi=113.5, shot_null=False, shot_size=2560x1600, dpr=2.000",
+    "2026-09-07 14:49:24.461 [DEBUG] [MainThread] root:109 - macOS shortcut released: id=1"
+  ]
+}

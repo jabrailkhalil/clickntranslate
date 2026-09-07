@@ -59,6 +59,63 @@ def hotkey_dispatch_check():
             'release_and_reregister': 'passed', 'delivery': 'Carbon SendEventToEventTarget, own process'}
 
 
+def dialog_placement_check(main, app, window, report_path, screenshots):
+    """Exercise real secondary windows with a displaced/scaled native owner."""
+    from PyQt5 import QtCore
+    from PyQt5.QtTest import QTest
+    import settings_window as settings
+    from styled_dialogs import StyledMessageBox
+
+    results = []
+    for theme in ('dark', 'light'):
+        expected_theme = 'Темная' if theme == 'dark' else 'Светлая'
+        if window.current_theme != expected_theme:
+            window.toggle_theme()
+        for percent in (80, 100, 130):
+            actual = window.set_ui_scale_percent(percent)
+            bounds = window.screen().availableGeometry()
+            window.move(bounds.left() + min(80, max(0, bounds.width() - window.width())),
+                        bounds.top() + min(90, max(0, bounds.height() - window.height())))
+            window.show_settings()
+            owner = window.settings_window
+            with mock.patch.object(QtCore.QTimer, 'singleShot'):
+                packages = settings.OcrLanguageManagerDialog(owner)
+            dialogs = [
+                ('packages', packages), ('update', settings.UpdateProgressDialog(owner)),
+                ('install', settings.TesseractInstallProgressDialog(owner)),
+                ('argos-confirm', main.ArgosPackageInstallDialog(window, 'English → Русский')),
+                ('argos-error', main.ArgosTranslationErrorDialog(window, 'English → Русский', 'Fixture error')),
+                ('result', main.TranslationResultDialog(window, 'Привет', auto_copy=False, source_text='Hello')),
+                ('document', main.DocumentTranslationDialog(window)), ('message', StyledMessageBox(owner)),
+            ]
+            dialogs[-1][1].setText('Проверка расположения окна')
+            for name, dialog in dialogs:
+                dialog.show()
+                QTest.qWait(100)
+                frame = dialog.frameGeometry()
+                center = window.frameGeometry().center()
+                x = max(bounds.left(), min(center.x() - (frame.width() - 1) // 2,
+                                          bounds.right() - frame.width() + 1))
+                y = max(bounds.top(), min(center.y() - (frame.height() - 1) // 2,
+                                         bounds.bottom() - frame.height() + 1))
+                assert frame.topLeft() == QtCore.QPoint(x, y), (name, frame, x, y)
+                assert bounds.contains(frame), (name, frame, bounds)
+                filename = f'{report_path.stem}-position-{theme}-{percent}-{name}.png'
+                picture = dialog.grab()
+                assert picture.save(str(report_path.with_name(filename)))
+                screenshots.append({'file': filename, 'requested_percent': percent,
+                                    'effective_percent': actual, 'width': picture.width(),
+                                    'height': picture.height(), 'dpr': picture.devicePixelRatioF()})
+                results.append({'window': name, 'theme': theme, 'scale': percent,
+                                'geometry': [frame.x(), frame.y(), frame.width(), frame.height()]})
+                dialog.close()
+                dialog.deleteLater()
+                app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    window.show_main_screen()
+    return {'cases': len(results), 'checks': 'native owner center and available screen bounds',
+            'results': results}
+
+
 def popup_screenshots(app, window, report_path, screenshots):
     """Check the real NSWindow background as well as Qt's painted corners."""
     import ctypes
@@ -325,6 +382,9 @@ def run(main, report_path):
             for _ in range(5):
                 app.processEvents()
             assert window.isVisible() and window.text_input.width() > 0
+            initial_frame = window.frameGeometry()
+            initial_bounds = window.screen().availableGeometry()
+            assert initial_frame.center() == initial_bounds.center(), (initial_frame, initial_bounds)
             screenshots = []
             for theme in ('dark', 'light'):
                 expected_theme = 'Темная' if theme == 'dark' else 'Светлая'
@@ -354,6 +414,7 @@ def run(main, report_path):
             if os.environ.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1':
                 extended_screenshots(main, app, window, report_path, screenshots)
             dropdown_results = dropdown_screenshots(main, app, window, report_path, screenshots)
+            placement_results = dialog_placement_check(main, app, window, report_path, screenshots)
             popup_results = popup_screenshots(app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
@@ -384,6 +445,7 @@ def run(main, report_path):
                 "native_popup_surfaces": popup_results,
                 "dropdowns": dropdown_results,
                 "hotkey_event_delivery": hotkey_delivery,
+                "window_placement": placement_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()

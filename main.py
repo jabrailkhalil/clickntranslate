@@ -4052,21 +4052,8 @@ class CenteredFramelessDialog(QDialog):
         self._centered_once = False
 
     def _center_on_owner(self):
-        owner = self.parentWidget()
-        target = owner.window().frameGeometry() if owner is not None else None
-        if target is None or not target.isValid():
-            screen = QApplication.primaryScreen()
-            target = screen.availableGeometry() if screen is not None else None
-        if target is None or not target.isValid():
-            return
-        frame = self.frameGeometry()
-        frame.moveCenter(target.center())
-        screen = QApplication.screenAt(target.center()) or QApplication.primaryScreen()
-        if screen is not None:
-            available = screen.availableGeometry()
-            frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
-            frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
-        self.move(frame.topLeft())
+        from ui_scaling import center_window
+        center_window(self)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -4591,24 +4578,9 @@ class TranslationResultDialog(QDialog):
                 )
 
     def _center_on_parent(self):
+        from ui_scaling import center_window
         self.ensurePolished()
-        target = self.parentWidget()
-        if target is not None:
-            target_geometry = target.window().frameGeometry()
-        else:
-            screen = QApplication.primaryScreen()
-            target_geometry = screen.availableGeometry() if screen is not None else None
-        if target_geometry is None:
-            return
-        frame = self.frameGeometry()
-        frame.moveCenter(target_geometry.center())
-        frame.translate(self._stack_offset)
-        screen = QApplication.screenAt(target_geometry.center()) or QApplication.primaryScreen()
-        if screen is not None:
-            available = screen.availableGeometry()
-            frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
-            frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
-        self.move(frame.topLeft())
+        center_window(self, offset=self._stack_offset)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and event.pos().y() <= 78:

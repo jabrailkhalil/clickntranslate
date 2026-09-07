@@ -7,7 +7,7 @@ import weakref
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import sip
 
-from ui_scaling import BASE_SCALE, DEFAULT_SCALE, normalize_ui_scale
+from ui_scaling import BASE_SCALE, DEFAULT_SCALE, normalize_ui_scale, center_window, window_position_context
 
 
 _PIXELS = re.compile(r'(-?\d+(?:\.\d+)?)px\b')
@@ -118,7 +118,19 @@ class DialogAppearance(QtCore.QObject):
             # padding there would enlarge the first popup below the taskbar.
             self.apply(watched)
         elif event.type() == QtCore.QEvent.Show and watched is window:
+            automatic_position = (window.windowType() != QtCore.Qt.Popup
+                                  and not window.testAttribute(QtCore.Qt.WA_Moved))
             self.apply(window)
+            if automatic_position:
+                center_window(window, available=self.available_geometry(window))
+                position = window.pos()
+                reference = weakref.ref(window)
+                def finish_position():
+                    item = reference()
+                    if (item is not None and not sip.isdeleted(item) and item.isVisible()
+                            and item.pos() == position):
+                        center_window(item, available=self.available_geometry(item))
+                QtCore.QTimer.singleShot(0, finish_position)
         elif event.type() == QtCore.QEvent.StyleChange and window in self._windows:
             self._queue(window)
         return False
@@ -162,6 +174,8 @@ class DialogAppearance(QtCore.QObject):
         return normalize_ui_scale(window.property('ui_scale_override') or self.percent)
 
     def available_geometry(self, window):
+        if not window.testAttribute(QtCore.Qt.WA_Moved):
+            return window_position_context(window)[1]
         screen = window.screen() or self.app.primaryScreen()
         return screen.availableGeometry() if screen else QtCore.QRect(0, 0, 1920, 1080)
 

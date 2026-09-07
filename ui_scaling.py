@@ -6,7 +6,7 @@ import sys
 import weakref
 
 from PyQt5.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, QRegularExpression, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QRegularExpressionValidator
+from PyQt5.QtGui import QColor, QCursor, QFont, QIcon, QPainter, QPalette, QRegularExpressionValidator
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsScene, QGraphicsView, QLineEdit, QMainWindow, QPushButton,
     QStyle, QStyleOptionButton, QStyleOptionToolButton, QStylePainter, QToolButton, QWidget,
@@ -81,6 +81,39 @@ def native_window_parent(widget):
         if reference is not None and reference() is not None:
             return reference()
     return widget
+
+
+def window_position_context(window, owner=None):
+    """Resolve an embedded owner to its visible native window and monitor."""
+    owner = native_window_parent(owner if owner is not None else window.parentWidget())
+    if isinstance(owner, QWidget):
+        owner = owner.window()
+        if owner is not window and owner.isVisible() and not owner.isMinimized():
+            target = owner.frameGeometry()
+            screen = QApplication.screenAt(target.center()) or owner.screen()
+            return target, screen.availableGeometry()
+    screen = QApplication.screenAt(QCursor.pos()) or window.screen() or QApplication.primaryScreen()
+    available = screen.availableGeometry() if screen is not None else QRect(0, 0, 1920, 1080)
+    return available, available
+
+
+def centered_window_geometry(frame, target, available, offset=None):
+    frame = QRect(frame)
+    frame.moveCenter(target.center())
+    if offset is not None:
+        frame.translate(offset)
+    frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
+    frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
+    return frame
+
+
+def center_window(window, owner=None, offset=None, available=None):
+    target, screen_area = window_position_context(window, owner)
+    if available is not None and target == screen_area:
+        target = available
+    frame = centered_window_geometry(window.frameGeometry(), target,
+                                     available if available is not None else screen_area, offset)
+    window.move(frame.topLeft())
 
 
 def paint_scaled_icon(painter, button, option):
@@ -221,6 +254,9 @@ class MainWindowScaleController(QObject):
         self.effective_percent = MIN_SCALE
         self.maximum_percent = MAX_SCALE
         self._screen = None
+        self._shown = False
+        self._initial_position = None
+        owner.installEventFilter(self)
         self.canvas = _InterfaceCanvas(owner)
         self.view = _ScaleView(owner)
         self.view.setObjectName('mainUiScaleView')
@@ -243,6 +279,11 @@ class MainWindowScaleController(QObject):
         if handle is not None:
             handle.screenChanged.connect(self._screen_changed)
             self._screen_changed(handle.screen())
+
+    def eventFilter(self, watched, event):
+        if watched is self.owner and event.type() == QEvent.Show:
+            self._shown = True
+        return False
 
     def available_geometry(self):
         handle = self.owner.windowHandle()
@@ -276,6 +317,11 @@ class MainWindowScaleController(QObject):
         factor = actual / BASE_SCALE
         width, height = round(BASE_WIDTH * factor), round(BASE_HEIGHT * factor)
         position = self.owner.pos()
+        initial = (not self._shown and anchor_widget is None
+                   and (position == self._initial_position
+                        or (self._initial_position is None and not self.owner.testAttribute(Qt.WA_Moved))))
+        if initial:
+            position = centered_window_geometry(QRect(0, 0, width, height), available, available).topLeft()
         if anchor_widget is not None:
             anchor_global = self.view.mouse_global_position
             if anchor_global is None or not self.view.viewport().rect().contains(self.view.viewport().mapFromGlobal(anchor_global)):
@@ -296,6 +342,8 @@ class MainWindowScaleController(QObject):
             self.owner.setFixedSize(width, height)
             self.owner.layout().activate()
             self.owner.move(position)
+            if initial:
+                self._initial_position = QPoint(position)
         finally:
             self.owner.setUpdatesEnabled(updates_enabled)
         self.changed.emit(actual, self.maximum_percent)

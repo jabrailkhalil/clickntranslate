@@ -11,7 +11,7 @@ from unittest import mock
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PyQt5.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, Qt
+from PyQt5.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt5.QtGui import QColor, QIcon, QIconEngine, QMouseEvent, QPalette, QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QGraphicsItem
@@ -521,7 +521,10 @@ class UiScalingTest(unittest.TestCase):
 
     def test_numeric_input_clamps_to_screen_and_handles_empty_input(self):
         self.window.show_settings()
-        self.available.return_value = QRect(0, 0, 1280, 640)
+        # Cocoa moves a visible window below the real menu bar. Keep this
+        # artificial 640px work area on the actual available-screen origin.
+        origin = self.app.primaryScreen().availableGeometry().topLeft()
+        self.available.return_value = QRect(origin, QSize(1280, 640))
         self.controller.refresh()
         editor = self.window.settings_window.ui_scale_value
         viewport = self.controller.view.viewport()
@@ -534,7 +537,8 @@ class UiScalingTest(unittest.TestCase):
             self.settle()
             self.assertEqual(editor.text(), f'{expected}%')
             self.assertEqual(self.window.config['ui_scale_percent'], expected)
-            self.assertTrue(self.available.return_value.contains(self.window.geometry()))
+            self.assertTrue(self.available.return_value.contains(self.window.geometry()),
+                            (text, self.window.geometry(), self.available.return_value))
 
     def test_leaving_the_number_field_keeps_the_clicked_control_under_the_pointer(self):
         self.window.show_settings()

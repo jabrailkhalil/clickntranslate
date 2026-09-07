@@ -1,0 +1,9 @@
+{
+  "application": "/Applications/ClicknTranslate.app",
+  "normal_launch": "passed",
+  "ipc_show": "accepted",
+  "second_autostart_launch_returncode": 0,
+  "single_process_remains": true,
+  "pid": 35050,
+  "scope": "LaunchServices and app IPC; no physical Dock click"
+}

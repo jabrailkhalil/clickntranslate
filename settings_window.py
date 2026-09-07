@@ -1321,44 +1321,14 @@ def _bring_progress_dialog_to_front(dialog):
 
 def _center_progress_dialog(dialog, owner):
     """Center a frameless progress window after its final size is known."""
-    owner_window = None
-    if isinstance(owner, QWidget):
-        try:
-            owner_window = owner.window()
-        except Exception:
-            owner_window = owner
-    if owner_window is None:
-        owner_parent = getattr(owner, "parent", None)
-        if isinstance(owner_parent, QWidget):
-            try:
-                owner_window = owner_parent.window()
-            except Exception:
-                owner_window = owner_parent
-
-    target_geometry = None
-    if owner_window is not None:
-        try:
-            target_geometry = owner_window.frameGeometry()
-        except Exception:
-            target_geometry = None
-    if target_geometry is None or not target_geometry.isValid():
-        screen = QApplication.primaryScreen()
-        if screen is not None:
-            target_geometry = screen.availableGeometry()
-    if target_geometry is None or not target_geometry.isValid():
-        return
-
+    from ui_scaling import center_window
+    if not isinstance(owner, QWidget):
+        owner = getattr(owner, "parent", None)
+        if callable(owner):
+            owner = owner()
     dialog.ensurePolished()
     dialog.adjustSize()
-    frame = dialog.frameGeometry()
-    frame.moveCenter(target_geometry.center())
-    screen = QApplication.screenAt(target_geometry.center()) or QApplication.primaryScreen()
-    if screen is not None:
-        available = screen.availableGeometry()
-        x = max(available.left(), min(frame.left(), available.right() - frame.width() + 1))
-        y = max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1))
-        frame.moveTopLeft(QtCore.QPoint(x, y))
-    dialog.move(frame.topLeft())
+    center_window(dialog, owner=owner)
 
 
 class UpdateProgressDialog(QDialog):
@@ -3736,27 +3706,8 @@ class OcrLanguageManagerDialog(QDialog):
         table.setMaximumHeight((available // row_height) * row_height + chrome)
 
     def _center_on_owner(self):
-        owner_window = None
-        try:
-            owner_window = self.owner.window() if self.owner is not None else None
-        except Exception:
-            owner_window = None
-        if owner_window is not None and owner_window.isVisible():
-            target = owner_window.frameGeometry().center() - self.rect().center()
-        else:
-            screen = QApplication.screenAt(QtGui.QCursor.pos()) if hasattr(QApplication, "screenAt") else None
-            screen = screen or QApplication.primaryScreen()
-            if screen is None:
-                return
-            target = screen.availableGeometry().center() - self.rect().center()
-
-        screen = QApplication.screenAt(target) if hasattr(QApplication, "screenAt") else None
-        screen = screen or QApplication.primaryScreen()
-        if screen is not None:
-            available = screen.availableGeometry()
-            target.setX(max(available.left(), min(target.x(), available.right() - self.width() + 1)))
-            target.setY(max(available.top(), min(target.y(), available.bottom() - self.height() + 1)))
-        self.move(target)
+        from ui_scaling import center_window
+        center_window(self, owner=self.owner)
 
     def showEvent(self, event):
         super().showEvent(event)

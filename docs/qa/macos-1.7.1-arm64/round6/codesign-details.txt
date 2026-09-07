@@ -1,0 +1,23 @@
+Executable=/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate
+Identifier=io.github.jabrailkhalil.clickntranslate
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=73184 flags=0x2(adhoc) hashes=2280+3 location=embedded
+VersionPlatform=1
+VersionMin=720896
+VersionSDK=983040
+Hash type=sha256 size=32
+CandidateCDHash sha256=de3952efe90457c57be5e7bc6f59a53d155e20b6
+CandidateCDHashFull sha256=de3952efe90457c57be5e7bc6f59a53d155e20b682ae716e6bf69d0f0a028aa9
+Hash choices=sha256
+CMSDigest=de3952efe90457c57be5e7bc6f59a53d155e20b682ae716e6bf69d0f0a028aa9
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=49152
+Executable Segment flags=0x1
+Page size=4096
+CDHash=de3952efe90457c57be5e7bc6f59a53d155e20b6
+Signature=adhoc
+Info.plist entries=15
+TeamIdentifier=not set
+Sealed Resources version=2 rules=13 files=784
+Internal requirements count=0 size=12

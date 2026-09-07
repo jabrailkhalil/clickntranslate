@@ -1,0 +1,38 @@
+............................................... [ 50%]
+.....F........................................       [100%]
+=================================== FAILURES ===================================
+__ UiScalingTest.test_numeric_input_clamps_to_screen_and_handles_empty_input ___
+
+self = <test_ui_scaling.UiScalingTest testMethod=test_numeric_input_clamps_to_screen_and_handles_empty_input>
+
+    def test_numeric_input_clamps_to_screen_and_handles_empty_input(self):
+        self.window.show_settings()
+        self.available.return_value = QRect(0, 0, 1280, 640)
+        self.controller.refresh()
+        editor = self.window.settings_window.ui_scale_value
+        viewport = self.controller.view.viewport()
+        self.click(editor)
+        for text, expected in (('999', 128), ('', 128), ('70', 80), ('90', 90), ('118%', 118)):
+            QTest.keyClick(viewport, Qt.Key_A, Qt.ControlModifier)
+            QTest.keyClick(viewport, Qt.Key_Backspace)
+            QTest.keyClicks(viewport, text)
+            QTest.keyClick(viewport, Qt.Key_Return)
+            self.settle()
+            self.assertEqual(editor.text(), f'{expected}%')
+            self.assertEqual(self.window.config['ui_scale_percent'], expected)
+>           self.assertTrue(self.available.return_value.contains(self.window.geometry()))
+E           AssertionError: False is not true
+
+tests/test_ui_scaling.py:537: AssertionError
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_ui_scaling.py::UiScalingTest::test_numeric_input_clamps_to_screen_and_handles_empty_input
+1 failed, 92 passed, 2 warnings, 117 subtests passed in 41.24s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
