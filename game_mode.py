@@ -574,18 +574,9 @@ class GameRegionSelector(QtWidgets.QWidget):
         self._persist_pair()
         self._starting_session = True
         self.close()
-        if platform_support.IS_MAC and target_window:
-            try:
-                from macos_desktop import return_focus_to_window_application
-                restored = return_focus_to_window_application(target_window)
-                logging.getLogger('clickntranslate.game').debug(
-                    'Selection focus handoff; window=%s, restored=%s', target_window, restored)
-            except Exception:
-                logging.getLogger('clickntranslate.game').exception('Unable to return selection focus')
-        QtCore.QTimer.singleShot(
-            80,
-            lambda: _begin_game_session(global_rects, source, target, target_window),
-        )
+        # Replace selection with the live areas in this event-loop turn. The
+        # first capture already waits for the windows to finish appearing.
+        _begin_game_session(global_rects, source, target, target_window)
 
     def _fill_targets(self, selected=None):
         source = self.source_combo.currentData()
@@ -831,6 +822,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._deferred_translation = None
         self._empty_ocr_frames = 0
         self._has_ocr_source = False
+        self._has_shown_translation = False
+        self._startup_frame_visible = True
         self._created_at = time.monotonic()
         self._bound_window_rect = _window_rect(self.target_window)
         self._bound_offset = (
@@ -926,9 +919,9 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.translation_ready.connect(self._apply_translation)
         self._apply_style()
         self._place_near_region()
-        # Stay visually transparent until the first useful translation. This
-        # avoids a dark rectangle flashing over every selected game area while
-        # the initial OCR request is still running.
+        # Keep a light outline while the first OCR/translation runs, so Start
+        # does not make the chosen area disappear. The text card stays empty
+        # and hidden until a result or an error is ready.
         self.card.hide()
         self.show()
         self.raise_()
@@ -949,6 +942,17 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if not self._timer.isActive():
             self._timer.start()
         self._scan_once()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self._startup_frame_visible:
+            return
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(QtGui.QColor('#b596dd'), 2))
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 8, 8)
+        painter.end()
 
     def _apply_style(self):
         dark = self.config.get("theme", "Темная") == "Темная"
@@ -980,6 +984,11 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             logging.getLogger('clickntranslate.game').debug(
                 'Region state; window=%s, state=%s', self.target_window, key)
             self._diagnostic_status = key
+        startup_visible = (not self._has_shown_translation
+                           and key not in {'paused', 'capture_error', 'ocr_error', 'translation_error'})
+        if startup_visible != self._startup_frame_visible:
+            self._startup_frame_visible = startup_visible
+            self.update()
         self.status_label.setText(game_text(self.language, key))
         self.status_dot.setStyleSheet(
             "color: #8fd18b;" if active else "color: #a597ac;"
@@ -1276,6 +1285,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 bool(self.config.get("game_show_original_text", False))
             )
             self.translation_label.setText(translated)
+            self._has_shown_translation = True
             self.card.show()
             self._set_status("waiting")
             logging.getLogger('clickntranslate.game').debug(
@@ -1993,6 +2003,8 @@ def _begin_game_session(regions, source_language, target_language, target_window
             start_delay_ms=index * 160,
         )
         _game_overlay_refs.append(overlay)
+    if _game_overlay_refs:
+        _schedule_game_focus_handoff(target_window, tuple(_game_overlay_refs))
     if not _game_overlay_refs:
         try:
             from mode_coordinator import release_mode
@@ -2000,6 +2012,28 @@ def _begin_game_session(regions, source_language, target_language, target_window
         except Exception:
             pass
     return tuple(_game_overlay_refs)
+
+
+def _schedule_game_focus_handoff(target_window, overlays):
+    if not platform_support.IS_MAC or not target_window:
+        return
+
+    def handoff():
+        # Cocoa may activate our app while the new panels are being mapped.
+        # Return focus after their creation, before the first capture, and
+        # only for a session that has not been closed in the meantime.
+        if not any(overlay in _game_overlay_refs or overlay is _game_fullscreen_ref
+                   for overlay in overlays):
+            return
+        try:
+            from macos_desktop import return_focus_to_window_application
+            restored = return_focus_to_window_application(target_window)
+            logging.getLogger('clickntranslate.game').debug(
+                'Live overlay focus handoff; window=%s, restored=%s', target_window, restored)
+        except Exception:
+            logging.getLogger('clickntranslate.game').exception('Unable to return overlay focus')
+
+    QtCore.QTimer.singleShot(80, handoff)
 
 
 def _begin_fullscreen_game_session(source_language, target_language, target_window=0):
@@ -2014,6 +2048,7 @@ def _begin_fullscreen_game_session(source_language, target_language, target_wind
         target_language,
         target_window,
     )
+    _schedule_game_focus_handoff(target_window, (_game_fullscreen_ref,))
     return _game_fullscreen_ref
 
 
