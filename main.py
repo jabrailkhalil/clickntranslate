@@ -4083,6 +4083,14 @@ for _lang, _label in {
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]['live_translation'] = _label + '...'
 
 
+def _translation_progress_message(label, done=0, total=0):
+    # A percentage is useful only while multiple known parts are unfinished.
+    # Avoid 0% for one request and a final 100% flash before the done signal.
+    if total > 1 and done < total:
+        return f'{completion_percent(done, total)}% · {label}'
+    return label
+
+
 class TranslateOnEnterTextEdit(QTextEdit):
     """Enter translates, Shift+Enter starts a new line.
 
@@ -4569,7 +4577,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = False
         self._retranslating = True
         self._update_actions()
-        self._set_status(f"0% · {self.text['live_translation']}")
+        self._set_status(self.text['live_translation'])
         error_label = ui_text(self.lang, "translation_error")
 
         def worker():
@@ -4602,7 +4610,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = True
         self.translated_text = text
         self._update_actions()
-        self._set_status(f"{completion_percent(done, total)}% · {self.text['live_translation']}")
+        self._set_status(_translation_progress_message(self.text['live_translation'], done, total))
 
     def _follow_main_translation(self, request, progress=None):
         self._following_main_translation = True
@@ -4611,7 +4619,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = bool(self.translated_text)
         self._retranslating = True
         self._update_actions()
-        self._set_status(f"{completion_percent(*(progress or (0, 0)))}% · {self.text['live_translation']}")
+        self._set_status(_translation_progress_message(self.text['live_translation'], *(progress or (0, 0))))
 
     def _finish_main_preview(self, text, error):
         if self._closed or not getattr(self, '_following_main_translation', False):
@@ -4624,7 +4632,7 @@ class TranslationResultDialog(QDialog):
             self.translated_text = text
         self._update_actions()
         # The originating main request owns history and automatic copying.
-        self._set_status(error or f"100% · {self.text['ready']}")
+        self._set_status(error or self.text['ready'])
 
     @QtCore.pyqtSlot(int, str, str)
     def _on_retranslated(self, request_id, translated_text, error):
@@ -4646,7 +4654,7 @@ class TranslationResultDialog(QDialog):
         if self.auto_copy:
             platform_support.copy_text(translated_text)
             save_copy_history(translated_text)
-        self._set_status('100% · ' + (self.text["auto_copied"] if self.auto_copy else self.text["ready"]))
+        self._set_status(self.text["auto_copied"] if self.auto_copy else self.text["ready"])
 
     @staticmethod
     def _replace_editor_text(editor, text):
@@ -5828,7 +5836,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if total:
             percent = completion_percent(done, total)
             self.progress_bar.setValue(percent)
-            self._set_status(f"{doc_text(self.lang, 'translating')}: {percent}%")
+            self._set_status(_translation_progress_message(doc_text(self.lang, 'translating'), done, total))
         else:
             self.progress_bar.setValue(0)
             self._set_status(message)
@@ -10723,10 +10731,9 @@ class DarkThemeApp(QMainWindow):
             error = getattr(self, '_main_result_error', '')
             if isinstance(status, QLabel):
                 if self._main_translation_running:
-                    percent = completion_percent(*(progress or (0, 0)))
-                    status.setText(f"{percent}% · {labels['live_translation']}")
+                    status.setText(_translation_progress_message(labels['live_translation'], *(progress or (0, 0))))
                 else:
-                    status.setText('100%' if progress and not error else '')
+                    status.clear()
                 status.setToolTip(tooltip_text(error) if error else status.text())
             stale = False
             detail = ''
@@ -11195,7 +11202,7 @@ class DarkThemeApp(QMainWindow):
     def _finish_main_translation_state(self, translated_text=None, error=''):
         self._update_main_preview_windows(translated_text, error=error)
         self._main_translation_running = False
-        self._main_result_progress = (1, 1) if translated_text and not error else None
+        self._main_result_progress = None
         self._argos_install_required = False
         self._argos_cancel_enabled = False
         if getattr(self, "translate_button", None) is not None:

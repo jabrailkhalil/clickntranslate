@@ -158,8 +158,10 @@ failure; automatic copying and history saving wait for successful completion.
 Argos streams through its helper without loading a new model per chunk. This
 new translation flow awaits runtime QA; only autostart was tested in Round22.
 The result panel has a reserved, localized “Translating in real time...”
-status line below the translated text, with a percentage of completed request
-parts. The main chat has a single expand button on the
+status line below the translated text. Percentages appear only for a known
+multi-part request that is still incomplete; single-part requests show the
+status without a number. Completion clears the main status line, with no
+lingering 100%. The main chat has a single expand button on the
 right, enabled even before a result exists. Opening it during translation follows
 the current request without starting another one or copying/saving its result
 twice. Editing or closing that preview detaches it from the main request.

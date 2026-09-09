@@ -1,0 +1,9 @@
+{
+  "installed": "/Applications/ClicknTranslate.app",
+  "source": "local build; runtime tests explicitly skipped",
+  "previous_app": "/Users/jabrail/Desktop/click/clickntranslate/build/macos/round26/previous.app",
+  "normal_shutdown": true,
+  "data_preserved": true,
+  "screen_permissions_reset": false,
+  "signer": "E5E6A8042F96479E560AED29881A6F06D4D374A2"
+}
