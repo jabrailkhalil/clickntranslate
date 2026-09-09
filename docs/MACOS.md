@@ -279,10 +279,17 @@ before creating a draft release; it uploads only package/checksum assets, not
 the smoke-test screenshots. Local native testing does not imply that both CI
 architectures have already passed.
 
-Ephemeral PR/manual CI permits explicitly marked ad-hoc QA builds through
+To keep signed files for a later coordinated release, run the workflow manually
+with `prepare_release=true`. This mode skips pytest/runtime smoke, verifies the
+permanent certificate, and stores only the distributables plus a source manifest
+for 90 days. It creates no tag or GitHub Release. See
+[downloading the prepared files from Windows](MACOS_ARTIFACTS.md).
+
+Ephemeral PR/ordinary manual CI permits explicitly marked ad-hoc QA builds through
 `CLICKNTRANSLATE_ALLOW_ADHOC=1`. Tagged release builds restore the permanent
 encrypted keychain from two repository Actions secrets:
 `MACOS_SIGNING_KEYCHAIN_BASE64` and `MACOS_SIGNING_KEYCHAIN_PASSWORD`.
+Explicit `prepare_release` runs restore the same signer without publishing a release.
 The same certificate signs both arm64 and Intel releases. Its public certificate
 is `packaging/macos/release-certificate.pem`; the pinned SHA-1 fingerprint is
 `E5E6A8042F96479E560AED29881A6F06D4D374A2`. Missing secrets or a mismatched signer

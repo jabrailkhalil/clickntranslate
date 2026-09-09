@@ -7,9 +7,16 @@ on:
         description: Verify the permanent signer without building or running the app
         type: boolean
         default: false
+      prepare_release:
+        description: Prepare signed files for a later release, without tests or publication
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       signing_only:
+        type: boolean
+        default: false
+      prepare_release:
         type: boolean
         default: false
     secrets:
@@ -49,13 +56,18 @@ jobs:
       - name: Select isolated signing directory
         run: echo "CLICKNTRANSLATE_SIGNING_DIR=$RUNNER_TEMP/clickntranslate-signing" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
+      - name: Validate preparation mode
+        if: inputs.prepare_release && inputs.signing_only
+        run: |
+          echo 'Choose either signing_only or prepare_release, not both.' >&2
+          exit 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: ${{ !inputs.signing_only && 'pip' || '' }}
           cache-dependency-path: requirements-macos.txt
       - name: Restore permanent release signer
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only)
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only || inputs.prepare_release)
         env:
           MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
           MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
@@ -67,7 +79,7 @@ jobs:
         if: '!inputs.signing_only'
         run: bash tools/setup_macos_env.sh
       - name: Test platform behavior and selected engines
-        if: '!inputs.signing_only'
+        if: '!inputs.signing_only && !inputs.prepare_release'
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
@@ -75,14 +87,42 @@ jobs:
       - name: Build and exercise native bundle
         if: '!inputs.signing_only'
         env:
-          # PR/manual QA never receives the private key. Tags must use it.
-          CLICKNTRANSLATE_ALLOW_ADHOC: ${{ startsWith(github.ref, 'refs/tags/') && '0' || '1' }}
+          # Only tags and explicit signed preparation use the permanent key.
+          CLICKNTRANSLATE_ALLOW_ADHOC: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.prepare_release) && '0' || '1' }}
+          CLICKNTRANSLATE_SKIP_SMOKE: ${{ inputs.prepare_release && '1' || '0' }}
         run: bash tools/build_macos_release.sh
       - name: Verify final release certificate
-        if: startsWith(github.ref, 'refs/tags/') && !inputs.signing_only
+        if: (startsWith(github.ref, 'refs/tags/') || inputs.prepare_release) && !inputs.signing_only
         run: python tools/macos_ci_signing.py verify --app dist/ClicknTranslate.app --report build/macos/release-signature.json
+      - name: Stage signed files and source manifest
+        if: inputs.prepare_release && !inputs.signing_only
+        run: python tools/stage_macos_artifacts.py
+      - name: Keep files for a later coordinated release
+        id: prepared
+        if: inputs.prepare_release && !inputs.signing_only
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-prepared
+          path: build/macos/prepared/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+      - name: Link prepared files
+        if: inputs.prepare_release && !inputs.signing_only
+        env:
+          ARTIFACT_URL: ${{ steps.prepared.outputs.artifact-url }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as output:
+              output.write(f"Prepared {os.environ['BUILD_ARCH']} files from `{os.environ['GITHUB_SHA']}`.\n\n")
+              output.write(f"[Download artifact]({os.environ['ARTIFACT_URL']}) (retained for 90 days).\n\n")
+              output.write('Permanent self-signed certificate; not notarized. Runtime tests were skipped. No GitHub Release or tag was created.\n')
+          PY
       - uses: actions/upload-artifact@v4
-        if: '!inputs.signing_only'
+        if: '!inputs.signing_only && !inputs.prepare_release'
         with:
           name: macos-${{ matrix.arch }}-release
           path: |
@@ -100,7 +140,7 @@ jobs:
             build/macos/release-signature.json
           if-no-files-found: error
       - name: Remove private signer from runner
-        if: always() && github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only)
+        if: always() && github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only || inputs.prepare_release)
         run: python tools/macos_ci_signing.py cleanup
       - name: Keep build diagnostics on failure
         if: failure()
