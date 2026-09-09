@@ -141,7 +141,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                 self.window.show_main_screen()
                 self.settle()
                 editor = self.window.text_input
-                expand = self.window.document_expand_button
+                expand = self.window.main_result_expand_button
                 editor.setFocus()
                 for index, line in enumerate(("one", "two", "three", "four")):
                     if index:
@@ -156,20 +156,21 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                 self.assertFalse(button_rect.intersects(
                     self.rect_in(self.window.main_composer, self.window.translate_button)
                 ))
-                with mock.patch.object(self.window, "open_document_translation") as opened:
+                with mock.patch.object(main, "show_translation_dialog") as opened:
                     QTest.mouseClick(expand, Qt.LeftButton)
-                    opened.assert_called_once_with(initial_text="one\ntwo\nthree\nfour")
+                    self.assertEqual(opened.call_args.kwargs['source_text'], "one\ntwo\nthree\nfour")
 
                 editor.setPlainText("A long paragraph with automatic line wrapping. " * 12)
                 self.settle()
                 self.assertEqual(editor.document().blockCount(), 1)
-                self.assertGreater(self.window._composer_visual_line_count(), 2)
                 self.assertTrue(expand.isVisible())
+                self.assertTrue(expand.isEnabled())
 
                 for text in ("one\ntwo", ""):
                     editor.setPlainText(text)
                     self.settle()
-                    self.assertFalse(expand.isVisible())
+                    self.assertTrue(expand.isVisible())
+                    self.assertTrue(expand.isEnabled())
 
     def test_main_panels_and_shadow_action_remain_visible_in_both_themes(self):
         def luminance(color):

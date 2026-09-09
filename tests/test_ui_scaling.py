@@ -147,10 +147,10 @@ class UiScalingTest(unittest.TestCase):
             QTest.keyClicks(viewport, text)
         self.settle()
         self.assertEqual(self.window.text_input.toPlainText(), 'one\ntwo\nthree\nfour')
-        self.assertTrue(self.window.document_expand_button.isVisible())
-        with mock.patch.object(self.window, 'open_document_translation') as opened:
-            self.click(self.window.document_expand_button)
-            opened.assert_called_once_with(initial_text='one\ntwo\nthree\nfour')
+        self.assertTrue(self.window.main_result_expand_button.isVisible())
+        with mock.patch.object(main, 'show_translation_dialog') as opened:
+            self.click(self.window.main_result_expand_button)
+            self.assertEqual(opened.call_args.kwargs['source_text'], 'one\ntwo\nthree\nfour')
 
     def test_scaled_text_uses_smooth_gray_edges_without_color_fringes(self):
         if self.window.current_theme != 'Темная':

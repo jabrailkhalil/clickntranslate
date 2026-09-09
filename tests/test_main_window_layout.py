@@ -79,7 +79,8 @@ class MainScreenSourceTest(unittest.TestCase):
         self.assertNotIn("self.main_layout.addWidget(self.translate_button)", translate)
         self.assertIn("self.translate_button = ScaledIconButton()", source)
         self.assertIn("self.translate_button.setFixedSize(32, 32)", translate)
-        self.assertIn("self.document_expand_button.hide()", source)
+        self.assertNotIn("mainDocumentExpandButton", source)
+        self.assertIn("self.main_result_expand_button", source)
         self.assertIn("_apply_main_translate_button_theme", translate)
         self.assertNotIn("background-color: #C5B3E9", shadow)
 
@@ -99,7 +100,8 @@ class MainScreenSourceTest(unittest.TestCase):
         # Reserve a real gap below the language pickers within the fixed
         # 700x400 viewport, while retaining three readable lines of text.
         self.assertIn("self.main_composer.setMinimumHeight(74)", source)
-        self.assertIn("self.text_input.setMinimumHeight(66)", source)
+        self.assertIn("self.text_input.setMinimumHeight(50)", source)
+        self.assertIn("self.main_translation_status.setFixedHeight(14)", source)
 
 
 class HotkeyBarTextTest(unittest.TestCase):
@@ -625,20 +627,23 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertGreaterEqual(button_left, text_right)
         self.assertLessEqual(abs(button_bottom - text_bottom), 2)
 
-    def test_long_input_offers_document_mode_without_a_scrollbar(self):
+    def test_only_the_right_expand_button_is_available_for_any_input_length(self):
         editor = self.window.text_input
-        expand = self.window.document_expand_button
+        expand = self.window.main_result_expand_button
+        self.assertFalse(hasattr(self.window, 'document_expand_button'))
 
         self.assertEqual(editor.verticalScrollBarPolicy(), Qt.ScrollBarAsNeeded)
         editor.setPlainText("one\ntwo")
         for _ in range(3):
             self.app.processEvents()
-        self.assertFalse(expand.isVisible())
+        self.assertTrue(expand.isVisible())
+        self.assertTrue(expand.isEnabled())
 
         editor.setPlainText("one\ntwo\nthree")
         for _ in range(3):
             self.app.processEvents()
         self.assertTrue(expand.isVisible())
+        self.assertTrue(expand.isEnabled())
 
     def test_document_workspace_reopens_and_receives_composer_text(self):
         text = "one\ntwo\nthree\nfour"
@@ -646,7 +651,7 @@ class MainWindowGeometryTest(unittest.TestCase):
         for _ in range(3):
             self.app.processEvents()
 
-        QTest.mouseClick(self.window.document_expand_button, Qt.LeftButton)
+        self.window.open_document_translation(initial_text=text)
         self.app.processEvents()
         dialog = self.window.document_dialog
         self.assertIsNotNone(dialog)

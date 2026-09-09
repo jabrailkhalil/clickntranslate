@@ -53,6 +53,7 @@ class ArgosProgressUiTest(unittest.TestCase):
             _confirm_argos_package_install=mock.Mock(return_value=True),
             _show_argos_translation_error=mock.Mock(),
             _show_argos_progress=mock.Mock(),
+            _refresh_main_result_caption=mock.Mock(),
             translate_button=mock.Mock(),
         )
         dummy._start_main_translation = lambda *args: main.DarkThemeApp._start_main_translation(dummy, *args)
@@ -204,7 +205,7 @@ class ArgosProgressUiTest(unittest.TestCase):
         )
         main.DarkThemeApp._on_main_translation_error(dummy, "RuntimeError: test failure")
 
-        dummy._finish_main_translation_state.assert_called_once_with()
+        dummy._finish_main_translation_state.assert_called_once_with(error="RuntimeError: test failure")
         dummy._show_argos_translation_error.assert_called_once_with(
             "RuntimeError: test failure", "RU→PT"
         )

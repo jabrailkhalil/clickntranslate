@@ -157,6 +157,11 @@ GUI thread. Partial text retains the reading position and remains visible on
 failure; automatic copying and history saving wait for successful completion.
 Argos streams through its helper without loading a new model per chunk. This
 new translation flow awaits runtime QA; only autostart was tested in Round22.
+The input panel now has a reserved, localized “Translating in real time...”
+status line during a request. The main chat has a single expand button on the
+right, enabled even before a result exists. Opening it during translation follows
+the current request without starting another one or copying/saving its result
+twice. Editing or closing that preview detaches it from the main request.
 
 Hover hints use the system font, a compact neutral surface and an anchor next to
 the cursor. The placement handles both native windows and the scaled main canvas;

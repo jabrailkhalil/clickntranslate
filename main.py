@@ -4071,6 +4071,17 @@ for _lang, _labels in {
         ("input_tab", "hide_source", "show_source", "open_result", "previous_result", "result_needs_update"), _labels))
 
 
+for _lang, _label in {
+    'ru': 'Переводится в реальном времени',
+    'en': 'Translating in real time',
+    'es': 'Traduciendo en tiempo real',
+    'de': 'Übersetzung in Echtzeit',
+    'fr': 'Traduction en temps réel',
+    'zh': '正在实时翻译',
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang]['live_translation'] = _label + '...'
+
+
 class TranslateOnEnterTextEdit(QTextEdit):
     """Enter translates, Shift+Enter starts a new line.
 
@@ -4454,6 +4465,7 @@ class TranslationResultDialog(QDialog):
         self.swap_button.setEnabled(bool(self.source_text or self.translated_text))
 
     def _invalidate_request(self):
+        self._following_main_translation = False
         self._request_id += 1
         if self._cancel_event is not None:
             self._cancel_event.set()
@@ -4556,7 +4568,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = False
         self._retranslating = True
         self._update_actions()
-        self._set_status(ui_text(self.lang, "translating"))
+        self._set_status(self.text['live_translation'])
         error_label = ui_text(self.lang, "translation_error")
 
         def worker():
@@ -4589,7 +4601,29 @@ class TranslationResultDialog(QDialog):
         self._received_partial = True
         self.translated_text = text
         self._update_actions()
-        self._set_status(f"{ui_text(self.lang, 'translating')} {done}/{total}")
+        self._set_status(f"{self.text['live_translation']} {done}/{total}")
+
+    def _follow_main_translation(self, request):
+        self._following_main_translation = True
+        self._request_id += 1
+        self._pending_request = request
+        self._received_partial = bool(self.translated_text)
+        self._retranslating = True
+        self._update_actions()
+        self._set_status(self.text['live_translation'])
+
+    def _finish_main_preview(self, text, error):
+        if self._closed or not getattr(self, '_following_main_translation', False):
+            return
+        self._following_main_translation = False
+        self._pending_request = None
+        self._retranslating = False
+        if text is not None and not error:
+            _update_translation_editor(self.text_edit, text, reset=not self._received_partial)
+            self.translated_text = text
+        self._update_actions()
+        # The originating main request owns history and automatic copying.
+        self._set_status(error or self.text['ready'])
 
     @QtCore.pyqtSlot(int, str, str)
     def _on_retranslated(self, request_id, translated_text, error):
@@ -9332,6 +9366,10 @@ class DarkThemeApp(QMainWindow):
                 if isinstance(caption, QLabel):
                     caption.setStyleSheet(
                         f"color:{muted}; background:transparent; border:0; font-size:12px; font-weight:500;")
+            status = getattr(self, 'main_translation_status', None)
+            if isinstance(status, QLabel):
+                status.setStyleSheet(
+                    f"color:{muted}; background:transparent; border:0; padding-left:9px; font-size:11px; font-weight:400;")
             line = getattr(self, 'main_composer_divider', None)
             if isinstance(line, QFrame):
                 line.setStyleSheet(f"background:{divider}; border:0;")
@@ -9347,15 +9385,6 @@ class DarkThemeApp(QMainWindow):
             )
             button.setIcon(send_arrow_icon("Темная" if is_dark else "Светлая"))
             button.setIconSize(QSize(24, 24))
-            expand_button = getattr(self, "document_expand_button", None)
-            if isinstance(expand_button, QPushButton):
-                expand_button.setStyleSheet(
-                    button_qss(is_dark, selector="QPushButton#mainDocumentExpandButton", icon=True) + tooltip_stylesheet(is_dark)
-                )
-                expand_button.setIcon(
-                    document_expand_icon("Темная" if is_dark else "Светлая")
-                )
-                expand_button.setIconSize(QSize(24, 24))
             heading = getattr(self, "direction_summary", None)
             if isinstance(heading, QLabel):
                 heading_color = "#c4a3e8" if is_dark else "#674586"
@@ -9390,12 +9419,6 @@ class DarkThemeApp(QMainWindow):
                 title_button.setIcon(document_translation_icon(self.current_theme))
             except RuntimeError:
                 self.document_button = None
-        button = getattr(self, "document_expand_button", None)
-        if isinstance(button, QPushButton):
-            try:
-                button.setIcon(document_expand_icon(self.current_theme))
-            except RuntimeError:
-                self.document_expand_button = None
 
     def toggle_theme(self):
         # Apply the parent and every open child as one paint transaction.  Qt
@@ -9477,13 +9500,6 @@ class DarkThemeApp(QMainWindow):
                 document_button.setToolTip(tooltip_text(doc_text(lang, "title")))
             except RuntimeError:
                 self.document_button = None
-        document_expand_button = getattr(self, "document_expand_button", None)
-        if isinstance(document_expand_button, QPushButton):
-            try:
-                document_expand_button.setAccessibleName(doc_text(lang, "title"))
-                document_expand_button.setToolTip(tooltip_text(doc_text(lang, "title")))
-            except RuntimeError:
-                self.document_expand_button = None
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
             self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang][key]))
@@ -10238,9 +10254,8 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
         self.text_input.setToolTip(tooltip_text(
             doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
-        # This is what the window is for, so it gets the room the second
-        # language row and the hint line used to take.
-        self.text_input.setMinimumHeight(66)
+        # Reserve a quiet status line inside the existing fixed-size panel.
+        self.text_input.setMinimumHeight(50)
         self.text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -10250,13 +10265,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setContextMenuPolicy(Qt.CustomContextMenu)
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
-        self._composer_expand_timer = QTimer(self.text_input)
-        self._composer_expand_timer.setSingleShot(True)
-        self._composer_expand_timer.timeout.connect(self._update_document_expand_visibility)
-        self.text_input.textChanged.connect(self._schedule_document_expand_visibility)
-        self.text_input.document().documentLayout().documentSizeChanged.connect(
-            self._schedule_document_expand_visibility
-        )
+        self.text_input.textChanged.connect(self._remember_main_input)
         input_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
@@ -10267,22 +10276,6 @@ class DarkThemeApp(QMainWindow):
         composer_actions_layout.setContentsMargins(0, 0, 0, 0)
         composer_actions_layout.setSpacing(0)
 
-        self.document_expand_button = ScaledIconButton()
-        self.document_expand_button.setObjectName("mainDocumentExpandButton")
-        self.document_expand_button.setAccessibleName(
-            doc_text(self.current_interface_language, "title")
-        )
-        self.document_expand_button.setToolTip(
-            tooltip_text(doc_text(self.current_interface_language, "title"))
-        )
-        self.document_expand_button.setFixedSize(28, 28)
-        self.document_expand_button.clicked.connect(
-            self._open_composer_in_document_translation
-        )
-        self.document_expand_button.hide()
-        composer_actions_layout.addWidget(
-            self.document_expand_button, 0, Qt.AlignHCenter | Qt.AlignTop
-        )
         composer_actions_layout.addStretch(1)
 
         translate_action_text = ui_text(
@@ -10301,6 +10294,12 @@ class DarkThemeApp(QMainWindow):
             self.translate_button, 0, Qt.AlignHCenter | Qt.AlignBottom
         )
         input_layout.addWidget(composer_actions, 0, 1)
+        self.main_translation_status = QLabel()
+        self.main_translation_status.setObjectName('mainTranslationStatus')
+        self.main_translation_status.setFixedHeight(14)
+        self.main_translation_status.setMinimumWidth(0)
+        self.main_translation_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        input_layout.addWidget(self.main_translation_status, 1, 0, 1, 2)
         self.main_result_view = QTextEdit()
         self.main_result_view.setObjectName('mainComposerResult')
         self.main_result_view.setReadOnly(True)
@@ -10336,7 +10335,7 @@ class DarkThemeApp(QMainWindow):
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
-        self.translate_button.setEnabled(has_translation_pair)
+        self.translate_button.setEnabled(has_translation_pair and not self._main_translation_running)
         if not has_translation_pair:
             self.translate_button.setToolTip(
                 tooltip_text(
@@ -10684,53 +10683,12 @@ class DarkThemeApp(QMainWindow):
             elif item.layout():
                 self._clear_nested_layout(item.layout())
 
-    def _schedule_document_expand_visibility(self, *_args):
+    def _remember_main_input(self, *_args):
         try:
             self._main_input_draft = self.text_input.toPlainText()
             self._refresh_main_result_caption()
         except RuntimeError:
             return  # The previous page's document can finish a queued layout.
-        timer = getattr(self, "_composer_expand_timer", None)
-        if isinstance(timer, QTimer):
-            try:
-                timer.start(0)
-            except RuntimeError:
-                pass
-
-    def _composer_visual_line_count(self):
-        editor = getattr(self, "text_input", None)
-        if not isinstance(editor, QTextEdit):
-            return 0
-        document = editor.document()
-        # Force the layout to catch up before counting wrapped lines.
-        document.documentLayout().documentSize()
-        line_count = 0
-        block = document.begin()
-        while block.isValid():
-            layout = block.layout()
-            line_count += max(1, layout.lineCount() if layout is not None else 1)
-            block = block.next()
-        return line_count
-
-    def _update_document_expand_visibility(self):
-        button = getattr(self, "document_expand_button", None)
-        editor = getattr(self, "text_input", None)
-        if not isinstance(button, QPushButton) or not isinstance(editor, QTextEdit):
-            return
-        try:
-            # Long drafts can also be opened in the document workspace.
-            button.setVisible(
-                bool(editor.toPlainText().strip())
-                and self._composer_visual_line_count() > 2
-            )
-        except RuntimeError:
-            self.document_expand_button = None
-
-    def _open_composer_in_document_translation(self):
-        editor = getattr(self, "text_input", None)
-        text = editor.toPlainText() if isinstance(editor, QTextEdit) else ""
-        if text.strip():
-            self.open_document_translation(initial_text=text)
 
     def _refresh_main_result_caption(self, *_args):
         caption = getattr(self, 'main_result_caption', None)
@@ -10739,6 +10697,9 @@ class DarkThemeApp(QMainWindow):
         labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
         snapshot = getattr(self, '_main_result_snapshot', None)
         try:
+            status = getattr(self, 'main_translation_status', None)
+            if isinstance(status, QLabel):
+                status.setText(labels['live_translation'] if self._main_translation_running else '')
             stale = False
             detail = ''
             if snapshot:
@@ -10770,8 +10731,9 @@ class DarkThemeApp(QMainWindow):
                 _update_translation_editor(self.main_result_view, snapshot['translated_text'],
                                            reset=getattr(self, '_main_reset_preview', False))
                 self._main_reset_preview = False
-            self.main_result_actions.setEnabled(bool(snapshot))
-            self.main_result_expand_button.setEnabled(not self._main_translation_running)
+            self.main_result_actions.setEnabled(True)
+            self.main_result_expand_button.setEnabled(True)
+            self.main_result_copy_button.setEnabled(bool(snapshot))
             self._refresh_main_result_caption()
         except RuntimeError:
             # A completed worker may arrive while Settings owns the page.
@@ -10791,12 +10753,41 @@ class DarkThemeApp(QMainWindow):
 
     def _open_main_result_window(self):
         snapshot = getattr(self, '_main_result_snapshot', None)
-        if snapshot:
-            dialog = show_translation_dialog(self, auto_copy=False, lang=self.current_interface_language,
-                                             theme=self.current_theme, result_mode='main', **snapshot)
-            # Expanding a result should not overwrite the clipboard again;
-            # subsequent translations still respect the auto-copy setting.
-            dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
+        if self._main_translation_running:
+            source_text, source_lang, target_lang = self._main_active_request
+            text = getattr(self, '_main_streamed_text', '')
+            snapshot = dict(translated_text=text, source_text=source_text,
+                            source_lang=source_lang, target_lang=target_lang)
+        elif snapshot is None:
+            snapshot = dict(translated_text='', source_text=self.text_input.toPlainText(),
+                            source_lang=language_code_from_name(
+                                self.source_lang.currentText(), self.current_interface_language),
+                            target_lang=language_code_from_name(
+                                self.target_lang.currentText(), self.current_interface_language))
+        dialog = show_translation_dialog(self, auto_copy=False, lang=self.current_interface_language,
+                                         theme=self.current_theme, result_mode='main', **snapshot)
+        dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
+        if self._main_translation_running:
+            dialog.engine_label.setText(self._main_active_engine)
+            dialog._follow_main_translation(self._main_active_request)
+            self._main_preview_dialogs.append(dialog)
+        return dialog
+
+    def _update_main_preview_windows(self, text, done=None, total=None, error=''):
+        # Deliver from the GUI completion handlers, not directly from the worker:
+        # a click can open a preview after the worker has already queued its result.
+        for dialog in getattr(self, '_main_preview_dialogs', []):
+            try:
+                if dialog._closed or not getattr(dialog, '_following_main_translation', False):
+                    continue
+                if done is None:
+                    dialog._finish_main_preview(text, error)
+                else:
+                    dialog._on_partial_translation(dialog._request_id, text, done, total)
+            except RuntimeError:
+                pass  # The preview may have been closed during this request.
+        if done is None:
+            self._main_preview_dialogs = []
 
     def _on_document_dialog_destroyed(self, *_args):
         self.document_dialog = None
@@ -11177,7 +11168,8 @@ class DarkThemeApp(QMainWindow):
             self._argos_progress.cancel_button.setEnabled(False)
             self._argos_progress.close_button.setEnabled(False)
 
-    def _finish_main_translation_state(self):
+    def _finish_main_translation_state(self, translated_text=None, error=''):
+        self._update_main_preview_windows(translated_text, error=error)
         self._main_translation_running = False
         self._main_result_progress = None
         self._argos_install_required = False
@@ -11257,10 +11249,13 @@ class DarkThemeApp(QMainWindow):
         self._argos_active_pair = pair_label
         self._main_active_request = (text, source_code, target_code)
         self._main_active_engine = engine
+        self._main_preview_dialogs = []
+        self._main_streamed_text = ''
         self._main_result_progress = None
         self._main_result_error = ''
         self._main_reset_preview = True
         self._argos_cancel_requested.clear()
+        self._refresh_main_result_caption()
         if hasattr(self, "translate_button"):
             self.translate_button.setEnabled(False)
         if not package_installed:
@@ -11298,6 +11293,8 @@ class DarkThemeApp(QMainWindow):
     def _on_main_translation_partial(self, text, done, total):
         if not self._main_translation_running or self._argos_cancel_requested.is_set():
             return
+        self._main_streamed_text = text
+        self._update_main_preview_windows(text, done, total)
         if result_window_hidden_for(get_cached_config(), 'main'):
             return
         self._main_result_progress = (done, total)
@@ -11308,7 +11305,8 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_done(self, translated_text):
-        self._finish_main_translation_state()
+        error = '' if translated_text.strip() else ui_text(self.current_interface_language, 'translation_error')
+        self._finish_main_translation_state(translated_text, error)
         source_text, source_code, target_code = self._main_active_request
         self._present_main_translation_result(
             translated_text,
@@ -11320,7 +11318,7 @@ class DarkThemeApp(QMainWindow):
     @QtCore.pyqtSlot(str)
     def _on_main_translation_error(self, error_text):
         self._main_result_error = str(error_text)
-        self._finish_main_translation_state()
+        self._finish_main_translation_state(error=error_text)
         if self._main_active_engine == 'argos':
             self._show_argos_translation_error(error_text, self._argos_active_pair)
         else:
@@ -11338,7 +11336,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot()
     def _on_argos_translation_cancelled(self):
-        self._finish_main_translation_state()
+        self._finish_main_translation_state(error=ui_text(self.current_interface_language, 'argos_install_cancelled'))
         QMessageBox.information(
             self,
             "Argos",
