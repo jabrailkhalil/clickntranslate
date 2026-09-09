@@ -43,6 +43,9 @@ def run_request(request, event_callback=None):
     def cancel_callback():
         return bool(cancel_path and os.path.exists(cancel_path))
 
+    def partial_callback(text, done, total):
+        emit_event({'type': 'translation', 'text': text, 'done': done, 'total': total})
+
     try:
         if not translater._ensure_argos_available():
             raise RuntimeError(translater.argos_unavailable_reason())
@@ -98,6 +101,7 @@ def run_request(request, event_callback=None):
             allow_install=bool(request.get("allow_install", False)),
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
+            partial_callback=partial_callback if request.get('stream_translation') else None,
         )
         return {"result": result, "statuses": statuses, "error": ""}
     except Exception as exc:

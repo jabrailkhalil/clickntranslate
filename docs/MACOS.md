@@ -151,6 +151,12 @@ labelled Previous translation when the draft or language pair changes. Each resu
 its original source and language pair when expanded; expanding does not copy it
 again. Auto-copy and the explicit clipboard-only result setting still apply.
 Provider failures keep the draft and the preceding result available.
+Long requests now publish each completed provider chunk to the main result,
+translation workspace and document preview. The main request runs outside the
+GUI thread. Partial text retains the reading position and remains visible on
+failure; automatic copying and history saving wait for successful completion.
+Argos streams through its helper without loading a new model per chunk. This
+new translation flow awaits runtime QA; only autostart was tested in Round22.
 
 Hover hints use the system font, a compact neutral surface and an anchor next to
 the cursor. The placement handles both native windows and the scaled main canvas;

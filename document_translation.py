@@ -37,6 +37,7 @@ def translate_document_text(
     progress_callback=None,
     cancel_event=None,
     max_chars=None,
+    partial_callback=None,
 ):
     text = str(text or '')
     if not text.strip():
@@ -68,6 +69,8 @@ def translate_document_text(
             translated = restore_boundary_whitespace(chunk.text, translated)
             results.append(TranslationChunkResult(index, chunk.text, translated, error))
             translated_parts.append(translated)
+            if partial_callback:
+                partial_callback(''.join(translated_parts), len(results), total)
             _emit_progress(progress_callback, len(results), total, f"Translated chunk {index + 1}/{total}")
     except translater.TranslationCancelledError:
         pass

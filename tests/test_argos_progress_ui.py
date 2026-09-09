@@ -37,23 +37,26 @@ class ArgosProgressUiTest(unittest.TestCase):
         cls.app = main.QApplication.instance() or main.QApplication([])
 
     def _dummy(self):
-        return SimpleNamespace(
+        dummy = SimpleNamespace(
             current_interface_language="ru",
-            _argos_translation_running=False,
+            _main_translation_running=False,
             _argos_install_required=False,
             _argos_cancel_enabled=False,
             _argos_active_pair="",
             _argos_cancel_requested=threading.Event(),
             _argos_status_signal=_SignalRecorder(),
             _argos_progress_signal=_SignalRecorder(),
-            _argos_translation_done_signal=_SignalRecorder(),
-            _argos_translation_error_signal=_SignalRecorder(),
+            _main_translation_done_signal=_SignalRecorder(),
+            _main_translation_error_signal=_SignalRecorder(),
+            _main_translation_partial_signal=_SignalRecorder(),
             _argos_translation_cancelled_signal=_SignalRecorder(),
             _confirm_argos_package_install=mock.Mock(return_value=True),
             _show_argos_translation_error=mock.Mock(),
             _show_argos_progress=mock.Mock(),
             translate_button=mock.Mock(),
         )
+        dummy._start_main_translation = lambda *args: main.DarkThemeApp._start_main_translation(dummy, *args)
+        return dummy
 
     def test_missing_pair_prepares_the_selected_direction_and_continues_translation(self):
         dummy = self._dummy()
@@ -68,7 +71,7 @@ class ArgosProgressUiTest(unittest.TestCase):
         self.assertEqual(translate.call_args.args, ("Привет", "ru", "en"))
         self.assertEqual(translate.call_args.kwargs["engine"], "argos")
         self.assertTrue(callable(translate.call_args.kwargs["progress_callback"]))
-        self.assertEqual(dummy._argos_translation_done_signal.values, [("Hello",)])
+        self.assertEqual(dummy._main_translation_done_signal.values, [("Hello",)])
 
     def test_declining_missing_package_keeps_text_and_does_not_start_translation(self):
         dummy = self._dummy()
@@ -79,7 +82,7 @@ class ArgosProgressUiTest(unittest.TestCase):
         translate.assert_not_called()
         dummy._show_argos_progress.assert_not_called()
         dummy.translate_button.setEnabled.assert_not_called()
-        self.assertFalse(dummy._argos_translation_running)
+        self.assertFalse(dummy._main_translation_running)
 
     def test_installed_pair_skips_download_prompt_and_progress_window(self):
         dummy = self._dummy()
@@ -95,14 +98,14 @@ class ArgosProgressUiTest(unittest.TestCase):
         dummy._confirm_argos_package_install.assert_not_called()
         dummy._show_argos_progress.assert_not_called()
         self.assertFalse(dummy._argos_install_required)
-        self.assertEqual(dummy._argos_translation_done_signal.values, [("Hello",)])
+        self.assertEqual(dummy._main_translation_done_signal.values, [("Hello",)])
 
     def test_cancel_button_sets_worker_cancel_event(self):
         cancel_button = mock.Mock()
         close_button = mock.Mock()
         dummy = SimpleNamespace(
             current_interface_language="ru",
-            _argos_translation_running=True,
+            _main_translation_running=True,
             _argos_cancel_enabled=True,
             _argos_cancel_requested=threading.Event(),
             _argos_progress=SimpleNamespace(cancel_button=cancel_button, close_button=close_button),
@@ -195,12 +198,13 @@ class ArgosProgressUiTest(unittest.TestCase):
             current_interface_language="ru",
             current_theme="Темная",
             _argos_active_pair="RU→PT",
-            _finish_argos_translation_state=mock.Mock(),
+            _main_active_engine="argos",
+            _finish_main_translation_state=mock.Mock(),
             _show_argos_translation_error=mock.Mock(),
         )
-        main.DarkThemeApp._on_argos_translation_error(dummy, "RuntimeError: test failure")
+        main.DarkThemeApp._on_main_translation_error(dummy, "RuntimeError: test failure")
 
-        dummy._finish_argos_translation_state.assert_called_once_with()
+        dummy._finish_main_translation_state.assert_called_once_with()
         dummy._show_argos_translation_error.assert_called_once_with(
             "RuntimeError: test failure", "RU→PT"
         )

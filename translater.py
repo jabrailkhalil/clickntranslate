@@ -434,12 +434,12 @@ def _clean_hymt_output(output, prompt):
     return text.strip("\"' \r\n")
 
 
-def hymt_translate(text, source_code, target_code, status_callback=None, *, cancel_callback=None, _cache=None):
+def hymt_translate(text, source_code, target_code, status_callback=None, *, cancel_callback=None, _cache=None, partial_callback=None):
     # Bound each generation as well as its prompt; otherwise a long input can
     # silently hit the output-token cap and return an incomplete translation.
     return _translate_chunks(text, 1000, lambda chunk: _hymt_translate_chunk(
         chunk, source_code, target_code, status_callback=status_callback,
-    ), cache=_cache, engine='hymt', cancel_callback=cancel_callback)
+    ), cache=_cache, engine='hymt', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
 def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
@@ -989,6 +989,7 @@ def _try_argos_translate_local(
     allow_install=True,
     progress_callback=None,
     cancel_callback=None,
+    partial_callback=None,
 ):
     if not _ensure_argos_available():
         return None
@@ -1004,6 +1005,11 @@ def _try_argos_translate_local(
             translation_obj = _get_translation_object(source_code, target_code)
     if translation_obj is None:
         return None
+    if partial_callback:
+        # Keep one loaded Argos model/worker for the entire request.
+        return _translate_chunks(text, None, translation_obj.translate, engine='argos',
+                                 max_chars=1800, cancel_callback=cancel_callback,
+                                 partial_callback=partial_callback)
     return translation_obj.translate(text)
 
 
@@ -1013,6 +1019,7 @@ def _run_argos_worker_request(
     progress_callback=None,
     cancel_callback=None,
     timeout=1800,
+    partial_callback=None,
 ):
     worker_path = _argos_worker_path()
     if not worker_path:
@@ -1060,6 +1067,10 @@ def _run_argos_worker_request(
                     event.get("downloaded_bytes", 0),
                     event.get("total_bytes", 0),
                 )
+            elif event.get("type") == "translation" and partial_callback:
+                _check_translation_cancelled(cancel_callback)
+                partial_callback(str(event.get("text", "")),
+                                 int(event.get("done", 0)), int(event.get("total", 0)))
 
     try:
         request = dict(request or {})
@@ -1221,6 +1232,7 @@ def _try_argos_translate_worker(
     allow_install=True,
     progress_callback=None,
     cancel_callback=None,
+    partial_callback=None,
 ):
     worker_path = _argos_worker_path()
     if not worker_path:
@@ -1232,7 +1244,15 @@ def _try_argos_translate_worker(
             allow_install=allow_install,
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
+            partial_callback=partial_callback,
         )
+
+    partial_delivered = False
+
+    def report_partial(text, done, total):
+        nonlocal partial_delivered
+        partial_delivered = True
+        partial_callback(text, done, total)
 
     def request_translation(install_allowed):
         payload = _run_argos_worker_request(
@@ -1242,10 +1262,12 @@ def _try_argos_translate_worker(
                 "source_code": source_code,
                 "target_code": target_code,
                 "allow_install": bool(install_allowed),
+                "stream_translation": bool(partial_callback),
             },
             status_callback=status_callback,
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
+            partial_callback=report_partial if partial_callback else None,
         )
         if payload.get("error"):
             error = str(payload["error"])
@@ -1259,6 +1281,10 @@ def _try_argos_translate_worker(
     except ArgosInstallCancelledError:
         raise
     except Exception as first_error:
+        if partial_delivered:
+            # Keep the displayed prefix and report the error; restarting the
+            # model here would replay already delivered text into the UI.
+            raise
         # Each packaged translation runs in a fresh worker. Directly after a
         # package install Windows may still be releasing model files, so retry
         # once only when a fresh probe confirms the complete route is installed.
@@ -1287,6 +1313,7 @@ def _try_argos_translate(
     allow_install=True,
     progress_callback=None,
     cancel_callback=None,
+    partial_callback=None,
 ):
     if _argos_worker_path():
         return _try_argos_translate_worker(
@@ -1297,6 +1324,7 @@ def _try_argos_translate(
             allow_install=allow_install,
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
+            partial_callback=partial_callback,
         )
     return _try_argos_translate_local(
         text,
@@ -1306,6 +1334,7 @@ def _try_argos_translate(
         allow_install=allow_install,
         progress_callback=progress_callback,
         cancel_callback=cancel_callback,
+        partial_callback=partial_callback,
     )
 
 def test_translation():
@@ -1411,6 +1440,7 @@ def translate_text(
     engine=None,
     progress_callback=None,
     cancel_callback=None,
+    partial_callback=None,
 ):
     """Translate with the selected engine; failures never change providers."""
     config = get_cached_translator_config()
@@ -1429,13 +1459,13 @@ def translate_text(
 
     def _call_online(name, txt, src, tgt):
         if name == 'google':
-            return google_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
+            return google_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback)
         elif name == 'mymemory':
-            return mymemory_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
+            return mymemory_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback)
         elif name == 'lingva':
-            return lingva_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
+            return lingva_translate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback)
         elif name == 'libretranslate':
-            return libretranslate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache)
+            return libretranslate(txt, src, tgt, cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback)
         raise ValueError(f"Unknown engine: {name}")
 
     def _cache_and_return(result, actual_engine=None):
@@ -1445,7 +1475,7 @@ def translate_text(
 
     if engine == HYMT_ENGINE_KEY:
         return _cache_and_return(hymt_translate(text, source_code, target_code, status_callback=status_callback,
-            cancel_callback=cancel_callback, _cache=cache))
+            cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback))
 
     if engine in online_engines:
         _check_translation_cancelled(cancel_callback)
@@ -1468,6 +1498,7 @@ def translate_text(
             allow_install=bool(progress_callback),
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
+            partial_callback=partial_callback,
         )
         if argos_result:
             return _cache_and_return(argos_result)
@@ -1539,10 +1570,10 @@ def _google_translate_chunk(text, source_code, target_code, *, cancel_callback=N
     return _validated_translation(''.join(segments), 'Google')
 
 
-def google_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+def google_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None, partial_callback=None):
     """Google Translate через публичный endpoint с разбивкой длинного текста."""
     return _translate_chunks(text, PROVIDER_BYTE_LIMITS['google'], lambda chunk: _google_translate_chunk(chunk, source_code, target_code, cancel_callback=cancel_callback),
-        cache=_cache, engine='google', cancel_callback=cancel_callback)
+        cache=_cache, engine='google', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
 def _validated_translation(value, provider):
@@ -1551,11 +1582,12 @@ def _validated_translation(value, provider):
     return value
 
 
-def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='', cancel_callback=None):
+def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='', cancel_callback=None,
+                      max_chars=None, partial_callback=None):
     """Translate the common request plan; retain completed parts after failure."""
     translated = []
-    chunks = split_text(text, max_bytes=byte_limit)
-    for chunk in chunks:
+    chunks = split_text(text, max_bytes=byte_limit, max_chars=max_chars)
+    for index, chunk in enumerate(chunks):
         _check_translation_cancelled(cancel_callback)
         content = chunk.strip()
         if not content:
@@ -1567,13 +1599,16 @@ def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='
             if cache is not None and len(chunks) > 1:
                 cache.save(content, result, engine, segment=True)
         translated.append(restore_boundary_whitespace(chunk, result))
+        _check_translation_cancelled(cancel_callback)
+        if partial_callback and len(chunks) > 1:
+            partial_callback(''.join(translated), index + 1, len(chunks))
     return ''.join(translated)
 
-def mymemory_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+def mymemory_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None, partial_callback=None):
     """Respect MyMemory's 500-byte UTF-8 limit without losing chunk separators."""
     # https://mymemory.translated.net/doc/spec.php specifies bytes, not characters.
     return _translate_chunks(text, PROVIDER_BYTE_LIMITS['mymemory'], lambda chunk: _mymemory_translate_chunk(chunk, source_code, target_code),
-        cache=_cache, engine='mymemory', cancel_callback=cancel_callback)
+        cache=_cache, engine='mymemory', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
 def _mymemory_translate_chunk(text, source_code, target_code):
@@ -1604,9 +1639,9 @@ def _server_error_detail(response):
         pass
     return f"HTTP {response.status_code}"
 
-def lingva_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+def lingva_translate(text, source_code, target_code, *, cancel_callback=None, _cache=None, partial_callback=None):
     return _translate_chunks(text, PROVIDER_BYTE_LIMITS['lingva'], lambda chunk: _lingva_translate_chunk(chunk, source_code, target_code, cancel_callback=cancel_callback),
-        cache=_cache, engine='lingva', cancel_callback=cancel_callback)
+        cache=_cache, engine='lingva', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
 def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=None):
@@ -1656,9 +1691,9 @@ def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=N
             continue
     raise Exception(f"Lingva translate failed: {last_error}")
 
-def libretranslate(text, source_code, target_code, *, cancel_callback=None, _cache=None):
+def libretranslate(text, source_code, target_code, *, cancel_callback=None, _cache=None, partial_callback=None):
     return _translate_chunks(text, PROVIDER_BYTE_LIMITS['libretranslate'], lambda chunk: _libretranslate_chunk(chunk, source_code, target_code),
-        cache=_cache, engine='libretranslate', cancel_callback=cancel_callback)
+        cache=_cache, engine='libretranslate', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
 class _BatchNotSupportedError(RuntimeError):

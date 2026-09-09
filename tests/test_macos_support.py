@@ -80,6 +80,24 @@ def test_source_autostart_keeps_resource_working_directory(mac, monkeypatch):
     assert entry['ProgramArguments'][1] == str(Path(desktop.__file__).with_name('main.py').resolve())
 
 
+def test_autostart_rejects_a_plist_without_a_dictionary(mac):
+    path = desktop.autostart_path()
+    path.parent.mkdir(parents=True)
+    path.write_bytes(plistlib.dumps(['unexpected entry']))
+    assert not desktop.autostart_enabled()
+
+
+def test_autostart_failed_removal_keeps_the_actual_enabled_state(mac, monkeypatch):
+    import main
+    monkeypatch.setattr(desktop, 'launch_arguments', lambda: ['/current/app'])
+    desktop.set_autostart(True)
+    owner = SimpleNamespace(config={'autostart': True}, autostart=True)
+    with mock.patch.object(desktop, 'set_autostart', side_effect=PermissionError('Permission denied')):
+        assert main.DarkThemeApp.set_autostart(owner, False)
+    assert owner.config['autostart'] is True
+    assert 'Permission denied' in owner._autostart_error
+
+
 @pytest.mark.parametrize('engine', ['Apple Vision', 'Tesseract', 'RapidOCR', 'EasyOCR'])
 def test_imported_settings_preserve_every_available_selected_engine(mac, engine):
     import main

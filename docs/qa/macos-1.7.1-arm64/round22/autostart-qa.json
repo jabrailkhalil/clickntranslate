@@ -1,0 +1,28 @@
+{
+  "native_platform": "cocoa",
+  "installed_ui_clicked": false,
+  "scope": "Source checkbox signal, actual save handler, real LaunchAgent; installed launch arguments supplied explicitly",
+  "login_session_tested": false,
+  "enabled": true,
+  "saved": true,
+  "checked_after_reload": true,
+  "plist_valid": true,
+  "entry": {
+    "Label": "io.github.jabrailkhalil.clickntranslate",
+    "LimitLoadToSessionType": "Aqua",
+    "ProgramArguments": [
+      "/usr/bin/open",
+      "-a",
+      "/Applications/ClicknTranslate.app",
+      "--args",
+      "--autostart"
+    ],
+    "RunAtLoad": true,
+    "WorkingDirectory": "/Users/jabrail/Desktop/click/clickntranslate"
+  },
+  "disabled": true,
+  "removed": true,
+  "initial_agent_restored": true,
+  "user_config_unchanged": true,
+  "other_agents_unchanged": true
+}

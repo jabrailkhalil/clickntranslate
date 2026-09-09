@@ -1,0 +1,24 @@
+{
+  "architecture": "arm64",
+  "signer_sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "signature": "permanent self-signed; no Developer ID or notarization",
+  "source_base_commit": "149777bc145750358d8dbcfd8bfd8dce5bb26528",
+  "app": "/Applications/ClicknTranslate.app",
+  "built_app": "/Users/jabrail/Desktop/click/clickntranslate/dist/ClicknTranslate.app",
+  "streaming_runtime_tested": false,
+  "targeted_autostart_tested": true,
+  "tests": "Five autostart pytest cases and one native source-checkbox/real-LaunchAgent round trip. Translation, broad UI and native bundle smoke skipped.",
+  "login_session_tested": false,
+  "files": [
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166258983,
+      "sha256": "4d623541a1695f42b8e06bafd76c016dfa767f564ad4bdc72af9fa1c9933bd64"
+    },
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153586594,
+      "sha256": "cfa5f92d0a49b21802e166c4f225b824489ad8a6248fddfecb5352dddc1eb745"
+    }
+  ]
+}

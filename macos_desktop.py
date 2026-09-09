@@ -42,7 +42,8 @@ def autostart_enabled():
     try:
         with autostart_path().open("rb") as stream:
             entry = plistlib.load(stream)
-        return (entry.get("Label") == APP_ID and entry.get("RunAtLoad") is True
+        return (isinstance(entry, dict)
+                and entry.get("Label") == APP_ID and entry.get("RunAtLoad") is True
                 and not entry.get("Disabled", False)
                 and entry.get("ProgramArguments") == launch_arguments())
     except (OSError, ValueError, plistlib.InvalidFileException, RuntimeError):

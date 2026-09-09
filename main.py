@@ -137,6 +137,8 @@ from languages import (
 AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
 STORE_STARTUP_TASK_ID = "ClicknTranslateStartup"
 AUTOSTART_BACKEND = (
+    "macos_launchagent" if platform_support.IS_MAC else
+    "xdg_autostart" if platform_support.IS_LINUX else
     "store_startup_task" if portable_paths.is_windows_packaged() else "startup_shortcut"
 )
 
@@ -4132,10 +4134,33 @@ class CenteredFramelessDialog(QDialog):
         super().mouseReleaseEvent(event)
 
 
+def _update_translation_editor(editor, text, *, reset=False):
+    """Append completed parts without jumping away from the user's reading position."""
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    previous = editor.toPlainText()
+    if previous == text:
+        return
+    scroll = editor.verticalScrollBar()
+    position, following_end = scroll.value(), scroll.value() >= scroll.maximum() - 2
+    append = not reset and bool(previous) and text.startswith(previous)
+    with QtCore.QSignalBlocker(editor):
+        cursor = QtGui.QTextCursor(editor.document())
+        cursor.beginEditBlock()
+        if append:
+            cursor.movePosition(QtGui.QTextCursor.End)
+            cursor.insertText(text[len(previous):])
+        else:
+            cursor.select(QtGui.QTextCursor.Document)
+            cursor.insertText(text)
+        cursor.endEditBlock()
+    scroll.setValue((scroll.maximum() if following_end else position) if append else 0)
+
+
 class TranslationResultDialog(QDialog):
     """Editable source and result, with requests bound to an exact input revision."""
 
     _retranslated_signal = QtCore.pyqtSignal(int, str, str)
+    _partial_translation_signal = QtCore.pyqtSignal(int, str, int, int)
 
     def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная",
                  source_text="", source_lang="", target_lang="", result_mode="main"):
@@ -4309,6 +4334,7 @@ class TranslationResultDialog(QDialog):
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
         self.target_combo.currentIndexChanged.connect(self._on_target_changed)
         self._retranslated_signal.connect(self._on_retranslated)
+        self._partial_translation_signal.connect(self._on_partial_translation)
         self.refresh_theme(theme)
         self._reflow_editors()
         self._refresh_scale_caption()
@@ -4527,6 +4553,7 @@ class TranslationResultDialog(QDialog):
         self.engine_label.setText(engine)
         source_text, source_code, target_code = self.source_text, self.source_code, self.target_code
         self._pending_request = (source_text, source_code, target_code)
+        self._received_partial = False
         self._retranslating = True
         self._update_actions()
         self._set_status(ui_text(self.lang, "translating"))
@@ -4536,7 +4563,9 @@ class TranslationResultDialog(QDialog):
             try:
                 from translater import translate_text
                 result = translate_text(source_text, source_code, target_code,
-                                        engine=engine, cancel_callback=cancelled.is_set)
+                                        engine=engine, cancel_callback=cancelled.is_set,
+                                        partial_callback=lambda text, done, total:
+                                        self._partial_translation_signal.emit(request_id, text, done, total))
                 error = "" if str(result or "").strip() else error_label
             except Exception as exc:
                 result, error = "", f"{error_label}: {exc}"
@@ -4552,6 +4581,16 @@ class TranslationResultDialog(QDialog):
         except Exception as exc:
             self._on_retranslated(request_id, "", f"{error_label}: {exc}")
 
+    @QtCore.pyqtSlot(int, str, int, int)
+    def _on_partial_translation(self, request_id, text, done, total):
+        if self._closed or request_id != self._request_id or self._pending_request is None:
+            return
+        _update_translation_editor(self.text_edit, text, reset=not self._received_partial)
+        self._received_partial = True
+        self.translated_text = text
+        self._update_actions()
+        self._set_status(f"{ui_text(self.lang, 'translating')} {done}/{total}")
+
     @QtCore.pyqtSlot(int, str, str)
     def _on_retranslated(self, request_id, translated_text, error):
         if self._closed or request_id != self._request_id or self._pending_request is None:
@@ -4564,7 +4603,8 @@ class TranslationResultDialog(QDialog):
             self._update_actions()
             self._set_status(error or ui_text(self.lang, "translation_error"))
             return
-        self._replace_editor_text(self.text_edit, translated_text)
+        _update_translation_editor(self.text_edit, translated_text,
+                                   reset=not getattr(self, '_received_partial', False))
         self.translated_text = translated_text
         self._update_actions()
         save_translation_history(original, translated_text, target)
@@ -5040,6 +5080,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
     _document_loaded_signal = QtCore.pyqtSignal(object)
     _document_error_signal = QtCore.pyqtSignal(str)
     _document_progress_signal = QtCore.pyqtSignal(int, int, str)
+    _document_partial_signal = QtCore.pyqtSignal(str, int, int)
     _document_done_signal = QtCore.pyqtSignal(str, object)
 
     def __init__(self, parent_app, initial_path=None):
@@ -5060,6 +5101,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._document_loaded_signal.connect(self._on_document_loaded)
         self._document_error_signal.connect(self._on_document_error)
         self._document_progress_signal.connect(self._on_translation_progress)
+        self._document_partial_signal.connect(self._on_document_partial)
         self._document_done_signal.connect(self._on_translation_done)
 
         self.setWindowTitle(doc_text(self.lang, "title"))
@@ -5730,12 +5772,20 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                     provider_engine=provider_engine,
                     progress_callback=progress,
                     cancel_event=cancel_event,
+                    partial_callback=self._document_partial_signal.emit,
                 )
                 self._document_done_signal.emit(translated, results)
             except Exception as exc:
                 self._document_error_signal.emit(str(exc))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _on_document_partial(self, text, done, total):
+        if not self.translation_running or (self._translation_cancel_event is not None
+                                            and self._translation_cancel_event.is_set()):
+            return
+        self.translated_text = text
+        _update_translation_editor(self.translated_view, text, reset=done == 1)
 
     def _on_translation_progress(self, done, total, message):
         if self._translation_cancel_event is not None and self._translation_cancel_event.is_set():
@@ -5755,7 +5805,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         friendly_failure = self._friendly_provider_failure_text(self.translation_results)
         self.translation_error_message_visible = bool(friendly_failure)
         self.translated_text = friendly_failure or (translated or "")
-        self.translated_view.setPlainText(self.translated_text)
+        _update_translation_editor(self.translated_view, self.translated_text)
         self.progress_bar.setRange(0, 100)
         if not canceled:
             self.progress_bar.setValue(100)
@@ -6770,8 +6820,9 @@ class DarkThemeApp(QMainWindow):
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str, str, str, str)
     _argos_status_signal = QtCore.pyqtSignal(str)
     _argos_progress_signal = QtCore.pyqtSignal(str, int, int)
-    _argos_translation_done_signal = QtCore.pyqtSignal(str)
-    _argos_translation_error_signal = QtCore.pyqtSignal(str)
+    _main_translation_done_signal = QtCore.pyqtSignal(str)
+    _main_translation_error_signal = QtCore.pyqtSignal(str)
+    _main_translation_partial_signal = QtCore.pyqtSignal(str, int, int)
     _argos_translation_cancelled_signal = QtCore.pyqtSignal()
     _launch_update_signal = QtCore.pyqtSignal(str)
     _copy_notification_signal = QtCore.pyqtSignal(str)
@@ -6785,14 +6836,15 @@ class DarkThemeApp(QMainWindow):
         self._show_selection_signal.connect(self._show_selection_translation)
         self._argos_status_signal.connect(self._on_argos_status)
         self._argos_progress_signal.connect(self._on_argos_progress)
-        self._argos_translation_done_signal.connect(self._on_argos_translation_done)
-        self._argos_translation_error_signal.connect(self._on_argos_translation_error)
+        self._main_translation_done_signal.connect(self._on_main_translation_done)
+        self._main_translation_error_signal.connect(self._on_main_translation_error)
+        self._main_translation_partial_signal.connect(self._on_main_translation_partial)
         self._argos_translation_cancelled_signal.connect(self._on_argos_translation_cancelled)
-        self._argos_translation_running = False
+        self._main_translation_running = False
         self._argos_install_required = False
         self._argos_cancel_enabled = False
         self._argos_active_pair = ""
-        self._argos_active_request = ("", "", "")
+        self._main_active_request = ("", "", "")
         self._argos_progress = None
         self._argos_cancel_requested = threading.Event()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -7764,6 +7816,7 @@ class DarkThemeApp(QMainWindow):
         return enabled
 
     def set_autostart(self, enable: bool):
+        self._autostart_error = ''
         try:
             if platform_support.IS_MAC:
                 import macos_desktop
@@ -7794,11 +7847,14 @@ class DarkThemeApp(QMainWindow):
             self.config["autostart_backend"] = AUTOSTART_BACKEND
             return self.autostart
         except Exception as e:
-            print("Error setting autostart:", e)
-            self.autostart = False
-            self.config["autostart"] = False
+            logging.exception("Could not change autostart")
+            self._autostart_error = str(e)
+            # A failed removal must not uncheck a still-enabled LaunchAgent.
+            if platform_support.IS_MAC:
+                self.autostart = macos_desktop.autostart_enabled()
+            self.config["autostart"] = bool(getattr(self, 'autostart', False))
             self.config["autostart_backend"] = AUTOSTART_BACKEND
-            return False
+            return self.config["autostart"]
 
     def init_ui(self):
         self.title_bar = QLabel(self.ui_root)
@@ -10233,6 +10289,7 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language, "translate_button"
         )
         self.translate_button = ScaledIconButton()
+        self.translate_button.setEnabled(not self._main_translation_running)
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setObjectName("mainTranslateButton")
         self.translate_button.setAccessibleName(translate_action_text)
@@ -10593,8 +10650,8 @@ class DarkThemeApp(QMainWindow):
                 self.target_lang.setCurrentIndex(0)
         finally:
             self.target_lang.blockSignals(False)
-        if hasattr(self, "translate_button"):
-            self.translate_button.setEnabled(self.target_lang.count() > 0)
+        if getattr(self, "translate_button", None) is not None:
+            self.translate_button.setEnabled(self.target_lang.count() > 0 and not self._main_translation_running)
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
         update_swap = getattr(self, "_update_main_language_swap", None)
@@ -10693,7 +10750,15 @@ class DarkThemeApp(QMainWindow):
                           + ' → ' + language_display_name(snapshot['target_lang'], self.current_interface_language))
                 if stale:
                     detail += '\n' + labels['result_needs_update']
-            caption.setText(labels['previous_result' if stale else 'result_tab'])
+            title = labels['previous_result' if stale else 'result_tab']
+            progress = getattr(self, '_main_result_progress', None)
+            if progress:
+                title += f' · {progress[0]}/{progress[1]}'
+            error = getattr(self, '_main_result_error', '')
+            if error:
+                title += ' · !'
+                detail += '\n' + error
+            caption.setText(title)
             caption.setToolTip(tooltip_text(detail))
         except RuntimeError:
             pass  # A language change may arrive as the old page is disposed.
@@ -10702,8 +10767,11 @@ class DarkThemeApp(QMainWindow):
         snapshot = getattr(self, '_main_result_snapshot', None)
         try:
             if snapshot:
-                self.main_result_view.setPlainText(snapshot['translated_text'])
+                _update_translation_editor(self.main_result_view, snapshot['translated_text'],
+                                           reset=getattr(self, '_main_reset_preview', False))
+                self._main_reset_preview = False
             self.main_result_actions.setEnabled(bool(snapshot))
+            self.main_result_expand_button.setEnabled(not self._main_translation_running)
             self._refresh_main_result_caption()
         except RuntimeError:
             # A completed worker may arrive while Settings owns the page.
@@ -11038,7 +11106,7 @@ class DarkThemeApp(QMainWindow):
             self._argos_progress = TesseractInstallProgressDialog(
                 self,
                 title="Argos",
-                in_progress_attr="_argos_translation_running",
+                in_progress_attr="_main_translation_running",
                 cancel_callback=self._request_argos_install_cancel,
             )
             self._argos_progress.setCancelButtonText(ui_text(self.current_interface_language, "cancel"))
@@ -11100,7 +11168,7 @@ class DarkThemeApp(QMainWindow):
             self._show_argos_progress(text, determinate=False)
 
     def _request_argos_install_cancel(self):
-        if not self._argos_translation_running or not self._argos_cancel_enabled:
+        if not self._main_translation_running or not self._argos_cancel_enabled:
             return
         self._argos_cancel_requested.set()
         text = ui_text(self.current_interface_language, "argos_canceling")
@@ -11109,11 +11177,12 @@ class DarkThemeApp(QMainWindow):
             self._argos_progress.cancel_button.setEnabled(False)
             self._argos_progress.close_button.setEnabled(False)
 
-    def _finish_argos_translation_state(self):
-        self._argos_translation_running = False
+    def _finish_main_translation_state(self):
+        self._main_translation_running = False
+        self._main_result_progress = None
         self._argos_install_required = False
         self._argos_cancel_enabled = False
-        if hasattr(self, "translate_button"):
+        if getattr(self, "translate_button", None) is not None:
             try:
                 self.translate_button.setEnabled(True)
             except RuntimeError:
@@ -11128,6 +11197,11 @@ class DarkThemeApp(QMainWindow):
                 progress.deleteLater()
             except Exception:
                 pass
+        try:
+            self.main_result_expand_button.setEnabled(True)
+            self._refresh_main_result_caption()
+        except (AttributeError, RuntimeError):
+            pass  # The main page may have been replaced by Settings.
 
     def _present_main_translation_result(self, translated_text, source_text="",
                                          source_lang="", target_lang=""):
@@ -11156,7 +11230,7 @@ class DarkThemeApp(QMainWindow):
         self._show_inline_main_result(translated_text, source_text, source_lang, target_lang)
 
     def _start_argos_translation(self, text, source_code, target_code):
-        if self._argos_translation_running:
+        if self._main_translation_running:
             return
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
         try:
@@ -11170,11 +11244,22 @@ class DarkThemeApp(QMainWindow):
         if not package_installed and not self._confirm_argos_package_install(pair_label):
             return
 
-        self._argos_translation_running = True
+        self._start_main_translation(text, source_code, target_code, 'argos', package_installed)
+
+    def _start_main_translation(self, text, source_code, target_code, engine, package_installed=True):
+        if self._main_translation_running:
+            return
+        pair_label = f"{source_code.upper()}→{target_code.upper()}"
+
+        self._main_translation_running = True
         self._argos_install_required = not package_installed
         self._argos_cancel_enabled = not package_installed
         self._argos_active_pair = pair_label
-        self._argos_active_request = (text, source_code, target_code)
+        self._main_active_request = (text, source_code, target_code)
+        self._main_active_engine = engine
+        self._main_result_progress = None
+        self._main_result_error = ''
+        self._main_reset_preview = True
         self._argos_cancel_requested.clear()
         if hasattr(self, "translate_button"):
             self.translate_button.setEnabled(False)
@@ -11189,26 +11274,42 @@ class DarkThemeApp(QMainWindow):
                     text,
                     source_code,
                     target_code,
-                    engine="argos",
+                    engine=engine,
                     status_callback=self._argos_status_signal.emit if not package_installed else None,
                     progress_callback=self._argos_progress_signal.emit if not package_installed else None,
                     cancel_callback=self._argos_cancel_requested.is_set,
+                    partial_callback=self._main_translation_partial_signal.emit,
                 )
-                self._argos_translation_done_signal.emit(str(translated_text or ""))
-            except translater.ArgosInstallCancelledError:
+                self._main_translation_done_signal.emit(str(translated_text or ""))
+            except (translater.ArgosInstallCancelledError, translater.TranslationCancelledError):
                 self._argos_translation_cancelled_signal.emit()
             except Exception as exc:
-                logging.getLogger("clickntranslate.argos").exception(
-                    "Argos translation failed for %s", pair_label
+                logging.getLogger("clickntranslate.translation").exception(
+                    "%s translation failed for %s", engine, pair_label
                 )
-                self._argos_translation_error_signal.emit(str(exc))
+                self._main_translation_error_signal.emit(str(exc))
 
-        threading.Thread(target=worker, daemon=True).start()
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as exc:
+            self._on_main_translation_error(str(exc))
+
+    @QtCore.pyqtSlot(str, int, int)
+    def _on_main_translation_partial(self, text, done, total):
+        if not self._main_translation_running or self._argos_cancel_requested.is_set():
+            return
+        if result_window_hidden_for(get_cached_config(), 'main'):
+            return
+        self._main_result_progress = (done, total)
+        if self._argos_progress is not None:
+            self._argos_progress.hide()
+        source_text, source_code, target_code = self._main_active_request
+        self._show_inline_main_result(text, source_text, source_code, target_code)
 
     @QtCore.pyqtSlot(str)
-    def _on_argos_translation_done(self, translated_text):
-        self._finish_argos_translation_state()
-        source_text, source_code, target_code = self._argos_active_request
+    def _on_main_translation_done(self, translated_text):
+        self._finish_main_translation_state()
+        source_text, source_code, target_code = self._main_active_request
         self._present_main_translation_result(
             translated_text,
             source_text=source_text,
@@ -11217,9 +11318,13 @@ class DarkThemeApp(QMainWindow):
         )
 
     @QtCore.pyqtSlot(str)
-    def _on_argos_translation_error(self, error_text):
-        self._finish_argos_translation_state()
-        self._show_argos_translation_error(error_text, self._argos_active_pair)
+    def _on_main_translation_error(self, error_text):
+        self._main_result_error = str(error_text)
+        self._finish_main_translation_state()
+        if self._main_active_engine == 'argos':
+            self._show_argos_translation_error(error_text, self._argos_active_pair)
+        else:
+            QMessageBox.warning(self, ui_text(self.current_interface_language, 'translation_error'), error_text)
 
     def _show_argos_translation_error(self, error_text, pair_label=""):
         dialog = ArgosTranslationErrorDialog(
@@ -11233,7 +11338,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot()
     def _on_argos_translation_cancelled(self):
-        self._finish_argos_translation_state()
+        self._finish_main_translation_state()
         QMessageBox.information(
             self,
             "Argos",
@@ -11241,28 +11346,17 @@ class DarkThemeApp(QMainWindow):
         )
 
     def translate_input_text(self):
+        if self._main_translation_running:
+            return
         text = self.text_input.toPlainText()
-        if text:
+        if text.strip():
             source_code = language_code_from_name(self.source_lang.currentText(), self.current_interface_language)
             target_code = language_code_from_name(self.target_lang.currentText(), self.current_interface_language)
             engine = str(get_cached_config().get("translator_engine", "Google")).lower()
             if engine == "argos":
                 self._start_argos_translation(text, source_code, target_code)
                 return
-            try:
-                translated_text = translater.translate_text(text, source_code, target_code)
-                self._present_main_translation_result(
-                    translated_text,
-                    source_text=text,
-                    source_lang=source_code,
-                    target_lang=target_code,
-                )
-            except Exception as e:
-                QMessageBox.warning(
-                    self,
-                    ui_text(self.current_interface_language, "translation_error"),
-                    str(e),
-                )
+            self._start_main_translation(text, source_code, target_code, engine)
 
     def minimize_to_tray(self):
         if not self.has_tray():

@@ -6680,9 +6680,18 @@ class SettingsWindow(QWidget):
         self.ui_scale_decrease.setEnabled(value > MIN_SCALE)
         self.ui_scale_increase.setEnabled(value < maximum)
 
-    def switch_startup(self, state):
+    def _apply_startup_checkbox(self):
         enabled = self.parent.set_autostart(self.autostart_checkbox.isChecked())
         self.autostart_checkbox.setChecked(enabled)
+        error = getattr(self.parent, '_autostart_error', '')
+        if error:
+            lang = self.parent.current_interface_language
+            QMessageBox.warning(self, settings_text(lang, 'error_title'),
+                                settings_text(lang, 'autostart') + '\n\n' + error)
+        return enabled
+
+    def switch_startup(self, state):
+        enabled = self._apply_startup_checkbox()
         self.parent.autostart = enabled
         self.parent.config["autostart"] = enabled
         self.parent.save_config()
@@ -9180,8 +9189,7 @@ class SettingsWindow(QWidget):
         self.apply_theme()
 
     def save_and_back(self):
-        autostart_enabled = self.parent.set_autostart(self.autostart_checkbox.isChecked())
-        self.autostart_checkbox.setChecked(autostart_enabled)
+        autostart_enabled = self._apply_startup_checkbox()
         self.parent.config["autostart"] = autostart_enabled
         self.parent.config["copy_translated_text"] = self.copy_translated_checkbox.isChecked()
         self.parent.config["copy_history"] = self.copy_history_checkbox.isChecked()

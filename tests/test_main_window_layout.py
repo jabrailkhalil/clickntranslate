@@ -228,6 +228,11 @@ class MainWindowGeometryTest(unittest.TestCase):
                 mock.patch.object(main.translater, 'translate_text', side_effect=RuntimeError('Provider unavailable')), \
                 mock.patch.object(main.QMessageBox, 'warning') as warning:
             window.translate_input_text()
+            for _ in range(100):
+                if not window._main_translation_running:
+                    break
+                QTest.qWait(10)
+            self.assertFalse(window._main_translation_running)
         self.assertIn('Provider unavailable', warning.call_args.args[-1])
         self.assertEqual(window.text_input.toPlainText(), 'A new draft')
         self.assertEqual(window.main_result_view.toPlainText(), 'Previous result')
@@ -237,6 +242,11 @@ class MainWindowGeometryTest(unittest.TestCase):
                 mock.patch.object(main, 'save_translation_history') as history, \
                 mock.patch.object(main.QMessageBox, 'warning') as warning:
             window.translate_input_text()
+            for _ in range(100):
+                if not window._main_translation_running:
+                    break
+                QTest.qWait(10)
+            self.assertFalse(window._main_translation_running)
         warning.assert_called_once()
         history.assert_not_called()
         self.assertEqual(window.text_input.toPlainText(), 'A new draft')
