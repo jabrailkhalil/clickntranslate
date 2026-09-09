@@ -5,6 +5,25 @@
 (`arm64`) и Intel (`x86_64`), использует постоянный сертификат и сохраняет файлы
 в артефактах `macos-arm64-prepared` и `macos-x86_64-prepared`.
 
+## Подготовлено 9 сентября 2026 года
+
+[Успешный запуск Actions №34401925327](https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327),
+исходники `478f0c6ec74445606116766eb3d10bcdd670ad8a`:
+
+| Mac | Скачать |
+| --- | --- |
+| Apple Silicon / arm64 | [macos-arm64-prepared](https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/artifacts/10123887082) |
+| Intel / x86_64 | [macos-x86_64-prepared](https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/artifacts/10124009677) |
+
+Обе архитектуры собраны и подписаны; runtime-тесты не запускались.
+Артефакты истекают **8 декабря 2026 года в 20:35 UTC**. Скачать до этой даты.
+
+Команда для Windows:
+
+```powershell
+gh run download 34401925327 --repo jabrailkhalil/clickntranslate --pattern 'macos-*-prepared' --dir macos-prepared
+```
+
 Это отдельные CI-сборки из указанного коммита. Они не являются загрузкой байт
 локальной `/Applications/ClicknTranslate.app`. Приложение и данные на Mac не меняются.
 Режим подготовки пропускает pytest и runtime smoke по текущему запросу пользователя;

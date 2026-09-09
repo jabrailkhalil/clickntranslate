@@ -1,0 +1,27 @@
+{
+  "version": "1.7.1",
+  "architecture": "x86_64",
+  "source_commit": "478f0c6ec74445606116766eb3d10bcdd670ad8a",
+  "source_ref": "refs/heads/codex/macos-1.7.1",
+  "workflow_run": "34401925327",
+  "build_macos": "15.7.9",
+  "minimum_macos": "13.4",
+  "signer_sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "signature": "permanent self-signed",
+  "notarized": false,
+  "runtime_tested": false,
+  "tests_skipped": "Explicit prepare_release workflow mode",
+  "published_release": false,
+  "files": [
+    {
+      "name": "Click-n-Translate-1.7.1-macos-x86_64.dmg",
+      "bytes": 204562379,
+      "sha256": "444bfe9f4fa3532a8c941b2eed65b6e9f2cab531b48c6bfb200cfee12a5e6d5b"
+    },
+    {
+      "name": "Click-n-Translate-1.7.1-macos-x86_64.zip",
+      "bytes": 184182914,
+      "sha256": "771765e2b1e1005d91c77605480e734eb759671586b8ec7f73aceaeb5194f044"
+    }
+  ]
+}

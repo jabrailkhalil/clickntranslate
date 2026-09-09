@@ -1,0 +1,225 @@
+{
+  "run_id": 34401925327,
+  "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327",
+  "status": "completed",
+  "conclusion": "success",
+  "source_commit": "478f0c6ec74445606116766eb3d10bcdd670ad8a",
+  "runtime_tested": false,
+  "published_release": false,
+  "signer_sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "notarized": false,
+  "jobs": [
+    {
+      "name": "build (macos-15-intel, x86_64)",
+      "conclusion": "success",
+      "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/job/102635637314",
+      "completed_steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Select isolated signing directory",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Validate preparation mode",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore permanent release signer",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify signer survives a binary update",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Install native dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test platform behavior and selected engines",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Build and exercise native bundle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify final release certificate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stage signed files and source manifest",
+          "conclusion": "success"
+        },
+        {
+          "name": "Keep files for a later coordinated release",
+          "conclusion": "success"
+        },
+        {
+          "name": "Link prepared files",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Keep public signing verification",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Remove private signer from runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Keep build diagnostics on failure",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "build (macos-15, arm64)",
+      "conclusion": "success",
+      "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/job/102635637683",
+      "completed_steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Select isolated signing directory",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Validate preparation mode",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore permanent release signer",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify signer survives a binary update",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Install native dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test platform behavior and selected engines",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Build and exercise native bundle",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify final release certificate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stage signed files and source manifest",
+          "conclusion": "success"
+        },
+        {
+          "name": "Keep files for a later coordinated release",
+          "conclusion": "success"
+        },
+        {
+          "name": "Link prepared files",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Keep public signing verification",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Remove private signer from runner",
+          "conclusion": "success"
+        },
+        {
+          "name": "Keep build diagnostics on failure",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 10124009677,
+      "name": "macos-x86_64-prepared",
+      "bytes": 388747754,
+      "sha256": "sha256:900264436f6804b8f7fb5f4e332a389e55bb387037c13aa7d025752507744a5d",
+      "expires_at": "2026-12-08T20:35:14Z",
+      "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/artifacts/10124009677"
+    },
+    {
+      "id": 10123887082,
+      "name": "macos-arm64-prepared",
+      "bytes": 315711857,
+      "sha256": "sha256:56eae203dcacf7383162382cd3e46afd7609fc1f1221b69f18efe77d1f156b5d",
+      "expires_at": "2026-12-08T20:35:14Z",
+      "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/34401925327/artifacts/10123887082"
+    }
+  ],
+  "download_verification": [
+    {
+      "architecture": "arm64",
+      "files_verified": 2,
+      "method": "Downloaded Actions artifact; compared file sizes and SHA-256 against BUILD.json"
+    },
+    {
+      "architecture": "x86_64",
+      "files_verified": 2,
+      "method": "Downloaded Actions artifact; compared file sizes and SHA-256 against BUILD.json"
+    }
+  ]
+}
