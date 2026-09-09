@@ -9379,7 +9379,18 @@ class DarkThemeApp(QMainWindow):
                                ('main_result_copy_button', clipboard_copy_icon)):
                 action = getattr(self, name, None)
                 if isinstance(action, QPushButton):
-                    action.setStyleSheet(button_qss(is_dark, 'quiet', icon=True) + tooltip_stylesheet(is_dark))
+                    style = button_qss(is_dark, 'quiet', icon=True)
+                    if name == 'main_result_copy_button':
+                        # A disabled quiet button normally gets a framed tile.
+                        # Copy stays an unframed icon, including before a result.
+                        focus_background = '#302737' if is_dark else '#e7ddee'
+                        style += (
+                            'QPushButton { border:0; }'
+                            'QPushButton:disabled { background:transparent; border:0; }'
+                            'QPushButton[keyboardFocus="true"]:focus {'
+                            f' background:{focus_background}; border:0; }}'
+                        )
+                    action.setStyleSheet(style + tooltip_stylesheet(is_dark))
                     action.setIcon(icon("Темная" if is_dark else "Светлая"))
                     action.setIconSize(QSize(24, 24))
             button.setStyleSheet(
@@ -10300,7 +10311,7 @@ class DarkThemeApp(QMainWindow):
         self.main_translation_status.setFixedHeight(14)
         self.main_translation_status.setMinimumWidth(0)
         self.main_translation_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        result_layout.addWidget(self.main_translation_status, 1, 0, 1, 2)
+        result_layout.addWidget(self.main_translation_status, 1, 0)
         self.main_result_view = QTextEdit()
         self.main_result_view.setObjectName('mainComposerResult')
         self.main_result_view.setReadOnly(True)
@@ -10331,12 +10342,17 @@ class DarkThemeApp(QMainWindow):
         result_actions_layout.addWidget(self.main_result_expand_button, 0, Qt.AlignHCenter | Qt.AlignTop)
         result_actions_layout.addStretch(1)
         self.main_result_copy_button = ScaledIconButton()
+        self.main_result_copy_button.setFocusPolicy(Qt.TabFocus)
+        self.main_result_copy_button.setAutoDefault(False)
+        self.main_result_copy_button.setAttribute(Qt.WA_MacShowFocusRect, False)
         self.main_result_copy_button.setFixedSize(32, 32)
         self.main_result_copy_button.setAccessibleName(ui_text(self.current_interface_language, 'copy'))
         self.main_result_copy_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, 'copy')))
         self.main_result_copy_button.clicked.connect(self._copy_main_result)
         result_actions_layout.addWidget(self.main_result_copy_button, 0, Qt.AlignHCenter | Qt.AlignBottom)
-        result_layout.addWidget(self.main_result_actions, 0, 1)
+        # Match the send column's full height. Progress belongs only to the
+        # text column, so it cannot lift Copy above Send.
+        result_layout.addWidget(self.main_result_actions, 0, 1, 2, 1)
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
