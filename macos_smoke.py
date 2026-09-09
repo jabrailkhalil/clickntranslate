@@ -579,7 +579,6 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
     previous_theme = window.current_theme
     previous_draft = getattr(window, '_main_input_draft', '')
     previous_result = getattr(window, '_main_result_snapshot', None)
-    previous_visible = getattr(window, '_main_result_visible', False)
     source = 'A compact window keeps the original text available.'
     result = ('Компактное окно сохраняет исходный текст.\n' * 12) + 'Последняя строка'
     dialog = None
@@ -590,7 +589,6 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
             window.current_theme = theme
             window.show_main_screen()
             window.apply_theme()
-            window.main_input_tab.click()
             window.text_input.setPlainText(source)
             QTest.qWait(50)
             size = window.size()
@@ -608,7 +606,12 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
                 window._present_main_translation_result(result, source, 'en', 'ru')
             QTest.qWait(50)
             assert window.size() == size
-            assert window.main_result_view.isVisible() and not window.text_input.isVisible()
+            assert window.main_result_view.isVisible() and window.text_input.isVisible()
+            result_rect = QtCore.QRect(window.main_result_view.mapTo(window.main_composer, QtCore.QPoint()),
+                                       window.main_result_view.size())
+            source_rect = QtCore.QRect(window.text_input.mapTo(window.main_composer, QtCore.QPoint()),
+                                       window.text_input.size())
+            assert not result_rect.intersects(source_rect)
             assert window.main_result_view.toPlainText() == result
             assert window.main_result_view.verticalScrollBar().maximum() > 0
             capture('inline-result', window)
@@ -627,7 +630,6 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
             assert dialog.source_panel.isVisible()
             dialog.close()
             dialog = None
-            window.main_input_tab.click()
             assert window.text_input.toPlainText() == source
             records.append({'theme': theme, 'main_size': [size.width(), size.height()],
                             'inline_scrollable': True, 'source_preserved': True, 'collapse_restores_input': True})
@@ -639,7 +641,6 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
         window.current_theme = previous_theme
         window._main_input_draft = previous_draft
         window._main_result_snapshot = previous_result
-        window._main_result_visible = previous_visible
         window.show_main_screen()
         window.apply_theme()
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)

@@ -23,9 +23,13 @@ def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
     if dark is None:
         dark = _uses_dark_theme()
     background, foreground, border = (
-        ("#211d28", "#f7f3ff", "#7a5fa1") if dark else
-        ("#faf7fc", "#302639", "#a18caf")
+        ("#303030", "#f2f2f2", "#505050") if dark else
+        ("#f7f7f7", "#252525", "#c9c9c9")
     )
+    if QtWidgets.QApplication.instance() is not None:
+        family = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont).family()
+    else:
+        family = 'Helvetica Neue' if sys.platform == 'darwin' else 'Sans Serif'
     if use_palette:
         background, foreground, border = 'palette(tool-tip-base)', 'palette(tool-tip-text)', 'palette(mid)'
     return f"""
@@ -33,10 +37,11 @@ def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
         background-color: {background};
         color: {foreground};
         border: 1px solid {border};
-        border-radius: 8px;
-        padding: 4px 8px;
-        font-family: 'Segoe UI';
-        font-size: 12px;
+        border-radius: 4px;
+        padding: 3px 6px;
+        font-family: '{family}';
+        font-size: 11px;
+        font-weight: 400;
         opacity: 245;
     }}
 """
@@ -52,7 +57,7 @@ TOOLTIP_QSS = tooltip_stylesheet(True)
 # gets wrapped to a fixed width; short labels stay snug so "Close" does not
 # become a fixed-width box.
 TOOLTIP_WRAP_THRESHOLD = 44
-TOOLTIP_WRAP_WIDTH = 280
+TOOLTIP_WRAP_WIDTH = 240
 
 
 def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
@@ -81,12 +86,18 @@ class _RoundedTooltipFilter(QtCore.QObject):
         event_type = event.type()
         if event_type not in (
             QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
-            QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
+            QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange, QtCore.QEvent.Move,
         ):
             return False
         if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
             return False
         is_tooltip = _is_tooltip(watched)
+        if (is_tooltip and event_type in (QtCore.QEvent.Show, QtCore.QEvent.Move,
+                                         QtCore.QEvent.Resize, QtCore.QEvent.StyleChange)
+                and not watched.property('clickntranslateTooltipPlacementPending')):
+            watched.setProperty('clickntranslateTooltipPlacementPending', True)
+            anchor = QtGui.QCursor.pos()
+            QtCore.QTimer.singleShot(0, lambda widget=watched, point=anchor: _fit_hover_tooltip(widget, point))
         if is_tooltip and event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show):
             # QTipLabel is reused across unrelated windows. Its previous owner
             # and stylesheet must not leave a dark tooltip in the light theme.
@@ -144,6 +155,54 @@ def _apply_tooltip_theme(widget) -> None:
         pass
 
 
+def position_popup_near_cursor(widget, anchor=None):
+    """Place in desktop coordinates even when Qt embeds a tip in the UI scene."""
+    anchor = QtGui.QCursor.pos() if anchor is None else anchor
+    screen = QtWidgets.QApplication.screenAt(anchor) or QtWidgets.QApplication.primaryScreen()
+    if screen is None:
+        return
+    bounds = screen.availableGeometry().adjusted(4, 4, -4, -4)
+    proxy = widget.graphicsProxyWidget()
+    views = ([view for view in proxy.scene().views() if view.isVisible()]
+             if proxy is not None and proxy.scene() is not None else [])
+    view = views[0] if views else None
+    if view is not None:
+        # Embedded popups are clipped by the view, even when the desktop has
+        # space below it. Put footer hints above the cursor in that case.
+        viewport = view.viewport()
+        visible_bounds = QtCore.QRect(viewport.mapToGlobal(QtCore.QPoint()), viewport.size())
+        bounds = bounds.intersected(visible_bounds.adjusted(4, 4, -4, -4))
+    x, y = anchor.x() + 7, anchor.y() + 13
+    if y + widget.height() > bounds.bottom() + 1:
+        y = anchor.y() - widget.height() - 7
+    x = max(bounds.left(), min(x, bounds.right() - widget.width() + 1))
+    y = max(bounds.top(), min(y, bounds.bottom() - widget.height() + 1))
+    if view is not None:
+        # A tooltip is a desktop hint, independent of the main canvas zoom.
+        proxy.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
+        scene_point = view.mapToScene(view.viewport().mapFromGlobal(QtCore.QPoint(x, y)))
+        parent = proxy.parentItem()
+        proxy.setPos(parent.mapFromScene(scene_point) if parent is not None else scene_point)
+        return
+    widget.move(x, y)
+
+
+def _fit_hover_tooltip(widget, anchor):
+    try:
+        if sip.isdeleted(widget):
+            return
+        if widget.isVisible():
+            widget.setWordWrap(len(widget.text()) > TOOLTIP_WRAP_THRESHOLD)
+            widget.setMaximumWidth(260)
+            widget.adjustSize()
+            if widget.wordWrap():
+                widget.resize(widget.width(), max(widget.height(), widget.heightForWidth(widget.width())))
+            position_popup_near_cursor(widget, anchor)
+        widget.setProperty('clickntranslateTooltipPlacementPending', False)
+    except RuntimeError:
+        pass  # Qt may dispose the shared tip before this queued placement.
+
+
 def _is_rounded_popup(widget) -> bool:
     try:
         return _is_tooltip(widget) or bool(
@@ -169,6 +228,8 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
         if rect.width() < 2 or rect.height() < 2:
             return
         path = QtGui.QPainterPath()
+        if _is_tooltip(widget) or isinstance(widget, StatusPopup):
+            radius = 4.0
         path.addRoundedRect(QtCore.QRectF(rect), radius, radius)
         polygon = path.toFillPolygon().toPolygon()
         widget.setMask(QtGui.QRegion(polygon))
@@ -260,10 +321,14 @@ def install_tooltip_style(app=None, dark=None) -> None:
     if style != existing:
         app.setStyleSheet(style)
     palette = QtWidgets.QToolTip.palette()
-    palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor('#211d28' if dark else '#faf7fc'))
-    palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor('#f7f3ff' if dark else '#302639'))
-    palette.setColor(QtGui.QPalette.Mid, QtGui.QColor('#7a5fa1' if dark else '#a18caf'))
+    palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor('#303030' if dark else '#f7f7f7'))
+    palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor('#f2f2f2' if dark else '#252525'))
+    palette.setColor(QtGui.QPalette.Mid, QtGui.QColor('#505050' if dark else '#c9c9c9'))
     QtWidgets.QToolTip.setPalette(palette)
+    font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
+    font.setPixelSize(11)
+    font.setWeight(QtGui.QFont.Normal)
+    QtWidgets.QToolTip.setFont(font)
     for widget in app.topLevelWidgets():
         if _is_tooltip(widget):
             widget.setStyleSheet(tooltip_stylesheet(dark))

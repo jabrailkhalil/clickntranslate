@@ -4058,15 +4058,15 @@ for _lang, _labels in {
 
 
 for _lang, _labels in {
-    "ru": ("Ввод", "Скрыть ввод", "Показать ввод", "Открыть перевод в отдельном окне"),
-    "en": ("Input", "Hide input", "Show input", "Open translation in a separate window"),
-    "de": ("Eingabe", "Eingabe ausblenden", "Eingabe einblenden", "Übersetzung in einem eigenen Fenster öffnen"),
-    "fr": ("Saisie", "Masquer la saisie", "Afficher la saisie", "Ouvrir la traduction dans une fenêtre séparée"),
-    "es": ("Entrada", "Ocultar entrada", "Mostrar entrada", "Abrir la traducción en otra ventana"),
-    "zh": ("输入", "隐藏输入", "显示输入", "在独立窗口中打开译文"),
+    "ru": ("Ввод", "Скрыть ввод", "Показать ввод", "Открыть перевод в отдельном окне", "Предыдущий перевод", "Ввод или языки изменены. Нажмите «Перевести»."),
+    "en": ("Input", "Hide input", "Show input", "Open translation in a separate window", "Previous translation", "The input or languages changed. Click Translate."),
+    "de": ("Eingabe", "Eingabe ausblenden", "Eingabe einblenden", "Übersetzung in einem eigenen Fenster öffnen", "Vorherige Übersetzung", "Eingabe oder Sprachen geändert. Klicke auf Übersetzen."),
+    "fr": ("Saisie", "Masquer la saisie", "Afficher la saisie", "Ouvrir la traduction dans une fenêtre séparée", "Traduction précédente", "La saisie ou les langues ont changé. Cliquez sur Traduire."),
+    "es": ("Entrada", "Ocultar entrada", "Mostrar entrada", "Abrir la traducción en otra ventana", "Traducción anterior", "La entrada o los idiomas han cambiado. Pulsa Traducir."),
+    "zh": ("输入", "隐藏输入", "显示输入", "在独立窗口中打开译文", "上次译文", "输入或语言已更改，请点击翻译。"),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
-        ("input_tab", "hide_source", "show_source", "open_result"), _labels))
+        ("input_tab", "hide_source", "show_source", "open_result", "previous_result", "result_needs_update"), _labels))
 
 
 class TranslateOnEnterTextEdit(QTextEdit):
@@ -8692,11 +8692,10 @@ class DarkThemeApp(QMainWindow):
         self._hide_status_signal.connect(self._on_hide_status)
 
     def _on_show_status(self, text):
-        from PyQt5.QtGui import QCursor
+        from styled_dialogs import position_popup_near_cursor
         self._status_label.setText(text)
         self._status_label.adjustSize()
-        pos = QCursor.pos()
-        self._status_label.move(pos.x() + 15, pos.y() + 15)
+        position_popup_near_cursor(self._status_label)
         self._status_label.show()
 
     def _on_hide_status(self):
@@ -9273,17 +9272,13 @@ class DarkThemeApp(QMainWindow):
                     "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }"
                     + tooltip_stylesheet(is_dark)
                 )
-            for tab in (getattr(self, 'main_input_tab', None), getattr(self, 'main_result_tab', None)):
-                if isinstance(tab, QToolButton):
-                    tab.setStyleSheet(
-                        "QToolButton { background:transparent; border:0; border-radius:0;"
-                        f" color:{muted}; padding:0 6px 2px; font-size:12px; font-weight:600; }}"
-                        f"QToolButton:checked {{ color:{input_text}; border-bottom:2px solid #9a7fc1; }}"
-                        f"QToolButton:hover:enabled {{ color:{input_text}; }}"
-                        f"QToolButton:disabled {{ color:{muted}; }}")
-            pair_label = getattr(self, 'main_result_pair_label', None)
-            if isinstance(pair_label, QLabel):
-                pair_label.setStyleSheet(f"color:{muted}; background:transparent; border:0; font-size:13px;")
+            for caption in (getattr(self, 'main_input_caption', None), getattr(self, 'main_result_caption', None)):
+                if isinstance(caption, QLabel):
+                    caption.setStyleSheet(
+                        f"color:{muted}; background:transparent; border:0; font-size:12px; font-weight:500;")
+            line = getattr(self, 'main_composer_divider', None)
+            if isinstance(line, QFrame):
+                line.setStyleSheet(f"background:{divider}; border:0;")
             for name, icon in (('main_result_expand_button', document_expand_icon),
                                ('main_result_copy_button', clipboard_copy_icon)):
                 action = getattr(self, name, None)
@@ -10112,28 +10107,21 @@ class DarkThemeApp(QMainWindow):
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
         )
         result_labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
-        composer_tabs = QWidget()
-        composer_tabs.setFixedHeight(18)
-        tabs_layout = QHBoxLayout(composer_tabs)
-        tabs_layout.setContentsMargins(0, 0, 0, 0)
-        tabs_layout.setSpacing(6)
-        tabs_layout.addStretch(1)
-        tab_group = QtWidgets.QButtonGroup(composer_tabs)
-        self.main_input_tab = QToolButton()
-        self.main_result_tab = QToolButton()
-        for tab, caption in ((self.main_input_tab, result_labels['input_tab']),
-                             (self.main_result_tab, result_labels['result_tab'])):
-            tab.setText(caption)
-            tab.setAccessibleName(caption)
-            tab.setCheckable(True)
-            tab.setFixedHeight(18)
-            tab.setCursor(Qt.PointingHandCursor)
-            tab_group.addButton(tab)
-            tabs_layout.addWidget(tab)
-        tabs_layout.addStretch(1)
-        self.main_input_tab.clicked.connect(lambda: self._set_main_result_visible(False, focus=True))
-        self.main_result_tab.clicked.connect(lambda: self._set_main_result_visible(True, focus=True))
-        text_section_layout.addWidget(composer_tabs)
+        composer_headings = QWidget()
+        composer_headings.setFixedHeight(18)
+        headings_layout = QHBoxLayout(composer_headings)
+        headings_layout.setContentsMargins(0, 0, 0, 0)
+        headings_layout.setSpacing(6)
+        self.main_input_caption = QLabel(result_labels['input_tab'])
+        self.main_result_caption = QLabel(result_labels['result_tab'])
+        for caption in (self.main_input_caption, self.main_result_caption):
+            caption.setMinimumWidth(0)
+            caption.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            caption.setAlignment(Qt.AlignCenter)
+        headings_layout.addWidget(self.main_input_caption, 1)
+        headings_layout.addSpacing(30)
+        headings_layout.addWidget(self.main_result_caption, 1)
+        text_section_layout.addWidget(composer_headings)
         for combo in (self.source_lang, self.target_lang):
             combo.setFixedHeight(30)
             combo.setMinimumWidth(0)
@@ -10141,12 +10129,6 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.addWidget(self.source_lang, 1)
         language_picker_layout.addWidget(self.main_language_swap)
         language_picker_layout.addWidget(self.target_lang, 1)
-        self.main_result_pair_label = QLabel()
-        self.main_result_pair_label.setFixedHeight(30)
-        self.main_result_pair_label.setAlignment(Qt.AlignCenter)
-        self.main_result_pair_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        self.main_result_pair_label.hide()
-        language_picker_layout.addWidget(self.main_result_pair_label, 1)
         text_section_layout.addLayout(language_picker_layout)
         self._apply_main_combo_theme(self.current_theme == "Темная")
         self._restore_main_translation_languages()
@@ -10165,34 +10147,50 @@ class DarkThemeApp(QMainWindow):
         self.source_lang.currentIndexChanged.connect(self.update_languages)
         self.target_lang.currentIndexChanged.connect(self._on_main_translation_target_changed)
         self.main_language_swap.clicked.connect(self._swap_main_translation_languages)
+        self.source_lang.currentIndexChanged.connect(self._refresh_main_result_caption)
+        self.target_lang.currentIndexChanged.connect(self._refresh_main_result_caption)
         self.main_composer = QFrame()
         self.main_composer.setObjectName("mainComposer")
         self.main_composer.setMinimumHeight(74)
         composer_layout = QGridLayout(self.main_composer)
         composer_layout.setContentsMargins(3, 2, 4, 4)
-        composer_layout.setSpacing(0)
+        composer_layout.setSpacing(6)
         composer_layout.setColumnStretch(0, 1)
-        # Keep both actions in a narrow rail of their own. Long input never
-        # grows a scrollbar beside the send arrow: after two visual lines an
-        # unobtrusive expand action appears and opens the document workspace.
+        composer_layout.setColumnStretch(2, 1)
+        input_pane = QWidget(self.main_composer)
+        result_pane = QWidget(self.main_composer)
+        input_layout = QGridLayout(input_pane)
+        result_layout = QGridLayout(result_pane)
+        for pane_layout in (input_layout, result_layout):
+            pane_layout.setContentsMargins(0, 0, 0, 0)
+            pane_layout.setSpacing(0)
+            pane_layout.setColumnStretch(0, 1)
+        divider_space = QWidget(self.main_composer)
+        divider_space.setFixedWidth(30)
+        divider_layout = QHBoxLayout(divider_space)
+        divider_layout.setContentsMargins(0, 6, 0, 6)
+        self.main_composer_divider = QFrame(divider_space)
+        self.main_composer_divider.setFixedWidth(1)
+        divider_layout.addWidget(self.main_composer_divider, 0, Qt.AlignHCenter)
+        composer_layout.addWidget(input_pane, 0, 0)
+        composer_layout.addWidget(divider_space, 0, 1)
+        composer_layout.addWidget(result_pane, 0, 2)
 
         self.text_input = TranslateOnEnterTextEdit()
         self.text_input.setPlainText(getattr(self, '_main_input_draft', ''))
         self.text_input.setObjectName("mainComposerInput")
-        self.text_input.setPlaceholderText(
-            f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
-        )
-        # Deliberately plain two-line text. Qt respects the explicit line break
-        # without squeezing it into the narrow rich-text tooltip seen before.
-        self.text_input.setToolTip(doc_text(self.current_interface_language, "main_file_tooltip"))
+        self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
+        self.text_input.setToolTip(tooltip_text(
+            doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
         # This is what the window is for, so it gets the room the second
         # language row and the hint line used to take.
         self.text_input.setMinimumHeight(66)
         self.text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.text_input.setWordWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.text_input.setAcceptDrops(False)
-        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.text_input.setContextMenuPolicy(Qt.CustomContextMenu)
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
@@ -10203,7 +10201,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input.document().documentLayout().documentSizeChanged.connect(
             self._schedule_document_expand_visibility
         )
-        composer_layout.addWidget(self.text_input, 0, 0)
+        input_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
         self.main_input_actions = composer_actions
@@ -10245,7 +10243,7 @@ class DarkThemeApp(QMainWindow):
         composer_actions_layout.addWidget(
             self.translate_button, 0, Qt.AlignHCenter | Qt.AlignBottom
         )
-        composer_layout.addWidget(composer_actions, 0, 1)
+        input_layout.addWidget(composer_actions, 0, 1)
         self.main_result_view = QTextEdit()
         self.main_result_view.setObjectName('mainComposerResult')
         self.main_result_view.setReadOnly(True)
@@ -10257,7 +10255,8 @@ class DarkThemeApp(QMainWindow):
         self.main_result_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.main_result_view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.main_result_view.setAccessibleName(result_labels['result_tab'])
-        composer_layout.addWidget(self.main_result_view, 0, 0)
+        self.main_result_view.setPlaceholderText(result_labels['result_placeholder'])
+        result_layout.addWidget(self.main_result_view, 0, 0)
         self.main_result_actions = QWidget(self.main_composer)
         self.main_result_actions.setFixedWidth(34)
         result_actions_layout = QVBoxLayout(self.main_result_actions)
@@ -10276,7 +10275,7 @@ class DarkThemeApp(QMainWindow):
         self.main_result_copy_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, 'copy')))
         self.main_result_copy_button.clicked.connect(self._copy_main_result)
         result_actions_layout.addWidget(self.main_result_copy_button, 0, Qt.AlignHCenter | Qt.AlignBottom)
-        composer_layout.addWidget(self.main_result_actions, 0, 1)
+        result_layout.addWidget(self.main_result_actions, 0, 1)
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
@@ -10631,6 +10630,7 @@ class DarkThemeApp(QMainWindow):
     def _schedule_document_expand_visibility(self, *_args):
         try:
             self._main_input_draft = self.text_input.toPlainText()
+            self._refresh_main_result_caption()
         except RuntimeError:
             return  # The previous page's document can finish a queued layout.
         timer = getattr(self, "_composer_expand_timer", None)
@@ -10661,8 +10661,7 @@ class DarkThemeApp(QMainWindow):
         if not isinstance(button, QPushButton) or not isinstance(editor, QTextEdit):
             return
         try:
-            # One or two lines remain a quick message. Longer text gets a clear
-            # way into the spacious document editor instead of a tiny scrollbar.
+            # Long drafts can also be opened in the document workspace.
             button.setVisible(
                 bool(editor.toPlainText().strip())
                 and self._composer_visual_line_count() > 2
@@ -10676,31 +10675,36 @@ class DarkThemeApp(QMainWindow):
         if text.strip():
             self.open_document_translation(initial_text=text)
 
-    def _set_main_result_visible(self, visible, *, focus=False):
-        visible = bool(visible and getattr(self, '_main_result_snapshot', None))
-        self._main_result_visible = visible
-        self.main_input_tab.setChecked(not visible)
-        self.main_result_tab.setChecked(visible)
-        self.main_result_tab.setEnabled(bool(getattr(self, '_main_result_snapshot', None)))
-        for widget in (self.text_input, self.main_input_actions, self.source_lang,
-                       self.main_language_swap, self.target_lang):
-            widget.setVisible(not visible)
-        for widget in (self.main_result_view, self.main_result_actions, self.main_result_pair_label):
-            widget.setVisible(visible)
-        if focus:
-            (self.main_result_view if visible else self.text_input).setFocus(Qt.OtherFocusReason)
+    def _refresh_main_result_caption(self, *_args):
+        caption = getattr(self, 'main_result_caption', None)
+        if caption is None:
+            return
+        labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
+        snapshot = getattr(self, '_main_result_snapshot', None)
+        try:
+            stale = False
+            detail = ''
+            if snapshot:
+                source = language_code_from_name(self.source_lang.currentText(), self.current_interface_language)
+                target = language_code_from_name(self.target_lang.currentText(), self.current_interface_language)
+                stale = (self.text_input.toPlainText() != snapshot['source_text']
+                         or (source, target) != (snapshot['source_lang'], snapshot['target_lang']))
+                detail = (language_display_name(snapshot['source_lang'], self.current_interface_language)
+                          + ' → ' + language_display_name(snapshot['target_lang'], self.current_interface_language))
+                if stale:
+                    detail += '\n' + labels['result_needs_update']
+            caption.setText(labels['previous_result' if stale else 'result_tab'])
+            caption.setToolTip(tooltip_text(detail))
+        except RuntimeError:
+            pass  # A language change may arrive as the old page is disposed.
 
     def _restore_main_result_widgets(self):
         snapshot = getattr(self, '_main_result_snapshot', None)
         try:
             if snapshot:
                 self.main_result_view.setPlainText(snapshot['translated_text'])
-                self.main_result_pair_label.setText(
-                    f"{snapshot['source_lang'].upper()} → {snapshot['target_lang'].upper()}")
-                self.main_result_pair_label.setToolTip(
-                    language_display_name(snapshot['source_lang'], self.current_interface_language)
-                    + ' → ' + language_display_name(snapshot['target_lang'], self.current_interface_language))
-            self._set_main_result_visible(getattr(self, '_main_result_visible', False))
+            self.main_result_actions.setEnabled(bool(snapshot))
+            self._refresh_main_result_caption()
         except RuntimeError:
             # A completed worker may arrive while Settings owns the page.
             # Keep the snapshot for the next main-page reconstruction.
@@ -10709,7 +10713,6 @@ class DarkThemeApp(QMainWindow):
     def _show_inline_main_result(self, translated_text, source_text, source_lang, target_lang):
         self._main_result_snapshot = dict(translated_text=translated_text, source_text=source_text,
                                           source_lang=source_lang, target_lang=target_lang)
-        self._main_result_visible = True
         self._restore_main_result_widgets()
 
     def _copy_main_result(self):

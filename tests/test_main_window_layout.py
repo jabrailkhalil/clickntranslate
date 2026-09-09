@@ -74,7 +74,7 @@ class MainScreenSourceTest(unittest.TestCase):
         self.assertIn("composer_actions_layout.addWidget", translate)
         self.assertIn("Qt.AlignHCenter | Qt.AlignBottom", translate)
         self.assertIn("self.text_input.setViewportMargins(0, 0, 0, 0)", source)
-        self.assertIn("self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)", source)
+        self.assertIn("self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)", source)
         self.assertIn("text_section_layout.addWidget(self.main_composer, 1)", translate)
         self.assertNotIn("self.main_layout.addWidget(self.translate_button)", translate)
         self.assertIn("self.translate_button = ScaledIconButton()", source)
@@ -191,19 +191,19 @@ class MainWindowGeometryTest(unittest.TestCase):
             window._present_main_translation_result(result, source, 'en', 'ru')
             self.app.processEvents()
             self.assertTrue(window.main_result_view.isVisible())
-            self.assertFalse(window.text_input.isVisible())
+            self.assertTrue(window.text_input.isVisible())
             self.assertEqual(window.size(), initial_size)
             self.assertEqual(window.main_result_view.toPlainText(), result)
             self.assertGreater(window.main_result_view.verticalScrollBar().maximum(), 0)
             copy.assert_called_once_with(result)
             history.assert_called_once_with(source, result, 'ru')
             dialog.assert_not_called()
-            window.main_input_tab.click()
             self.assertTrue(window.text_input.isVisible())
             self.assertEqual(window.text_input.toPlainText(), source)
             window.text_input.insertPlainText(' New edit.')
             edited_source = window.text_input.toPlainText()
-            window.main_result_tab.click()
+            self.assertEqual(window.main_result_caption.text(),
+                             main.TRANSLATION_RESULT_DIALOG_TEXT[window.current_interface_language]['previous_result'])
             for theme in ('Светлая', 'Темная'):
                 window.current_theme = theme
                 window.apply_theme()
@@ -223,7 +223,6 @@ class MainWindowGeometryTest(unittest.TestCase):
     def test_failed_main_translation_keeps_draft_and_previous_result(self):
         window = self.window
         window._show_inline_main_result('Previous result', 'Previous input', 'en', 'ru')
-        window.main_input_tab.click()
         window.text_input.setPlainText('A new draft')
         with mock.patch.object(main, 'get_cached_config', return_value=dict(window.config, translator_engine='Lingva')), \
                 mock.patch.object(main.translater, 'translate_text', side_effect=RuntimeError('Provider unavailable')), \
@@ -282,8 +281,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 detached_keys = {
                     info["key"] for info in panel.overlay._detached_buttons.values()
                 }
-                self.assertIn("main_input_tab", detached_keys)
-                self.assertIn("main_result_tab", detached_keys)
+                self.assertIn("main_input_caption", detached_keys)
+                self.assertIn("main_result_caption", detached_keys)
                 self.assertIn("mainShortcutSectionTitle", detached_keys)
                 self.assertIn("mainOcrSummary", detached_keys)
                 source_info = panel.overlay._detached_buttons[self.window.source_lang]
@@ -620,7 +619,7 @@ class MainWindowGeometryTest(unittest.TestCase):
         editor = self.window.text_input
         expand = self.window.document_expand_button
 
-        self.assertEqual(editor.verticalScrollBarPolicy(), Qt.ScrollBarAlwaysOff)
+        self.assertEqual(editor.verticalScrollBarPolicy(), Qt.ScrollBarAsNeeded)
         editor.setPlainText("one\ntwo")
         for _ in range(3):
             self.app.processEvents()

@@ -143,13 +143,18 @@ the draft, and Command-Z can restore the preceding result.
 The translation pane has a Hide input / Show input control. It gives the result
 the full editor area without changing the window size or discarding the source.
 
-The fixed main window now uses Input and Translation tabs in its existing text
-panel. Successful manual translations appear inline with scrolling, Copy and
-Open in a separate window actions. Switching tabs or rebuilding the main page
-preserves the current input and the last result in memory. Each result retains
+The fixed main window shows input and translation side by side in its existing
+text panel, separated by a thin line. Both fields scroll independently; Copy and
+Open in a separate window remain available for the result. Editing the input or
+rebuilding the main page preserves the last result in memory. An older result is
+labelled Previous translation when the draft or language pair changes. Each result retains
 its original source and language pair when expanded; expanding does not copy it
 again. Auto-copy and the explicit clipboard-only result setting still apply.
 Provider failures keep the draft and the preceding result available.
+
+Hover hints use the system font, a compact neutral surface and an anchor next to
+the cursor. The placement handles both native windows and the scaled main canvas;
+tooltips keep their own size rather than following the main-window zoom.
 
 Screen capture asks for **Screen Recording** access; copying and replacing a
 selection asks for **Accessibility**. The application explains the permission
