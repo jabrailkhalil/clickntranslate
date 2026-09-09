@@ -2143,6 +2143,25 @@ def document_expand_icon(theme_name):
     return QIcon(pixmap)
 
 
+def clipboard_copy_icon(theme_name):
+    pixmap = QPixmap(96, 96)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.scale(4, 4)
+    painter.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(QColor("#c5b3e9" if theme_name == "Темная" else "#674586"), 1.8)
+    pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.NoBrush)
+    painter.drawRoundedRect(QtCore.QRectF(8, 8, 12, 13), 2, 2)
+    painter.drawLine(5, 16, 4, 16)
+    painter.drawLine(4, 16, 4, 4)
+    painter.drawLine(4, 4, 15, 4)
+    painter.drawLine(15, 4, 15, 5)
+    painter.end()
+    return QIcon(pixmap)
+
+
 WELCOME_TEXT = {
     "en": {
         "window": "News",
@@ -4038,6 +4057,18 @@ for _lang, _labels in {
         ("workspace_title", "source_placeholder", "result_placeholder", "swap_texts"), _labels))
 
 
+for _lang, _labels in {
+    "ru": ("Ввод", "Скрыть ввод", "Показать ввод", "Открыть перевод в отдельном окне"),
+    "en": ("Input", "Hide input", "Show input", "Open translation in a separate window"),
+    "de": ("Eingabe", "Eingabe ausblenden", "Eingabe einblenden", "Übersetzung in einem eigenen Fenster öffnen"),
+    "fr": ("Saisie", "Masquer la saisie", "Afficher la saisie", "Ouvrir la traduction dans une fenêtre séparée"),
+    "es": ("Entrada", "Ocultar entrada", "Mostrar entrada", "Abrir la traducción en otra ventana"),
+    "zh": ("输入", "隐藏输入", "显示输入", "在独立窗口中打开译文"),
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
+        ("input_tab", "hide_source", "show_source", "open_result"), _labels))
+
+
 class TranslateOnEnterTextEdit(QTextEdit):
     """Enter translates, Shift+Enter starts a new line.
 
@@ -4131,6 +4162,7 @@ class TranslationResultDialog(QDialog):
         self._pending_request = None
         self._cancel_event = None
         self._panel_orientation = None
+        self._source_collapsed = False
         self._status_message = ""
 
         self.setObjectName("translationResultRoot")
@@ -4214,6 +4246,16 @@ class TranslationResultDialog(QDialog):
         self.translated_text = self.text_edit.toPlainText()
         self.source_panel = self._editor_panel(self.text["source_tab"], self.source_combo, self.source_edit)
         self.result_panel = self._editor_panel(self.text["result_tab"], self.target_combo, self.text_edit)
+        self.source_toggle = QToolButton(self)
+        self.source_toggle.setObjectName("translationSourceToggle")
+        self.source_toggle.setText(self.text["hide_source"])
+        self.source_toggle.setAccessibleName(self.text["hide_source"])
+        self.source_toggle.setToolTip(self.text["hide_source"])
+        self.source_toggle.setCheckable(True)
+        self.source_toggle.setFixedHeight(24)
+        self.source_toggle.setCursor(Qt.PointingHandCursor)
+        self.source_toggle.toggled.connect(self._set_source_collapsed)
+        self.result_panel.caption_layout.addWidget(self.source_toggle)
         self.swap_button = LanguageSwapButton(self)
         self.swap_button.setObjectName("translationResultSwap")
         self.swap_button.setFixedSize(34, 34)
@@ -4309,25 +4351,46 @@ class TranslationResultDialog(QDialog):
         contents.setSpacing(8)
         label = QLabel(caption)
         label.setObjectName("translationEditorCaption")
+        label.setMinimumHeight(24)
         label.setBuddy(editor)
-        contents.addWidget(label)
+        panel.caption_layout = QHBoxLayout()
+        panel.caption_layout.setSpacing(6)
+        panel.caption_layout.addWidget(label, 1)
+        contents.addLayout(panel.caption_layout)
         contents.addWidget(combo)
         contents.addWidget(editor, 1)
         return panel
+
+    def _set_source_collapsed(self, collapsed):
+        self._source_collapsed = bool(collapsed)
+        caption = self.text["show_source" if collapsed else "hide_source"]
+        self.source_toggle.setText(caption)
+        self.source_toggle.setAccessibleName(caption)
+        self.source_toggle.setToolTip(caption)
+        self._reflow_editors()
+        (self.text_edit if collapsed else self.source_edit).setFocus(Qt.OtherFocusReason)
 
     def _reflow_editors(self):
         if not hasattr(self, "body_grid"):
             return
         factor = float(self.property("ui_effective_scale") or 1)
         horizontal = self.editors.width() >= round(620 * factor)
-        if horizontal == self._panel_orientation:
+        orientation = "collapsed" if self._source_collapsed else horizontal
+        if orientation == self._panel_orientation:
             return
-        self._panel_orientation = horizontal
+        self._panel_orientation = orientation
         for widget in (self.source_panel, self.swap_button, self.result_panel):
             self.body_grid.removeWidget(widget)
         for position in range(3):
             self.body_grid.setColumnStretch(position, 0)
             self.body_grid.setRowStretch(position, 0)
+        self.source_panel.setVisible(not self._source_collapsed)
+        self.swap_button.setVisible(not self._source_collapsed)
+        if self._source_collapsed:
+            self.body_grid.addWidget(self.result_panel, 0, 0)
+            self.body_grid.setColumnStretch(0, 1)
+            self.body_grid.setRowStretch(0, 1)
+            return
         self.body_grid.addWidget(self.source_panel, 0, 0)
         if horizontal:
             self.body_grid.addWidget(self.swap_button, 0, 1, Qt.AlignCenter)
@@ -4564,6 +4627,9 @@ class TranslationResultDialog(QDialog):
         """ + standard_buttons(dark, compact=False))
         for button in (self.scale_decrease, self.scale_increase):
             button.setStyleSheet(button_qss(dark, "quiet", selector="QToolButton", icon=True, radius=4))
+        self.source_toggle.setStyleSheet(
+            button_qss(dark, "quiet", selector="QToolButton", compact=True, radius=4)
+            + "QToolButton { font-size:12px; padding:0 5px; }")
         for combo in (self.source_combo, self.target_combo):
             combo.set_popup_background(surface)
 
@@ -9195,14 +9261,36 @@ class DarkThemeApp(QMainWindow):
                     "QFrame#mainComposer {"
                     " background:transparent; border:1px solid transparent; border-radius:0;"
                     f" border-top:1px solid {divider}; }}"
-                    "QTextEdit#mainComposerInput {"
+                    "QTextEdit#mainComposerInput, QTextEdit#mainComposerResult {"
                     f" background: transparent; color: {input_text};"
                     f" selection-background-color: #7A5FA1; border: none;"
                     " padding: 7px 9px; font-size: 14px; }"
                     "QTextEdit#mainComposerInput:disabled {"
                     f" color: {muted}; }}"
+                    "QScrollBar:vertical { background:transparent; width:6px; margin:3px 0; }"
+                    f"QScrollBar::handle:vertical {{ background:{border}; border-radius:3px; min-height:20px; }}"
+                    "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
+                    "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }"
                     + tooltip_stylesheet(is_dark)
                 )
+            for tab in (getattr(self, 'main_input_tab', None), getattr(self, 'main_result_tab', None)):
+                if isinstance(tab, QToolButton):
+                    tab.setStyleSheet(
+                        "QToolButton { background:transparent; border:0; border-radius:0;"
+                        f" color:{muted}; padding:0 6px 2px; font-size:12px; font-weight:600; }}"
+                        f"QToolButton:checked {{ color:{input_text}; border-bottom:2px solid #9a7fc1; }}"
+                        f"QToolButton:hover:enabled {{ color:{input_text}; }}"
+                        f"QToolButton:disabled {{ color:{muted}; }}")
+            pair_label = getattr(self, 'main_result_pair_label', None)
+            if isinstance(pair_label, QLabel):
+                pair_label.setStyleSheet(f"color:{muted}; background:transparent; border:0; font-size:13px;")
+            for name, icon in (('main_result_expand_button', document_expand_icon),
+                               ('main_result_copy_button', clipboard_copy_icon)):
+                action = getattr(self, name, None)
+                if isinstance(action, QPushButton):
+                    action.setStyleSheet(button_qss(is_dark, 'quiet', icon=True) + tooltip_stylesheet(is_dark))
+                    action.setIcon(icon("Темная" if is_dark else "Светлая"))
+                    action.setIconSize(QSize(24, 24))
             button.setStyleSheet(
                 button_qss(is_dark, "quiet", icon=True) + tooltip_stylesheet(is_dark)
             )
@@ -10023,11 +10111,29 @@ class DarkThemeApp(QMainWindow):
         self.main_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
         )
-        text_section_title = QLabel(hotkey_language_text(self.current_interface_language, "text_section"))
-        text_section_title.setObjectName("mainTextSectionTitle")
-        text_section_title.setAlignment(Qt.AlignCenter)
-        text_section_title.setFixedHeight(18)
-        text_section_layout.addWidget(text_section_title)
+        result_labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
+        composer_tabs = QWidget()
+        composer_tabs.setFixedHeight(18)
+        tabs_layout = QHBoxLayout(composer_tabs)
+        tabs_layout.setContentsMargins(0, 0, 0, 0)
+        tabs_layout.setSpacing(6)
+        tabs_layout.addStretch(1)
+        tab_group = QtWidgets.QButtonGroup(composer_tabs)
+        self.main_input_tab = QToolButton()
+        self.main_result_tab = QToolButton()
+        for tab, caption in ((self.main_input_tab, result_labels['input_tab']),
+                             (self.main_result_tab, result_labels['result_tab'])):
+            tab.setText(caption)
+            tab.setAccessibleName(caption)
+            tab.setCheckable(True)
+            tab.setFixedHeight(18)
+            tab.setCursor(Qt.PointingHandCursor)
+            tab_group.addButton(tab)
+            tabs_layout.addWidget(tab)
+        tabs_layout.addStretch(1)
+        self.main_input_tab.clicked.connect(lambda: self._set_main_result_visible(False, focus=True))
+        self.main_result_tab.clicked.connect(lambda: self._set_main_result_visible(True, focus=True))
+        text_section_layout.addWidget(composer_tabs)
         for combo in (self.source_lang, self.target_lang):
             combo.setFixedHeight(30)
             combo.setMinimumWidth(0)
@@ -10035,6 +10141,12 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.addWidget(self.source_lang, 1)
         language_picker_layout.addWidget(self.main_language_swap)
         language_picker_layout.addWidget(self.target_lang, 1)
+        self.main_result_pair_label = QLabel()
+        self.main_result_pair_label.setFixedHeight(30)
+        self.main_result_pair_label.setAlignment(Qt.AlignCenter)
+        self.main_result_pair_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.main_result_pair_label.hide()
+        language_picker_layout.addWidget(self.main_result_pair_label, 1)
         text_section_layout.addLayout(language_picker_layout)
         self._apply_main_combo_theme(self.current_theme == "Темная")
         self._restore_main_translation_languages()
@@ -10065,6 +10177,7 @@ class DarkThemeApp(QMainWindow):
         # unobtrusive expand action appears and opens the document workspace.
 
         self.text_input = TranslateOnEnterTextEdit()
+        self.text_input.setPlainText(getattr(self, '_main_input_draft', ''))
         self.text_input.setObjectName("mainComposerInput")
         self.text_input.setPlaceholderText(
             f"{ui_text(self.current_interface_language, 'input_placeholder')}\n{doc_text(self.current_interface_language, 'main_file_hint')}"
@@ -10093,6 +10206,7 @@ class DarkThemeApp(QMainWindow):
         composer_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
+        self.main_input_actions = composer_actions
         composer_actions.setObjectName("mainComposerActions")
         composer_actions.setFixedWidth(34)
         composer_actions_layout = QVBoxLayout(composer_actions)
@@ -10132,6 +10246,38 @@ class DarkThemeApp(QMainWindow):
             self.translate_button, 0, Qt.AlignHCenter | Qt.AlignBottom
         )
         composer_layout.addWidget(composer_actions, 0, 1)
+        self.main_result_view = QTextEdit()
+        self.main_result_view.setObjectName('mainComposerResult')
+        self.main_result_view.setReadOnly(True)
+        self.main_result_view.setAcceptRichText(False)
+        self.main_result_view.setMinimumHeight(66)
+        self.main_result_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
+        self.main_result_view.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.main_result_view.setWordWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.main_result_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.main_result_view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_result_view.setAccessibleName(result_labels['result_tab'])
+        composer_layout.addWidget(self.main_result_view, 0, 0)
+        self.main_result_actions = QWidget(self.main_composer)
+        self.main_result_actions.setFixedWidth(34)
+        result_actions_layout = QVBoxLayout(self.main_result_actions)
+        result_actions_layout.setContentsMargins(0, 0, 0, 0)
+        result_actions_layout.setSpacing(0)
+        self.main_result_expand_button = ScaledIconButton()
+        self.main_result_expand_button.setFixedSize(28, 28)
+        self.main_result_expand_button.setAccessibleName(result_labels['open_result'])
+        self.main_result_expand_button.setToolTip(tooltip_text(result_labels['open_result']))
+        self.main_result_expand_button.clicked.connect(self._open_main_result_window)
+        result_actions_layout.addWidget(self.main_result_expand_button, 0, Qt.AlignHCenter | Qt.AlignTop)
+        result_actions_layout.addStretch(1)
+        self.main_result_copy_button = ScaledIconButton()
+        self.main_result_copy_button.setFixedSize(32, 32)
+        self.main_result_copy_button.setAccessibleName(ui_text(self.current_interface_language, 'copy'))
+        self.main_result_copy_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, 'copy')))
+        self.main_result_copy_button.clicked.connect(self._copy_main_result)
+        result_actions_layout.addWidget(self.main_result_copy_button, 0, Qt.AlignHCenter | Qt.AlignBottom)
+        composer_layout.addWidget(self.main_result_actions, 0, 1)
+        self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
         self.translate_button.setEnabled(has_translation_pair)
@@ -10483,6 +10629,10 @@ class DarkThemeApp(QMainWindow):
                 self._clear_nested_layout(item.layout())
 
     def _schedule_document_expand_visibility(self, *_args):
+        try:
+            self._main_input_draft = self.text_input.toPlainText()
+        except RuntimeError:
+            return  # The previous page's document can finish a queued layout.
         timer = getattr(self, "_composer_expand_timer", None)
         if isinstance(timer, QTimer):
             try:
@@ -10525,6 +10675,57 @@ class DarkThemeApp(QMainWindow):
         text = editor.toPlainText() if isinstance(editor, QTextEdit) else ""
         if text.strip():
             self.open_document_translation(initial_text=text)
+
+    def _set_main_result_visible(self, visible, *, focus=False):
+        visible = bool(visible and getattr(self, '_main_result_snapshot', None))
+        self._main_result_visible = visible
+        self.main_input_tab.setChecked(not visible)
+        self.main_result_tab.setChecked(visible)
+        self.main_result_tab.setEnabled(bool(getattr(self, '_main_result_snapshot', None)))
+        for widget in (self.text_input, self.main_input_actions, self.source_lang,
+                       self.main_language_swap, self.target_lang):
+            widget.setVisible(not visible)
+        for widget in (self.main_result_view, self.main_result_actions, self.main_result_pair_label):
+            widget.setVisible(visible)
+        if focus:
+            (self.main_result_view if visible else self.text_input).setFocus(Qt.OtherFocusReason)
+
+    def _restore_main_result_widgets(self):
+        snapshot = getattr(self, '_main_result_snapshot', None)
+        try:
+            if snapshot:
+                self.main_result_view.setPlainText(snapshot['translated_text'])
+                self.main_result_pair_label.setText(
+                    f"{snapshot['source_lang'].upper()} → {snapshot['target_lang'].upper()}")
+                self.main_result_pair_label.setToolTip(
+                    language_display_name(snapshot['source_lang'], self.current_interface_language)
+                    + ' → ' + language_display_name(snapshot['target_lang'], self.current_interface_language))
+            self._set_main_result_visible(getattr(self, '_main_result_visible', False))
+        except RuntimeError:
+            # A completed worker may arrive while Settings owns the page.
+            # Keep the snapshot for the next main-page reconstruction.
+            pass
+
+    def _show_inline_main_result(self, translated_text, source_text, source_lang, target_lang):
+        self._main_result_snapshot = dict(translated_text=translated_text, source_text=source_text,
+                                          source_lang=source_lang, target_lang=target_lang)
+        self._main_result_visible = True
+        self._restore_main_result_widgets()
+
+    def _copy_main_result(self):
+        snapshot = getattr(self, '_main_result_snapshot', None)
+        if snapshot:
+            platform_support.copy_text(snapshot['translated_text'])
+            save_copy_history(snapshot['translated_text'])
+
+    def _open_main_result_window(self):
+        snapshot = getattr(self, '_main_result_snapshot', None)
+        if snapshot:
+            dialog = show_translation_dialog(self, auto_copy=False, lang=self.current_interface_language,
+                                             theme=self.current_theme, result_mode='main', **snapshot)
+            # Expanding a result should not overwrite the clipboard again;
+            # subsequent translations still respect the auto-copy setting.
+            dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
 
     def _on_document_dialog_destroyed(self, *_args):
         self.document_dialog = None
@@ -10927,10 +11128,13 @@ class DarkThemeApp(QMainWindow):
 
     def _present_main_translation_result(self, translated_text, source_text="",
                                          source_lang="", target_lang=""):
+        if not str(translated_text or '').strip():
+            QMessageBox.warning(self, ui_text(self.current_interface_language, 'translation_error'),
+                                ui_text(self.current_interface_language, 'translation_error'))
+            return
         config = get_cached_config()
         auto_copy = config.get("copy_translated_text", False)
         lang = config.get("interface_language", "ru")
-        theme = config.get("theme", "Темная")
         save_translation_history(source_text, translated_text, target_lang)
         if result_window_hidden_for(config, "main"):
             # Hiding the result window explicitly makes the clipboard the only
@@ -10943,17 +11147,10 @@ class DarkThemeApp(QMainWindow):
             self._show_status_signal.emit(dialog_text["copied"])
             QTimer.singleShot(1200, self._hide_status_signal.emit)
             return
-        show_translation_dialog(
-            self,
-            translated_text,
-            auto_copy=auto_copy,
-            lang=lang,
-            theme=theme,
-            source_text=source_text,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            result_mode="main",
-        )
+        if auto_copy:
+            platform_support.copy_text(translated_text)
+            save_copy_history(translated_text)
+        self._show_inline_main_result(translated_text, source_text, source_lang, target_lang)
 
     def _start_argos_translation(self, text, source_code, target_code):
         if self._argos_translation_running:

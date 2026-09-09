@@ -1,0 +1,30 @@
+[
+  {
+    "theme": "Светлая",
+    "main_size": [
+      560,
+      320
+    ],
+    "workspace_size": [
+      608,
+      426
+    ],
+    "source_preserved": true,
+    "result_inline": true,
+    "dpr": 2.0
+  },
+  {
+    "theme": "Темная",
+    "main_size": [
+      560,
+      320
+    ],
+    "workspace_size": [
+      608,
+      426
+    ],
+    "source_preserved": true,
+    "result_inline": true,
+    "dpr": 2.0
+  }
+]

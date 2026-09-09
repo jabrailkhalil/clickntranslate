@@ -176,6 +176,73 @@ class MainWindowGeometryTest(unittest.TestCase):
         layout = self.window.main_layout
         return [layout.itemAt(index) for index in range(layout.count())]
 
+    def test_inline_result_preserves_input_and_fixed_window_across_pages(self):
+        window = self.window
+        source = 'A draft that stays available.'
+        result = ('Длинный перевод со всеми строками.\n' * 50) + 'LAST LINE'
+        window.text_input.setPlainText(source)
+        initial_size = window.size()
+        with mock.patch.object(main, 'get_cached_config', return_value=dict(
+                window.config, result_window_hidden_modes=(), copy_translated_text=True)), \
+                mock.patch.object(main, 'save_translation_history') as history, \
+                mock.patch.object(main, 'save_copy_history'), \
+                mock.patch.object(main.platform_support, 'copy_text') as copy, \
+                mock.patch.object(main, 'show_translation_dialog') as dialog:
+            window._present_main_translation_result(result, source, 'en', 'ru')
+            self.app.processEvents()
+            self.assertTrue(window.main_result_view.isVisible())
+            self.assertFalse(window.text_input.isVisible())
+            self.assertEqual(window.size(), initial_size)
+            self.assertEqual(window.main_result_view.toPlainText(), result)
+            self.assertGreater(window.main_result_view.verticalScrollBar().maximum(), 0)
+            copy.assert_called_once_with(result)
+            history.assert_called_once_with(source, result, 'ru')
+            dialog.assert_not_called()
+            window.main_input_tab.click()
+            self.assertTrue(window.text_input.isVisible())
+            self.assertEqual(window.text_input.toPlainText(), source)
+            window.text_input.insertPlainText(' New edit.')
+            edited_source = window.text_input.toPlainText()
+            window.main_result_tab.click()
+            for theme in ('Светлая', 'Темная'):
+                window.current_theme = theme
+                window.apply_theme()
+                self.app.processEvents()
+                self.assertEqual(window.size(), initial_size)
+                self.assertEqual(window.main_result_view.toPlainText(), result)
+            window.show_main_screen()
+            self.app.processEvents()
+            self.assertTrue(window.main_result_view.isVisible())
+            self.assertEqual(window.text_input.toPlainText(), edited_source)
+            window.main_result_expand_button.click()
+            self.assertEqual(dialog.call_args.kwargs['source_text'], source)
+            self.assertEqual(dialog.call_args.kwargs['translated_text'], result)
+            self.assertFalse(dialog.call_args.kwargs['auto_copy'])
+            copy.assert_called_once()  # Expanding does not copy the result twice.
+
+    def test_failed_main_translation_keeps_draft_and_previous_result(self):
+        window = self.window
+        window._show_inline_main_result('Previous result', 'Previous input', 'en', 'ru')
+        window.main_input_tab.click()
+        window.text_input.setPlainText('A new draft')
+        with mock.patch.object(main, 'get_cached_config', return_value=dict(window.config, translator_engine='Lingva')), \
+                mock.patch.object(main.translater, 'translate_text', side_effect=RuntimeError('Provider unavailable')), \
+                mock.patch.object(main.QMessageBox, 'warning') as warning:
+            window.translate_input_text()
+        self.assertIn('Provider unavailable', warning.call_args.args[-1])
+        self.assertEqual(window.text_input.toPlainText(), 'A new draft')
+        self.assertEqual(window.main_result_view.toPlainText(), 'Previous result')
+        self.assertTrue(window.text_input.isVisible())
+        with mock.patch.object(main, 'get_cached_config', return_value=dict(window.config, translator_engine='Lingva')), \
+                mock.patch.object(main.translater, 'translate_text', return_value=''), \
+                mock.patch.object(main, 'save_translation_history') as history, \
+                mock.patch.object(main.QMessageBox, 'warning') as warning:
+            window.translate_input_text()
+        warning.assert_called_once()
+        history.assert_not_called()
+        self.assertEqual(window.text_input.toPlainText(), 'A new draft')
+        self.assertEqual(window.main_result_view.toPlainText(), 'Previous result')
+
     def test_the_chat_composer_stays_compact(self):
         # A Telegram-style composer is deliberately shorter than the settings
         # panel below it, while still fitting two placeholder/text lines.
@@ -215,7 +282,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 detached_keys = {
                     info["key"] for info in panel.overlay._detached_buttons.values()
                 }
-                self.assertIn("mainTextSectionTitle", detached_keys)
+                self.assertIn("main_input_tab", detached_keys)
+                self.assertIn("main_result_tab", detached_keys)
                 self.assertIn("mainShortcutSectionTitle", detached_keys)
                 self.assertIn("mainOcrSummary", detached_keys)
                 source_info = panel.overlay._detached_buttons[self.window.source_lang]

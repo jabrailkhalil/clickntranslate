@@ -85,8 +85,12 @@ class _MainResultHarness:
 
     def __init__(self):
         self.statuses = []
+        self.inline_results = []
         self._show_status_signal = SimpleNamespace(emit=self.statuses.append)
         self._hide_status_signal = SimpleNamespace(emit=lambda: None)
+
+    def _show_inline_main_result(self, *result):
+        self.inline_results.append(result)
 
 
 class _PairMemoryParent(QWidget):
@@ -497,7 +501,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 main.TRANSLATION_RESULT_DIALOG_TEXT["en"]["copied"], harness.statuses
             )
 
-    def test_main_window_result_still_opens_when_the_mode_is_not_listed(self):
+    def test_main_window_result_stays_inline_when_the_mode_is_not_listed(self):
         harness = _MainResultHarness()
         config = {
             "copy_translated_text": False,
@@ -513,8 +517,8 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main, "show_translation_dialog") as dialog:
             harness._present_main_translation_result("Привет", "Hello", "en", "ru")
 
-        dialog.assert_called_once()
-        self.assertEqual(dialog.call_args.kwargs["result_mode"], "main")
+        dialog.assert_not_called()
+        self.assertEqual(harness.inline_results, [("Привет", "Hello", "en", "ru")])
         copy.assert_not_called()
         history.assert_not_called()
         translation_history.assert_called_once_with("Hello", "Привет", "ru")

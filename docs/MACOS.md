@@ -140,6 +140,16 @@ Both panes of the translation window are editable. Translate uses the most
 recently edited pane; a draft entered in Translation is first kept in Source,
 then translated with the selected language pair and provider. Errors preserve
 the draft, and Command-Z can restore the preceding result.
+The translation pane has a Hide input / Show input control. It gives the result
+the full editor area without changing the window size or discarding the source.
+
+The fixed main window now uses Input and Translation tabs in its existing text
+panel. Successful manual translations appear inline with scrolling, Copy and
+Open in a separate window actions. Switching tabs or rebuilding the main page
+preserves the current input and the last result in memory. Each result retains
+its original source and language pair when expanded; expanding does not copy it
+again. Auto-copy and the explicit clipboard-only result setting still apply.
+Provider failures keep the draft and the preceding result available.
 
 Screen capture asks for **Screen Recording** access; copying and replacing a
 selection asks for **Accessibility**. The application explains the permission

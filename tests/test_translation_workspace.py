@@ -306,6 +306,31 @@ def test_scale_and_theme_changes_preserve_drafts_and_fit_a_small_screen(app, wor
         appearance.deleteLater()
 
 
+def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, requests):
+    drafts = (workspace.source_edit.toPlainText(), workspace.text_edit.toPlainText())
+    for width in (900, 420):
+        workspace.resize(width, 620)
+        app.processEvents()
+        original_size = workspace.size()
+        workspace.source_toggle.click()
+        app.processEvents()
+        assert not workspace.source_panel.isVisible()
+        assert not workspace.swap_button.isVisible()
+        assert workspace.result_panel.isVisible()
+        assert workspace.result_panel.width() == workspace.editors.contentsRect().width()
+        assert workspace.size() == original_size
+        workspace.refresh_theme('Светлая')
+        workspace.resize(width + 20, 640)
+        app.processEvents()
+        assert not workspace.source_panel.isVisible()
+        assert workspace.source_toggle.text() == workspace.text['show_source']
+        workspace.source_toggle.click()
+        app.processEvents()
+        assert workspace.source_panel.isVisible() and workspace.swap_button.isVisible()
+        assert (workspace.source_edit.toPlainText(), workspace.text_edit.toPlainText()) == drafts
+        assert not requests  # Changing the view never submits a new translation.
+
+
 def test_stacked_editors_stay_inside_their_frames_at_default_scale(app, workspace):
     appearance = install_window_appearance(app, 100, 'Светлая')
     try:

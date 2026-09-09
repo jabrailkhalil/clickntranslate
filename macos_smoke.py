@@ -571,6 +571,80 @@ def capture_picker_and_notice_check(main, app, window, report_path, screenshots)
         window.show_window_from_tray(force_show=True)
 
 
+def compact_translation_views_check(main, app, window, report_path, screenshots):
+    from PyQt5 import QtCore
+    from PyQt5.QtTest import QTest
+
+    previous_config = dict(window.config)
+    previous_theme = window.current_theme
+    previous_draft = getattr(window, '_main_input_draft', '')
+    previous_result = getattr(window, '_main_result_snapshot', None)
+    previous_visible = getattr(window, '_main_result_visible', False)
+    source = 'A compact window keeps the original text available.'
+    result = ('Компактное окно сохраняет исходный текст.\n' * 12) + 'Последняя строка'
+    dialog = None
+    records = []
+    try:
+        window.config.update(copy_translated_text=False, result_window_hidden_modes=())
+        for theme, name in [('Светлая', 'light'), ('Темная', 'dark')]:
+            window.current_theme = theme
+            window.show_main_screen()
+            window.apply_theme()
+            window.main_input_tab.click()
+            window.text_input.setPlainText(source)
+            QTest.qWait(50)
+            size = window.size()
+
+            def capture(kind, widget):
+                picture = widget.grab()
+                filename = f'{report_path.stem}-{name}-{kind}.png'
+                assert picture.save(str(report_path.with_name(filename)))
+                screenshots.append({'file': filename, 'width': picture.width(), 'height': picture.height(),
+                                    'dpr': picture.devicePixelRatioF()})
+
+            capture('inline-input', window)
+            with mock.patch.object(main, 'get_cached_config', return_value=window.config), \
+                    mock.patch.object(main, 'save_translation_history'):
+                window._present_main_translation_result(result, source, 'en', 'ru')
+            QTest.qWait(50)
+            assert window.size() == size
+            assert window.main_result_view.isVisible() and not window.text_input.isVisible()
+            assert window.main_result_view.toPlainText() == result
+            assert window.main_result_view.verticalScrollBar().maximum() > 0
+            capture('inline-result', window)
+            dialog = main.show_translation_dialog(window, result, auto_copy=False, lang='ru', theme=theme,
+                                                  source_text=source, source_lang='en', target_lang='ru')
+            QTest.qWait(50)
+            capture('workspace-expanded', dialog)
+            dialog_size = dialog.size()
+            dialog.source_toggle.click()
+            QTest.qWait(50)
+            assert dialog.size() == dialog_size and not dialog.source_panel.isVisible()
+            assert dialog.result_panel.isVisible()
+            assert dialog.source_edit.toPlainText() == source
+            capture('workspace-collapsed', dialog)
+            dialog.source_toggle.click()
+            assert dialog.source_panel.isVisible()
+            dialog.close()
+            dialog = None
+            window.main_input_tab.click()
+            assert window.text_input.toPlainText() == source
+            records.append({'theme': theme, 'main_size': [size.width(), size.height()],
+                            'inline_scrollable': True, 'source_preserved': True, 'collapse_restores_input': True})
+        return {'themes': records, 'provider_calls': False, 'scope': 'native presentation of a supplied result'}
+    finally:
+        if dialog is not None:
+            dialog.close()
+        window.config.update(previous_config)
+        window.current_theme = previous_theme
+        window._main_input_draft = previous_draft
+        window._main_result_snapshot = previous_result
+        window._main_result_visible = previous_visible
+        window.show_main_screen()
+        window.apply_theme()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
 def run(main, report_path):
     import macos_desktop
     import macos_ocr
@@ -634,6 +708,7 @@ def run(main, report_path):
             draft_results = translation_draft_check(main, app, window, report_path, screenshots)
             direction_theme_results = main_direction_and_theme_check(main, app, window)
             capture_notice_results = capture_picker_and_notice_check(main, app, window, report_path, screenshots)
+            compact_translation_results = compact_translation_views_check(main, app, window, report_path, screenshots)
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -668,6 +743,7 @@ def run(main, report_path):
                 "translation_drafts": draft_results,
                 "main_direction_and_theme": direction_theme_results,
                 "capture_picker_and_notice": capture_notice_results,
+                "compact_translation_views": compact_translation_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()
