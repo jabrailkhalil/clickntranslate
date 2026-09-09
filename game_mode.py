@@ -182,24 +182,30 @@ def game_texts_are_similar(left, right, threshold=0.90):
     return difflib.SequenceMatcher(None, left, right).ratio() >= float(threshold)
 
 
-def game_frame_fingerprint(image, width=24, height=12):
-    """A tiny grayscale frame signature cheap enough to compute every tick."""
+def game_frame_fingerprint(image, width=96, height=48):
+    """Retain small text changes that a 24x12 point sample could miss."""
     if image is None or image.isNull():
         return ()
     sample = image.scaled(
         width,
         height,
         QtCore.Qt.IgnoreAspectRatio,
-        QtCore.Qt.FastTransformation,
+        QtCore.Qt.SmoothTransformation,
     ).convertToFormat(QtGui.QImage.Format_Grayscale8)
-    return tuple(QtGui.QColor(sample.pixel(x, y)).red() for y in range(height) for x in range(width))
+    pixels = sample.constBits().asstring(sample.byteCount())
+    stride = sample.bytesPerLine()
+    return b''.join(pixels[y * stride:y * stride + width] for y in range(height))
 
 
 def game_frames_are_different(previous, current, threshold=4.0):
     if not previous or not current or len(previous) != len(current):
         return True
-    difference = sum(abs(a - b) for a, b in zip(previous, current)) / len(current)
-    return difference >= float(threshold)
+    differences = [abs(a - b) for a, b in zip(previous, current)]
+    difference = sum(differences) / len(current)
+    # Scrolling a text column can change only a small part of a mostly blank
+    # window. Do not dilute its changed letters into the whole-screen average.
+    changed_pixels = sum(value >= 16 for value in differences)
+    return difference >= float(threshold) or changed_pixels >= max(3, round(len(current) * 0.005))
 
 
 def _foreground_window():
@@ -717,6 +723,10 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._unchanged_ticks = 0
         self._last_source_text = ""
         self._pending_source_text = ""
+        self._translation_cancel = None
+        self._deferred_translation = None
+        self._empty_ocr_frames = 0
+        self._has_ocr_source = False
         self._created_at = time.monotonic()
         self._bound_window_rect = _window_rect(self.target_window)
         self._bound_offset = (
@@ -863,8 +873,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         )
         # Fast-changing Reading/Translating/Waiting captions made a stable
         # subtitle look as if it was flickering. Keep the previous translation
-        # untouched; only persistent states need a visible explanation.
-        visible = key in {"paused", "capture_error", "ocr_error", "translation_error"}
+        # untouched; only actual failures need a visible explanation.
+        visible = key in {"capture_error", "ocr_error", "translation_error"}
         self.status_label.setVisible(visible)
         if visible:
             self.card.show()
@@ -892,11 +902,14 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             return True
         if not self.target_window or not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
             return True
-        if _window_is_minimized(self.target_window):
-            return False
         # Give focus a moment to return after the region selector closes.
         if time.monotonic() - self._created_at < 1.0:
             return True
+        if platform_support.IS_MAC:
+            from macos_desktop import window_application_is_active
+            return window_application_is_active(self.target_window)
+        if _window_is_minimized(self.target_window):
+            return False
         foreground = _foreground_window()
         return foreground in {self.target_window, int(self.winId())}
 
@@ -919,11 +932,17 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 self.setWindowOpacity(1.0)
 
     def _scan_once(self):
-        if self._closed or self.paused or self._capture_busy or self._ocr_busy or self._translation_busy:
+        if self._closed or self.paused or self._capture_busy or self._ocr_busy:
             return
         try:
             self._update_bound_region()
             if not self._target_is_active():
+                self.card.hide()
+                self._last_frame = ()
+                self._last_source_text = ''
+                self._pending_source_text = ''
+                if self._translation_cancel is not None:
+                    self._translation_cancel.set()
                 self._set_status("paused", active=False)
                 return
             if platform_support.IS_MAC:
@@ -965,17 +984,20 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def _process_frame(self, qimage):
         fingerprint = game_frame_fingerprint(qimage)
-        if not game_frames_are_different(self._last_frame, fingerprint):
+        changed = game_frames_are_different(self._last_frame, fingerprint)
+        if not changed:
             self._unchanged_ticks += 1
             # Retry transient OCR failures periodically, without re-reading
             # every identical frame.
-            if self._unchanged_ticks < max(2, round(10000 / self.interval_ms)):
+            if (self._unchanged_ticks < max(2, round(10000 / self.interval_ms))
+                    and self._empty_ocr_frames != 1):
                 self._set_status('waiting')
                 return
             self._unchanged_ticks = 0
         else:
             self._unchanged_ticks = 0
         self._last_frame = fingerprint
+        self._ocr_frame_changed = changed
         self._set_status('scanning')
         self._start_ocr(qimage)
 
@@ -1039,14 +1061,28 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(str)
     def _on_ocr_result(self, text):
+        if self._closed or self.paused or not self._target_is_active():
+            return
+        self._has_ocr_source = True
         normalized = normalize_game_ocr_text(text)
         if not normalized:
+            self._empty_ocr_frames += 1
+            self._last_source_text = ''
+            self._pending_source_text = ''
+            if self._translation_cancel is not None:
+                self._translation_cancel.set()
+            if self._empty_ocr_frames >= 2:
+                self.card.hide()
             self._set_status("no_text", active=False)
             return
-        if game_texts_are_similar(self._last_source_text, normalized, self.similarity):
+        self._empty_ocr_frames = 0
+        if (normalized == self._last_source_text
+                or (not getattr(self, '_ocr_frame_changed', True)
+                    and game_texts_are_similar(self._last_source_text, normalized, self.similarity))):
             self._set_status("waiting")
             return
         self._last_source_text = normalized
+        self.card.hide()
         self._start_translation(normalized)
 
     @QtCore.pyqtSlot()
@@ -1054,12 +1090,20 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         worker = self.sender()
         self._workers.discard(worker)
         self._ocr_busy = False
+        if self._deferred_translation is not None:
+            result, self._deferred_translation = self._deferred_translation, None
+            self._apply_translation(*result)
 
     def _start_translation(self, source_text):
         if self._translation_busy:
+            # Only the newest OCR text survives a scroll while a request runs.
             self._pending_source_text = source_text
+            if self._translation_cancel is not None:
+                self._translation_cancel.set()
             return
         self._translation_busy = True
+        cancelled = self._translation_cancel = threading.Event()
+        engine = self.config.get('translator_engine', 'Google')
         self._revision += 1
         revision = self._revision
         self._set_status("translating")
@@ -1071,10 +1115,13 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                     source_text,
                     self.source_language,
                     self.target_language,
+                    engine=engine,
+                    cancel_callback=cancelled.is_set,
                 )
                 self.translation_ready.emit(revision, source_text, str(translated or ""), "")
             except Exception as exc:
-                logging.getLogger("clickntranslate.game").exception("Game translation failed")
+                if not cancelled.is_set():
+                    logging.getLogger("clickntranslate.game").exception("Game translation failed")
                 self.translation_ready.emit(revision, source_text, "", str(exc))
 
         threading.Thread(
@@ -1085,10 +1132,29 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(int, str, str, str)
     def _apply_translation(self, revision, source_text, translated, error):
-        if revision != self._revision:
+        if self._closed or revision != self._revision:
+            return
+        if self._ocr_busy:
+            # The newest capture may already contain another paragraph. Let
+            # its OCR result replace the pending request before painting.
+            self._deferred_translation = (revision, source_text, translated, error)
             return
         self._translation_busy = False
+        pending = self._pending_source_text
+        self._pending_source_text = ''
+        was_cancelled = self._translation_cancel is not None and self._translation_cancel.is_set()
+        self._translation_cancel = None
+        if self.paused or not self._target_is_active():
+            self._last_source_text = ''
+            self._last_frame = ()
+            return
+        if pending:
+            self._start_translation(pending)
+            return
+        if was_cancelled or (self._has_ocr_source and source_text != self._last_source_text):
+            return
         if error or not translated:
+            self._last_source_text = ''
             self._set_status("translation_error", active=False)
         else:
             from ocr import save_translation_history
@@ -1102,10 +1168,6 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             if bool(self.config.get("history", False)):
                 save_translation_history(source_text, translated, self.target_language)
             self._place_near_region()
-        pending = self._pending_source_text
-        self._pending_source_text = ""
-        if pending and not game_texts_are_similar(source_text, pending, self.similarity):
-            self._start_translation(pending)
 
     def _toggle_pause(self):
         self.paused = not self.paused
@@ -1142,6 +1204,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     def closeEvent(self, event):
         self._timer.stop()
         self._closed = True
+        if self._translation_cancel is not None:
+            self._translation_cancel.set()
         self._revision += 1
         for worker in list(self._workers):
             try:
@@ -1324,6 +1388,9 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._last_frame = ()
         self._unchanged_ticks = 0
         self._last_layout_signature = ()
+        self._pending_lines = None
+        self._translation_cancel = None
+        self._deferred_translation = None
         self._empty_ocr_frames = 0
         self._blocks = []
         self._has_shown_translation = False
@@ -1371,11 +1438,19 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             return True
         if not self.target_window or not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
             return True
+        if platform_support.IS_MAC:
+            from macos_desktop import window_application_is_active
+            return window_application_is_active(self.target_window)
         if _window_is_minimized(self.target_window):
             return False
         return _foreground_window() == self.target_window
 
     def _set_status(self, key, error=False):
+        if key == 'paused':
+            self._status = ''
+            self._status_is_error = False
+            self.update()
+            return
         # Normal scan phases can change several times per second. Painting all
         # of them made the empty full-screen overlay flash. Once translations
         # exist, keep them stable and repaint only for results or real states.
@@ -1409,9 +1484,15 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 self.setWindowOpacity(1.0)
 
     def _scan_once(self):
-        if self._closed or self._capture_busy or self._ocr_busy or self._translation_busy:
+        if self._closed or self._capture_busy or self._ocr_busy:
             return
         if not self._target_is_active():
+            self._blocks = []
+            self._last_frame = ()
+            self._last_layout_signature = ()
+            self._pending_lines = None
+            if self._translation_cancel is not None:
+                self._translation_cancel.set()
             self._set_status("paused")
             return
         if platform_support.IS_MAC:
@@ -1456,7 +1537,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         geometry = self._screen.geometry()
         self._ocr_scale_x = pixmap.width() / max(1, geometry.width())
         self._ocr_scale_y = pixmap.height() / max(1, geometry.height())
-        fingerprint = game_frame_fingerprint(image, width=36, height=20)
+        fingerprint = game_frame_fingerprint(image, width=192, height=108)
         if not game_frames_are_different(self._last_frame, fingerprint, threshold=3.0):
             self._unchanged_ticks += 1
             # Re-read an unchanged screen periodically. This is essential when
@@ -1490,6 +1571,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _on_position_ocr_result(self, lines):
         from ocr import _group_screen_ocr_lines
 
+        if self._closed or not self._target_is_active():
+            return
         grouped = _group_screen_ocr_lines(lines)
         grouped = [
             item for item in grouped
@@ -1497,6 +1580,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         ]
         if not grouped:
             self._empty_ocr_frames += 1
+            self._last_layout_signature = ()
+            self._pending_lines = []
+            if self._translation_cancel is not None:
+                self._translation_cancel.set()
             if self._blocks and self._empty_ocr_frames >= 2:
                 self._blocks = []
                 self._last_layout_signature = ()
@@ -1508,6 +1595,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             (
                 round(float(item[0]) / 8),
                 round(float(item[1]) / 8),
+                round(float(item[2]) / 8),
+                round(float(item[3]) / 8),
                 normalize_game_ocr_text(item[4]).casefold(),
             )
             for item in grouped
@@ -1516,8 +1605,12 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._set_status("waiting")
             return
         self._last_layout_signature = signature
-        # Keep the previous frame readable until its replacement is ready.
-        # Clearing it here caused a flash for every OCR layout/text change.
+        # Reposition known lines after scrolling, and drop translations whose
+        # source left the frame. Never leave old text over a different paragraph.
+        known = {normalize_game_ocr_text(block[4]): block[5] for block in self._blocks}
+        self._blocks = [(*item[:4], normalize_game_ocr_text(item[4]), known[normalize_game_ocr_text(item[4])])
+                        for item in grouped if normalize_game_ocr_text(item[4]) in known]
+        self.update()
         self._start_block_translation(grouped)
 
     @QtCore.pyqtSlot()
@@ -1525,9 +1618,20 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         worker = self.sender()
         self._workers.discard(worker)
         self._ocr_busy = False
+        if self._deferred_translation is not None:
+            result, self._deferred_translation = self._deferred_translation, None
+            self._apply_translation(*result)
 
     def _start_block_translation(self, lines):
+        if self._translation_busy:
+            self._pending_lines = list(lines)
+            if self._translation_cancel is not None:
+                self._translation_cancel.set()
+            return
+        self._pending_lines = None
         self._translation_busy = True
+        cancelled = self._translation_cancel = threading.Event()
+        engine = self.config.get('translator_engine', 'Google')
         self._revision += 1
         revision = self._revision
         self._set_status("translating")
@@ -1541,7 +1645,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 ordered_texts = [normalize_game_ocr_text(item[4]) for item in lines]
                 translated_values = _translate_screen_texts(
                     ordered_texts,
-                    translate_text,
+                    lambda text, source, target: translate_text(
+                        text, source, target, engine=engine, cancel_callback=cancelled.is_set),
                     self.source_language,
                     self.target_language,
                 )
@@ -1562,10 +1667,11 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 # batches made labels from different moments appear together.
                 self.translation_ready.emit(revision, blocks, "", True)
             except Exception as exc:
-                logging.getLogger("clickntranslate.game").exception(
-                    "Full-screen game translation failed"
-                )
-                error = str(exc)
+                if not cancelled.is_set():
+                    logging.getLogger("clickntranslate.game").exception(
+                        "Full-screen game translation failed"
+                    )
+                error = str(exc) or game_text(self.language, 'translation_error')
             if error:
                 self.translation_ready.emit(revision, [], error, True)
 
@@ -1577,9 +1683,28 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(int, object, str, bool)
     def _apply_translation(self, revision, blocks, error, final=True):
-        if revision != self._revision:
+        if self._closed or revision != self._revision:
+            return
+        if self._ocr_busy:
+            self._deferred_translation = (revision, blocks, error, final)
             return
         self._translation_busy = not bool(final)
+        was_cancelled = self._translation_cancel is not None and self._translation_cancel.is_set()
+        if final:
+            self._translation_cancel = None
+        if not self._target_is_active():
+            self._last_frame = ()
+            self._last_layout_signature = ()
+            self._pending_lines = None
+            return
+        if self._pending_lines is not None:
+            if final:
+                pending, self._pending_lines = self._pending_lines, None
+                if pending:
+                    self._start_block_translation(pending)
+            return
+        if was_cancelled:
+            return
         if error:
             self._last_layout_signature = ()
             self._set_status("translation_error", error=True)
@@ -1661,7 +1786,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
         # No toolbar or second title-bar button is added. A compact passive
         # status only appears until the first translated frame or on errors.
-        if (
+        if self._status and (
             (not self._blocks and not self._has_shown_translation)
             or self._status_is_error
         ):
@@ -1695,6 +1820,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         global _game_fullscreen_ref
         self._timer.stop()
         self._closed = True
+        if self._translation_cancel is not None:
+            self._translation_cancel.set()
         self._revision += 1
         for worker in list(self._workers):
             try:

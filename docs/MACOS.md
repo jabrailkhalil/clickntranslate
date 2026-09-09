@@ -175,9 +175,17 @@ keeping the overlays visible. macOS 14+ uses ScreenCaptureKit screenshot capture
 with application exclusion; 13.4 uses the Quartz window-list compositor excluding
 the process. Capture runs in a cancellable worker, with Retina pixel dimensions.
 Capture errors are shown without hiding the overlay or switching OCR engines.
-The fullscreen renderer on every OS retains its previous result until a new
-translation is ready and requires two empty OCR frames before clearing it.
-This Round24 capture change awaits runtime QA, including Intel, macOS 13.4,
+Capture and OCR now continue during translation. Each region retains only the
+latest pending text, cancels superseded requests cooperatively and discards
+their results. A completed translation waits for any newer OCR already in
+progress. Fine grayscale frame samples detect scrolling text columns; changed
+frames do not use fuzzy text matching to dismiss a new paragraph as OCR noise.
+The fullscreen renderer repositions still-visible translated lines after
+scrolling and removes lines whose source disappeared, with two-frame confirmation
+for empty OCR. macOS checks the target window's owning application for activity,
+so a temporary sibling window does not pause translation. Activity/pause captions
+are hidden; real capture/OCR/provider errors remain visible.
+These Round24/Round28 changes await runtime QA, including Intel, macOS 13.4,
 macOS 15+, multiple displays and multiple regions. Linux/older Windows retain
 their existing brief capture-time hide when OS exclusion is unavailable.
 

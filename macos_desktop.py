@@ -199,6 +199,17 @@ def foreground_window_number():
                  and int(entry.get('kCGWindowLayer', -1)) == 0), 0)
 
 
+def window_application_is_active(number):
+    """A transient sibling window must not pause capture of the same app."""
+    import AppKit
+
+    info = window_info(number)
+    if not info or not info.get('kCGWindowIsOnscreen', False):
+        return False
+    front = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+    return front is not None and int(front.processIdentifier()) == int(info.get('kCGWindowOwnerPID', 0))
+
+
 def send_edit_shortcut(key, validate_target=None):
     """Send Cmd+C/V without synthesizing releases of keys the user is holding."""
     import Quartz

@@ -227,21 +227,27 @@ class GameModeWidgetTest(unittest.TestCase):
         overlay.target_window = 123
         overlay._created_at = 0
         try:
-            # Window handles and foreground/minimized state are a Windows-only
-            # capability. Exercise that branch explicitly so the same product
+            # Exercise the Windows handle-based focus branch explicitly; Mac
+            # checks the owning application's activity instead. The same
             # test remains meaningful on the Linux release runner.
             with mock.patch.object(
                 game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(
+                game_mode.platform_support, "IS_MAC", False
             ), mock.patch.object(game_mode, "_window_is_minimized", return_value=True):
                 self.assertFalse(overlay._target_is_active())
             with mock.patch.object(
                 game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(
+                game_mode.platform_support, "IS_MAC", False
             ), mock.patch.object(
                 game_mode, "_window_is_minimized", return_value=False
             ), mock.patch.object(game_mode, "_foreground_window", return_value=999):
                 self.assertFalse(overlay._target_is_active())
             with mock.patch.object(
                 game_mode.platform_support, "IS_WINDOWS", True
+            ), mock.patch.object(
+                game_mode.platform_support, "IS_MAC", False
             ), mock.patch.object(
                 game_mode, "_window_is_minimized", return_value=False
             ), mock.patch.object(game_mode, "_foreground_window", return_value=123):
@@ -297,8 +303,10 @@ class GameModeWidgetTest(unittest.TestCase):
             with mock.patch.object(overlay, "_start_block_translation") as start:
                 overlay._on_position_ocr_result([line])
                 start.assert_called_once()
-                self.assertEqual(overlay._blocks, previous)
+                self.assertEqual(overlay._blocks, [], 'old text must not cover a different paragraph')
 
+            previous = [(100, 200, 180, 28, "Open the gate", "Открыть ворота")]
+            overlay._blocks = previous
             overlay._on_position_ocr_result([])
             self.assertEqual(overlay._blocks, previous)
             overlay._on_position_ocr_result([])
