@@ -279,6 +279,55 @@ def _exclude_from_windows_capture(widget):
         return False
 
 
+class _MacOverlayCaptureWorker(QtCore.QThread):
+    result_ready = QtCore.pyqtSignal(object, str)
+
+    def __init__(self, capture, screen_rect, region_rect, density):
+        super().__init__()
+        self.capture = capture
+        self.screen_rect = screen_rect
+        self.region_rect = region_rect
+        self.density = density
+
+    def run(self):
+        from macos_capture import CaptureCancelled
+        try:
+            image = self.capture.capture(
+                self.screen_rect, self.region_rect, self.density, self.isInterruptionRequested)
+        except CaptureCancelled:
+            return
+        except Exception as exc:
+            logging.getLogger('clickntranslate.game').exception('macOS overlay capture failed')
+            if not self.isInterruptionRequested():
+                self.result_ready.emit(None, str(exc))
+            return
+        if not self.isInterruptionRequested():
+            self.result_ready.emit(image, '')
+
+
+def _start_macos_capture(overlay, screen, region):
+    from macos_capture import OverlayCapture
+
+    if getattr(overlay, '_native_capture', None) is None:
+        overlay._native_capture = OverlayCapture()
+    overlay._capture_region = QtCore.QRect(region)
+    worker = _MacOverlayCaptureWorker(
+        overlay._native_capture, screen.geometry().getRect(), region.getRect(),
+        screen.devicePixelRatio())
+    overlay._capture_busy = True
+    overlay._workers.add(worker)
+    worker.result_ready.connect(overlay._on_macos_capture)
+    worker.finished.connect(overlay._capture_finished)
+    worker.finished.connect(worker.deleteLater)
+    try:
+        worker.start()
+    except Exception:
+        overlay._capture_busy = False
+        overlay._workers.discard(worker)
+        worker.deleteLater()
+        raise
+
+
 def _prepare_game_ocr_variants(qimage):
     """Prepare one low-latency, game-font-friendly OCR image."""
     from PIL import Image, ImageEnhance, ImageOps, ImageStat
@@ -659,6 +708,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._session_handoff = False
         self._drag_offset = QtCore.QPoint()
         self._ocr_busy = False
+        self._capture_busy = False
+        self._closed = False
         self._translation_busy = False
         self._workers = set()
         self._revision = 0
@@ -868,36 +919,65 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 self.setWindowOpacity(1.0)
 
     def _scan_once(self):
-        if self.paused or self._ocr_busy or self._translation_busy:
+        if self._closed or self.paused or self._capture_busy or self._ocr_busy or self._translation_busy:
             return
         try:
             self._update_bound_region()
             if not self._target_is_active():
                 self._set_status("paused", active=False)
                 return
+            if platform_support.IS_MAC:
+                screen = (QtWidgets.QApplication.screenAt(self.region.center())
+                          or QtWidgets.QApplication.primaryScreen())
+                _start_macos_capture(self, screen, self.region)
+                return
             pixmap = self._grab_region()
             if pixmap.isNull():
                 self._set_status("capture_error", active=False)
                 return
-            qimage = pixmap.toImage()
-            fingerprint = game_frame_fingerprint(qimage)
-            if not game_frames_are_different(self._last_frame, fingerprint):
-                self._unchanged_ticks += 1
-                # A periodic retry recovers from a transient OCR failure without
-                # doing expensive recognition work on every identical frame.
-                if self._unchanged_ticks < max(2, round(10000 / self.interval_ms)):
-                    self._set_status("waiting")
-                    return
-                self._unchanged_ticks = 0
-            else:
-                self._unchanged_ticks = 0
-            self._last_frame = fingerprint
-            self._set_status("scanning")
-            self._start_ocr(qimage)
+            self._process_frame(pixmap.toImage())
         except Exception:
             self._ocr_busy = False
             logging.getLogger("clickntranslate.game").exception("Game capture/OCR tick failed")
             self._set_status("ocr_error", active=False)
+
+    @QtCore.pyqtSlot(object, str)
+    def _on_macos_capture(self, image, error):
+        self._capture_busy = False
+        if self._closed or self.paused:
+            return
+        if error:
+            self._set_status('capture_error', active=False)
+            self.status_label.setToolTip(error)
+            return
+        try:
+            self._update_bound_region()
+            if self.region != self._capture_region or not self._target_is_active():
+                return
+            self._process_frame(image)
+        except Exception:
+            logging.getLogger('clickntranslate.game').exception('Game OCR frame failed')
+            self._set_status('ocr_error', active=False)
+
+    @QtCore.pyqtSlot()
+    def _capture_finished(self):
+        self._workers.discard(self.sender())
+
+    def _process_frame(self, qimage):
+        fingerprint = game_frame_fingerprint(qimage)
+        if not game_frames_are_different(self._last_frame, fingerprint):
+            self._unchanged_ticks += 1
+            # Retry transient OCR failures periodically, without re-reading
+            # every identical frame.
+            if self._unchanged_ticks < max(2, round(10000 / self.interval_ms)):
+                self._set_status('waiting')
+                return
+            self._unchanged_ticks = 0
+        else:
+            self._unchanged_ticks = 0
+        self._last_frame = fingerprint
+        self._set_status('scanning')
+        self._start_ocr(qimage)
 
     def _start_ocr(self, qimage):
         from ocr import (
@@ -1061,6 +1141,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         self._timer.stop()
+        self._closed = True
         self._revision += 1
         for worker in list(self._workers):
             try:
@@ -1235,12 +1316,15 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             min(100, int(self.config.get("game_overlay_opacity", 88))),
         )
         self._ocr_busy = False
+        self._capture_busy = False
+        self._closed = False
         self._translation_busy = False
         self._workers = set()
         self._revision = 0
         self._last_frame = ()
         self._unchanged_ticks = 0
         self._last_layout_signature = ()
+        self._empty_ocr_frames = 0
         self._blocks = []
         self._has_shown_translation = False
         self._status = game_text(self.language, "waiting")
@@ -1325,29 +1409,61 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 self.setWindowOpacity(1.0)
 
     def _scan_once(self):
-        if self._ocr_busy or self._translation_busy:
+        if self._closed or self._capture_busy or self._ocr_busy or self._translation_busy:
             return
         if not self._target_is_active():
             self._set_status("paused")
+            return
+        if platform_support.IS_MAC:
+            try:
+                _start_macos_capture(self, self._screen, self._screen.geometry())
+            except Exception:
+                logging.getLogger('clickntranslate.game').exception('Unable to start macOS capture')
+                self._set_status('capture_error', error=True)
             return
         pixmap = self._grab_screen()
         if pixmap.isNull():
             self._set_status("capture_error", error=True)
             return
+        self._process_frame(pixmap.toImage())
+
+    @QtCore.pyqtSlot(object, str)
+    def _on_macos_capture(self, image, error):
+        self._capture_busy = False
+        if self._closed:
+            return
+        if error:
+            self._set_status('capture_error', error=True)
+            self._status += ': ' + error
+            return
+        if self._screen.geometry() != self._capture_region or not self._target_is_active():
+            return
+        try:
+            self._process_frame(image)
+        except Exception:
+            logging.getLogger('clickntranslate.game').exception('Full-screen OCR frame failed')
+            self._set_status('ocr_error', error=True)
+
+    @QtCore.pyqtSlot()
+    def _capture_finished(self):
+        self._workers.discard(self.sender())
+
+    def _process_frame(self, image):
+        pixmap = QtGui.QPixmap.fromImage(image)
         # Keep the newest live frame for the ordinary full-screen replacement
         # renderer, which samples the source background around every OCR line.
         self.screenshot = pixmap
         geometry = self._screen.geometry()
         self._ocr_scale_x = pixmap.width() / max(1, geometry.width())
         self._ocr_scale_y = pixmap.height() / max(1, geometry.height())
-        image = pixmap.toImage()
         fingerprint = game_frame_fingerprint(image, width=36, height=20)
         if not game_frames_are_different(self._last_frame, fingerprint, threshold=3.0):
             self._unchanged_ticks += 1
             # Re-read an unchanged screen periodically. This is essential when
             # the previous online request was rate-limited: a static dialogue
             # must recover without the player having to move the camera.
-            if self._unchanged_ticks < max(1, round(10000 / self.interval_ms)):
+            if (self._unchanged_ticks < max(1, round(10000 / self.interval_ms))
+                    and not (self._blocks and self._empty_ocr_frames == 1)):
                 self._set_status("waiting")
                 return
             self._unchanged_ticks = 0
@@ -1380,12 +1496,14 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             if len(normalize_game_ocr_text(item[4])) >= 2
         ]
         if not grouped:
-            if self._blocks:
+            self._empty_ocr_frames += 1
+            if self._blocks and self._empty_ocr_frames >= 2:
                 self._blocks = []
                 self._last_layout_signature = ()
                 self.update()
             self._set_status("no_text")
             return
+        self._empty_ocr_frames = 0
         signature = tuple(
             (
                 round(float(item[0]) / 8),
@@ -1398,9 +1516,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._set_status("waiting")
             return
         self._last_layout_signature = signature
-        if self._blocks:
-            self._blocks = []
-            self.update()
+        # Keep the previous frame readable until its replacement is ready.
+        # Clearing it here caused a flash for every OCR layout/text change.
         self._start_block_translation(grouped)
 
     @QtCore.pyqtSlot()
@@ -1577,6 +1694,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def closeEvent(self, event):
         global _game_fullscreen_ref
         self._timer.stop()
+        self._closed = True
         self._revision += 1
         for worker in list(self._workers):
             try:

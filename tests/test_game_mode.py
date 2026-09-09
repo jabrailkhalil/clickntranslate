@@ -286,17 +286,21 @@ class GameModeWidgetTest(unittest.TestCase):
         finally:
             overlay.close()
 
-    def test_fullscreen_translates_every_line_immediately_and_clears_stale_cards(self):
+    def test_fullscreen_keeps_results_until_replacement_or_confirmed_empty_frame(self):
         overlay = self._fullscreen_overlay(
             history=False, game_capture_interval_ms=850
         )
         line = (100.0, 200.0, 180.0, 28.0, "Open the gate")
         try:
+            previous = [(100, 200, 180, 28, "Open", "Открыть")]
+            overlay._blocks = previous
             with mock.patch.object(overlay, "_start_block_translation") as start:
                 overlay._on_position_ocr_result([line])
                 start.assert_called_once()
+                self.assertEqual(overlay._blocks, previous)
 
-            overlay._blocks = [(100, 200, 180, 28, "Open", "Открыть")]
+            overlay._on_position_ocr_result([])
+            self.assertEqual(overlay._blocks, previous)
             overlay._on_position_ocr_result([])
             self.assertEqual(overlay._blocks, [])
         finally:

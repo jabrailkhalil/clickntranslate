@@ -27,6 +27,10 @@ The 1.7.1 source also includes a **macOS port for Apple Silicon and Intel**:
 [setup, build instructions, and native validation status](docs/MACOS.md).
 Mac artifacts require the macOS build workflow; a signed public Mac release is not yet available.
 
+The shared UI and translation improvements for **Windows, Linux and macOS** are
+available in `main`: [how to pull them and what changed](docs/CROSS_PLATFORM_HANDOFF.md).
+This is a source update; the latest UI changes still await native QA on each OS.
+
 | Improvement | What it changes |
 | --- | --- |
 | **Dynamic multi-area translation** | Select one or several screen regions and keep their translated text updated in place |

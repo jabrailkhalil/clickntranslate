@@ -2,6 +2,11 @@
 import re
 
 
+def completion_percent(done, total):
+    """Progress by completed request parts, never an estimate of elapsed time."""
+    return max(0, min(100, int(done * 100 // total))) if total > 0 else 0
+
+
 # These are conservative client budgets, not claimed service-wide quotas.
 # MyMemory's documented limit is specifically 500 UTF-8 bytes.
 PROVIDER_BYTE_LIMITS = {

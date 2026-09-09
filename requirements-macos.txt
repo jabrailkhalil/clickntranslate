@@ -23,6 +23,8 @@ pyobjc-framework-Cocoa==11.1
 pyobjc-framework-Quartz==11.1
 pyobjc-framework-ApplicationServices==11.1
 pyobjc-framework-Vision==11.1
+pyobjc-framework-CoreMedia==11.1
+pyobjc-framework-ScreenCaptureKit==11.1
 
 # Bundled in the isolated worker. This ONNX version has Intel AND arm64 wheels.
 rapidocr-onnxruntime==1.4.4

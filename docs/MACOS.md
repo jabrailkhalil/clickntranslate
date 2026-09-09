@@ -157,11 +157,26 @@ GUI thread. Partial text retains the reading position and remains visible on
 failure; automatic copying and history saving wait for successful completion.
 Argos streams through its helper without loading a new model per chunk. This
 new translation flow awaits runtime QA; only autostart was tested in Round22.
-The input panel now has a reserved, localized “Translating in real time...”
-status line during a request. The main chat has a single expand button on the
+The result panel has a reserved, localized “Translating in real time...”
+status line below the translated text, with a percentage of completed request
+parts. The main chat has a single expand button on the
 right, enabled even before a result exists. Opening it during translation follows
 the current request without starting another one or copying/saving its result
 twice. Editing or closing that preview detaches it from the main request.
+Clicking the expand button does not leave a focus outline; keyboard focus remains
+available through Tab. These UI and translation changes are shared by all OSes;
+see [the cross-platform handoff](CROSS_PLATFORM_HANDOFF.md).
+
+Dynamic translation on macOS captures beneath all application windows while
+keeping the overlays visible. macOS 14+ uses ScreenCaptureKit screenshot capture
+with application exclusion; 13.4 uses the Quartz window-list compositor excluding
+the process. Capture runs in a cancellable worker, with Retina pixel dimensions.
+Capture errors are shown without hiding the overlay or switching OCR engines.
+The fullscreen renderer on every OS retains its previous result until a new
+translation is ready and requires two empty OCR frames before clearing it.
+This Round24 capture change awaits runtime QA, including Intel, macOS 13.4,
+macOS 15+, multiple displays and multiple regions. Linux/older Windows retain
+their existing brief capture-time hide when OS exclusion is unavailable.
 
 Hover hints use the system font, a compact neutral surface and an anchor next to
 the cursor. The placement handles both native windows and the scaled main canvas;

@@ -20,6 +20,7 @@ import time
 import logging
 import translater
 import diagnostics
+from translation_chunks import completion_percent
 
 # CTranslate2 can crash when its native runtime is first loaded after Qt on
 # Windows. Load it while startup is still single-threaded; online translation
@@ -4568,7 +4569,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = False
         self._retranslating = True
         self._update_actions()
-        self._set_status(self.text['live_translation'])
+        self._set_status(f"0% · {self.text['live_translation']}")
         error_label = ui_text(self.lang, "translation_error")
 
         def worker():
@@ -4601,16 +4602,16 @@ class TranslationResultDialog(QDialog):
         self._received_partial = True
         self.translated_text = text
         self._update_actions()
-        self._set_status(f"{self.text['live_translation']} {done}/{total}")
+        self._set_status(f"{completion_percent(done, total)}% · {self.text['live_translation']}")
 
-    def _follow_main_translation(self, request):
+    def _follow_main_translation(self, request, progress=None):
         self._following_main_translation = True
         self._request_id += 1
         self._pending_request = request
         self._received_partial = bool(self.translated_text)
         self._retranslating = True
         self._update_actions()
-        self._set_status(self.text['live_translation'])
+        self._set_status(f"{completion_percent(*(progress or (0, 0)))}% · {self.text['live_translation']}")
 
     def _finish_main_preview(self, text, error):
         if self._closed or not getattr(self, '_following_main_translation', False):
@@ -4623,7 +4624,7 @@ class TranslationResultDialog(QDialog):
             self.translated_text = text
         self._update_actions()
         # The originating main request owns history and automatic copying.
-        self._set_status(error or self.text['ready'])
+        self._set_status(error or f"100% · {self.text['ready']}")
 
     @QtCore.pyqtSlot(int, str, str)
     def _on_retranslated(self, request_id, translated_text, error):
@@ -4645,7 +4646,7 @@ class TranslationResultDialog(QDialog):
         if self.auto_copy:
             platform_support.copy_text(translated_text)
             save_copy_history(translated_text)
-        self._set_status(self.text["auto_copied"] if self.auto_copy else self.text["ready"])
+        self._set_status('100% · ' + (self.text["auto_copied"] if self.auto_copy else self.text["ready"]))
 
     @staticmethod
     def _replace_editor_text(editor, text):
@@ -5825,8 +5826,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if self._translation_cancel_event is not None and self._translation_cancel_event.is_set():
             return
         if total:
-            self.progress_bar.setValue(max(0, min(100, int(done * 100 / total))))
-            self._set_status(f"{doc_text(self.lang, 'translating')}: {done}/{total}")
+            percent = completion_percent(done, total)
+            self.progress_bar.setValue(percent)
+            self._set_status(f"{doc_text(self.lang, 'translating')}: {percent}%")
         else:
             self.progress_bar.setValue(0)
             self._set_status(message)
@@ -10254,8 +10256,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
         self.text_input.setToolTip(tooltip_text(
             doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
-        # Reserve a quiet status line inside the existing fixed-size panel.
-        self.text_input.setMinimumHeight(50)
+        self.text_input.setMinimumHeight(66)
         self.text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -10299,12 +10300,13 @@ class DarkThemeApp(QMainWindow):
         self.main_translation_status.setFixedHeight(14)
         self.main_translation_status.setMinimumWidth(0)
         self.main_translation_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
-        input_layout.addWidget(self.main_translation_status, 1, 0, 1, 2)
+        result_layout.addWidget(self.main_translation_status, 1, 0, 1, 2)
         self.main_result_view = QTextEdit()
         self.main_result_view.setObjectName('mainComposerResult')
         self.main_result_view.setReadOnly(True)
         self.main_result_view.setAcceptRichText(False)
-        self.main_result_view.setMinimumHeight(66)
+        # Reserve the progress line below the result without enlarging the window.
+        self.main_result_view.setMinimumHeight(50)
         self.main_result_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.main_result_view.setLineWrapMode(QTextEdit.WidgetWidth)
         self.main_result_view.setWordWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
@@ -10319,6 +10321,9 @@ class DarkThemeApp(QMainWindow):
         result_actions_layout.setContentsMargins(0, 0, 0, 0)
         result_actions_layout.setSpacing(0)
         self.main_result_expand_button = ScaledIconButton()
+        self.main_result_expand_button.setFocusPolicy(Qt.TabFocus)
+        self.main_result_expand_button.setAutoDefault(False)
+        self.main_result_expand_button.setAttribute(Qt.WA_MacShowFocusRect, False)
         self.main_result_expand_button.setFixedSize(28, 28)
         self.main_result_expand_button.setAccessibleName(result_labels['open_result'])
         self.main_result_expand_button.setToolTip(tooltip_text(result_labels['open_result']))
@@ -10698,8 +10703,15 @@ class DarkThemeApp(QMainWindow):
         snapshot = getattr(self, '_main_result_snapshot', None)
         try:
             status = getattr(self, 'main_translation_status', None)
+            progress = getattr(self, '_main_result_progress', None)
+            error = getattr(self, '_main_result_error', '')
             if isinstance(status, QLabel):
-                status.setText(labels['live_translation'] if self._main_translation_running else '')
+                if self._main_translation_running:
+                    percent = completion_percent(*(progress or (0, 0)))
+                    status.setText(f"{percent}% · {labels['live_translation']}")
+                else:
+                    status.setText('100%' if progress and not error else '')
+                status.setToolTip(tooltip_text(error) if error else status.text())
             stale = False
             detail = ''
             if snapshot:
@@ -10712,10 +10724,6 @@ class DarkThemeApp(QMainWindow):
                 if stale:
                     detail += '\n' + labels['result_needs_update']
             title = labels['previous_result' if stale else 'result_tab']
-            progress = getattr(self, '_main_result_progress', None)
-            if progress:
-                title += f' · {progress[0]}/{progress[1]}'
-            error = getattr(self, '_main_result_error', '')
             if error:
                 title += ' · !'
                 detail += '\n' + error
@@ -10769,7 +10777,7 @@ class DarkThemeApp(QMainWindow):
         dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
         if self._main_translation_running:
             dialog.engine_label.setText(self._main_active_engine)
-            dialog._follow_main_translation(self._main_active_request)
+            dialog._follow_main_translation(self._main_active_request, self._main_result_progress)
             self._main_preview_dialogs.append(dialog)
         return dialog
 
@@ -11171,7 +11179,7 @@ class DarkThemeApp(QMainWindow):
     def _finish_main_translation_state(self, translated_text=None, error=''):
         self._update_main_preview_windows(translated_text, error=error)
         self._main_translation_running = False
-        self._main_result_progress = None
+        self._main_result_progress = (1, 1) if translated_text and not error else None
         self._argos_install_required = False
         self._argos_cancel_enabled = False
         if getattr(self, "translate_button", None) is not None:
@@ -11294,10 +11302,10 @@ class DarkThemeApp(QMainWindow):
         if not self._main_translation_running or self._argos_cancel_requested.is_set():
             return
         self._main_streamed_text = text
+        self._main_result_progress = (done, total)
         self._update_main_preview_windows(text, done, total)
         if result_window_hidden_for(get_cached_config(), 'main'):
             return
-        self._main_result_progress = (done, total)
         if self._argos_progress is not None:
             self._argos_progress.hide()
         source_text, source_code, target_code = self._main_active_request

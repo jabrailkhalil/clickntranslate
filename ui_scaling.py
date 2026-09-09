@@ -143,6 +143,8 @@ class ScaledIconButton(QPushButton):
         option = QStyleOptionButton()
         self.initStyleOption(option)
         option.icon = QIcon()
+        if not self.property('keyboardFocus'):
+            option.state &= ~QStyle.State_HasFocus
         painter = QStylePainter(self)
         painter.drawControl(QStyle.CE_PushButton, option)
         paint_scaled_icon(painter, self, option)
@@ -155,6 +157,8 @@ class ScaledIconToolButton(QToolButton):
         option = QStyleOptionToolButton()
         self.initStyleOption(option)
         option.icon = QIcon()
+        if not self.property('keyboardFocus'):
+            option.state &= ~QStyle.State_HasFocus
         painter = QStylePainter(self)
         painter.drawComplexControl(QStyle.CC_ToolButton, option)
         paint_scaled_icon(painter, self, option)

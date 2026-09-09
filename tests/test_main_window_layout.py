@@ -100,7 +100,8 @@ class MainScreenSourceTest(unittest.TestCase):
         # Reserve a real gap below the language pickers within the fixed
         # 700x400 viewport, while retaining three readable lines of text.
         self.assertIn("self.main_composer.setMinimumHeight(74)", source)
-        self.assertIn("self.text_input.setMinimumHeight(50)", source)
+        self.assertIn("self.text_input.setMinimumHeight(66)", source)
+        self.assertIn("self.main_result_view.setMinimumHeight(50)", source)
         self.assertIn("self.main_translation_status.setFixedHeight(14)", source)
 
 

@@ -17,7 +17,8 @@ entitlements = 'packaging/macos/entitlements.plist' if identity else None
 common_excludes = ['tkinter', 'pytest', 'IPython', 'jupyter', 'tensorflow', 'keras',
                    'matplotlib', 'pandas', 'sklearn', 'stanza', 'minisbd', 'spacy', 'thinc']
 optional = ['easyocr', 'torch', 'torchvision', 'skimage']
-native_bridges = ['Vision', 'Quartz', 'AppKit', 'Foundation', 'CoreFoundation', 'ApplicationServices', 'objc']
+native_bridges = ['Vision', 'Quartz', 'AppKit', 'Foundation', 'CoreFoundation', 'ApplicationServices',
+                  'CoreMedia', 'ScreenCaptureKit', 'objc']
 gui_hidden = ['pypdf']
 for module in native_bridges:
     gui_hidden += collect_submodules(module)
