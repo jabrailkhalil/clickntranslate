@@ -1,0 +1,25 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "signer_sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "signature": "permanent self-signed; no Developer ID or notarization",
+  "source_base_commit": "194347aca1691aa7d779195a6fc42e1b97e5d8f8",
+  "app": "/Applications/ClicknTranslate.app",
+  "built_app": "/Users/jabrail/Desktop/click/clickntranslate/dist/ClicknTranslate.app",
+  "runtime_tested": false,
+  "tests_skipped": "User deferred tests. No pytest or runtime smoke. UI diagnosis unavailable: Sky Computer Use service startup request failed.",
+  "build_verification": "codesign --verify --deep --strict; 227 Mach-O files compatible with macOS 13.4",
+  "published_release": false,
+  "files": [
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166255006,
+      "sha256": "3f0e8b9fb4155e665f33114aa7684c6bf989ed1df0b62a0c31349e6d808b3a98"
+    },
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153663064,
+      "sha256": "e8717dfeb4a09d8bdf608432fee7f080980ed08e24acc387f57a25172506445b"
+    }
+  ]
+}

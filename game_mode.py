@@ -35,7 +35,7 @@ GAME_TEXT = {
     "en": {
         "title": "Dynamic translation",
         "select": "Select one or more areas whose text should be replaced",
-        "select_hint": "Draw every area, then press Start or Enter · Backspace removes the last one",
+        "select_hint": "Drag to move · × to remove · Enter to start",
         "start": "Start",
         "undo": "Undo",
         "selected_count": "Selected: {count}",
@@ -56,7 +56,7 @@ GAME_TEXT = {
     "ru": {
         "title": "Динамический перевод",
         "select": "Выделите одну или несколько областей для замены текста",
-        "select_hint": "Выделите все области, затем нажмите «Запустить» или Enter · Backspace удаляет последнюю",
+        "select_hint": "Перетаскивайте области · × — удалить · Enter — запустить",
         "start": "Запустить",
         "undo": "Назад",
         "selected_count": "Выбрано: {count}",
@@ -77,7 +77,7 @@ GAME_TEXT = {
     "es": {
         "title": "Traducción dinámica",
         "select": "Selecciona una o varias áreas cuyo texto se reemplazará",
-        "select_hint": "Dibuja todas las áreas y pulsa Iniciar o Enter · Retroceso elimina la última",
+        "select_hint": "Arrastra para mover · × para eliminar · Enter para iniciar",
         "start": "Iniciar",
         "undo": "Deshacer",
         "selected_count": "Seleccionadas: {count}",
@@ -98,7 +98,7 @@ GAME_TEXT = {
     "de": {
         "title": "Dynamische Übersetzung",
         "select": "Einen oder mehrere Bereiche zum Ersetzen des Textes auswählen",
-        "select_hint": "Alle Bereiche markieren, dann Start oder Enter · Rücktaste entfernt den letzten",
+        "select_hint": "Ziehen zum Verschieben · × zum Entfernen · Enter zum Starten",
         "start": "Start",
         "undo": "Zurück",
         "selected_count": "Ausgewählt: {count}",
@@ -119,7 +119,7 @@ GAME_TEXT = {
     "fr": {
         "title": "Traduction dynamique",
         "select": "Sélectionnez une ou plusieurs zones dont le texte doit être remplacé",
-        "select_hint": "Tracez toutes les zones puis cliquez sur Démarrer ou Entrée · Retour supprime la dernière",
+        "select_hint": "Glissez pour déplacer · × pour supprimer · Entrée pour démarrer",
         "start": "Démarrer",
         "undo": "Annuler",
         "selected_count": "Sélectionnées : {count}",
@@ -140,7 +140,7 @@ GAME_TEXT = {
     "zh": {
         "title": "动态翻译",
         "select": "选择一个或多个需要替换文字的区域",
-        "select_hint": "画出全部区域，然后点开始或按 Enter · Backspace 删除最后一个",
+        "select_hint": "拖动以移动 · × 删除 · Enter 开始",
         "start": "开始",
         "undo": "撤销",
         "selected_count": "已选择：{count}",
@@ -334,6 +334,14 @@ def _start_macos_capture(overlay, screen, region):
         raise
 
 
+def _keep_overlay_visible_without_focus(widget):
+    if platform_support.IS_MAC:
+        # Qt::Tool maps to NSPanel, whose default hidesOnDeactivate makes a
+        # successful translation disappear as soon as its source app is active.
+        widget.setAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow, True)
+        widget.setWindowFlag(QtCore.Qt.WindowDoesNotAcceptFocus, True)
+
+
 def _prepare_game_ocr_variants(qimage):
     """Prepare one low-latency, game-font-friendly OCR image."""
     from PIL import Image, ImageEnhance, ImageOps, ImageStat
@@ -384,6 +392,9 @@ class GameRegionSelector(QtWidgets.QWidget):
         self._start = None
         self._end = None
         self._regions = []
+        self._selected_region = None
+        self._moving_region = None
+        self._move_offset = QtCore.QPoint()
         self._starting_session = False
         self._config = get_cached_ocr_config()
         self._language = str(self._config.get("interface_language", "en"))
@@ -402,6 +413,7 @@ class GameRegionSelector(QtWidgets.QWidget):
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self.setCursor(QtCore.Qt.CrossCursor)
+        self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
         from capture_widgets import CaptureLanguageCombo as DropDownCombo
@@ -512,8 +524,35 @@ class GameRegionSelector(QtWidgets.QWidget):
 
     def _undo_last_region(self):
         if self._regions:
-            self._regions.pop()
+            self._remove_region(len(self._regions) - 1)
+
+    def _remove_region(self, index):
+        if index is not None and 0 <= index < len(self._regions):
+            self._regions.pop(index)
+        self._selected_region = None
+        self._moving_region = None
+        self._update_cursor(self.mapFromGlobal(QtGui.QCursor.pos()))
         self._update_selection_controls()
+
+    @staticmethod
+    def _remove_button_rect(rect):
+        return QtCore.QRect(rect.right() - 30, rect.top() + 7, 24, 24)
+
+    def _region_at(self, point):
+        return next((index for index in range(len(self._regions) - 1, -1, -1)
+                     if self._regions[index].contains(point)), None)
+
+    def _update_cursor(self, point):
+        index = self._region_at(point)
+        if self._moving_region is not None:
+            cursor = QtCore.Qt.ClosedHandCursor
+        elif index is None:
+            cursor = QtCore.Qt.CrossCursor
+        elif self._remove_button_rect(self._regions[index]).contains(point):
+            cursor = QtCore.Qt.PointingHandCursor
+        else:
+            cursor = QtCore.Qt.OpenHandCursor
+        self.setCursor(cursor)
 
     def _start_selected_regions(self):
         if not self._regions:
@@ -523,9 +562,26 @@ class GameRegionSelector(QtWidgets.QWidget):
         source = str(self.source_combo.currentData() or "en")
         target = str(self.target_combo.currentData() or "ru")
         target_window = self._target_window
+        if platform_support.IS_MAC:
+            # The app/menu that launched selection need not own the area.
+            # Bind to the actual window beneath it before dismissing selection.
+            try:
+                from macos_desktop import window_number_at_point
+                center = global_rects[0].center()
+                target_window = window_number_at_point(center.x(), center.y()) or target_window
+            except Exception:
+                logging.getLogger('clickntranslate.game').exception('Unable to bind selected window')
         self._persist_pair()
         self._starting_session = True
         self.close()
+        if platform_support.IS_MAC and target_window:
+            try:
+                from macos_desktop import return_focus_to_window_application
+                restored = return_focus_to_window_application(target_window)
+                logging.getLogger('clickntranslate.game').debug(
+                    'Selection focus handoff; window=%s, restored=%s', target_window, restored)
+            except Exception:
+                logging.getLogger('clickntranslate.game').exception('Unable to return selection focus')
         QtCore.QTimer.singleShot(
             80,
             lambda: _begin_game_session(global_rects, source, target, target_window),
@@ -593,7 +649,11 @@ class GameRegionSelector(QtWidgets.QWidget):
             painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
             painter.fillRect(rect, QtCore.Qt.transparent)
             painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
-            painter.setPen(QtGui.QPen(QtGui.QColor("#b596dd"), 2))
+            # A faint fill also makes the interior draggable on native
+            # translucent windows, instead of relying only on their border.
+            painter.fillRect(rect, QtGui.QColor(181, 150, 221, 12))
+            selected = index - 1 == self._selected_region
+            painter.setPen(QtGui.QPen(QtGui.QColor("#e4ceff" if selected else "#b596dd"), 2))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawRoundedRect(rect, 8, 8)
             if rect is not active_rect:
@@ -604,6 +664,14 @@ class GameRegionSelector(QtWidgets.QWidget):
                 painter.setPen(QtGui.QColor("#ffffff"))
                 painter.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Bold))
                 painter.drawText(badge, QtCore.Qt.AlignCenter, str(index))
+                remove = self._remove_button_rect(rect)
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.setBrush(QtGui.QColor(32, 28, 40, 235))
+                painter.drawRoundedRect(remove, 7, 7)
+                painter.setPen(QtGui.QPen(QtGui.QColor("#ffffff"), 1.5))
+                center = remove.center()
+                painter.drawLine(center + QtCore.QPoint(-4, -4), center + QtCore.QPoint(4, 4))
+                painter.drawLine(center + QtCore.QPoint(-4, 4), center + QtCore.QPoint(4, -4))
 
         title_font = QtGui.QFont("Segoe UI", 15, QtGui.QFont.Bold)
         hint_font = QtGui.QFont("Segoe UI", 10)
@@ -629,29 +697,62 @@ class GameRegionSelector(QtWidgets.QWidget):
         painter.end()
 
     def mousePressEvent(self, event):
+        index = self._region_at(event.pos())
         if event.button() == QtCore.Qt.RightButton:
-            self.close()
+            if index is not None:
+                self._remove_region(index)
+            else:
+                self.close()
             return
         if event.button() == QtCore.Qt.LeftButton:
+            self.setFocus(QtCore.Qt.MouseFocusReason)
+            self._selected_region = index
+            if index is not None:
+                if self._remove_button_rect(self._regions[index]).contains(event.pos()):
+                    self._remove_region(index)
+                    return
+                self._moving_region = index
+                self._move_offset = event.pos() - self._regions[index].topLeft()
+                self._update_cursor(event.pos())
+                self.update()
+                return
             self._start = event.pos()
             self._end = event.pos()
             self.update()
 
     def mouseMoveEvent(self, event):
-        if self._start is not None:
+        if self._moving_region is not None:
+            rect = self._regions[self._moving_region]
+            position = event.pos() - self._move_offset
+            rect.moveTopLeft(QtCore.QPoint(
+                max(0, min(position.x(), self.width() - rect.width())),
+                max(0, min(position.y(), self.height() - rect.height())),
+            ))
+            self.update()
+        elif self._start is not None:
             self._end = event.pos()
             self.update()
+        self._update_cursor(event.pos())
 
     def mouseReleaseEvent(self, event):
-        if event.button() != QtCore.Qt.LeftButton or self._start is None:
+        if event.button() != QtCore.Qt.LeftButton:
+            return
+        if self._moving_region is not None:
+            self.mouseMoveEvent(event)
+            self._moving_region = None
+            self._update_cursor(event.pos())
+            return
+        if self._start is None:
             return
         self._end = event.pos()
-        local = QtCore.QRect(self._start, self._end).normalized()
+        local = QtCore.QRect(self._start, self._end).normalized().intersected(self.rect())
         self._start = self._end = None
         if local.width() < 180 or local.height() < 70:
             self.update()
             return
         self._regions.append(local)
+        self._selected_region = len(self._regions) - 1
+        self._update_cursor(event.pos())
         self._update_selection_controls()
 
     def keyPressEvent(self, event):
@@ -662,7 +763,10 @@ class GameRegionSelector(QtWidgets.QWidget):
             self._start_selected_regions()
             return
         if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Delete):
-            self._undo_last_region()
+            if self._selected_region is None:
+                self._undo_last_region()
+            else:
+                self._remove_region(self._selected_region)
             return
         super().keyPressEvent(event)
 
@@ -744,6 +848,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if transparent_input is not None:
             flags |= transparent_input
         self.setWindowFlags(flags)
+        _keep_overlay_visible_without_focus(self)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
@@ -828,6 +933,10 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.show()
         self.raise_()
         self._capture_excluded = _exclude_from_windows_capture(self)
+        logging.getLogger('clickntranslate.game').info(
+            'Region session started; window=%s, region=%s, OCR=%s, translator=%s',
+            self.target_window, self.region.getRect(), self.config.get('ocr_engine'),
+            self.config.get('translator_engine'))
 
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(self.interval_ms)
@@ -867,6 +976,10 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         """ + button_qss(dark, "quiet", selector="QToolButton", icon=True))
 
     def _set_status(self, key, active=True):
+        if key != getattr(self, '_diagnostic_status', None):
+            logging.getLogger('clickntranslate.game').debug(
+                'Region state; window=%s, state=%s', self.target_window, key)
+            self._diagnostic_status = key
         self.status_label.setText(game_text(self.language, key))
         self.status_dot.setStyleSheet(
             "color: #8fd18b;" if active else "color: #a597ac;"
@@ -1165,6 +1278,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             self.translation_label.setText(translated)
             self.card.show()
             self._set_status("waiting")
+            logging.getLogger('clickntranslate.game').debug(
+                'Region translation displayed; window=%s, revision=%s', self.target_window, revision)
             if bool(self.config.get("history", False)):
                 save_translation_history(source_text, translated, self.target_language)
             self._place_near_region()
@@ -1417,6 +1532,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         if transparent_input is not None:
             flags |= transparent_input
         self.setWindowFlags(flags)
+        _keep_overlay_visible_without_focus(self)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)

@@ -185,7 +185,14 @@ scrolling and removes lines whose source disappeared, with two-frame confirmatio
 for empty OCR. macOS checks the target window's owning application for activity,
 so a temporary sibling window does not pause translation. Activity/pause captions
 are hidden; real capture/OCR/provider errors remain visible.
-These Round24/Round28 changes await runtime QA, including Intel, macOS 13.4,
+Before starting, drag selected areas to move them, use their × to remove one,
+or press Delete/Backspace to remove the selected area (the last one if none is
+selected). Movement stays inside the monitor. These controls are shared by all OSes.
+On macOS, the source window is resolved beneath the first selected area and focus
+is handed back once after Start. Both dynamic overlays explicitly remain visible
+while the source app is active and cannot take keyboard focus: Qt's default
+tool-window behavior otherwise hides them on application deactivation.
+These Round24/Round28/Round29 changes await runtime QA, including Intel, macOS 13.4,
 macOS 15+, multiple displays and multiple regions. Linux/older Windows retain
 their existing brief capture-time hide when OS exclusion is unavailable.
 

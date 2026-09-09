@@ -210,6 +210,46 @@ def window_application_is_active(number):
     return front is not None and int(front.processIdentifier()) == int(info.get('kCGWindowOwnerPID', 0))
 
 
+def window_number_at_point(x, y):
+    """Find the visible source window beneath our region selector."""
+    import Quartz
+
+    entries = Quartz.CGWindowListCopyWindowInfo(
+        Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements, 0)
+    for entry in entries or ():
+        if (int(entry.get('kCGWindowOwnerPID', 0)) == os.getpid()
+                or int(entry.get('kCGWindowLayer', -1)) != 0
+                or float(entry.get('kCGWindowAlpha', 1)) <= 0):
+            continue
+        bounds = entry.get('kCGWindowBounds', {})
+        left, top = bounds.get('X', 0), bounds.get('Y', 0)
+        if (left <= x < left + bounds.get('Width', 0)
+                and top <= y < top + bounds.get('Height', 0)):
+            return int(entry['kCGWindowNumber'])
+    return 0
+
+
+def return_focus_to_window_application(number):
+    """Hand off selection focus once; never steal it back on capture ticks."""
+    import AppKit
+
+    info = window_info(number)
+    pid = int(info.get('kCGWindowOwnerPID', 0))
+    if not pid or pid == os.getpid() or not info.get('kCGWindowIsOnscreen', False):
+        return False
+    front = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+    if front is not None and int(front.processIdentifier()) != os.getpid():
+        # The user may have switched apps between selection and this callback.
+        return int(front.processIdentifier()) == pid
+    target = AppKit.NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+    if target is None:
+        return False
+    application = AppKit.NSApplication.sharedApplication()
+    if application.respondsToSelector_('yieldActivationToApplication:'):
+        application.yieldActivationToApplication_(target)
+    return bool(target.activateWithOptions_(AppKit.NSApplicationActivateIgnoringOtherApps))
+
+
 def send_edit_shortcut(key, validate_target=None):
     """Send Cmd+C/V without synthesizing releases of keys the user is holding."""
     import Quartz
