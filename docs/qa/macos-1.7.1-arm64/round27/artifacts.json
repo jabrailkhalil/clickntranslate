@@ -1,0 +1,25 @@
+{
+  "architecture": "arm64",
+  "macos": "14.3",
+  "signer_sha1": "E5E6A8042F96479E560AED29881A6F06D4D374A2",
+  "signature": "permanent self-signed; no Developer ID or notarization",
+  "source_base_commit": "d19db73de6f2fb4b9d26add4ce9f247bb066d2d8",
+  "app": "/Applications/ClicknTranslate.app",
+  "built_app": "/Users/jabrail/Desktop/click/clickntranslate/dist/ClicknTranslate.app",
+  "runtime_tested": false,
+  "tests_skipped": "Explicit user request: no pytest, smoke, screenshots or functional QA in this round.",
+  "build_verification": "codesign --verify --deep --strict; 227 Mach-O files compatible with macOS 13.4",
+  "published_release": false,
+  "files": [
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.dmg",
+      "bytes": 166234582,
+      "sha256": "d5fe7c0f0c3def72e453ce6bae0ed6f70bdedb789b048f83e86910f665a1df26"
+    },
+    {
+      "path": "/Users/jabrail/Desktop/click/clickntranslate/releases/Click-n-Translate-1.7.1-macos-arm64.zip",
+      "bytes": 153649161,
+      "sha256": "ccb8813acc860748a07c22d9d79a8fec5a7ce6c52d623a900685802e16a62620"
+    }
+  ]
+}

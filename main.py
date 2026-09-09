@@ -4084,11 +4084,11 @@ for _lang, _label in {
 
 
 def _translation_progress_message(label, done=0, total=0):
-    # A percentage is useful only while multiple known parts are unfinished.
-    # Avoid 0% for one request and a final 100% flash before the done signal.
+    # Keep the whole line empty until a multi-part request reports progress.
+    # A single-block request must never flash a status before its result.
     if total > 1 and done < total:
         return f'{completion_percent(done, total)}% · {label}'
-    return label
+    return ''
 
 
 class TranslateOnEnterTextEdit(QTextEdit):
@@ -4577,7 +4577,7 @@ class TranslationResultDialog(QDialog):
         self._received_partial = False
         self._retranslating = True
         self._update_actions()
-        self._set_status(self.text['live_translation'])
+        self._set_status('')
         error_label = ui_text(self.lang, "translation_error")
 
         def worker():
@@ -5795,7 +5795,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self._set_busy(True)
-        self._set_status(doc_text(self.lang, "translating"))
+        self._set_status('')
 
         source_code = self._source_code()
         target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
