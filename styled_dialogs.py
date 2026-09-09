@@ -7,6 +7,7 @@ from ui_scaling import native_window_parent
 
 import ctypes
 import logging
+import math
 import os
 import re
 import sys
@@ -74,7 +75,7 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
 
 
 class _RoundedTooltipFilter(QtCore.QObject):
-    """Makes the rounded corners in TOOLTIP_QSS actually round.
+    """Paint compact hover tips and keep popup corners transparent.
 
     `border-radius` only rounds what Qt paints. The tooltip is a window of its
     own with square edges, so each corner kept a square of the window's own
@@ -87,28 +88,28 @@ class _RoundedTooltipFilter(QtCore.QObject):
         if event_type not in (
             QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
             QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange, QtCore.QEvent.Move,
+            QtCore.QEvent.Paint,
         ):
             return False
         if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
             return False
         is_tooltip = _is_tooltip(watched)
+        if event_type == QtCore.QEvent.Paint:
+            if is_tooltip:
+                _paint_hover_tooltip(watched)
+                return True
+            return False
+        if is_tooltip and event_type in (QtCore.QEvent.Polish, QtCore.QEvent.StyleChange):
+            # Qt repolishes a reused tip against its new owner's stylesheet.
+            # Our paint handler supplies the whole surface, including corners.
+            watched.setAttribute(QtCore.Qt.WA_StyledBackground, False)
+            watched.setAutoFillBackground(False)
         if (is_tooltip and event_type in (QtCore.QEvent.Show, QtCore.QEvent.Move,
                                          QtCore.QEvent.Resize, QtCore.QEvent.StyleChange)
                 and not watched.property('clickntranslateTooltipPlacementPending')):
             watched.setProperty('clickntranslateTooltipPlacementPending', True)
             anchor = QtGui.QCursor.pos()
             QtCore.QTimer.singleShot(0, lambda widget=watched, point=anchor: _fit_hover_tooltip(widget, point))
-        if is_tooltip and event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show):
-            # QTipLabel is reused across unrelated windows. Its previous owner
-            # and stylesheet must not leave a dark tooltip in the light theme.
-            _apply_tooltip_theme(watched)
-        if is_tooltip and event_type in (
-            QtCore.QEvent.Show, QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange,
-        ):
-            # Moving between controls calls QTipLabel::setStyleSheet("/* */")
-            # even while the same tip stays visible. Apply after Qt finishes
-            # assigning its new owner, without reentering stylesheet polish.
-            QtCore.QTimer.singleShot(0, lambda widget=watched: _apply_tooltip_theme(widget))
         rounded_popup = (is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
                          or (sys.platform == 'darwin' and isinstance(watched, QtWidgets.QMenu)))
         if event_type == QtCore.QEvent.Polish and rounded_popup:
@@ -119,7 +120,11 @@ class _RoundedTooltipFilter(QtCore.QObject):
                 watched.setWindowFlag(QtCore.Qt.FramelessWindowHint, True)
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
-            watched.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+            watched.setAttribute(QtCore.Qt.WA_StyledBackground, not is_tooltip)
+        if is_tooltip and event_type == QtCore.QEvent.Show:
+            _fit_hover_tooltip(watched, QtGui.QCursor.pos())
+        if is_tooltip and event_type == QtCore.QEvent.PaletteChange:
+            watched.update()
         if rounded_popup and event_type in (
             QtCore.QEvent.Polish,
             QtCore.QEvent.Show,
@@ -143,16 +148,66 @@ def _is_tooltip(widget) -> bool:
         return False
 
 
-def _apply_tooltip_theme(widget) -> None:
+def _hover_tooltip_document(widget, anchor):
+    """Measure the same unscaled text that we paint, without QLabel sizeHint.
+
+    QTipLabel inherits the hovered owner's stylesheet and recalculates its
+    QLabel size when reused. QLabel also chooses its own rich-text wrap width.
+    Smaller QToolTip CSS therefore does not give us predictable bubble bounds.
+    Keep Qt's hover lifetime, but own both text layout and painting explicitly.
+    """
+    text = widget.text()
+    if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', text, re.I):
+        source = QtGui.QTextDocument()
+        source.setHtml(text)
+        text = source.toPlainText()
+    font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
+    font.setPixelSize(11)
+    font.setWeight(QtGui.QFont.Normal)
+    font.setItalic(False)
+    document = QtGui.QTextDocument()
+    document.setDocumentMargin(0)
+    document.setDefaultFont(font)
+    option = document.defaultTextOption()
+    option.setWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+    document.setDefaultTextOption(option)
+    document.setPlainText(text)
+    screen = QtWidgets.QApplication.screenAt(anchor) or QtWidgets.QApplication.primaryScreen()
+    width = TOOLTIP_WRAP_WIDTH
+    if screen is not None:
+        width = min(width, max(1, screen.availableGeometry().width() - 22))
+    document.setTextWidth(width)
+    # Six logical pixels per side and three above/below. No inherited label
+    # padding, minimum size, HTML width or main-window scale enters this size.
+    size = QtCore.QSize(math.ceil(document.idealWidth()) + 12,
+                        math.ceil(document.size().height()) + 6)
+    return document, size
+
+
+def _paint_hover_tooltip(widget):
+    # Reused QTipLabels can change text without a Show or Resize event. Layout
+    # at paint time too, so a long hint cannot leave its size on the next one.
+    document = _fit_hover_tooltip(widget, QtGui.QCursor.pos())
+    if document is None:
+        return
+    owner = widget.property('_q_stylesheet_parent')
+    dark = _uses_dark_theme(owner if isinstance(owner, QtWidgets.QWidget) else widget)
+    background, foreground, border = (
+        ('#303030', '#f2f2f2', '#505050') if dark else
+        ('#f7f7f7', '#252525', '#c9c9c9')
+    )
+    painter = QtGui.QPainter(widget)
     try:
-        if sip.isdeleted(widget):
-            return
-        style = tooltip_stylesheet(_uses_dark_theme(widget))
-        if widget.styleSheet() != style:
-            widget.setStyleSheet(style)
-    except RuntimeError:
-        # A pending hover can be cancelled before the queued update runs.
-        pass
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(QtGui.QColor(border), 1))
+        painter.setBrush(QtGui.QColor(background))
+        painter.drawRoundedRect(QtCore.QRectF(widget.rect()).adjusted(.5, .5, -.5, -.5), 4, 4)
+        painter.translate(6, 3)
+        context = QtGui.QAbstractTextDocumentLayout.PaintContext()
+        context.palette.setColor(QtGui.QPalette.Text, QtGui.QColor(foreground))
+        document.documentLayout().draw(painter, context)
+    finally:
+        painter.end()
 
 
 def position_popup_near_cursor(widget, anchor=None):
@@ -191,14 +246,14 @@ def _fit_hover_tooltip(widget, anchor):
     try:
         if sip.isdeleted(widget):
             return
+        widget.setProperty('clickntranslateTooltipPlacementPending', True)
+        document, size = _hover_tooltip_document(widget, anchor)
+        if widget.size() != size or widget.minimumSize() != size or widget.maximumSize() != size:
+            widget.setFixedSize(size)
         if widget.isVisible():
-            widget.setWordWrap(len(widget.text()) > TOOLTIP_WRAP_THRESHOLD)
-            widget.setMaximumWidth(260)
-            widget.adjustSize()
-            if widget.wordWrap():
-                widget.resize(widget.width(), max(widget.height(), widget.heightForWidth(widget.width())))
             position_popup_near_cursor(widget, anchor)
         widget.setProperty('clickntranslateTooltipPlacementPending', False)
+        return document
     except RuntimeError:
         pass  # Qt may dispose the shared tip before this queued placement.
 
@@ -329,9 +384,13 @@ def install_tooltip_style(app=None, dark=None) -> None:
     font.setPixelSize(11)
     font.setWeight(QtGui.QFont.Normal)
     QtWidgets.QToolTip.setFont(font)
+    # Qt effects capture the private QLabel before Show/our final geometry.
+    # A plain show uses the compact surface from its first visible frame.
+    app.setEffectEnabled(QtCore.Qt.UI_FadeTooltip, False)
+    app.setEffectEnabled(QtCore.Qt.UI_AnimateTooltip, False)
     for widget in app.topLevelWidgets():
         if _is_tooltip(widget):
-            widget.setStyleSheet(tooltip_stylesheet(dark))
+            widget.update()
 
 
 def install_qt_exception_guard() -> None:

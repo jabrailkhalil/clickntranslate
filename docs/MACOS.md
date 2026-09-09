@@ -155,6 +155,11 @@ Provider failures keep the draft and the preceding result available.
 Hover hints use the system font, a compact neutral surface and an anchor next to
 the cursor. The placement handles both native windows and the scaled main canvas;
 tooltips keep their own size rather than following the main-window zoom.
+Their text is measured and painted directly at 11 logical pixels, with 6×3 pixel
+insets and a 240 pixel text-width limit. The native tooltip still controls hover
+timing and dismissal, but inherited QLabel styles and HTML widths no longer
+determine the bubble size. This renderer replaces the earlier CSS-only sizing;
+its visual validation is pending at the user's request (see Round21 in QA).
 
 Screen capture asks for **Screen Recording** access; copying and replacing a
 selection asks for **Accessibility**. The application explains the permission
