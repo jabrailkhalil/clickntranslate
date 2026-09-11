@@ -230,7 +230,7 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_to": "ru",
     "game_translate_source_language": "en",
     "game_translate_target_language": "ru",
-    # Dynamic translation continuously replaces text inside selected areas.
+    # Dynamic translation starts with a choice of live areas or the whole screen.
     "game_capture_mode": "region",
     "game_capture_interval_ms": 850,
     "game_text_similarity": 0.90,
@@ -296,9 +296,8 @@ def merge_config_defaults(config):
             missing_keys += ("ocr_engine",)
     from ui_scaling import normalize_ui_scale
     merged["ui_scale_percent"] = normalize_ui_scale(merged["ui_scale_percent"])
-    # The experimental whole-screen Dynamic workflow was removed because it
-    # produced unrelated OCR fragments.  Existing installations migrate to the
-    # reliable multi-area workflow without keeping a hidden obsolete choice.
+    # Always open the visible scope picker, including for old experimental
+    # fullscreen settings. Whole-screen capture now requires an explicit choice.
     merged["game_capture_mode"] = "region"
     # Before per-action pairs existed, selected-text translation used the main
     # pair and fullscreen translation inherited the OCR pair. Preserve exactly
