@@ -102,16 +102,18 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         label = self.window.main_footer.findChild(QLabel, name)
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         self.assertLessEqual(label.sizeHint().height(), label.height(), label.text())
-                    for panel, name in (
-                        (self.window.main_text_section, "mainTextSectionTitle"),
-                        (self.window.main_shortcut_section, "mainShortcutSectionTitle"),
-                    ):
+                    for caption in (self.window.main_input_caption, self.window.main_result_caption):
+                        self.assertLessEqual(caption.sizeHint().width(), caption.width(), caption.text())
+                        self.assertLessEqual(caption.sizeHint().height(), caption.height(), caption.text())
+                        self.assertTrue(self.window.main_text_section.rect().contains(
+                            self.rect_in(self.window.main_text_section, caption)))
+                    for panel, name in ((self.window.main_shortcut_section, "mainShortcutSectionTitle"),):
                         label = panel.findChild(QLabel, name)
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         self.assertLessEqual(label.sizeHint().height(), label.height(), label.text())
                         self.assertEqual(label.alignment(), Qt.AlignCenter)
                         self.assertAlmostEqual(self.rect_in(self.window, label).center().x(), 349, delta=1)
-                        picker = self.window.source_lang if name == "mainTextSectionTitle" else self.window.hotkey_mode_combo
+                        picker = self.window.hotkey_mode_combo
                         self.assertGreaterEqual(self.rect_in(self.window, picker).top() -
                                                 self.rect_in(self.window, label).bottom() - 1, 6)
                     footer = self.window.main_footer

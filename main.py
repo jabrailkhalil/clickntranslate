@@ -11668,19 +11668,9 @@ if __name__ == "__main__":
             window.showNormal()
             window.raise_()
             window.activateWindow()
-    for argument in sys.argv[1:]:
-        if not argument.startswith("--update-ack="):
-            continue
-        ack_path = argument.split("=", 1)[1].strip()
-        if ack_path:
-            try:
-                ack_parent = os.path.dirname(os.path.abspath(ack_path))
-                os.makedirs(ack_parent, exist_ok=True)
-                with open(ack_path, "w", encoding="utf-8") as ack_file:
-                    ack_file.write(APP_VERSION)
-            except Exception:
-                pass
-        break
+    from update_handshake import acknowledge_ready
+    _update_package_root = get_portable_dir() if platform_support.IS_WINDOWS and getattr(sys, 'frozen', False) else None
+    QTimer.singleShot(0, lambda: acknowledge_ready(sys.argv[1:], APP_VERSION, _update_package_root))
     # Первый запуск из ярлыка рабочего стола: экземпляра ещё не было, поэтому
     # действие выполняем сами, как только окно готово.
     if _requested_shortcut_action:

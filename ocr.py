@@ -13,6 +13,7 @@ import time
 import re
 import functools
 import threading
+import math
 
 from button_styles import button_qss
 from settings_window import LanguageSwapButton
@@ -5221,7 +5222,7 @@ def _group_screen_ocr_lines(lines_data):
         except (TypeError, ValueError):
             continue
         text = str(item[4] or "").strip()
-        if not text or width <= 0 or height <= 0:
+        if not text or not all(math.isfinite(value) for value in (x, y, width, height)) or width <= 0 or height <= 0:
             continue
         lines.append((x, y, width, height, text))
     lines.sort(key=lambda item: (item[1], item[0]))
@@ -5375,6 +5376,39 @@ def _recognize_image_layout(image, engine, language_code):
     return lines
 
 
+def _windows_ocr_lines_in_image(recognized, width, height):
+    """Map WinRT's deskewed boxes back onto the original capture pixels.
+
+    OcrResult.TextAngle rotates about the image center. Ignoring it shifts
+    whole columns, even when Windows detects a small skew on a flat screen.
+    https://learn.microsoft.com/uwp/api/windows.media.ocr.ocrresult.textangle
+    """
+    angle = float(getattr(recognized, "text_angle", None) or 0)
+    if not math.isfinite(angle):
+        angle = 0
+    transform = QtGui.QTransform()
+    transform.translate(width / 2.0, height / 2.0)
+    transform.rotate(angle)
+    transform.translate(-width / 2.0, -height / 2.0)
+    lines = []
+    for line in recognized.lines:
+        words = list(line.words)
+        if not words:
+            continue
+        boxes = []
+        for word in words:
+            rect = word.bounding_rect
+            boxes.append(transform.mapRect(QtCore.QRectF(rect.x, rect.y, rect.width, rect.height)))
+        bounds = QtCore.QRectF(boxes[0])
+        for box in boxes[1:]:
+            bounds = bounds.united(box)
+        text = " ".join(word.text for word in words).strip()
+        if text:
+            lines.append((*bounds.getRect(), text))
+    logging.info("Windows OCR layout: angle=%.3f, image=%sx%s, lines=%s", angle, width, height, len(lines))
+    return lines
+
+
 class FullScreenOCRWorker(QtCore.QThread):
     """OCR worker that returns text lines with bounding box positions."""
 
@@ -5425,17 +5459,8 @@ class FullScreenOCRWorker(QtCore.QThread):
 
             logging.info(f"FullScreenOCR: recognized={recognized}")
             if recognized:
-                for line in recognized.lines:
-                    words = list(line.words)
-                    if not words:
-                        continue
-                    min_x = min(w.bounding_rect.x for w in words)
-                    min_y = min(w.bounding_rect.y for w in words)
-                    max_x = max(w.bounding_rect.x + w.bounding_rect.width for w in words)
-                    max_y = max(w.bounding_rect.y + w.bounding_rect.height for w in words)
-                    text = " ".join(w.text for w in words)
-                    if text.strip():
-                        lines_data.append((min_x, min_y, max_x - min_x, max_y - min_y, text))
+                lines_data = _windows_ocr_lines_in_image(
+                    recognized, self.bitmap.pixel_width, self.bitmap.pixel_height)
             logging.info(f"FullScreenOCR: found {len(lines_data)} text blocks")
         except Exception as e:
             logging.error(f"FullScreenOCRWorker error: {e}")
@@ -5777,6 +5802,9 @@ class FullScreenTranslateOverlay(QWidget):
 
         try:
             self._lines_data = _group_screen_ocr_lines(lines_data)
+            if not self._lines_data:
+                self._fail_translation(run_id, "screen_no_text")
+                return
             import threading
             threading.Thread(
                 target=self._translate_all,
@@ -5797,7 +5825,12 @@ class FullScreenTranslateOverlay(QWidget):
             logging.info(f"FullScreenOverlay: translating {len(lines_data)} blocks ({src}->{tgt})")
 
             all_texts = [item[4] for item in lines_data]
-            translated_texts = _translate_screen_texts(all_texts, translate_text, src, tgt)
+            engine = get_cached_ocr_config().get("translator_engine", "Google")
+            translate = functools.partial(
+                translate_text, engine=engine,
+                cancel_callback=lambda: run_id != self._translation_run_id,
+            )
+            translated_texts = _translate_screen_texts(all_texts, translate, src, tgt)
 
             if translated_texts and any(translated_texts):
                 for i, (x, y, w, h, orig) in enumerate(lines_data):
@@ -5946,14 +5979,16 @@ class FullScreenTranslateOverlay(QWidget):
             max(1.0, self.height() - screen_margin * 2),
         )
         source_rect = QtCore.QRectF(rect_f).normalized()
+        empty_layout = (QtCore.QRectF(), QtCore.QRectF(), QtGui.QFont("Segoe UI", 6),
+                        QtCore.Qt.AlignLeft | QtCore.Qt.TextSingleLine)
+        if (rect_f.width() <= 0 or rect_f.height() <= 0
+                or not all(math.isfinite(value) for value in (rect_f.x(), rect_f.y(), rect_f.width(), rect_f.height()))):
+            return empty_layout
         source_rect = source_rect.adjusted(-pad, -pad, pad, pad).intersected(bounds)
         if source_rect.isEmpty():
-            source_rect = QtCore.QRectF(
-                bounds.left(),
-                bounds.top(),
-                max(1.0, min(bounds.width(), rect_f.width())),
-                max(1.0, min(bounds.height(), rect_f.height())),
-            )
+            # Invalid/off-screen OCR coordinates must never pile up at (8, 8).
+            # Keep every replacement anchored to an actual visible source row.
+            return empty_layout
 
         left_limit = bounds.left()
         right_limit = bounds.right()
@@ -6047,6 +6082,8 @@ class FullScreenTranslateOverlay(QWidget):
         bg_rect, draw_rect, font, flags = layout or self._translation_block_layout(
             rect_f, original, text
         )
+        if bg_rect.isEmpty():
+            return
         background, foreground = self._replacement_palette(
             QtCore.QRectF(rect_f).normalized().adjusted(-2, -2, 2, 2)
         )

@@ -95,7 +95,8 @@ def test_source_can_be_extended_and_retranslated(appearance):
             mock.patch.object(main, 'save_translation_history'), \
             mock.patch.object(translater, 'translate_text', return_value='Hello world') as translate:
         dialog.translate_button.click()
-    translate.assert_called_once_with('Hola mundo', 'es', 'en', engine=mock.ANY, cancel_callback=mock.ANY)
+    translate.assert_called_once_with('Hola mundo', 'es', 'en', engine=mock.ANY,
+                                      cancel_callback=mock.ANY, partial_callback=mock.ANY)
     assert dialog.text_edit.toPlainText() == 'Hello world'
     assert dialog.source_edit.isVisible() and dialog.text_edit.isVisible()
     assert not dialog.text_edit.isReadOnly()

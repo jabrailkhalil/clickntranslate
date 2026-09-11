@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -67,7 +68,8 @@ internal static class ClicknTranslateLauncher
             {
                 throw new InvalidOperationException("Windows did not start the application process.");
             }
-            WriteUpdateAcknowledgement(args);
+            // Only the initialized application can confirm its runtime version.
+            // Starting a child process does not prove it loaded or became ready.
             return 0;
         }
         catch (Exception error)
@@ -78,17 +80,7 @@ internal static class ClicknTranslateLauncher
                 "ru",
                 StringComparison.OrdinalIgnoreCase
             );
-            string message = russian
-                ? "Click'n'Translate не удалось запустить.\n\n"
-                  + "Основной файл программы отсутствует или заблокирован. Проверьте карантин антивируса, "
-                  + "восстановите ClicknTranslateApp.exe и добавьте папку ClicknTranslate в исключения. "
-                  + "Если файла нет — запустите установщик ещё раз.\n\n"
-                  + "Кнопка ниже создаст безопасный отчёт без буфера обмена, истории и текста документов."
-                : "Click'n'Translate could not be started.\n\n"
-                  + "The main application file is missing or blocked. Check your antivirus quarantine, "
-                  + "restore ClicknTranslateApp.exe and allow the ClicknTranslate folder. "
-                  + "If the file is not there, run the installer again.\n\n"
-                  + "The button below creates a safe report without clipboard, history or document text.";
+            string message = StartupFailureMessage(error, russian);
             SilentWinFormsDialog.ShowStartupFailure(
                 message,
                 "Click'n'Translate",
@@ -100,6 +92,41 @@ internal static class ClicknTranslateLauncher
             );
             return 1;
         }
+    }
+
+    private static string StartupFailureMessage(Exception error, bool russian)
+    {
+        Win32Exception native = error as Win32Exception;
+        string reason;
+        if (native != null && (native.NativeErrorCode == 225 || native.NativeErrorCode == 226))
+        {
+            reason = russian
+                ? "Windows сообщает, что файл заблокирован антивирусом. В журнале защиты найдите ClicknTranslateApp.exe и передайте разработчику название обнаружения вместе с отчётом."
+                : "Windows reports that antivirus protection blocked the file. Find ClicknTranslateApp.exe in protection history and send the detection name and report to the developer.";
+        }
+        else if (error is FileNotFoundException || error is DirectoryNotFoundException
+                 || (native != null && (native.NativeErrorCode == 2 || native.NativeErrorCode == 3)))
+        {
+            reason = russian
+                ? "Не найден основной файл app\\ClicknTranslateApp.exe. Причина пока неизвестна: проверьте журнал защиты и создайте отчёт. Если антивирус не удалял файл, повторно запустите официальный установщик в ту же папку."
+                : "The main file app\\ClicknTranslateApp.exe was not found. The cause is not yet known: check protection history and create a report. If antivirus did not remove it, run the official installer again into the same folder.";
+        }
+        else if (error is UnauthorizedAccessException || (native != null && native.NativeErrorCode == 5))
+        {
+            reason = russian
+                ? "Windows отказала в доступе к файлам программы. Это может быть ограничение прав или защиты. Создайте отчёт и передайте его разработчику; при наличии обнаружения приложите его название."
+                : "Windows denied access to the application files. Permissions or protection may be responsible. Create a report for the developer and include any antivirus detection name.";
+        }
+        else
+        {
+            reason = russian
+                ? "Ошибка запуска не означает, что антивирус удалил программу. Создайте отчёт: в нём будут код ошибки и состояние файлов. По этим данным разработчик сможет определить причину."
+                : "A startup error does not establish that antivirus removed the application. Create a report with the error code and file status so the developer can investigate.";
+        }
+        return (russian ? "Click'n'Translate не удалось запустить.\n\n" : "Click'n'Translate could not be started.\n\n")
+            + reason + "\n\n"
+            + (russian ? "Отчёт не содержит буфер обмена, историю и текст документов."
+                       : "The report excludes clipboard contents, histories and document text.");
     }
 
     private static string FindApplicationExecutable(string root)
@@ -176,10 +203,17 @@ internal static class ClicknTranslateLauncher
         AppendFileStatus(report, "updater", Path.Combine(root, "app", "_internal", "ClicknTranslateUpdater.exe"));
         AppendFileStatus(report, "ocr_worker", Path.Combine(root, "app", "_internal", "OcrWorker.exe"));
         AppendFileStatus(report, "argos_worker", Path.Combine(root, "app", "_internal", "ArgosWorker.exe"));
+        AppendFileStatus(report, "python_library", Path.Combine(root, "app", "_internal", "base_library.zip"));
+        AppendFileStatus(report, "program_inventory", Path.Combine(root, "program-files.sha256"));
+        AppendUpdateState(report, root);
         if (error != null)
         {
             report.AppendLine();
             report.AppendLine("startup_error:");
+            Win32Exception native = error as Win32Exception;
+            report.AppendLine("error_type: " + error.GetType().FullName);
+            report.AppendLine("hresult: 0x" + error.HResult.ToString("X8"));
+            if (native != null) report.AppendLine("win32_error: " + native.NativeErrorCode);
             report.AppendLine(RedactPath(error.ToString()));
         }
 
@@ -203,6 +237,31 @@ internal static class ClicknTranslateLauncher
         return path;
     }
 
+    private static void AppendUpdateState(StringBuilder report, string root)
+    {
+        // Metadata only: the marker and backup may explain interrupted updates.
+        // Do not read settings, histories, model files or unrelated installations.
+        string marker = Path.Combine(root, "data", ".update-in-progress");
+        report.AppendLine("update_marker: " + (File.Exists(marker) ? "present" : "absent"));
+        try
+        {
+            if (File.Exists(marker)) report.AppendLine("update_marker_modified_utc: " + File.GetLastWriteTimeUtc(marker).ToString("O"));
+            DirectoryInfo parent = new DirectoryInfo(root).Parent;
+            if (parent == null) return;
+            foreach (DirectoryInfo backup in parent.GetDirectories(".clickntranslate_backup_*")
+                     .OrderByDescending(item => item.LastWriteTimeUtc).Take(5))
+            {
+                report.AppendLine("nearby_update_backup: " + backup.Name
+                    + ", modified_utc=" + backup.LastWriteTimeUtc.ToString("O")
+                    + ", application_present=" + File.Exists(Path.Combine(backup.FullName, "app", "ClicknTranslateApp.exe")));
+            }
+        }
+        catch (Exception statusError)
+        {
+            report.AppendLine("update_state_unavailable: " + RedactPath(statusError.Message));
+        }
+    }
+
     private static void AppendFileStatus(StringBuilder report, string label, string path)
     {
         if (!File.Exists(path))
@@ -215,12 +274,15 @@ internal static class ClicknTranslateLauncher
             FileInfo info = new FileInfo(path);
             report.AppendLine(
                 label + ": present, bytes=" + info.Length + ", sha256=" + Sha256(path)
+                + ", modified_utc=" + info.LastWriteTimeUtc.ToString("O")
+                + ", version=" + (path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                    ? FileVersionInfo.GetVersionInfo(path).FileVersion : "n/a")
                 + ", path=" + RedactPath(path)
             );
         }
         catch (Exception statusError)
         {
-            report.AppendLine(label + ": unreadable, error=" + statusError.Message);
+            report.AppendLine(label + ": unreadable, error=" + RedactPath(statusError.Message));
         }
     }
 
@@ -339,35 +401,6 @@ internal static class ClicknTranslateLauncher
     private static string JoinArguments(string[] args)
     {
         return string.Join(" ", args.Select(QuoteArgument));
-    }
-
-    private static void WriteUpdateAcknowledgement(string[] args)
-    {
-        string prefix = "--update-ack=";
-        string argument = args.FirstOrDefault(value => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-        if (string.IsNullOrWhiteSpace(argument))
-        {
-            return;
-        }
-        string path = argument.Substring(prefix.Length).Trim().Trim('"');
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-        try
-        {
-            string directory = Path.GetDirectoryName(Path.GetFullPath(path));
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            Version version = Assembly.GetExecutingAssembly().GetName().Version;
-            File.WriteAllText(path, string.Format("{0}.{1}.{2}", version.Major, version.Minor, version.Build));
-        }
-        catch (Exception error)
-        {
-            WriteFailureLog(new InvalidOperationException("Could not write the update acknowledgement.", error));
-        }
     }
 
     private static string QuoteArgument(string value)

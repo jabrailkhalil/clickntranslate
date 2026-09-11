@@ -1599,8 +1599,8 @@ def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='
             if cache is not None and len(chunks) > 1:
                 cache.save(content, result, engine, segment=True)
         translated.append(restore_boundary_whitespace(chunk, result))
-        _check_translation_cancelled(cancel_callback)
         if partial_callback and len(chunks) > 1:
+            _check_translation_cancelled(cancel_callback)
             partial_callback(''.join(translated), index + 1, len(chunks))
     return ''.join(translated)
 
