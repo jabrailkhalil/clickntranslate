@@ -73,14 +73,13 @@ GUIDE_SETTING_STEPS = {
     "notifications": ("copy_notification_checkbox", 1, True),
     "update_check_on_launch": ("update_check_on_launch_checkbox", 1, True),
     "game_pause_when_inactive": ("game_pause_inactive_checkbox", 2, True),
-    "game_show_original_text": ("game_show_original_checkbox", 2, True),
 }
 
 GUIDE_SETUP_CHAPTERS = (
     ("startup", ("settings", "autostart", "start_minimized", "copy_translated_text", "history", "copy_history")),
     ("translation", ("ocr_engine", "translator", "result_window", "language_packages")),
     ("capture", ("settings_page_updates", "keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "update_check_on_launch")),
-    ("dynamic", ("settings_page_game", "game_controls", "game_pause_when_inactive", "game_show_original_text")),
+    ("dynamic", ("settings_page_game", "game_controls", "game_pause_when_inactive")),
     ("finish", ("settings_page_main", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
 )
 GUIDE_SETUP_ORDER = tuple(action for _chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions)

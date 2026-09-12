@@ -1,0 +1,8 @@
+{
+  "name": "clickntranslate-landing",
+  "private": true,
+  "scripts": {
+    "locales": "node tools/generate-locales.mjs",
+    "build": "npm run locales && node tools/build.mjs"
+  }
+}

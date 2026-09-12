@@ -38,7 +38,6 @@ GAME_TEXT = {
         "select": "Select one or more areas whose text should be replaced",
         "select_hint": "Drag to move · × to remove · Enter to start",
         "start": "Start",
-        "fullscreen": "Auto-translate the whole screen",
         "stop": "Stop",
         "undo": "Undo",
         "selected_count": "Selected: {count}",
@@ -61,7 +60,6 @@ GAME_TEXT = {
         "select": "Выделите одну или несколько областей для замены текста",
         "select_hint": "Перетаскивайте области · × — удалить · Enter — запустить",
         "start": "Запустить",
-        "fullscreen": "Автоперевод всего экрана",
         "stop": "Стоп",
         "undo": "Назад",
         "selected_count": "Выбрано: {count}",
@@ -84,7 +82,6 @@ GAME_TEXT = {
         "select": "Selecciona una o varias áreas cuyo texto se reemplazará",
         "select_hint": "Arrastra para mover · × para eliminar · Enter para iniciar",
         "start": "Iniciar",
-        "fullscreen": "Traducir toda la pantalla",
         "stop": "Detener",
         "undo": "Deshacer",
         "selected_count": "Seleccionadas: {count}",
@@ -107,7 +104,6 @@ GAME_TEXT = {
         "select": "Einen oder mehrere Bereiche zum Ersetzen des Textes auswählen",
         "select_hint": "Ziehen zum Verschieben · × zum Entfernen · Enter zum Starten",
         "start": "Start",
-        "fullscreen": "Ganzen Bildschirm live übersetzen",
         "stop": "Beenden",
         "undo": "Zurück",
         "selected_count": "Ausgewählt: {count}",
@@ -130,7 +126,6 @@ GAME_TEXT = {
         "select": "Sélectionnez une ou plusieurs zones dont le texte doit être remplacé",
         "select_hint": "Glissez pour déplacer · × pour supprimer · Entrée pour démarrer",
         "start": "Démarrer",
-        "fullscreen": "Traduire tout l’écran en direct",
         "stop": "Arrêter",
         "undo": "Annuler",
         "selected_count": "Sélectionnées : {count}",
@@ -153,7 +148,6 @@ GAME_TEXT = {
         "select": "选择一个或多个需要替换文字的区域",
         "select_hint": "拖动以移动 · × 删除 · Enter 开始",
         "start": "开始",
-        "fullscreen": "自动翻译整个屏幕",
         "stop": "停止",
         "undo": "撤销",
         "selected_count": "已选择：{count}",
@@ -288,14 +282,8 @@ def _exclude_from_windows_capture(widget):
     """Keep our subtitle card out of the frames sent back into OCR."""
     if not platform_support.IS_WINDOWS:
         return False
-    try:
-        hwnd = int(widget.winId())
-        # WDA_EXCLUDEFROMCAPTURE (Windows 10 2004+), with WDA_MONITOR fallback.
-        if ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000011):
-            return True
-        return bool(ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, 0x00000001))
-    except Exception:
-        return False
+    from windows_overlay import exclude_from_capture
+    return exclude_from_capture(widget)
 
 
 class _MacOverlayCaptureWorker(QtCore.QThread):
@@ -435,7 +423,6 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.swap_button = LanguageSwapButton(self)
         self.undo_button = QtWidgets.QPushButton(game_text(self._language, "undo"), self)
         self.start_button = QtWidgets.QPushButton(self)
-        self.fullscreen_button = QtWidgets.QPushButton(game_text(self._language, "fullscreen"), self)
         available = set(installed_ocr_language_codes(config=self._config))
         if str(self._config.get("translator_engine", "Google")).lower() == "argos":
             available = {
@@ -493,17 +480,15 @@ class GameRegionSelector(QtWidgets.QWidget):
         )
         self.undo_button.setFixedSize(92, 44)
         self.start_button.setFixedSize(142, 44)
-        self.fullscreen_button.setFixedSize(320, 44)
         from window_appearance import style_capture_controls
         style_capture_controls(self, self._config,
-                               (self.source_combo, self.swap_button, self.target_combo, self.undo_button, self.start_button, self.fullscreen_button))
+                               (self.source_combo, self.swap_button, self.target_combo, self.undo_button, self.start_button))
         self._layout_controls()
         self.source_combo.currentIndexChanged.connect(self._source_changed)
         self.target_combo.currentIndexChanged.connect(self._persist_pair)
         self.swap_button.clicked.connect(self._swap)
         self.undo_button.clicked.connect(self._undo_last_region)
         self.start_button.clicked.connect(self._start_selected_regions)
-        self.fullscreen_button.clicked.connect(self._start_fullscreen)
         self._update_selection_controls()
 
         self.show()
@@ -511,13 +496,12 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.activateWindow()
 
     def _layout_controls(self):
-        if not hasattr(self, 'fullscreen_button'):
+        if not hasattr(self, 'start_button'):
             return
         languages = [self.source_combo, self.swap_button, self.target_combo]
         actions = [self.undo_button, self.start_button]
         controls = languages + actions
         rows = [controls] if sum(w.width() for w in controls) + 8 * 4 <= self.width() - 32 else [languages, actions]
-        rows.append([self.fullscreen_button])
         y = 48
         for row in rows:
             height = max(w.height() for w in row)
@@ -537,18 +521,7 @@ class GameRegionSelector(QtWidgets.QWidget):
         if count:
             label = f"{label} ({count})"
         self.start_button.setText(label)
-        self.fullscreen_button.setEnabled(bool(self.source_combo.currentData() and self.target_combo.currentData()))
         self.update()
-
-    def _start_fullscreen(self):
-        source, target = self.source_combo.currentData(), self.target_combo.currentData()
-        if not source or not target:
-            return
-        self._persist_pair()
-        self._starting_session = True
-        screen = self._screen
-        self.close()
-        _begin_fullscreen_game_session(str(source), str(target), self._target_window, screen=screen)
 
     def _undo_last_region(self):
         if self._regions:
@@ -876,7 +849,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             flags |= transparent_input
         self.setWindowFlags(flags)
         _keep_overlay_visible_without_focus(self)
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        from windows_overlay import configure_surface
+        configure_surface(self, windows=platform_support.IS_WINDOWS)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setWindowIcon(QtGui.QIcon())
@@ -957,6 +931,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         # does not make the chosen area disappear. The text card stays empty
         # and hidden until a result or an error is ready.
         self.card.hide()
+        self._source_frame = QtGui.QImage()
+        self._update_capture_shape()
         self.show()
         self.raise_()
         self._capture_excluded = _exclude_from_windows_capture(self)
@@ -979,14 +955,29 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if not self._startup_frame_visible:
-            return
         painter = QtGui.QPainter(self)
+        if platform_support.IS_WINDOWS and not self._source_frame.isNull():
+            painter.drawImage(self.rect(), self._source_frame)
+        if not self._startup_frame_visible:
+            painter.end()
+            return
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtGui.QPen(QtGui.QColor('#b596dd'), 2))
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 8, 8)
         painter.end()
+
+    def _update_capture_shape(self):
+        if not platform_support.IS_WINDOWS or not hasattr(self, 'card'):
+            return
+        from windows_overlay import rounded_region, set_surface_region
+        region = QtGui.QRegion()
+        if not self.card.isHidden():
+            region = rounded_region(self.rect(), 14)
+        elif self._startup_frame_visible:
+            region = rounded_region(self.rect().adjusted(1, 1, -1, -1), 8)
+            region -= rounded_region(self.rect().adjusted(3, 3, -3, -3), 6)
+        set_surface_region(self, region, windows=True)
 
     def _apply_style(self):
         dark = self.config.get("theme", "Темная") == "Темная"
@@ -1034,12 +1025,14 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.status_label.setVisible(visible)
         if visible:
             self.card.show()
+        self._update_capture_shape()
 
     def _place_near_region(self):
         # Keep the translated surface exactly on top of the selected source.
         # The old subtitle card sat outside the region, which made this mode a
         # second result window instead of an in-place game translation.
         self.setGeometry(self.region)
+        self._update_capture_shape()
 
     def _update_bound_region(self):
         if not self.target_window or self._bound_window_rect.isNull():
@@ -1076,6 +1069,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         local = self.region.translated(-geometry.left(), -geometry.top())
         restore_opacity = False
         if not self._capture_excluded:
+            if platform_support.IS_WINDOWS:
+                raise RuntimeError('Windows cannot exclude the live overlay from capture; capture stopped to avoid flickering.')
             self.setWindowOpacity(0.0)
             QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
             restore_opacity = True
@@ -1139,6 +1134,9 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._workers.discard(self.sender())
 
     def _process_frame(self, qimage):
+        self._source_frame = qimage
+        if platform_support.IS_WINDOWS and not self.card.isHidden():
+            self.update()
         fingerprint = game_frame_fingerprint(qimage)
         changed = game_frames_are_different(self._last_frame, fingerprint)
         if not changed:
@@ -1521,7 +1519,8 @@ class GameSessionControls(QtWidgets.QFrame):
         self._drag_offset = None
         self.setObjectName('liveSessionControls')
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        from windows_overlay import configure_surface
+        configure_surface(self, windows=platform_support.IS_WINDOWS)
         _keep_overlay_visible_without_focus(self)
         dark = overlay.config.get('theme', 'Темная') != 'Светлая'
         background, foreground, border = ('#201d28', '#f5f0fa', '#746087') if dark else ('#f7f3fa', '#302837', '#a18bb9')
@@ -1541,13 +1540,21 @@ class GameSessionControls(QtWidgets.QFrame):
             button.setStyleSheet(button_qss(dark, compact=True))
             button.setFixedHeight(32)
             layout.addWidget(button)
-        metrics = self.pause_button.fontMetrics()
-        self.pause_button.setFixedWidth(max(metrics.horizontalAdvance(game_text(overlay.language, key))
-                                            for key in ('pause', 'resume')) + 24)
+        # Reserve both captions using Qt's styled size hint, including borders
+        # and padding. Keep the control still when Pause changes to Resume.
+        self.pause_button.ensurePolished()
+        pause_widths = []
+        for key in ('pause', 'resume'):
+            self.pause_button.setText(game_text(overlay.language, key))
+            pause_widths.append(self.pause_button.sizeHint().width())
+        self.pause_button.setText(game_text(overlay.language, 'pause'))
+        self.pause_button.setFixedWidth(max(pause_widths))
         self.pause_button.clicked.connect(overlay._toggle_pause)
         self.stop_button.clicked.connect(overlay.close)
         self.stop_button.setToolTip(game_text(overlay.language, 'close'))
         self.adjustSize()
+        from windows_overlay import rounded_region, set_surface_region
+        set_surface_region(self, rounded_region(self.rect(), 9), windows=platform_support.IS_WINDOWS)
         available = overlay._screen.availableGeometry()
         self.move(available.center().x() - self.width() // 2, available.top() + 12)
         self.show()
@@ -1653,13 +1660,15 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             flags |= transparent_input
         self.setWindowFlags(flags)
         _keep_overlay_visible_without_focus(self)
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        from windows_overlay import configure_surface
+        configure_surface(self, windows=platform_support.IS_WINDOWS)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setWindowIcon(QtGui.QIcon())
         self.translation_ready.connect(self._apply_translation)
 
+        self._update_capture_shape()
         self.show()
         self.raise_()
         self._capture_excluded = _exclude_from_windows_capture(self)
@@ -1711,8 +1720,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
         geometry = self._screen.geometry()
         hidden = [widget for widget in (self, self.controls) if not widget._capture_excluded]
+        if hidden and platform_support.IS_WINDOWS:
+            raise RuntimeError('Windows cannot exclude the live overlay from capture; capture stopped to avoid flickering.')
         if hidden:
-            # Display affinity is unavailable on older Windows and X11. Hide
+            # Display affinity is unavailable on X11. Hide
             # only for the capture call so our own translations never feed
             # back into OCR and multiply on the next frame.
             for widget in hidden:
@@ -1991,12 +2002,9 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         if not self.paused:
             self._scan_once()
 
-    def paintEvent(self, _event):
+    def _layout_translation_blocks(self):
         from ocr import FullScreenTranslateOverlay
 
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
         rendered_blocks = []
         source_rects = []
         for x, y, width, height, source, translated in self._blocks:
@@ -2027,6 +2035,45 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             )
             occupied.append(layout[0])
             painted_blocks.append((source_rect, source, translated, layout))
+        return painted_blocks
+
+    def _visible_status_rect(self):
+        if not self._status or not ((not self._blocks and not self._has_shown_translation) or self._status_is_error):
+            return QtCore.QRectF()
+        font = QtGui.QFont('Segoe UI', 10, QtGui.QFont.DemiBold)
+        width = min(self.width() - 24, QtGui.QFontMetrics(font).horizontalAdvance(self._status) + 24)
+        return QtCore.QRectF(self.width() - width - 12, 12, width, 30)
+
+    def _update_capture_shape(self):
+        if not platform_support.IS_WINDOWS or not hasattr(self, '_blocks'):
+            return
+        from windows_overlay import rounded_region, set_surface_region
+        region = QtGui.QRegion()
+        for source_rect, _source, _translated, layout in self._layout_translation_blocks():
+            if layout[0].isEmpty():
+                continue
+            region |= QtGui.QRegion(layout[0].toAlignedRect())
+            region |= QtGui.QRegion(source_rect.adjusted(-2, -2, 2, 2).toAlignedRect())
+        status_rect = self._visible_status_rect()
+        if not status_rect.isEmpty():
+            region |= rounded_region(status_rect, 9)
+        set_surface_region(self, region, windows=True)
+
+    def update(self, *args):
+        self._update_capture_shape()
+        super().update(*args)
+
+    def paintEvent(self, _event):
+        from ocr import FullScreenTranslateOverlay
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
+        if platform_support.IS_WINDOWS and not self.screenshot.isNull():
+            # The native mask exposes only translated rectangles. Repaint their
+            # source first so adjustable backgrounds retain their appearance.
+            painter.drawPixmap(self.rect(), self.screenshot)
+        painted_blocks = self._layout_translation_blocks()
 
         # Exactly the same two-pass in-place renderer as ordinary full-screen
         # translation: local replacement backgrounds first, then every line.
@@ -2061,15 +2108,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
         # A passive status appears until the first result or on errors. Normal
         # scan phases do not change the surface or resize the separate controls.
-        if self._status and (
-            (not self._blocks and not self._has_shown_translation)
-            or self._status_is_error
-        ):
+        status_rect = self._visible_status_rect()
+        if not status_rect.isEmpty():
             status_font = QtGui.QFont("Segoe UI", 10, QtGui.QFont.DemiBold)
             painter.setFont(status_font)
-            metrics = QtGui.QFontMetrics(status_font)
-            width = min(self.width() - 24, metrics.horizontalAdvance(self._status) + 24)
-            status_rect = QtCore.QRectF(self.width() - width - 12, 12, width, 30)
             painter.setPen(QtGui.QPen(QtGui.QColor(126, 103, 153, 210), 1))
             painter.setBrush(
                 QtGui.QColor(74, 25, 31, 232)
@@ -2132,11 +2174,12 @@ def _show_game_selector(target_window=0):
             _game_selector_ref.close()
         except RuntimeError:
             pass
-    _game_selector_ref = GameRegionSelector(target_window)
+    from dynamic_workspace import PairedRegionSelector
+    _game_selector_ref = PairedRegionSelector(target_window)
     return _game_selector_ref
 
 
-def _begin_game_session(regions, source_language, target_language, target_window=0):
+def _begin_game_session(regions, source_language, target_language, target_window=0, *, output_regions=None, output_styles=None):
     global _game_overlay_refs
     for overlay in list(_game_overlay_refs):
         try:
@@ -2149,12 +2192,22 @@ def _begin_game_session(regions, source_language, target_language, target_window
     for index, region in enumerate(regions or ()):
         if not isinstance(region, QtCore.QRect) or region.isNull():
             continue
-        overlay = GameTranslationOverlay(
+        factory = GameTranslationOverlay
+        options = {}
+        if output_regions is not None:
+            if index >= len(output_regions) or not isinstance(output_regions[index], QtCore.QRect) or output_regions[index].isEmpty():
+                continue
+            from dynamic_workspace import PairedTranslationOverlay
+            factory = PairedTranslationOverlay
+            options = {'output_region': output_regions[index],
+                       'style': output_styles[index] if output_styles and index < len(output_styles) else None}
+        overlay = factory(
             region,
             source_language,
             target_language,
             target_window,
             start_delay_ms=index * 160,
+            **options,
         )
         _game_overlay_refs.append(overlay)
     if _game_overlay_refs:
@@ -2239,7 +2292,7 @@ def stop_game_mode():
 
 
 def toggle_game_mode():
-    """Choose live areas or automatic whole-screen translation; repeat to stop."""
+    """Choose source/output pairs for live translation; repeat to stop."""
     from mode_coordinator import release_mode, request_mode
 
     if not request_mode("game", stop_game_mode):

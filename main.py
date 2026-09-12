@@ -230,7 +230,7 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_to": "ru",
     "game_translate_source_language": "en",
     "game_translate_target_language": "ru",
-    # Dynamic translation starts with a choice of live areas or the whole screen.
+    # Dynamic translation continuously replaces text inside selected areas.
     "game_capture_mode": "region",
     "game_capture_interval_ms": 850,
     "game_text_similarity": 0.90,
@@ -296,8 +296,9 @@ def merge_config_defaults(config):
             missing_keys += ("ocr_engine",)
     from ui_scaling import normalize_ui_scale
     merged["ui_scale_percent"] = normalize_ui_scale(merged["ui_scale_percent"])
-    # Always open the visible scope picker, including for old experimental
-    # fullscreen settings. Whole-screen capture now requires an explicit choice.
+    # The experimental whole-screen Dynamic workflow was removed because it
+    # produced unrelated OCR fragments. Existing installations use the same
+    # selected-area workflow as Mac, including old fullscreen settings.
     merged["game_capture_mode"] = "region"
     # Before per-action pairs existed, selected-text translation used the main
     # pair and fullscreen translation inherited the OCR pair. Preserve exactly
@@ -2674,6 +2675,8 @@ def guide_text(lang):
             steps.append(existing[action])
         elif action in extras:
             title, body = extras[action]
+            if action == "game_controls":
+                body = settings_text(language, "game_workflow_note")
             steps.append((action, title, body))
     if platform_support.IS_MAC:
         from macos_text import macos_text
@@ -6492,7 +6495,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Select a screen area. OCR copies the recognized text.",
         "ocr": "Select a screen area. OCR translates it with this mode's language pair.",
         "fullscreen": "Translate visible text blocks across the whole screen with the Screen pair.",
-        "game": "Keep translations updated over one or more selected areas with the Dynamic pair. Press the shortcut again to stop.",
+        "game": "Select text to read, then choose where to display its live translation. Adjust the output and save templates. Press the shortcut again to stop.",
         "selection": "Select text in another app, then translate it without changing the original.",
         "replace": "Select editable text in another app. The same selection is replaced by its translation; if focus changed, the result is only copied.",
         "toggle": "Hide the app to its previous place or restore it from the tray/taskbar.",
@@ -6501,7 +6504,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Выделите область экрана. OCR распознает и скопирует текст.",
         "ocr": "Выделите область экрана. OCR переведёт её с парой языков этого режима.",
         "fullscreen": "Переведёт видимые блоки текста на всём экране с парой режима «Экран».",
-        "game": "Обновляет перевод поверх одной или нескольких выбранных областей с парой режима «Динамический». Повторное нажатие останавливает режим.",
+        "game": "Выделите исходный текст, затем место вывода перевода. Окно можно настроить, расположение — сохранить как шаблон. Повторная горячая клавиша остановит перевод.",
         "selection": "Выделите текст в другой программе: он переведётся без изменения оригинала.",
         "replace": "Выделите редактируемый текст в другой программе. То же выделение заменится переводом; при смене фокуса результат только скопируется.",
         "toggle": "Скроет программу туда, где она была, или вернёт её из трея/панели задач.",
@@ -6510,7 +6513,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Selecciona un área de pantalla. OCR reconoce y copia el texto.",
         "ocr": "Selecciona un área. OCR la traduce con el par de idiomas de este modo.",
         "fullscreen": "Traduce los bloques de texto visibles en toda la pantalla con el par Pantalla.",
-        "game": "Actualiza la traducción sobre una o varias áreas elegidas con el par Dinámico. Repite el atajo para detenerlo.",
+        "game": "Selecciona el texto original y dónde mostrar su traducción. Ajusta la salida y guarda plantillas. Repite el atajo para detener.",
         "selection": "Selecciona texto en otra app y tradúcelo sin cambiar el original.",
         "replace": "Selecciona texto editable en otra app. La misma selección se reemplaza; si cambia el foco, el resultado solo se copia.",
         "toggle": "Oculta la app en su ubicación anterior o la restaura desde bandeja/barra de tareas.",
@@ -6519,7 +6522,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Bildschirmbereich markieren. OCR erkennt und kopiert den Text.",
         "ocr": "Bereich markieren. OCR übersetzt ihn mit dem Sprachpaar dieses Modus.",
         "fullscreen": "Sichtbare Textblöcke des ganzen Bildschirms mit dem Bildschirm-Paar übersetzen.",
-        "game": "Aktualisiert Übersetzungen über einem oder mehreren markierten Bereichen mit dem Dynamisch-Paar. Erneut drücken beendet den Modus.",
+        "game": "Quelltext und Ausgabebereich wählen. Ausgabe anpassen und Vorlagen speichern. Erneutes Tastenkürzel beendet die Übersetzung.",
         "selection": "Text in einer anderen App markieren und übersetzen, ohne das Original zu ändern.",
         "replace": "Bearbeitbaren Text markieren. Dieselbe Auswahl wird ersetzt; bei geändertem Fokus wird das Ergebnis nur kopiert.",
         "toggle": "App an den vorherigen Ort ausblenden oder aus Tray/Taskleiste wiederherstellen.",
@@ -6528,7 +6531,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Sélectionnez une zone d’écran. L’OCR reconnaît et copie le texte.",
         "ocr": "Sélectionnez une zone. L’OCR la traduit avec la paire de langues de ce mode.",
         "fullscreen": "Traduit les blocs de texte visibles sur tout l’écran avec la paire Écran.",
-        "game": "Actualise la traduction sur une ou plusieurs zones choisies avec la paire Dynamique. Le même raccourci arrête le mode.",
+        "game": "Choisissez le texte source, puis où afficher sa traduction. Réglez la sortie et enregistrez des modèles. Répétez le raccourci pour arrêter.",
         "selection": "Sélectionnez du texte dans une autre app et traduisez-le sans modifier l’original.",
         "replace": "Sélectionnez du texte modifiable. La même sélection est remplacée ; si le focus change, le résultat est seulement copié.",
         "toggle": "Masque l’app à son emplacement précédent ou la restaure depuis la zone de notification/barre des tâches.",
@@ -6537,7 +6540,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "框选屏幕区域；OCR 会识别并复制文字。",
         "ocr": "框选屏幕区域；OCR 使用此模式的语言对进行翻译。",
         "fullscreen": "使用“全屏”语言对翻译整个屏幕上的可见文字块。",
-        "game": "使用“动态”语言对持续更新一个或多个选定区域的译文；再次按快捷键即可停止。",
+        "game": "先选择原文，再选择译文显示区域。可调整输出窗口并保存模板。再次按快捷键停止翻译。",
         "selection": "在其他应用中选中文字并翻译，不修改原文。",
         "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
         "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Click'n'Translate — product demo</title>
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #0b0a0f;
+        --panel: #15131d;
+        --line: #302a40;
+        --muted: #a9a1b5;
+        --text: #f7f3fb;
+        --accent: #a97be4;
+        --accent-2: #d6b8fa;
+        --green: #70d3a5;
+        --blue: #78b6ff;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+
+      body::before,
+      body::after { content: ""; position: absolute; width: 700px; height: 700px; border-radius: 50%; opacity: 0.17; pointer-events: none; }
+      body::before { top: -420px; right: -160px; background: radial-gradient(circle, #b47be8 0%, rgba(180, 123, 232, 0) 68%); }
+      body::after { bottom: -480px; left: -160px; background: radial-gradient(circle, #5c8ee6 0%, rgba(92, 142, 230, 0) 68%); }
+      #root { position: relative; width: 1920px; height: 1080px; isolation: isolate; }
+      .grain { position: absolute; inset: 0; z-index: 20; opacity: 0.035; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E"); }
+
+      .topbar { position: absolute; top: 48px; left: 76px; right: 76px; z-index: 12; display: flex; align-items: center; justify-content: space-between; }
+      .brand { display: flex; align-items: center; gap: 16px; font-size: 25px; font-weight: 750; letter-spacing: -0.02em; }
+      .brand img { width: 46px; height: 46px; object-fit: contain; border-radius: 12px; }
+      .open-source { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 20px; font-weight: 600; }
+      .open-source .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 18px rgba(112, 211, 165, 0.75); }
+      .scene { position: absolute; inset: 0; padding: 132px 76px 66px; }
+      .eyebrow { display: inline-flex; align-items: center; gap: 10px; color: var(--accent-2); font-size: 20px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+      .eyebrow::before { content: ""; width: 30px; height: 2px; background: var(--accent); }
+      h1, h2, p { margin: 0; }
+      .headline { margin-top: 20px; max-width: 930px; font-size: 76px; line-height: 0.98; letter-spacing: -0.055em; font-weight: 820; }
+      .headline .accent { color: var(--accent-2); }
+      .subhead { margin-top: 28px; max-width: 760px; color: var(--muted); font-size: 28px; line-height: 1.4; }
+
+      .desktop { position: absolute; left: 76px; right: 76px; top: 150px; bottom: 74px; overflow: hidden; border: 1px solid rgba(214, 184, 250, 0.24); border-radius: 34px; background: linear-gradient(145deg, #161421 0%, #0e1118 100%); box-shadow: 0 46px 110px rgba(0, 0, 0, 0.48); }
+      .window-bar { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid var(--line); background: rgba(25, 23, 33, 0.96); color: #d4cedd; font-size: 18px; }
+      .workspace { position: absolute; inset: 62px 0 0; display: grid; grid-template-columns: 260px 1fr; }
+      .sidebar { padding: 30px 22px; border-right: 1px solid var(--line); background: #111019; }
+      .side-label { margin: 0 10px 18px; color: #8a8292; font-size: 14px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; }
+      .side-item { display: flex; gap: 12px; align-items: center; height: 48px; padding: 0 14px; border-radius: 13px; color: #a9a1b5; font-size: 17px; }
+      .side-item.active { background: #211b2d; color: #eadbfb; }
+      .side-item::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #4c4558; }
+      .side-item.active::before { background: var(--accent); box-shadow: 0 0 13px rgba(169, 123, 228, .7); }
+      .game-page { position: relative; padding: 64px 74px; background: linear-gradient(180deg, rgba(15, 19, 27, .08), rgba(15, 19, 27, .7)), radial-gradient(circle at 68% 42%, rgba(77, 104, 152, .22), transparent 34%); }
+      .game-kicker { color: var(--blue); font-size: 18px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+      .game-title { margin-top: 14px; font-size: 52px; line-height: 1.05; letter-spacing: -.045em; }
+      .game-copy { margin-top: 20px; width: 620px; color: #a8a5af; font-size: 23px; line-height: 1.45; }
+
+      .dialogue { position: absolute; min-width: 300px; padding: 16px 20px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: rgba(8, 11, 18, .84); color: #fff; box-shadow: 0 18px 40px rgba(0,0,0,.34); font-size: 22px; font-weight: 650; }
+      .dialogue.one { right: 136px; top: 180px; }
+      .dialogue.two { right: 310px; bottom: 115px; }
+      .dialogue .speaker { display: block; margin-bottom: 7px; color: #7fa8dc; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; }
+      .selection { position: absolute; border: 3px solid var(--accent); border-radius: 17px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 0 30px rgba(169,123,228,.2); }
+      .selection::before, .selection::after { content: ""; position: absolute; width: 10px; height: 10px; border-radius: 3px; background: var(--accent-2); }
+      .selection::before { left: -6px; top: -6px; }
+      .selection::after { right: -6px; bottom: -6px; }
+      .selection.one { right: 112px; top: 158px; width: 482px; height: 112px; }
+      .selection.two { right: 286px; bottom: 93px; width: 466px; height: 112px; }
+      .cursor { position: absolute; width: 26px; height: 34px; z-index: 5; }
+      .cursor::before { content: ""; position: absolute; inset: 0; background: var(--accent-2); clip-path: polygon(0 0, 0 100%, 26% 75%, 43% 100%, 57% 92%, 40% 67%, 100% 64%); filter: drop-shadow(0 5px 8px rgba(0,0,0,.35)); }
+      .hotkey { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 13px 18px; border: 1px solid rgba(214,184,250,.28); border-radius: 15px; background: rgba(16, 14, 22, .94); color: #d8d0e2; font-size: 17px; box-shadow: 0 18px 45px rgba(0,0,0,.35); }
+      .key { min-width: 36px; height: 32px; padding: 0 9px; display: grid; place-items: center; border: 1px solid #5b4f6d; border-bottom-width: 3px; border-radius: 8px; background: #221d2c; color: #f3eaff; font-weight: 750; }
+      .translate-card { position: absolute; z-index: 4; width: 470px; padding: 20px 22px; border: 1px solid rgba(214,184,250,.3); border-radius: 19px; background: linear-gradient(145deg, rgba(45,35,60,.97), rgba(24,20,34,.97)); box-shadow: 0 24px 65px rgba(0,0,0,.46), 0 0 44px rgba(169,123,228,.13); }
+      .translate-card.one { right: 116px; top: 152px; }
+      .translate-card.two { right: 290px; bottom: 87px; }
+      .translate-card small { display: block; margin-bottom: 8px; color: #9d91ac; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+      .translate-card strong { font-size: 24px; letter-spacing: -.015em; }
+      .mode-chip { position: absolute; left: 346px; top: 510px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 999px; background: rgba(31, 27, 41, .92); color: #cfc7da; font-size: 17px; }
+      .mode-chip::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+
+      .replace-shell { position: absolute; left: 50%; top: 52%; width: 1320px; transform: translate(-50%, -50%); padding: 44px 48px 52px; border: 1px solid var(--line); border-radius: 30px; background: linear-gradient(145deg, #17141f, #111019); box-shadow: 0 42px 100px rgba(0,0,0,.42); }
+      .replace-label { color: var(--accent-2); font-size: 18px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+      .replace-line { margin-top: 28px; font-size: 45px; line-height: 1.35; letter-spacing: -.03em; }
+      .replace-old { position: relative; display: inline; color: #ded7e5; }
+      .strike { position: absolute; left: 0; right: 0; top: 54%; height: 4px; transform-origin: left center; border-radius: 4px; background: #db6c83; }
+      .replace-new { display: block; margin-top: 12px; color: var(--green); font-weight: 760; }
+      .replace-note { margin-top: 34px; display: flex; align-items: center; gap: 13px; color: #aaa2b4; font-size: 20px; }
+      .replace-note .check { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(112,211,165,.14); color: var(--green); font-weight: 900; }
+
+      .outro { display: grid; place-items: center; text-align: center; }
+      .outro-inner { margin-top: 20px; }
+      .outro-logo { width: 126px; height: 126px; object-fit: contain; border-radius: 30px; filter: drop-shadow(0 26px 45px rgba(134,88,194,.28)); }
+      .outro-title { margin-top: 24px; font-size: 70px; font-weight: 830; letter-spacing: -.055em; }
+      .outro-copy { margin-top: 14px; color: #b7aebe; font-size: 27px; }
+      .benefits { margin-top: 38px; display: flex; justify-content: center; gap: 13px; }
+      .benefit { padding: 12px 17px; border: 1px solid rgba(214,184,250,.22); border-radius: 999px; background: rgba(28,24,37,.8); color: #ddd5e6; font-size: 18px; font-weight: 650; }
+      .outro-cta { margin-top: 34px; color: var(--accent-2); font-size: 20px; font-weight: 720; }
+
+      #intro, #regions, #replace, #outro { opacity: 0; }
+      #intro-card { position: absolute; right: 86px; top: 222px; width: 650px; padding: 36px; border: 1px solid rgba(214,184,250,.2); border-radius: 28px; background: linear-gradient(145deg, rgba(31,27,42,.94), rgba(18,16,24,.94)); box-shadow: 0 36px 90px rgba(0,0,0,.4); }
+      .sample-label { color: #8e849c; font-size: 16px; text-transform: uppercase; letter-spacing: .08em; }
+      .sample-text { margin-top: 18px; color: #f0eaf5; font-size: 31px; line-height: 1.48; }
+      .sample-selection { display: inline; padding: 2px 5px; border-radius: 6px; background: rgba(169,123,228,.3); color: #fff; }
+      .sample-hint { margin-top: 26px; display: flex; align-items: center; justify-content: space-between; color: #9e95a9; font-size: 17px; }
+      .sample-hint strong { color: var(--accent-2); }
+    </style>
+  </head>
+  <body>
+    <main data-hf-id="hf-n127" id="root" data-composition-id="main" data-start="0" data-duration="12" data-width="1920" data-height="1080">
+      <div data-hf-id="hf-mndw" class="topbar">
+        <div data-hf-id="hf-im9d" class="brand"><img data-hf-id="hf-2rc0" src="assets/icon.png" alt=""> Click'n'Translate</div>
+        <div data-hf-id="hf-2t86" class="open-source"><span data-hf-id="hf-9gry" class="dot"></span> Open source · no account</div>
+      </div>
+
+      <section data-hf-id="hf-zf3v" id="intro" class="scene clip" data-start="0" data-duration="1.65" data-track-index="1">
+        <div data-hf-id="hf-pnbq" class="intro-content">
+          <div data-hf-id="hf-iqt1" class="eyebrow">Translate what is on your screen</div>
+          <h1 data-hf-id="hf-xx8i" class="headline">Text you <span data-hf-id="hf-5hin" class="accent">can’t select?</span></h1>
+          <p data-hf-id="hf-a4ln" class="subhead">Turn screen text into something you can understand — without interrupting your workflow.</p>
+          <div data-hf-id="hf-6lxx" id="intro-card" data-layout-allow-overflow="">
+            <div data-hf-id="hf-d6nm" class="sample-label">On screen</div>
+            <div data-hf-id="hf-s8su" class="sample-text">The gate is sealed. <span data-hf-id="hf-kea7" class="sample-selection">Find another way inside.</span></div>
+            <div data-hf-id="hf-nmx4" class="sample-hint"><span data-hf-id="hf-cqc6">Game dialogue, image, video, app</span><strong data-hf-id="hf-d6x8">Ctrl + Alt + L</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-hf-id="hf-lpoq" id="regions" class="scene clip" data-start="1.65" data-duration="5.17" data-track-index="2">
+        <div data-hf-id="hf-6guo" class="desktop">
+          <div data-hf-id="hf-85t8" class="window-bar"><span data-hf-id="hf-n2u1">Adventure.exe</span><span data-hf-id="hf-266h">— &#160; □ &#160; ×</span></div>
+          <div data-hf-id="hf-e8vj" class="workspace">
+            <aside data-hf-id="hf-842t" class="sidebar">
+              <div data-hf-id="hf-4y73" class="side-label">Journal</div>
+              <div data-hf-id="hf-lfvn" class="side-item">Map</div>
+              <div data-hf-id="hf-wbiq" class="side-item active">Current quest</div>
+              <div data-hf-id="hf-jpu5" class="side-item">Inventory</div>
+            </aside>
+            <div data-hf-id="hf-7hca" class="game-page">
+              <div data-hf-id="hf-y9mu" class="game-kicker">Current objective</div>
+              <h2 data-hf-id="hf-8l83" class="game-title">The abandoned observatory</h2>
+              <p data-hf-id="hf-ihp0" class="game-copy">Explore the ruins and recover the missing star chart before nightfall.</p>
+              <div data-hf-id="hf-tr7d" class="dialogue one" data-layout-allow-occlusion=""><span data-hf-id="hf-8ibt" class="speaker">Archivist</span>The northern door is locked.</div>
+              <div data-hf-id="hf-2gh7" class="dialogue two" data-layout-allow-occlusion=""><span data-hf-id="hf-3oa6" class="speaker">Companion</span>There must be another entrance.</div>
+              <div data-hf-id="hf-xfpy" class="selection one"></div>
+              <div data-hf-id="hf-fguw" class="selection two"></div>
+              <div data-hf-id="hf-98kp" class="translate-card one"><small data-hf-id="hf-qbtb">English → Russian</small><strong data-hf-id="hf-ew4t">Северная дверь заперта.</strong></div>
+              <div data-hf-id="hf-wvtb" class="translate-card two"><small data-hf-id="hf-bmun">English → Russian</small><strong data-hf-id="hf-gle1">Должен быть другой вход.</strong></div>
+              <div data-hf-id="hf-tuza" class="cursor"></div>
+            </div>
+          </div>
+          <div data-hf-id="hf-1y42" class="mode-chip">Dynamic regions active</div>
+          <div data-hf-id="hf-30ba" class="hotkey"><span data-hf-id="hf-d8lv" class="key">Ctrl</span><span data-hf-id="hf-kyim">+</span><span data-hf-id="hf-o8jt" class="key">Alt</span><span data-hf-id="hf-3k4i">+</span><span data-hf-id="hf-nv02" class="key">L</span><span data-hf-id="hf-b6tg">Select several regions</span></div>
+        </div>
+      </section>
+
+      <section data-hf-id="hf-q824" id="replace" class="scene clip" data-start="6.82" data-duration="2.18" data-track-index="3">
+        <div data-hf-id="hf-gggp" class="replace-shell">
+          <div data-hf-id="hf-hirc" class="replace-label">Translate and replace</div>
+          <div data-hf-id="hf-k5c7" class="replace-line"><span data-hf-id="hf-d6e2" class="replace-old">Can we move tomorrow’s lesson to 18:00?<span data-hf-id="hf-2svb" class="strike"></span></span><span data-hf-id="hf-m4dc" class="replace-new"> Можно перенести завтрашний урок на 18:00?</span></div>
+          <div data-hf-id="hf-kqis" class="replace-note"><span data-hf-id="hf-qb1c" class="check">✓</span> Select text, press the hotkey, keep typing.</div>
+        </div>
+      </section>
+
+      <section data-hf-id="hf-d2q4" id="outro" class="scene outro clip" data-start="9" data-duration="3.2" data-track-index="4">
+        <div data-hf-id="hf-tra2" class="outro-inner">
+          <img data-hf-id="hf-bwde" class="outro-logo" src="assets/outro-icon.png" alt="">
+          <h2 data-hf-id="hf-l32n" class="outro-title">Click'n'Translate</h2>
+          <p data-hf-id="hf-i6tq" class="outro-copy">Translate text anywhere on your screen.</p>
+          <div data-hf-id="hf-u4kc" class="benefits"><span data-hf-id="hf-lw4b" class="benefit">Windows &amp; Linux</span><span data-hf-id="hf-kllj" class="benefit">Free forever</span><span data-hf-id="hf-omsz" class="benefit">Open source</span><span data-hf-id="hf-sg5r" class="benefit">1,000+ downloads</span></div>
+          <div data-hf-id="hf-boly" class="outro-cta">github.com/jabrailkhalil/clickntranslate</div>
+        </div>
+      </section>
+      <div data-hf-id="hf-h60x" class="grain"></div>
+    </main>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#intro", { opacity: 1 }, 0)
+        .fromTo(".intro-content", { y: 24 }, { y: 0, duration: 0.55, ease: "power3.out" }, 0.05)
+        .fromTo("#intro-card", { opacity: 0, x: 42, scale: 0.98 }, { opacity: 1, x: 0, scale: 1, duration: 0.62, ease: "power3.out" }, 0.28)
+        .to(".intro-content", { opacity: 0, y: -18, duration: 0.28, ease: "power2.in" }, 1.34)
+        .set(".intro-content", { opacity: 0 }, 1.65)
+        .set("#regions", { opacity: 1 }, 1.65)
+        .fromTo(".desktop", { opacity: 0, y: 42, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.62, ease: "power3.out" }, 1.65)
+        .fromTo(".cursor", { x: 760, y: 470, opacity: 0 }, { x: 1060, y: 140, opacity: 1, duration: 0.62, ease: "power2.out" }, 2.08)
+        .fromTo(".selection.one", { opacity: 0, scaleX: 0.08, scaleY: 0.5, transformOrigin: "left top" }, { opacity: 1, scaleX: 1, scaleY: 1, duration: 0.48, ease: "power2.out" }, 2.45)
+        .to(".cursor", { x: 860, y: 570, duration: 0.55, ease: "power2.inOut" }, 3.0)
+        .fromTo(".selection.two", { opacity: 0, scaleX: 0.08, scaleY: 0.5, transformOrigin: "left top" }, { opacity: 1, scaleX: 1, scaleY: 1, duration: 0.48, ease: "power2.out" }, 3.22)
+        .fromTo(".translate-card.one", { opacity: 0, y: 16, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.42, ease: "back.out(1.4)" }, 4.02)
+        .fromTo(".translate-card.two", { opacity: 0, y: 16, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.42, ease: "back.out(1.4)" }, 4.34)
+        .to(".selection, .dialogue", { opacity: 0, duration: 0.18 }, 4.0)
+        .fromTo(".mode-chip", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.38, ease: "power2.out" }, 4.65)
+        .to(".desktop", { opacity: 0, scale: 0.985, duration: 0.3, ease: "power2.in" }, 6.48)
+        .set(".desktop", { opacity: 0 }, 6.82)
+        .set("#replace", { opacity: 1 }, 6.82)
+        .fromTo(".replace-shell", { opacity: 0, y: 34, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "power3.out" }, 6.82)
+        .fromTo(".strike", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.inOut" }, 7.25)
+        .fromTo(".replace-new", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.38, ease: "power2.out" }, 7.76)
+        .fromTo(".replace-note", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.32, ease: "power2.out" }, 8.05)
+        .to("#replace", { opacity: 0, y: -15, duration: 0.28, ease: "power2.in" }, 8.55)
+        .set("#outro", { opacity: 1 }, 9.0)
+        .fromTo(".outro-logo", { opacity: 0, y: 22, scale: 0.82 }, { opacity: 1, y: 0, scale: 1, duration: 0.56, ease: "back.out(1.5)" }, 9.02)
+        .fromTo(".outro-title, .outro-copy", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.48, stagger: 0.1, ease: "power3.out" }, 9.28)
+        .fromTo(".benefit", { opacity: 0, y: 15, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.34, stagger: 0.08, ease: "power2.out" }, 9.68)
+        .fromTo(".outro-cta", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.36, ease: "power2.out" }, 10.2);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

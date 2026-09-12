@@ -1,0 +1,13 @@
+{
+  "duration": 12,
+  "assertions": [
+    { "kind": "appearsBy", "selector": ".headline", "bySec": 0.7 },
+    { "kind": "appearsBy", "selector": ".desktop", "bySec": 2.3 },
+    { "kind": "appearsBy", "selector": ".translate-card.one", "bySec": 4.7 },
+    { "kind": "appearsBy", "selector": ".replace-new", "bySec": 8.4 },
+    { "kind": "appearsBy", "selector": ".outro-title", "bySec": 10.0 },
+    { "kind": "before", "a": ".selection.one", "b": ".translate-card.one" },
+    { "kind": "staysInFrame", "selector": ".outro-inner" },
+    { "kind": "keepsMoving", "withinSelector": "#root", "maxStaticSec": 2.5 }
+  ]
+}
