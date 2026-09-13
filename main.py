@@ -136,6 +136,9 @@ from languages import (
 )
 
 AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
+LEGACY_AUTOSTART_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+LEGACY_AUTOSTART_RUN_VALUE = "ClicknTranslate"
+_AUTOSTART_LOCK = threading.RLock()
 STORE_STARTUP_TASK_ID = "ClicknTranslateStartup"
 AUTOSTART_BACKEND = (
     "macos_launchagent" if platform_support.IS_MAC else
@@ -686,18 +689,59 @@ def _autostart_shortcut_matches_current(shortcut_info):
     )
 
 
-def _write_autostart_command(enable):
-    shortcut_path = _autostart_shortcut_path()
-    if enable:
-        _write_autostart_shortcut()
-        return
+def _read_legacy_autostart_command():
+    if not platform_support.IS_WINDOWS:
+        return ""
+    import winreg
 
     try:
-        os.remove(shortcut_path)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_QUERY_VALUE
+        ) as key:
+            value, value_type = winreg.QueryValueEx(key, LEGACY_AUTOSTART_RUN_VALUE)
+            return str(value or "") if value_type in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) else ""
+    except FileNotFoundError:
+        return ""
+
+
+def _remove_legacy_autostart_command():
+    """Remove only the per-user Run value written by older releases."""
+    if not platform_support.IS_WINDOWS:
+        return
+    import winreg
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_SET_VALUE
+        ) as key:
+            winreg.DeleteValue(key, LEGACY_AUTOSTART_RUN_VALUE)
     except FileNotFoundError:
         pass
-    except OSError:
-        pass
+
+
+def _write_autostart_command(enable):
+    with _AUTOSTART_LOCK:
+        shortcut_path = _autostart_shortcut_path()
+        if enable:
+            had_shortcut = os.path.exists(shortcut_path)
+            # Keep the old Run entry until its replacement has been written.
+            _write_autostart_shortcut()
+            try:
+                _remove_legacy_autostart_command()
+            except OSError:
+                if not had_shortcut:
+                    try:
+                        os.remove(shortcut_path)
+                    except OSError:
+                        logging.exception("Could not roll back the new autostart shortcut")
+                raise
+            return
+
+        _remove_legacy_autostart_command()
+        try:
+            os.remove(shortcut_path)
+        except FileNotFoundError:
+            pass
 
 
 def _read_autostart_command():
@@ -7130,29 +7174,44 @@ class DarkThemeApp(QMainWindow):
             self.save_config()
 
     @staticmethod
-    def _probe_portable_windows_autostart(stored_autostart, stored_backend):
-        """Resolve the real shortcut state without touching Qt or app config."""
-        shortcut_info = _read_autostart_shortcut()
-        if shortcut_info and _autostart_shortcut_matches_current(shortcut_info):
-            return True
+    def _probe_portable_windows_autostart(stored_autostart, stored_backend, repair_stale=True):
+        """Reconcile the Startup shortcut and the Run entry from older releases."""
+        with _AUTOSTART_LOCK:
+            shortcut_info = _read_autostart_shortcut()
+            enabled = _autostart_shortcut_matches_current(shortcut_info)
+            legacy_enabled = False
+            try:
+                legacy_enabled = bool(_read_legacy_autostart_command())
+                if not repair_stale:
+                    return enabled or legacy_enabled
+                if enabled:
+                    _remove_legacy_autostart_command()
+                    return True
 
-        should_repair = bool(
-            (shortcut_info and getattr(sys, "frozen", False))
-            or (
-                not shortcut_info
-                and stored_autostart
-                and stored_backend != AUTOSTART_BACKEND
-            )
-        )
-        if not should_repair:
-            return False
-
-        try:
-            _write_autostart_command(True)
-            return _autostart_shortcut_matches_current(_read_autostart_shortcut())
-        except Exception:
-            logging.exception("Could not repair the portable Windows autostart shortcut")
-            return False
+                should_repair = bool(
+                    (shortcut_info and getattr(sys, "frozen", False))
+                    or (
+                        not shortcut_info
+                        and (
+                            (stored_autostart and stored_backend != AUTOSTART_BACKEND)
+                            or (legacy_enabled and (stored_autostart or stored_backend != AUTOSTART_BACKEND))
+                        )
+                    )
+                )
+                if should_repair:
+                    _write_autostart_command(True)
+                    return _autostart_shortcut_matches_current(_read_autostart_shortcut())
+                if not shortcut_info:
+                    # An explicit off state in the current backend must also
+                    # remove a Run entry left behind by the incomplete migration.
+                    _remove_legacy_autostart_command()
+                return False
+            except OSError:
+                logging.exception("Could not reconcile Windows autostart")
+                return enabled or legacy_enabled or bool(stored_autostart)
+            except Exception:
+                logging.exception("Could not repair the portable Windows autostart shortcut")
+                return enabled or legacy_enabled
 
     def _start_deferred_autostart_sync(self):
         if not getattr(self, "_autostart_sync_pending", False):
@@ -7170,17 +7229,27 @@ class DarkThemeApp(QMainWindow):
             "_autostart_probe_stored_backend",
             self.config.get("autostart_backend"),
         )
+        revision = getattr(self, "_autostart_revision", 0)
 
         def worker():
-            enabled = self._probe_portable_windows_autostart(
-                stored_autostart,
-                stored_backend,
-            )
+            with _AUTOSTART_LOCK:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
+                    return
+                enabled = self._probe_portable_windows_autostart(
+                    stored_autostart,
+                    stored_backend,
+                )
 
             def apply_result():
                 # Do not overwrite a choice the user made while the shortcut
                 # probe was running in the background.
-                if bool(self.config.get("autostart", False)) != stored_autostart:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
                     return
                 changed = (
                     bool(self.config.get("autostart", False)) != bool(enabled)
@@ -7841,27 +7910,18 @@ class DarkThemeApp(QMainWindow):
             self.config["autostart_backend"] = AUTOSTART_BACKEND
             return enabled
 
-        shortcut_info = _read_autostart_shortcut()
         stored_autostart = bool(self.config.get("autostart", DEFAULT_CONFIG["autostart"]))
         stored_backend = self.config.get("autostart_backend")
-        enabled = False
-        if shortcut_info:
-            if _autostart_shortcut_matches_current(shortcut_info):
-                enabled = True
-            elif repair_stale and getattr(sys, "frozen", False):
-                # A stale ClicknTranslate shortcut means the user wanted autostart,
-                # but the path changed after moving/updating the portable app.
-                enabled = self.set_autostart(True)
-            else:
-                enabled = False
-        elif repair_stale and stored_autostart and stored_backend != AUTOSTART_BACKEND:
-            enabled = self.set_autostart(True)
+        enabled = DarkThemeApp._probe_portable_windows_autostart(
+            stored_autostart, stored_backend, repair_stale=repair_stale
+        )
         self.autostart = enabled
         self.config["autostart"] = enabled
         self.config["autostart_backend"] = AUTOSTART_BACKEND
         return enabled
 
     def set_autostart(self, enable: bool):
+        self._autostart_revision = getattr(self, "_autostart_revision", 0) + 1
         self._autostart_error = ''
         try:
             if platform_support.IS_MAC:
