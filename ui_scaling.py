@@ -401,7 +401,16 @@ def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
 
 
 def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
-    """Popup coordinates belong to the scene, not to the native desktop."""
+    """Position an in-scene popup; only macOS draws the list inside the proxy.
+
+    On Windows and X11 the popup of an embedded combo is still a native top
+    level window, but Qt reports a graphics proxy for it. Treating the scene
+    coordinates as desktop coordinates dropped the list at the canvas origin
+    (upper left of the window) instead of under the field. Returning False
+    sends the caller to the global-coordinate layout path instead.
+    """
+    if sys.platform != 'darwin':
+        return False
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()

@@ -259,7 +259,7 @@ class UiScalingTest(unittest.TestCase):
             self.settle()
             for combo in (self.window.source_lang, self.window.target_lang,
                           self.window.hotkey_source_combo):
-                geometries = []
+                anchors = []
                 for attempt in (1, 2):
                     self.click(combo)
                     # Cocoa's native-to-scene synchronization is posted after
@@ -267,17 +267,31 @@ class UiScalingTest(unittest.TestCase):
                     QTest.qWait(100)
                     popup = combo.view().window()
                     self.assertTrue(popup.isVisible())
-                    proxy = popup.graphicsProxyWidget()
-                    root = combo.window()
-                    geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
-                    field = QRect(combo.mapTo(root, QPoint()), combo.size())
-                    self.assertTrue(root.rect().contains(geometry.toAlignedRect()))
-                    self.assertFalse(geometry.intersects(QRectF(field)),
-                                     (percent, attempt, geometry, field))
-                    geometries.append(geometry)
+                    if sys.platform == 'darwin':
+                        # macOS draws the list inside the proxy scene.
+                        proxy = popup.graphicsProxyWidget()
+                        root = combo.window()
+                        geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
+                        field = QRect(combo.mapTo(root, QPoint()), combo.size())
+                        self.assertTrue(root.rect().contains(geometry.toAlignedRect()))
+                        self.assertFalse(geometry.intersects(QRectF(field)),
+                                         (percent, attempt, geometry, field))
+                        anchors.append(geometry)
+                    else:
+                        # Windows and X11 show a native window: the list has to
+                        # stay under (or above, when there is no room below) the
+                        # field in desktop coordinates, never at the canvas
+                        # origin.
+                        frame = popup.frameGeometry()
+                        field = QRect(combo.mapToGlobal(QPoint()), combo.size())
+                        horiz_overlap = frame.x() < field.right() and frame.right() > field.left()
+                        vertical_clear = frame.bottom() <= field.top() or frame.top() >= field.bottom()
+                        self.assertTrue(horiz_overlap and vertical_clear,
+                                        (percent, attempt, frame, field))
+                        anchors.append((frame.x(), frame.y()))
                     QTest.keyClick(self.controller.view.viewport(), Qt.Key_Escape)
                     self.settle()
-                self.assertEqual(geometries[0], geometries[1])
+                self.assertEqual(anchors[0], anchors[1])
 
     def test_dynamic_language_catalog_is_ready_before_the_first_popup(self):
         self.window.show_settings()
