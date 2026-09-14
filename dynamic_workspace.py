@@ -3,6 +3,7 @@
 import logging
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtTest import QTest
 
 import game_mode
 import platform_support
@@ -367,17 +368,36 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
             if any(not widget._capture_excluded for widget in windows):
                 raise RuntimeError('Windows cannot exclude a translation window from capture')
             return super()._grab_region()
-        # Mac's compositor already excludes all process windows. On X11 the
-        # output of another pair and its controls must also stay out of OCR.
-        hidden = [(widget, widget.windowOpacity()) for widget in windows]
-        for widget, _ in hidden:
-            widget.setWindowOpacity(0)
-        QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        # Mac's compositor excludes our windows from a grab automatically, and
+        # X11 has no such exclusion at all: windowOpacity only works with a
+        # compositor and does not remove the window from a root grab. A window
+        # that overlaps the captured region is therefore hidden for the grab
+        # and restored afterwards, while windows outside the region stay
+        # untouched and keep the output visible without any flicker.
+        region = self.region
+        hidden = [widget for widget in windows
+                  if widget.isVisible() and widget.geometry().intersects(region)]
+        for widget in hidden:
+            widget.hide()
+        if hidden:
+            # Let the window manager actually unmap the windows and repaint the
+            # exposed region before the grab; XGetImage right after hide() can
+            # still return the old backing store.
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+            QTest.qWait(60)
         try:
-            return super()._grab_region()
+            # Same capture as the base class, but without its windowOpacity
+            # dance: visibility here is managed by hide()/show() above.
+            from ocr import grab_screen_pixmap
+            screen = QtWidgets.QApplication.screenAt(region.center()) or QtWidgets.QApplication.primaryScreen()
+            geometry = screen.geometry()
+            local = region.translated(-geometry.left(), -geometry.top())
+            return grab_screen_pixmap(screen, local.x(), local.y(), local.width(), local.height())
         finally:
-            for widget, opacity in hidden:
-                widget.setWindowOpacity(opacity)
+            for widget in hidden:
+                if widget.isHidden():
+                    widget.show()
+                    widget.raise_()
 
     def _process_frame(self, image):
         if platform_support.IS_WINDOWS:

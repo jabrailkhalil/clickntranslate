@@ -194,8 +194,49 @@ def test_micro_controls_resize_unlock_and_save_current_layout(isolated):
 
 def test_public_entry_uses_paired_selector(isolated):
     selector = game_mode._show_game_selector()
-    assert isinstance(selector, workspace.PairedRegionSelector)
-    assert selector.template_combo.isVisible()
-    assert selector.save_template_button.isVisible()
-    assert selector.delete_template_button.isVisible()
-    selector.close()
+    try:
+        assert isinstance(selector, workspace.PairedRegionSelector)
+        assert selector.template_combo.isVisible()
+        assert selector.save_template_button.isVisible()
+        assert selector.delete_template_button.isVisible()
+    finally:
+        selector.close()
+
+
+def test_linux_disjoint_output_and_controls_remain_visible_during_capture(isolated):
+    source = QtCore.QRect(20, 250, 220, 70)
+    with (mock.patch.object(workspace.platform_support, 'IS_WINDOWS', False),
+          mock.patch.object(workspace.platform_support, 'IS_MAC', False)):
+        overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=QtCore.QRect(400, 350, 260, 90))
+        overlay._capture_excluded = False
+        try:
+            def capture(*args):
+                assert overlay.isVisible() and overlay.controls.isVisible()
+                assert overlay.windowOpacity() == 1 and overlay.controls.windowOpacity() == 1
+                return QtGui.QPixmap(source.size())
+            with (mock.patch.object(ocr, 'grab_screen_pixmap', side_effect=capture),
+                  mock.patch.object(overlay, 'setWindowOpacity', side_effect=AssertionError('Unnecessary output flicker')),
+                  mock.patch.object(overlay.controls, 'setWindowOpacity', side_effect=AssertionError('Unnecessary controls flicker'))):
+                overlay._grab_region()
+        finally:
+            overlay.close()
+
+
+def test_linux_overlapping_output_is_excluded_and_restored_after_capture_error(isolated):
+    source = QtCore.QRect(50, 250, 230, 80)
+    with (mock.patch.object(workspace.platform_support, 'IS_WINDOWS', False),
+          mock.patch.object(workspace.platform_support, 'IS_MAC', False)):
+        overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=source)
+        overlay._capture_excluded = False
+        try:
+            def capture(*args):
+                assert not overlay.isVisible()
+                assert overlay.controls.isVisible()
+                raise RuntimeError('Fixture capture failure')
+            with mock.patch.object(ocr, 'grab_screen_pixmap', side_effect=capture):
+                with pytest.raises(RuntimeError, match='Fixture capture failure'):
+                    overlay._grab_region()
+            assert overlay.isVisible() and overlay.controls.isVisible()
+            assert overlay.geometry() == source
+        finally:
+            overlay.close()

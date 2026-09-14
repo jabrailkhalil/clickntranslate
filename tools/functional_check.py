@@ -403,6 +403,13 @@ def check_ipc():
 
     def stale_socket():
         server.stop()
+        # stop() is deliberately non-blocking: the listener keeps the owner
+        # lock while in-flight commands drain, and only then removes the
+        # socket. Wait for that removal so the stale-path probe below is not
+        # racing the cleanup.
+        deadline = time.time() + 5
+        while os.path.exists(path) and time.time() < deadline:
+            time.sleep(0.05)
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(path)
         stale.close()
@@ -478,7 +485,7 @@ def check_documents():
     def document_pipeline():
         seen = []
 
-        def fake_translate(text, source, target, status_callback=None, engine=None):
+        def fake_translate(text, source, target, status_callback=None, engine=None, cancel_callback=None):
             seen.append(engine)
             if status_callback:
                 status_callback("working")
