@@ -389,3 +389,20 @@ class SetupGuideCard(QFrame):
         self.setFixedSize(rect.size())
         self.move(rect.topLeft())
         self.layout().activate()
+        # QVBoxLayout rounds wrapped label heights down by a pixel, which clips
+        # the last line of long translations (the Chinese setup text is the
+        # worst case). Grow the card by exactly the shortfall.
+        deficit = 0
+        for label in (self.title, self.body, self.hint):
+            if label.isVisible():
+                needed = label.heightForWidth(label.width())
+                if label.height() < needed:
+                    deficit = max(deficit, needed - label.height())
+        if deficit:
+            grown = self.geometry()
+            grown.setHeight(grown.height() + deficit)
+            if grown.bottom() > bounds.bottom():
+                grown.moveTop(max(bounds.top(), grown.y() - (grown.bottom() - bounds.bottom())))
+            self.setFixedSize(grown.size())
+            self.move(grown.topLeft())
+            self.layout().activate()
