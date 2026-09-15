@@ -10348,6 +10348,9 @@ class DarkThemeApp(QMainWindow):
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
         self.text_input.textChanged.connect(self._remember_main_input)
+        self.text_input.textChanged.connect(self._update_main_translate_button)
+        self.source_lang.currentIndexChanged.connect(self._update_main_translate_button)
+        self.target_lang.currentIndexChanged.connect(self._update_main_translate_button)
         input_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
@@ -10364,7 +10367,7 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language, "translate_button"
         )
         self.translate_button = ScaledIconButton()
-        self.translate_button.setEnabled(not self._main_translation_running)
+        self.translate_button.setEnabled(False)
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setObjectName("mainTranslateButton")
         self.translate_button.setAccessibleName(translate_action_text)
@@ -10426,7 +10429,7 @@ class DarkThemeApp(QMainWindow):
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
-        self.translate_button.setEnabled(has_translation_pair and not self._main_translation_running)
+        self._update_main_translate_button()
         if not has_translation_pair:
             self.translate_button.setToolTip(
                 tooltip_text(
@@ -10741,7 +10744,7 @@ class DarkThemeApp(QMainWindow):
         finally:
             self.target_lang.blockSignals(False)
         if getattr(self, "translate_button", None) is not None:
-            self.translate_button.setEnabled(self.target_lang.count() > 0 and not self._main_translation_running)
+            self._update_main_translate_button()
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
         update_swap = getattr(self, "_update_main_language_swap", None)
@@ -11269,7 +11272,7 @@ class DarkThemeApp(QMainWindow):
         self._argos_cancel_enabled = False
         if getattr(self, "translate_button", None) is not None:
             try:
-                self.translate_button.setEnabled(True)
+                self._update_main_translate_button()
             except RuntimeError:
                 pass
         if self._argos_progress is not None:
@@ -11448,6 +11451,17 @@ class DarkThemeApp(QMainWindow):
                 self._start_argos_translation(text, source_code, target_code)
                 return
             self._start_main_translation(text, source_code, target_code, engine)
+
+    def _update_main_translate_button(self, *_args):
+        """Translate is only meaningful with a language pair and non-empty text."""
+        if getattr(self, "translate_button", None) is None:
+            return
+        try:
+            pair = self.target_lang.count() > 0
+            text = bool(self.text_input.toPlainText().strip())
+            self.translate_button.setEnabled(pair and text and not self._main_translation_running)
+        except RuntimeError:
+            pass
 
     def minimize_to_tray(self):
         if not self.has_tray():
