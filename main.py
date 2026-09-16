@@ -7133,9 +7133,24 @@ class DarkThemeApp(QMainWindow):
         config_path = get_data_file("config.json")
         migrated_keys = ()
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8-sig") as f:
-                loaded_config = json.load(f)
+            loaded_config = None
+            try:
+                with open(config_path, "r", encoding="utf-8-sig") as f:
+                    loaded_config = json.load(f)
+                if not isinstance(loaded_config, dict):
+                    raise ValueError("config root is not an object")
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                logging.warning("Config file is unreadable; starting with defaults: %s", exc)
+                loaded_config = {}
             self.config, migrated_keys = merge_config_defaults(loaded_config)
+            if not loaded_config:
+                # A broken config must not block startup, but it should not
+                # keep falling into the broken state either.
+                try:
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        json.dump(self.config, f, ensure_ascii=False, indent=4)
+                except OSError:
+                    pass
         else:
             self.config = DEFAULT_CONFIG.copy()
             with open(config_path, "w", encoding="utf-8") as f:
