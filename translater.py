@@ -1648,10 +1648,10 @@ def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=N
     """Translate through the public Lingva APIs."""
     # Список публичных инстансов Lingva
     instances = [
-        # Active Vercel deployment. Keep it first: the older public domains
-        # below remain useful fallbacks but currently fail intermittently.
+        # Try another instance of the selected provider on failure. lingva.ml
+        # is intentionally excluded: it returned HTTP 200 while echoing the
+        # original sentences instead of translating them (2026-09-19).
         'https://lingva.vercel.app',
-        'https://lingva.ml',
         'https://translate.plausibility.cloud',
     ]
     session = _get_http_session()

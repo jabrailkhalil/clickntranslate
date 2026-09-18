@@ -208,10 +208,7 @@ except Exception:
 
 # Настройка логирования в файл для диагностики
 def get_log_dir():
-    if getattr(sys, 'frozen', False):
-        base_dir = portable_paths.portable_base_dir()
-    else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = portable_paths.portable_base_dir()
     log_dir = os.path.join(base_dir, "data", "logs")
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
@@ -224,10 +221,11 @@ def get_debug_artifact_dir():
     os.makedirs(artifact_dir, exist_ok=True)
     return artifact_dir
 
-_debug_log_path = get_log_path()
+_debug_log_path = None
 _OCR_LOGGER = logging.getLogger("clickntranslate.ocr")
 
 def _setup_ocr_diagnostics_logging():
+    global _debug_log_path
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
@@ -236,17 +234,27 @@ def _setup_ocr_diagnostics_logging():
         "%Y-%m-%d %H:%M:%S",
     )
     if not any(getattr(handler, "_clickntranslate_ocr_file", False) for handler in root.handlers):
-        file_handler = logging.handlers.RotatingFileHandler(
-            _debug_log_path,
-            maxBytes=5 * 1024 * 1024,
-            backupCount=5,
-            encoding="utf-8",
-        )
+        try:
+            log_path = get_log_path()
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_path,
+                maxBytes=5 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+        except OSError as error:
+            # Diagnostics must not prevent OCR from starting on a read-only
+            # install, a full disk, or a temporarily locked log file.
+            _OCR_LOGGER.warning("OCR file diagnostics unavailable: %s", error)
+            logging.captureWarnings(True)
+            return False
+        _debug_log_path = log_path
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
         file_handler._clickntranslate_ocr_file = True
         root.addHandler(file_handler)
     logging.captureWarnings(True)
+    return True
 
 
 def close_ocr_diagnostics_logging():

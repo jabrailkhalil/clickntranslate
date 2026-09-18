@@ -15,6 +15,7 @@ Exit code is 1 if anything failed (skips do not fail the run).
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -114,11 +115,11 @@ def check_translators(offline):
     def call_provider(function):
         """Public endpoints go down and time out; one retry before judging."""
         try:
-            return _nonempty(function(text, "en", "ru"))
+            return _translated_sample(function(text, "en", "ru"))
         except Exception as first_error:
             time.sleep(3)
             try:
-                return _nonempty(function(text, "en", "ru"))
+                return _translated_sample(function(text, "en", "ru"))
             except Exception:
                 raise first_error
 
@@ -130,7 +131,11 @@ def check_translators(offline):
             skip_reason="--offline" if offline else "",
         )
 
-    check(title, "argos runtime available", lambda: translater.argos_unavailable_reason() or "ready")
+    def argos_runtime():
+        reason = translater.argos_unavailable_reason()
+        return (SKIP, reason) if reason else "ready"
+
+    check(title, "argos runtime available", argos_runtime)
 
     def argos_translate():
         result = translater._try_argos_translate(SAMPLE_RU, "ru", "en", allow_install=False)
@@ -177,6 +182,18 @@ def _nonempty(value):
     if not text:
         raise AssertionError("empty result")
     return text[:70]
+
+
+def _translated_sample(value):
+    """Our known English sentence must actually return Russian, not an echo.
+
+    This is a probe assertion, not a rule for arbitrary user translations:
+    names, URLs and numbers can legitimately remain unchanged.
+    """
+    text = _nonempty(value)
+    if not re.search(r'[\u0400-\u04ff]', str(value)):
+        raise AssertionError(f"English-to-Russian probe returned no Russian text: {text!r}")
+    return text
 
 
 def _fail(message):

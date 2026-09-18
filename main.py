@@ -193,6 +193,8 @@ SETTINGS_ACTIONS_FOOTER_GAP = 6
 DEFAULT_CONFIG = {
     "theme": "Темная",
     "ui_scale_percent": DEFAULT_SCALE,
+    "desktop_assistant_enabled": False,
+    "desktop_assistant_position": None,
     "interface_language": "en",
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
@@ -7020,6 +7022,7 @@ class DarkThemeApp(QMainWindow):
 
         if not LAYOUT_EDITOR_MODE:
             self.create_tray_icon()
+            self._sync_desktop_assistant()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7297,6 +7300,29 @@ class DarkThemeApp(QMainWindow):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, ensure_ascii=False, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+
+    def _sync_desktop_assistant(self):
+        assistant = getattr(self, '_desktop_assistant', None)
+        if self.config.get('desktop_assistant_enabled') is True:
+            if assistant is None:
+                from desktop_assistant import DesktopAssistant
+                self._desktop_assistant = DesktopAssistant(self)
+            else:
+                assistant.refresh()
+        elif assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
+
+    def set_desktop_assistant_enabled(self, enabled):
+        self.config['desktop_assistant_enabled'] = bool(enabled)
+        self.save_config()
+        self._sync_desktop_assistant()
+        settings = self.settings_window or self._cached_settings_window
+        checkbox = getattr(settings, 'desktop_assistant_checkbox', None)
+        if checkbox is not None:
+            blocker = QtCore.QSignalBlocker(checkbox)
+            checkbox.setChecked(bool(enabled))
+            del blocker
 
     def set_ui_scale_percent(self, value, anchor_widget=None):
         from ui_scaling import normalize_ui_scale
@@ -9139,6 +9165,8 @@ class DarkThemeApp(QMainWindow):
             thread.start()
 
     def apply_theme(self):
+        if hasattr(self, 'config'):
+            self._sync_desktop_assistant()
         theme = THEMES[self.current_theme]
         from window_appearance import refresh_window_appearance
         refresh_window_appearance(percent=self.config.get('ui_scale_percent', DEFAULT_SCALE), theme=self.current_theme)
@@ -11123,6 +11151,10 @@ class DarkThemeApp(QMainWindow):
             self.force_quit = True
 
         # Если force_quit=True, то выполняем полноценный выход
+        assistant = getattr(self, '_desktop_assistant', None)
+        if assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
         try:
             if hasattr(self, "hotkey_thread") and self.hotkey_thread is not None:
                 self.hotkey_thread.stop()

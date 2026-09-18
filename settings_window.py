@@ -6713,6 +6713,13 @@ class SettingsWindow(QWidget):
         if callable(complete):
             complete(key)
 
+    def _set_desktop_assistant_enabled(self, enabled):
+        setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
+        if callable(setter):
+            setter(bool(enabled))
+        else:
+            self.auto_save_setting('desktop_assistant_enabled', bool(enabled))
+
     def _on_start_minimized_toggled(self, state):
         enabled = bool(state)
         self.auto_save_setting("start_minimized", enabled)
@@ -7478,6 +7485,25 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
         self._refresh_ui_scale()
+
+        # Reuse the fifth row's empty right cell in the fixed window.
+        from assistant_text import assistant_text
+        self.desktop_assistant_label = QLabel(assistant_text(lang, 'setting'))
+        self.desktop_assistant_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.desktop_assistant_label.setFixedHeight(engine_control_height)
+        self.desktop_assistant_checkbox = QCheckBox(assistant_text(lang, 'enabled'))
+        self.desktop_assistant_checkbox.setFixedSize(engine_combo_width, engine_control_height)
+        self.desktop_assistant_checkbox.setStyleSheet('margin:0; padding:0;')
+        self.desktop_assistant_checkbox.setChecked(self.parent.config.get('desktop_assistant_enabled') is True)
+        assistant_hint = tooltip_text(assistant_text(lang, 'hint'))
+        self.desktop_assistant_label.setToolTip(assistant_hint)
+        self.desktop_assistant_checkbox.setToolTip(assistant_hint)
+        self.desktop_assistant_checkbox.setAccessibleName(
+            assistant_text(lang, 'setting') + ' ' + assistant_text(lang, 'enabled'))
+        self.desktop_assistant_checkbox.toggled.connect(self._set_desktop_assistant_enabled)
+        self.desktop_assistant_label.setBuddy(self.desktop_assistant_checkbox)
+        form_grid.addWidget(self.desktop_assistant_label, 4, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.desktop_assistant_checkbox, 4, 2, Qt.AlignVCenter)
 
         # Чекбокс "Не сворачивать при OCR"
         self.keep_visible_checkbox = QCheckBox(settings_text(lang, "keep_visible_on_ocr"))
@@ -13411,6 +13437,8 @@ finally {
         # Default configuration
         default_config = {
             "theme": "Темная",
+            "desktop_assistant_enabled": False,
+            "desktop_assistant_position": None,
             # Language is identity/navigation state, not a behaviour setting.
             # Resetting it while the title-bar flag kept the previous icon made
             # the application visibly contradict itself until the next launch.
