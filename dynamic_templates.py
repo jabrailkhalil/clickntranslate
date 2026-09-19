@@ -78,12 +78,16 @@ def validate_template(value):
         raise ValueError('Invalid template regions')
     clean = []
     for pair in pairs:
+        if not isinstance(pair, dict):
+            raise ValueError('Invalid template pair')
         item = {}
         for key in ('source', 'output'):
             area = pair.get(key, {})
+            if not isinstance(area, dict):
+                raise ValueError('Invalid template region')
             rect = area.get('rect')
             if (not isinstance(rect, list) or len(rect) != 4
-                    or not all(isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n) and 0 <= n <= 1 for n in rect)
+                    or not all(isinstance(n, (int, float)) and not isinstance(n, bool) and 0 <= n <= 1 and math.isfinite(n) for n in rect)
                     or rect[2] <= 0 or rect[3] <= 0 or rect[0]+rect[2] > 1.000001 or rect[1]+rect[3] > 1.000001):
                 raise ValueError('Invalid template coordinates')
             item[key] = {'screen': str(area.get('screen', ''))[:200], 'rect': list(rect)}
@@ -103,7 +107,7 @@ class TemplateStore:
         if not self.path.exists():
             return []
         data = json.loads(self.path.read_text(encoding='utf-8'))
-        if data.get('version') != 1 or not isinstance(data.get('templates'), list):
+        if not isinstance(data, dict) or data.get('version') != 1 or not isinstance(data.get('templates'), list):
             raise ValueError('Unsupported templates file')
         return [validate_template(value) for value in data['templates'][:100]]
 

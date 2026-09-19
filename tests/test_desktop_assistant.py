@@ -4,7 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from unittest import mock
 
 import pytest
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest
 
 from assistant_text import ASSISTANT_TEXT, assistant_text
@@ -215,3 +215,38 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
     finally:
         menu.close()
         menu.deleteLater()
+
+
+def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(companion, app):
+    owner = companion.owner
+    companion.dispose()
+    app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    listeners = len(mode_coordinator._listeners)
+    for cycle in range(6):
+        helper = DesktopAssistant(owner)
+        discarded = []
+        for index, language in enumerate(ASSISTANT_TEXT):
+            owner.current_interface_language = language
+            owner.current_theme = 'Светлая' if index % 2 else 'Темная'
+            helper.refresh()
+            helper.toggle_menu()
+            assert helper.menu.isVisible()
+            assert helper.anchor.size() == QtCore.QSize(84, 84)
+            discarded.append(helper.menu)
+            name = f'qa-capture-{cycle}-{index}'
+            assert mode_coordinator.request_mode(name, lambda: None)
+            assert not helper.anchor.isVisible() and not helper.menu.isVisible()
+            assert helper.anchor.movie.state() != QtGui.QMovie.Running
+            mode_coordinator.release_mode(name)
+            assert helper.anchor.isVisible()
+            app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        helper.request_action('screen')
+        anchor = helper.anchor
+        helper.dispose()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()
+        assert sip.isdeleted(anchor) and sip.isdeleted(helper)
+        assert all(sip.isdeleted(menu) for menu in discarded)
+        assert len(mode_coordinator._listeners) == listeners
+    QTest.qWait(220)
+    owner.launch_fullscreen_translate.assert_not_called()

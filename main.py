@@ -125,6 +125,7 @@ import portable_paths
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
+from atomic_storage import write_json
 from document_translation import translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -5953,7 +5954,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not self.translated_text.strip():
             QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_translation"))
             return
-        paths = default_output_paths(self._data_dir(), self._source_file_name())
+        try:
+            paths = default_output_paths(self._data_dir(), self._source_file_name())
+        except OSError as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             doc_text(self.lang, "save_translation"),
@@ -5972,11 +5977,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         elif not ext:
             path = root + ".txt"
 
-        if path.lower().endswith(".json"):
-            save_session(path, self._session_payload())
-        else:
-            save_text(path, self.translated_text)
-            save_session(paths["session"], self._session_payload())
+        try:
+            if path.lower().endswith(".json"):
+                save_session(path, self._session_payload())
+            else:
+                save_text(path, self.translated_text)
+                save_session(paths["session"], self._session_payload())
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         self._set_status(f"{doc_text(self.lang, 'saved')}: {path}")
 
     def open_session(self):
@@ -6005,6 +6014,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translated_view.setPlainText(self.translated_text)
         if payload.get("provider_engine"):
             self._populate_provider_combo(payload.get("provider_engine"))
+        self._refresh_document_provider_languages()
+        source_index = self.source_combo.findData(payload.get('source_language'))
+        if source_index >= 0:
+            self.source_combo.setCurrentIndex(source_index)
+        target_index = self.target_combo.findData(payload.get('target_language'))
+        if target_index >= 0:
+            self.target_combo.setCurrentIndex(target_index)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100 if self.translated_text else 0)
         self._set_status(doc_text(self.lang, "session_loaded"))
@@ -6027,6 +6043,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
             if kind == "online"
         }
+        # Keep an explicitly selected offline engine even when its package was
+        # removed. Reopening a local session must never select an online engine.
+        if selected_engine in {engine for engine, _name, _kind in TRANSLATION_PROVIDER_OPTIONS}:
+            available_engines.add(selected_engine)
         try:
             if translater.argos_installed_translation_pairs_fast():
                 available_engines.add("argos")
@@ -7150,14 +7170,12 @@ class DarkThemeApp(QMainWindow):
                 # A broken config must not block startup, but it should not
                 # keep falling into the broken state either.
                 try:
-                    with open(config_path, "w", encoding="utf-8") as f:
-                        json.dump(self.config, f, ensure_ascii=False, indent=4)
+                    write_json(config_path, self.config, indent=4)
                 except OSError:
                     pass
         else:
             self.config = DEFAULT_CONFIG.copy()
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, ensure_ascii=False, indent=4)
+            write_json(config_path, self.config, indent=4)
             invalidate_config_cache()
         # Извлекаем значения с дефолтами из DEFAULT_CONFIG
         self.current_theme = self.config.get("theme", DEFAULT_CONFIG["theme"])
@@ -7297,8 +7315,7 @@ class DarkThemeApp(QMainWindow):
                                                   LANGUAGES[self.current_interface_language][0])
         self.config["start_minimized"] = getattr(self, "start_minimized", False)
         config_path = get_data_file("config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=4)
+        write_json(config_path, self.config, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
 
     def _sync_desktop_assistant(self):

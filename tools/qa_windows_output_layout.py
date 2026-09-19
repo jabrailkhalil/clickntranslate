@@ -25,7 +25,7 @@ def run():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     screen = app.primaryScreen()
     available = screen.availableGeometry()
-    folder = ROOT/'.tmp/dynamic-output-20260912/native'
+    folder = Path(os.environ.get('CNT_QA_OUTPUT', str(ROOT/'.tmp/dynamic-output-20260912/native')))
     folder.mkdir(parents=True, exist_ok=True)
     fixture = QtWidgets.QWidget(None, QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
     fixture.setGeometry(available.x()+30, available.y()+150, 650, 320)
@@ -44,7 +44,7 @@ def run():
         local = rect.translated(-screen.geometry().topLeft())
         return ocr.grab_screen_pixmap(screen, *local.getRect()).toImage()
     source_image, output_image = capture(source), capture(output)
-    config = {'theme':'Темная', 'interface_language':'ru', 'ocr_engine':'Windows', 'translator_engine':'Google',
+    config = {'theme':os.environ.get('CNT_QA_THEME', 'Темная'), 'interface_language':'ru', 'ocr_engine':'Windows', 'translator_engine':'Google',
               'history':False, 'game_pause_when_inactive':False, 'game_show_original_text':True}
     try:
         with ExitStack() as stack:

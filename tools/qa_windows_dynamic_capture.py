@@ -51,7 +51,7 @@ def run():
     config = {'theme': 'Темная', 'interface_language': 'en', 'ocr_engine': 'Windows',
               'translator_engine': 'Google', 'history': False, 'game_pause_when_inactive': False}
     report = {'density': density, 'region_frames': 0, 'fullscreen_frames': 0}
-    output = ROOT / '.tmp/windows-live-capture-qa'
+    output = Path(os.environ.get('CNT_QA_OUTPUT', str(ROOT / '.tmp/windows-live-capture-qa')))
     output.mkdir(parents=True, exist_ok=True)
     try:
         with ExitStack() as stack:
