@@ -28,6 +28,10 @@ class CaptureError(RuntimeError):
     """Raised when no capture backend can produce an image."""
 
 
+class CaptureCancelled(CaptureError):
+    """The user cancelled the portal; do not try another capture backend."""
+
+
 #: External helpers, in the order they are tried. Each entry builds the command
 #: that writes a PNG to the given path.
 HELPERS = (
@@ -81,10 +85,20 @@ def portal_available():
         interface = QtDBus.QDBusInterface(
             "org.freedesktop.portal.Desktop",
             "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.Screenshot",
+            "org.freedesktop.DBus.Properties",
             bus,
         )
-        return bool(interface.isValid())
+        # isValid() can be true when the portal exists but exposes no
+        # Screenshot interface (e.g. its required backend is missing).
+        if not interface.isValid():
+            return False
+        reply = QtDBus.QDBusReply(interface.call('Get', 'org.freedesktop.portal.Screenshot', 'version'))
+        if not reply.isValid():
+            return False
+        version = reply.value()
+        if isinstance(version, QtDBus.QDBusVariant):
+            version = version.variant()
+        return isinstance(version, int) and version >= 1
     except Exception:
         return False
 
@@ -204,7 +218,8 @@ def capture_with_portal():
     timer.timeout.connect(loop.quit)
     timer.start(_PORTAL_TIMEOUT_MS)
     try:
-        loop.exec_()
+        if result["response"] is None:
+            loop.exec_()
     finally:
         timer.stop()
         bus.disconnect(
@@ -216,7 +231,16 @@ def capture_with_portal():
         )
 
     if result["response"] is None:
+        # A timeout only ends our wait. Explicitly dismiss the outstanding
+        # request so its permission dialog cannot remain on the desktop.
+        message = QtDBus.QDBusMessage.createMethodCall(
+            "org.freedesktop.portal.Desktop", request_path,
+            "org.freedesktop.portal.Request", "Close",
+        )
+        bus.asyncCall(message)
         raise CaptureError("The desktop portal did not answer the screenshot request.")
+    if result["response"] == 1:
+        raise CaptureCancelled("The screenshot request was cancelled.")
     if result["response"] != 0:
         # 1 = cancelled by the user, 2 = ended some other way.
         raise CaptureError("The screenshot permission was declined.")
@@ -259,6 +283,7 @@ def capture_with_helper(helper=None):
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             errors.append(f"{name}: {exc}")
+            _discard(path)
             continue
         if completed.returncode == 0 and os.path.isfile(path) and os.path.getsize(path) > 0:
             return path
@@ -286,7 +311,8 @@ def crop_to_screen(pixmap, screen):
         return pixmap
     try:
         geometry = screen.geometry()
-        ratio = pixmap.width() / max(1, _desktop_width(screen))
+        desktop = _desktop_geometry(screen)
+        ratio = pixmap.width() / max(1, desktop.width())
     except Exception:
         return pixmap
     if ratio <= 0:
@@ -294,25 +320,34 @@ def crop_to_screen(pixmap, screen):
     expected_width = int(round(geometry.width() * ratio))
     expected_height = int(round(geometry.height() * ratio))
     if pixmap.width() <= expected_width and pixmap.height() <= expected_height:
+        pixmap.setDevicePixelRatio(ratio)
         return pixmap
-    return pixmap.copy(
-        int(round(geometry.x() * ratio)),
-        int(round(geometry.y() * ratio)),
+    result = pixmap.copy(
+        int(round((geometry.x() - desktop.x()) * ratio)),
+        int(round((geometry.y() - desktop.y()) * ratio)),
         expected_width,
         expected_height,
     )
+    # PNG has no Qt DPR metadata. Selection overlays use that metadata to map
+    # logical coordinates back to pixels. A compositor may capture every output
+    # at its highest scale, so screen.devicePixelRatio() is not sufficient.
+    result.setDevicePixelRatio(ratio)
+    return result
 
 
-def _desktop_width(screen):
-    """Width of the whole virtual desktop in logical pixels."""
+def _desktop_geometry(screen):
+    """Bounds of the virtual desktop, including monitors left/above primary."""
+    from PyQt5.QtCore import QRect
     try:
         from PyQt5.QtWidgets import QApplication
 
         screens = QApplication.screens() or [screen]
     except Exception:
         screens = [screen]
-    right_edges = [scr.geometry().x() + scr.geometry().width() for scr in screens]
-    return max(right_edges) if right_edges else screen.geometry().width()
+    bounds = QRect(screen.geometry())
+    for item in screens:
+        bounds = bounds.united(item.geometry())
+    return bounds
 
 
 def looks_blank(pixmap):
@@ -372,10 +407,9 @@ def grab_screen(screen):
     blank_pixmap = None
     platform_name = qt_platform_name()
     logging.info(
-        "Screen capture: qt platform=%s, session=%s, portal=%s",
+        "Screen capture: qt platform=%s, session=%s",
         platform_name or "unknown",
         platform_support.linux_session_type() or "unknown",
-        portal_available(),
     )
     if platform_name == "xcb":
         pixmap = screen.grabWindow(0)
@@ -398,6 +432,8 @@ def grab_screen(screen):
                 errors.append("portal: the returned image could not be read")
             finally:
                 _discard(path)
+        except CaptureCancelled:
+            raise
         except CaptureError as exc:
             errors.append(str(exc))
 

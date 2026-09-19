@@ -3760,7 +3760,10 @@ class ScreenCaptureOverlay(QWidget):
                     f"[OCR:{session_id}] Frozen grab attempt full screen; screen={_screen_to_text(target_screen)}, "
                     f"shot_null={shot.isNull()}, shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
                 )
-                if shot.isNull():
+                # A Wayland region grab requests the same full portal image.
+                # Retrying it would reopen a permission dialog just cancelled
+                # by the user, without changing the capture strategy.
+                if shot.isNull() and not (platform_support.IS_LINUX and platform_support.is_wayland()):
                     shot = grab_screen_pixmap(target_screen, 0, 0, screen_rect.width(), screen_rect.height())
                     logging.debug(
                         f"[OCR:{session_id}] Frozen grab retry; shot_null={shot.isNull()}, "

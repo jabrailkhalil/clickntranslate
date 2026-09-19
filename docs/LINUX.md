@@ -1,5 +1,10 @@
 # Click'n'Translate on Linux
 
+Latest source audit: [19 September 2026](QA_LINUX_2026_09_19.md) (Russian).
+It covers real X11 and two-output Wayland capture, mixed scaling, desktop
+launchers, autostart, clipboard, OCR and Argos package lifecycle. It also records
+the current Lingva service failure and the remaining desktop/build limitations.
+
 The Linux build shares all application code with the Windows build. Everything
 that differs is isolated in four modules:
 
@@ -17,10 +22,9 @@ the same code as before.
 
 ### Shortcuts are bound in your desktop, not in the app
 
-Linux has no reliable way for an application to grab a global hotkey: X11 grabs
-collide with the desktop's own bindings and Wayland forbids them outright. The
-same problem is why NormCap documents shortcut setup as an OS task and why
-Flameshot asks you to bind `flameshot gui` yourself.
+This build delegates shortcut registration to the desktop's keyboard settings.
+It does not register X11 keyboard grabs or use the Wayland GlobalShortcuts
+portal. A command starts the app or forwards the action to its running instance.
 
 So the app exposes commands instead:
 
@@ -194,7 +198,10 @@ Three fixes came out of porting and apply to both systems:
   It now also scans the standard system locations and, failing that, trusts a
   binary that reports the language itself.
 
-## Verification matrix
+## Earlier packaged verification
+
+The following results describe earlier packaged builds. For the current source
+and the exact scope checked on 19 September, use the audit linked above.
 
 The port is checked in separate layers so a WSL-only success is not mistaken
 for a working Linux desktop build.

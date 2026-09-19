@@ -113,7 +113,12 @@ def run():
                 controls.opacity.setValue(65)
                 controls.locked.setChecked(False)
                 QTest.qWait(100)
-                controls.grab().save(str(folder/'settings.png'))
+                controls_image = controls.grab().toImage()
+                controls_image.save(str(folder/'settings.png'))
+                density = controls_image.devicePixelRatio()
+                color = controls_image.pixelColor(round(controls.width() * .5 * density), round(10 * density))
+                background = '#f5f1f8' if config['theme'] == 'Светлая' else '#211d29'
+                check('controls_background', color.alpha() == 255 and color.name() == background)
                 before = QtCore.QRect(overlay.output_rect)
                 for button, delta in ((controls.move_button, QtCore.QPoint(10, 5)),
                                       (controls.resize_button, QtCore.QPoint(20, 10))):

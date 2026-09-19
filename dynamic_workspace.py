@@ -539,6 +539,15 @@ class OutputControls(QtWidgets.QFrame):
         self.show()
         self._capture_excluded = game_mode._exclude_from_windows_capture(self)
 
+    def paintEvent(self, event):
+        # Translucent Linux/macOS surfaces suppress the automatic background.
+        # Paint the panel explicitly so labels retain their themed backing.
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(QtGui.QColor('#746087'), 1))
+        painter.setBrush(QtGui.QColor('#f5f1f8' if self.overlay.config.get('theme') == 'Светлая' else '#211d29'))
+        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 6, 6)
+
     def _toggle_panel(self):
         self.panel.setVisible(self.panel.isHidden())
         self._resize_panel()

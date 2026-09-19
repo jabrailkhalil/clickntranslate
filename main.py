@@ -7950,11 +7950,10 @@ class DarkThemeApp(QMainWindow):
             import linux_desktop
 
             enabled = linux_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                # The entry points at a path that moved (a new AppImage, say);
-                # rewrite it for the current executable.
-                enabled = linux_desktop.set_autostart(
-                    True, portable_paths.public_executable_path()
+            if repair_stale:
+                enabled = linux_desktop.repair_autostart(
+                    portable_paths.public_executable_path(),
+                    restore_missing=bool(self.config.get("autostart")),
                 )
             self.autostart = enabled
             self.config["autostart"] = enabled

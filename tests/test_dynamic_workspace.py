@@ -44,6 +44,27 @@ def select(selector, rect):
     QTest.mouseRelease(selector, QtCore.Qt.LeftButton, pos=rect.bottomRight())
 
 
+@pytest.mark.parametrize('theme,background', [('Темная', '#211d29'), ('Светлая', '#f5f1f8')])
+@pytest.mark.parametrize('windows', [False, True])
+def test_output_controls_paint_themed_background_on_translucent_surfaces(isolated, monkeypatch, theme, background, windows):
+    config, _ = isolated
+    config['theme'] = theme
+    monkeypatch.setattr(workspace.platform_support, 'IS_WINDOWS', windows)
+    overlay = workspace.PairedTranslationOverlay(QtCore.QRect(50, 50, 150, 80), 'en', 'ru',
+                                                output_region=QtCore.QRect(300, 300, 200, 100))
+    try:
+        controls = overlay.controls
+        controls.gear.click()
+        QTest.qWait(10)
+        image = controls.grab().toImage()
+        ratio = image.devicePixelRatio()
+        color = image.pixelColor(round(controls.width() * .5 * ratio), round(10 * ratio))
+        assert color.alpha() == 255
+        assert color.name() == background
+    finally:
+        overlay.close()
+
+
 def test_source_requires_a_separate_output_and_enter_routes_both_bounds(isolated):
     selector = workspace.PairedRegionSelector()
     try:
