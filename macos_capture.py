@@ -16,6 +16,8 @@ class CaptureCancelled(Exception):
 
 
 def _await_completion(start, cancelled, timeout=8):
+    if cancelled():
+        raise CaptureCancelled()
     completed = threading.Event()
     result = []
 

@@ -7941,8 +7941,8 @@ class DarkThemeApp(QMainWindow):
         if platform_support.IS_MAC:
             import macos_desktop
             enabled = macos_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                enabled = macos_desktop.set_autostart(True)
+            if repair_stale:
+                enabled = macos_desktop.repair_autostart(restore_missing=bool(self.config.get("autostart")))
             self.autostart = self.config["autostart"] = enabled
             self.config["autostart_backend"] = "macos_launchagent"
             return enabled
