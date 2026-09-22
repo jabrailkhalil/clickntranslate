@@ -8,11 +8,13 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
 import argparse
+import faulthandler
 import json
 import os
 import sys
 import tempfile
 import time
+import traceback
 
 
 def run():
@@ -26,16 +28,33 @@ def run():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     sys.path[:0] = [str(root), str(root / 'tests')]
+    os.chdir(root)  # Application resource paths are relative to the source root.
     os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-    from PyQt5 import QtCore, QtWidgets
-    from PyQt5.QtTest import QTest
-    from qt_layout_test_support import ensure_layout_fonts
-    from ui_scaling import MainWindowScaleController
     import portable_paths
 
     with tempfile.TemporaryDirectory(prefix='cnt-ui-qa-') as sandbox, ExitStack() as stack:
         stack.enter_context(mock.patch.object(portable_paths, 'portable_base_dir', return_value=sandbox))
+        stack.enter_context(mock.patch.dict(os.environ, {
+            key: str(Path(sandbox) / key.lower())
+            for key in ('XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_CONFIG_HOME')
+        }))
+        stack.enter_context(mock.patch.object(sys, 'argv', [str(Path(sandbox) / 'main.py')]))
+        # Match real startup: CTranslate2 must load before any Qt module on
+        # Windows. Loading Qt first can terminate the native runtime without
+        # a Python traceback, even before constructing QApplication.
+        print('UI QA: importing application before Qt', flush=True)
         import main
+        from PyQt5 import QtCore, QtWidgets
+        from PyQt5.QtTest import QTest
+        from qt_layout_test_support import ensure_layout_fonts
+        from ui_scaling import MainWindowScaleController
+        print('UI QA: application imported; preparing disposable windows', flush=True)
+
+        def save_capture(widget, name):
+            path = output / name
+            if not widget.grab().save(str(path), 'PNG'):
+                raise RuntimeError('Could not save UI capture: ' + str(path))
+
         config = dict(main.DEFAULT_CONFIG, interface_language='ru', show_update_info=False,
                       desktop_assistant_enabled=False, translator_engine='Google')
         data = Path(sandbox) / 'data'
@@ -63,23 +82,23 @@ def run():
             window.config['theme'] = theme
             window.apply_theme()
             QTest.qWait(50)
-            window.grab().save(str(output / ('main-' + suffix + '.png')))
+            save_capture(window, 'main-' + suffix + '.png')
             dialog = main.TranslationResultDialog(window, 'Здесь появится перевод', auto_copy=False,
                 lang='ru', theme=theme, source_text='Choose a provider for this window.', source_lang='en', target_lang='ru')
             dialog.show()
             for width, name in ((760, 'wide'), (420, 'compact')):
                 dialog.resize(width, 620 if width < 600 else 470)
                 QTest.qWait(30)
-                dialog.grab().save(str(output / ('workspace-' + suffix + '-' + name + '.png')))
+                save_capture(dialog, 'workspace-' + suffix + '-' + name + '.png')
             dialog.close()
             dialog.deleteLater()
         welcome = main.WelcomeDialog(window)
         welcome.show()
         QTest.qWait(40)
-        welcome.grab().save(str(output / 'welcome-unchecked.png'))
+        save_capture(welcome, 'welcome-unchecked.png')
         welcome.checkbox.click()
         app.processEvents()
-        welcome.grab().save(str(output / 'welcome-checked.png'))
+        save_capture(welcome, 'welcome-checked.png')
         welcome.close()
         welcome.deleteLater()
         app.processEvents()
@@ -142,4 +161,10 @@ def run():
 
 
 if __name__ == '__main__':
-    raise SystemExit(run())
+    faulthandler.enable()
+    try:
+        code = run()
+    except Exception:
+        traceback.print_exc(file=sys.__stderr__)
+        code = 1
+    raise SystemExit(code)
