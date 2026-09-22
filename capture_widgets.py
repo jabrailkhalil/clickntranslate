@@ -2,7 +2,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from languages import language_display_name
+from languages import language_display_name, language_short_label
 from settings_window import DropDownCombo
 from styled_dialogs import install_tooltip_style, set_widget_stylesheet
 
@@ -70,6 +70,27 @@ class CaptureLanguageCombo(DropDownCombo):
         install_tooltip_style()
         self.set_capture_theme(True)
 
+    def initStyleOption(self, option):
+        super().initStyleOption(option)
+        # The collapsed field always paints the compact code, independently of
+        # the full-name popup delegate, even during selection/close events.
+        code = self.currentData()
+        if code:
+            option.currentText = language_short_label(code)
+
+    def showPopup(self):
+        # Native Qt combo animation first snapshots a list aligned over the
+        # selected field. Our full-name delegate then appears over "RU" before
+        # the popup is moved below it. Disable that snapshot only for this
+        # synchronous opening and restore the application's setting afterwards.
+        effect = QtCore.Qt.UI_AnimateCombo
+        animated = QtWidgets.QApplication.isEffectEnabled(effect)
+        try:
+            QtWidgets.QApplication.setEffectEnabled(effect, False)
+            super().showPopup()
+        finally:
+            QtWidgets.QApplication.setEffectEnabled(effect, animated)
+
     def set_capture_theme(self, dark, language='en'):
         self.interface_language = language
         self.colors = (dict(surface='#211d29', text='#f5f0fc', muted='#a49bad', border='#544760',
@@ -115,7 +136,7 @@ class CaptureLanguageCombo(DropDownCombo):
             QAbstractItemView {{ background:transparent; color:{c['text']}; border:0; outline:none; }}
             QScrollBar:vertical {{ background:transparent; width:6px; margin:7px 0; border:0; }}
             QScrollBar::handle:vertical {{ background:{c['border']}; border-radius:3px; min-height:28px; }}
-            QScrollBar::handle:vertical:hover {{ background:{c['accent']}; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{c['accent']}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; border:0; }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
         """)

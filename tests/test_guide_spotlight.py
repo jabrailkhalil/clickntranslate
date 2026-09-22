@@ -165,16 +165,12 @@ class IdleCostTest(unittest.TestCase):
         # The spotlight ring replaced it: a stroked rectangle, not a blur.
         self.assertIn("_spotlight_guide_target", source)
 
-    def test_the_welcome_pulse_is_bounded(self):
+    def test_the_welcome_has_no_software_blur_animation(self):
         import inspect
-
-        source = inspect.getsource(main.WelcomeDialog._pulse_flag_button)
-
-        self.assertIn("QGraphicsDropShadowEffect", source, "the pulse itself is fine")
-        self.assertNotIn("setLoopCount(-1)", source)
-        self.assertIn("setLoopCount(8)", source)
-        # And the effect comes off the button when it is done.
-        self.assertIn("setGraphicsEffect(None)", source)
+        source = inspect.getsource(main.WelcomeDialog)
+        self.assertNotIn('QGraphicsDropShadowEffect', source)
+        self.assertNotIn('QPropertyAnimation', source)
+        self.assertNotIn('singleShot(120', source)
 
     def test_the_spotlight_pulse_is_cheap(self):
         """The one animation left running is a pen stroke, no blur behind it."""

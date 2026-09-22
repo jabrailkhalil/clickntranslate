@@ -517,7 +517,7 @@ class DropDownCombo(QComboBox):
                 border: none;
                 border-radius: 4px;
             }}
-            QScrollBar::handle:vertical:hover {{ background: {handle_hover}; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background: {handle_hover}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0;
                 border: none;

@@ -271,9 +271,10 @@ class MainWindowScaleController(QObject):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
-        # A single compact canvas needs one complete frame when its theme or
-        # scale changes. Partial proxy updates can retain strips of the old theme.
-        self.view.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # Ordinary child changes (including the 16px companion) must not
+        # repaint the entire scaled window. Theme/scale transitions explicitly
+        # invalidate the whole viewport below, avoiding old-theme edge strips.
+        self.view.setViewportUpdateMode(QGraphicsView.BoundingRectViewportUpdate)
         self.view.setFocusPolicy(Qt.StrongFocus)
         self.scene = QGraphicsScene(self.view)
         self.view.setScene(self.scene)
@@ -353,6 +354,7 @@ class MainWindowScaleController(QObject):
                 self._initial_position = QPoint(position)
         finally:
             self.owner.setUpdatesEnabled(updates_enabled)
+        self.view.viewport().update()
         self.changed.emit(actual, self.maximum_percent)
         return actual
 
@@ -377,6 +379,7 @@ class MainWindowScaleController(QObject):
         self.view.viewport().setAutoFillBackground(True)
         self.view.setBackgroundBrush(color)
         self.scene.setBackgroundBrush(color)
+        self.view.viewport().update()
 
     def map_widget_to_view(self, widget, point=None):
         point = point if point is not None else widget.rect().center()

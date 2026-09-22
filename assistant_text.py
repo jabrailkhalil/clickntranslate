@@ -2,6 +2,7 @@
 
 ASSISTANT_TEXT = {
     'en': {
+        'tray': 'Desktop assistant', 'preview_hint': 'Configure the desktop assistant',
         'setting': 'Assistant:', 'enabled': 'On desktop', 'title': 'How can I help?',
         'hint': 'Click for translation actions. Drag to move the assistant.',
         'screen': ('Translate entire screen', 'Replace visible text with its translation.'),
@@ -14,6 +15,7 @@ ASSISTANT_TEXT = {
         'hide_hint': 'Enable it again in General settings.',
     },
     'ru': {
+        'tray': 'Помощник на рабочем столе', 'preview_hint': 'Настроить помощника на рабочем столе',
         'setting': 'Помощник:', 'enabled': 'На рабочем столе', 'title': 'Чем помочь?',
         'hint': 'Нажмите для выбора перевода. Перетащите помощника в удобное место.',
         'screen': ('Перевести весь экран', 'Заменить видимый текст его переводом.'),
@@ -26,6 +28,7 @@ ASSISTANT_TEXT = {
         'hide_hint': 'Включить снова можно в основных настройках.',
     },
     'de': {
+        'tray': 'Desktop-Assistent', 'preview_hint': 'Desktop-Assistenten konfigurieren',
         'setting': 'Assistent:', 'enabled': 'Auf dem Desktop', 'title': 'Wie kann ich helfen?',
         'hint': 'Für Übersetzungsaktionen klicken. Zum Verschieben ziehen.',
         'screen': ('Gesamten Bildschirm übersetzen', 'Sichtbaren Text durch die Übersetzung ersetzen.'),
@@ -38,6 +41,7 @@ ASSISTANT_TEXT = {
         'hide_hint': 'In den allgemeinen Einstellungen wieder aktivieren.',
     },
     'es': {
+        'tray': 'Asistente de escritorio', 'preview_hint': 'Configurar el asistente de escritorio',
         'setting': 'Asistente:', 'enabled': 'En el escritorio', 'title': '¿Cómo puedo ayudar?',
         'hint': 'Haz clic para traducir. Arrastra el asistente para moverlo.',
         'screen': ('Traducir toda la pantalla', 'Sustituye el texto visible por su traducción.'),
@@ -50,6 +54,7 @@ ASSISTANT_TEXT = {
         'hide_hint': 'Puedes activarlo de nuevo en los ajustes generales.',
     },
     'fr': {
+        'tray': 'Assistant de bureau', 'preview_hint': 'Configurer l’assistant de bureau',
         'setting': 'Assistant :', 'enabled': 'Sur le bureau', 'title': 'Comment vous aider ?',
         'hint': 'Cliquez pour traduire. Faites glisser l’assistant pour le déplacer.',
         'screen': ('Traduire tout l’écran', 'Remplacer le texte visible par sa traduction.'),
@@ -62,6 +67,7 @@ ASSISTANT_TEXT = {
         'hide_hint': 'Réactivez-le dans les réglages généraux.',
     },
     'zh': {
+        'tray': '桌面助手', 'preview_hint': '设置桌面助手',
         'setting': '助手：', 'enabled': '在桌面显示', 'title': '需要什么帮助？',
         'hint': '点击选择翻译功能。拖动助手可调整位置。',
         'screen': ('翻译整个屏幕', '将可见文字替换为译文。'),

@@ -294,8 +294,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 detached_keys = {
                     info["key"] for info in panel.overlay._detached_buttons.values()
                 }
-                self.assertIn("main_input_caption", detached_keys)
-                self.assertIn("main_result_caption", detached_keys)
+                self.assertNotIn("main_input_caption", detached_keys)
+                self.assertNotIn("main_result_caption", detached_keys)
                 self.assertIn("mainShortcutSectionTitle", detached_keys)
                 self.assertIn("mainOcrSummary", detached_keys)
                 source_info = panel.overlay._detached_buttons[self.window.source_lang]

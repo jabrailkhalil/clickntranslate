@@ -4281,14 +4281,22 @@ class TranslationResultDialog(QDialog):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
 
-        header = QHBoxLayout()
+        header = QGridLayout()
         header.setSpacing(12)
+        self.engine_header = header
+        self._header_compact = None
+        header.setColumnStretch(0, 1)
+        header.setColumnStretch(1, 1)
         self.title_label = QLabel(self.text["workspace_title"])
         self.title_label.setObjectName("translationResultTitle")
-        header.addWidget(self.title_label)
-        self.engine_label = QLabel(str(config.get("translator_engine", "Google")))
-        self.engine_label.setObjectName("translationResultEngine")
-        header.addWidget(self.engine_label, 1)
+        self.title_label.setMinimumWidth(0)
+        header.addWidget(self.title_label, 0, 0)
+        self.engine_combo = self._language_combo()
+        self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
+        from settings_window import _populate_grouped_translator_combo
+        _populate_grouped_translator_combo(self.engine_combo, self.lang)
+        self.set_window_engine(str(config.get('translator_engine', 'Google')))
+        header.addWidget(self.engine_combo, 0, 1)
         from ui_scaling import ScalePercentEdit
         self.scale_decrease = QToolButton(self)
         self.scale_decrease.setText("‹")
@@ -4310,7 +4318,7 @@ class TranslationResultDialog(QDialog):
         scale_layout.setSpacing(0)
         for control in (self.scale_decrease, self.scale_value, self.scale_increase):
             scale_layout.addWidget(control)
-        header.addWidget(self.scale_control)
+        header.addWidget(self.scale_control, 0, 2)
         self.scale_decrease.clicked.connect(lambda: self._step_scale(-1, self.scale_decrease))
         self.scale_increase.clicked.connect(lambda: self._step_scale(1, self.scale_increase))
         self._scale_commit_timer = QTimer(self)
@@ -4325,7 +4333,7 @@ class TranslationResultDialog(QDialog):
         self.title_close_button.setFixedSize(32, 32)
         self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.title_close_button.clicked.connect(self.accept)
-        header.addWidget(self.title_close_button)
+        header.addWidget(self.title_close_button, 0, 3)
         layout.addLayout(header)
 
         self.source_combo = self._language_combo()
@@ -4400,6 +4408,7 @@ class TranslationResultDialog(QDialog):
 
         self.source_edit.textChanged.connect(self._edited_source)
         self.text_edit.textChanged.connect(self._edited_result)
+        self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
         self.target_combo.currentIndexChanged.connect(self._on_target_changed)
         self._retranslated_signal.connect(self._on_retranslated)
@@ -4410,6 +4419,47 @@ class TranslationResultDialog(QDialog):
         self._update_actions()
         self._set_status(self.text["auto_copied"] if auto_copy else self.text["ready"])
         self.source_edit.setFocus(Qt.OtherFocusReason)
+
+    def set_window_engine(self, engine):
+        """Set an initial/followed provider without changing the app or sending text."""
+        self.window_engine = str(engine)
+        key = self.window_engine.lower().replace('hy-mt', 'hymt')
+        with QtCore.QSignalBlocker(self.engine_combo):
+            index = self.engine_combo.findData(key)
+            if index < 0:
+                # Never silently fall back from an unknown/offline provider
+                # to an online one; preserve the explicitly configured value.
+                self.engine_combo.addItem(self.window_engine, key)
+                index = self.engine_combo.count() - 1
+            self.engine_combo.setCurrentIndex(index)
+        hints = {
+            'ru': 'Движок только для этого окна. Общие настройки не меняются.',
+            'en': 'Provider for this window only. Global settings stay unchanged.',
+            'de': 'Anbieter nur für dieses Fenster. Globale Einstellungen bleiben unverändert.',
+            'es': 'Proveedor solo para esta ventana. Los ajustes globales no cambian.',
+            'fr': 'Fournisseur pour cette fenêtre uniquement. Les réglages globaux restent inchangés.',
+            'zh': '仅更改此窗口的翻译引擎，不影响全局设置。',
+        }
+        self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
+
+    def _on_engine_changed(self, *_args):
+        key = self.engine_combo.currentData()
+        if not key or key == self.window_engine.lower().replace('hy-mt', 'hymt'):
+            return
+        self._invalidate_request()
+        self.set_window_engine(self.engine_combo.currentText())
+        self._start_retranslate()
+
+    def _reflow_engine_header(self):
+        factor = float(self.property('ui_effective_scale') or 1)
+        compact = self.frame.width() < round(570 * factor)
+        if compact == self._header_compact:
+            return
+        self._header_compact = compact
+        self.engine_header.removeWidget(self.engine_combo)
+        self.engine_header.addWidget(self.engine_combo, 1 if compact else 0,
+                                     0 if compact else 1, 1, 4 if compact else 1)
+        self.engine_header.setColumnStretch(1, 0 if compact else 1)
 
     def _current_config(self):
         config = getattr(self.parentWidget(), "config", None)
@@ -4468,6 +4518,7 @@ class TranslationResultDialog(QDialog):
     def _reflow_editors(self):
         if not hasattr(self, "body_grid"):
             return
+        self._reflow_engine_header()
         factor = float(self.property("ui_effective_scale") or 1)
         horizontal = self.editors.width() >= round(620 * factor)
         orientation = "collapsed" if self._source_collapsed else horizontal
@@ -4618,9 +4669,7 @@ class TranslationResultDialog(QDialog):
         request_id = self._request_id
         cancelled = threading.Event()
         self._cancel_event = cancelled
-        config = self._current_config()
-        engine = str(config.get("translator_engine", "Google"))
-        self.engine_label.setText(engine)
+        engine = self.window_engine
         source_text, source_code, target_code = self.source_text, self.source_code, self.target_code
         self._pending_request = (source_text, source_code, target_code)
         self._received_partial = False
@@ -4762,7 +4811,7 @@ class TranslationResultDialog(QDialog):
         self.source_toggle.setStyleSheet(
             button_qss(dark, "quiet", selector="QToolButton", compact=True, radius=4)
             + "QToolButton { font-size:12px; padding:0 5px; }")
-        for combo in (self.source_combo, self.target_combo):
+        for combo in (self.source_combo, self.target_combo, self.engine_combo):
             combo.set_popup_background(surface)
 
     def _appearance_manager(self):
@@ -5016,16 +5065,32 @@ class WelcomeDialog(QDialog):
         card_layout.addLayout(chips)
         card_layout.addStretch()
 
-        self.checkbox = QCheckBox(text["checkbox"])
+        from ui_details import WelcomeCheckBox, social_icon
+        self.checkbox = WelcomeCheckBox(text["checkbox"])
+        self.checkbox.setMinimumHeight(24)
+        self.checkbox.setCursor(Qt.PointingHandCursor)
         self.checkbox.setChecked(previous_checked)
         card_layout.addWidget(self.checkbox)
 
         actions = QHBoxLayout()
         actions.setSpacing(10)
-        self.telegram_btn = QPushButton(text["telegram"])
+        self.telegram_btn = QPushButton()
         self.telegram_btn.setObjectName("welcomeTelegram")
         self.telegram_btn.clicked.connect(self.open_telegram)
-        actions.addWidget(self.telegram_btn)
+        self.github_btn = QPushButton()
+        self.github_btn.setObjectName("welcomeGitHub")
+        self.github_btn.clicked.connect(lambda: webbrowser.open("https://github.com/jabrailkhalil"))
+        for button, kind, label in ((self.telegram_btn, 'telegram', text['telegram']),
+                                    (self.github_btn, 'github', 'GitHub · jabrailkhalil')):
+            button.setIcon(social_icon(kind))
+            button.setIconSize(QSize(20, 20))
+            button.setFixedSize(36, 36)
+            button.setAccessibleName(label)
+            button.setToolTip(tooltip_text(label))
+            button.setCursor(Qt.PointingHandCursor)
+            button.setAutoDefault(False)
+            button.setStyleSheet(button_qss(True, 'quiet', icon=True))
+            actions.addWidget(button)
         actions.addStretch()
 
         self.skip_btn = QPushButton(text["skip"])
@@ -5039,30 +5104,13 @@ class WelcomeDialog(QDialog):
         actions.addWidget(self.guide_btn)
         card_layout.addLayout(actions)
 
-        QTimer.singleShot(120, self._pulse_flag_button)
+        # The language control has a static accent, not a repeatedly rasterized
+        # drop shadow. This welcome page has no animation timer.
 
     def _pulse_flag_button(self):
-        if not getattr(self, "flag_button", None):
-            return
-        glow = QGraphicsDropShadowEffect(self.flag_button)
-        glow.setOffset(0, 0)
-        glow.setColor(QColor(197, 179, 233, 210))
-        glow.setBlurRadius(16)
-        self.flag_button.setGraphicsEffect(glow)
-
-        animation = QtCore.QPropertyAnimation(glow, b"blurRadius", self)
-        animation.setStartValue(10)
-        animation.setEndValue(30)
-        animation.setDuration(1050)
-        animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
-        # Bounded, not endless. A blurred drop shadow is re-rendered in software
-        # on every frame of the animation: measured at 10% of a core for as long
-        # as this dialog stayed open on Linux, where it is the only thing on
-        # screen. Eight cycles is long enough to catch the eye and then stop.
-        animation.setLoopCount(8)
-        animation.finished.connect(lambda: self.flag_button.setGraphicsEffect(None))
-        animation.start()
-        self._animations.append(animation)
+        # Kept as a compatibility hook for older callers; deliberately static.
+        if getattr(self, 'flag_button', None) is not None:
+            self.flag_button.setGraphicsEffect(None)
 
     def _stop_animations(self):
         for animation in getattr(self, "_animations", []):
@@ -5160,9 +5208,22 @@ class WelcomeDialog(QDialog):
                 self.parent.save_config()
         self.init_ui()
 
-    def accept(self):
+    def done(self, result):
         self._stop_animations()
-        super().accept()
+        # Persist the preference on Accept, Escape and window-manager Close.
+        # Previously only the startup caller's Accepted branch saved it.
+        config = getattr(self.parent, 'config', None)
+        if isinstance(config, dict):
+            show_again = not self.checkbox.isChecked()
+            if config.get('show_update_info', True) != show_again:
+                previous = config.get('show_update_info', True)
+                config['show_update_info'] = show_again
+                try:
+                    self.parent.save_config()
+                except Exception:
+                    config['show_update_info'] = previous
+                    logging.exception('Could not save the welcome preference')
+        super().done(result)
 
     def closeEvent(self, event):
         self._stop_animations()
@@ -7319,6 +7380,10 @@ class DarkThemeApp(QMainWindow):
         invalidate_config_cache()  # Сбрасываем кэш после записи
 
     def _sync_desktop_assistant(self):
+        action = getattr(self, '_tray_assistant_action', None)
+        if action is not None:
+            with QtCore.QSignalBlocker(action):
+                action.setChecked(self.config.get('desktop_assistant_enabled') is True)
         assistant = getattr(self, '_desktop_assistant', None)
         if self.config.get('desktop_assistant_enabled') is True:
             if assistant is None:
@@ -8133,6 +8198,12 @@ class DarkThemeApp(QMainWindow):
         fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
         game_action = tray_menu.addAction(ui_text(lang, "tray_game_translate"))
         game_action.triggered.connect(self.launch_game_translate)
+        tray_menu.addSeparator()
+        from assistant_text import assistant_text
+        self._tray_assistant_action = tray_menu.addAction(assistant_text(lang, 'tray'))
+        self._tray_assistant_action.setCheckable(True)
+        self._tray_assistant_action.setChecked(self.config.get('desktop_assistant_enabled') is True)
+        self._tray_assistant_action.toggled.connect(self.set_desktop_assistant_enabled)
         tray_menu.addSeparator()
         exit_action = tray_menu.addAction(ui_text(lang, "tray_exit"))
         exit_action.triggered.connect(self.exit_app)
@@ -9819,7 +9890,7 @@ class DarkThemeApp(QMainWindow):
                     min-height: 30px;
                     border-radius: 5px;
                 }
-                QScrollBar::handle:vertical:hover {
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
                     background: #c5b3e9;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -9863,7 +9934,7 @@ class DarkThemeApp(QMainWindow):
                     min-height: 30px;
                     border-radius: 5px;
                 }
-                QScrollBar::handle:vertical:hover {
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
                     background: #7a5fa1;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -10321,21 +10392,13 @@ class DarkThemeApp(QMainWindow):
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
         )
         result_labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
-        composer_headings = QWidget()
-        composer_headings.setFixedHeight(18)
-        headings_layout = QHBoxLayout(composer_headings)
-        headings_layout.setContentsMargins(0, 0, 0, 0)
-        headings_layout.setSpacing(6)
-        self.main_input_caption = QLabel(result_labels['input_tab'])
-        self.main_result_caption = QLabel(result_labels['result_tab'])
-        for caption in (self.main_input_caption, self.main_result_caption):
-            caption.setMinimumWidth(0)
-            caption.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-            caption.setAlignment(Qt.AlignCenter)
-        headings_layout.addWidget(self.main_input_caption, 1)
-        headings_layout.addSpacing(30)
-        headings_layout.addWidget(self.main_result_caption, 1)
-        text_section_layout.addWidget(composer_headings)
+        # No redundant heading row above the language fields. Keep the small
+        # metadata labels off-layout for stale-result state/page restoration;
+        # the visible editors expose the same text to accessibility and tips.
+        self.main_input_caption = QLabel(result_labels['input_tab'], self.main_text_section)
+        self.main_result_caption = QLabel(result_labels['result_tab'], self.main_text_section)
+        self.main_input_caption.hide()
+        self.main_result_caption.hide()
         for combo in (self.source_lang, self.target_lang):
             combo.setFixedHeight(30)
             combo.setMinimumWidth(0)
@@ -10393,6 +10456,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input = TranslateOnEnterTextEdit()
         self.text_input.setPlainText(getattr(self, '_main_input_draft', ''))
         self.text_input.setObjectName("mainComposerInput")
+        self.text_input.setAccessibleName(result_labels['input_tab'])
         self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
         self.text_input.setToolTip(tooltip_text(
             doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
@@ -10496,6 +10560,10 @@ class DarkThemeApp(QMainWindow):
                 )
             )
         text_section_layout.addWidget(self.main_composer, 1)
+        from assistant_preview import AssistantPreview
+        self.assistant_preview = AssistantPreview(self, self.current_interface_language, self.main_text_section)
+        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
+        text_section_layout.addWidget(self.assistant_preview)
         self.main_layout.addWidget(self.main_text_section, 1)
 
         self._refresh_direction_summary()
@@ -10740,6 +10808,18 @@ class DarkThemeApp(QMainWindow):
         except RuntimeError:
             pass
 
+    def show_desktop_assistant_settings(self):
+        self.show_settings()
+        checkbox = self.settings_window.desktop_assistant_checkbox
+        checkbox.setFocus(Qt.OtherFocusReason)
+        # Focus the actual setting; do not enable an overlay just by visiting.
+        page = checkbox.parentWidget()
+        while page is not None:
+            if isinstance(page, QtWidgets.QScrollArea):
+                page.ensureWidgetVisible(checkbox)
+                break
+            page = page.parentWidget()
+
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)
         self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
@@ -10876,6 +10956,10 @@ class DarkThemeApp(QMainWindow):
                 detail += '\n' + error
             caption.setText(title)
             caption.setToolTip(tooltip_text(detail))
+            result_view = getattr(self, 'main_result_view', None)
+            if isinstance(result_view, QTextEdit):
+                result_view.setAccessibleName(title)
+                result_view.setToolTip(tooltip_text(detail))
         except RuntimeError:
             pass  # A language change may arrive as the old page is disposed.
 
@@ -10923,7 +11007,7 @@ class DarkThemeApp(QMainWindow):
                                          theme=self.current_theme, result_mode='main', **snapshot)
         dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
         if self._main_translation_running:
-            dialog.engine_label.setText(self._main_active_engine)
+            dialog.set_window_engine(self._main_active_engine)
             dialog._follow_main_translation(self._main_active_request, self._main_result_progress)
             self._main_preview_dialogs.append(dialog)
         return dialog

@@ -103,10 +103,13 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         self.assertLessEqual(label.sizeHint().height(), label.height(), label.text())
                     for caption in (self.window.main_input_caption, self.window.main_result_caption):
-                        self.assertLessEqual(caption.sizeHint().width(), caption.width(), caption.text())
-                        self.assertLessEqual(caption.sizeHint().height(), caption.height(), caption.text())
-                        self.assertTrue(self.window.main_text_section.rect().contains(
-                            self.rect_in(self.window.main_text_section, caption)))
+                        self.assertTrue(caption.isHidden(), 'Redundant headings stay off-layout')
+                    rail = self.window.assistant_preview
+                    self.assertTrue(rail.isVisible())
+                    self.assertTrue(self.window.main_text_section.rect().contains(
+                        self.rect_in(self.window.main_text_section, rail)))
+                    self.assertTrue(self.window.text_input.accessibleName())
+                    self.assertTrue(self.window.main_result_view.accessibleName())
                     for panel, name in ((self.window.main_shortcut_section, "mainShortcutSectionTitle"),):
                         label = panel.findChild(QLabel, name)
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
