@@ -4905,7 +4905,10 @@ class WelcomeDialog(QDialog):
         )
         self.setWindowTitle(welcome_text(self.lang)["window"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self.setFixedSize(560, 390)
+        # Keep the compact width, but let wrapped copy use its real font height.
+        self.setFixedWidth(560)
+        self.setMinimumHeight(390)
+        self.resize(560, 390)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.init_ui()
@@ -5107,6 +5110,16 @@ class WelcomeDialog(QDialog):
 
         # The language control has a static accent, not a repeatedly rasterized
         # drop shadow. This welcome page has no animation timer.
+
+        # Windows and Linux fonts have different line heights. Measure after
+        # stylesheet polishing; a fixed-height card clipped Russian/German copy.
+        # Repeat only when rebuilding the dialog (including language changes).
+        card.ensurePolished()
+        card.show()  # Rebuilt children must participate in height-for-width now.
+        self.main_layout.invalidate()
+        self.main_layout.activate()
+        self.resize(self.width(), max(self.minimumHeight(),
+                    self.main_layout.totalHeightForWidth(self.width())))
 
     def _pulse_flag_button(self):
         # Kept as a compatibility hook for older callers; deliberately static.
