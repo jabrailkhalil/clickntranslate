@@ -127,14 +127,14 @@ def test_workspace_engine_is_local_and_survives_global_changes(owner, workspaces
     translate = mock.Mock(return_value='Локальный перевод')
     monkeypatch.setattr(translater, 'translate_text', translate)
     jobs.pop()()
-    assert translate.call_args.kwargs['engine'] == 'Google'
+    assert translate.call_args.kwargs['engine'] == 'google'
     second.translate_button.click()
     jobs.pop()()
-    assert translate.call_args.kwargs['engine'] == 'Lingva'
+    assert translate.call_args.kwargs['engine'] == 'lingva'
     assert owner.config['translator_engine'] == 'MyMemory'
     first.translate_button.click()
     jobs.pop()()
-    assert translate.call_args.kwargs['engine'] == 'Google'
+    assert translate.call_args.kwargs['engine'] == 'google'
 
 
 def test_switch_engine_cancels_old_reply_and_main_stream(workspaces, monkeypatch):
@@ -151,7 +151,7 @@ def test_switch_engine_cancels_old_reply_and_main_stream(workspaces, monkeypatch
     monkeypatch.setattr(translater, 'translate_text', mock.Mock(return_value='Current provider'))
     jobs[-1]()
     assert dialog.text_edit.toPlainText() == 'Current provider'
-    assert translater.translate_text.call_args.kwargs['engine'] == 'MyMemory'
+    assert translater.translate_text.call_args.kwargs['engine'] == 'mymemory'
 
 
 @pytest.mark.parametrize('theme', ['Светлая', 'Темная'])

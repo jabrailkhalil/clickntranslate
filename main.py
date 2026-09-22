@@ -4669,7 +4669,8 @@ class TranslationResultDialog(QDialog):
         request_id = self._request_id
         cancelled = threading.Event()
         self._cancel_event = cancelled
-        engine = self.window_engine
+        # Dispatch the stable provider ID, not its display name (Hy-MT != hymt).
+        engine = self.engine_combo.currentData() or self.window_engine
         source_text, source_code, target_code = self.source_text, self.source_code, self.target_code
         self._pending_request = (source_text, source_code, target_code)
         self._received_partial = False

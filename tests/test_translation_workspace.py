@@ -61,7 +61,7 @@ def test_translate_uses_the_current_draft_and_selected_engine(workspace, request
     requests.pop()()
     args, kwargs = translate.call_args
     assert args == ('A revised source\nwith another paragraph', 'en', 'ru')
-    assert kwargs['engine'] == 'Lingva'
+    assert kwargs['engine'] == 'lingva'
     assert callable(kwargs['cancel_callback'])
     assert workspace.source_edit.toPlainText() == args[0]
     assert workspace.text_edit.toPlainText() == 'Дополненный перевод'
@@ -94,7 +94,7 @@ def test_typing_in_result_translates_that_draft_and_keeps_it_visible(workspace, 
     assert workspace.text_edit.toPlainText() == 'My new draft'
     requests.pop()()
     assert translate.call_args.args == ('My new draft', 'en', 'ru')
-    assert translate.call_args.kwargs['engine'] == 'Lingva'
+    assert translate.call_args.kwargs['engine'] == 'lingva'
     assert workspace.source_edit.toPlainText() == 'My new draft'
     if reply == 'Новый перевод':
         assert workspace.text_edit.toPlainText() == reply
