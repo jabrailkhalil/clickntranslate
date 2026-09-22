@@ -9,6 +9,24 @@ permissions:
   contents: read
 
 jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive exact reviewed source
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-source"
+          git archive --format=zip --output="$RUNNER_TEMP/ui-source/source.zip" HEAD
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-source/revision.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-review-source
+          path: ${{ runner.temp }}/ui-source
+          retention-days: 3
+          if-no-files-found: error
+
   test:
     timeout-minutes: 15
     strategy:
@@ -38,9 +56,9 @@ jobs:
             python -m pip install --no-deps 'argostranslate~=1.11.0'
           fi
       - name: Check welcome text fitting before full regressions
-        run: python tools/run_regression_tests.py --output .tmp/ui-smoke tests/test_welcome_content_fit.py tests/test_ui_polish.py
-      - name: Render revised UI without network or desktop hooks
-        run: python tools/qa_ui_polish.py --output .tmp/ui-renders
+        run: python tools/run_regression_tests.py --output .tmp/ui-smoke tests/test_welcome_content_fit.py tests/test_ui_polish.py tests/test_window_provider_dispatch.py
+      - name: Render UI and sample animation in active and idle states
+        run: python tools/qa_ui_polish.py --output .tmp/ui-renders --benchmark-seconds 5
       - uses: actions/upload-artifact@v4
         with:
           name: ui-preview-${{ runner.os }}
