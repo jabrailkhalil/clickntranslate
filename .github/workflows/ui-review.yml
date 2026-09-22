@@ -1,64 +1,62 @@
-name: Fit welcome copy to actual platform fonts
+name: UI branch review
 
 on:
   push:
     branches: [codex/ui-polish-20260923]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  apply:
-    if: github.ref == 'refs/heads/codex/ui-polish-20260923'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
+  test:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            requirements: requirements.txt
+          - os: ubuntu-latest
+            requirements: requirements-linux.txt
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          ref: ${{ github.sha }}
-          fetch-depth: 2
-      - name: Apply reviewed adaptive welcome height
-        shell: python
-        run: |
-          import hashlib, os, pathlib, subprocess
-          assert os.environ['GITHUB_REF'] == 'refs/heads/codex/ui-polish-20260923'
-          path = pathlib.Path('main.py')
-          data = path.read_bytes()
-          assert hashlib.sha256(data).hexdigest() == '44a5b82732e708335bc74862decab0d508b83d6d68af6346ff30d330f07c1488'
-          text = data.decode('utf-8')
-          old = '        self.setFixedSize(560, 390)\n'
-          new = ('        # Keep the compact width, but let wrapped copy use its real font height.\n'
-                 '        self.setFixedWidth(560)\n'
-                 '        self.setMinimumHeight(390)\n'
-                 '        self.resize(560, 390)\n')
-          assert text.count(old) == 1
-          text = text.replace(old, new)
-          old = ('        # The language control has a static accent, not a repeatedly rasterized\n'
-                 '        # drop shadow. This welcome page has no animation timer.\n')
-          new = old + ('\n'
-                 '        # Windows and Linux fonts have different line heights. Measure after\n'
-                 '        # stylesheet polishing; a fixed-height card clipped Russian/German copy.\n'
-                 '        # Repeat only when rebuilding the dialog (including language changes).\n'
-                 '        card.ensurePolished()\n'
-                 '        card.show()  # Rebuilt children must participate in height-for-width now.\n'
-                 '        self.main_layout.invalidate()\n'
-                 '        self.main_layout.activate()\n'
-                 '        self.resize(self.width(), max(self.minimumHeight(),\n'
-                 '                    self.main_layout.totalHeightForWidth(self.width())))\n')
-          assert text.count(old) == 1
-          data = text.replace(old, new).encode('utf-8')
-          assert hashlib.sha256(data).hexdigest() == '99b130b3511e07f965706e05a545eacdc2c6d97ecf0f72e0a0ecf9c7967ca7ec'
-          path.write_bytes(data)
-          subprocess.run(['git', 'add', '--', 'main.py'], check=True)
-          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
-      - name: Publish source only to review branch
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ${{ matrix.requirements }}
+      - name: Install test dependencies
         shell: bash
         run: |
-          test "$GITHUB_REF" = refs/heads/codex/ui-polish-20260923
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Fit welcome card to wrapped copy without clipping platform fonts'
-          git push origin HEAD:refs/heads/codex/ui-polish-20260923
-          git log -1 --format='%H %s'
+          python -m pip install -r "${{ matrix.requirements }}" pytest pyinstaller
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            python -m pip install --no-deps 'argostranslate~=1.11.0'
+          fi
+      - name: Check welcome text fitting before full regressions
+        run: python tools/run_regression_tests.py --output .tmp/ui-smoke tests/test_welcome_content_fit.py tests/test_ui_polish.py
+      - name: Render revised UI without network or desktop hooks
+        run: python tools/qa_ui_polish.py --output .tmp/ui-renders
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-preview-${{ runner.os }}
+          path: .tmp/ui-renders
+          include-hidden-files: true
+          retention-days: 7
+      - name: Run regression suite with isolated user data
+        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review-${{ runner.os }}
+          path: |
+            test-results.xml
+            .tmp/ui-ci/run.json
+            .tmp/ui-smoke/run.json
+            .tmp/ui-renders
+          include-hidden-files: true
+          retention-days: 7
