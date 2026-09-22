@@ -107,6 +107,10 @@ if (-not $CertificateThumbprint) {
     Write-Warning 'This is an unsigned stage. Do not describe it as a signed release.'
 }
 
+# Hash the final signed bytes of every program module, library and worker.
+& (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'release_manifest.py') write $packageRoot $Version
+if ($LASTEXITCODE -ne 0) { throw 'Program manifest generation failed.' }
+
 [pscustomobject]@{
     Version = $Version
     Stage = $stageRoot

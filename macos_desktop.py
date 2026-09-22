@@ -1,12 +1,14 @@
 """macOS integration. Native frameworks are loaded only on demand on a Mac."""
 
 import os
+import logging
 from pathlib import Path
 import plistlib
 import subprocess
 import sys
 import tempfile
 import time
+from xml.parsers.expat import ExpatError
 
 from platform_support import APP_ID
 
@@ -46,7 +48,7 @@ def autostart_enabled():
                 and entry.get("Label") == APP_ID and entry.get("RunAtLoad") is True
                 and not entry.get("Disabled", False)
                 and entry.get("ProgramArguments") == launch_arguments())
-    except (OSError, ValueError, plistlib.InvalidFileException, RuntimeError):
+    except (OSError, ValueError, plistlib.InvalidFileException, ExpatError, RuntimeError):
         return False
 
 
@@ -61,14 +63,43 @@ def set_autostart(enabled):
              "RunAtLoad": True, "LimitLoadToSessionType": "Aqua"}
     if not getattr(sys, "frozen", False):
         entry["WorkingDirectory"] = str(Path(__file__).resolve().parent)
+    _write_launchagent(path, entry)
+    return autostart_enabled()
+
+
+def _write_launchagent(path, entry):
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{APP_ID}-", dir=path.parent)
     try:
         with os.fdopen(descriptor, "wb") as stream:
             plistlib.dump(entry, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(temporary, path)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def repair_autostart(restore_missing=False):
+    """Follow a moved app without re-enabling disabled or replacing bad agents."""
+    path = autostart_path()
+    try:
+        if not os.path.lexists(path):
+            return set_autostart(True) if restore_missing else False
+        with path.open('rb') as stream:
+            entry = plistlib.load(stream)
+        if (not isinstance(entry, dict) or entry.get('Label') != APP_ID
+                or entry.get('RunAtLoad') is not True or entry.get('Disabled', False)):
+            return False
+        expected = launch_arguments()
+        if entry.get('ProgramArguments') == expected:
+            return True
+        entry['ProgramArguments'] = expected
+        if not getattr(sys, 'frozen', False):
+            entry['WorkingDirectory'] = str(Path(__file__).resolve().parent)
+        _write_launchagent(path, entry)
+    except (OSError, ValueError, plistlib.InvalidFileException, ExpatError, RuntimeError):
+        logging.exception('Could not repair macOS autostart; existing LaunchAgent preserved')
     return autostart_enabled()
 
 

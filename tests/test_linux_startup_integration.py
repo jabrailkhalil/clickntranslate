@@ -15,6 +15,70 @@ import main  # noqa: E402
 import platform_support  # noqa: E402
 
 
+class AutostartSyncTest(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory(prefix='cnt_autostart_sync_')
+        self.addCleanup(folder.cleanup)
+        environment = mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': folder.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.window = mock.Mock(config={'autostart': True})
+
+    def sync(self):
+        with (mock.patch.object(platform_support, 'IS_LINUX', True),
+              mock.patch.object(platform_support, 'IS_MAC', False),
+              mock.patch.object(main.portable_paths, 'public_executable_path', return_value='/opt/new.AppImage')):
+            return main.DarkThemeApp.sync_autostart_state(self.window, repair_stale=True)
+
+    def test_moved_appimage_repairs_enabled_entry_and_preserves_desktop_options(self):
+        linux_desktop.set_autostart(True, '/opt/old.AppImage')
+        path = Path(linux_desktop.autostart_path())
+        with path.open('a', encoding='utf-8') as stream:
+            stream.write('X-GNOME-Autostart-Delay=12\nOnlyShowIn=GNOME;\n')
+        self.assertTrue(self.sync())
+        content = path.read_text(encoding='utf-8')
+        self.assertIn('Exec=/opt/new.AppImage', content)
+        self.assertNotIn('old.AppImage', content)
+        self.assertIn('X-GNOME-Autostart-Delay=12', content)
+        self.assertIn('OnlyShowIn=GNOME;', content)
+
+    def test_os_disabled_entry_is_not_reenabled_by_saved_settings(self):
+        for marker in ('Hidden=true', 'X-GNOME-Autostart-enabled=false'):
+            with self.subTest(marker=marker):
+                path = Path(linux_desktop.autostart_path())
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('[Desktop Entry]\nExec=/opt/old.AppImage\n' + marker + '\n', encoding='utf-8')
+                previous = path.read_bytes()
+                self.assertFalse(self.sync())
+                self.assertEqual(path.read_bytes(), previous)
+                self.assertFalse(self.window.config['autostart'])
+                self.window.config['autostart'] = True
+
+    def test_missing_enabled_entry_is_restored(self):
+        self.assertTrue(self.sync())
+        self.assertIn('Exec=/opt/new.AppImage', Path(linux_desktop.autostart_path()).read_text())
+
+    def test_missing_disabled_entry_stays_absent(self):
+        self.window.config['autostart'] = False
+        self.assertFalse(self.sync())
+        self.assertFalse(Path(linux_desktop.autostart_path()).exists())
+
+    def test_matching_entry_is_not_rewritten(self):
+        linux_desktop.set_autostart(True, '/opt/new.AppImage')
+        with mock.patch.object(linux_desktop, '_write_entry') as write:
+            self.assertTrue(self.sync())
+        write.assert_not_called()
+
+    def test_failed_repair_preserves_existing_entry_and_does_not_stop_startup(self):
+        linux_desktop.set_autostart(True, '/opt/old.AppImage')
+        path = Path(linux_desktop.autostart_path())
+        previous = path.read_bytes()
+        import atomic_storage
+        with mock.patch.object(atomic_storage.os, 'replace', side_effect=OSError('read-only directory')):
+            self.assertTrue(self.sync())
+        self.assertEqual(path.read_bytes(), previous)
+
+
 class DesktopEntryInstallTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp(prefix="cnt_startup_")

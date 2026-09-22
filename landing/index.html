@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Free Screen Translator for Windows | Click'n'Translate</title>
+    <meta name="description" content="Copy or translate text from games, images, videos, apps, and documents. Free open-source screen OCR with hotkeys and online or offline engines." />
+    <meta name="theme-color" content="#111016" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Translate any text on your screen with one hotkey" />
+    <meta property="og:description" content="Free, open-source screen OCR and translation for Windows and Linux." />
+    <meta property="og:image" content="https://xynapse.online/clickntranslate/assets/translation-demo.gif" />
+    <meta property="og:url" content="https://xynapse.online/clickntranslate/" />
+    <link rel="canonical" href="https://xynapse.online/clickntranslate/" />
+    <link rel="alternate" hreflang="en" href="https://xynapse.online/clickntranslate/" />
+    <link rel="alternate" hreflang="ru" href="https://xynapse.online/clickntranslate/ru/" />
+    <link rel="alternate" hreflang="es" href="https://xynapse.online/clickntranslate/es/" />
+    <link rel="alternate" hreflang="de" href="https://xynapse.online/clickntranslate/de/" />
+    <link rel="alternate" hreflang="fr" href="https://xynapse.online/clickntranslate/fr/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://xynapse.online/clickntranslate/zh-CN/" />
+    <link rel="alternate" hreflang="x-default" href="https://xynapse.online/clickntranslate/" />
+    <link rel="icon" href="assets/icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      (() => {
+        const supported = ["en", "ru", "es", "de", "fr", "zh-CN"];
+        const normalize = (value = "") => {
+          const code = value.toLowerCase();
+          if (code.startsWith("zh")) return "zh-CN";
+          return supported.find((item) => item.toLowerCase() === code.split("-")[0]) || "en";
+        };
+        try {
+          const saved = localStorage.getItem("clickntranslate-site-language");
+          const detected = saved || normalize((navigator.languages && navigator.languages[0]) || navigator.language);
+          if (detected && detected !== "en" && supported.includes(detected)) location.replace(`${detected}/`);
+        } catch (_) {}
+      })();
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Click'n'Translate",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows 10, Windows 11, Linux",
+        "isAccessibleForFree": true,
+        "license": "https://github.com/jabrailkhalil/clickntranslate/blob/main/LICENSE",
+        "url": "https://xynapse.online/clickntranslate/",
+        "downloadUrl": "https://github.com/jabrailkhalil/clickntranslate/releases/latest",
+        "codeRepository": "https://github.com/jabrailkhalil/clickntranslate",
+        "description": "Free open-source screen OCR and translation for Windows and Linux with configurable hotkeys and online or offline engines.",
+        "author": {"@type": "Person", "name": "Dzhabrail Khalilov"},
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Click'n'Translate home">
+        <img src="assets/icon.png" alt="" />
+        <span>Click'n'Translate</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#workflows">Workflows</a>
+        <a href="#engines">Engines</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="header-actions">
+        <details class="language-menu">
+          <summary aria-label="Choose language">EN</summary>
+          <div class="language-options">
+            <a class="active" href="./" lang="en" data-language-choice="en">English</a>
+            <a href="ru/" lang="ru" data-language-choice="ru">Русский</a>
+            <a href="es/" lang="es" data-language-choice="es">Español</a>
+            <a href="de/" lang="de" data-language-choice="de">Deutsch</a>
+            <a href="fr/" lang="fr" data-language-choice="fr">Français</a>
+            <a href="zh-CN/" lang="zh-CN" data-language-choice="zh-CN">中文</a>
+          </div>
+        </details>
+        <a class="button button-small button-outline" href="https://github.com/jabrailkhalil/clickntranslate">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> Free and open source · Windows & Linux</p>
+          <h1>Translate any text <em>on your screen.</em></h1>
+          <p class="hero-lead">Copy text that cannot be selected. Translate a game, image, video, application, or document. One hotkey keeps you in the flow.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" data-latest-windows href="https://github.com/jabrailkhalil/clickntranslate/releases/latest">Download the latest Windows version <span>↓</span></a>
+            <a class="button button-quiet" href="https://github.com/jabrailkhalil/clickntranslate/releases/latest">Other downloads</a>
+          </div>
+          <p class="microcopy">Latest: <span data-latest-version>current release</span> · No account · No ads · GPL-3.0</p>
+          <div class="proof-row" aria-label="Product facts">
+            <div><strong>7</strong><span>global actions</span></div>
+            <div><strong>4</strong><span>local OCR engines</span></div>
+            <div><strong>1,000+</strong><span>release downloads</span></div>
+          </div>
+        </div>
+
+        <figure class="hero-demo hero-capture">
+          <img src="assets/translation-demo.gif" alt="Selecting dialogue in a game and showing its translation with Click'n'Translate" fetchpriority="high" />
+          <figcaption><strong>Game translation</strong><span>Real recording from Click'n'Translate</span></figcaption>
+        </figure>
+      </section>
+
+      <section class="trust-strip" aria-label="Key benefits">
+        <span>OCR stays on your computer</span>
+        <span>Online or offline translation</span>
+        <span>Configurable hotkeys</span>
+        <span>Source code on GitHub</span>
+      </section>
+
+      <section class="section capture-showcase" aria-labelledby="real-captures-title">
+        <div class="section-heading narrow">
+          <p class="kicker">Real application recordings</p>
+          <h2 id="real-captures-title">See the workflows in action.</h2>
+          <p>Every animation below is captured from Click'n'Translate itself — no generated interface mockups.</p>
+        </div>
+        <div class="capture-grid">
+          <figure class="capture-card">
+            <img src="assets/area-ocr-demo.gif" alt="Selecting a screen area and copying its recognized text with OCR" loading="lazy" />
+            <figcaption><strong>Area OCR</strong><span>Copy text from any screen region.</span></figcaption>
+          </figure>
+          <figure class="capture-card">
+            <img src="assets/selected-text-demo.gif" alt="Translating highlighted text inside a desktop application" loading="lazy" />
+            <figcaption><strong>Selected text</strong><span>Translate a selection without changing apps.</span></figcaption>
+          </figure>
+          <figure class="capture-card">
+            <img src="assets/fullscreen-translation-demo.gif" alt="Replacing text across the screen with translated overlays" loading="lazy" />
+            <figcaption><strong>Full-screen translation</strong><span>Translate the visible screen with one hotkey.</span></figcaption>
+          </figure>
+          <figure class="capture-card">
+            <img src="assets/update-demo.gif" alt="Downloading and installing a Click'n'Translate update inside the app" loading="lazy" />
+            <figcaption><strong>In-app updates</strong><span>Install the latest public release from the app.</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section workflows" id="workflows">
+        <div class="section-heading">
+          <p class="kicker">One app, several jobs</p>
+          <h2>Text becomes useful the moment you see it.</h2>
+          <p>Choose the result you need instead of moving the same screenshot through several utilities.</p>
+        </div>
+        <div class="workflow-grid">
+          <article class="workflow workflow-featured">
+            <span class="workflow-number">01</span>
+            <div>
+              <h3>Dynamic translation</h3>
+              <p>Select one or several regions. Unchanged frames are skipped; translated overlays update only when the source text changes.</p>
+              <span class="hotkey">Ctrl + Alt + G</span>
+            </div>
+            <div class="mini-regions" aria-hidden="true"><i></i><i></i><i></i></div>
+          </article>
+          <article class="workflow">
+            <span class="workflow-number">02</span>
+            <h3>Area OCR</h3>
+            <p>Copy text from images, videos, games, scans, and interfaces that block selection.</p>
+            <span class="hotkey">Ctrl + Alt + C</span>
+          </article>
+          <article class="workflow">
+            <span class="workflow-number">03</span>
+            <h3>Screen translation</h3>
+            <p>Translate one focused area or place translated text over the entire screen.</p>
+            <span class="hotkey">Ctrl + Alt + T / F</span>
+          </article>
+          <article class="workflow">
+            <span class="workflow-number">04</span>
+            <h3>Selected text</h3>
+            <p>Translate a selection or replace it in the same application with the saved language pair.</p>
+            <span class="hotkey">Ctrl + Alt + Q</span>
+          </article>
+          <article class="workflow">
+            <span class="workflow-number">05</span>
+            <h3>Documents</h3>
+            <p>Open common text, Word, PDF, HTML, and RTF files with original and translation side by side.</p>
+            <span class="hotkey">Ctrl + O</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section engines" id="engines">
+        <div class="section-heading narrow">
+          <p class="kicker">Your screen, your route</p>
+          <h2>Use the engine that fits the text.</h2>
+          <p>Stylized fonts, scripts, scaling, and poor contrast behave differently. Install only the components you need.</p>
+        </div>
+        <div class="engine-table">
+          <div class="engine-row">
+            <div><span class="engine-icon">Aa</span><strong>Local OCR</strong></div>
+            <p>Windows OCR · Tesseract · RapidOCR · EasyOCR</p>
+            <span class="engine-state local">On device</span>
+          </div>
+          <div class="engine-row">
+            <div><span class="engine-icon">↗</span><strong>Online translation</strong></div>
+            <p>Google · MyMemory · Lingva · LibreTranslate</p>
+            <span class="engine-state online">Internet</span>
+          </div>
+          <div class="engine-row">
+            <div><span class="engine-icon">⌂</span><strong>Offline translation</strong></div>
+            <p>Argos Translate · Hy-MT</p>
+            <span class="engine-state local">On device</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section privacy" id="privacy">
+        <div class="privacy-mark" aria-hidden="true">⌾</div>
+        <div>
+          <p class="kicker">Privacy without vague promises</p>
+          <h2>Know where your text goes.</h2>
+        </div>
+        <div class="privacy-copy">
+          <p>OCR runs locally. Argos Translate and Hy-MT also translate locally after their packages are installed. If you choose an online provider, the text you request to translate is sent to that provider.</p>
+          <p>Copy and translation histories stay on your computer and are optional. The app includes no developer-operated analytics.</p>
+          <a href="https://github.com/jabrailkhalil/clickntranslate/blob/main/PRIVACY.md">Read the privacy policy →</a>
+        </div>
+      </section>
+
+      <section class="section open-source">
+        <div>
+          <p class="kicker">Built in public</p>
+          <h2>Free software with visible trade-offs.</h2>
+        </div>
+        <div class="source-facts">
+          <p><strong>GPL-3.0</strong><span>Source, issues, and release history are public.</span></p>
+          <p><strong>700+</strong><span>Automated checks in the current repository.</span></p>
+          <p><strong>Safe reports</strong><span>Diagnostics exclude clipboard text, documents, histories, credentials, and OCR logs.</span></p>
+        </div>
+        <aside class="antivirus-note">
+          <strong>About Windows antivirus warnings</strong>
+          <p>The Windows build is currently unsigned. Global hotkeys, screen capture, clipboard integration, optional autostart, and updating can trigger generic heuristic warnings. Download only from the official repository, verify release hashes, and report unexpected detections so they can be investigated.</p>
+        </aside>
+      </section>
+
+      <section class="section faq" id="faq">
+        <div class="section-heading narrow">
+          <p class="kicker">Questions, answered</p>
+          <h2>Before you install.</h2>
+        </div>
+        <div class="faq-list">
+          <details open><summary>Does it work offline?</summary><p>Yes, after installing the OCR language data and an Argos Translate or Hy-MT package for the direction you need. Online providers still require a connection.</p></details>
+          <details><summary>Can it translate games and videos?</summary><p>Yes. OCR reads pixels from a selected region, so the source does not have to be selectable. Accuracy depends on the language, font, scale, contrast, and selected OCR engine.</p></details>
+          <details><summary>Does it support Linux?</summary><p>Yes. The release page provides an x86_64 AppImage and a portable TAR archive. Screen capture integration may vary by desktop session.</p></details>
+          <details><summary>Can I change every hotkey?</summary><p>Yes. Every global shortcut can be changed or cleared. OCR, full-screen, selection, replacement, and Dynamic translation remember their own language pair.</p></details>
+          <details><summary>What document formats are supported?</summary><p>TXT, Markdown, DOCX, PDF, HTML, HTM, and RTF. Results can be saved as text, Markdown, or a reopenable local session.</p></details>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <p class="kicker">See it. Select it. Understand it.</p>
+        <h2>Translate the first thing that gets in your way.</h2>
+        <div class="hero-actions centered">
+          <a class="button button-primary" data-latest-windows href="https://github.com/jabrailkhalil/clickntranslate/releases/latest">Download the latest Click'n'Translate <span>↓</span></a>
+          <a class="button button-quiet" href="https://github.com/jabrailkhalil/clickntranslate">Browse the source</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <a class="brand footer-brand" href="#top"><img src="assets/icon.png" alt="" /><span>Click'n'Translate</span></a>
+      <p>Free and open-source screen OCR and translation.</p>
+      <nav aria-label="Footer navigation">
+        <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest">Downloads</a>
+        <a href="https://github.com/jabrailkhalil/clickntranslate/issues">Bug reports</a>
+        <a href="https://t.me/jabrail_digital">Telegram</a>
+        <a href="https://github.com/jabrailkhalil/clickntranslate/blob/main/LICENSE">License</a>
+      </nav>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>

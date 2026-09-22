@@ -232,6 +232,31 @@ def test_cancellation_during_validation_restores_previous_engine(tmp_path):
     assert (destination / 'engine').read_bytes() == b'working'
 
 
+@pytest.mark.parametrize('phase', ['backup', 'publish', 'restore'])
+def test_directory_rename_failures_preserve_working_engine(tmp_path, monkeypatch, phase):
+    source = make_package(tmp_path / 'source')
+    destination = make_package(tmp_path / 'installed', b'working')
+    rename = Path.rename
+    def faulty_rename(path, target):
+        if ((phase == 'backup' and path == destination)
+                or (phase == 'publish' and path.name == 'candidate')
+                or (phase == 'restore' and path.name == 'backup')):
+            raise PermissionError('simulated engine file locked')
+        return rename(path, target)
+    monkeypatch.setattr(Path, 'rename', faulty_rename)
+    validator = mock.Mock(side_effect=ValueError('broken candidate') if phase == 'restore' else None)
+    with pytest.raises((OSError, RuntimeError)) as caught:
+        package_installation.install_directory(source, destination, validator)
+    if phase == 'restore':
+        backup, = tmp_path.glob('.installed-install-*/backup/engine')
+        assert backup.read_bytes() == b'working'
+        assert str(backup.parent.parent) in str(caught.value)
+    else:
+        validator.assert_not_called()
+        assert (destination / 'engine').read_bytes() == b'working'
+        assert not list(tmp_path.glob('.installed-install-*'))
+
+
 @pytest.mark.parametrize('version,locked', [((3,10),False),((3,12),True),((3,13),True),((3,14),False)])
 def test_easyocr_dependency_lock_matches_only_verified_python_versions(version, locked, monkeypatch):
     monkeypatch.setattr(sw.platform_support, 'IS_MAC', False)

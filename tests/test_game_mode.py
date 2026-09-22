@@ -89,6 +89,8 @@ class GameModeWidgetTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        from qt_layout_test_support import ensure_layout_fonts
+        ensure_layout_fonts(cls.app)
 
     def setUp(self):
         mode_coordinator._reset_for_tests()
@@ -170,6 +172,17 @@ class GameModeWidgetTest(unittest.TestCase):
             self.assertTrue(selector.start_button.isEnabled())
             QTest.keyClick(selector, QtCore.Qt.Key_Backspace)
             self.assertEqual(selector._regions, [first])
+            # Enter must keep the selected bounds, including a monitor origin
+            # left of the primary screen; it must never select fullscreen.
+            selector.setGeometry(-1280, 40, 1280, 720)
+            expected = first.translated(selector.geometry().topLeft())
+            with mock.patch.object(selector, '_persist_pair'), \
+                 mock.patch.object(game_mode, '_begin_game_session') as start_regions, \
+                 mock.patch.object(game_mode, '_begin_fullscreen_game_session') as start_fullscreen:
+                QTest.keyClick(selector, QtCore.Qt.Key_Return)
+                self.assertEqual(start_regions.call_args.args[:3], ([expected], 'en', 'ru'))
+                start_regions.assert_called_once()
+                start_fullscreen.assert_not_called()
         finally:
             selector.close()
 
@@ -262,6 +275,7 @@ class GameModeWidgetTest(unittest.TestCase):
         try:
             self.assertTrue(overlay.testAttribute(QtCore.Qt.WA_TransparentForMouseEvents))
             overlay._revision = 1
+            overlay._live.observe([(10.0, 20.0, 120.0, 28.0, 'Hello')], 0)
             with mock.patch.object(ocr, "save_translation_history") as save_history:
                 overlay._apply_translation(
                     1,
@@ -301,7 +315,11 @@ class GameModeWidgetTest(unittest.TestCase):
             previous = [(100, 200, 180, 28, "Open", "Открыть")]
             overlay._blocks = previous
             with mock.patch.object(overlay, "_start_block_translation") as start:
-                overlay._on_position_ocr_result([line])
+                with mock.patch.object(game_mode.time, 'monotonic', return_value=10.0):
+                    overlay._on_position_ocr_result([line])
+                start.assert_not_called()
+                with mock.patch.object(game_mode.time, 'monotonic', return_value=10.2):
+                    overlay._on_position_ocr_result([line])
                 start.assert_called_once()
                 self.assertEqual(overlay._blocks, [], 'old text must not cover a different paragraph')
 
@@ -337,6 +355,7 @@ class GameModeWidgetTest(unittest.TestCase):
             )
         )
         try:
+            overlay._live.observe(lines, 0)
             with mock.patch.object(
                 ocr,
                 "_translate_screen_texts",
@@ -359,9 +378,175 @@ class GameModeWidgetTest(unittest.TestCase):
         import inspect
 
         source = inspect.getsource(game_mode.GameFullscreenOverlay.paintEvent)
-        self.assertIn("FullScreenTranslateOverlay._translation_block_layout", source)
+        layout_source = inspect.getsource(game_mode.GameFullscreenOverlay._layout_translation_blocks)
+        self.assertIn("FullScreenTranslateOverlay._translation_block_layout", layout_source)
         self.assertIn("FullScreenTranslateOverlay._paint_block", source)
         self.assertNotIn("drawRoundedRect(card", source)
+
+    def test_scrolling_during_translation_does_not_cancel_or_restore_old_coordinates(self):
+        import threading
+        overlay = self._fullscreen_overlay()
+        try:
+            original = (10, 100, 160, 24, 'Open the gate')
+            moved = (400, 200, 160, 24, 'Open the gate')
+            overlay._live.observe([original], 0)
+            overlay._translation_busy = True
+            overlay._requested_texts = {'Open the gate'}
+            overlay._translation_cancel = threading.Event()
+            overlay._revision = 7
+            overlay._on_position_ocr_result([moved])
+            self.assertFalse(overlay._translation_cancel.is_set())
+            overlay._apply_translation(7, [(*original, 'Открой ворота')], '', True)
+            self.assertEqual(overlay._blocks, [(*moved, 'Открой ворота')])
+            self.assertEqual(overlay._revision, 7)
+        finally:
+            overlay.close()
+
+    def test_live_only_requests_uncached_text_once_using_the_selected_provider(self):
+        overlay = self._fullscreen_overlay(translator_engine='DeepL')
+        lines = [(10, 10, 160, 24, 'Settings'), (10, 100, 160, 24, 'New quest'),
+                 (500, 100, 160, 24, 'New quest')]
+        try:
+            overlay._live.remember([('Settings', 'Настройки')])
+            with mock.patch.object(overlay, '_scan_once'), mock.patch('translater.translate_text', return_value='Новое задание') as translate:
+                with mock.patch.object(game_mode.time, 'monotonic', return_value=10):
+                    overlay._on_position_ocr_result(lines)
+                with mock.patch.object(game_mode.time, 'monotonic', return_value=10.2):
+                    overlay._on_position_ocr_result(lines)
+                for _ in range(100):
+                    self.app.processEvents()
+                    if not overlay._translation_busy:
+                        break
+                    QTest.qWait(5)
+                translate.assert_called_once_with('New quest', 'en', 'ru', engine='DeepL', cancel_callback=mock.ANY)
+                self.assertEqual(len(overlay._blocks), 3)
+                self.assertEqual([item[5] for item in overlay._blocks], ['Настройки', 'Новое задание', 'Новое задание'])
+        finally:
+            overlay.close()
+
+    def test_live_pause_and_stop_controls_clear_the_surface_and_release_the_mode(self):
+        overlay = self._fullscreen_overlay()
+        game_mode._game_fullscreen_ref = overlay
+        mode_coordinator.request_mode('game', game_mode.stop_game_mode)
+        try:
+            self.assertTrue(game_mode.game_mode_active())
+            overlay._blocks = [(10, 10, 120, 24, 'Hello', 'Привет')]
+            overlay.controls.pause_button.click()
+            self.assertTrue(overlay.paused)
+            self.assertFalse(overlay._blocks)
+            with mock.patch.object(overlay, '_scan_once') as scan:
+                overlay.controls.pause_button.click()
+                self.assertFalse(overlay.paused)
+                scan.assert_called_once()
+            overlay.controls.stop_button.click()
+            self.assertFalse(game_mode.game_mode_active())
+            self.assertIsNone(mode_coordinator.active_mode())
+        finally:
+            game_mode.stop_game_mode()
+
+    def test_region_picker_matches_mac_workflow_and_fits_small_screens(self):
+        for language in game_mode.GAME_TEXT:
+            for theme in ('Темная', 'Светлая'):
+                with self.subTest(language=language, theme=theme):
+                    config = {'interface_language': language, 'theme': theme, 'ui_scale_percent': 200,
+                              'translator_engine': 'Google', 'game_translate_source_language': 'en',
+                              'game_translate_target_language': 'ru'}
+                    with mock.patch.object(ocr, 'get_cached_ocr_config', return_value=config), \
+                         mock.patch.object(ocr, 'installed_ocr_language_codes', return_value=['en', 'ru']), \
+                         mock.patch.object(ocr, '_translation_targets_for_source', return_value=['ru']), \
+                         mock.patch.object(ocr, '_write_ocr_config_updates'):
+                        selector = game_mode.GameRegionSelector()
+                        try:
+                            selector.resize(640, 480)
+                            selector._layout_controls()
+                            widgets = [selector.source_combo, selector.swap_button, selector.target_combo,
+                                       selector.undo_button, selector.start_button]
+                            for index, widget in enumerate(widgets):
+                                self.assertTrue(selector.rect().contains(widget.geometry()))
+                                for other in widgets[index + 1:]:
+                                    self.assertFalse(widget.geometry().intersects(other.geometry()))
+                            self.assertGreater(selector._caption_top, max(widget.geometry().bottom() for widget in widgets))
+                            self.assertFalse(selector.start_button.isEnabled())
+                            self.assertFalse(hasattr(selector, 'fullscreen_button'))
+                            self.assertFalse(hasattr(selector, '_start_fullscreen'))
+                            with mock.patch.object(game_mode, '_begin_fullscreen_game_session') as fullscreen, \
+                                 mock.patch.object(game_mode, '_begin_game_session') as start:
+                                QTest.keyClick(selector, QtCore.Qt.Key_Return)
+                                start.assert_not_called()
+                                selector._regions.extend([QtCore.QRect(40, 280, 180, 60), QtCore.QRect(300, 340, 200, 70)])
+                                selector._update_selection_controls()
+                                first = QtCore.QRect(selector._regions[0])
+                                QTest.mousePress(selector, QtCore.Qt.LeftButton, pos=first.center())
+                                QTest.mouseRelease(selector, QtCore.Qt.LeftButton, pos=first.center() + QtCore.QPoint(20, 5))
+                                self.assertEqual(selector._regions[0], first.translated(20, 5))
+                                QTest.keyClick(selector, QtCore.Qt.Key_Delete)
+                                self.assertEqual(len(selector._regions), 1)
+                                selector._regions.append(first)
+                                QTest.mouseClick(selector, QtCore.Qt.LeftButton, pos=selector._remove_button_rect(first).center())
+                                self.assertEqual(len(selector._regions), 1)
+                                selector._regions.append(first)
+                                selector._update_selection_controls()
+                                expected = [rect.translated(selector.geometry().topLeft()) for rect in selector._regions]
+                                selector.start_button.click()
+                                self.assertEqual(start.call_args.args[:3], (expected, 'en', 'ru'))
+                                start.assert_called_once()
+                                fullscreen.assert_not_called()
+                        finally:
+                            selector.close()
+
+    def test_capture_fallback_hides_both_translation_and_controls_and_restores_on_error(self):
+        overlay = self._fullscreen_overlay()
+        try:
+            overlay._capture_excluded = overlay.controls._capture_excluded = False
+            def failed_capture(*args):
+                self.assertEqual(overlay.windowOpacity(), 0)
+                self.assertEqual(overlay.controls.windowOpacity(), 0)
+                raise RuntimeError('capture unavailable')
+            with mock.patch.object(ocr, 'grab_screen_pixmap', side_effect=failed_capture), \
+                 mock.patch.object(game_mode.platform_support, 'IS_WINDOWS', False):
+                with self.assertRaisesRegex(RuntimeError, 'capture unavailable'):
+                    overlay._grab_screen()
+            self.assertEqual(overlay.windowOpacity(), 1)
+            self.assertEqual(overlay.controls.windowOpacity(), 1)
+        finally:
+            overlay.close()
+
+    def test_windows_capture_failure_never_blinks_or_captures_the_overlay(self):
+        overlays = (self._overlay(), self._fullscreen_overlay())
+        try:
+            for overlay in overlays:
+                overlay._capture_excluded = False
+                capture = getattr(overlay, '_grab_region', None) or overlay._grab_screen
+                with mock.patch.object(game_mode.platform_support, 'IS_WINDOWS', True), \
+                     mock.patch.object(overlay, 'setWindowOpacity') as opacity, \
+                     mock.patch.object(ocr, 'grab_screen_pixmap') as grab:
+                    with self.assertRaisesRegex(RuntimeError, 'exclude'):
+                        capture()
+                    opacity.assert_not_called()
+                    grab.assert_not_called()
+        finally:
+            for overlay in overlays:
+                overlay.close()
+
+    def test_windows_fullscreen_shape_follows_text_and_pause_leaves_no_monitor_sized_window(self):
+        with mock.patch.object(game_mode.platform_support, 'IS_WINDOWS', True):
+            overlay = self._fullscreen_overlay()
+            try:
+                overlay._status = ''
+                overlay._has_shown_translation = True
+                overlay._blocks = [(50, 70, 160, 25, 'Hello', 'Привет')]
+                overlay.update()
+                self.assertTrue(overlay.mask().contains(QtCore.QPoint(100, 80)))
+                self.assertFalse(overlay.mask().contains(QtCore.QPoint(5, overlay.height()-5)))
+                overlay._blocks = [(350, 70, 160, 25, 'Hello', 'Привет')]
+                overlay.update()
+                self.assertFalse(overlay.mask().contains(QtCore.QPoint(100, 80)))
+                self.assertTrue(overlay.mask().contains(QtCore.QPoint(400, 80)))
+                overlay._toggle_pause()
+                self.assertTrue(overlay.mask().intersected(QtGui.QRegion(overlay.rect())).isEmpty())
+                self.assertTrue(overlay.isVisible())
+            finally:
+                overlay.close()
 
     def test_one_entry_always_launches_selected_areas_and_second_press_stops(self):
         stale_fullscreen_config = {

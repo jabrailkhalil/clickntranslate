@@ -6,10 +6,15 @@ in the application menu, and its desktop actions give the tray-less desktops a
 right-click menu for the capture commands.
 """
 
+import configparser
+import io
+import logging
 import os
 import shutil
+import sys
 
 import platform_support
+from atomic_storage import write_text
 
 
 APP_NAME = "Click'n'Translate"
@@ -53,14 +58,24 @@ def _remove_file(path):
 
 def _escape(value):
     """Escape a value for a desktop entry key."""
-    return str(value or "").replace("\\", "\\\\").replace("\n", " ")
+    return (str(value or "").replace("\\", "\\\\")
+            .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t"))
 
 
 def _exec_value(executable, argument=""):
-    """Exec= value, quoted when the path contains spaces."""
-    command = _escape(executable)
-    if " " in command:
-        command = f'"{command}"'
+    """Apply Exec argument quoting, field-code escaping, then key-file escaping."""
+    arguments = [os.fspath(executable)]
+    if not getattr(sys, 'frozen', False) and os.path.splitext(arguments[0])[1].lower() in ('.py', '.pyw'):
+        arguments.insert(0, sys.executable)
+    if '=' in arguments[0]:
+        # '=' is not allowed in the executable token. The shell program is
+        # constant; the executable remains a positional argument, never code.
+        arguments[:0] = ['/bin/sh', '-c', 'exec "$@"', 'clickntranslate-launch']
+    elif '%' in arguments[0]:
+        # GLib checks the executable before expanding %%.
+        arguments[:0] = ['env', '--']
+    command = ' '.join(_escape(platform_support.quote_command_argument(value).replace('%', '%%'))
+                       for value in arguments)
     return f"{command} {argument}".strip()
 
 
@@ -101,9 +116,7 @@ def desktop_entry_text(executable, autostart=False, include_actions=True):
 
 
 def _write_entry(path, text):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
+    write_text(path, text)
     os.chmod(path, 0o755)
     return path
 
@@ -123,10 +136,45 @@ def set_autostart(enabled, executable):
     return True
 
 
+def _autostart_entries():
+    for path in _autostart_paths():
+        try:
+            entry = configparser.ConfigParser(interpolation=None, strict=False)
+            entry.optionxform = str
+            with open(path, encoding='utf-8') as stream:
+                entry.read_file(stream)
+            if (entry.has_section('Desktop Entry')
+                    and not entry.getboolean('Desktop Entry', 'Hidden', fallback=False)
+                    and entry.getboolean('Desktop Entry', 'X-GNOME-Autostart-enabled', fallback=True)):
+                yield path, entry
+        except (OSError, ValueError, configparser.Error):
+            continue
+
+
+def _autostart_paths():
+    return autostart_path(), _legacy_entry_path(platform_support.autostart_dir())
+
+
 def autostart_enabled():
-    return os.path.isfile(autostart_path()) or os.path.isfile(
-        _legacy_entry_path(platform_support.autostart_dir())
-    )
+    return next(_autostart_entries(), None) is not None
+
+
+def repair_autostart(executable, restore_missing=False):
+    """Follow a moved AppImage without overriding a desktop's disabled entry."""
+    if not any(os.path.lexists(path) for path in _autostart_paths()):
+        return set_autostart(True, executable) if restore_missing else False
+    command = _exec_value(executable)
+    for path, entry in _autostart_entries():
+        if entry.get('Desktop Entry', 'Exec', fallback='') == command:
+            continue
+        entry.set('Desktop Entry', 'Exec', command)
+        content = io.StringIO()
+        entry.write(content, space_around_delimiters=False)
+        try:
+            _write_entry(path, content.getvalue())
+        except OSError:
+            logging.exception('Could not update Linux autostart executable in %s', path)
+    return autostart_enabled()
 
 
 def install_desktop_entry(executable, icon_source=""):

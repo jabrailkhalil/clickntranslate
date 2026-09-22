@@ -14,6 +14,29 @@ from collections.abc import Callable
 _lock = threading.RLock()
 _active_name: str | None = None
 _stop_active: Callable[[], object] | None = None
+_listeners: set[Callable[[], object]] = set()
+
+
+def subscribe(callback: Callable[[], object]) -> Callable[[], None]:
+    """Observe capture ownership before a new owner takes its first screenshot."""
+    with _lock:
+        _listeners.add(callback)
+
+    def unsubscribe():
+        with _lock:
+            _listeners.discard(callback)
+    return unsubscribe
+
+
+def _notify_listeners():
+    with _lock:
+        listeners = tuple(_listeners)
+    for callback in listeners:
+        try:
+            callback()
+        except Exception:
+            # Optional UI must not prevent capture or cleanup.
+            pass
 
 
 def request_mode(name: str, stop_callback: Callable[[], object]) -> bool:
@@ -46,6 +69,7 @@ def request_mode(name: str, stop_callback: Callable[[], object]) -> bool:
             _stop_active = stop_callback
             should_start = True
 
+    _notify_listeners()
     if previous_stop is not None:
         try:
             previous_stop()
@@ -65,7 +89,8 @@ def release_mode(name: str) -> bool:
             return False
         _active_name = None
         _stop_active = None
-        return True
+    _notify_listeners()
+    return True
 
 
 def stop_active_mode() -> str | None:
@@ -77,6 +102,7 @@ def stop_active_mode() -> str | None:
         callback = _stop_active
         _active_name = None
         _stop_active = None
+    _notify_listeners()
     if callback is not None:
         try:
             callback()

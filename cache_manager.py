@@ -11,6 +11,9 @@ import shutil
 import datetime
 import threading
 import hashlib
+import math
+
+from atomic_storage import write_json
 
 # Default limits
 MAX_COPY_HISTORY = 500          # max records in copy history
@@ -20,7 +23,7 @@ MAX_TEXT_LENGTH = 5000           # max chars per history record text
 CACHE_DIR_NAME = "cache"        # subfolder for cache files
 TRANSLATION_CACHE_FILE = "translation_cache.json"
 
-_cache_lock = threading.Lock()
+_cache_lock = threading.RLock()
 
 
 def _tree_size(path):
@@ -176,8 +179,7 @@ def cleanup_history(data_dir, max_copy=MAX_COPY_HISTORY,
                 records = _truncate_texts(records, MAX_TEXT_LENGTH, "text")
                 records = _trim_list(records, max_copy)
                 removed["copy_history"] = original_count - len(records)
-                with open(ch_path, "w", encoding="utf-8") as f:
-                    json.dump(records, f, ensure_ascii=False, indent=2)
+                write_json(ch_path, records, indent=2)
             except Exception:
                 pass
 
@@ -193,8 +195,7 @@ def cleanup_history(data_dir, max_copy=MAX_COPY_HISTORY,
                 records = _truncate_texts(records, MAX_TEXT_LENGTH, "translated")
                 records = _trim_list(records, max_translation)
                 removed["translation_history"] = original_count - len(records)
-                with open(th_path, "w", encoding="utf-8") as f:
-                    json.dump(records, f, ensure_ascii=False, indent=2)
+                write_json(th_path, records, indent=2)
             except Exception:
                 pass
 
@@ -255,6 +256,7 @@ def clear_all_cache(data_dir, portable_root=None):
 # --- Translation Cache (avoid re-translating same text) ---
 
 _translation_caches = {}  # lazy loaded per data_dir
+_pending_cache_writes = {}
 
 
 def _get_cache_path(data_dir):
@@ -263,19 +265,31 @@ def _get_cache_path(data_dir):
 
 
 def _load_translation_cache(data_dir):
-    cache_id = os.path.abspath(data_dir)
-    if cache_id in _translation_caches:
-        return _translation_caches[cache_id]
-    path = _get_cache_path(data_dir)
-    if os.path.exists(path):
+    with _cache_lock:
+        cache_id = os.path.abspath(data_dir)
+        if cache_id in _translation_caches:
+            return _translation_caches[cache_id]
+        clean = {}
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                _translation_caches[cache_id] = json.load(f)
-        except Exception:
-            _translation_caches[cache_id] = {}
-    else:
-        _translation_caches[cache_id] = {}
-    return _translation_caches[cache_id]
+            with open(_get_cache_path(data_dir), "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                for key, entry in loaded.items():
+                    if not isinstance(entry, dict) or not isinstance(entry.get('translated'), str) or not entry['translated']:
+                        continue
+                    for stamp in ('created', 'accessed'):
+                        value = entry.get(stamp, 0)
+                        try:
+                            entry[stamp] = float(value) if not isinstance(value, bool) and math.isfinite(float(value)) else 0
+                        except (ValueError, TypeError, OverflowError):
+                            entry[stamp] = 0
+                    clean[key] = entry
+        except (OSError, ValueError):
+            pass
+        if len(clean) > MAX_TRANSLATION_CACHE:
+            clean = dict(sorted(clean.items(), key=lambda item: item[1]['accessed'])[-MAX_TRANSLATION_CACHE:])
+        _translation_caches[cache_id] = clean
+        return clean
 
 
 def _translation_cache_key(text, source_code, target_code, engine=None):
@@ -293,59 +307,61 @@ def _legacy_translation_cache_key(text, source_code, target_code, engine=None):
 
 def get_cached_translation(data_dir, text, source_code, target_code, engine=None, *, strict_engine=False):
     """Look up a cached translation. Returns translated text or None."""
-    cache = _load_translation_cache(data_dir)
     keys = [_translation_cache_key(text, source_code, target_code, engine)]
     if engine and engine != "hymt" and not strict_engine:
         keys.append(_translation_cache_key(text, source_code, target_code))
     keys.append(_legacy_translation_cache_key(text, source_code, target_code, engine))
     if engine and engine != "hymt" and not strict_engine:
         keys.append(_legacy_translation_cache_key(text, source_code, target_code))
-    entry = None
-    for key in keys:
-        entry = cache.get(key)
-        if entry:
-            break
-    if entry:
-        # Update access time
-        entry["accessed"] = time.time()
-        return entry["translated"]
+    with _cache_lock:
+        cache = _load_translation_cache(data_dir)
+        for key in keys:
+            entry = cache.get(key)
+            if entry:
+                entry["accessed"] = time.time()
+                return entry["translated"]
     return None
 
 
 def save_cached_translation(data_dir, text, source_code, target_code, translated, engine=None):
     """Save a translation to cache. Trims cache if over limit."""
-    if not translated or len(text) > MAX_TEXT_LENGTH:
+    if not isinstance(translated, str) or not translated or len(text) > MAX_TEXT_LENGTH:
         return
-    cache = _load_translation_cache(data_dir)
-    key = _translation_cache_key(text, source_code, target_code, engine)
-    cache[key] = {
-        "translated": translated,
-        "created": time.time(),
-        "accessed": time.time(),
-    }
-    # Trim by LRU if over limit
-    if len(cache) > MAX_TRANSLATION_CACHE:
-        sorted_keys = sorted(cache.keys(), key=lambda k: cache[k].get("accessed", 0))
-        to_remove = len(cache) - MAX_TRANSLATION_CACHE
-        for k in sorted_keys[:to_remove]:
-            del cache[k]
-    # Save async
-    threading.Thread(
-        target=_save_translation_cache, args=(data_dir, cache), daemon=True
-    ).start()
+    with _cache_lock:
+        cache = _load_translation_cache(data_dir)
+        key = _translation_cache_key(text, source_code, target_code, engine)
+        cache[key] = {
+            "translated": translated,
+            "created": time.time(),
+            "accessed": time.time(),
+        }
+        if len(cache) > MAX_TRANSLATION_CACHE:
+            sorted_keys = sorted(cache.keys(), key=lambda k: cache[k].get("accessed", 0))
+            for k in sorted_keys[:len(cache) - MAX_TRANSLATION_CACHE]:
+                del cache[k]
+        cache_id = os.path.abspath(data_dir)
+        # Coalesce completions that arrive before the writer takes the lock.
+        if _pending_cache_writes.get(cache_id) is not cache:
+            _pending_cache_writes[cache_id] = cache
+            try:
+                threading.Thread(target=_save_translation_cache, args=(data_dir, cache),
+                                 name='ClicknTranslate-cache-save', daemon=True).start()
+            except Exception:
+                _pending_cache_writes.pop(cache_id, None)
+                raise
 
 
 def _save_translation_cache(data_dir, cache):
     with _cache_lock:
         cache_id = os.path.abspath(data_dir)
-        if _translation_caches.get(cache_id) is not cache:
-            return
         try:
-            path = _get_cache_path(data_dir)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(cache, f, ensure_ascii=False)
+            if _translation_caches.get(cache_id) is cache:
+                write_json(_get_cache_path(data_dir), cache)
         except Exception:
             pass
+        finally:
+            if _pending_cache_writes.get(cache_id) is cache:
+                _pending_cache_writes.pop(cache_id, None)
 
 
 def invalidate_translation_cache():

@@ -51,11 +51,17 @@ def _run_install(command, env, log_path, check_cancel, *, engine_name='Tesseract
                 time.sleep(0.15)
         finally:
             if process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass  # Exited between poll() and killpg(); still reap it.
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    os.killpg(process.pid, signal.SIGKILL)
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                     process.wait(timeout=5)
     check_cancel()
     if process.returncode:
@@ -73,6 +79,7 @@ def install(root, download, check_cancel, progress):
     root = Path(root).resolve()
     check_cancel()
     root.mkdir(parents=True, exist_ok=True)
+    previous = managed_command(root)
     runtime = root / ('runtime-' + uuid.uuid4().hex)
     committed = False
     manifest_stage = root / ('.installation-' + uuid.uuid4().hex)
@@ -109,6 +116,18 @@ def install(root, download, check_cancel, progress):
                                     capture_output=True, text=True, timeout=20)
             if result.returncode or 'tesseract 5.' not in result.stdout.lower():
                 raise RuntimeError('Installed Tesseract could not start:\n' + result.stderr[-2000:])
+            if previous:
+                old_data = Path(previous).parent.parent / 'share/tessdata'
+                for source in old_data.rglob('*'):
+                    check_cancel()
+                    # Carry over downloaded languages without overwriting models
+                    # shipped by the new runtime or following external symlinks.
+                    if not source.is_file() or not source.resolve().is_relative_to(old_data.resolve()):
+                        continue
+                    target = runtime / 'share/tessdata' / source.relative_to(old_data)
+                    if not target.exists():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, target)
             check_cancel()
             manifest_stage.write_text(json.dumps({'runtime': runtime.name, 'architecture': architecture,
                                                    'version': '5.5.3'}) + '\n')

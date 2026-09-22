@@ -1,6 +1,7 @@
 """Exercise editable translation drafts and real Qt reflow, without network."""
 
 import os
+import threading
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from types import SimpleNamespace
 from unittest import mock
@@ -304,6 +305,57 @@ def test_scale_and_theme_changes_preserve_drafts_and_fit_a_small_screen(app, wor
         del app._dialog_appearance
         app.setProperty('ui_theme', None)
         appearance.deleteLater()
+
+
+@pytest.mark.parametrize('action', ['edit_source', 'edit_result', 'new_language', 'close', 'delete'])
+def test_inflight_real_worker_cannot_overwrite_newer_user_state(app, workspace, monkeypatch, action):
+    entered, release = threading.Event(), threading.Event()
+    threads = []
+    original_thread = threading.Thread
+    def start_worker(*args, **kwargs):
+        thread = original_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+    def translate(text, source, target, **kwargs):
+        if target == 'de':
+            return 'New answer'
+        entered.set()
+        assert release.wait(5)
+        # A provider can already have received a chunk when cancellation occurs.
+        kwargs['partial_callback']('Old partial', 1, 2)
+        return 'Old final'
+    monkeypatch.setattr(main.threading, 'Thread', start_worker)
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    workspace.translate_button.click()
+    try:
+        assert entered.wait(5)
+        if action.startswith('edit_'):
+            field = workspace.source_edit if action == 'edit_source' else workspace.text_edit
+            field.setPlainText('Newest draft')
+        elif action == 'new_language':
+            workspace.target_combo.setCurrentIndex(workspace.target_combo.findData('de'))
+        else:
+            workspace.close()
+            if action == 'delete':
+                workspace.deleteLater()
+                app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+                assert sip.isdeleted(workspace)
+    finally:
+        release.set()
+        for thread in threads:
+            thread.join(5)
+            assert not thread.is_alive()
+    app.processEvents()
+    if action.startswith('edit_'):
+        assert field.toPlainText() == 'Newest draft'
+        assert 'Old' not in workspace.text_edit.toPlainText()
+    if action == 'new_language':
+        assert workspace.text_edit.toPlainText() == 'New answer'
+        main.save_translation_history.assert_called_once_with('Hello world', 'New answer', 'de')
+        main.platform_support.copy_text.assert_called_once_with('New answer')
+    else:
+        main.save_translation_history.assert_not_called()
+        main.platform_support.copy_text.assert_not_called()
 
 
 def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, requests):

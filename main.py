@@ -125,6 +125,7 @@ import portable_paths
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
+from atomic_storage import write_json
 from document_translation import translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -136,6 +137,9 @@ from languages import (
 )
 
 AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
+LEGACY_AUTOSTART_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+LEGACY_AUTOSTART_RUN_VALUE = "ClicknTranslate"
+_AUTOSTART_LOCK = threading.RLock()
 STORE_STARTUP_TASK_ID = "ClicknTranslateStartup"
 AUTOSTART_BACKEND = (
     "macos_launchagent" if platform_support.IS_MAC else
@@ -190,6 +194,8 @@ SETTINGS_ACTIONS_FOOTER_GAP = 6
 DEFAULT_CONFIG = {
     "theme": "Темная",
     "ui_scale_percent": DEFAULT_SCALE,
+    "desktop_assistant_enabled": False,
+    "desktop_assistant_position": None,
     "interface_language": "en",
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
@@ -297,8 +303,8 @@ def merge_config_defaults(config):
     from ui_scaling import normalize_ui_scale
     merged["ui_scale_percent"] = normalize_ui_scale(merged["ui_scale_percent"])
     # The experimental whole-screen Dynamic workflow was removed because it
-    # produced unrelated OCR fragments.  Existing installations migrate to the
-    # reliable multi-area workflow without keeping a hidden obsolete choice.
+    # produced unrelated OCR fragments. Existing installations use the same
+    # selected-area workflow as Mac, including old fullscreen settings.
     merged["game_capture_mode"] = "region"
     # Before per-action pairs existed, selected-text translation used the main
     # pair and fullscreen translation inherited the OCR pair. Preserve exactly
@@ -686,18 +692,59 @@ def _autostart_shortcut_matches_current(shortcut_info):
     )
 
 
-def _write_autostart_command(enable):
-    shortcut_path = _autostart_shortcut_path()
-    if enable:
-        _write_autostart_shortcut()
-        return
+def _read_legacy_autostart_command():
+    if not platform_support.IS_WINDOWS:
+        return ""
+    import winreg
 
     try:
-        os.remove(shortcut_path)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_QUERY_VALUE
+        ) as key:
+            value, value_type = winreg.QueryValueEx(key, LEGACY_AUTOSTART_RUN_VALUE)
+            return str(value or "") if value_type in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) else ""
+    except FileNotFoundError:
+        return ""
+
+
+def _remove_legacy_autostart_command():
+    """Remove only the per-user Run value written by older releases."""
+    if not platform_support.IS_WINDOWS:
+        return
+    import winreg
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_SET_VALUE
+        ) as key:
+            winreg.DeleteValue(key, LEGACY_AUTOSTART_RUN_VALUE)
     except FileNotFoundError:
         pass
-    except OSError:
-        pass
+
+
+def _write_autostart_command(enable):
+    with _AUTOSTART_LOCK:
+        shortcut_path = _autostart_shortcut_path()
+        if enable:
+            had_shortcut = os.path.exists(shortcut_path)
+            # Keep the old Run entry until its replacement has been written.
+            _write_autostart_shortcut()
+            try:
+                _remove_legacy_autostart_command()
+            except OSError:
+                if not had_shortcut:
+                    try:
+                        os.remove(shortcut_path)
+                    except OSError:
+                        logging.exception("Could not roll back the new autostart shortcut")
+                raise
+            return
+
+        _remove_legacy_autostart_command()
+        try:
+            os.remove(shortcut_path)
+        except FileNotFoundError:
+            pass
 
 
 def _read_autostart_command():
@@ -2675,6 +2722,8 @@ def guide_text(lang):
             steps.append(existing[action])
         elif action in extras:
             title, body = extras[action]
+            if action == "game_controls":
+                body = settings_text(language, "game_workflow_note")
             steps.append((action, title, body))
     if platform_support.IS_MAC:
         from macos_text import macos_text
@@ -5905,7 +5954,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not self.translated_text.strip():
             QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_translation"))
             return
-        paths = default_output_paths(self._data_dir(), self._source_file_name())
+        try:
+            paths = default_output_paths(self._data_dir(), self._source_file_name())
+        except OSError as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             doc_text(self.lang, "save_translation"),
@@ -5924,11 +5977,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         elif not ext:
             path = root + ".txt"
 
-        if path.lower().endswith(".json"):
-            save_session(path, self._session_payload())
-        else:
-            save_text(path, self.translated_text)
-            save_session(paths["session"], self._session_payload())
+        try:
+            if path.lower().endswith(".json"):
+                save_session(path, self._session_payload())
+            else:
+                save_text(path, self.translated_text)
+                save_session(paths["session"], self._session_payload())
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         self._set_status(f"{doc_text(self.lang, 'saved')}: {path}")
 
     def open_session(self):
@@ -5957,6 +6014,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translated_view.setPlainText(self.translated_text)
         if payload.get("provider_engine"):
             self._populate_provider_combo(payload.get("provider_engine"))
+        self._refresh_document_provider_languages()
+        source_index = self.source_combo.findData(payload.get('source_language'))
+        if source_index >= 0:
+            self.source_combo.setCurrentIndex(source_index)
+        target_index = self.target_combo.findData(payload.get('target_language'))
+        if target_index >= 0:
+            self.target_combo.setCurrentIndex(target_index)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100 if self.translated_text else 0)
         self._set_status(doc_text(self.lang, "session_loaded"))
@@ -5979,6 +6043,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
             if kind == "online"
         }
+        # Keep an explicitly selected offline engine even when its package was
+        # removed. Reopening a local session must never select an online engine.
+        if selected_engine in {engine for engine, _name, _kind in TRANSLATION_PROVIDER_OPTIONS}:
+            available_engines.add(selected_engine)
         try:
             if translater.argos_installed_translation_pairs_fast():
                 available_engines.add("argos")
@@ -6493,7 +6561,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Select a screen area. OCR copies the recognized text.",
         "ocr": "Select a screen area. OCR translates it with this mode's language pair.",
         "fullscreen": "Translate visible text blocks across the whole screen with the Screen pair.",
-        "game": "Keep translations updated over one or more selected areas with the Dynamic pair. Press the shortcut again to stop.",
+        "game": "Select text to read, then choose where to display its live translation. Adjust the output and save templates. Press the shortcut again to stop.",
         "selection": "Select text in another app, then translate it without changing the original.",
         "replace": "Select editable text in another app. The same selection is replaced by its translation; if focus changed, the result is only copied.",
         "toggle": "Hide the app to its previous place or restore it from the tray/taskbar.",
@@ -6502,7 +6570,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Выделите область экрана. OCR распознает и скопирует текст.",
         "ocr": "Выделите область экрана. OCR переведёт её с парой языков этого режима.",
         "fullscreen": "Переведёт видимые блоки текста на всём экране с парой режима «Экран».",
-        "game": "Обновляет перевод поверх одной или нескольких выбранных областей с парой режима «Динамический». Повторное нажатие останавливает режим.",
+        "game": "Выделите исходный текст, затем место вывода перевода. Окно можно настроить, расположение — сохранить как шаблон. Повторная горячая клавиша остановит перевод.",
         "selection": "Выделите текст в другой программе: он переведётся без изменения оригинала.",
         "replace": "Выделите редактируемый текст в другой программе. То же выделение заменится переводом; при смене фокуса результат только скопируется.",
         "toggle": "Скроет программу туда, где она была, или вернёт её из трея/панели задач.",
@@ -6511,7 +6579,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Selecciona un área de pantalla. OCR reconoce y copia el texto.",
         "ocr": "Selecciona un área. OCR la traduce con el par de idiomas de este modo.",
         "fullscreen": "Traduce los bloques de texto visibles en toda la pantalla con el par Pantalla.",
-        "game": "Actualiza la traducción sobre una o varias áreas elegidas con el par Dinámico. Repite el atajo para detenerlo.",
+        "game": "Selecciona el texto original y dónde mostrar su traducción. Ajusta la salida y guarda plantillas. Repite el atajo para detener.",
         "selection": "Selecciona texto en otra app y tradúcelo sin cambiar el original.",
         "replace": "Selecciona texto editable en otra app. La misma selección se reemplaza; si cambia el foco, el resultado solo se copia.",
         "toggle": "Oculta la app en su ubicación anterior o la restaura desde bandeja/barra de tareas.",
@@ -6520,7 +6588,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Bildschirmbereich markieren. OCR erkennt und kopiert den Text.",
         "ocr": "Bereich markieren. OCR übersetzt ihn mit dem Sprachpaar dieses Modus.",
         "fullscreen": "Sichtbare Textblöcke des ganzen Bildschirms mit dem Bildschirm-Paar übersetzen.",
-        "game": "Aktualisiert Übersetzungen über einem oder mehreren markierten Bereichen mit dem Dynamisch-Paar. Erneut drücken beendet den Modus.",
+        "game": "Quelltext und Ausgabebereich wählen. Ausgabe anpassen und Vorlagen speichern. Erneutes Tastenkürzel beendet die Übersetzung.",
         "selection": "Text in einer anderen App markieren und übersetzen, ohne das Original zu ändern.",
         "replace": "Bearbeitbaren Text markieren. Dieselbe Auswahl wird ersetzt; bei geändertem Fokus wird das Ergebnis nur kopiert.",
         "toggle": "App an den vorherigen Ort ausblenden oder aus Tray/Taskleiste wiederherstellen.",
@@ -6529,7 +6597,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Sélectionnez une zone d’écran. L’OCR reconnaît et copie le texte.",
         "ocr": "Sélectionnez une zone. L’OCR la traduit avec la paire de langues de ce mode.",
         "fullscreen": "Traduit les blocs de texte visibles sur tout l’écran avec la paire Écran.",
-        "game": "Actualise la traduction sur une ou plusieurs zones choisies avec la paire Dynamique. Le même raccourci arrête le mode.",
+        "game": "Choisissez le texte source, puis où afficher sa traduction. Réglez la sortie et enregistrez des modèles. Répétez le raccourci pour arrêter.",
         "selection": "Sélectionnez du texte dans une autre app et traduisez-le sans modifier l’original.",
         "replace": "Sélectionnez du texte modifiable. La même sélection est remplacée ; si le focus change, le résultat est seulement copié.",
         "toggle": "Masque l’app à son emplacement précédent ou la restaure depuis la zone de notification/barre des tâches.",
@@ -6538,7 +6606,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "框选屏幕区域；OCR 会识别并复制文字。",
         "ocr": "框选屏幕区域；OCR 使用此模式的语言对进行翻译。",
         "fullscreen": "使用“全屏”语言对翻译整个屏幕上的可见文字块。",
-        "game": "使用“动态”语言对持续更新一个或多个选定区域的译文；再次按快捷键即可停止。",
+        "game": "先选择原文，再选择译文显示区域。可调整输出窗口并保存模板。再次按快捷键停止翻译。",
         "selection": "在其他应用中选中文字并翻译，不修改原文。",
         "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
         "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",
@@ -6974,6 +7042,7 @@ class DarkThemeApp(QMainWindow):
 
         if not LAYOUT_EDITOR_MODE:
             self.create_tray_icon()
+            self._sync_desktop_assistant()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7087,13 +7156,26 @@ class DarkThemeApp(QMainWindow):
         config_path = get_data_file("config.json")
         migrated_keys = ()
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8-sig") as f:
-                loaded_config = json.load(f)
+            loaded_config = None
+            try:
+                with open(config_path, "r", encoding="utf-8-sig") as f:
+                    loaded_config = json.load(f)
+                if not isinstance(loaded_config, dict):
+                    raise ValueError("config root is not an object")
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                logging.warning("Config file is unreadable; starting with defaults: %s", exc)
+                loaded_config = {}
             self.config, migrated_keys = merge_config_defaults(loaded_config)
+            if not loaded_config:
+                # A broken config must not block startup, but it should not
+                # keep falling into the broken state either.
+                try:
+                    write_json(config_path, self.config, indent=4)
+                except OSError:
+                    pass
         else:
             self.config = DEFAULT_CONFIG.copy()
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, ensure_ascii=False, indent=4)
+            write_json(config_path, self.config, indent=4)
             invalidate_config_cache()
         # Извлекаем значения с дефолтами из DEFAULT_CONFIG
         self.current_theme = self.config.get("theme", DEFAULT_CONFIG["theme"])
@@ -7128,29 +7210,44 @@ class DarkThemeApp(QMainWindow):
             self.save_config()
 
     @staticmethod
-    def _probe_portable_windows_autostart(stored_autostart, stored_backend):
-        """Resolve the real shortcut state without touching Qt or app config."""
-        shortcut_info = _read_autostart_shortcut()
-        if shortcut_info and _autostart_shortcut_matches_current(shortcut_info):
-            return True
+    def _probe_portable_windows_autostart(stored_autostart, stored_backend, repair_stale=True):
+        """Reconcile the Startup shortcut and the Run entry from older releases."""
+        with _AUTOSTART_LOCK:
+            shortcut_info = _read_autostart_shortcut()
+            enabled = _autostart_shortcut_matches_current(shortcut_info)
+            legacy_enabled = False
+            try:
+                legacy_enabled = bool(_read_legacy_autostart_command())
+                if not repair_stale:
+                    return enabled or legacy_enabled
+                if enabled:
+                    _remove_legacy_autostart_command()
+                    return True
 
-        should_repair = bool(
-            (shortcut_info and getattr(sys, "frozen", False))
-            or (
-                not shortcut_info
-                and stored_autostart
-                and stored_backend != AUTOSTART_BACKEND
-            )
-        )
-        if not should_repair:
-            return False
-
-        try:
-            _write_autostart_command(True)
-            return _autostart_shortcut_matches_current(_read_autostart_shortcut())
-        except Exception:
-            logging.exception("Could not repair the portable Windows autostart shortcut")
-            return False
+                should_repair = bool(
+                    (shortcut_info and getattr(sys, "frozen", False))
+                    or (
+                        not shortcut_info
+                        and (
+                            (stored_autostart and stored_backend != AUTOSTART_BACKEND)
+                            or (legacy_enabled and (stored_autostart or stored_backend != AUTOSTART_BACKEND))
+                        )
+                    )
+                )
+                if should_repair:
+                    _write_autostart_command(True)
+                    return _autostart_shortcut_matches_current(_read_autostart_shortcut())
+                if not shortcut_info:
+                    # An explicit off state in the current backend must also
+                    # remove a Run entry left behind by the incomplete migration.
+                    _remove_legacy_autostart_command()
+                return False
+            except OSError:
+                logging.exception("Could not reconcile Windows autostart")
+                return enabled or legacy_enabled or bool(stored_autostart)
+            except Exception:
+                logging.exception("Could not repair the portable Windows autostart shortcut")
+                return enabled or legacy_enabled
 
     def _start_deferred_autostart_sync(self):
         if not getattr(self, "_autostart_sync_pending", False):
@@ -7168,17 +7265,27 @@ class DarkThemeApp(QMainWindow):
             "_autostart_probe_stored_backend",
             self.config.get("autostart_backend"),
         )
+        revision = getattr(self, "_autostart_revision", 0)
 
         def worker():
-            enabled = self._probe_portable_windows_autostart(
-                stored_autostart,
-                stored_backend,
-            )
+            with _AUTOSTART_LOCK:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
+                    return
+                enabled = self._probe_portable_windows_autostart(
+                    stored_autostart,
+                    stored_backend,
+                )
 
             def apply_result():
                 # Do not overwrite a choice the user made while the shortcut
                 # probe was running in the background.
-                if bool(self.config.get("autostart", False)) != stored_autostart:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
                     return
                 changed = (
                     bool(self.config.get("autostart", False)) != bool(enabled)
@@ -7208,9 +7315,31 @@ class DarkThemeApp(QMainWindow):
                                                   LANGUAGES[self.current_interface_language][0])
         self.config["start_minimized"] = getattr(self, "start_minimized", False)
         config_path = get_data_file("config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=4)
+        write_json(config_path, self.config, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+
+    def _sync_desktop_assistant(self):
+        assistant = getattr(self, '_desktop_assistant', None)
+        if self.config.get('desktop_assistant_enabled') is True:
+            if assistant is None:
+                from desktop_assistant import DesktopAssistant
+                self._desktop_assistant = DesktopAssistant(self)
+            else:
+                assistant.refresh()
+        elif assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
+
+    def set_desktop_assistant_enabled(self, enabled):
+        self.config['desktop_assistant_enabled'] = bool(enabled)
+        self.save_config()
+        self._sync_desktop_assistant()
+        settings = self.settings_window or self._cached_settings_window
+        checkbox = getattr(settings, 'desktop_assistant_checkbox', None)
+        if checkbox is not None:
+            blocker = QtCore.QSignalBlocker(checkbox)
+            checkbox.setChecked(bool(enabled))
+            del blocker
 
     def set_ui_scale_percent(self, value, anchor_widget=None):
         from ui_scaling import normalize_ui_scale
@@ -7812,8 +7941,8 @@ class DarkThemeApp(QMainWindow):
         if platform_support.IS_MAC:
             import macos_desktop
             enabled = macos_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                enabled = macos_desktop.set_autostart(True)
+            if repair_stale:
+                enabled = macos_desktop.repair_autostart(restore_missing=bool(self.config.get("autostart")))
             self.autostart = self.config["autostart"] = enabled
             self.config["autostart_backend"] = "macos_launchagent"
             return enabled
@@ -7821,11 +7950,10 @@ class DarkThemeApp(QMainWindow):
             import linux_desktop
 
             enabled = linux_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                # The entry points at a path that moved (a new AppImage, say);
-                # rewrite it for the current executable.
-                enabled = linux_desktop.set_autostart(
-                    True, portable_paths.public_executable_path()
+            if repair_stale:
+                enabled = linux_desktop.repair_autostart(
+                    portable_paths.public_executable_path(),
+                    restore_missing=bool(self.config.get("autostart")),
                 )
             self.autostart = enabled
             self.config["autostart"] = enabled
@@ -7839,27 +7967,18 @@ class DarkThemeApp(QMainWindow):
             self.config["autostart_backend"] = AUTOSTART_BACKEND
             return enabled
 
-        shortcut_info = _read_autostart_shortcut()
         stored_autostart = bool(self.config.get("autostart", DEFAULT_CONFIG["autostart"]))
         stored_backend = self.config.get("autostart_backend")
-        enabled = False
-        if shortcut_info:
-            if _autostart_shortcut_matches_current(shortcut_info):
-                enabled = True
-            elif repair_stale and getattr(sys, "frozen", False):
-                # A stale ClicknTranslate shortcut means the user wanted autostart,
-                # but the path changed after moving/updating the portable app.
-                enabled = self.set_autostart(True)
-            else:
-                enabled = False
-        elif repair_stale and stored_autostart and stored_backend != AUTOSTART_BACKEND:
-            enabled = self.set_autostart(True)
+        enabled = DarkThemeApp._probe_portable_windows_autostart(
+            stored_autostart, stored_backend, repair_stale=repair_stale
+        )
         self.autostart = enabled
         self.config["autostart"] = enabled
         self.config["autostart_backend"] = AUTOSTART_BACKEND
         return enabled
 
     def set_autostart(self, enable: bool):
+        self._autostart_revision = getattr(self, "_autostart_revision", 0) + 1
         self._autostart_error = ''
         try:
             if platform_support.IS_MAC:
@@ -9062,6 +9181,8 @@ class DarkThemeApp(QMainWindow):
             thread.start()
 
     def apply_theme(self):
+        if hasattr(self, 'config'):
+            self._sync_desktop_assistant()
         theme = THEMES[self.current_theme]
         from window_appearance import refresh_window_appearance
         refresh_window_appearance(percent=self.config.get('ui_scale_percent', DEFAULT_SCALE), theme=self.current_theme)
@@ -10286,6 +10407,9 @@ class DarkThemeApp(QMainWindow):
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
         self.text_input.textChanged.connect(self._remember_main_input)
+        self.text_input.textChanged.connect(self._update_main_translate_button)
+        self.source_lang.currentIndexChanged.connect(self._update_main_translate_button)
+        self.target_lang.currentIndexChanged.connect(self._update_main_translate_button)
         input_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
@@ -10302,7 +10426,7 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language, "translate_button"
         )
         self.translate_button = ScaledIconButton()
-        self.translate_button.setEnabled(not self._main_translation_running)
+        self.translate_button.setEnabled(False)
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setObjectName("mainTranslateButton")
         self.translate_button.setAccessibleName(translate_action_text)
@@ -10364,7 +10488,7 @@ class DarkThemeApp(QMainWindow):
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
-        self.translate_button.setEnabled(has_translation_pair and not self._main_translation_running)
+        self._update_main_translate_button()
         if not has_translation_pair:
             self.translate_button.setToolTip(
                 tooltip_text(
@@ -10679,7 +10803,7 @@ class DarkThemeApp(QMainWindow):
         finally:
             self.target_lang.blockSignals(False)
         if getattr(self, "translate_button", None) is not None:
-            self.translate_button.setEnabled(self.target_lang.count() > 0 and not self._main_translation_running)
+            self._update_main_translate_button()
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
         update_swap = getattr(self, "_update_main_language_swap", None)
@@ -11043,6 +11167,10 @@ class DarkThemeApp(QMainWindow):
             self.force_quit = True
 
         # Если force_quit=True, то выполняем полноценный выход
+        assistant = getattr(self, '_desktop_assistant', None)
+        if assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
         try:
             if hasattr(self, "hotkey_thread") and self.hotkey_thread is not None:
                 self.hotkey_thread.stop()
@@ -11207,7 +11335,7 @@ class DarkThemeApp(QMainWindow):
         self._argos_cancel_enabled = False
         if getattr(self, "translate_button", None) is not None:
             try:
-                self.translate_button.setEnabled(True)
+                self._update_main_translate_button()
             except RuntimeError:
                 pass
         if self._argos_progress is not None:
@@ -11386,6 +11514,17 @@ class DarkThemeApp(QMainWindow):
                 self._start_argos_translation(text, source_code, target_code)
                 return
             self._start_main_translation(text, source_code, target_code, engine)
+
+    def _update_main_translate_button(self, *_args):
+        """Translate is only meaningful with a language pair and non-empty text."""
+        if getattr(self, "translate_button", None) is None:
+            return
+        try:
+            pair = self.target_lang.count() > 0
+            text = bool(self.text_input.toPlainText().strip())
+            self.translate_button.setEnabled(pair and text and not self._main_translation_running)
+        except RuntimeError:
+            pass
 
     def minimize_to_tray(self):
         if not self.has_tray():
@@ -11668,19 +11807,9 @@ if __name__ == "__main__":
             window.showNormal()
             window.raise_()
             window.activateWindow()
-    for argument in sys.argv[1:]:
-        if not argument.startswith("--update-ack="):
-            continue
-        ack_path = argument.split("=", 1)[1].strip()
-        if ack_path:
-            try:
-                ack_parent = os.path.dirname(os.path.abspath(ack_path))
-                os.makedirs(ack_parent, exist_ok=True)
-                with open(ack_path, "w", encoding="utf-8") as ack_file:
-                    ack_file.write(APP_VERSION)
-            except Exception:
-                pass
-        break
+    from update_handshake import acknowledge_ready
+    _update_package_root = get_portable_dir() if platform_support.IS_WINDOWS and getattr(sys, 'frozen', False) else None
+    QTimer.singleShot(0, lambda: acknowledge_ready(sys.argv[1:], APP_VERSION, _update_package_root))
     # Первый запуск из ярлыка рабочего стола: экземпляра ещё не было, поэтому
     # действие выполняем сами, как только окно готово.
     if _requested_shortcut_action:

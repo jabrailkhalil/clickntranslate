@@ -1,5 +1,10 @@
 # macOS port (1.7.1 development)
 
+**Portable audit (2026-09-19):** startup repair, Tesseract model retention and
+cancellation fixes; 28 new regression cases; dependency binaries checked for
+both architectures. See [the current audit](QA_MACOS_2026_09_19.md) for results
+and remaining native checks. No new Mac build or native run was made in this audit.
+
 The source implements macOS support for Apple Silicon (`arm64`) and Intel
 (`x86_64`). The build targets macOS 13.4 or newer and Python 3.12. Separate native
 builds avoid requiring Rosetta or a mixture of incompatible native libraries.

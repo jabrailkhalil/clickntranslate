@@ -7,6 +7,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -321,6 +322,8 @@ internal static class ClicknTranslateApplyUpdate
         private const int TitleBarHeight = 40;
 
         private readonly UpdateRequest request;
+        private bool rollbackCompleted;
+        private string recoveryBackup;
         private readonly Label status;
         private readonly Label detail;
         private readonly AccentProgressBar progress;
@@ -669,7 +672,10 @@ internal static class ClicknTranslateApplyUpdate
             progress.Invalidate();
             status.Text = "The update could not be installed";
             status.ForeColor = Palette.DangerText;
-            detail.Text = "The previous version was restored. Close other copies of the app and run Update again.";
+            detail.Text = rollbackCompleted
+                ? "The previous files were restored. Close other copies of the app and run Update again."
+                : "Automatic recovery could not finish. Create a startup report or reinstall into the same folder."
+                    + (string.IsNullOrWhiteSpace(recoveryBackup) ? "" : "\nRecovery files: " + recoveryBackup);
             closeButton.Enabled = true;
         }
 
@@ -715,6 +721,7 @@ internal static class ClicknTranslateApplyUpdate
                     InstallSetup(request.PackagePath, request.AppDirectory);
                 }
 
+                SetStatus("Verifying all program files…", "Checking that every component was updated completely.");
                 VerifyInstalledFiles(request.AppDirectory, request.ExecutableName, request.ExpectedVersion);
                 TryDelete(marker);
                 StartAndVerify(request.AppDirectory, request.ExecutableName, request.ExpectedVersion);
@@ -729,14 +736,17 @@ internal static class ClicknTranslateApplyUpdate
                 try
                 {
                     StopInstallProcesses(request.AppDirectory);
-                    if (backupComplete && !string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup))
+                    if (!string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup))
                     {
-                        RemoveProgramItems(request.AppDirectory);
+                        // A failed move can leave only part of the old program
+                        // in backup. Restore that part without deleting the rest.
+                        if (backupComplete) RemoveProgramItems(request.AppDirectory);
                         RestoreBackup(backup, request.AppDirectory);
                         backup = null;
                     }
                     TryDelete(marker);
                     StartApplication(request.AppDirectory, request.ExecutableName, "--show-after-update");
+                    rollbackCompleted = true;
                 }
                 catch (Exception rollbackError)
                 {
@@ -749,6 +759,7 @@ internal static class ClicknTranslateApplyUpdate
                 TryDelete(marker);
                 if (!string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup))
                 {
+                    recoveryBackup = backup;
                     WriteLog("Preserving recovery backup at " + backup);
                 }
             }
@@ -772,6 +783,7 @@ internal static class ClicknTranslateApplyUpdate
                 {
                     throw new InvalidDataException("The update archive is incomplete.");
                 }
+                VerifyInstalledFiles(payloadRoot, request.ExecutableName, request.ExpectedVersion);
                 CopyDirectoryContents(payloadRoot, appDirectory);
             }
             finally
@@ -886,9 +898,65 @@ internal static class ClicknTranslateApplyUpdate
         string inner = Path.Combine(appDirectory, "app", "ClicknTranslateApp.exe");
         if (!File.Exists(launcher) || !File.Exists(inner))
             throw new InvalidDataException("The installed application files are incomplete.");
-        string fileVersion = FileVersionInfo.GetVersionInfo(launcher).FileVersion ?? string.Empty;
-        if (!fileVersion.StartsWith(version + ".", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("The installed launcher has the wrong version.");
+        foreach (string executable in new[] { launcher, inner,
+            Path.Combine(appDirectory, "app", "_internal", "OcrWorker.exe"),
+            Path.Combine(appDirectory, "app", "_internal", "ArgosWorker.exe"),
+            Path.Combine(appDirectory, "app", "_internal", "ClicknTranslateUpdater.exe") })
+        {
+            if (!File.Exists(executable)) throw new InvalidDataException("Missing program file: " + Path.GetFileName(executable));
+            string fileVersion = FileVersionInfo.GetVersionInfo(executable).FileVersion ?? string.Empty;
+            if (!string.Equals(fileVersion, version, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(fileVersion, version + ".0", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The installed " + Path.GetFileName(executable) + " has the wrong version.");
+        }
+        VerifyProgramManifest(appDirectory, version);
+    }
+
+    private static IEnumerable<string> ProgramFiles(string root)
+    {
+        foreach (FileSystemInfo item in new DirectoryInfo(root).GetFileSystemInfos())
+        {
+            if (IsPreserved(item)) continue;
+            if (item is DirectoryInfo)
+                foreach (string path in Directory.GetFiles(item.FullName, "*", SearchOption.AllDirectories)) yield return path;
+            else if (!item.Name.Equals("program-files.sha256", StringComparison.OrdinalIgnoreCase)) yield return item.FullName;
+        }
+    }
+
+    private static void VerifyProgramManifest(string root, string version)
+    {
+        string manifest = Path.Combine(root, "program-files.sha256");
+        if (!File.Exists(manifest)) throw new InvalidDataException("The program file manifest is missing.");
+        string[] lines = File.ReadAllLines(manifest);
+        if (lines.Length < 2 || lines[0] != "# ClicknTranslate " + version)
+            throw new InvalidDataException("The program file manifest has the wrong version.");
+        string prefix = Path.GetFullPath(root).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+        HashSet<string> expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string line in lines.Skip(1))
+        {
+            if (line.Length < 67 || line.Substring(64, 2) != " *")
+                throw new InvalidDataException("Invalid program manifest entry.");
+            string relative = line.Substring(66).Replace('\\', '/');
+            string path = Path.GetFullPath(Path.Combine(root, relative));
+            if (relative.Contains(':') || relative.Split('/').Any(part => part == "" || part == "." || part == "..")
+                || !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !expected.Add(path))
+                throw new InvalidDataException("Invalid program manifest path: " + relative);
+            if (!File.Exists(path)) throw new InvalidDataException("Missing program file: " + relative);
+            string hash;
+            using (SHA256 sha = SHA256.Create())
+            using (FileStream stream = File.OpenRead(path))
+                hash = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "");
+            if (!hash.Equals(line.Substring(0, 64), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Damaged program file: " + relative);
+        }
+        string[] required = { "ClicknTranslate.exe", "app/ClicknTranslateApp.exe",
+            "app/_internal/OcrWorker.exe", "app/_internal/ArgosWorker.exe",
+            "app/_internal/ClicknTranslateUpdater.exe", "app/_internal/base_library.zip" };
+        if (required.Any(relative => !expected.Contains(Path.GetFullPath(Path.Combine(root, relative)))))
+            throw new InvalidDataException("The manifest omits required program modules.");
+        if (!expected.SetEquals(ProgramFiles(root).Select(Path.GetFullPath)))
+            throw new InvalidDataException("The installed program inventory differs from its manifest.");
+        WriteLog("Verified all " + expected.Count + " program files against the release manifest.");
     }
 
     private static void WaitForProcessExit(int processId, TimeSpan timeout)
@@ -977,12 +1045,7 @@ internal static class ClicknTranslateApplyUpdate
 
     private static void CopyDirectoryContents(string source, string destination)
     {
-        foreach (string directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
-        {
-            string relative = directory.Substring(source.Length).TrimStart('\\', '/');
-            Directory.CreateDirectory(Path.Combine(destination, relative));
-        }
-        foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        foreach (string file in ProgramFiles(source).Concat(new[] { Path.Combine(source, "program-files.sha256") }))
         {
             string relative = file.Substring(source.Length).TrimStart('\\', '/');
             string target = Path.Combine(destination, relative);
