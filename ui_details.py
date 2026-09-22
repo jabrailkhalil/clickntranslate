@@ -24,8 +24,10 @@ class _SocialIcon(QtGui.QIconEngine):
         if mode == QtGui.QIcon.Disabled:
             painter.setOpacity(.4)
         side = min(rect.width(), rect.height())
-        target = QtCore.QRectF(rect.center().x() - side / 2,
-                              rect.center().y() - side / 2, side, side)
+        inset = max(1.0, side * 0.08)
+        target = QtCore.QRectF(rect.center().x() - side / 2 + inset / 2,
+                              rect.center().y() - side / 2 + inset / 2,
+                              max(1.0, side - inset), max(1.0, side - inset))
         self.renderer.render(painter, target)
         painter.restore()
 

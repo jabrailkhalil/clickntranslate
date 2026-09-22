@@ -369,3 +369,25 @@ def test_main_scaling_uses_local_dirty_rectangles_and_full_theme_refresh(app, ow
         update.assert_called()
     window.close()
     window.deleteLater()
+
+
+def test_main_screen_has_translation_heading_and_larger_preview(app, owner):
+    owner.resize(920, 760)
+    with mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False), \
+            mock.patch.object(main.DarkThemeApp, '_maybe_check_updates_on_launch'):
+        window = main.DarkThemeApp()
+    window.show()
+    app.processEvents()
+    title = window.main_text_section.findChild(QtWidgets.QLabel, 'mainTextSectionTitle')
+    assert title is not None
+    assert title.text() == main.hotkey_language_text(window.current_interface_language, 'text_section')
+    assert title.alignment() & QtCore.Qt.AlignCenter
+    assert window.assistant_preview.height() >= 24
+    assert window.assistant_preview.button.width() >= 28
+    line_y = window.assistant_preview.height() - 7
+    image = window.assistant_preview.grab().toImage()
+    non_transparent = [image.pixelColor(x, line_y).alpha() for x in range(12, max(13, image.width()-12), 8)]
+    assert any(alpha > 0 for alpha in non_transparent)
+    window.force_quit = True
+    window.close()
+    window.deleteLater()

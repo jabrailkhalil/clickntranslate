@@ -45,7 +45,7 @@ class _PreviewButton(QtWidgets.QAbstractButton):
     def __init__(self, rail):
         super().__init__(rail)
         self.rail = rail
-        self.setFixedSize(22, 18)
+        self.setFixedSize(28, 24)
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
@@ -60,9 +60,9 @@ class _PreviewButton(QtWidgets.QAbstractButton):
         frames = self.rail.frames[0 if self.rail.direction > 0 else 1]
         if frames:
             pixmap = frames[self.rail.frame_index % len(frames)]
-            size = pixmap.size().scaled(16, 16, QtCore.Qt.KeepAspectRatio)
+            size = pixmap.size().scaled(22, 22, QtCore.Qt.KeepAspectRatio)
             target = QtCore.QRect((self.width() - size.width()) // 2,
-                                  self.height() - size.height() - 1, size.width(), size.height())
+                                  self.height() - size.height(), size.width(), size.height())
             painter.drawPixmap(target, pixmap)
         else:
             painter.setPen(self.palette().text().color())
@@ -99,7 +99,7 @@ class AssistantPreview(QtWidgets.QWidget):
     def __init__(self, activity_owner, language='en', parent=None):
         super().__init__(parent)
         self.setObjectName('assistantPreviewRail')
-        self.setFixedHeight(18)
+        self.setFixedHeight(26)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self._owner = activity_owner
         self._hovered = False
@@ -159,6 +159,16 @@ class AssistantPreview(QtWidgets.QWidget):
         self.button.move(round(self._x), 0)
         self._sync_animation()
         super().resizeEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        y = self.height() - 7
+        line = QtCore.QRectF(10, y, max(0, self.width() - 20), 2)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(154, 127, 193, 90))
+        painter.drawRoundedRect(line, 1, 1)
 
     def _tick(self):
         # A busy UI never catches up by running a burst of animation frames.

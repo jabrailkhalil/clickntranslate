@@ -4264,8 +4264,8 @@ class TranslationResultDialog(QDialog):
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setMinimumSize(400, 370)
-        self.resize(760, 470)
+        self.setMinimumSize(400, 350)
+        self.resize(720, 440)
         self.setSizeGripEnabled(True)
 
         outer = QVBoxLayout(self)
@@ -4292,6 +4292,8 @@ class TranslationResultDialog(QDialog):
         self.title_label.setMinimumWidth(0)
         header.addWidget(self.title_label, 0, 0)
         self.engine_combo = self._language_combo()
+        self.engine_combo.setFixedWidth(190)
+        self.engine_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
         from settings_window import _populate_grouped_translator_combo
         _populate_grouped_translator_combo(self.engine_combo, self.lang)
@@ -4383,10 +4385,12 @@ class TranslationResultDialog(QDialog):
         self.close_button = QPushButton(ui_text(self.lang, "close"))
         self.close_button.setObjectName("translationResultClose")
         self.close_button.clicked.connect(self.accept)
-        buttons.addWidget(self.close_button)
+        self.close_button.hide()
         buttons.addStretch(1)
-        self.copy_button = QPushButton(ui_text(self.lang, "copy"))
+        self.copy_button = QPushButton()
         self.copy_button.setObjectName("translationResultCopyText")
+        self.copy_button.setAccessibleName(ui_text(self.lang, "copy"))
+        self.copy_button.setToolTip(tooltip_text(ui_text(self.lang, "copy")))
         self.copy_button.clicked.connect(self._copy_result)
         buttons.addWidget(self.copy_button)
         self.translate_button = QPushButton(ui_text(self.lang, "translate_button"))
@@ -4396,6 +4400,8 @@ class TranslationResultDialog(QDialog):
         for button in (self.close_button, self.copy_button, self.translate_button):
             button.setMinimumHeight(36)
             button.setAutoDefault(False)
+        self.copy_button.setText("")
+        self.copy_button.setFixedWidth(48)
         layout.addLayout(buttons)
         self.translate_shortcuts = []
         for key in ("Ctrl+Return", "Ctrl+Enter"):
@@ -4457,8 +4463,10 @@ class TranslationResultDialog(QDialog):
             return
         self._header_compact = compact
         self.engine_header.removeWidget(self.engine_combo)
-        self.engine_header.addWidget(self.engine_combo, 1 if compact else 0,
-                                     0 if compact else 1, 1, 4 if compact else 1)
+        if compact:
+            self.engine_header.addWidget(self.engine_combo, 1, 0, 1, 2, Qt.AlignLeft)
+        else:
+            self.engine_header.addWidget(self.engine_combo, 0, 1, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         self.engine_header.setColumnStretch(1, 0 if compact else 1)
 
     def _current_config(self):
@@ -4814,6 +4822,9 @@ class TranslationResultDialog(QDialog):
             + "QToolButton { font-size:12px; padding:0 5px; }")
         for combo in (self.source_combo, self.target_combo, self.engine_combo):
             combo.set_popup_background(surface)
+        self.copy_button.setIcon(clipboard_copy_icon(theme))
+        self.copy_button.setIconSize(QSize(18, 18))
+        self.copy_button.setStyleSheet(button_qss(dark, "quiet", compact=False, radius=6))
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
@@ -10319,6 +10330,16 @@ class DarkThemeApp(QMainWindow):
         shortcut_section_layout = QVBoxLayout(self.main_shortcut_section)
         shortcut_section_layout.setContentsMargins(0, 2, 0, 2)
         shortcut_section_layout.setSpacing(6)
+
+        text_caption = QLabel(hotkey_language_text(self.current_interface_language, "text_section"))
+        text_caption.setObjectName("mainTextSectionTitle")
+        text_caption.setFixedHeight(18)
+        text_caption.setAlignment(Qt.AlignCenter)
+        text_header = QHBoxLayout()
+        text_header.setContentsMargins(8, 0, 8, 0)
+        text_header.setSpacing(8)
+        text_header.addWidget(text_caption, 1)
+        text_section_layout.addLayout(text_header)
 
         self.label = None
         self._hotkey_language_controls_loading = True
