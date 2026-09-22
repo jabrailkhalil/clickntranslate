@@ -1,0 +1,65 @@
+name: UI branch review
+
+on:
+  push:
+    branches: [codex/ui-polish-20260923]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare source for isolated review
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-review"
+          git archive --format=zip --output="$RUNNER_TEMP/ui-review/source.zip" HEAD
+          python -m pip download --only-binary=:all: 'PyQt5~=5.15.11' pyperclip pypdf -d "$RUNNER_TEMP/ui-review/wheels"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-review-source
+          path: ${{ runner.temp }}/ui-review
+          retention-days: 3
+          if-no-files-found: error
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            requirements: requirements.txt
+          - os: ubuntu-latest
+            requirements: requirements-linux.txt
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ${{ matrix.requirements }}
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          python -m pip install -r "${{ matrix.requirements }}" pytest pyinstaller
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            python -m pip install --no-deps 'argostranslate~=1.11.0'
+          fi
+      - name: Run regression suite
+        run: python -m pytest -q --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review-tests-${{ runner.os }}
+          path: test-results.xml
+          retention-days: 7
