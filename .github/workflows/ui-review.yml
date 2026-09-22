@@ -1,42 +1,80 @@
-name: Apply requested UI follow-up
+name: UI branch review
 
 on:
   push:
     branches: [codex/ui-polish-20260923]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
-    if: github.event.head_commit.message != 'Apply requested UI follow-up'
+  source:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Apply exact reviewed patch
-        shell: python
-        env:
-          PATCH_B64: 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
-        run: |
-          import base64, hashlib, os, pathlib, subprocess, zlib
-          patch = zlib.decompress(base64.b64decode(os.environ['PATCH_B64']))
-          assert hashlib.sha256(patch).hexdigest() == 'a0b79f7998f37c294fa689f2eceb8e0d6b49b8f525bc26f5050dade09ba9c09f'
-          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'ui-followup.patch'
-          path.write_bytes(patch)
-          subprocess.run(['git', 'apply', '--check', '-p2', str(path)], check=True)
-          subprocess.run(['git', 'apply', '-p2', str(path)], check=True)
-          subprocess.run(['git', 'diff', '--check'], check=True)
-          changed = set(subprocess.check_output(['git','diff','--name-only'], text=True).splitlines())
-          expected = {'main.py','assistant_preview.py','ui_details.py','tests/test_ui_polish.py','tests/test_translation_result_ui.py'}
-          assert changed == expected, (changed, expected)
-      - name: Commit follow-up
+      - name: Archive exact reviewed source
         shell: bash
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add main.py assistant_preview.py ui_details.py tests/test_ui_polish.py tests/test_translation_result_ui.py
-          git commit -m 'Apply requested UI follow-up'
-          git push origin HEAD:refs/heads/codex/ui-polish-20260923
+          mkdir -p "$RUNNER_TEMP/ui-source"
+          git archive --format=zip --output="$RUNNER_TEMP/ui-source/source.zip" HEAD
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-source/revision.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-review-source
+          path: ${{ runner.temp }}/ui-source
+          retention-days: 3
+          if-no-files-found: error
+
+  test:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            requirements: requirements.txt
+          - os: ubuntu-latest
+            requirements: requirements-linux.txt
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ${{ matrix.requirements }}
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          python -m pip install -r "${{ matrix.requirements }}" pytest pyinstaller
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            python -m pip install --no-deps 'argostranslate~=1.11.0'
+          fi
+      - name: Focused UI follow-up tests
+        run: python tools/run_regression_tests.py --output .tmp/ui-smoke tests/test_ui_polish.py tests/test_translation_result_ui.py tests/test_window_provider_dispatch.py
+      - name: Render UI and sample animation in active and idle states
+        run: python tools/qa_ui_polish.py --output .tmp/ui-renders --benchmark-seconds 5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-preview-${{ runner.os }}
+          path: .tmp/ui-renders
+          include-hidden-files: true
+          retention-days: 7
+      - name: Run regression suite with isolated user data
+        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review-${{ runner.os }}
+          path: |
+            test-results.xml
+            .tmp/ui-ci/run.json
+            .tmp/ui-smoke/run.json
+            .tmp/ui-renders
+          include-hidden-files: true
+          retention-days: 7
