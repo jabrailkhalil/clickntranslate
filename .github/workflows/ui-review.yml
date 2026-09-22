@@ -1,57 +1,53 @@
-name: Complete window provider dispatch fix
+name: UI branch review
 
 on:
   push:
     branches: [codex/ui-polish-20260923]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  apply:
-    if: github.ref == 'refs/heads/codex/ui-polish-20260923'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
+  test:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            requirements: requirements.txt
+          - os: ubuntu-latest
+            requirements: requirements-linux.txt
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          ref: ${{ github.sha }}
-          fetch-depth: 2
-      - name: Apply reviewed canonical provider fix
-        shell: python
-        run: |
-          import hashlib, os, pathlib, subprocess
-          assert os.environ['GITHUB_REF'] == 'refs/heads/codex/ui-polish-20260923'
-          hashes = {
-              'main.py': ('8b02d1299629793b326cc66808446327003b4281da71f9399a9e6e47c267a41c', '44a5b82732e708335bc74862decab0d508b83d6d68af6346ff30d330f07c1488'),
-              'tests/test_translation_workspace.py': ('5ee4390de2af1ff1d83861ae1b15f4db83e39f664734a3633c90ae5217506127', '24c050fed43c709a564b2f8f02a94e653f8478e5fecf093d62399225213182d7'),
-              'tests/test_ui_polish.py': ('f6d84c998dbb037f6c9d109770018741bf4faeeb1c21685ee2633ddd35b02902', 'aba175cbf22d15c2afec52aca9ad26a8ac87188ee2b925ea5fa6c5e934774997'),
-          }
-          for name, (before, after) in hashes.items():
-              path = pathlib.Path(name)
-              raw = path.read_bytes()
-              assert hashlib.sha256(raw).hexdigest() == before, name
-              text = raw.decode('utf-8')
-              if name == 'main.py':
-                  old = '        engine = self.window_engine\n'
-                  assert text.count(old) == 1
-                  text = text.replace(old, '        # Dispatch the stable provider ID, not its display name (Hy-MT != hymt).\n        engine = self.engine_combo.currentData() or self.window_engine\n')
-              else:
-                  for value in ('Google', 'Lingva', 'MyMemory'):
-                      text = text.replace("kwargs['engine'] == '" + value + "'", "kwargs['engine'] == '" + value.lower() + "'")
-              raw = text.encode('utf-8')
-              assert hashlib.sha256(raw).hexdigest() == after, name
-              path.write_bytes(raw)
-          subprocess.run(['git', 'add', '--', *hashes], check=True)
-          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
-      - name: Publish source only to review branch
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ${{ matrix.requirements }}
+      - name: Install test dependencies
         shell: bash
         run: |
-          test "$GITHUB_REF" = refs/heads/codex/ui-polish-20260923
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Use provider IDs for local window requests and verify all six backends'
-          git push origin HEAD:refs/heads/codex/ui-polish-20260923
-          git log -1 --format='%H %s'
+          python -m pip install -r "${{ matrix.requirements }}" pytest pyinstaller
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            python -m pip install --no-deps 'argostranslate~=1.11.0'
+          fi
+      - name: Run regression suite with isolated user data
+        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml
+      - name: Render revised UI without network or desktop hooks
+        run: python tools/qa_ui_polish.py --output .tmp/ui-renders
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review-${{ runner.os }}
+          path: |
+            test-results.xml
+            .tmp/ui-ci/run.json
+            .tmp/ui-renders
+          include-hidden-files: true
+          retention-days: 7
