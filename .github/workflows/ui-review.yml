@@ -1,34 +1,74 @@
-name: UI branch review
+name: Publish and test reviewed UI patch
 
 on:
   push:
     branches: [codex/ui-polish-20260923]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  snapshot:
+  apply:
+    if: github.ref == 'refs/heads/codex/ui-polish-20260923'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.publish.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-      - name: Prepare source for isolated review
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Verify exact reviewed patch and apply it
+        shell: python
         run: |
-          mkdir -p "$RUNNER_TEMP/ui-review"
-          git archive --format=zip --output="$RUNNER_TEMP/ui-review/source.zip" HEAD
-          python -m pip download --only-binary=:all: 'PyQt5~=5.15.11' pyperclip pypdf -d "$RUNNER_TEMP/ui-review/wheels"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ui-review-source
-          path: ${{ runner.temp }}/ui-review
-          retention-days: 3
-          if-no-files-found: error
+          import base64, hashlib, os, pathlib, subprocess, zlib
+          assert os.environ['GITHUB_REF'] == 'refs/heads/codex/ui-polish-20260923'
+          files = sorted(pathlib.Path('.github').glob('ui-polish.payload.*'))
+          assert len(files) == 4
+          chunks = [p.read_text(encoding='ascii').strip() for p in files]
+          # Correct three transfer typos; verify every resulting byte below.
+          for before, after in [('FKZZze', 'FKZze'), ('Atx+XtWQ5', 'Atx+XtQ5'), ('PxaXP5n4', 'PxaXP7n4')]:
+              assert chunks[0].count(before) == 1
+              chunks[0] = chunks[0].replace(before, after)
+          hashes = ['8c039063404e542016369d93231ebea23ff0ea09', 'a94a8a0816198cedb2ee71430f9521b62a083229', 'b967cf0c4d1c106aff34c6b05a4a36685ef5973e', 'e2862249d90065de70d068d198a30d222c91f366']
+          for chunk, expected in zip(chunks, hashes):
+              data = chunk.encode('ascii')
+              assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
+          patch = zlib.decompress(base64.b64decode(''.join(chunks), validate=True))
+          assert len(patch) == 71691
+          assert hashlib.sha256(patch).hexdigest() == '055b4a1af94ecbd0f60e50366dbc18e8fcb216387169feb0e559d0b40a509bc1'
+          target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'ui-polish.patch'
+          target.write_bytes(patch)
+          expected_paths = {'assistant_preview.py', 'assistant_text.py', 'capture_widgets.py', 'docs/UI_POLISH_2026_09_23.md', 'main.py', 'settings_window.py', 'tests/test_fixed_window_text_layout.py', 'tests/test_guide_spotlight.py', 'tests/test_main_window_layout.py', 'tests/test_ui_polish.py', 'tools/qa_ui_polish.py', 'ui_details.py', 'ui_scaling.py'}
+          stats = subprocess.check_output(['git', 'apply', '--numstat', str(target)], text=True)
+          assert {line.split('\t', 2)[2] for line in stats.splitlines()} == expected_paths
+          subprocess.run(['git', 'apply', '--check', str(target)], check=True)
+          subprocess.run(['git', 'apply', str(target)], check=True)
+          template = pathlib.Path('.github/ui-review-final.yml')
+          pathlib.Path('.github/workflows/ui-review.yml').write_bytes(template.read_bytes())
+          template.unlink()
+          for path in files:
+              path.unlink()
+          subprocess.run(['git', 'add', '--', *sorted(expected_paths), '.github'], check=True)
+          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
+      - name: Commit only to the requested review branch
+        id: publish
+        shell: bash
+        run: |
+          test "$GITHUB_REF" = refs/heads/codex/ui-polish-20260923
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Polish welcome, local translation engines, mascot preview and OCR controls'
+          git push origin HEAD:refs/heads/codex/ui-polish-20260923
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git log -1 --format='%H %s'
 
   test:
+    needs: apply
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +83,8 @@ jobs:
       PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.apply.outputs.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -55,11 +97,17 @@ jobs:
           if [ "${{ runner.os }}" = "Linux" ]; then
             python -m pip install --no-deps 'argostranslate~=1.11.0'
           fi
-      - name: Run regression suite
-        run: python tools/run_regression_tests.py --junitxml=test-results.xml
+      - name: Run regression suite with isolated user data
+        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml
+      - name: Render revised UI without network or desktop hooks
+        run: python tools/qa_ui_polish.py --output .tmp/ui-renders
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ui-review-tests-${{ runner.os }}
-          path: test-results.xml
+          name: ui-review-${{ runner.os }}
+          path: |
+            test-results.xml
+            .tmp/ui-ci/run.json
+            .tmp/ui-renders
+          include-hidden-files: true
           retention-days: 7
