@@ -62,7 +62,9 @@ russian.MainExecutableMissing=Основной файл программы бы�
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "data\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "data\*;program-files.sha256"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Older in-place updaters require this file beside ClicknTranslate.exe.
+Source: "{#SourceDir}\program-files.sha256"; DestDir: "{app}"; Attribs: hidden; Flags: ignoreversion
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\app"

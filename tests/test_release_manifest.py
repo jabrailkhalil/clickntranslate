@@ -20,9 +20,27 @@ def package(tmp_path):
 
 
 def test_manifest_covers_all_modules_and_excludes_user_data(package):
+    # The legacy updater looks only beside ClicknTranslate.exe and treats any
+    # nested file as a program module, so this compatibility file must stay at
+    # the root instead of becoming an unlisted file under app/.
+    assert (package / MANIFEST).is_file()
+    assert not (package / 'app' / MANIFEST).exists()
+    assert not any(path.name == MANIFEST for path in (package / 'app').rglob('*'))
     assert verify_manifest(package, '1.7.1') == 8
     (package / 'data/config.json').write_bytes(b'edited settings')
     assert verify_manifest(package, '1.7.1') == 8
+
+
+def test_manifest_is_a_legacy_updater_requirement_not_an_unpacked_dependency():
+    source = Path(__file__).resolve().parents[1]
+    updater = (source / 'launcher/ClicknTranslateApplyUpdate.cs').read_text(encoding='utf-8')
+    program_files = updater[updater.index('private static IEnumerable<string> ProgramFiles'):]
+    program_files = program_files[:program_files.index('private static void WaitForProcessExit')]
+    assert 'Path.Combine(root, "program-files.sha256")' in program_files
+    assert 'item.Name.Equals("program-files.sha256"' in program_files
+    # The recursive directory branch deliberately counts nested files: moving
+    # the manifest into app/ would make old helpers reject an otherwise valid update.
+    assert 'Directory.GetFiles(item.FullName, "*", SearchOption.AllDirectories)' in program_files
 
 
 @pytest.mark.parametrize('relative', sorted(REQUIRED | {'app/_internal/qt/plugins/platforms/qwindows.dll', 'app/_internal/icons/icon.png'}))
