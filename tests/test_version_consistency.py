@@ -16,7 +16,7 @@ def test_release_version_is_synchronized_everywhere():
     version = match.group(1)
     four_part = version + ".0" if version.count(".") == 2 else version
 
-    assert version == "1.7.1"
+    assert version == "1.7.2"
     assert f'#define MyAppVersion "{version}"' in _read("installer/ClicknTranslate.iss")
     assert f'version="{four_part}"' in _read("installer/windows/ClicknTranslate.exe.manifest")
     assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateRepair.manifest")
