@@ -212,6 +212,15 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
                 required = label.heightForWidth(label.width())
                 assert required <= label.height(), (language, key, label.text(), required, label.height())
             assert button.width() > 0
+        assert menu.header_widget.isVisible()
+        assert all(button.parentWidget() is menu.header_widget
+                   for button in menu.section_buttons.values())
+        assert menu.buttons['text'].parentWidget() is not menu.header_widget
+        assert 'border-radius' in menu.buttons['text'].styleSheet()
+        assert 'background:' in menu.buttons['text'].styleSheet()
+        if app.platformName() != 'cocoa':
+            assert not menu.mask().contains(QtCore.QPoint(0, 0))
+            assert menu.mask().contains(menu.rect().center())
         requested = []
         menu.action_requested.connect(requested.append)
         menu.buttons['screen'].click()
