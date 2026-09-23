@@ -10346,7 +10346,7 @@ class DarkThemeApp(QMainWindow):
         self.main_shortcut_section = QFrame()
         self.main_shortcut_section.setObjectName("mainShortcutSection")
         shortcut_section_layout = QVBoxLayout(self.main_shortcut_section)
-        shortcut_section_layout.setContentsMargins(0, 2, 0, 2)
+        shortcut_section_layout.setContentsMargins(0, 2, 0, 0)
         shortcut_section_layout.setSpacing(6)
 
         text_caption = QLabel(hotkey_language_text(self.current_interface_language, "text_section"))
@@ -10672,7 +10672,7 @@ class DarkThemeApp(QMainWindow):
         self.main_hotkey_area = QFrame()
         self.main_hotkey_area.setObjectName("mainHotkeyArea")
         hotkey_grid = QGridLayout(self.main_hotkey_area)
-        hotkey_grid.setContentsMargins(0, 3, 0, 0)
+        hotkey_grid.setContentsMargins(0, 1, 0, 0)
         hotkey_grid.setHorizontalSpacing(hotkey_spacing)
         hotkey_grid.setVerticalSpacing(0)
 
