@@ -4806,6 +4806,7 @@ class TranslationResultDialog(QDialog):
         dark = theme != "Светлая"
         background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
         ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        scrollbar_active = "#c5b3e9" if dark else "#674586"
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
             QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
@@ -4821,6 +4822,7 @@ class TranslationResultDialog(QDialog):
             QLineEdit#translationResultScale {{ color:{ink}; background:transparent; border:0; font-size:12px; }}
             QScrollBar:vertical {{ background:{surface}; width:10px; margin:2px; }}
             QScrollBar::handle:vertical {{ background:{edge}; min-height:24px; border-radius:4px; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{scrollbar_active}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
         """ + standard_buttons(dark, compact=False))
         for button in (self.scale_decrease, self.scale_increase):
@@ -5708,7 +5710,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 min-height: 34px;
                 border-radius: 5px;
             }}
-            QScrollBar::handle:vertical:hover {{
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{
                 background: {accent};
             }}
             QScrollBar::add-line:vertical,
@@ -8210,12 +8212,17 @@ class DarkThemeApp(QMainWindow):
         self.apply_theme()
 
     def _layout_title_buttons(self):
-        """One grid for the fixed canvas, with the right group anchored to its edge."""
+        """Keep the title bar controls aligned when the scaled canvas grows."""
+        controls = ("title_bar", "flag_button", "theme_button", "document_button",
+                    "help_button", "settings_button", "minimize_button", "close_button")
+        if not all(hasattr(self, name) for name in controls):
+            return
         size, gap = 30, 6
         left_inset, right_inset = 6, 10
         left = (self.flag_button, self.theme_button)
         right = (self.document_button, self.help_button, self.settings_button,
                  self.minimize_button, self.close_button)
+        self.title_bar.setGeometry(0, 0, self.ui_root.width(), self.title_bar.height())
         right_width = len(right) * size + (len(right) - 1) * gap
         y = (self.title_bar.height() - size) // 2
         groups = ((left, left_inset),
@@ -9440,7 +9447,8 @@ class DarkThemeApp(QMainWindow):
                 border: none;
                 border-radius: 4px;
             }}
-            QComboBox QAbstractItemView QScrollBar::handle:vertical:hover {{
+            QComboBox QAbstractItemView QScrollBar::handle:vertical:hover,
+            QComboBox QAbstractItemView QScrollBar::handle:vertical:pressed {{
                 background: {scrollbar_handle_hover};
             }}
             QComboBox QAbstractItemView QScrollBar::add-line:vertical,
@@ -9478,7 +9486,8 @@ class DarkThemeApp(QMainWindow):
                 min-height: 30px;
                 border-radius: 5px;
             }}
-            QTextEdit QScrollBar::handle:vertical:hover {{
+            QTextEdit QScrollBar::handle:vertical:hover,
+            QTextEdit QScrollBar::handle:vertical:pressed {{
                 background: {scrollbar_handle_hover};
             }}
             QTextEdit QScrollBar::add-line:vertical, QTextEdit QScrollBar::sub-line:vertical {{
@@ -9604,6 +9613,7 @@ class DarkThemeApp(QMainWindow):
             divider = "#433a4c" if is_dark else "#d7cde3"
             input_text = "#f2eff6" if is_dark else "#27222d"
             muted = "#b5acbf" if is_dark else "#655b70"
+            scrollbar_handle_active = "#c5b3e9" if is_dark else "#674586"
             section = getattr(self, "main_text_section", None)
             if isinstance(section, QFrame):
                 section.setStyleSheet(
@@ -9636,6 +9646,7 @@ class DarkThemeApp(QMainWindow):
                     f" color: {muted}; }}"
                     "QScrollBar:vertical { background:transparent; width:6px; margin:3px 0; }"
                     f"QScrollBar::handle:vertical {{ background:{border}; border-radius:3px; min-height:20px; }}"
+                    f"QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{scrollbar_handle_active}; }}"
                     "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
                     "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }"
                     + tooltip_stylesheet(is_dark)

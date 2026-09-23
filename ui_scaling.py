@@ -295,6 +295,16 @@ class _InterfaceCanvas(QMainWindow):
         self.setFixedSize(BASE_WIDTH, BASE_HEIGHT)
         self.setAcceptDrops(True)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Content can force the canvas wider than its 700px base size. Keep
+        # the header controls attached to the visible canvas edges after that
+        # resize instead of leaving a short title strip at the top.
+        owner = self._ui_native_owner()
+        layout_title = getattr(owner, '_layout_title_buttons', None)
+        if layout_title is not None:
+            layout_title()
+
     def mousePressEvent(self, event):
         self._ui_native_owner().mousePressEvent(event)
 
