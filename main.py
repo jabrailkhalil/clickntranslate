@@ -4264,8 +4264,8 @@ class TranslationResultDialog(QDialog):
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setMinimumSize(400, 350)
-        self.resize(720, 440)
+        self.setMinimumSize(400, 330)
+        self.resize(700, 420)
         self.setSizeGripEnabled(True)
 
         outer = QVBoxLayout(self)
@@ -4282,7 +4282,7 @@ class TranslationResultDialog(QDialog):
         layout.setSpacing(12)
 
         header = QGridLayout()
-        header.setSpacing(12)
+        header.setSpacing(8)
         self.engine_header = header
         self._header_compact = None
         header.setColumnStretch(0, 1)
@@ -4292,7 +4292,7 @@ class TranslationResultDialog(QDialog):
         self.title_label.setMinimumWidth(0)
         header.addWidget(self.title_label, 0, 0)
         self.engine_combo = self._language_combo()
-        self.engine_combo.setFixedWidth(190)
+        self.engine_combo.setFixedWidth(160)
         self.engine_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
         from settings_window import _populate_grouped_translator_combo
@@ -7410,7 +7410,8 @@ class DarkThemeApp(QMainWindow):
             with QtCore.QSignalBlocker(action):
                 action.setChecked(self.config.get('desktop_assistant_enabled') is True)
         assistant = getattr(self, '_desktop_assistant', None)
-        if self.config.get('desktop_assistant_enabled') is True:
+        suppressed = bool(getattr(self, '_desktop_assistant_suppressed_until_restart', False))
+        if self.config.get('desktop_assistant_enabled') is True and not suppressed:
             if assistant is None:
                 from desktop_assistant import DesktopAssistant
                 self._desktop_assistant = DesktopAssistant(self)
@@ -7419,6 +7420,21 @@ class DarkThemeApp(QMainWindow):
         elif assistant is not None:
             assistant.dispose()
             self._desktop_assistant = None
+
+    def dismiss_desktop_assistant_until_restart(self):
+        """Hide both assistant surfaces for this process only; do not persist it."""
+        self._desktop_assistant_suppressed_until_restart = True
+        preview = getattr(self, 'assistant_preview', None)
+        if preview is not None:
+            try:
+                preview.hide()
+            except RuntimeError:
+                pass
+        self._sync_desktop_assistant()
+        settings = self.settings_window or self._cached_settings_window
+        button = getattr(settings, 'desktop_assistant_dismiss_button', None)
+        if button is not None:
+            button.setEnabled(False)
 
     def set_desktop_assistant_enabled(self, enabled):
         self.config['desktop_assistant_enabled'] = bool(enabled)
@@ -8168,16 +8184,19 @@ class DarkThemeApp(QMainWindow):
 
     def _layout_title_buttons(self):
         """One grid for the fixed canvas, with the right group anchored to its edge."""
-        size, gap, inset = 30, 6, 10
+        size, gap = 30, 6
+        left_inset, right_inset = 6, 10
         left = (self.flag_button, self.theme_button)
         right = (self.document_button, self.help_button, self.settings_button,
                  self.minimize_button, self.close_button)
         right_width = len(right) * size + (len(right) - 1) * gap
         y = (self.title_bar.height() - size) // 2
-        for buttons, start in ((left, inset), (right, self.ui_root.width() - inset - right_width)):
+        groups = ((left, left_inset),
+                  (right, self.ui_root.width() - right_inset - right_width))
+        for buttons, start in groups:
             for index, button in enumerate(buttons):
                 button.setGeometry(start + index * (size + gap), y, size, size)
-                button.setIconSize(QSize(24, 24))
+                button.setIconSize(QSize(20, 20) if button is self.flag_button else QSize(24, 24))
 
     def create_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
@@ -9716,7 +9735,7 @@ class DarkThemeApp(QMainWindow):
     def update_interface_language_button(self):
         option = get_interface_language_option(self.current_interface_language)
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
-        self.flag_button.setIconSize(QSize(24, 24))
+        self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
 
     def refresh_interface_language_ui(self):
@@ -10599,6 +10618,8 @@ class DarkThemeApp(QMainWindow):
         self.assistant_preview = AssistantPreview(self, self.current_interface_language, self.main_text_section)
         self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
         text_section_layout.addWidget(self.assistant_preview)
+        if getattr(self, '_desktop_assistant_suppressed_until_restart', False):
+            self.assistant_preview.hide()
         self.main_layout.addWidget(self.main_text_section, 1)
 
         self._refresh_direction_summary()

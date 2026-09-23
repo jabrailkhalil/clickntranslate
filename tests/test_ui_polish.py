@@ -391,3 +391,38 @@ def test_main_screen_has_translation_heading_and_larger_preview(app, owner):
     window.force_quit = True
     window.close()
     window.deleteLater()
+
+
+def test_assistant_can_be_shooed_until_restart_without_persisting(app, owner):
+    class AssistantStub:
+        def __init__(self):
+            self.disposed = False
+        def dispose(self):
+            self.disposed = True
+    owner.config['desktop_assistant_enabled'] = True
+    owner._desktop_assistant = AssistantStub()
+    owner._cached_settings_window = None
+    owner.settings_window = None
+    owner.assistant_preview = QtWidgets.QWidget(owner)
+    owner.assistant_preview.show()
+    owner._sync_desktop_assistant = lambda: main.DarkThemeApp._sync_desktop_assistant(owner)
+    main.DarkThemeApp.dismiss_desktop_assistant_until_restart(owner)
+    assert owner.config['desktop_assistant_enabled'] is True
+    assert owner._desktop_assistant is None
+    assert owner._desktop_assistant_suppressed_until_restart is True
+    assert not owner.assistant_preview.isVisible()
+    owner.save_config.assert_not_called()
+
+
+def test_title_flag_is_smaller_and_left_aligned(app, monkeypatch):
+    with mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False), \
+            mock.patch.object(main.DarkThemeApp, '_maybe_check_updates_on_launch'):
+        window = main.DarkThemeApp()
+    try:
+        assert window.flag_button.geometry().left() == 6
+        assert window.flag_button.iconSize() == QtCore.QSize(20, 20)
+        assert window.theme_button.iconSize() == QtCore.QSize(24, 24)
+    finally:
+        window.force_quit = True
+        window.close()
+        window.deleteLater()

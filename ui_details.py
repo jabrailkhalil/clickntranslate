@@ -24,7 +24,7 @@ class _SocialIcon(QtGui.QIconEngine):
         if mode == QtGui.QIcon.Disabled:
             painter.setOpacity(.4)
         side = min(rect.width(), rect.height())
-        inset = max(1.0, side * 0.08)
+        inset = max(1.0, side * 0.08) if self.kind == 'github' else 0.0
         target = QtCore.QRectF(rect.center().x() - side / 2 + inset / 2,
                               rect.center().y() - side / 2 + inset / 2,
                               max(1.0, side - inset), max(1.0, side - inset))

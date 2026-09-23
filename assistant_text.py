@@ -12,7 +12,7 @@ ASSISTANT_TEXT = {
         'text': ('Open translator', 'Type, edit and translate text.'),
         'documents': ('Translate a document', 'Open a file or continue a saved session.'),
         'settings': 'Settings', 'guide': 'Quick guide', 'hide': 'Hide assistant',
-        'hide_hint': 'Enable it again in General settings.',
+        'hide_hint': 'Enable it again in General settings.', 'dismiss': 'Shoo', 'dismiss_hint': 'Hide the assistant until Click’n’Translate is restarted.',
     },
     'ru': {
         'tray': 'Помощник на рабочем столе', 'preview_hint': 'Настроить помощника на рабочем столе',
@@ -25,7 +25,7 @@ ASSISTANT_TEXT = {
         'text': ('Открыть переводчик', 'Введите, дополните и переведите текст.'),
         'documents': ('Перевести документ', 'Откройте файл или сохранённую сессию.'),
         'settings': 'Настройки', 'guide': 'Обучение', 'hide': 'Скрыть помощника',
-        'hide_hint': 'Включить снова можно в основных настройках.',
+        'hide_hint': 'Включить снова можно в основных настройках.', 'dismiss': 'Прогнать', 'dismiss_hint': 'Скрыть помощника до следующего запуска Click’n’Translate.',
     },
     'de': {
         'tray': 'Desktop-Assistent', 'preview_hint': 'Desktop-Assistenten konfigurieren',
@@ -38,7 +38,7 @@ ASSISTANT_TEXT = {
         'text': ('Übersetzer öffnen', 'Text eingeben, bearbeiten und übersetzen.'),
         'documents': ('Dokument übersetzen', 'Datei oder gespeicherte Sitzung öffnen.'),
         'settings': 'Einstellungen', 'guide': 'Anleitung', 'hide': 'Assistent ausblenden',
-        'hide_hint': 'In den allgemeinen Einstellungen wieder aktivieren.',
+        'hide_hint': 'In den allgemeinen Einstellungen wieder aktivieren.', 'dismiss': 'Wegschicken', 'dismiss_hint': 'Assistenten bis zum Neustart von Click’n’Translate ausblenden.',
     },
     'es': {
         'tray': 'Asistente de escritorio', 'preview_hint': 'Configurar el asistente de escritorio',
@@ -51,7 +51,7 @@ ASSISTANT_TEXT = {
         'text': ('Abrir traductor', 'Escribe, edita y traduce texto.'),
         'documents': ('Traducir un documento', 'Abre un archivo o una sesión guardada.'),
         'settings': 'Ajustes', 'guide': 'Guía', 'hide': 'Ocultar asistente',
-        'hide_hint': 'Puedes activarlo de nuevo en los ajustes generales.',
+        'hide_hint': 'Puedes activarlo de nuevo en los ajustes generales.', 'dismiss': 'Ahuyentar', 'dismiss_hint': 'Ocultar el asistente hasta reiniciar Click’n’Translate.',
     },
     'fr': {
         'tray': 'Assistant de bureau', 'preview_hint': 'Configurer l’assistant de bureau',
@@ -64,7 +64,7 @@ ASSISTANT_TEXT = {
         'text': ('Ouvrir le traducteur', 'Saisissez, modifiez et traduisez du texte.'),
         'documents': ('Traduire un document', 'Ouvrez un fichier ou une session enregistrée.'),
         'settings': 'Réglages', 'guide': 'Guide', 'hide': 'Masquer l’assistant',
-        'hide_hint': 'Réactivez-le dans les réglages généraux.',
+        'hide_hint': 'Réactivez-le dans les réglages généraux.', 'dismiss': 'Chasser', 'dismiss_hint': 'Masquer l’assistant jusqu’au redémarrage de Click’n’Translate.',
     },
     'zh': {
         'tray': '桌面助手', 'preview_hint': '设置桌面助手',
@@ -77,7 +77,7 @@ ASSISTANT_TEXT = {
         'text': ('打开翻译器', '输入、编辑并翻译文字。'),
         'documents': ('翻译文档', '打开文件或已保存的会话。'),
         'settings': '设置', 'guide': '使用指南', 'hide': '隐藏助手',
-        'hide_hint': '可在常规设置中重新启用。',
+        'hide_hint': '可在常规设置中重新启用。', 'dismiss': '赶走', 'dismiss_hint': '隐藏助手，直到重新启动 Click’n’Translate。',
     },
 }
 

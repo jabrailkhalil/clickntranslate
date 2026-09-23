@@ -6720,6 +6720,14 @@ class SettingsWindow(QWidget):
         else:
             self.auto_save_setting('desktop_assistant_enabled', bool(enabled))
 
+    def _dismiss_desktop_assistant_until_restart(self):
+        dismiss = getattr(self.parent, 'dismiss_desktop_assistant_until_restart', None)
+        if callable(dismiss):
+            dismiss()
+        button = getattr(self, 'desktop_assistant_dismiss_button', None)
+        if button is not None:
+            button.setEnabled(False)
+
     def _on_start_minimized_toggled(self, state):
         enabled = bool(state)
         self.auto_save_setting("start_minimized", enabled)
@@ -7491,10 +7499,25 @@ class SettingsWindow(QWidget):
         self.desktop_assistant_label = QLabel(assistant_text(lang, 'setting'))
         self.desktop_assistant_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.desktop_assistant_label.setFixedHeight(engine_control_height)
+        self.desktop_assistant_control = QWidget(self)
+        self.desktop_assistant_control.setFixedSize(230, engine_control_height)
+        assistant_controls = QHBoxLayout(self.desktop_assistant_control)
+        assistant_controls.setContentsMargins(0, 0, 0, 0)
+        assistant_controls.setSpacing(6)
         self.desktop_assistant_checkbox = QCheckBox(assistant_text(lang, 'enabled'))
-        self.desktop_assistant_checkbox.setFixedSize(engine_combo_width, engine_control_height)
+        self.desktop_assistant_checkbox.setFixedHeight(engine_control_height)
         self.desktop_assistant_checkbox.setStyleSheet('margin:0; padding:0;')
         self.desktop_assistant_checkbox.setChecked(self.parent.config.get('desktop_assistant_enabled') is True)
+        self.desktop_assistant_dismiss_button = QPushButton(assistant_text(lang, 'dismiss'))
+        self.desktop_assistant_dismiss_button.setObjectName('desktopAssistantDismiss')
+        self.desktop_assistant_dismiss_button.setFixedHeight(28)
+        self.desktop_assistant_dismiss_button.setCursor(Qt.PointingHandCursor)
+        self.desktop_assistant_dismiss_button.setToolTip(tooltip_text(assistant_text(lang, 'dismiss_hint')))
+        self.desktop_assistant_dismiss_button.setEnabled(
+            not getattr(self.parent, '_desktop_assistant_suppressed_until_restart', False))
+        self.desktop_assistant_dismiss_button.clicked.connect(self._dismiss_desktop_assistant_until_restart)
+        assistant_controls.addWidget(self.desktop_assistant_checkbox, 1)
+        assistant_controls.addWidget(self.desktop_assistant_dismiss_button, 0)
         assistant_hint = tooltip_text(assistant_text(lang, 'hint'))
         self.desktop_assistant_label.setToolTip(assistant_hint)
         self.desktop_assistant_checkbox.setToolTip(assistant_hint)
@@ -7503,7 +7526,7 @@ class SettingsWindow(QWidget):
         self.desktop_assistant_checkbox.toggled.connect(self._set_desktop_assistant_enabled)
         self.desktop_assistant_label.setBuddy(self.desktop_assistant_checkbox)
         form_grid.addWidget(self.desktop_assistant_label, 4, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.desktop_assistant_checkbox, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.desktop_assistant_control, 4, 2, Qt.AlignVCenter)
 
         # Чекбокс "Не сворачивать при OCR"
         self.keep_visible_checkbox = QCheckBox(settings_text(lang, "keep_visible_on_ocr"))
