@@ -4285,14 +4285,14 @@ class TranslationResultDialog(QDialog):
         header.setSpacing(8)
         self.engine_header = header
         self._header_compact = None
-        header.setColumnStretch(0, 1)
+        header.setColumnStretch(0, 0)
         header.setColumnStretch(1, 1)
         self.title_label = QLabel(self.text["workspace_title"])
         self.title_label.setObjectName("translationResultTitle")
         self.title_label.setMinimumWidth(0)
         header.addWidget(self.title_label, 0, 0)
         self.engine_combo = self._language_combo()
-        self.engine_combo.setFixedWidth(160)
+        self.engine_combo.setFixedWidth(150)
         self.engine_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
         from settings_window import _populate_grouped_translator_combo
