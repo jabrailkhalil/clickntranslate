@@ -244,7 +244,6 @@ class AssistantMenu(QtWidgets.QFrame):
     def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='orb'):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.setObjectName('desktopAssistantMenu')
-        self.setProperty('clickntranslateRoundedPopup', True)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
         self.setWindowTitle(assistant_text(language, 'title'))
@@ -373,7 +372,6 @@ class AssistantMenu(QtWidgets.QFrame):
         self.select_section('translation_section')
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
-        self._apply_rounded_shape()
 
     def _apply_rounded_shape(self):
         # On Windows and Linux the QWidget mask clips the native popup window,

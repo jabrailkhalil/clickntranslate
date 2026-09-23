@@ -5,8 +5,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PyQt5.QtCore import QEvent, Qt
-from PyQt5.QtGui import QPalette
+from PyQt5.QtCore import QEvent, QPoint, Qt
+from PyQt5.QtGui import QHelpEvent, QPalette
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QPushButton, QToolButton, QWidget
 
@@ -53,6 +53,26 @@ def test_mouse_click_clears_the_ring_but_tab_focus_remains_visible(app, dark, bu
     finally:
         owner.close()
         owner.deleteLater()
+
+
+def test_button_hover_tips_can_be_disabled_and_restored(app):
+    button = QPushButton("Hover me")
+    button.setToolTip("A useful hint")
+    button.setStyleSheet(button_qss(True))
+    event_filter = app._button_focus_filter
+    original = app.property("buttonTooltipsEnabled")
+    try:
+        app.setProperty("buttonTooltipsEnabled", False)
+        event = QHelpEvent(QEvent.ToolTip, QPoint(2, 2), QPoint(2, 2))
+        assert event_filter.eventFilter(button, event)
+        assert event.isAccepted()
+        assert button.toolTip() == "A useful hint"
+        app.setProperty("buttonTooltipsEnabled", True)
+        event = QHelpEvent(QEvent.ToolTip, QPoint(2, 2), QPoint(2, 2))
+        assert not event_filter.eventFilter(button, event)
+    finally:
+        app.setProperty("buttonTooltipsEnabled", original)
+        button.deleteLater()
 
 
 @pytest.mark.parametrize("theme", ["Темная", "Светлая"])

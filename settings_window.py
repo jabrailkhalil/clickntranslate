@@ -1758,6 +1758,7 @@ SETTINGS_TEXT = {
         "save_and_back": "Save and return",
         "copy_to_clipboard": "Copy to clipboard",
         "history": "Save translation history",
+        "button_hover_tips": "Button hover tips",
         "test_ocr": "Test OCR Translation",
         "save": "Save",
         "back": "Back",
@@ -1875,6 +1876,7 @@ SETTINGS_TEXT = {
         "save_and_back": "Сохранить и вернуться",
         "copy_to_clipboard": "Копировать в буфер",
         "history": "Сохранять историю переводов",
+        "button_hover_tips": "Подсказки при наведении",
         "test_ocr": "Проверить OCR",
         "save": "Сохранить",
         "back": "Назад",
@@ -1990,6 +1992,7 @@ SETTINGS_TEXT = {
         "save_and_back": "Guardar y volver",
         "copy_to_clipboard": "Copiar al portapapeles",
         "history": "Guardar historial de traducciones",
+        "button_hover_tips": "Ayuda al pasar sobre botones",
         "test_ocr": "Probar OCR",
         "save": "Guardar",
         "back": "Volver",
@@ -2105,6 +2108,7 @@ SETTINGS_TEXT = {
         "save_and_back": "Speichern und zuruck",
         "copy_to_clipboard": "In Zwischenablage kopieren",
         "history": "Ubersetzungsverlauf speichern",
+        "button_hover_tips": "Schaltflächenhinweise",
         "test_ocr": "OCR testen",
         "save": "Speichern",
         "back": "Zuruck",
@@ -2220,6 +2224,7 @@ SETTINGS_TEXT = {
         "save_and_back": "Enregistrer et revenir",
         "copy_to_clipboard": "Copier dans le presse-papiers",
         "history": "Enregistrer l'historique des traductions",
+        "button_hover_tips": "Aide au survol des boutons",
         "test_ocr": "Tester l'OCR",
         "save": "Enregistrer",
         "back": "Retour",
@@ -2335,6 +2340,7 @@ SETTINGS_TEXT = {
         "save_and_back": "保存并返回",
         "copy_to_clipboard": "复制到剪贴板",
         "history": "保存翻译历史",
+        "button_hover_tips": "按钮悬停提示",
         "test_ocr": "测试 OCR",
         "save": "保存",
         "back": "返回",
@@ -6707,6 +6713,10 @@ class SettingsWindow(QWidget):
 
     def auto_save_setting(self, key, value):
         self.parent.config[key] = value
+        if key == "button_tooltips_enabled":
+            app = QApplication.instance()
+            if app is not None:
+                app.setProperty("buttonTooltipsEnabled", bool(value))
         if key == "start_minimized":
             self.parent.start_minimized = value
         if key == "autostart":
@@ -7019,6 +7029,12 @@ class SettingsWindow(QWidget):
             merged["game_capture_mode"] = "region"
 
             self.parent.config = merged
+            app = QApplication.instance()
+            if app is not None:
+                app.setProperty(
+                    "buttonTooltipsEnabled",
+                    bool(merged.get("button_tooltips_enabled", True)),
+                )
             self.parent.current_theme = merged["theme"]
             self.parent.current_interface_language = merged["interface_language"]
             self.parent.start_minimized = bool(merged.get("start_minimized", False))
@@ -7448,6 +7464,17 @@ class SettingsWindow(QWidget):
         self.history_checkbox.setStyleSheet("margin:0; padding:0;")
         self.history_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.history_checkbox, 4, 0, alignment=Qt.AlignLeft)
+
+        self.button_tooltips_checkbox = QCheckBox(settings_text(lang, "button_hover_tips"))
+        self.button_tooltips_checkbox.setChecked(
+            self.parent.config.get("button_tooltips_enabled", True) is True
+        )
+        self.button_tooltips_checkbox.toggled.connect(
+            lambda enabled: self.auto_save_setting("button_tooltips_enabled", bool(enabled))
+        )
+        self.button_tooltips_checkbox.setStyleSheet("margin:0; padding:0;")
+        self.button_tooltips_checkbox.setFixedHeight(fixed_height)
+        form_grid.addWidget(self.button_tooltips_checkbox, 4, 1, 1, 2, alignment=Qt.AlignLeft)
 
         self.ui_scale_label = QLabel(settings_text(lang, 'ui_scale_caption'))
         self.ui_scale_label.setObjectName('uiScaleLabel')
@@ -13557,6 +13584,12 @@ finally {
             return
         # Update parent state
         self.parent.config = default_config
+        app = QApplication.instance()
+        if app is not None:
+            app.setProperty(
+                "buttonTooltipsEnabled",
+                bool(default_config.get("button_tooltips_enabled", True)),
+            )
         self.parent.current_theme = default_config["theme"]
         self.parent.current_interface_language = default_config["interface_language"]
         self.parent.autostart = default_config["autostart"]
