@@ -115,6 +115,17 @@ if (-not $CertificateThumbprint) {
 & (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'release_manifest.py') write $packageRoot $Version
 if ($LASTEXITCODE -ne 0) { throw 'Program manifest generation failed.' }
 
+# The installed updater from earlier versions requires this manifest beside
+# ClicknTranslate.exe. Keep that compatibility file at the root but hide it in
+# Explorer so the program files remain organized under app/.
+$legacyManifest = Get-Item -LiteralPath (Join-Path $packageRoot 'program-files.sha256')
+if (($legacyManifest.Attributes -band [IO.FileAttributes]::Hidden) -eq 0) {
+    $legacyManifest.Attributes = $legacyManifest.Attributes -bor [IO.FileAttributes]::Hidden
+}
+if (($legacyManifest.Attributes -band [IO.FileAttributes]::Hidden) -eq 0) {
+    throw 'The legacy update manifest could not be hidden.'
+}
+
 $defenderReport = $null
 if ($RequireSignature -or $CertificateThumbprint -or $ScanWithDefender) {
     $defenderReport = Join-Path $stageRoot 'windows-defender.json'
