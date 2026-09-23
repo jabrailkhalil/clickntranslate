@@ -69,12 +69,15 @@ def test_primary_and_secondary_actions_match_across_windows(app, theme):
     cancel = message.addButton("Отмена", message.RejectRole)
     groups = (
         (colors["accent"], [installer.install_button, result.translate_button, accept]),
-        (colors["surface"], [installer.cancel_button, result.copy_button, result.close_button, cancel]),
+        (colors["surface"], [installer.cancel_button, result.copy_button, cancel]),
     )
     try:
         for window in (installer, result, message):
             window.show()
         app.processEvents()
+        # The result window already has a title-bar ×; the redundant text Close
+        # action is deliberately removed from the visible footer.
+        assert not result.close_button.isVisible()
         for expected, buttons in groups:
             for button in buttons:
                 button.clearFocus()
