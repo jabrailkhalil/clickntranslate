@@ -4824,7 +4824,6 @@ class TranslationResultDialog(QDialog):
             combo.set_popup_background(surface)
         self.copy_button.setIcon(clipboard_copy_icon(theme))
         self.copy_button.setIconSize(QSize(18, 18))
-        self.copy_button.setStyleSheet(button_qss(dark, "quiet", compact=False, radius=6))
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
