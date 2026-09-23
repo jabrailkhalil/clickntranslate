@@ -321,6 +321,48 @@ def test_faq_scrollbar_keeps_contrast_while_held(app, owner, monkeypatch, theme)
         dialog.deleteLater()
 
 
+@pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
+def test_translation_result_scrollbar_keeps_contrast_while_held(app, owner, theme):
+    dialog = main.TranslationResultDialog(
+        owner, '', auto_copy=False, lang='ru', theme=theme,
+        source_text='\n'.join(f'Строка {index}' for index in range(80)),
+    )
+    dialog.resize(700, 420)
+    dialog.show()
+    app.processEvents()
+    try:
+        bar = dialog.source_edit.verticalScrollBar()
+        assert bar.maximum() > 0
+        bar.setValue(bar.maximum() // 2)
+        app.processEvents()
+        option = QtWidgets.QStyleOptionSlider()
+        option.initFrom(bar)
+        option.orientation = bar.orientation()
+        option.minimum, option.maximum = bar.minimum(), bar.maximum()
+        option.sliderPosition, option.sliderValue = bar.sliderPosition(), bar.value()
+        option.singleStep, option.pageStep = bar.singleStep(), bar.pageStep()
+        handle = bar.style().subControlRect(
+            QtWidgets.QStyle.CC_ScrollBar, option,
+            QtWidgets.QStyle.SC_ScrollBarSlider, bar,
+        )
+        point = handle.center()
+        QTest.mouseMove(bar, point)
+        QTest.mousePress(bar, QtCore.Qt.LeftButton, pos=point)
+        QTest.qWait(40)
+        image = bar.grab().toImage()
+        handle_color = image.pixelColor(point)
+        track_y = 2 if handle.top() > bar.height() // 2 else image.height() - 3
+        track = image.pixelColor(point.x(), track_y)
+        assert abs(handle_color.lightness() - track.lightness()) > 35, (
+            f'bar={bar.size()}, handle={handle}, handle_color={handle_color.name()}, '
+            f'track_y={track_y}, track_color={track.name()}'
+        )
+        QTest.mouseRelease(bar, QtCore.Qt.LeftButton, pos=point)
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_tray_toggle_and_settings_use_one_state(app, owner, monkeypatch):
     import desktop_assistant
     factory = mock.Mock()

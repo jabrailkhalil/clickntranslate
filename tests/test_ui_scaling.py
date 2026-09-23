@@ -168,6 +168,17 @@ class UiScalingTest(unittest.TestCase):
         self.assertEqual(self.window.ui_root.size(), original)
         self.assertEqual(self.controller.proxy.boundingRect().size().toSize(), original)
 
+    def test_title_bar_and_controls_follow_canvas_width_growth(self):
+        original_width = self.window.ui_root.width()
+        composer = self.window.main_composer
+        composer.setMinimumWidth(original_width + 180)
+        self.settle()
+        canvas_width = self.window.ui_root.width()
+        self.assertGreaterEqual(canvas_width, original_width + 180)
+        self.assertEqual(self.window.title_bar.width(), canvas_width)
+        self.assertEqual(self.window.close_button.geometry().right(), canvas_width - 10 - 1)
+        self.assertEqual(self.window.flag_button.x(), 6)
+
     def test_clicks_and_multiline_typing_reach_the_scaled_controls(self):
         self.window.set_ui_scale_percent(175)
         self.click(self.window.settings_button)
