@@ -208,7 +208,9 @@ class ActionButton(QtWidgets.QPushButton):
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setAccessibleName(title)
         self.setAccessibleDescription(description)
-        self.setStyleSheet(button_qss(dark, 'quiet') + 'QPushButton { text-align:left; padding:0; }')
+        # Each program action is its own card. The previous transparent
+        # buttons ran together into one large block, especially on dark mode.
+        self.setStyleSheet(button_qss(dark, 'secondary') + 'QPushButton { text-align:left; }')
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(3)
@@ -242,12 +244,26 @@ class AssistantMenu(QtWidgets.QFrame):
     def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='orb'):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.setObjectName('desktopAssistantMenu')
+        self.setProperty('clickntranslateRoundedPopup', True)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
         self.setWindowTitle(assistant_text(language, 'title'))
         background, border = ('#201d28', '#746087') if dark else ('#f7f3fa', '#a18bb9')
-        self.setStyleSheet(f'QFrame#desktopAssistantMenu {{ background:{background}; border:1px solid {border}; border-radius:10px; }}')
+        header, header_border = ('#292431', '#4d425a') if dark else ('#eee8f4', '#d2c5dd')
+        self.setStyleSheet(f'''
+            QFrame#desktopAssistantMenu {{ background:{background}; border:1px solid {border}; border-radius:12px; }}
+            QFrame#assistantMenuHeader {{ background:{header}; border:1px solid {header_border}; border-radius:9px; }}
+            QFrame#assistantMenuDivider {{ background:{header_border}; border:0; max-height:1px; }}
+            QFrame#assistantMenuHeader QLabel {{ background:transparent; border:0; }}
+        ''')
         outer = QtWidgets.QVBoxLayout(self)
-        outer.setContentsMargins(8, 10, 8, 8)
-        outer.setSpacing(5)
+        outer.setContentsMargins(9, 9, 9, 9)
+        outer.setSpacing(7)
+        self.header_widget = QtWidgets.QFrame(self)
+        self.header_widget.setObjectName('assistantMenuHeader')
+        header_layout = QtWidgets.QVBoxLayout(self.header_widget)
+        header_layout.setContentsMargins(7, 5, 7, 7)
+        header_layout.setSpacing(5)
         title_row = QtWidgets.QHBoxLayout()
         title = QtWidgets.QLabel(assistant_text(language, 'title'))
         title.setStyleSheet(f'color:{"#f5f0fa" if dark else "#302837"}; font-size:16px; font-weight:600; padding-left:8px;')
@@ -258,8 +274,9 @@ class AssistantMenu(QtWidgets.QFrame):
         close.setStyleSheet(button_qss(dark, 'close', icon=True))
         close.clicked.connect(self.hide)
         title_row.addWidget(close)
-        outer.addLayout(title_row)
+        header_layout.addLayout(title_row)
         navigation = QtWidgets.QHBoxLayout()
+        navigation.setSpacing(6)
         self.section_buttons = {}
         self.section_pages = {}
         for key in ('translation_section', 'companion_section'):
@@ -270,7 +287,12 @@ class AssistantMenu(QtWidgets.QFrame):
             button.clicked.connect(lambda checked=False, section=key: self.select_section(section))
             self.section_buttons[key] = button
             navigation.addWidget(button)
-        outer.addLayout(navigation)
+        header_layout.addLayout(navigation)
+        outer.addWidget(self.header_widget)
+        divider = QtWidgets.QFrame(self)
+        divider.setObjectName('assistantMenuDivider')
+        divider.setFixedHeight(1)
+        outer.addWidget(divider)
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -287,8 +309,9 @@ class AssistantMenu(QtWidgets.QFrame):
             self.section_pages[key] = page
             layout.addWidget(page)
         translate_layout = QtWidgets.QGridLayout(self.section_pages['translation_section'])
-        translate_layout.setContentsMargins(0, 4, 0, 4)
-        translate_layout.setSpacing(5)
+        translate_layout.setContentsMargins(2, 5, 2, 5)
+        translate_layout.setHorizontalSpacing(8)
+        translate_layout.setVerticalSpacing(8)
         for index, action in enumerate(('text', 'area', 'screen', 'copy', 'dynamic', 'documents')):
             button = ActionButton(*assistant_text(language, action), dark)
             button.setMinimumHeight(80)
@@ -331,7 +354,7 @@ class AssistantMenu(QtWidgets.QFrame):
         footer = QtWidgets.QHBoxLayout()
         for action in ('settings', 'guide'):
             button = QtWidgets.QPushButton(assistant_text(language, 'companion_settings' if action == 'settings' else action))
-            button.setStyleSheet(button_qss(dark, compact=True))
+            button.setStyleSheet(button_qss(dark, 'primary' if action == 'settings' else 'secondary', compact=True))
             button.setMinimumHeight(32)
             button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
             footer.addWidget(button)
@@ -350,6 +373,18 @@ class AssistantMenu(QtWidgets.QFrame):
         self.select_section('translation_section')
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
+        self._apply_rounded_shape()
+
+    def _apply_rounded_shape(self):
+        # On Windows and Linux the QWidget mask clips the native popup window,
+        # not just the rounded background painted by the stylesheet. Cocoa
+        # keeps its antialiased translucent corners and deliberately skips it.
+        from styled_dialogs import _apply_rounded_popup_mask
+        _apply_rounded_popup_mask(self, 12)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_rounded_shape()
 
     def select_section(self, section):
         for key, page in self.section_pages.items():
