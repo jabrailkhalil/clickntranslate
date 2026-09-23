@@ -1,9 +1,12 @@
 param(
     [string]$Version = "1.7.1",
     [switch]$SkipPyInstaller,
+    # Separate private test builds from an existing stage and its user data.
+    [ValidatePattern('^$|^[A-Za-z0-9][A-Za-z0-9._-]*$')][string]$StageName = "",
     [string]$CertificateThumbprint = "",
     [ValidateSet('CurrentUser', 'LocalMachine')][string]$CertificateStoreLocation = 'CurrentUser',
-    [switch]$RequireSignature
+    [switch]$RequireSignature,
+    [switch]$ScanWithDefender
 )
 
 Set-StrictMode -Version Latest
@@ -17,7 +20,8 @@ $fileVersion = if (($Version -split '\.').Count -eq 3) { "$Version.0" } else { $
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $releasesRoot = Join-Path $repoRoot "releases"
 $distRoot = Join-Path $repoRoot "dist\ClicknTranslate"
-$stageRoot = Join-Path $releasesRoot ("ClicknTranslate-v" + $Version + "-win64-stage")
+if (-not $StageName) { $StageName = "ClicknTranslate-v" + $Version + "-win64-stage" }
+$stageRoot = Join-Path $releasesRoot $StageName
 $packageRoot = Join-Path $stageRoot "ClicknTranslate"
 $innerRoot = Join-Path $packageRoot "app"
 
@@ -107,11 +111,22 @@ if (-not $CertificateThumbprint) {
     Write-Warning 'This is an unsigned stage. Do not describe it as a signed release.'
 }
 
+# Hash the final signed bytes of every program module, library and worker.
+& (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'release_manifest.py') write $packageRoot $Version
+if ($LASTEXITCODE -ne 0) { throw 'Program manifest generation failed.' }
+
+$defenderReport = $null
+if ($RequireSignature -or $CertificateThumbprint -or $ScanWithDefender) {
+    $defenderReport = Join-Path $stageRoot 'windows-defender.json'
+    & (Join-Path $PSScriptRoot 'scan_windows_release.ps1') -Path $packageRoot -ReportPath $defenderReport
+}
+
 [pscustomobject]@{
     Version = $Version
     Stage = $stageRoot
     Package = $packageRoot
     SignatureReport = $signatureReport
+    DefenderReport = $defenderReport
     Signed = [bool]$CertificateThumbprint
     LauncherVersion = (Get-Item -LiteralPath (Join-Path $packageRoot "ClicknTranslate.exe")).VersionInfo.FileVersion
     PackageBytes = (Get-ChildItem -LiteralPath $packageRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum

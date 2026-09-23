@@ -116,22 +116,57 @@ class UiScalingTest(unittest.TestCase):
         original = [widget.geometry() for widget in widgets]
         icon = self.window.settings_button
         self.assertFalse(icon.icon().isNull())
-        sizes = ((80, 448, 256), (100, 560, 320), (125, 700, 400),
-                 (137, 767, 438), (150, 840, 480), (200, 1120, 640),
-                 (125, 700, 400), (80, 448, 256)) if sys.platform == "darwin" else ((80, 700, 400), (100, 875, 500), (125, 1094, 625),
-                                       (137, 1199, 685), (150, 1312, 750), (200, 1750, 1000),
-                                       (125, 1094, 625), (80, 700, 400))
-        for percent, width, height in sizes:
+        content = self.window.ui_root.size()
+        for percent in (80, 100, 125, 137, 150, 200, 125, 80):
             with self.subTest(percent=percent):
                 self.window.set_ui_scale_percent(percent)
                 self.settle()
-                self.assertEqual(self.window.width(), width)
-                self.assertEqual(self.window.height(), height)
+                self.assertEqual(self.window.width(), round(content.width() * percent / BASE_SCALE))
+                self.assertEqual(self.window.height(), round(content.height() * percent / BASE_SCALE))
                 self.assertEqual([widget.geometry() for widget in widgets], original)
                 left = self.controller.map_widget_to_view(icon, QPoint())
                 right = self.controller.map_widget_to_view(icon, QPoint(icon.width(), 0))
                 self.assertAlmostEqual(right.x() - left.x(), icon.width() * percent / BASE_SCALE, delta=1)
                 self.assertTrue(icon.isVisible())
+
+    def test_main_controls_fit_their_panels_and_viewport_on_full_hd_and_qhd(self):
+        for desktop in (QRect(0, 0, 1920, 1040), QRect(0, 0, 2560, 1400),
+                        QRect(-1280, 0, 1280, 640), QRect(0, 0, 640, 360)):
+            self.available.return_value = desktop
+            for percent in (80, 100, 125, 137, 150, 200):
+                with self.subTest(desktop=desktop, percent=percent):
+                    self.window.set_ui_scale_percent(percent)
+                    self.settle()
+                    self.assertTrue(desktop.contains(self.window.geometry()))
+                    self.assertEqual(self.window.config['ui_scale_percent'], percent)
+                    self.assertEqual(self.controller.proxy.boundingRect().size().toSize(), self.window.ui_root.size())
+                    for widget in (self.window.translate_button, self.window.main_result_copy_button,
+                                   self.window.main_result_expand_button, self.window.start_button,
+                                   *self.window.main_hotkey_references.values()):
+                        parent = widget.parentWidget()
+                        while parent is not None and parent is not self.window.ui_root:
+                            rect = QRect(widget.mapTo(parent, QPoint()), widget.size())
+                            self.assertTrue(parent.rect().contains(rect), (widget.objectName(), parent.objectName(), rect))
+                            parent = parent.parentWidget()
+                        top_left = self.controller.map_widget_to_view(widget, QPoint())
+                        bottom_right = self.controller.map_widget_to_view(widget, widget.rect().bottomRight())
+                        self.assertTrue(self.controller.view.viewport().rect().contains(QRect(top_left, bottom_right)))
+
+    def test_content_growth_and_return_to_settings_resynchronize_the_proxy(self):
+        original = self.window.ui_root.size()
+        composer = self.window.main_composer
+        composer.setMinimumHeight(composer.minimumHeight() + 40)
+        self.settle()
+        self.assertGreaterEqual(self.window.ui_root.height(), original.height() + 40)
+        self.assertEqual(self.controller.proxy.boundingRect().size().toSize(), self.window.ui_root.size())
+        self.window.show_settings()
+        self.settle()
+        self.assertEqual(self.window.ui_root.size(), QSize(700, 400))
+        self.assertEqual(self.controller.proxy.boundingRect().size().toSize(), QSize(700, 400))
+        self.window.show_main_screen()
+        self.settle()
+        self.assertEqual(self.window.ui_root.size(), original)
+        self.assertEqual(self.controller.proxy.boundingRect().size().toSize(), original)
 
     def test_clicks_and_multiline_typing_reach_the_scaled_controls(self):
         self.window.set_ui_scale_percent(175)
@@ -253,31 +288,49 @@ class UiScalingTest(unittest.TestCase):
         self.assertFalse(popup.isVisible())
 
     def test_first_popup_keeps_its_anchor_after_native_proxy_sync_and_zoom(self):
+        # Native popups query Qt's actual screen. Keep their host on that same
+        # logical desktop (offscreen's 800x600 shrinks further at high DPI).
+        self.available.return_value = self.app.primaryScreen().availableGeometry()
         self.window.show_main_screen()
         for percent in (80, 100, 137):
             self.window.set_ui_scale_percent(percent)
             self.settle()
             for combo in (self.window.source_lang, self.window.target_lang,
                           self.window.hotkey_source_combo):
-                geometries = []
+                anchors = []
                 for attempt in (1, 2):
                     self.click(combo)
                     # Cocoa's native-to-scene synchronization is posted after
                     # showPopup returns; processEvents alone missed the jump.
                     QTest.qWait(100)
                     popup = combo.view().window()
-                    self.assertTrue(popup.isVisible())
-                    proxy = popup.graphicsProxyWidget()
-                    root = combo.window()
-                    geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
-                    field = QRect(combo.mapTo(root, QPoint()), combo.size())
-                    self.assertTrue(root.rect().contains(geometry.toAlignedRect()))
-                    self.assertFalse(geometry.intersects(QRectF(field)),
-                                     (percent, attempt, geometry, field))
-                    geometries.append(geometry)
+                    self.assertTrue(popup.isVisible(), (percent, attempt, combo.objectName(),
+                        combo.mapToGlobal(combo.rect().center()), self.app.primaryScreen().availableGeometry()))
+                    if sys.platform == 'darwin':
+                        # macOS draws the list inside the proxy scene.
+                        proxy = popup.graphicsProxyWidget()
+                        root = combo.window()
+                        geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
+                        field = QRect(combo.mapTo(root, QPoint()), combo.size())
+                        self.assertTrue(root.rect().contains(geometry.toAlignedRect()))
+                        self.assertFalse(geometry.intersects(QRectF(field)),
+                                         (percent, attempt, geometry, field))
+                        anchors.append(geometry)
+                    else:
+                        # Windows and X11 show a native window: the list has to
+                        # stay under (or above, when there is no room below) the
+                        # field in desktop coordinates, never at the canvas
+                        # origin.
+                        frame = popup.frameGeometry()
+                        field = QRect(combo.mapToGlobal(QPoint()), combo.size())
+                        horiz_overlap = frame.x() < field.right() and frame.right() > field.left()
+                        vertical_clear = frame.bottom() <= field.top() or frame.top() >= field.bottom()
+                        self.assertTrue(horiz_overlap and vertical_clear,
+                                        (percent, attempt, frame, field))
+                        anchors.append((frame.x(), frame.y()))
                     QTest.keyClick(self.controller.view.viewport(), Qt.Key_Escape)
                     self.settle()
-                self.assertEqual(geometries[0], geometries[1])
+                self.assertEqual(anchors[0], anchors[1])
 
     def test_dynamic_language_catalog_is_ready_before_the_first_popup(self):
         self.window.show_settings()
@@ -351,7 +404,9 @@ class UiScalingTest(unittest.TestCase):
         self.available.return_value = QRect(-1024, 0, 1024, 512) if sys.platform == 'darwin' else QRect(-1280, 0, 1280, 640)
         self.controller.refresh()
         self.settle()
-        self.assertEqual(self.controller.effective_percent, 160 if sys.platform == 'darwin' else 128)
+        expected = min(200, self.available.return_value.width() * BASE_SCALE // self.window.ui_root.width(),
+                       self.available.return_value.height() * BASE_SCALE // self.window.ui_root.height())
+        self.assertEqual(self.controller.effective_percent, expected)
         self.assertTrue(self.available.return_value.contains(self.window.geometry()))
         self.assertEqual(self.window.config['ui_scale_percent'], 200)
         self.available.return_value = QRect(0, 0, 2560, 1440)
@@ -395,7 +450,7 @@ class UiScalingTest(unittest.TestCase):
         try:
             self.assertEqual(restarted._ui_scale_controller.effective_percent, 137)
             self.assertEqual(restarted.width(), round(700 * 137 / BASE_SCALE))
-            self.assertEqual(restarted.height(), round(400 * 137 / BASE_SCALE))
+            self.assertEqual(restarted.height(), round(restarted.ui_root.height() * 137 / BASE_SCALE))
         finally:
             restarted.force_quit = True
             restarted.close()

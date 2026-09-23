@@ -68,12 +68,19 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.window.current_interface_language = language
                     self.window.show_main_screen()
                     self.settle()
-                    self.assertEqual((self.window.ui_root.width(), self.window.ui_root.height()), (700, 400))
+                    self.assertEqual(self.window.ui_root.width(), 700)
+                    self.assertGreaterEqual(self.window.ui_root.height(), self.window.main_layout.minimumSize().height())
                     self.assertEqual(self.rect_in(self.window, self.window.source_lang).left(),
                                      self.rect_in(self.window, self.window.hotkey_mode_combo).left())
                     self.assertEqual(self.rect_in(self.window, self.window.target_lang).right(),
                                      self.rect_in(self.window, self.window.hotkey_target_combo).right())
                     composer = self.rect_in(self.window, self.window.main_composer)
+                    self.assertTrue(self.window.main_text_section.rect().contains(
+                        self.rect_in(self.window.main_text_section, self.window.main_composer)))
+                    for button in (self.window.translate_button, self.window.main_result_copy_button,
+                                   self.window.main_result_expand_button):
+                        self.assertTrue(self.window.main_composer.rect().contains(
+                            self.rect_in(self.window.main_composer, button)))
                     language_bottom = max(
                         self.rect_in(self.window, widget).bottom()
                         for widget in (self.window.source_lang, self.window.target_lang)
@@ -102,16 +109,21 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         label = self.window.main_footer.findChild(QLabel, name)
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         self.assertLessEqual(label.sizeHint().height(), label.height(), label.text())
-                    for panel, name in (
-                        (self.window.main_text_section, "mainTextSectionTitle"),
-                        (self.window.main_shortcut_section, "mainShortcutSectionTitle"),
-                    ):
+                    for caption in (self.window.main_input_caption, self.window.main_result_caption):
+                        self.assertTrue(caption.isHidden(), 'Redundant headings stay off-layout')
+                    rail = self.window.assistant_preview
+                    self.assertTrue(rail.isVisible())
+                    self.assertTrue(self.window.main_text_section.rect().contains(
+                        self.rect_in(self.window.main_text_section, rail)))
+                    self.assertTrue(self.window.text_input.accessibleName())
+                    self.assertTrue(self.window.main_result_view.accessibleName())
+                    for panel, name in ((self.window.main_shortcut_section, "mainShortcutSectionTitle"),):
                         label = panel.findChild(QLabel, name)
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         self.assertLessEqual(label.sizeHint().height(), label.height(), label.text())
                         self.assertEqual(label.alignment(), Qt.AlignCenter)
                         self.assertAlmostEqual(self.rect_in(self.window, label).center().x(), 349, delta=1)
-                        picker = self.window.source_lang if name == "mainTextSectionTitle" else self.window.hotkey_mode_combo
+                        picker = self.window.hotkey_mode_combo
                         self.assertGreaterEqual(self.rect_in(self.window, picker).top() -
                                                 self.rect_in(self.window, label).bottom() - 1, 6)
                     footer = self.window.main_footer
@@ -121,8 +133,8 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     right = self.rect_in(self.window, footer.findChild(QLabel, "mainOcrSummary"))
                     self.assertLess(left.right(), action.left())
                     self.assertLess(action.right(), right.left())
-                    self.assertTrue(self.window.main_shortcut_section.rect().contains(
-                        self.rect_in(self.window.main_shortcut_section, self.window.main_hotkey_area)))
+                    area_in_shortcut_section = self.rect_in(self.window.main_shortcut_section, self.window.main_hotkey_area)
+                    self.assertTrue(self.window.main_shortcut_section.rect().contains(area_in_shortcut_section))
                     area = self.window.main_hotkey_area
                     for pair in self.window.main_hotkey_references.values():
                         self.assertTrue(area.rect().contains(self.rect_in(area, pair)))
@@ -192,9 +204,13 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             for panel in (self.window.main_text_section, self.window.main_shortcut_section,
                           self.window.start_button):
                 edge = panel.mapTo(self.window.ui_root, QPoint(0, panel.height() // 2))
-                border = screenshot.pixelColor(round(edge.x() * scale), round(edge.y() * scale))
                 outside = screenshot.pixelColor(round((edge.x() - 2) * scale), round(edge.y() * scale))
-                self.assertGreaterEqual(contrast(border, outside), 2, (theme, panel.objectName()))
+                # A one-pixel logical border crosses physical pixel centres at
+                # fractional DPI; sample its rasterized footprint, not one
+                # rounded coordinate which can land just outside the stroke.
+                border_contrast = max(contrast(screenshot.pixelColor(x, round(edge.y() * scale)), outside)
+                                      for x in range(int(edge.x() * scale), round((edge.x() + 2) * scale) + 1))
+                self.assertGreaterEqual(border_contrast, 2, (theme, panel.objectName()))
             button = self.window.start_button
             self.assertGreaterEqual(button.width(), button.sizeHint().width())
             fill = button.grab().toImage().pixelColor(button.width() // 2, 5)
@@ -324,7 +340,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             self.settle()
             self.assertGreater(active_contrast, text_contrast(tabs[0], theme == "Темная") + 20)
             self.assertEqual(positions, [tab.geometry() for tab in tabs])
-            self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True])
+        self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False])
 
     def test_main_action_captions_use_full_words(self):
         self.window.current_interface_language = 'ru'

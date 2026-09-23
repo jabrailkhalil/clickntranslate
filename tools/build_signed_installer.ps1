@@ -52,6 +52,8 @@ $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 $signCommand = '$q{0}$q -NoProfile -NonInteractive -File $q{1}$q -FilePath $f -CertificateThumbprint {2} -CertificateStoreLocation {3}' -f `
     $powershell.Replace('$', '$$'), $signScript.Replace('$', '$$'), $CertificateThumbprint, $CertificateStoreLocation
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+& (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'release_manifest.py') verify $PackageRoot $version
+if ($LASTEXITCODE -ne 0) { throw 'The package changed after its program manifest was generated; rebuild the stage.' }
 $installerName = "Click-n-Translate-$version-windows-x64-installer"
 $installerPath = Join-Path $OutputDirectory "$installerName.exe"
 if (Test-Path -LiteralPath $installerPath) {
@@ -62,5 +64,7 @@ if (Test-Path -LiteralPath $installerPath) {
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
 & $signScript -Mode Verify -FilePath $installerPath -CertificateThumbprint $CertificateThumbprint `
     -ReportPath "$installerPath.signatures.json"
+& (Join-Path $PSScriptRoot 'scan_windows_release.ps1') -Path $installerPath `
+    -ReportPath "$installerPath.defender.json"
 $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$installerPath.sha256", "$hash  $([IO.Path]::GetFileName($installerPath))`n", [Text.UTF8Encoding]::new($false))

@@ -83,7 +83,18 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          .venv-macos/bin/python -m pytest -q tests/test_macos_support.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py tests/test_document_services.py tests/test_single_instance.py
+          .venv-macos/bin/python tools/run_regression_tests.py --output build/macos/portable-tests \
+            tests/test_macos_*.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py \
+            tests/test_document_services.py tests/test_single_instance.py
+      - name: Keep platform test results
+        if: always() && !inputs.signing_only && !inputs.prepare_release
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-platform-tests
+          path: |
+            build/macos/portable-tests/results.xml
+            build/macos/portable-tests/run.json
+          if-no-files-found: ignore
       - name: Build and exercise native bundle
         if: '!inputs.signing_only'
         env:

@@ -232,9 +232,17 @@ def shortcut_command(action, executable=None):
         raise ValueError(f"Unknown shortcut action: {action}")
     if executable is None:
         executable = appimage_path() or LINUX_BINARY_NAME
-    if " " in executable:
-        executable = f'"{executable}"'
-    return f"{executable} --{action}"
+    return f"{quote_command_argument(executable)} --{action}"
+
+
+def quote_command_argument(value):
+    """Quote one literal argument for Linux desktop shortcut commands."""
+    value = str(value)
+    reserved = '\"\'\\><~|&;$*?#()`'
+    if value and not any(char.isspace() or char in reserved for char in value):
+        return value
+    escaped = ''.join('\\' + char if char in '\\"`$' else char for char in value)
+    return '"' + escaped + '"'
 
 
 # --- clipboard ----------------------------------------------------------------
@@ -282,6 +290,15 @@ def _copy_with_helper(text):
             # could not reach the display server, so try the next one.
             if process.returncode == 0:
                 return True
+        except subprocess.TimeoutExpired:
+            # communicate() does not terminate a timed-out helper. Reap only
+            # the process we started, otherwise each retry leaves one behind.
+            try:
+                process.kill()
+                process.communicate(timeout=1)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            continue
         except (OSError, subprocess.SubprocessError):
             continue
     return False

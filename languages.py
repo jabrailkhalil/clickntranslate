@@ -41,6 +41,20 @@ LOCALIZED_LANGUAGE_NAMES = {
     },
 }
 
+AUTO_LANGUAGE_NAMES = {
+    'en': 'Detect language', 'ru': 'Определить язык', 'de': 'Sprache erkennen',
+    'es': 'Detectar idioma', 'fr': 'Détecter la langue', 'zh': '自动检测语言',
+}
+
+
+def supports_auto_source(engine):
+    """Text detection is a provider capability, not an OCR language."""
+    return str(engine or '').lower() == 'google'
+
+
+def valid_translation_source(code, engine):
+    return get_language(code) is not None or (code == 'auto' and supports_auto_source(engine))
+
 
 @dataclass(frozen=True)
 class LanguageInfo:
@@ -92,6 +106,8 @@ def get_language(code):
 
 
 def language_display_name(code, interface_language="en"):
+    if code == 'auto':
+        return AUTO_LANGUAGE_NAMES.get(interface_language, AUTO_LANGUAGE_NAMES['en'])
     language = get_language(code)
     return language.display_name(interface_language) if language else str(code or "").upper()
 
@@ -119,6 +135,8 @@ def language_names(interface_language="en"):
 
 def language_code_from_name(name, interface_language="en"):
     name = str(name or "")
+    if name == 'auto' or name in AUTO_LANGUAGE_NAMES.values():
+        return 'auto'
     for language in LANGUAGES:
         if name in (language.english_name, language.russian_name):
             return language.code

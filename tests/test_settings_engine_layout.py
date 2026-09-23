@@ -522,7 +522,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.app.processEvents()
 
             self.assertEqual(settings._settings_page_index, 0)
-            self.assertEqual(len(settings.settings_page_dots), 3)
+            self.assertEqual(len(settings.settings_page_dots), 4)
             self.assertTrue(settings.settings_page_dots[0].isChecked())
             self.assertTrue(settings.settings_updates_page.isHidden())
             self.assertFalse(hasattr(settings, "version_label"))

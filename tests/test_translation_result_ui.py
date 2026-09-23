@@ -150,6 +150,9 @@ class TranslationResultUiTest(unittest.TestCase):
             self.assertFalse(dialog.copy_button.autoDefault())
             self.assertFalse(dialog.translate_button.autoDefault())
             self.assertFalse(dialog.close_button.autoDefault())
+            self.assertFalse(dialog.close_button.isVisible())
+            self.assertFalse(dialog.copy_button.icon().isNull())
+            self.assertEqual(dialog.copy_button.text(), '')
             for button in (dialog.copy_button, dialog.translate_button, dialog.close_button):
                 self.assertGreaterEqual(button.width(), button.sizeHint().width())
             if theme == "Темная":

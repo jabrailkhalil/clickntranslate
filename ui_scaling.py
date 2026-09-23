@@ -1,4 +1,4 @@
-"""Scale the fixed main UI as one scene, independently of desktop/OCR DPI."""
+"""Fit and scale the main UI as one scene, independently of desktop/OCR DPI."""
 
 import os
 import math
@@ -69,9 +69,76 @@ def normalize_ui_scale(value):
     return max(MIN_SCALE, min(MAX_SCALE, value))
 
 
-def maximum_ui_scale(available):
-    percent = min(available.width() * BASE_SCALE // BASE_WIDTH, available.height() * BASE_SCALE // BASE_HEIGHT)
-    return max(MIN_SCALE, min(MAX_SCALE, percent))
+def maximum_ui_scale(available, content_size=None):
+    size = content_size if content_size is not None else QSize(BASE_WIDTH, BASE_HEIGHT)
+    percent = min(available.width() * BASE_SCALE // size.width(),
+                  available.height() * BASE_SCALE // size.height())
+    # The user's preference is 80–200%, but a small logical desktop may need
+    # less than 80% to show every control (e.g. a high-DPI secondary monitor).
+    return max(1, min(MAX_SCALE, percent))
+
+
+def interface_scale_factor(config=None, widget=None):
+    """One logical UI scale; Qt applies monitor DPI separately, exactly once.
+
+    Screen rectangles and OCR coordinates must never use this factor.
+    A dialog's local scale overrides the global preference for its own hints.
+    """
+    if config is not None:
+        return normalize_ui_scale(config.get('ui_scale_percent', DEFAULT_SCALE)) / BASE_SCALE
+    if isinstance(widget, QWidget):
+        owner = native_window_parent(widget)
+        owner = owner.window() if owner is not None else None
+        factor = owner.property('ui_effective_scale') if owner is not None else None
+        if factor:
+            return float(factor)
+        controller = getattr(owner, '_ui_scale_controller', None)
+        if controller is not None:
+            return controller.effective_percent / BASE_SCALE
+    app = QApplication.instance()
+    value = app.property('ui_scale_percent') if app is not None else DEFAULT_SCALE
+    return normalize_ui_scale(value) / BASE_SCALE
+
+
+def desktop_control_scale(screen=None):
+    """DPI-sized capture/desktop chrome, independent of main-window zoom.
+
+    Windows currently keeps screen coordinates in native pixels. Its logical
+    DPI therefore still reports e.g. 144 at 150%. When Qt high-DPI scaling is
+    enabled, Qt normalizes logical DPI to 96 and applies the DPR itself. Using
+    logical DPI (never multiplying DPR) covers both without double scaling.
+    """
+    screen = screen or QApplication.primaryScreen()
+    baseline = 72.0 if sys.platform == 'darwin' else 96.0
+    dpi = screen.logicalDotsPerInch() if screen is not None else baseline
+    return max(1.0, min(3.0, dpi / baseline))
+
+
+class ScaleArrowButton(QToolButton):
+    """Every rapid click counts; remember the real pointer through proxy events."""
+    click_global = None
+
+    def mouseDoubleClickEvent(self, event):
+        self.mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self.click_global = event.globalPos() if event.button() == Qt.LeftButton else None
+        try:
+            super().mouseReleaseEvent(event)
+        finally:
+            self.click_global = None
+
+
+def retain_scale_click(button, global_point):
+    """At a screen edge the window cannot move further: keep the arrow reachable.
+
+    Only an explicit mouse click on a scale arrow may reposition the pointer.
+    Never warp it on keyboard changes, programmatic changes, or offscreen QA.
+    """
+    if (isinstance(button, ScaleArrowButton) and button.click_global is not None
+            and QApplication.platformName() != 'offscreen'
+            and (QCursor.pos() - global_point).manhattanLength() > 1):
+        QCursor.setPos(global_point)
 
 
 def native_window_parent(widget):
@@ -258,10 +325,15 @@ class MainWindowScaleController(QObject):
         self.effective_percent = MIN_SCALE
         self.maximum_percent = MAX_SCALE
         self._screen = None
+        self._window_handle = None
         self._shown = False
         self._initial_position = None
-        owner.installEventFilter(self)
         self.canvas = _InterfaceCanvas(owner)
+        self._content_timer = QTimer(self)
+        self._content_timer.setSingleShot(True)
+        self._content_timer.timeout.connect(self._refresh_content_size)
+        self.canvas.installEventFilter(self)
+        owner.installEventFilter(self)
         self.view = _ScaleView(owner)
         self.view.setObjectName('mainUiScaleView')
         self.view.viewport().setObjectName('mainUiViewport')
@@ -271,9 +343,10 @@ class MainWindowScaleController(QObject):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
-        # A single compact canvas needs one complete frame when its theme or
-        # scale changes. Partial proxy updates can retain strips of the old theme.
-        self.view.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # Ordinary child changes (including the 16px companion) must not
+        # repaint the entire scaled window. Theme/scale transitions explicitly
+        # invalidate the whole viewport below, avoiding old-theme edge strips.
+        self.view.setViewportUpdateMode(QGraphicsView.BoundingRectViewportUpdate)
         self.view.setFocusPolicy(Qt.StrongFocus)
         self.scene = QGraphicsScene(self.view)
         self.view.setScene(self.scene)
@@ -282,15 +355,31 @@ class MainWindowScaleController(QObject):
         self.canvas.hide()
         self.view.setSceneRect(0, 0, BASE_WIDTH, BASE_HEIGHT)
         self.owner.setCentralWidget(self.view)
-        handle = owner.windowHandle()
-        if handle is not None:
-            handle.screenChanged.connect(self._screen_changed)
-            self._screen_changed(handle.screen())
+        self._bind_window_screen()
 
     def eventFilter(self, watched, event):
         if watched is self.owner and event.type() == QEvent.Show:
             self._shown = True
+            self._bind_window_screen()
+        if watched is self.canvas and event.type() == QEvent.LayoutRequest:
+            # Fonts, language, theme and page changes can change the layout's
+            # minimum. Measure after Qt finishes laying out the new children.
+            self._content_timer.start(0)
         return False
+
+    def content_size(self):
+        return self.canvas.minimumSizeHint().expandedTo(QSize(BASE_WIDTH, BASE_HEIGHT))
+
+    def _refresh_content_size(self):
+        if self.content_size() != self.canvas.size():
+            self.refresh()
+
+    def _bind_window_screen(self):
+        handle = self.owner.windowHandle()
+        if handle is not None and handle is not self._window_handle:
+            self._window_handle = handle
+            handle.screenChanged.connect(self._screen_changed)
+            self._screen_changed(handle.screen())
 
     def available_geometry(self):
         handle = self.owner.windowHandle()
@@ -319,10 +408,11 @@ class MainWindowScaleController(QObject):
     def set_percent(self, value, anchor_widget=None):
         self.requested_percent = normalize_ui_scale(value)
         available = self.available_geometry()
-        self.maximum_percent = maximum_ui_scale(available)
+        content_size = self.content_size()
+        self.maximum_percent = maximum_ui_scale(available, content_size)
         actual = min(self.requested_percent, self.maximum_percent)
         factor = actual / BASE_SCALE
-        width, height = round(BASE_WIDTH * factor), round(BASE_HEIGHT * factor)
+        width, height = round(content_size.width() * factor), round(content_size.height() * factor)
         position = self.owner.pos()
         initial = (not self._shown and anchor_widget is None
                    and (position == self._initial_position
@@ -333,7 +423,9 @@ class MainWindowScaleController(QObject):
             anchor_global = self.view.mouse_global_position
             if anchor_global is None or not self.view.viewport().rect().contains(self.view.viewport().mapFromGlobal(anchor_global)):
                 anchor_global = self.view.viewport().mapToGlobal(self.map_widget_to_view(anchor_widget))
-            point = self.proxy.mapFromScene(self.view.mapToScene(self.view.viewport().mapFromGlobal(anchor_global)))
+            point = (QPointF(anchor_widget.mapTo(self.canvas, anchor_widget.rect().center()))
+                     if isinstance(anchor_widget, ScaleArrowButton) else
+                     self.proxy.mapFromScene(self.view.mapToScene(self.view.viewport().mapFromGlobal(anchor_global))))
             viewport_offset = self.view.viewport().mapTo(self.owner, QPoint())
             position = (QPointF(anchor_global) - point * factor - QPointF(viewport_offset)).toPoint()
         position.setX(max(available.left(), min(position.x(), available.right() - width + 1)))
@@ -344,6 +436,13 @@ class MainWindowScaleController(QObject):
         self.owner.setUpdatesEnabled(False)
         try:
             self.effective_percent = actual
+            self.canvas.setFixedSize(content_size)
+            self.canvas.layout().activate()
+            # The proxy retained the original fixed 700x400 constraints even
+            # after QWidget grew; without syncing both, it clips the footer.
+            self.proxy.setMinimumSize(content_size.width(), content_size.height())
+            self.proxy.setMaximumSize(content_size.width(), content_size.height())
+            self.proxy.resize(content_size.width(), content_size.height())
             self.proxy.setScale(factor)
             self.view.setSceneRect(QRectF(0, 0, width, height))
             self.owner.setFixedSize(width, height)
@@ -353,7 +452,10 @@ class MainWindowScaleController(QObject):
                 self._initial_position = QPoint(position)
         finally:
             self.owner.setUpdatesEnabled(updates_enabled)
+        self.view.viewport().update()
         self.changed.emit(actual, self.maximum_percent)
+        if isinstance(anchor_widget, ScaleArrowButton):
+            retain_scale_click(anchor_widget, self.view.viewport().mapToGlobal(self.map_widget_to_view(anchor_widget)))
         return actual
 
     def apply_theme(self, stylesheet, background):
@@ -377,6 +479,7 @@ class MainWindowScaleController(QObject):
         self.view.viewport().setAutoFillBackground(True)
         self.view.setBackgroundBrush(color)
         self.scene.setBackgroundBrush(color)
+        self.view.viewport().update()
 
     def map_widget_to_view(self, widget, point=None):
         point = point if point is not None else widget.rect().center()
@@ -401,7 +504,16 @@ def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
 
 
 def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
-    """Popup coordinates belong to the scene, not to the native desktop."""
+    """Position an in-scene popup; only macOS draws the list inside the proxy.
+
+    On Windows and X11 the popup of an embedded combo is still a native top
+    level window, but Qt reports a graphics proxy for it. Treating the scene
+    coordinates as desktop coordinates dropped the list at the canvas origin
+    (upper left of the window) instead of under the field. Returning False
+    sends the caller to the global-coordinate layout path instead.
+    """
+    if sys.platform != 'darwin':
+        return False
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()

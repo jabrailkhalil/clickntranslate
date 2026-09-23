@@ -144,6 +144,27 @@ def test_app_load_persists_migrated_defaults():
     assert dummy.config["toggle_window_hotkey"] == main.DEFAULT_TOGGLE_WINDOW_HOTKEY
 
 
+def test_broken_config_falls_back_to_defaults_and_is_repaired():
+    """A corrupted config.json must not stop startup: use defaults and rewrite."""
+    with tempfile.TemporaryDirectory(prefix="cnt_config_corrupt_") as temp_dir:
+        config_path = os.path.join(temp_dir, "config.json")
+        with open(config_path, "w", encoding="utf-8") as stream:
+            stream.write("{broken json")
+
+        dummy = SimpleNamespace()
+        dummy.sync_autostart_state = lambda repair_stale=True: False
+        dummy.save_config = lambda: None
+
+        with mock.patch.object(main, "get_data_file", return_value=config_path):
+            main.DarkThemeApp.load_config(dummy)
+
+        assert dummy.config["theme"] == main.DEFAULT_CONFIG["theme"]
+        assert dummy.config["interface_language"] == main.DEFAULT_CONFIG["interface_language"]
+        with open(config_path, encoding="utf-8") as stream:
+            repaired = json.load(stream)
+        assert repaired["theme"] == main.DEFAULT_CONFIG["theme"]
+
+
 def test_revision_three_gets_gaming_default_but_preserves_custom_or_current_empty():
     migrated, _ = main.merge_config_defaults({
         "hotkey_defaults_revision": 3,

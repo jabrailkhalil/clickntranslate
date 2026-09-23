@@ -22,6 +22,11 @@ venv/
 .venv*/
 .env
 
+# Reinstallable web dependencies and local preview caches
+node_modules/
+.thumbnails/
+.pytest_cache/
+
 # IDE / editor settings
 .idea/
 .vscode/
@@ -82,6 +87,7 @@ data/config.json
 data/copy_history.json
 data/translation_history.json
 data/settings.json
+data/dynamic_templates.json
 data/cache/
 data/logs/
 data/**/*.png

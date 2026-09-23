@@ -76,6 +76,7 @@ class DialogAppearance(QtCore.QObject):
         super().__init__(app)
         self.app = app
         self.percent = normalize_ui_scale(percent)
+        app.setProperty('ui_scale_percent', self.percent)
         self.theme = theme
         self._windows = weakref.WeakKeyDictionary()
         self._busy = False
@@ -151,6 +152,9 @@ class DialogAppearance(QtCore.QObject):
     def refresh(self, percent=None, theme=None):
         if percent is not None:
             self.percent = normalize_ui_scale(percent)
+            self.app.setProperty('ui_scale_percent', self.percent)
+            from styled_dialogs import install_tooltip_style
+            install_tooltip_style(self.app, (theme or self.theme) != 'Светлая')
         if theme is not None:
             self.theme = theme
             self.app.setProperty('ui_theme', theme)
@@ -161,7 +165,10 @@ class DialogAppearance(QtCore.QObject):
                 self.apply(window)
 
     def set_window_percent(self, window, percent, anchor_widget=None):
+        from ui_scaling import ScaleArrowButton, retain_scale_click
         anchor = anchor_widget.mapToGlobal(anchor_widget.rect().center()) if anchor_widget is not None else None
+        if isinstance(anchor_widget, ScaleArrowButton) and anchor_widget.click_global is not None:
+            anchor = anchor_widget.click_global
         window.setProperty('ui_scale_override', normalize_ui_scale(percent))
         self.apply(window)
         if anchor is not None:
@@ -169,6 +176,7 @@ class DialogAppearance(QtCore.QObject):
             available = self.available_geometry(window)
             window.move(max(available.left(), min(position.x(), available.right() - window.width() + 1)),
                         max(available.top(), min(position.y(), available.bottom() - window.height() + 1)))
+            retain_scale_click(anchor_widget, anchor_widget.mapToGlobal(anchor_widget.rect().center()))
 
     def window_percent(self, window):
         return normalize_ui_scale(window.property('ui_scale_override') or self.percent)
@@ -409,21 +417,65 @@ def refresh_window_appearance(percent=None, theme=None):
         install_tooltip_style(app, theme != 'Светлая')
 
 
+def scale_native_controls(root, factor):
+    """One-time sizing for independent desktop tool panels, without a proxy.
+
+    Capture/output rectangles aren't descendants of these panels, so they
+    remain untouched. Snapshot first to avoid scaling inherited fonts twice.
+    """
+    root.ensurePolished()
+    widgets = [root, *root.findChildren(QtWidgets.QWidget)]
+    snapshots = [(w, QtGui.QFont(w.font()), w.styleSheet(), w.minimumSize(), w.maximumSize(),
+                  w.iconSize() if isinstance(w, QtWidgets.QAbstractButton) else None) for w in widgets]
+    for widget, font, style, minimum, maximum, icon in snapshots:
+        if font.pixelSize() > 0:
+            font.setPixelSize(max(1, round(font.pixelSize() * factor)))
+        else:
+            font.setPointSizeF(max(1., font.pointSizeF() * factor))
+        widget.setFont(font)
+        widget.setMinimumSize(minimum * factor)
+        widget.setMaximumSize(*(16777215 if v == 16777215 else round(v * factor)
+                                for v in (maximum.width(), maximum.height())))
+        if icon is not None:
+            widget.setIconSize(icon * factor)
+    # Apply ancestor styles last. Otherwise setting a descendant's font can
+    # restore Qt's cached, unscaled inherited stylesheet font (notably inside
+    # QScrollArea and QAbstractSpinBox).
+    for widget, _, style, *_ in reversed(snapshots):
+        widget.setStyleSheet(scaled_stylesheet(style, factor))
+    for layout in root.findChildren(QtWidgets.QLayout):
+        margins = layout.contentsMargins()
+        layout.setContentsMargins(*(round(v * factor) for v in (margins.left(), margins.top(), margins.right(), margins.bottom())))
+        if layout.spacing() >= 0:
+            layout.setSpacing(round(layout.spacing() * factor))
+    root.setProperty('ui_effective_scale', factor)
+
+
 def style_capture_controls(overlay, config, controls):
-    """Keep screen controls compact, opaque and independent of the app's zoom."""
+    """Scale only the controls; capture geometry always stays in screen units."""
     from button_styles import button_qss
     from settings_window import DropDownCombo, modern_combo_style
     from capture_widgets import CaptureLanguageCombo
+    from ui_scaling import desktop_control_scale
     controls = [widget for widget in controls if widget is not None]
     dark = config.get('theme', 'Темная') != 'Светлая'
     for widget in controls:
         if widget.property('capture_base_size') is None:
             widget.setProperty('capture_base_size', widget.size())
             widget.setProperty('capture_base_icon', widget.iconSize())
-    overlay.setProperty('ui_effective_scale', 1.0)
+    # The language row must fit even on a small high-DPI screen. Other actions
+    # may wrap to a second row. Never shrink the full-screen capture surface.
+    row_width = sum(112 if isinstance(w, QtWidgets.QComboBox) else 36
+                    for w in controls if isinstance(w, (QtWidgets.QComboBox, QtWidgets.QToolButton)))
+    screen = getattr(overlay, '_screen', None) or getattr(overlay, 'screen', None)
+    screen = screen() if callable(screen) else screen
+    screen = screen or QtWidgets.QApplication.primaryScreen()
+    available_width = screen.availableGeometry().width() if screen is not None else overlay.width()
+    factor = min(desktop_control_scale(screen), max(.5, (available_width - 40) / max(1, row_width + 16)))
+    overlay.setProperty('ui_effective_scale', factor)
     for widget in controls:
         if isinstance(widget, CaptureLanguageCombo):
-            widget.set_capture_theme(dark, config.get('interface_language', 'en'))
+            widget.set_capture_theme(dark, config.get('interface_language', 'en'), factor)
             continue
         if isinstance(widget, QtWidgets.QComboBox):
             style = modern_combo_style(dark, 14) + """
@@ -435,15 +487,15 @@ def style_capture_controls(overlay, config, controls):
                 widget.set_popup_background('#20212a' if dark else '#f1edf4')
             # Reserve the icon, the language code and the chevron separately.
             # The settings-field padding hid the code in these compact fields.
-            widget.setFixedSize(max(112, widget.property('capture_base_size').width()), 44)
-            widget.setIconSize(QtCore.QSize(28, 28))
+            widget.setFixedSize(round(max(112, widget.property('capture_base_size').width()) * factor), round(44 * factor))
+            widget.setIconSize(QtCore.QSize(28, 28) * factor)
         else:
             style = button_qss(dark, 'secondary',
                                selector='QToolButton' if isinstance(widget, QtWidgets.QToolButton) else 'QPushButton',
                                icon=isinstance(widget, QtWidgets.QToolButton), compact=True)
-            widget.setFixedSize(max(36, widget.property('capture_base_size').width()), 36)
-            widget.setIconSize(widget.property('capture_base_icon'))
-        widget.setStyleSheet(style)
+            widget.setFixedSize(round(max(36, widget.property('capture_base_size').width()) * factor), round(44 * factor))
+            widget.setIconSize(widget.property('capture_base_icon') * factor)
+        widget.setStyleSheet(scaled_stylesheet(style, factor))
         palette = widget.palette()
         palette.setColor(QtGui.QPalette.ButtonText, QtGui.QColor('#f1edf5' if dark else '#302837'))
         widget.setPalette(palette)

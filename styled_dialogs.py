@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from button_styles import standard_buttons
-from ui_scaling import native_window_parent
+from ui_scaling import native_window_parent, interface_scale_factor
 
 import ctypes
 import logging
@@ -41,7 +41,7 @@ def tooltip_stylesheet(dark=None, *, use_palette=False) -> str:
         border-radius: 4px;
         padding: 3px 6px;
         font-family: '{family}';
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 400;
         opacity: 245;
     }}
@@ -113,10 +113,10 @@ class _RoundedTooltipFilter(QtCore.QObject):
         rounded_popup = (is_tooltip or bool(watched.property("clickntranslateRoundedPopup"))
                          or (sys.platform == 'darwin' and isinstance(watched, QtWidgets.QMenu)))
         if event_type == QtCore.QEvent.Polish and rounded_popup:
-            # Cocoa gives an ordinary Qt.ToolTip panel an opaque native
-            # background even when its Qt backing store has transparent
-            # corners. Configure it before the native window is created.
-            if sys.platform == 'darwin' and not watched.windowFlags() & QtCore.Qt.FramelessWindowHint:
+            # Both Windows and Cocoa require frameless top-level windows for
+            # translucent backing stores. Configure before native creation,
+            # not only on macOS: otherwise light tips acquire black corners.
+            if not watched.windowFlags() & QtCore.Qt.FramelessWindowHint:
                 watched.setWindowFlag(QtCore.Qt.FramelessWindowHint, True)
             watched.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
             watched.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
@@ -149,7 +149,7 @@ def _is_tooltip(widget) -> bool:
 
 
 def _hover_tooltip_document(widget, anchor):
-    """Measure the same unscaled text that we paint, without QLabel sizeHint.
+    """Measure the same scaled text that we paint, without QLabel sizeHint.
 
     QTipLabel inherits the hovered owner's stylesheet and recalculates its
     QLabel size when reused. QLabel also chooses its own rich-text wrap width.
@@ -161,8 +161,10 @@ def _hover_tooltip_document(widget, anchor):
         source = QtGui.QTextDocument()
         source.setHtml(text)
         text = source.toPlainText()
+    owner = widget.property('_q_stylesheet_parent')
+    factor = interface_scale_factor(widget=owner if isinstance(owner, QtWidgets.QWidget) else widget)
     font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
-    font.setPixelSize(11)
+    font.setPixelSize(max(12, round(13 * factor)))
     font.setWeight(QtGui.QFont.Normal)
     font.setItalic(False)
     document = QtGui.QTextDocument()
@@ -173,14 +175,14 @@ def _hover_tooltip_document(widget, anchor):
     document.setDefaultTextOption(option)
     document.setPlainText(text)
     screen = QtWidgets.QApplication.screenAt(anchor) or QtWidgets.QApplication.primaryScreen()
-    width = TOOLTIP_WRAP_WIDTH
+    width = round(TOOLTIP_WRAP_WIDTH * factor)
+    padding = QtCore.QPoint(round(8 * factor), round(5 * factor))
     if screen is not None:
-        width = min(width, max(1, screen.availableGeometry().width() - 22))
+        width = min(width, max(1, screen.availableGeometry().width() - 2 * padding.x() - 8))
     document.setTextWidth(width)
-    # Six logical pixels per side and three above/below. No inherited label
-    # padding, minimum size, HTML width or main-window scale enters this size.
-    size = QtCore.QSize(math.ceil(document.idealWidth()) + 12,
-                        math.ceil(document.size().height()) + 6)
+    widget.setProperty('tooltip_padding', padding)
+    size = QtCore.QSize(math.ceil(document.idealWidth()) + 2 * padding.x(),
+                        math.ceil(document.size().height()) + 2 * padding.y())
     return document, size
 
 
@@ -198,11 +200,16 @@ def _paint_hover_tooltip(widget):
     )
     painter = QtGui.QPainter(widget)
     try:
+        # The same native tip is reused. Clear the old backing-store corners
+        # before antialiasing the new light/dark surface.
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+        painter.fillRect(widget.rect(), QtCore.Qt.transparent)
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtGui.QPen(QtGui.QColor(border), 1))
         painter.setBrush(QtGui.QColor(background))
         painter.drawRoundedRect(QtCore.QRectF(widget.rect()).adjusted(.5, .5, -.5, -.5), 4, 4)
-        painter.translate(6, 3)
+        painter.translate(widget.property('tooltip_padding') or QtCore.QPoint(8, 5))
         context = QtGui.QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(QtGui.QPalette.Text, QtGui.QColor(foreground))
         document.documentLayout().draw(painter, context)
@@ -233,7 +240,8 @@ def position_popup_near_cursor(widget, anchor=None):
     x = max(bounds.left(), min(x, bounds.right() - widget.width() + 1))
     y = max(bounds.top(), min(y, bounds.bottom() - widget.height() + 1))
     if view is not None:
-        # A tooltip is a desktop hint, independent of the main canvas zoom.
+        # Text is already measured at the owner's UI scale. Do not apply the
+        # proxy transform again (that would square the scale on the main UI).
         proxy.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
         scene_point = view.mapToScene(view.viewport().mapFromGlobal(QtCore.QPoint(x, y)))
         parent = proxy.parentItem()
@@ -309,7 +317,12 @@ class StatusPopup(QtWidgets.QLabel):
         self._refresh_theme()
 
     def _refresh_theme(self):
-        set_widget_stylesheet(self, tooltip_stylesheet().replace('QToolTip', 'QLabel'))
+        from ui_scaling import desktop_control_scale
+        from window_appearance import scaled_stylesheet
+        screen = QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen()
+        factor = desktop_control_scale(screen)
+        set_widget_stylesheet(self, scaled_stylesheet(
+            tooltip_stylesheet().replace('QToolTip', 'QLabel'), factor))
 
     def showEvent(self, event):
         self._refresh_theme()
@@ -345,7 +358,8 @@ class CopyNotificationPopup(StatusPopup):
         if screen is None:
             return
         bounds = screen.availableGeometry().adjusted(18, 18, -18, -18)
-        self.setMaximumWidth(min(360, bounds.width()))
+        from ui_scaling import desktop_control_scale
+        self.setMaximumWidth(min(round(360 * desktop_control_scale(screen)), bounds.width()))
         self.adjustSize()
         self.move(bounds.right() - self.width() + 1, bounds.bottom() - self.height() + 1)
         self.show()
@@ -381,7 +395,7 @@ def install_tooltip_style(app=None, dark=None) -> None:
     palette.setColor(QtGui.QPalette.Mid, QtGui.QColor('#505050' if dark else '#c9c9c9'))
     QtWidgets.QToolTip.setPalette(palette)
     font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
-    font.setPixelSize(11)
+    font.setPixelSize(max(12, round(13 * interface_scale_factor())))
     font.setWeight(QtGui.QFont.Normal)
     QtWidgets.QToolTip.setFont(font)
     # Qt effects capture the private QLabel before Show/our final geometry.

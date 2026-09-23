@@ -162,7 +162,10 @@ class LingvaTest(unittest.TestCase):
         self.assertTrue(calls[0].startswith("https://lingva.vercel.app/"))
 
     def test_all_instances_down_surfaces_server_message(self):
+        urls = []
+
         def fake_get(url, timeout=None):
+            urls.append(url)
             return FakeResponse(500, {"error": "An error occurred while retrieving the translation"})
 
         with mock.patch.object(translater, "_get_http_session", return_value=SimpleNamespace(get=fake_get)):
@@ -170,6 +173,8 @@ class LingvaTest(unittest.TestCase):
                 translater.lingva_translate("hello", "en", "ru")
 
         self.assertIn("An error occurred", str(ctx.exception))
+        self.assertTrue(urls)
+        self.assertNotIn('lingva.ml', [urlsplit(url).hostname for url in urls])
 
 
 class ServerErrorDetailTest(unittest.TestCase):

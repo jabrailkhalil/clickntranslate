@@ -1,5 +1,5 @@
 from button_styles import button_qss, button_palette, standard_buttons
-from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
+from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
 from PyQt5 import sip
 import os
 import json
@@ -517,7 +517,7 @@ class DropDownCombo(QComboBox):
                 border: none;
                 border-radius: 4px;
             }}
-            QScrollBar::handle:vertical:hover {{ background: {handle_hover}; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background: {handle_hover}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0;
                 border: none;
@@ -1077,6 +1077,7 @@ class SettingsPageNavigation(QFrame):
     def paintEvent(self, event):
         super().paintEvent(event)
         tabs = self.findChildren(SettingsPageTabButton, options=Qt.FindDirectChildrenOnly)
+        tabs.sort(key=lambda tab: tab.geometry().left())
         selected = next((tab for tab in tabs if tab.isChecked()), None)
         if selected is None:
             return
@@ -1742,16 +1743,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR and updates",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
-        "game_intro": "Keep translating text as it changes in games, videos or applications. Choose screen areas to follow; the translation updates in place.",
-        "game_launch": "Choose areas and start translation",
+        "game_intro": "Choose the text to read and a separate area for its translation. Adjust the output window and save layouts as templates.",
+        "game_launch": "Choose source and output",
         "game_languages": "Languages:",
         "game_swap_languages": "Swap dynamic translation languages",
         "game_scan_interval": "Scan interval:",
         "game_overlay_opacity": "Translation background:",
         "game_pause_inactive": "Pause when the target app is inactive",
         "game_pause_inactive_tooltip": "Pauses OCR when the window active at mode start is minimized or no longer in the foreground. Translation resumes automatically when you return.",
-        "game_show_original": "Show recognized text above the translation",
-        "game_workflow_note": "Start Dynamic translation, select one or more text areas, then press Start. Translation updates in place; launch the mode again to stop.",
+        "game_show_original": "Show recognized text with the translation",
+        "game_workflow_note": "Select the source, then the output area. Press Start. Use the small menu beside the output for text size, opacity, position and templates. Repeat the shortcut to stop.",
         "translation_mode": "Text translation mode: {mode}",
         "hotkeys": "Configure hotkeys",
         "save_and_back": "Save and return",
@@ -1858,16 +1859,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR и обновления",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
-        "game_intro": "Для меняющегося текста в играх, видео и приложениях. Выберите области экрана — перевод в них будет обновляться автоматически.",
-        "game_launch": "Выбрать области и запустить перевод",
+        "game_intro": "Выберите исходный текст и отдельную область для перевода. Настройте окно вывода и сохраните расположение как шаблон.",
+        "game_launch": "Выбрать источник и вывод",
         "game_languages": "Языки:",
         "game_swap_languages": "Поменять языки динамического перевода местами",
         "game_scan_interval": "Частота проверки:",
         "game_overlay_opacity": "Фон перевода:",
         "game_pause_inactive": "Пауза, когда целевое окно неактивно",
         "game_pause_inactive_tooltip": "OCR приостанавливается, если окно, активное при запуске режима, свёрнуто или больше не находится на переднем плане. При возврате перевод продолжится автоматически.",
-        "game_show_original": "Показывать распознанный текст над переводом",
-        "game_workflow_note": "Запустите динамический режим, выделите одну или несколько областей и нажмите «Запустить». Перевод обновляется на месте; повторный запуск остановит режим.",
+        "game_show_original": "Показывать распознанный текст вместе с переводом",
+        "game_workflow_note": "Выделите источник, затем место вывода и нажмите «Запустить». Маленькое меню у вывода: размер текста, прозрачность, закрепление и шаблоны. Повторная горячая клавиша остановит перевод.",
         "translation_mode": "Режим перевода текста: {mode}",
         # Обновлённый текст: теперь явно указывается мгновенный перевод выделенного текста
         "hotkeys": "Настроить горячие клавиши",
@@ -1974,16 +1975,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR y actualizaciones",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
-        "game_intro": "Traduce texto que cambia en juegos, vídeos o aplicaciones. Elige zonas de la pantalla; la traducción se actualiza en ellas automáticamente.",
-        "game_launch": "Elegir zonas e iniciar la traducción",
+        "game_intro": "Elige el texto original y otra zona para la traducción. Ajusta la ventana de salida y guarda diseños como plantillas.",
+        "game_launch": "Elegir origen y salida",
         "game_languages": "Idiomas:",
         "game_swap_languages": "Intercambiar idiomas de traducción dinámica",
         "game_scan_interval": "Intervalo de lectura:",
         "game_overlay_opacity": "Fondo de traducción:",
         "game_pause_inactive": "Pausar si la aplicación vinculada está inactiva",
         "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
-        "game_show_original": "Mostrar el texto reconocido sobre la traducción",
-        "game_workflow_note": "Inicia el modo dinámico, selecciona una o varias zonas y pulsa Iniciar. La traducción se actualiza en el lugar; inicia el modo otra vez para detenerlo.",
+        "game_show_original": "Mostrar el texto reconocido junto con la traducción",
+        "game_workflow_note": "Selecciona el origen y después la salida; pulsa Iniciar. El menú junto a la salida permite ajustar tamaño, opacidad, posición y plantillas. Repite el atajo para detener.",
         "translation_mode": "Modo de traduccion: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
@@ -2089,16 +2090,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR und Updates",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
-        "game_intro": "Für wechselnden Text in Spielen, Videos und Anwendungen. Bildschirmbereiche auswählen; die Übersetzung wird dort automatisch aktualisiert.",
-        "game_launch": "Bereiche wählen und Übersetzung starten",
+        "game_intro": "Quelltext und einen eigenen Bereich für die Übersetzung wählen. Ausgabefenster anpassen und Anordnungen als Vorlagen speichern.",
+        "game_launch": "Quelle und Ausgabe wählen",
         "game_languages": "Sprachen:",
         "game_swap_languages": "Sprachen der dynamischen Übersetzung tauschen",
         "game_scan_interval": "Scanintervall:",
         "game_overlay_opacity": "Übersetzungshintergrund:",
         "game_pause_inactive": "Pausieren, wenn die Ziel-App inaktiv ist",
         "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
-        "game_show_original": "Erkannten Text über der Übersetzung zeigen",
-        "game_workflow_note": "Dynamischen Modus starten, einen oder mehrere Textbereiche wählen und Start drücken. Die Übersetzung wird dort aktualisiert; erneutes Starten beendet den Modus.",
+        "game_show_original": "Erkannten Text zusammen mit der Übersetzung zeigen",
+        "game_workflow_note": "Quelle und dann Ausgabebereich auswählen; Start drücken. Das kleine Menü an der Ausgabe bietet Schriftgröße, Deckkraft, Position und Vorlagen. Erneutes Tastenkürzel beendet die Übersetzung.",
         "translation_mode": "Ubersetzungsmodus: {mode}",
         "hotkeys": "Tastenkurzel konfigurieren",
         "save_and_back": "Speichern und zuruck",
@@ -2204,16 +2205,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR et mises à jour",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
-        "game_intro": "Pour le texte qui change dans les jeux, vidéos et applications. Choisissez des zones de l’écran ; la traduction s’y actualise automatiquement.",
-        "game_launch": "Choisir les zones et lancer la traduction",
+        "game_intro": "Choisissez le texte source et une zone distincte pour la traduction. Réglez la sortie et enregistrez sa disposition comme modèle.",
+        "game_launch": "Choisir source et sortie",
         "game_languages": "Langues :",
         "game_swap_languages": "Inverser les langues de la traduction dynamique",
         "game_scan_interval": "Intervalle d’analyse :",
         "game_overlay_opacity": "Fond de traduction :",
         "game_pause_inactive": "Pause si l’application liée est inactive",
         "game_pause_inactive_tooltip": "L’OCR s’arrête si la fenêtre active au lancement du mode est réduite ou n’est plus au premier plan. La traduction reprend automatiquement au retour.",
-        "game_show_original": "Afficher le texte reconnu au-dessus de la traduction",
-        "game_workflow_note": "Lancez le mode dynamique, choisissez une ou plusieurs zones puis appuyez sur Démarrer. La traduction s’actualise sur place ; relancer le mode l’arrête.",
+        "game_show_original": "Afficher le texte reconnu avec la traduction",
+        "game_workflow_note": "Sélectionnez la source, puis la sortie et démarrez. Le petit menu près de la sortie règle la taille, l’opacité, la position et les modèles. Répétez le raccourci pour arrêter.",
         "translation_mode": "Mode de traduction : {mode}",
         "hotkeys": "Configurer les raccourcis",
         "save_and_back": "Enregistrer et revenir",
@@ -2319,16 +2320,16 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR 与更新",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
-        "game_intro": "适用于游戏、视频和应用中不断变化的文字。选择屏幕区域，译文会在原位置自动更新。",
-        "game_launch": "选择区域并开始翻译",
+        "game_intro": "选择原文和单独的译文显示区域。调整输出窗口，并将布局保存为模板。",
+        "game_launch": "选择原文和译文区域",
         "game_languages": "语言：",
         "game_swap_languages": "交换动态翻译语言",
         "game_scan_interval": "扫描间隔：",
         "game_overlay_opacity": "翻译背景：",
         "game_pause_inactive": "绑定应用未激活时暂停",
         "game_pause_inactive_tooltip": "如果启动模式时的活动窗口被最小化或不再位于前台，OCR 会暂停；返回该窗口后会自动继续翻译。",
-        "game_show_original": "在译文上方显示识别文本",
-        "game_workflow_note": "启动动态模式，选择一个或多个文字区域后点击开始。译文会在原位置更新；再次启动该模式即可停止。",
+        "game_show_original": "同时显示识别文本和译文",
+        "game_workflow_note": "先选择原文，再选择译文区域，然后点击开始。输出旁的小菜单可调整字号、透明度、位置并保存模板。再次按快捷键停止翻译。",
         "translation_mode": "文本翻译模式：{mode}",
         "hotkeys": "配置快捷键",
         "save_and_back": "保存并返回",
@@ -2496,6 +2497,9 @@ def validated_import_settings(payload, defaults):
         if valid:
             accepted[key] = value
     numeric_ranges = {
+        "desktop_assistant_size": (60, 180),
+        "desktop_assistant_speed": (20, 100),
+        "desktop_assistant_opacity": (40, 100),
         "ui_scale_percent": (MIN_SCALE, MAX_SCALE),
         "ocr_dim_strength": (0, 80),
         "game_capture_interval_ms": (450, 10000),
@@ -6713,6 +6717,21 @@ class SettingsWindow(QWidget):
         if callable(complete):
             complete(key)
 
+    def _set_desktop_assistant_enabled(self, enabled):
+        setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
+        if callable(setter):
+            setter(bool(enabled))
+        else:
+            self.auto_save_setting('desktop_assistant_enabled', bool(enabled))
+
+    def _dismiss_desktop_assistant_until_restart(self):
+        dismiss = getattr(self.parent, 'dismiss_desktop_assistant_until_restart', None)
+        if callable(dismiss):
+            dismiss()
+        button = getattr(self, 'desktop_assistant_dismiss_button', None)
+        if button is not None:
+            button.setEnabled(False)
+
     def _on_start_minimized_toggled(self, state):
         enabled = bool(state)
         self.auto_save_setting("start_minimized", enabled)
@@ -7097,6 +7116,7 @@ class SettingsWindow(QWidget):
         for attribute in (
             "settings_updates_page",
             "settings_game_page",
+            "settings_assistant_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -7148,6 +7168,7 @@ class SettingsWindow(QWidget):
         for attribute in (
             "settings_updates_page",
             "settings_game_page",
+            "settings_assistant_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -7443,8 +7464,8 @@ class SettingsWindow(QWidget):
         scale_controls = QHBoxLayout(scale_field)
         scale_controls.setContentsMargins(2, 0, 2, 0)
         scale_controls.setSpacing(0)
-        self.ui_scale_decrease = QToolButton()
-        self.ui_scale_increase = QToolButton()
+        self.ui_scale_decrease = ScaleArrowButton()
+        self.ui_scale_increase = ScaleArrowButton()
         for button, name, glyph, direction in (
             (self.ui_scale_decrease, 'uiScaleDecrease', '‹', -1),
             (self.ui_scale_increase, 'uiScaleIncrease', '›', 1),
@@ -7478,6 +7499,9 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
         self._refresh_ui_scale()
+
+        # Companion preferences have their own page, not a hidden general row.
+        from assistant_text import assistant_text
 
         # Чекбокс "Не сворачивать при OCR"
         self.keep_visible_checkbox = QCheckBox(settings_text(lang, "keep_visible_on_ocr"))
@@ -7936,6 +7960,9 @@ class SettingsWindow(QWidget):
         game_layout.addWidget(
             self.game_show_original_checkbox, 5, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
         )
+        # Dedicated output windows contain translation only. Keep the legacy
+        # config value for older modes without exposing an ineffective option.
+        self.game_show_original_checkbox.hide()
 
         self.game_workflow_note = QLabel(
             settings_text(lang, "game_intro"), self.settings_game_page
@@ -7954,7 +7981,12 @@ class SettingsWindow(QWidget):
         self.game_launch_button.setCursor(Qt.PointingHandCursor)
         self.game_launch_button.setToolTip(tooltip_text(settings_text(lang, "game_workflow_note")))
         self.game_launch_button.clicked.connect(self._launch_dynamic_translation)
-        game_layout.addWidget(self.game_launch_button, 7, 0, 1, 2)
+        from dynamic_templates import text as dynamic_text
+        self.game_help_button = OpticallyCenteredPushButton(dynamic_text(lang, 'help'), self.settings_game_page)
+        self.game_help_button.setFixedHeight(32)
+        self.game_help_button.clicked.connect(lambda: getattr(self.parent, 'show_dynamic_translation_help', lambda: None)())
+        game_layout.addWidget(self.game_help_button, 7, 0)
+        game_layout.addWidget(self.game_launch_button, 7, 1)
 
         # Build the hidden page from the known application language catalog.
         # Probing EasyOCR/Tesseract packages before Settings has even painted
@@ -7977,6 +8009,12 @@ class SettingsWindow(QWidget):
             lambda state: self.auto_save_setting("game_show_original_text", bool(state))
         )
         self.settings_game_page.hide()
+        from assistant_settings import AssistantSettingsPage
+        self.settings_assistant_page = AssistantSettingsPage(self)
+        # Keep the public alias used by toggle synchronization and QA.
+        self.desktop_assistant_checkbox = self.settings_assistant_page.toggle
+        self.desktop_assistant_dismiss_button = self.settings_assistant_page.dismiss_button
+        self.settings_assistant_page.hide()
 
         # --- Переключатель страниц ---
         # Named tabs expose each destination before the user opens it.
@@ -7993,17 +8031,21 @@ class SettingsWindow(QWidget):
             "settings_page_main",
             "settings_page_updates",
             "settings_page_game",
+            "settings_page_assistant",
         )):
-            dot = SettingsPageTabButton(settings_text(lang, text_key), self.settings_page_footer, dark=dark)
-            dot.setAccessibleName(settings_text(lang, text_key))
-            dot.setToolTip(tooltip_text(settings_text(lang, text_key)))
+            caption = assistant_text(lang, 'page') if text_key == 'settings_page_assistant' else settings_text(lang, text_key)
+            dot = SettingsPageTabButton(caption, self.settings_page_footer, dark=dark)
+            dot.setAccessibleName(caption)
+            dot.setToolTip(tooltip_text(caption))
             dot.clicked.connect(
                 lambda _checked=False, page_index=index: self._set_settings_page(page_index)
             )
             dot.toggled.connect(
                 lambda _checked, navigation=self.settings_page_footer: navigation.update()
             )
-            dots_layout.addWidget(dot, 0, index)
+            # Keep semantic page IDs stable for guide/editor integrations, but
+            # put the short Companion tab between Updates and Dynamic.
+            dots_layout.addWidget(dot, 0, {0: 0, 1: 1, 2: 3, 3: 2}[index])
             self.settings_page_dots.append(dot)
         self.settings_page_footer.setFixedHeight(32)
 
@@ -8027,7 +8069,7 @@ class SettingsWindow(QWidget):
         self.settings_pages.setObjectName("settingsPages")
         self.settings_pages.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         for page in (
-            self.settings_general_page, self.settings_updates_page, self.settings_game_page
+            self.settings_general_page, self.settings_updates_page, self.settings_game_page, self.settings_assistant_page
         ):
             self.settings_pages.addWidget(page)
         self.main_layout.addWidget(self.settings_page_footer, 0, Qt.AlignHCenter)
@@ -8049,7 +8091,7 @@ class SettingsWindow(QWidget):
         game_page = getattr(self, "settings_game_page", None)
         if updates_page is None or game_page is None:
             return
-        index = max(0, min(int(index), 2))
+        index = max(0, min(int(index), self.settings_pages.count() - 1))
         self._settings_page_index = index
         self.settings_pages.setCurrentIndex(index)
         action_panel = getattr(self, "settings_action_panel", None)
@@ -8063,6 +8105,9 @@ class SettingsWindow(QWidget):
                 action_panel.raise_()
         updates_page.setVisible(index == 1)
         game_page.setVisible(index == 2)
+        self.settings_assistant_page.setVisible(index == 3)
+        if index == 3:
+            self.settings_assistant_page.refresh()
         if index == 1:
             updates_page.raise_()
         elif index == 2:
@@ -8077,7 +8122,7 @@ class SettingsWindow(QWidget):
         for dot_index, dot in enumerate(getattr(self, "settings_page_dots", ())):
             dot.setChecked(dot_index == index)
         complete = getattr(self.parent, "_complete_guide_step", None)
-        if callable(complete):
+        if callable(complete) and index < 3:
             complete({0: "settings_page_main", 1: "settings_page_updates", 2: "settings_page_game"}[index])
 
     def _position_settings_updates_page(self):
@@ -10875,15 +10920,23 @@ finally {
                 color: {disabled_text};
             }}
 
+            QWidget#assistantOptions QLabel:disabled {{
+                color: {disabled_text};
+            }}
+            QLabel#assistantSection {{ color: #a88bcc; font-size: 13px; font-weight: 700; }}
+            QLabel#assistantNote {{ color: {'#aaa0b8' if dark else '#71667d'}; font-size: 12px; }}
+            QSlider#assistantSlider::groove:horizontal,
             QSlider#ocrDimStrengthSlider::groove:horizontal {{
                 height: 5px;
                 background: {slider_track};
                 border-radius: 2px;
             }}
+            QSlider#assistantSlider::sub-page:horizontal,
             QSlider#ocrDimStrengthSlider::sub-page:horizontal {{
                 background: #9B78C8;
                 border-radius: 2px;
             }}
+            QSlider#assistantSlider::handle:horizontal,
             QSlider#ocrDimStrengthSlider::handle:horizontal {{
                 width: 16px;
                 height: 16px;
@@ -10892,10 +10945,13 @@ finally {
                 border: 1px solid #7A5FA1;
                 border-radius: 8px;
             }}
+            QSlider#assistantSlider::groove:horizontal:disabled,
+            QSlider#assistantSlider::sub-page:horizontal:disabled,
             QSlider#ocrDimStrengthSlider::groove:horizontal:disabled,
             QSlider#ocrDimStrengthSlider::sub-page:horizontal:disabled {{
                 background: {slider_disabled};
             }}
+            QSlider#assistantSlider::handle:horizontal:disabled,
             QSlider#ocrDimStrengthSlider::handle:horizontal:disabled {{
                 background: #756B80;
                 border-color: #5f5668;
@@ -10955,6 +11011,7 @@ finally {
         scale_border = '#3d3948' if dark else '#d7cde7'
         scale_ink = '#f4f6fb' if dark else '#202124'
         style += button_qss(dark, 'quiet', 'QToolButton#uiScaleDecrease, QToolButton#uiScaleIncrease', icon=True, radius=4)
+        style += button_qss(dark, 'secondary', 'QToolButton#assistantAppearance', compact=True)
         style += f"""
             QWidget#uiScaleControl {{ background: transparent; }}
             QFrame#uiScaleField {{
@@ -10970,6 +11027,9 @@ finally {
             }}
         """
         set_widget_stylesheet(self, style)
+        assistant_page = getattr(self, 'settings_assistant_page', None)
+        if assistant_page is not None:
+            self._apply_engine_combo_style(assistant_page.behavior)
         self._apply_action_panel_style()
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         navigation = getattr(self, "settings_page_navigation", None)
@@ -13406,8 +13466,12 @@ finally {
         if reply != QMessageBox.Yes:
             return
         # Default configuration
+        from assistant_settings import ASSISTANT_DEFAULTS
         default_config = {
+            **ASSISTANT_DEFAULTS,
             "theme": "Темная",
+            "desktop_assistant_enabled": False,
+            "desktop_assistant_position": None,
             # Language is identity/navigation state, not a behaviour setting.
             # Resetting it while the title-bar flag kept the previous icon made
             # the application visibly contradict itself until the next launch.

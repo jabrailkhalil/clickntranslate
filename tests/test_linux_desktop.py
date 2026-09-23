@@ -101,6 +101,23 @@ class AutostartTest(unittest.TestCase):
     def test_disabling_when_absent_is_harmless(self):
         self.assertFalse(linux_desktop.set_autostart(False, "/opt/clickntranslate"))
 
+    def test_desktop_disabled_autostart_is_not_reported_as_enabled(self):
+        for marker in ('Hidden=true', 'X-GNOME-Autostart-enabled=false'):
+            with self.subTest(marker=marker):
+                path = Path(linux_desktop.autostart_path())
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('[Desktop Entry]\n' + marker + '\n')
+                self.assertFalse(linux_desktop.autostart_enabled())
+
+    def test_interrupted_entry_update_preserves_previous_launcher(self):
+        path = Path(linux_desktop.autostart_path())
+        linux_desktop.set_autostart(True, '/old/app')
+        previous = path.read_bytes()
+        import atomic_storage
+        with mock.patch.object(atomic_storage.os, 'replace', side_effect=OSError('disk error')):
+            self.assertFalse(linux_desktop.set_autostart(True, '/new/app'))
+        self.assertEqual(path.read_bytes(), previous)
+
     def test_entry_records_the_executable_it_was_given(self):
         linux_desktop.set_autostart(True, "/opt/some/clickntranslate")
         with open(linux_desktop.autostart_path(), encoding="utf-8") as handle:

@@ -12,8 +12,14 @@ the official support@signpath.io contact. Gmail confirmed sending. After the
 local VPN connection was repaired, the official Foundation application form
 was also submitted on the same day and confirmed "Form submitted". The form
 explicitly referenced the earlier email so the requests can be associated.
-Approval is pending; no certificate has been issued. No antivirus sample
-submissions have been sent by this change.
+On 2026-09-09 SignPath requested independent references demonstrating project
+usage and reputation; the maintainer replied with supporting material the same
+day. A Gmail check on 2026-09-22 found no later reply or approval. No local
+code-signing certificate was present in either Windows certificate store.
+The latest local package is the unsigned September 22 rebuild of 1.7.1. Defender
+found no threats in either its directory or ZIP; details and launch paths are in
+[the rebuild report](LOCAL_1.7.1_QA_2026-09-22.md). The earlier ux5 investigation
+is preserved in [the initial local check](WINDOWS_DEFENDER_2026-09-22.md).
 
 File version, publisher strings and SHA-256 checksums are useful metadata. They
 are **not** Authenticode signatures. A self-signed development certificate is
@@ -130,6 +136,30 @@ It must not be described as a signed release. Existing public download links
 stay on 1.7.0 until actual 1.7.1 artifacts have passed release checks.
 
 ## Investigate antivirus reports
+
+Signed staging and the signed-installer builder now run Defender against the
+final signed bytes and fail if scanning fails or detects a threat. Definitions
+must be no more than two days old, and real-time protection must remain enabled.
+The JSON report records the scan output, engine definitions and SHA-256 of every
+scanned file. Files are hashed again afterward so a package changed during the
+scan cannot pass. Reports are saved outside the package and never overwritten.
+
+For an unsigned local stage use `-ScanWithDefender`. Existing packages and the
+final ZIP can be checked independently (choose a new report filename each run):
+
+```powershell
+./tools/scan_windows_release.ps1 -Path $package `
+    -ReportPath './releases/windows-defender-package.json'
+./tools/scan_windows_release.ps1 `
+    -Path './releases/Click-n-Translate-1.7.1-windows-portable-x64.zip' `
+    -ReportPath './releases/windows-defender-zip.json'
+```
+
+The custom scan uses `-DisableRemediation`: Microsoft's documented diagnostic
+mode ignores file exclusions, scans archives and reports detections without
+removing the inspected samples. It does not change protection settings. A local
+clean scan is a point-in-time check; a detection reported on another build or
+machine should still be submitted to Microsoft against that exact sample.
 
 The starting report is [Multiple Alerts on VirusTotal, #5](https://github.com/jabrailkhalil/clickntranslate/issues/5).
 Get the public report URL, scanned SHA-256, vendor names and full detection names.

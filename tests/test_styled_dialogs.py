@@ -56,13 +56,16 @@ def test_theme_detection_accepts_settings_parent_attribute():
     assert box._dark is False
 
 
-def test_message_box_centers_on_embedded_settings_in_global_coordinates():
+def test_message_box_centers_on_embedded_settings_in_global_coordinates(monkeypatch):
     app = _app()
     main_window = QtWidgets.QWidget()
-    # Center relative to logical screen coordinates, including 150% system DPI,
-    # so edge clamping does not mask the coordinate-space check.
+    # Qt offscreen's default 800px screen becomes only 400 logical pixels at
+    # DPR 2, narrower than this 500px dialog. Isolate coordinate conversion
+    # from legitimate screen-edge clamping on that artificial tiny monitor.
+    available = QtCore.QRect(0, 0, 1920, 1080)
+    monkeypatch.setattr(QtWidgets.QDesktopWidget, 'availableGeometry', lambda *args: available)
     main_window.setGeometry(120, 80, 700, 400)
-    main_window.move(app.primaryScreen().availableGeometry().center() - main_window.rect().center())
+    main_window.move(available.center() - main_window.rect().center())
     embedded_settings = QtWidgets.QWidget(main_window)
     embedded_settings.setGeometry(0, 40, 700, 350)
     main_window.show()
@@ -364,7 +367,7 @@ def test_document_provider_list_groups_online_and_only_installed_offline(monkeyp
     owner.close()
 
 
-def test_document_source_language_is_explicit_for_every_provider(monkeypatch):
+def test_document_auto_source_is_available_only_for_google(monkeypatch):
     app = _app()
     owner = QtWidgets.QWidget()
     owner.current_interface_language = "en"
@@ -383,7 +386,7 @@ def test_document_source_language_is_explicit_for_every_provider(monkeypatch):
         dialog._populate_provider_combo(engine)
         dialog._refresh_document_provider_languages()
         assert dialog.provider_combo.currentData() == engine
-        assert dialog.source_combo.findData("auto") == -1, engine
+        assert (dialog.source_combo.findData('auto') >= 0) == (engine == 'google'), engine
         assert dialog.source_combo.currentData() in {
             language.code for language in main.APP_LANGUAGES
         }, engine

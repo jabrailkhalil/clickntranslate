@@ -125,6 +125,7 @@ import portable_paths
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
+from atomic_storage import write_json
 from document_translation import translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -133,9 +134,14 @@ from languages import (
     language_code_from_name,
     language_display_name,
     language_names,
+    supports_auto_source,
+    valid_translation_source,
 )
 
 AUTOSTART_SHORTCUT_NAME = "ClicknTranslate.lnk"
+LEGACY_AUTOSTART_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+LEGACY_AUTOSTART_RUN_VALUE = "ClicknTranslate"
+_AUTOSTART_LOCK = threading.RLock()
 STORE_STARTUP_TASK_ID = "ClicknTranslateStartup"
 AUTOSTART_BACKEND = (
     "macos_launchagent" if platform_support.IS_MAC else
@@ -187,9 +193,14 @@ MAIN_ENGINE_STATUS_WIDTH = 672
 SETTINGS_ACTIONS_FOOTER_GAP = 6
 
 # --- Единственная константа с дефолтной конфигурацией ---
+from assistant_settings import ASSISTANT_DEFAULTS, assistant_preferences
+
 DEFAULT_CONFIG = {
+    **ASSISTANT_DEFAULTS,
     "theme": "Темная",
     "ui_scale_percent": DEFAULT_SCALE,
+    "desktop_assistant_enabled": False,
+    "desktop_assistant_position": None,
     "interface_language": "en",
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
@@ -296,9 +307,10 @@ def merge_config_defaults(config):
             missing_keys += ("ocr_engine",)
     from ui_scaling import normalize_ui_scale
     merged["ui_scale_percent"] = normalize_ui_scale(merged["ui_scale_percent"])
+    merged.update(assistant_preferences(merged))
     # The experimental whole-screen Dynamic workflow was removed because it
-    # produced unrelated OCR fragments.  Existing installations migrate to the
-    # reliable multi-area workflow without keeping a hidden obsolete choice.
+    # produced unrelated OCR fragments. Existing installations use the same
+    # selected-area workflow as Mac, including old fullscreen settings.
     merged["game_capture_mode"] = "region"
     # Before per-action pairs existed, selected-text translation used the main
     # pair and fullscreen translation inherited the OCR pair. Preserve exactly
@@ -686,18 +698,59 @@ def _autostart_shortcut_matches_current(shortcut_info):
     )
 
 
-def _write_autostart_command(enable):
-    shortcut_path = _autostart_shortcut_path()
-    if enable:
-        _write_autostart_shortcut()
-        return
+def _read_legacy_autostart_command():
+    if not platform_support.IS_WINDOWS:
+        return ""
+    import winreg
 
     try:
-        os.remove(shortcut_path)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_QUERY_VALUE
+        ) as key:
+            value, value_type = winreg.QueryValueEx(key, LEGACY_AUTOSTART_RUN_VALUE)
+            return str(value or "") if value_type in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) else ""
+    except FileNotFoundError:
+        return ""
+
+
+def _remove_legacy_autostart_command():
+    """Remove only the per-user Run value written by older releases."""
+    if not platform_support.IS_WINDOWS:
+        return
+    import winreg
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, LEGACY_AUTOSTART_RUN_KEY, 0, winreg.KEY_SET_VALUE
+        ) as key:
+            winreg.DeleteValue(key, LEGACY_AUTOSTART_RUN_VALUE)
     except FileNotFoundError:
         pass
-    except OSError:
-        pass
+
+
+def _write_autostart_command(enable):
+    with _AUTOSTART_LOCK:
+        shortcut_path = _autostart_shortcut_path()
+        if enable:
+            had_shortcut = os.path.exists(shortcut_path)
+            # Keep the old Run entry until its replacement has been written.
+            _write_autostart_shortcut()
+            try:
+                _remove_legacy_autostart_command()
+            except OSError:
+                if not had_shortcut:
+                    try:
+                        os.remove(shortcut_path)
+                    except OSError:
+                        logging.exception("Could not roll back the new autostart shortcut")
+                raise
+            return
+
+        _remove_legacy_autostart_command()
+        try:
+            os.remove(shortcut_path)
+        except FileNotFoundError:
+            pass
 
 
 def _read_autostart_command():
@@ -2675,6 +2728,8 @@ def guide_text(lang):
             steps.append(existing[action])
         elif action in extras:
             title, body = extras[action]
+            if action == "game_controls":
+                body = settings_text(language, "game_workflow_note")
             steps.append((action, title, body))
     if platform_support.IS_MAC:
         from macos_text import macos_text
@@ -4193,7 +4248,7 @@ class TranslationResultDialog(QDialog):
         self.result_mode = str(result_mode or "main").lower()
         config = self._current_config()
         self.source_code = str(source_lang or config.get("main_translation_source_language", "en")).lower()
-        if get_language(self.source_code) is None:
+        if not valid_translation_source(self.source_code, config.get('translator_engine', 'Google')):
             self.source_code = "en"
         self.target_code = default_target_for_source(
             self.source_code, str(target_lang or config.get("main_translation_target_language", "ru")).lower())
@@ -4215,8 +4270,8 @@ class TranslationResultDialog(QDialog):
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setMinimumSize(400, 370)
-        self.resize(760, 470)
+        self.setMinimumSize(400, 330)
+        self.resize(700, 420)
         self.setSizeGripEnabled(True)
 
         outer = QVBoxLayout(self)
@@ -4232,16 +4287,26 @@ class TranslationResultDialog(QDialog):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
 
-        header = QHBoxLayout()
-        header.setSpacing(12)
+        header = QGridLayout()
+        header.setSpacing(8)
+        self.engine_header = header
+        self._header_compact = None
+        header.setColumnStretch(0, 0)
+        header.setColumnStretch(1, 1)
         self.title_label = QLabel(self.text["workspace_title"])
         self.title_label.setObjectName("translationResultTitle")
-        header.addWidget(self.title_label)
-        self.engine_label = QLabel(str(config.get("translator_engine", "Google")))
-        self.engine_label.setObjectName("translationResultEngine")
-        header.addWidget(self.engine_label, 1)
-        from ui_scaling import ScalePercentEdit
-        self.scale_decrease = QToolButton(self)
+        self.title_label.setMinimumWidth(0)
+        header.addWidget(self.title_label, 0, 0)
+        self.engine_combo = self._language_combo()
+        self.engine_combo.setFixedWidth(150)
+        self.engine_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
+        from settings_window import _populate_grouped_translator_combo
+        _populate_grouped_translator_combo(self.engine_combo, self.lang)
+        self.set_window_engine(str(config.get('translator_engine', 'Google')))
+        header.addWidget(self.engine_combo, 0, 1)
+        from ui_scaling import ScalePercentEdit, ScaleArrowButton
+        self.scale_decrease = ScaleArrowButton(self)
         self.scale_decrease.setText("‹")
         self.scale_decrease.setFixedSize(26, 28)
         self.scale_decrease.setToolTip(settings_text(self.lang, "ui_scale_decrease"))
@@ -4250,7 +4315,7 @@ class TranslationResultDialog(QDialog):
         self.scale_value.setFixedSize(52, 28)
         self.scale_value.setAccessibleName(settings_text(self.lang, "ui_scale"))
         self.scale_value.setToolTip(tooltip_text(settings_text(self.lang, "ui_scale_edit_hint")))
-        self.scale_increase = QToolButton(self)
+        self.scale_increase = ScaleArrowButton(self)
         self.scale_increase.setText("›")
         self.scale_increase.setFixedSize(26, 28)
         self.scale_increase.setToolTip(settings_text(self.lang, "ui_scale_increase"))
@@ -4261,7 +4326,7 @@ class TranslationResultDialog(QDialog):
         scale_layout.setSpacing(0)
         for control in (self.scale_decrease, self.scale_value, self.scale_increase):
             scale_layout.addWidget(control)
-        header.addWidget(self.scale_control)
+        header.addWidget(self.scale_control, 0, 2)
         self.scale_decrease.clicked.connect(lambda: self._step_scale(-1, self.scale_decrease))
         self.scale_increase.clicked.connect(lambda: self._step_scale(1, self.scale_increase))
         self._scale_commit_timer = QTimer(self)
@@ -4276,10 +4341,12 @@ class TranslationResultDialog(QDialog):
         self.title_close_button.setFixedSize(32, 32)
         self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         self.title_close_button.clicked.connect(self.accept)
-        header.addWidget(self.title_close_button)
+        header.addWidget(self.title_close_button, 0, 3)
         layout.addLayout(header)
 
         self.source_combo = self._language_combo()
+        if supports_auto_source(config.get('translator_engine', 'Google')):
+            self.source_combo.addItem(language_display_name('auto', self.lang), 'auto')
         for language in APP_LANGUAGES:
             self.source_combo.addItem(language.display_name(self.lang), language.code)
         self.source_combo.setCurrentIndex(self.source_combo.findData(self.source_code))
@@ -4326,10 +4393,12 @@ class TranslationResultDialog(QDialog):
         self.close_button = QPushButton(ui_text(self.lang, "close"))
         self.close_button.setObjectName("translationResultClose")
         self.close_button.clicked.connect(self.accept)
-        buttons.addWidget(self.close_button)
+        self.close_button.hide()
         buttons.addStretch(1)
-        self.copy_button = QPushButton(ui_text(self.lang, "copy"))
+        self.copy_button = QPushButton()
         self.copy_button.setObjectName("translationResultCopyText")
+        self.copy_button.setAccessibleName(ui_text(self.lang, "copy"))
+        self.copy_button.setToolTip(tooltip_text(ui_text(self.lang, "copy")))
         self.copy_button.clicked.connect(self._copy_result)
         buttons.addWidget(self.copy_button)
         self.translate_button = QPushButton(ui_text(self.lang, "translate_button"))
@@ -4339,6 +4408,8 @@ class TranslationResultDialog(QDialog):
         for button in (self.close_button, self.copy_button, self.translate_button):
             button.setMinimumHeight(36)
             button.setAutoDefault(False)
+        self.copy_button.setText("")
+        self.copy_button.setFixedWidth(48)
         layout.addLayout(buttons)
         self.translate_shortcuts = []
         for key in ("Ctrl+Return", "Ctrl+Enter"):
@@ -4351,6 +4422,7 @@ class TranslationResultDialog(QDialog):
 
         self.source_edit.textChanged.connect(self._edited_source)
         self.text_edit.textChanged.connect(self._edited_result)
+        self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
         self.target_combo.currentIndexChanged.connect(self._on_target_changed)
         self._retranslated_signal.connect(self._on_retranslated)
@@ -4361,6 +4433,49 @@ class TranslationResultDialog(QDialog):
         self._update_actions()
         self._set_status(self.text["auto_copied"] if auto_copy else self.text["ready"])
         self.source_edit.setFocus(Qt.OtherFocusReason)
+
+    def set_window_engine(self, engine):
+        """Set an initial/followed provider without changing the app or sending text."""
+        self.window_engine = str(engine)
+        key = self.window_engine.lower().replace('hy-mt', 'hymt')
+        with QtCore.QSignalBlocker(self.engine_combo):
+            index = self.engine_combo.findData(key)
+            if index < 0:
+                # Never silently fall back from an unknown/offline provider
+                # to an online one; preserve the explicitly configured value.
+                self.engine_combo.addItem(self.window_engine, key)
+                index = self.engine_combo.count() - 1
+            self.engine_combo.setCurrentIndex(index)
+        hints = {
+            'ru': 'Движок только для этого окна. Общие настройки не меняются.',
+            'en': 'Provider for this window only. Global settings stay unchanged.',
+            'de': 'Anbieter nur für dieses Fenster. Globale Einstellungen bleiben unverändert.',
+            'es': 'Proveedor solo para esta ventana. Los ajustes globales no cambian.',
+            'fr': 'Fournisseur pour cette fenêtre uniquement. Les réglages globaux restent inchangés.',
+            'zh': '仅更改此窗口的翻译引擎，不影响全局设置。',
+        }
+        self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
+
+    def _on_engine_changed(self, *_args):
+        key = self.engine_combo.currentData()
+        if not key or key == self.window_engine.lower().replace('hy-mt', 'hymt'):
+            return
+        self._invalidate_request()
+        self.set_window_engine(self.engine_combo.currentText())
+        self._start_retranslate()
+
+    def _reflow_engine_header(self):
+        factor = float(self.property('ui_effective_scale') or 1)
+        compact = self.frame.width() < round(570 * factor)
+        if compact == self._header_compact:
+            return
+        self._header_compact = compact
+        self.engine_header.removeWidget(self.engine_combo)
+        if compact:
+            self.engine_header.addWidget(self.engine_combo, 1, 0, 1, 2, Qt.AlignLeft)
+        else:
+            self.engine_header.addWidget(self.engine_combo, 0, 1, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        self.engine_header.setColumnStretch(1, 0 if compact else 1)
 
     def _current_config(self):
         config = getattr(self.parentWidget(), "config", None)
@@ -4419,6 +4534,7 @@ class TranslationResultDialog(QDialog):
     def _reflow_editors(self):
         if not hasattr(self, "body_grid"):
             return
+        self._reflow_engine_header()
         factor = float(self.property("ui_effective_scale") or 1)
         horizontal = self.editors.width() >= round(620 * factor)
         orientation = "collapsed" if self._source_collapsed else horizontal
@@ -4471,7 +4587,7 @@ class TranslationResultDialog(QDialog):
         draft = self.translated_text if getattr(self, '_translate_edited_result', False) and self.translated_text.strip() else self.source_text
         self.translate_button.setEnabled(bool(draft.strip()) and not self._retranslating)
         self.copy_button.setEnabled(bool(self.translated_text))
-        self.swap_button.setEnabled(bool(self.source_text or self.translated_text))
+        self.swap_button.setEnabled(self.source_code != 'auto' and bool(self.source_text or self.translated_text))
 
     def _invalidate_request(self):
         self._following_main_translation = False
@@ -4532,6 +4648,8 @@ class TranslationResultDialog(QDialog):
         self._start_retranslate()
 
     def _swap_languages(self):
+        if self.source_code == 'auto':
+            return
         self._invalidate_request()
         source, result = self.source_edit.toPlainText(), self.text_edit.toPlainText()
         old_source, old_target = self.source_code, self.target_code
@@ -4569,9 +4687,8 @@ class TranslationResultDialog(QDialog):
         request_id = self._request_id
         cancelled = threading.Event()
         self._cancel_event = cancelled
-        config = self._current_config()
-        engine = str(config.get("translator_engine", "Google"))
-        self.engine_label.setText(engine)
+        # Dispatch the stable provider ID, not its display name (Hy-MT != hymt).
+        engine = self.engine_combo.currentData() or self.window_engine
         source_text, source_code, target_code = self.source_text, self.source_code, self.target_code
         self._pending_request = (source_text, source_code, target_code)
         self._received_partial = False
@@ -4584,9 +4701,7 @@ class TranslationResultDialog(QDialog):
             try:
                 from translater import translate_text
                 result = translate_text(source_text, source_code, target_code,
-                                        engine=engine, cancel_callback=cancelled.is_set,
-                                        partial_callback=lambda text, done, total:
-                                        self._partial_translation_signal.emit(request_id, text, done, total))
+                                       engine=engine, cancel_callback=cancelled.is_set)
                 error = "" if str(result or "").strip() else error_label
             except Exception as exc:
                 result, error = "", f"{error_label}: {exc}"
@@ -4713,8 +4828,10 @@ class TranslationResultDialog(QDialog):
         self.source_toggle.setStyleSheet(
             button_qss(dark, "quiet", selector="QToolButton", compact=True, radius=4)
             + "QToolButton { font-size:12px; padding:0 5px; }")
-        for combo in (self.source_combo, self.target_combo):
+        for combo in (self.source_combo, self.target_combo, self.engine_combo):
             combo.set_popup_background(surface)
+        self.copy_button.setIcon(clipboard_copy_icon(theme))
+        self.copy_button.setIconSize(QSize(18, 18))
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
@@ -4806,7 +4923,10 @@ class WelcomeDialog(QDialog):
         )
         self.setWindowTitle(welcome_text(self.lang)["window"])
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        self.setFixedSize(560, 390)
+        # Keep the compact width, but let wrapped copy use its real font height.
+        self.setFixedWidth(560)
+        self.setMinimumHeight(390)
+        self.resize(560, 390)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.init_ui()
@@ -4967,20 +5087,40 @@ class WelcomeDialog(QDialog):
         card_layout.addLayout(chips)
         card_layout.addStretch()
 
-        self.checkbox = QCheckBox(text["checkbox"])
+        from ui_details import WelcomeCheckBox, social_icon
+        self.checkbox = WelcomeCheckBox(text["checkbox"])
+        self.checkbox.setMinimumHeight(24)
+        self.checkbox.setCursor(Qt.PointingHandCursor)
         self.checkbox.setChecked(previous_checked)
         card_layout.addWidget(self.checkbox)
 
         actions = QHBoxLayout()
         actions.setSpacing(10)
-        self.telegram_btn = QPushButton(text["telegram"])
+        self.telegram_btn = QPushButton()
         self.telegram_btn.setObjectName("welcomeTelegram")
         self.telegram_btn.clicked.connect(self.open_telegram)
-        actions.addWidget(self.telegram_btn)
+        self.github_btn = QPushButton()
+        self.github_btn.setObjectName("welcomeGitHub")
+        self.github_btn.clicked.connect(lambda: webbrowser.open("https://github.com/jabrailkhalil"))
+        for button, kind, label in ((self.telegram_btn, 'telegram', text['telegram']),
+                                    (self.github_btn, 'github', 'GitHub · jabrailkhalil')):
+            button.setIcon(social_icon(kind))
+            button.setIconSize(QSize(20, 20))
+            button.setFixedSize(36, 36)
+            button.setAccessibleName(label)
+            button.setToolTip(tooltip_text(label))
+            button.setCursor(Qt.PointingHandCursor)
+            button.setAutoDefault(False)
+            button.setStyleSheet(button_qss(True, 'quiet', icon=True))
+            actions.addWidget(button)
         actions.addStretch()
 
         self.skip_btn = QPushButton(text["skip"])
         self.skip_btn.setObjectName("welcomeSkip")
+        self.skip_btn.setStyleSheet(button_qss(True, 'secondary'))
+        self.skip_btn.setMinimumSize(104, 36)
+        self.skip_btn.setCursor(Qt.PointingHandCursor)
+        self.skip_btn.setAutoDefault(False)
         self.skip_btn.clicked.connect(self.skip_guide)
         actions.addWidget(self.skip_btn)
 
@@ -4990,30 +5130,23 @@ class WelcomeDialog(QDialog):
         actions.addWidget(self.guide_btn)
         card_layout.addLayout(actions)
 
-        QTimer.singleShot(120, self._pulse_flag_button)
+        # The language control has a static accent, not a repeatedly rasterized
+        # drop shadow. This welcome page has no animation timer.
+
+        # Windows and Linux fonts have different line heights. Measure after
+        # stylesheet polishing; a fixed-height card clipped Russian/German copy.
+        # Repeat only when rebuilding the dialog (including language changes).
+        card.ensurePolished()
+        card.show()  # Rebuilt children must participate in height-for-width now.
+        self.main_layout.invalidate()
+        self.main_layout.activate()
+        self.resize(self.width(), max(self.minimumHeight(),
+                    self.main_layout.totalHeightForWidth(self.width())))
 
     def _pulse_flag_button(self):
-        if not getattr(self, "flag_button", None):
-            return
-        glow = QGraphicsDropShadowEffect(self.flag_button)
-        glow.setOffset(0, 0)
-        glow.setColor(QColor(197, 179, 233, 210))
-        glow.setBlurRadius(16)
-        self.flag_button.setGraphicsEffect(glow)
-
-        animation = QtCore.QPropertyAnimation(glow, b"blurRadius", self)
-        animation.setStartValue(10)
-        animation.setEndValue(30)
-        animation.setDuration(1050)
-        animation.setEasingCurve(QtCore.QEasingCurve.InOutSine)
-        # Bounded, not endless. A blurred drop shadow is re-rendered in software
-        # on every frame of the animation: measured at 10% of a core for as long
-        # as this dialog stayed open on Linux, where it is the only thing on
-        # screen. Eight cycles is long enough to catch the eye and then stop.
-        animation.setLoopCount(8)
-        animation.finished.connect(lambda: self.flag_button.setGraphicsEffect(None))
-        animation.start()
-        self._animations.append(animation)
+        # Kept as a compatibility hook for older callers; deliberately static.
+        if getattr(self, 'flag_button', None) is not None:
+            self.flag_button.setGraphicsEffect(None)
 
     def _stop_animations(self):
         for animation in getattr(self, "_animations", []):
@@ -5033,6 +5166,10 @@ class WelcomeDialog(QDialog):
     def _delete_layout_item(self, item):
         widget = item.widget()
         if widget is not None:
+            # Language changes rebuild the card inside a modal event loop.
+            # Do not leave the old visible card intercepting pointer input
+            # until Qt gets around to its DeferredDelete event.
+            widget.hide()
             widget.deleteLater()
         child_layout = item.layout()
         if child_layout is not None:
@@ -5111,9 +5248,22 @@ class WelcomeDialog(QDialog):
                 self.parent.save_config()
         self.init_ui()
 
-    def accept(self):
+    def done(self, result):
         self._stop_animations()
-        super().accept()
+        # Persist the preference on Accept, Escape and window-manager Close.
+        # Previously only the startup caller's Accepted branch saved it.
+        config = getattr(self.parent, 'config', None)
+        if isinstance(config, dict):
+            show_again = not self.checkbox.isChecked()
+            if config.get('show_update_info', True) != show_again:
+                previous = config.get('show_update_info', True)
+                config['show_update_info'] = show_again
+                try:
+                    self.parent.save_config()
+                except Exception:
+                    config['show_update_info'] = previous
+                    logging.exception('Could not save the welcome preference')
+        super().done(result)
 
     def closeEvent(self, event):
         self._stop_animations()
@@ -5638,11 +5788,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.source_combo.clear()
         self.source_combo.addItems(LANGUAGES[self.lang])
         self.source_combo.setCurrentIndex(0)
-        if source_code == "auto":
-            source_code = str(
-                get_cached_config().get("main_translation_source_language", "en")
-                or "en"
-            )
+        if source_code == 'auto' and supports_auto_source(self._provider_engine()):
+            self.source_combo.insertItem(0, language_display_name('auto', self.lang), 'auto')
         self._set_combo_to_language_code(self.source_combo, source_code)
         self.source_combo.blockSignals(False)
 
@@ -5905,7 +6052,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not self.translated_text.strip():
             QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_translation"))
             return
-        paths = default_output_paths(self._data_dir(), self._source_file_name())
+        try:
+            paths = default_output_paths(self._data_dir(), self._source_file_name())
+        except OSError as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             doc_text(self.lang, "save_translation"),
@@ -5924,11 +6075,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         elif not ext:
             path = root + ".txt"
 
-        if path.lower().endswith(".json"):
-            save_session(path, self._session_payload())
-        else:
-            save_text(path, self.translated_text)
-            save_session(paths["session"], self._session_payload())
+        try:
+            if path.lower().endswith(".json"):
+                save_session(path, self._session_payload())
+            else:
+                save_text(path, self.translated_text)
+                save_session(paths["session"], self._session_payload())
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
+            return
         self._set_status(f"{doc_text(self.lang, 'saved')}: {path}")
 
     def open_session(self):
@@ -5957,6 +6112,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translated_view.setPlainText(self.translated_text)
         if payload.get("provider_engine"):
             self._populate_provider_combo(payload.get("provider_engine"))
+        self._refresh_document_provider_languages()
+        source_index = self.source_combo.findData(payload.get('source_language'))
+        if source_index >= 0:
+            self.source_combo.setCurrentIndex(source_index)
+        target_index = self.target_combo.findData(payload.get('target_language'))
+        if target_index >= 0:
+            self.target_combo.setCurrentIndex(target_index)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100 if self.translated_text else 0)
         self._set_status(doc_text(self.lang, "session_loaded"))
@@ -5979,6 +6141,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
             if kind == "online"
         }
+        # Keep an explicitly selected offline engine even when its package was
+        # removed. Reopening a local session must never select an online engine.
+        if selected_engine in {engine for engine, _name, _kind in TRANSLATION_PROVIDER_OPTIONS}:
+            available_engines.add(selected_engine)
         try:
             if translater.argos_installed_translation_pairs_fast():
                 available_engines.add("argos")
@@ -6045,7 +6211,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         previous_source = (
             self._source_code() if self.source_combo.count() else configured_source
         )
-        if previous_source == "auto":
+        if previous_source == "auto" and not supports_auto_source(self._provider_engine()):
             previous_source = configured_source
         previous_target = (
             language_code_from_name(self.target_combo.currentText(), self.lang)
@@ -6059,6 +6225,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for language in APP_LANGUAGES
             if any(source == language.code for source, _target in pairs)
         ]
+        if supports_auto_source(self._provider_engine()):
+            source_codes.insert(0, 'auto')
 
         self.source_combo.blockSignals(True)
         self.target_combo.blockSignals(True)
@@ -6493,7 +6661,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Select a screen area. OCR copies the recognized text.",
         "ocr": "Select a screen area. OCR translates it with this mode's language pair.",
         "fullscreen": "Translate visible text blocks across the whole screen with the Screen pair.",
-        "game": "Keep translations updated over one or more selected areas with the Dynamic pair. Press the shortcut again to stop.",
+        "game": "Select text to read, then choose where to display its live translation. Adjust the output and save templates. Press the shortcut again to stop.",
         "selection": "Select text in another app, then translate it without changing the original.",
         "replace": "Select editable text in another app. The same selection is replaced by its translation; if focus changed, the result is only copied.",
         "toggle": "Hide the app to its previous place or restore it from the tray/taskbar.",
@@ -6502,7 +6670,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Выделите область экрана. OCR распознает и скопирует текст.",
         "ocr": "Выделите область экрана. OCR переведёт её с парой языков этого режима.",
         "fullscreen": "Переведёт видимые блоки текста на всём экране с парой режима «Экран».",
-        "game": "Обновляет перевод поверх одной или нескольких выбранных областей с парой режима «Динамический». Повторное нажатие останавливает режим.",
+        "game": "Выделите исходный текст, затем место вывода перевода. Окно можно настроить, расположение — сохранить как шаблон. Повторная горячая клавиша остановит перевод.",
         "selection": "Выделите текст в другой программе: он переведётся без изменения оригинала.",
         "replace": "Выделите редактируемый текст в другой программе. То же выделение заменится переводом; при смене фокуса результат только скопируется.",
         "toggle": "Скроет программу туда, где она была, или вернёт её из трея/панели задач.",
@@ -6511,7 +6679,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Selecciona un área de pantalla. OCR reconoce y copia el texto.",
         "ocr": "Selecciona un área. OCR la traduce con el par de idiomas de este modo.",
         "fullscreen": "Traduce los bloques de texto visibles en toda la pantalla con el par Pantalla.",
-        "game": "Actualiza la traducción sobre una o varias áreas elegidas con el par Dinámico. Repite el atajo para detenerlo.",
+        "game": "Selecciona el texto original y dónde mostrar su traducción. Ajusta la salida y guarda plantillas. Repite el atajo para detener.",
         "selection": "Selecciona texto en otra app y tradúcelo sin cambiar el original.",
         "replace": "Selecciona texto editable en otra app. La misma selección se reemplaza; si cambia el foco, el resultado solo se copia.",
         "toggle": "Oculta la app en su ubicación anterior o la restaura desde bandeja/barra de tareas.",
@@ -6520,7 +6688,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Bildschirmbereich markieren. OCR erkennt und kopiert den Text.",
         "ocr": "Bereich markieren. OCR übersetzt ihn mit dem Sprachpaar dieses Modus.",
         "fullscreen": "Sichtbare Textblöcke des ganzen Bildschirms mit dem Bildschirm-Paar übersetzen.",
-        "game": "Aktualisiert Übersetzungen über einem oder mehreren markierten Bereichen mit dem Dynamisch-Paar. Erneut drücken beendet den Modus.",
+        "game": "Quelltext und Ausgabebereich wählen. Ausgabe anpassen und Vorlagen speichern. Erneutes Tastenkürzel beendet die Übersetzung.",
         "selection": "Text in einer anderen App markieren und übersetzen, ohne das Original zu ändern.",
         "replace": "Bearbeitbaren Text markieren. Dieselbe Auswahl wird ersetzt; bei geändertem Fokus wird das Ergebnis nur kopiert.",
         "toggle": "App an den vorherigen Ort ausblenden oder aus Tray/Taskleiste wiederherstellen.",
@@ -6529,7 +6697,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "Sélectionnez une zone d’écran. L’OCR reconnaît et copie le texte.",
         "ocr": "Sélectionnez une zone. L’OCR la traduit avec la paire de langues de ce mode.",
         "fullscreen": "Traduit les blocs de texte visibles sur tout l’écran avec la paire Écran.",
-        "game": "Actualise la traduction sur une ou plusieurs zones choisies avec la paire Dynamique. Le même raccourci arrête le mode.",
+        "game": "Choisissez le texte source, puis où afficher sa traduction. Réglez la sortie et enregistrez des modèles. Répétez le raccourci pour arrêter.",
         "selection": "Sélectionnez du texte dans une autre app et traduisez-le sans modifier l’original.",
         "replace": "Sélectionnez du texte modifiable. La même sélection est remplacée ; si le focus change, le résultat est seulement copié.",
         "toggle": "Masque l’app à son emplacement précédent ou la restaure depuis la zone de notification/barre des tâches.",
@@ -6538,7 +6706,7 @@ MAIN_HOTKEY_TOOLTIPS = {
         "copy": "框选屏幕区域；OCR 会识别并复制文字。",
         "ocr": "框选屏幕区域；OCR 使用此模式的语言对进行翻译。",
         "fullscreen": "使用“全屏”语言对翻译整个屏幕上的可见文字块。",
-        "game": "使用“动态”语言对持续更新一个或多个选定区域的译文；再次按快捷键即可停止。",
+        "game": "先选择原文，再选择译文显示区域。可调整输出窗口并保存模板。再次按快捷键停止翻译。",
         "selection": "在其他应用中选中文字并翻译，不修改原文。",
         "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
         "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",
@@ -6769,6 +6937,8 @@ class HotkeyLanguageDialog(QDialog):
             language.code for language in APP_LANGUAGES
             if any(pair_source == language.code for pair_source, _ in pairs)
         ]
+        if any(source == 'auto' for source, _ in pairs):
+            source_codes.insert(0, 'auto')
         self._loading = True
         try:
             self.source_combo.clear()
@@ -6974,6 +7144,7 @@ class DarkThemeApp(QMainWindow):
 
         if not LAYOUT_EDITOR_MODE:
             self.create_tray_icon()
+            self._sync_desktop_assistant()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7087,13 +7258,26 @@ class DarkThemeApp(QMainWindow):
         config_path = get_data_file("config.json")
         migrated_keys = ()
         if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8-sig") as f:
-                loaded_config = json.load(f)
+            loaded_config = None
+            try:
+                with open(config_path, "r", encoding="utf-8-sig") as f:
+                    loaded_config = json.load(f)
+                if not isinstance(loaded_config, dict):
+                    raise ValueError("config root is not an object")
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                logging.warning("Config file is unreadable; starting with defaults: %s", exc)
+                loaded_config = {}
             self.config, migrated_keys = merge_config_defaults(loaded_config)
+            if not loaded_config:
+                # A broken config must not block startup, but it should not
+                # keep falling into the broken state either.
+                try:
+                    write_json(config_path, self.config, indent=4)
+                except OSError:
+                    pass
         else:
             self.config = DEFAULT_CONFIG.copy()
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, ensure_ascii=False, indent=4)
+            write_json(config_path, self.config, indent=4)
             invalidate_config_cache()
         # Извлекаем значения с дефолтами из DEFAULT_CONFIG
         self.current_theme = self.config.get("theme", DEFAULT_CONFIG["theme"])
@@ -7128,29 +7312,44 @@ class DarkThemeApp(QMainWindow):
             self.save_config()
 
     @staticmethod
-    def _probe_portable_windows_autostart(stored_autostart, stored_backend):
-        """Resolve the real shortcut state without touching Qt or app config."""
-        shortcut_info = _read_autostart_shortcut()
-        if shortcut_info and _autostart_shortcut_matches_current(shortcut_info):
-            return True
+    def _probe_portable_windows_autostart(stored_autostart, stored_backend, repair_stale=True):
+        """Reconcile the Startup shortcut and the Run entry from older releases."""
+        with _AUTOSTART_LOCK:
+            shortcut_info = _read_autostart_shortcut()
+            enabled = _autostart_shortcut_matches_current(shortcut_info)
+            legacy_enabled = False
+            try:
+                legacy_enabled = bool(_read_legacy_autostart_command())
+                if not repair_stale:
+                    return enabled or legacy_enabled
+                if enabled:
+                    _remove_legacy_autostart_command()
+                    return True
 
-        should_repair = bool(
-            (shortcut_info and getattr(sys, "frozen", False))
-            or (
-                not shortcut_info
-                and stored_autostart
-                and stored_backend != AUTOSTART_BACKEND
-            )
-        )
-        if not should_repair:
-            return False
-
-        try:
-            _write_autostart_command(True)
-            return _autostart_shortcut_matches_current(_read_autostart_shortcut())
-        except Exception:
-            logging.exception("Could not repair the portable Windows autostart shortcut")
-            return False
+                should_repair = bool(
+                    (shortcut_info and getattr(sys, "frozen", False))
+                    or (
+                        not shortcut_info
+                        and (
+                            (stored_autostart and stored_backend != AUTOSTART_BACKEND)
+                            or (legacy_enabled and (stored_autostart or stored_backend != AUTOSTART_BACKEND))
+                        )
+                    )
+                )
+                if should_repair:
+                    _write_autostart_command(True)
+                    return _autostart_shortcut_matches_current(_read_autostart_shortcut())
+                if not shortcut_info:
+                    # An explicit off state in the current backend must also
+                    # remove a Run entry left behind by the incomplete migration.
+                    _remove_legacy_autostart_command()
+                return False
+            except OSError:
+                logging.exception("Could not reconcile Windows autostart")
+                return enabled or legacy_enabled or bool(stored_autostart)
+            except Exception:
+                logging.exception("Could not repair the portable Windows autostart shortcut")
+                return enabled or legacy_enabled
 
     def _start_deferred_autostart_sync(self):
         if not getattr(self, "_autostart_sync_pending", False):
@@ -7168,17 +7367,27 @@ class DarkThemeApp(QMainWindow):
             "_autostart_probe_stored_backend",
             self.config.get("autostart_backend"),
         )
+        revision = getattr(self, "_autostart_revision", 0)
 
         def worker():
-            enabled = self._probe_portable_windows_autostart(
-                stored_autostart,
-                stored_backend,
-            )
+            with _AUTOSTART_LOCK:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
+                    return
+                enabled = self._probe_portable_windows_autostart(
+                    stored_autostart,
+                    stored_backend,
+                )
 
             def apply_result():
                 # Do not overwrite a choice the user made while the shortcut
                 # probe was running in the background.
-                if bool(self.config.get("autostart", False)) != stored_autostart:
+                if (
+                    getattr(self, "_autostart_revision", 0) != revision
+                    or bool(self.config.get("autostart", False)) != stored_autostart
+                ):
                     return
                 changed = (
                     bool(self.config.get("autostart", False)) != bool(enabled)
@@ -7208,9 +7417,53 @@ class DarkThemeApp(QMainWindow):
                                                   LANGUAGES[self.current_interface_language][0])
         self.config["start_minimized"] = getattr(self, "start_minimized", False)
         config_path = get_data_file("config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=4)
+        write_json(config_path, self.config, indent=4)
         invalidate_config_cache()  # Сбрасываем кэш после записи
+
+    def _sync_desktop_assistant(self):
+        action = getattr(self, '_tray_assistant_action', None)
+        if action is not None:
+            with QtCore.QSignalBlocker(action):
+                action.setChecked(self.config.get('desktop_assistant_enabled') is True)
+        assistant = getattr(self, '_desktop_assistant', None)
+        suppressed = bool(getattr(self, '_desktop_assistant_suppressed_until_restart', False))
+        if self.config.get('desktop_assistant_enabled') is True and not suppressed:
+            if assistant is None:
+                from desktop_assistant import DesktopAssistant
+                self._desktop_assistant = DesktopAssistant(self)
+            else:
+                assistant.refresh()
+        elif assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
+
+    def dismiss_desktop_assistant_until_restart(self):
+        """Hide both assistant surfaces for this process only; do not persist it."""
+        self._desktop_assistant_suppressed_until_restart = True
+        preview = getattr(self, 'assistant_preview', None)
+        if preview is not None:
+            try:
+                preview.hide()
+            except RuntimeError:
+                pass
+        self._sync_desktop_assistant()
+        settings = self.settings_window or self._cached_settings_window
+        button = getattr(settings, 'desktop_assistant_dismiss_button', None)
+        if button is not None:
+            button.setEnabled(False)
+
+    def set_desktop_assistant_enabled(self, enabled):
+        self.config['desktop_assistant_enabled'] = bool(enabled)
+        self.save_config()
+        self._sync_desktop_assistant()
+        settings = self.settings_window or self._cached_settings_window
+        page = getattr(settings, 'settings_assistant_page', None)
+        if page is not None:
+            page.refresh()
+
+    def show_assistant_settings(self):
+        self.show_settings()
+        self.settings_window._set_settings_page(3)
 
     def set_ui_scale_percent(self, value, anchor_widget=None):
         from ui_scaling import normalize_ui_scale
@@ -7242,16 +7495,19 @@ class DarkThemeApp(QMainWindow):
         # Direction editing must not depend on downloaded Argos packages.
         # Otherwise installing EN→RU silently disables both reverse arrows.
         # Translation prepares missing packages through the explicit progress flow.
-        return {
+        pairs = {
             (source.code, target.code)
             for source in APP_LANGUAGES
             for target in APP_LANGUAGES
             if source.code != target.code
         }
+        if supports_auto_source(self.config.get('translator_engine', 'Google')):
+            pairs.update(('auto', target.code) for target in APP_LANGUAGES)
+        return pairs
 
     def _main_translation_source_codes(self):
         pairs = self._available_main_translation_pairs()
-        return [
+        return (['auto'] if any(source == 'auto' for source, _ in pairs) else []) + [
             language.code
             for language in APP_LANGUAGES
             if any(source == language.code for source, _target in pairs)
@@ -7278,7 +7534,7 @@ class DarkThemeApp(QMainWindow):
                 DEFAULT_CONFIG["main_translation_target_language"],
             )
         ).lower()
-        if get_language(source_code) is None:
+        if not valid_translation_source(source_code, self.config.get('translator_engine', 'Google')):
             source_code = DEFAULT_CONFIG["main_translation_source_language"]
         if get_language(target_code) is None or target_code == source_code:
             target_code = default_target_for_source(source_code)
@@ -7289,7 +7545,7 @@ class DarkThemeApp(QMainWindow):
         source_code = str(source_code or "").lower()
         target_code = str(target_code or "").lower()
         if (
-            get_language(source_code) is None
+            not valid_translation_source(source_code, self.config.get('translator_engine', 'Google'))
             or get_language(target_code) is None
             or source_code == target_code
         ):
@@ -7298,6 +7554,8 @@ class DarkThemeApp(QMainWindow):
         normalized_mode = str(mode or "main").lower()
         if normalized_mode in {"area", "ocr"}:
             normalized_mode = "ocr"
+        if source_code == 'auto' and normalized_mode not in {'main', 'selection', 'replace'}:
+            return
 
         if normalized_mode == "main":
             source_key = "main_translation_source_language"
@@ -7342,7 +7600,7 @@ class DarkThemeApp(QMainWindow):
             target_code = language_code_from_name(
                 target_combo.currentText(), self.current_interface_language
             )
-            if get_language(source_code) is None or get_language(target_code) is None:
+            if not valid_translation_source(source_code, self.config.get('translator_engine', 'Google')) or get_language(target_code) is None:
                 return
             if source_code == target_code:
                 target_code = default_target_for_source(source_code)
@@ -7409,6 +7667,7 @@ class DarkThemeApp(QMainWindow):
         pairs = set(self._available_main_translation_pairs())
         if mode not in {"ocr", "fullscreen", "game"}:
             return pairs
+        pairs = {(source, target) for source, target in pairs if source != 'auto'}
         try:
             from ocr import installed_ocr_language_codes
 
@@ -7517,6 +7776,8 @@ class DarkThemeApp(QMainWindow):
                 for language in APP_LANGUAGES
                 if any(pair_source == language.code for pair_source, _ in pairs)
             ]
+            if any(source == 'auto' for source, _ in pairs):
+                source_codes.insert(0, 'auto')
             source_combo.clear()
             for code in source_codes:
                 source_combo.addItem(
@@ -7659,7 +7920,8 @@ class DarkThemeApp(QMainWindow):
         )
         source = str(self.config.get(source_key, "en") or "en").lower()
         target = str(self.config.get(target_key, "") or "").lower()
-        if get_language(source) is None:
+        if (not valid_translation_source(source, self.config.get('translator_engine', 'Google'))
+                or (source == 'auto' and mode not in {'selection', 'replace'})):
             source = "en"
         if get_language(target) is None or target == source:
             target = default_target_for_source(source)
@@ -7812,8 +8074,8 @@ class DarkThemeApp(QMainWindow):
         if platform_support.IS_MAC:
             import macos_desktop
             enabled = macos_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                enabled = macos_desktop.set_autostart(True)
+            if repair_stale:
+                enabled = macos_desktop.repair_autostart(restore_missing=bool(self.config.get("autostart")))
             self.autostart = self.config["autostart"] = enabled
             self.config["autostart_backend"] = "macos_launchagent"
             return enabled
@@ -7821,11 +8083,10 @@ class DarkThemeApp(QMainWindow):
             import linux_desktop
 
             enabled = linux_desktop.autostart_enabled()
-            if not enabled and repair_stale and self.config.get("autostart"):
-                # The entry points at a path that moved (a new AppImage, say);
-                # rewrite it for the current executable.
-                enabled = linux_desktop.set_autostart(
-                    True, portable_paths.public_executable_path()
+            if repair_stale:
+                enabled = linux_desktop.repair_autostart(
+                    portable_paths.public_executable_path(),
+                    restore_missing=bool(self.config.get("autostart")),
                 )
             self.autostart = enabled
             self.config["autostart"] = enabled
@@ -7839,27 +8100,18 @@ class DarkThemeApp(QMainWindow):
             self.config["autostart_backend"] = AUTOSTART_BACKEND
             return enabled
 
-        shortcut_info = _read_autostart_shortcut()
         stored_autostart = bool(self.config.get("autostart", DEFAULT_CONFIG["autostart"]))
         stored_backend = self.config.get("autostart_backend")
-        enabled = False
-        if shortcut_info:
-            if _autostart_shortcut_matches_current(shortcut_info):
-                enabled = True
-            elif repair_stale and getattr(sys, "frozen", False):
-                # A stale ClicknTranslate shortcut means the user wanted autostart,
-                # but the path changed after moving/updating the portable app.
-                enabled = self.set_autostart(True)
-            else:
-                enabled = False
-        elif repair_stale and stored_autostart and stored_backend != AUTOSTART_BACKEND:
-            enabled = self.set_autostart(True)
+        enabled = DarkThemeApp._probe_portable_windows_autostart(
+            stored_autostart, stored_backend, repair_stale=repair_stale
+        )
         self.autostart = enabled
         self.config["autostart"] = enabled
         self.config["autostart_backend"] = AUTOSTART_BACKEND
         return enabled
 
     def set_autostart(self, enable: bool):
+        self._autostart_revision = getattr(self, "_autostart_revision", 0) + 1
         self._autostart_error = ''
         try:
             if platform_support.IS_MAC:
@@ -7959,16 +8211,19 @@ class DarkThemeApp(QMainWindow):
 
     def _layout_title_buttons(self):
         """One grid for the fixed canvas, with the right group anchored to its edge."""
-        size, gap, inset = 30, 6, 10
+        size, gap = 30, 6
+        left_inset, right_inset = 6, 10
         left = (self.flag_button, self.theme_button)
         right = (self.document_button, self.help_button, self.settings_button,
                  self.minimize_button, self.close_button)
         right_width = len(right) * size + (len(right) - 1) * gap
         y = (self.title_bar.height() - size) // 2
-        for buttons, start in ((left, inset), (right, self.ui_root.width() - inset - right_width)):
+        groups = ((left, left_inset),
+                  (right, self.ui_root.width() - right_inset - right_width))
+        for buttons, start in groups:
             for index, button in enumerate(buttons):
                 button.setGeometry(start + index * (size + gap), y, size, size)
-                button.setIconSize(QSize(24, 24))
+                button.setIconSize(QSize(20, 20) if button is self.flag_button else QSize(24, 24))
 
     def create_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
@@ -8014,6 +8269,12 @@ class DarkThemeApp(QMainWindow):
         fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
         game_action = tray_menu.addAction(ui_text(lang, "tray_game_translate"))
         game_action.triggered.connect(self.launch_game_translate)
+        tray_menu.addSeparator()
+        from assistant_text import assistant_text
+        self._tray_assistant_action = tray_menu.addAction(assistant_text(lang, 'tray'))
+        self._tray_assistant_action.setCheckable(True)
+        self._tray_assistant_action.setChecked(self.config.get('desktop_assistant_enabled') is True)
+        self._tray_assistant_action.toggled.connect(self.set_desktop_assistant_enabled)
         tray_menu.addSeparator()
         exit_action = tray_menu.addAction(ui_text(lang, "tray_exit"))
         exit_action.triggered.connect(self.exit_app)
@@ -9062,6 +9323,8 @@ class DarkThemeApp(QMainWindow):
             thread.start()
 
     def apply_theme(self):
+        if hasattr(self, 'config'):
+            self._sync_desktop_assistant()
         theme = THEMES[self.current_theme]
         from window_appearance import refresh_window_appearance
         refresh_window_appearance(percent=self.config.get('ui_scale_percent', DEFAULT_SCALE), theme=self.current_theme)
@@ -9328,7 +9591,7 @@ class DarkThemeApp(QMainWindow):
         self._apply_main_translate_button_theme(is_dark)
 
     def _apply_main_translate_button_theme(self, is_dark):
-        """Keep the language toolbar and composer inside one translation panel."""
+        """Match the shortcut panel: one frame, toolbar, and inset work surface."""
         button = getattr(self, "translate_button", None)
         if not isinstance(button, QPushButton):
             return
@@ -9336,6 +9599,8 @@ class DarkThemeApp(QMainWindow):
             composer = getattr(self, "main_composer", None)
             background = "#1d1922" if is_dark else "#ffffff"
             border = "#62566e" if is_dark else "#927cab"
+            work_surface = "#121116" if is_dark else "#f8f5fb"
+            work_edge = "#62566e" if is_dark else "#a999bb"
             divider = "#433a4c" if is_dark else "#d7cde3"
             input_text = "#f2eff6" if is_dark else "#27222d"
             muted = "#b5acbf" if is_dark else "#655b70"
@@ -9344,6 +9609,7 @@ class DarkThemeApp(QMainWindow):
                 section.setStyleSheet(
                     "QFrame#mainTextSection {"
                     f" background:{background}; border:1px solid {border}; border-radius:10px; }}"
+                    "QFrame#mainTextToolbar { background:transparent; border:0; }"
                     "QLabel#mainTextSectionTitle {"
                     f" color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600; }}"
                 )
@@ -9358,8 +9624,10 @@ class DarkThemeApp(QMainWindow):
             if isinstance(composer, QFrame):
                 composer.setStyleSheet(
                     "QFrame#mainComposer {"
-                    " background:transparent; border:1px solid transparent; border-radius:0;"
-                    f" border-top:1px solid {divider}; }}"
+                    f" background:{work_surface}; border:0; border-top:1px solid {work_edge};"
+                    " border-bottom-left-radius:9px; border-bottom-right-radius:9px; }"
+                    "QFrame#mainInputPane, QFrame#mainResultPane {"
+                    " background:transparent; border:0; }"
                     "QTextEdit#mainComposerInput, QTextEdit#mainComposerResult {"
                     f" background: transparent; color: {input_text};"
                     f" selection-background-color: #7A5FA1; border: none;"
@@ -9402,7 +9670,10 @@ class DarkThemeApp(QMainWindow):
                     action.setIcon(icon("Темная" if is_dark else "Светлая"))
                     action.setIconSize(QSize(24, 24))
             button.setStyleSheet(
-                button_qss(is_dark, "quiet", icon=True) + tooltip_stylesheet(is_dark)
+                button_qss(is_dark, "quiet", icon=True)
+                + 'QPushButton { border:0; } QPushButton:disabled { background:transparent; border:0; }'
+                + 'QPushButton[keyboardFocus="true"]:focus { border:0; }'
+                + tooltip_stylesheet(is_dark)
             )
             button.setIcon(send_arrow_icon("Темная" if is_dark else "Светлая"))
             button.setIconSize(QSize(24, 24))
@@ -9499,7 +9770,7 @@ class DarkThemeApp(QMainWindow):
     def update_interface_language_button(self):
         option = get_interface_language_option(self.current_interface_language)
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
-        self.flag_button.setIconSize(QSize(24, 24))
+        self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
 
     def refresh_interface_language_ui(self):
@@ -9698,7 +9969,7 @@ class DarkThemeApp(QMainWindow):
                     min-height: 30px;
                     border-radius: 5px;
                 }
-                QScrollBar::handle:vertical:hover {
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
                     background: #c5b3e9;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -9742,7 +10013,7 @@ class DarkThemeApp(QMainWindow):
                     min-height: 30px;
                     border-radius: 5px;
                 }
-                QScrollBar::handle:vertical:hover {
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
                     background: #7a5fa1;
                 }
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -10023,12 +10294,36 @@ class DarkThemeApp(QMainWindow):
 
     def _connect_main_hotkey_pair(self, pair, config_key, action_name):
         """Use one handler for the row, its caption, and its shortcut."""
+        if config_key == 'game_translate_hotkey':
+            from dynamic_templates import text
+            pair.setToolTip(tooltip_text(text(self.current_interface_language, 'help')))
+            pair.setAccessibleDescription(text(self.current_interface_language, 'help'))
+            for label in pair.findChildren(QLabel):
+                label.setToolTip(pair.toolTip())
+            pair.clicked.connect(lambda: self.show_dynamic_translation_help())
+            return
         pair.clicked.connect(
             lambda _checked=False, key=config_key, action=action_name: self._offer_hotkey_settings(
                 key, action
             )
         )
         pair.value_label.setToolTip(pair.toolTip())
+
+    def show_dynamic_translation_help(self):
+        from dynamic_templates import text
+        lang = self.current_interface_language
+        box = QMessageBox(self)
+        box.setWindowTitle(ui_text(lang, 'game_translate'))
+        box.setText(text(lang, 'instructions').format(hotkey=self.config.get('game_translate_hotkey') or DEFAULT_GAME_HOTKEY))
+        start = box.addButton(settings_text(lang, 'game_launch'), QMessageBox.AcceptRole)
+        shortcut = box.addButton(text(lang, 'shortcuts'), QMessageBox.ActionRole)
+        box.addButton(settings_text(lang, 'cancel'), QMessageBox.RejectRole)
+        box.setDefaultButton(start)
+        box.exec_()
+        if box.clickedButton() is start:
+            self.launch_game_translate()
+        elif box.clickedButton() is shortcut:
+            self._offer_hotkey_settings('game_translate_hotkey', ui_text(lang, 'hotkey_gaming'))
 
     def _confirm_open_hotkey_settings(self, action_name, hotkey):
         lang = self.current_interface_language
@@ -10106,13 +10401,35 @@ class DarkThemeApp(QMainWindow):
         self.main_text_section = QFrame()
         self.main_text_section.setObjectName("mainTextSection")
         text_section_layout = QVBoxLayout(self.main_text_section)
-        text_section_layout.setContentsMargins(8, 2, 8, 2)
+        text_section_layout.setContentsMargins(0, 2, 0, 2)
         text_section_layout.setSpacing(6)
+        self.main_text_toolbar = QFrame()
+        self.main_text_toolbar.setObjectName('mainTextToolbar')
+        text_toolbar_layout = QVBoxLayout(self.main_text_toolbar)
+        text_toolbar_layout.setContentsMargins(8, 0, 8, 0)
+        text_toolbar_layout.setSpacing(4)
+        text_section_layout.addWidget(self.main_text_toolbar)
+        self.mainTextSectionTitle = QLabel(
+            hotkey_language_text(self.current_interface_language, "text_section")
+        )
+        self.mainTextSectionTitle.setObjectName("mainTextSectionTitle")
+        self.mainTextSectionTitle.setAlignment(Qt.AlignCenter)
+        self.mainTextSectionTitle.setFixedHeight(18)
+        text_toolbar_layout.addWidget(self.mainTextSectionTitle)
+        self.main_text_section_title = self.mainTextSectionTitle
         self.main_shortcut_section = QFrame()
         self.main_shortcut_section.setObjectName("mainShortcutSection")
         shortcut_section_layout = QVBoxLayout(self.main_shortcut_section)
-        shortcut_section_layout.setContentsMargins(0, 2, 0, 2)
+        shortcut_section_layout.setContentsMargins(0, 2, 0, 0)
         shortcut_section_layout.setSpacing(6)
+        self.mainShortcutSectionTitle = QLabel(
+            hotkey_language_text(self.current_interface_language, "hotkey_section")
+        )
+        self.mainShortcutSectionTitle.setObjectName("mainShortcutSectionTitle")
+        self.mainShortcutSectionTitle.setFixedHeight(18)
+        self.mainShortcutSectionTitle.setAlignment(Qt.AlignCenter)
+        shortcut_section_layout.addWidget(self.mainShortcutSectionTitle)
+        self.main_shortcut_section_title = self.mainShortcutSectionTitle
 
         self.label = None
         self._hotkey_language_controls_loading = True
@@ -10134,14 +10451,9 @@ class DarkThemeApp(QMainWindow):
         hotkey_row = QHBoxLayout()
         hotkey_row.setContentsMargins(0, 0, 0, 0)
         hotkey_row.setSpacing(6)
-        hotkey_caption = QLabel(hotkey_language_text(self.current_interface_language, "hotkey_section"))
-        hotkey_caption.setObjectName("mainShortcutSectionTitle")
-        hotkey_caption.setFixedHeight(18)
-        hotkey_caption.setAlignment(Qt.AlignCenter)
         shortcut_header = QHBoxLayout()
         shortcut_header.setContentsMargins(0, 0, 0, 0)
         shortcut_header.setSpacing(8)
-        shortcut_header.addWidget(hotkey_caption, 1)
         self.hotkey_language_bar.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "bar_hint"))
         )
@@ -10200,21 +10512,13 @@ class DarkThemeApp(QMainWindow):
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
         )
         result_labels = TRANSLATION_RESULT_DIALOG_TEXT[self.current_interface_language]
-        composer_headings = QWidget()
-        composer_headings.setFixedHeight(18)
-        headings_layout = QHBoxLayout(composer_headings)
-        headings_layout.setContentsMargins(0, 0, 0, 0)
-        headings_layout.setSpacing(6)
-        self.main_input_caption = QLabel(result_labels['input_tab'])
-        self.main_result_caption = QLabel(result_labels['result_tab'])
-        for caption in (self.main_input_caption, self.main_result_caption):
-            caption.setMinimumWidth(0)
-            caption.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-            caption.setAlignment(Qt.AlignCenter)
-        headings_layout.addWidget(self.main_input_caption, 1)
-        headings_layout.addSpacing(30)
-        headings_layout.addWidget(self.main_result_caption, 1)
-        text_section_layout.addWidget(composer_headings)
+        # No redundant heading row above the language fields. Keep the small
+        # metadata labels off-layout for stale-result state/page restoration;
+        # the visible editors expose the same text to accessibility and tips.
+        self.main_input_caption = QLabel(result_labels['input_tab'], self.main_text_section)
+        self.main_result_caption = QLabel(result_labels['result_tab'], self.main_text_section)
+        self.main_input_caption.hide()
+        self.main_result_caption.hide()
         for combo in (self.source_lang, self.target_lang):
             combo.setFixedHeight(30)
             combo.setMinimumWidth(0)
@@ -10222,7 +10526,7 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.addWidget(self.source_lang, 1)
         language_picker_layout.addWidget(self.main_language_swap)
         language_picker_layout.addWidget(self.target_lang, 1)
-        text_section_layout.addLayout(language_picker_layout)
+        text_toolbar_layout.addLayout(language_picker_layout)
         self._apply_main_combo_theme(self.current_theme == "Темная")
         self._restore_main_translation_languages()
         self._refresh_selection_pair_hint()
@@ -10246,20 +10550,23 @@ class DarkThemeApp(QMainWindow):
         self.main_composer.setObjectName("mainComposer")
         self.main_composer.setMinimumHeight(74)
         composer_layout = QGridLayout(self.main_composer)
-        composer_layout.setContentsMargins(3, 2, 4, 4)
-        composer_layout.setSpacing(6)
+        composer_layout.setContentsMargins(0, 0, 0, 0)
+        composer_layout.setSpacing(0)
         composer_layout.setColumnStretch(0, 1)
         composer_layout.setColumnStretch(2, 1)
-        input_pane = QWidget(self.main_composer)
-        result_pane = QWidget(self.main_composer)
+        input_pane = QFrame(self.main_composer)
+        result_pane = QFrame(self.main_composer)
+        input_pane.setObjectName('mainInputPane')
+        result_pane.setObjectName('mainResultPane')
+        self.main_input_pane, self.main_result_pane = input_pane, result_pane
         input_layout = QGridLayout(input_pane)
         result_layout = QGridLayout(result_pane)
         for pane_layout in (input_layout, result_layout):
-            pane_layout.setContentsMargins(0, 0, 0, 0)
+            pane_layout.setContentsMargins(3, 2, 3, 2)
             pane_layout.setSpacing(0)
             pane_layout.setColumnStretch(0, 1)
         divider_space = QWidget(self.main_composer)
-        divider_space.setFixedWidth(30)
+        divider_space.setFixedWidth(8)
         divider_layout = QHBoxLayout(divider_space)
         divider_layout.setContentsMargins(0, 6, 0, 6)
         self.main_composer_divider = QFrame(divider_space)
@@ -10272,6 +10579,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input = TranslateOnEnterTextEdit()
         self.text_input.setPlainText(getattr(self, '_main_input_draft', ''))
         self.text_input.setObjectName("mainComposerInput")
+        self.text_input.setAccessibleName(result_labels['input_tab'])
         self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
         self.text_input.setToolTip(tooltip_text(
             doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
@@ -10286,6 +10594,9 @@ class DarkThemeApp(QMainWindow):
         self.text_input.customContextMenuRequested.connect(self._show_text_input_context_menu)
         self.text_input.translation_requested.connect(self.translate_input_text)
         self.text_input.textChanged.connect(self._remember_main_input)
+        self.text_input.textChanged.connect(self._update_main_translate_button)
+        self.source_lang.currentIndexChanged.connect(self._update_main_translate_button)
+        self.target_lang.currentIndexChanged.connect(self._update_main_translate_button)
         input_layout.addWidget(self.text_input, 0, 0)
 
         composer_actions = QWidget(self.main_composer)
@@ -10302,7 +10613,7 @@ class DarkThemeApp(QMainWindow):
             self.current_interface_language, "translate_button"
         )
         self.translate_button = ScaledIconButton()
-        self.translate_button.setEnabled(not self._main_translation_running)
+        self.translate_button.setEnabled(False)
         self.translate_button.clicked.connect(self.translate_input_text)
         self.translate_button.setObjectName("mainTranslateButton")
         self.translate_button.setAccessibleName(translate_action_text)
@@ -10364,7 +10675,7 @@ class DarkThemeApp(QMainWindow):
         self._restore_main_result_widgets()
         self._apply_main_translate_button_theme(self.current_theme == "Темная")
         has_translation_pair = self.source_lang.count() > 0 and self.target_lang.count() > 0
-        self.translate_button.setEnabled(has_translation_pair and not self._main_translation_running)
+        self._update_main_translate_button()
         if not has_translation_pair:
             self.translate_button.setToolTip(
                 tooltip_text(
@@ -10372,6 +10683,12 @@ class DarkThemeApp(QMainWindow):
                 )
             )
         text_section_layout.addWidget(self.main_composer, 1)
+        from assistant_preview import AssistantPreview
+        self.assistant_preview = AssistantPreview(self, self.current_interface_language, self.main_text_section)
+        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
+        text_section_layout.addWidget(self.assistant_preview)
+        if getattr(self, '_desktop_assistant_suppressed_until_restart', False):
+            self.assistant_preview.hide()
         self.main_layout.addWidget(self.main_text_section, 1)
 
         self._refresh_direction_summary()
@@ -10425,7 +10742,7 @@ class DarkThemeApp(QMainWindow):
         self.main_hotkey_area = QFrame()
         self.main_hotkey_area.setObjectName("mainHotkeyArea")
         hotkey_grid = QGridLayout(self.main_hotkey_area)
-        hotkey_grid.setContentsMargins(0, 3, 0, 0)
+        hotkey_grid.setContentsMargins(0, 1, 0, 0)
         hotkey_grid.setHorizontalSpacing(hotkey_spacing)
         hotkey_grid.setVerticalSpacing(0)
 
@@ -10596,6 +10913,7 @@ class DarkThemeApp(QMainWindow):
             self.apply_theme()
         self._fit_hotkey_mode_combo()
         self._apply_main_hotkey_theme()
+        self._ui_scale_controller.refresh()
         self._complete_guide_step("back_home")
 
     def _fit_hotkey_mode_combo(self):
@@ -10615,6 +10933,18 @@ class DarkThemeApp(QMainWindow):
             combo.setFixedWidth(max(160, needed))
         except RuntimeError:
             pass
+
+    def show_desktop_assistant_settings(self):
+        self.show_assistant_settings()
+        checkbox = self.settings_window.desktop_assistant_checkbox
+        checkbox.setFocus(Qt.OtherFocusReason)
+        # Focus the actual setting; do not enable an overlay just by visiting.
+        page = checkbox.parentWidget()
+        while page is not None:
+            if isinstance(page, QtWidgets.QScrollArea):
+                page.ensureWidgetVisible(checkbox)
+                break
+            page = page.parentWidget()
 
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)
@@ -10648,6 +10978,9 @@ class DarkThemeApp(QMainWindow):
         self.settings_window._set_settings_page(0)
         self.settings_window.show()
         self.set_settings_button_to_home()
+        # Settle the owner's native geometry before a settings action opens
+        # and centers a dialog in the same event-loop turn.
+        self._ui_scale_controller.refresh()
         self._complete_guide_step("settings")
 
     def update_languages(self):
@@ -10679,7 +11012,7 @@ class DarkThemeApp(QMainWindow):
         finally:
             self.target_lang.blockSignals(False)
         if getattr(self, "translate_button", None) is not None:
-            self.translate_button.setEnabled(self.target_lang.count() > 0 and not self._main_translation_running)
+            self._update_main_translate_button()
         self._save_main_translation_languages()
         self._refresh_selection_pair_hint()
         update_swap = getattr(self, "_update_main_language_swap", None)
@@ -10752,6 +11085,10 @@ class DarkThemeApp(QMainWindow):
                 detail += '\n' + error
             caption.setText(title)
             caption.setToolTip(tooltip_text(detail))
+            result_view = getattr(self, 'main_result_view', None)
+            if isinstance(result_view, QTextEdit):
+                result_view.setAccessibleName(title)
+                result_view.setToolTip(tooltip_text(detail))
         except RuntimeError:
             pass  # A language change may arrive as the old page is disposed.
 
@@ -10799,7 +11136,7 @@ class DarkThemeApp(QMainWindow):
                                          theme=self.current_theme, result_mode='main', **snapshot)
         dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
         if self._main_translation_running:
-            dialog.engine_label.setText(self._main_active_engine)
+            dialog.set_window_engine(self._main_active_engine)
             dialog._follow_main_translation(self._main_active_request, self._main_result_progress)
             self._main_preview_dialogs.append(dialog)
         return dialog
@@ -11043,6 +11380,10 @@ class DarkThemeApp(QMainWindow):
             self.force_quit = True
 
         # Если force_quit=True, то выполняем полноценный выход
+        assistant = getattr(self, '_desktop_assistant', None)
+        if assistant is not None:
+            assistant.dispose()
+            self._desktop_assistant = None
         try:
             if hasattr(self, "hotkey_thread") and self.hotkey_thread is not None:
                 self.hotkey_thread.stop()
@@ -11207,7 +11548,7 @@ class DarkThemeApp(QMainWindow):
         self._argos_cancel_enabled = False
         if getattr(self, "translate_button", None) is not None:
             try:
-                self.translate_button.setEnabled(True)
+                self._update_main_translate_button()
             except RuntimeError:
                 pass
         if self._argos_progress is not None:
@@ -11386,6 +11727,17 @@ class DarkThemeApp(QMainWindow):
                 self._start_argos_translation(text, source_code, target_code)
                 return
             self._start_main_translation(text, source_code, target_code, engine)
+
+    def _update_main_translate_button(self, *_args):
+        """Translate is only meaningful with a language pair and non-empty text."""
+        if getattr(self, "translate_button", None) is None:
+            return
+        try:
+            pair = self.target_lang.count() > 0
+            text = bool(self.text_input.toPlainText().strip())
+            self.translate_button.setEnabled(pair and text and not self._main_translation_running)
+        except RuntimeError:
+            pass
 
     def minimize_to_tray(self):
         if not self.has_tray():
@@ -11668,19 +12020,9 @@ if __name__ == "__main__":
             window.showNormal()
             window.raise_()
             window.activateWindow()
-    for argument in sys.argv[1:]:
-        if not argument.startswith("--update-ack="):
-            continue
-        ack_path = argument.split("=", 1)[1].strip()
-        if ack_path:
-            try:
-                ack_parent = os.path.dirname(os.path.abspath(ack_path))
-                os.makedirs(ack_parent, exist_ok=True)
-                with open(ack_path, "w", encoding="utf-8") as ack_file:
-                    ack_file.write(APP_VERSION)
-            except Exception:
-                pass
-        break
+    from update_handshake import acknowledge_ready
+    _update_package_root = get_portable_dir() if platform_support.IS_WINDOWS and getattr(sys, 'frozen', False) else None
+    QTimer.singleShot(0, lambda: acknowledge_ready(sys.argv[1:], APP_VERSION, _update_package_root))
     # Первый запуск из ярлыка рабочего стола: экземпляра ещё не было, поэтому
     # действие выполняем сами, как только окно готово.
     if _requested_shortcut_action:

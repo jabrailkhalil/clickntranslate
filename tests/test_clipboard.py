@@ -22,6 +22,15 @@ class FakeProcess:
 
 
 class ClipboardHelperTest(unittest.TestCase):
+    def test_timed_out_clipboard_process_is_killed_and_reaped(self):
+        process = mock.Mock()
+        process.communicate.side_effect = [subprocess.TimeoutExpired('wl-copy', 5), (b'', b'')]
+        with mock.patch.object(platform_support.shutil, 'which', side_effect=lambda name: '/bin/wl-copy' if name == 'wl-copy' else None), \
+             mock.patch.object(platform_support.subprocess, 'Popen', return_value=process):
+            self.assertFalse(platform_support._copy_with_helper('fixture'))
+        process.kill.assert_called_once()
+        self.assertEqual(process.communicate.call_count, 2)
+
     def test_wayland_uses_wl_copy_first(self):
         started = []
 

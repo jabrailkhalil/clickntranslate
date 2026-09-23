@@ -30,7 +30,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y appstream libegl1 libgl1 \
+          sudo apt-get install -y appstream libegl1 libgl1 python3-gi \
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
             libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxkbcommon-x11-0
           python -m venv "$RUNNER_TEMP/clickntranslate-venv"

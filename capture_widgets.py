@@ -2,7 +2,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from languages import language_display_name
+from languages import language_display_name, language_short_label
 from settings_window import DropDownCombo
 from styled_dialogs import install_tooltip_style, set_widget_stylesheet
 
@@ -19,9 +19,11 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         metrics = QtGui.QFontMetrics(self.combo.font())
-        return QtCore.QSize(max(196, metrics.horizontalAdvance(self.label(index)) + 70), 30)
+        s = self.combo.ui_factor
+        return QtCore.QSize(max(round(196*s), metrics.horizontalAdvance(self.label(index)) + round(82*s)), round(40*s))
 
     def paint(self, painter, option, index):
+        s = self.combo.ui_factor
         palette = self.combo.colors
         chosen = index.row() == self.combo.currentIndex()
         hover = bool(option.state & (QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected))
@@ -35,12 +37,12 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
             painter.drawRoundedRect(rect, 6, 6)
         icon = index.data(QtCore.Qt.DecorationRole)
         if isinstance(icon, QtGui.QIcon):
-            icon.paint(painter, QtCore.QRect(int(rect.left()) + 7, int(rect.center().y()) - 9, 18, 18))
+            icon.paint(painter, QtCore.QRect(round(rect.left() + 7*s), round(rect.center().y() - 14*s), round(28*s), round(28*s)))
         font = self.combo.font()
         font.setWeight(QtGui.QFont.DemiBold if chosen else QtGui.QFont.Normal)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(palette['text'] if enabled else palette['muted']))
-        label_rect = rect.adjusted(34, 0, -26, 0)
+        label_rect = rect.adjusted(44*s, 0, -26*s, 0)
         label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, int(label_rect.width()))
         painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
         if chosen and enabled:
@@ -70,7 +72,29 @@ class CaptureLanguageCombo(DropDownCombo):
         install_tooltip_style()
         self.set_capture_theme(True)
 
-    def set_capture_theme(self, dark, language='en'):
+    def initStyleOption(self, option):
+        super().initStyleOption(option)
+        # The collapsed field always paints the compact code, independently of
+        # the full-name popup delegate, even during selection/close events.
+        code = self.currentData()
+        if code:
+            option.currentText = language_short_label(code)
+
+    def showPopup(self):
+        # Native Qt combo animation first snapshots a list aligned over the
+        # selected field. Our full-name delegate then appears over "RU" before
+        # the popup is moved below it. Disable that snapshot only for this
+        # synchronous opening and restore the application's setting afterwards.
+        effect = QtCore.Qt.UI_AnimateCombo
+        animated = QtWidgets.QApplication.isEffectEnabled(effect)
+        try:
+            QtWidgets.QApplication.setEffectEnabled(effect, False)
+            super().showPopup()
+        finally:
+            QtWidgets.QApplication.setEffectEnabled(effect, animated)
+
+    def set_capture_theme(self, dark, language='en', factor=1.0):
+        self.ui_factor = factor
         self.interface_language = language
         self.colors = (dict(surface='#211d29', text='#f5f0fc', muted='#a49bad', border='#544760',
                             hover='#2e2638', selected='#3e3050', accent='#c3a5eb') if dark else
@@ -78,22 +102,23 @@ class CaptureLanguageCombo(DropDownCombo):
                             hover='#f0e9f7', selected='#e9ddf4', accent='#765099'))
         c = self.colors
         font = QtWidgets.QApplication.font()
-        font.setPixelSize(12)
+        font.setPixelSize(max(12, round(14 * factor)))
         self.setFont(font)
-        self.setIconSize(QtCore.QSize(18, 18))
-        self.setFixedSize(96, 36)
+        self.setIconSize(QtCore.QSize(28, 28) * factor)
+        self.setFixedSize(QtCore.QSize(112, 44) * factor)
         palette = self.palette()
         for role in (QtGui.QPalette.Text, QtGui.QPalette.WindowText, QtGui.QPalette.ButtonText):
             palette.setColor(role, QtGui.QColor(c['text']))
         self.setPalette(palette)
-        self.setStyleSheet(f"""
+        from window_appearance import scaled_stylesheet
+        self.setStyleSheet(scaled_stylesheet(f"""
             QComboBox {{ background:{c['surface']}; color:{c['text']}; border:1px solid {c['border']};
-                border-radius:8px; padding:3px 20px 3px 8px; font-size:12px; font-weight:600; }}
+                border-radius:8px; padding:3px 20px 3px 8px; font-size:14px; font-weight:600; }}
             QComboBox:hover, QComboBox:on {{ border-color:{c['accent']}; background:{c['hover']}; }}
             QComboBox:disabled {{ color:{c['muted']}; }}
             QComboBox::drop-down {{ width:18px; border:0; background:transparent; }}
             QComboBox::down-arrow {{ image:none; }}
-        """)
+        """, factor))
         self._paint_popup_frame()
 
     def _paint_popup_frame(self):
@@ -115,7 +140,7 @@ class CaptureLanguageCombo(DropDownCombo):
             QAbstractItemView {{ background:transparent; color:{c['text']}; border:0; outline:none; }}
             QScrollBar:vertical {{ background:transparent; width:6px; margin:7px 0; border:0; }}
             QScrollBar::handle:vertical {{ background:{c['border']}; border-radius:3px; min-height:28px; }}
-            QScrollBar::handle:vertical:hover {{ background:{c['accent']}; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{c['accent']}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; border:0; }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
         """)

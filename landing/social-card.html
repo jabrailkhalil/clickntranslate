@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, height=630" />
+    <title>Click'n'Translate social card</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; margin: 0; overflow: hidden; }
+      body { position: relative; background: #0b0a0f; color: #f6f2fa; font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      body::before { content: ""; position: absolute; width: 720px; height: 720px; right: -280px; top: -360px; border-radius: 50%; background: radial-gradient(circle, rgba(169,123,228,.34), rgba(169,123,228,0) 68%); }
+      body::after { content: ""; position: absolute; width: 620px; height: 620px; left: -280px; bottom: -410px; border-radius: 50%; background: radial-gradient(circle, rgba(82,128,218,.25), rgba(82,128,218,0) 68%); }
+      .frame { position: absolute; inset: 28px; padding: 48px 54px; overflow: hidden; border: 1px solid #332d42; border-radius: 34px; background: linear-gradient(145deg, rgba(24,21,31,.96), rgba(11,10,15,.92)); box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+      .brand { display: flex; align-items: center; gap: 14px; font-size: 24px; font-weight: 760; letter-spacing: -.02em; }
+      .brand img { width: 46px; height: 46px; border-radius: 12px; }
+      .copy { position: relative; z-index: 2; width: 610px; margin-top: 68px; }
+      .eyebrow { display: flex; align-items: center; gap: 10px; color: #d4b6f7; font-size: 15px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .eyebrow i { width: 9px; height: 9px; border-radius: 50%; background: #70d3a5; box-shadow: 0 0 16px rgba(112,211,165,.7); }
+      h1 { margin: 18px 0 0; font-size: 66px; line-height: .98; letter-spacing: -.055em; }
+      h1 span { color: #bd91f3; }
+      p { margin: 22px 0 0; color: #aaa2b3; font-size: 22px; line-height: 1.42; }
+      .badges { display: flex; gap: 10px; margin-top: 30px; }
+      .badge { padding: 9px 13px; border: 1px solid #453a58; border-radius: 999px; background: #1d1926; color: #ddd4e7; font-size: 14px; font-weight: 700; }
+      .mock { position: absolute; z-index: 1; top: 108px; right: -12px; width: 455px; height: 414px; overflow: hidden; border: 1px solid #41374f; border-radius: 26px; background: linear-gradient(150deg, #181521, #10131a); transform: rotate(-2deg); box-shadow: 0 35px 75px rgba(0,0,0,.5); }
+      .mock-bar { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 17px; border-bottom: 1px solid #332d40; color: #aea5b8; font-size: 13px; }
+      .quest { padding: 40px 35px; }
+      .quest small { color: #78b6ff; font-weight: 800; letter-spacing: .09em; }
+      .quest h2 { margin: 10px 0 0; font-size: 29px; letter-spacing: -.035em; }
+      .dialogue { position: absolute; right: 28px; width: 342px; padding: 17px 18px; border: 2px solid #a97be4; border-radius: 15px; background: #0e1118; color: #f5f1f8; font-size: 16px; font-weight: 700; }
+      .dialogue.one { top: 184px; }
+      .dialogue.two { top: 286px; }
+      .translation { position: absolute; right: 20px; top: 277px; width: 362px; padding: 18px 20px; border: 1px solid #5c4a71; border-radius: 16px; background: linear-gradient(145deg, #33283f, #1b1723); box-shadow: 0 17px 45px rgba(0,0,0,.42); }
+      .translation small { display: block; margin-bottom: 6px; color: #bba6d0; letter-spacing: .08em; }
+      .translation strong { font-size: 19px; }
+      .footer { position: absolute; left: 54px; bottom: 38px; color: #837a8d; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="brand"><img src="assets/icon.png" alt="" /> Click'n'Translate</div>
+      <div class="copy">
+        <div class="eyebrow"><i></i> Free and open source</div>
+        <h1>Translate any text <span>on your screen.</span></h1>
+        <p>OCR, dynamic screen regions, selected-text replacement, and document translation.</p>
+        <div class="badges"><span class="badge">Windows & Linux</span><span class="badge">No account</span><span class="badge">1,000+ downloads</span></div>
+      </div>
+      <div class="mock">
+        <div class="mock-bar"><span>Adventure.exe</span><span>— &nbsp; □ &nbsp; ×</span></div>
+        <div class="quest"><small>CURRENT OBJECTIVE</small><h2>The northern passage</h2></div>
+        <div class="dialogue one">The northern door is locked.</div>
+        <div class="dialogue two">There must be another entrance.</div>
+        <div class="translation"><small>ENGLISH → RUSSIAN</small><strong>Должен быть другой вход.</strong></div>
+      </div>
+      <div class="footer">github.com/jabrailkhalil/clickntranslate</div>
+    </div>
+  </body>
+</html>

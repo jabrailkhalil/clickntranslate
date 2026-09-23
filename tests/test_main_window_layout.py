@@ -47,7 +47,7 @@ class MainScreenSourceTest(unittest.TestCase):
     def test_the_blocks_are_added_in_task_order(self):
         source = self._source()
         order = [
-            "text_section_layout.addLayout(language_picker_layout)",
+            "text_toolbar_layout.addLayout(language_picker_layout)",
             "text_section_layout.addWidget(self.main_composer, 1)",
             "self.main_layout.addWidget(self.main_text_section, 1)",
             "shortcut_section_layout.addWidget(self.hotkey_language_bar)",
@@ -294,8 +294,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 detached_keys = {
                     info["key"] for info in panel.overlay._detached_buttons.values()
                 }
-                self.assertIn("main_input_caption", detached_keys)
-                self.assertIn("main_result_caption", detached_keys)
+                self.assertNotIn("main_input_caption", detached_keys)
+                self.assertNotIn("main_result_caption", detached_keys)
                 self.assertIn("mainShortcutSectionTitle", detached_keys)
                 self.assertIn("mainOcrSummary", detached_keys)
                 source_info = panel.overlay._detached_buttons[self.window.source_lang]
@@ -783,7 +783,8 @@ class MainWindowGeometryTest(unittest.TestCase):
         self.assertTrue(shortcuts.isAncestorOf(self.window.hotkey_mode_combo))
         self.assertTrue(shortcuts.isAncestorOf(self.window.main_hotkey_area))
         self.assertTrue(footer.isAncestorOf(self.window.start_button))
-        self.assertEqual(self.window.ui_root.size(), QtCore.QSize(700, 400))
+        self.assertEqual(self.window.ui_root.width(), 700)
+        self.assertGreaterEqual(self.window.ui_root.height(), self.window.main_layout.minimumSize().height())
 
     def test_the_mode_picker_is_sized_by_qt_not_by_a_guess(self):
         """Full mode names get their measured width on the current platform."""
@@ -924,15 +925,11 @@ class MainWindowGeometryTest(unittest.TestCase):
                 self.window.show_main_screen()
                 self.app.processEvents()
 
-    def test_clicking_hotkey_badge_offers_its_exact_setting(self):
+    def test_clicking_dynamic_badge_opens_the_explanation_and_actions(self):
         game = self.window.main_hotkey_references["game"]
-        with mock.patch.object(self.window, "_offer_hotkey_settings") as offer:
+        with mock.patch.object(self.window, "show_dynamic_translation_help") as offer:
             QTest.mouseClick(game.value_label, Qt.LeftButton)
-
-        offer.assert_called_once_with(
-            "game_translate_hotkey",
-            main.ui_text(self.window.current_interface_language, "hotkey_gaming"),
-        )
+        offer.assert_called_once_with()
 
     def test_caption_shortcut_and_empty_space_are_one_click_target(self):
         bindings = {
@@ -948,12 +945,14 @@ class MainWindowGeometryTest(unittest.TestCase):
                 QtCore.QPoint((row.caption_label.geometry().right() + row.value_label.x()) // 2, row.height() // 2),
             )
             for point in points:
-                with self.subTest(action=action, point=point), mock.patch.object(self.window, "_offer_hotkey_settings") as offer:
+                method = 'show_dynamic_translation_help' if action == 'game' else '_offer_hotkey_settings'
+                with self.subTest(action=action, point=point), mock.patch.object(self.window, method) as offer:
                     hit = self.window.ui_root.childAt(row.mapTo(self.window.ui_root, point))
                     self.assertIs(hit, row)
                     QTest.mouseClick(row, Qt.LeftButton, pos=point)
                     offer.assert_called_once()
-                    self.assertEqual(offer.call_args.args[0], bindings[action])
+                    if action != 'game':
+                        self.assertEqual(offer.call_args.args[0], bindings[action])
 
     def test_shortcut_row_can_be_activated_from_the_keyboard(self):
         row = self.window.main_hotkey_references["copy"]

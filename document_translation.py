@@ -2,7 +2,7 @@ import threading
 from dataclasses import dataclass
 
 import translater
-from languages import detect_language_code
+from languages import detect_language_code, supports_auto_source
 from translation_chunks import provider_chunks, split_text, restore_boundary_whitespace
 
 
@@ -47,7 +47,7 @@ def translate_document_text(
     # blocks that the HTTP layer would split again at unrelated byte offsets.
     chunks = split_text_chunks(text, max_chars=max_chars, engine=engine)
 
-    if source_code == "auto":
+    if source_code == "auto" and not supports_auto_source(engine):
         source_code = detect_language_code(text[:5000])
 
     results = []

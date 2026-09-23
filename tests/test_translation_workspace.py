@@ -1,6 +1,7 @@
 """Exercise editable translation drafts and real Qt reflow, without network."""
 
 import os
+import threading
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from types import SimpleNamespace
 from unittest import mock
@@ -60,7 +61,7 @@ def test_translate_uses_the_current_draft_and_selected_engine(workspace, request
     requests.pop()()
     args, kwargs = translate.call_args
     assert args == ('A revised source\nwith another paragraph', 'en', 'ru')
-    assert kwargs['engine'] == 'Lingva'
+    assert kwargs['engine'] == 'lingva'
     assert callable(kwargs['cancel_callback'])
     assert workspace.source_edit.toPlainText() == args[0]
     assert workspace.text_edit.toPlainText() == 'Дополненный перевод'
@@ -93,7 +94,7 @@ def test_typing_in_result_translates_that_draft_and_keeps_it_visible(workspace, 
     assert workspace.text_edit.toPlainText() == 'My new draft'
     requests.pop()()
     assert translate.call_args.args == ('My new draft', 'en', 'ru')
-    assert translate.call_args.kwargs['engine'] == 'Lingva'
+    assert translate.call_args.kwargs['engine'] == 'lingva'
     assert workspace.source_edit.toPlainText() == 'My new draft'
     if reply == 'Новый перевод':
         assert workspace.text_edit.toPlainText() == reply
@@ -266,7 +267,8 @@ def test_both_editors_wrap_and_remain_accessible_after_reflow(app, monkeypatch, 
                 editor.verticalScrollBar().setValue(editor.verticalScrollBar().maximum())
                 rect = QtCore.QRect(editor.mapTo(dialog, QtCore.QPoint()), editor.size())
                 assert dialog.rect().contains(rect)
-            for button in (dialog.translate_button, dialog.copy_button, dialog.close_button):
+            assert not dialog.close_button.isVisible()
+            for button in (dialog.translate_button, dialog.copy_button):
                 assert button.width() >= button.sizeHint().width(), (lang, button.text())
                 rect = QtCore.QRect(button.mapTo(dialog, QtCore.QPoint()), button.size())
                 assert dialog.rect().contains(rect)
@@ -304,6 +306,57 @@ def test_scale_and_theme_changes_preserve_drafts_and_fit_a_small_screen(app, wor
         del app._dialog_appearance
         app.setProperty('ui_theme', None)
         appearance.deleteLater()
+
+
+@pytest.mark.parametrize('action', ['edit_source', 'edit_result', 'new_language', 'close', 'delete'])
+def test_inflight_real_worker_cannot_overwrite_newer_user_state(app, workspace, monkeypatch, action):
+    entered, release = threading.Event(), threading.Event()
+    threads = []
+    original_thread = threading.Thread
+    def start_worker(*args, **kwargs):
+        thread = original_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+    def translate(text, source, target, **kwargs):
+        if target == 'de':
+            return 'New answer'
+        entered.set()
+        assert release.wait(5)
+        # A provider can already have received a chunk when cancellation occurs.
+        kwargs['partial_callback']('Old partial', 1, 2)
+        return 'Old final'
+    monkeypatch.setattr(main.threading, 'Thread', start_worker)
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    workspace.translate_button.click()
+    try:
+        assert entered.wait(5)
+        if action.startswith('edit_'):
+            field = workspace.source_edit if action == 'edit_source' else workspace.text_edit
+            field.setPlainText('Newest draft')
+        elif action == 'new_language':
+            workspace.target_combo.setCurrentIndex(workspace.target_combo.findData('de'))
+        else:
+            workspace.close()
+            if action == 'delete':
+                workspace.deleteLater()
+                app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+                assert sip.isdeleted(workspace)
+    finally:
+        release.set()
+        for thread in threads:
+            thread.join(5)
+            assert not thread.is_alive()
+    app.processEvents()
+    if action.startswith('edit_'):
+        assert field.toPlainText() == 'Newest draft'
+        assert 'Old' not in workspace.text_edit.toPlainText()
+    if action == 'new_language':
+        assert workspace.text_edit.toPlainText() == 'New answer'
+        main.save_translation_history.assert_called_once_with('Hello world', 'New answer', 'de')
+        main.platform_support.copy_text.assert_called_once_with('New answer')
+    else:
+        main.save_translation_history.assert_not_called()
+        main.platform_support.copy_text.assert_not_called()
 
 
 def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, requests):

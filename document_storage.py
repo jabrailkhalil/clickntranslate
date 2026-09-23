@@ -3,6 +3,8 @@ import os
 import re
 from datetime import datetime
 
+from atomic_storage import write_json, write_text
+
 
 def translations_dir(data_dir):
     path = os.path.join(data_dir, "translations")
@@ -23,18 +25,14 @@ def default_output_paths(data_dir, source_file_name):
 
 
 def save_text(path, text):
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(str(text or ""))
+    write_text(path, str(text or ""))
     return path
 
 
 def save_session(path, session):
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     payload = dict(session or {})
     payload.setdefault("saved_at", datetime.now().isoformat(timespec="seconds"))
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    write_json(path, payload, indent=2)
     return path
 
 
@@ -43,6 +41,10 @@ def load_session(path):
         payload = json.load(f)
     if not isinstance(payload, dict):
         raise ValueError("Invalid translation session file.")
+    for field in ('original_text', 'translated_text', 'source_file_name', 'source_path',
+                  'detected_language', 'source_language', 'target_language', 'provider_engine', 'provider'):
+        if field in payload and not isinstance(payload[field], str):
+            raise ValueError(f"Invalid translation session field: {field}.")
     return payload
 
 

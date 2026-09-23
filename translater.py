@@ -1553,6 +1553,18 @@ def _google_translate_chunk(text, source_code, target_code, *, cancel_callback=N
         fallback = session.get(fallback_url, params=fallback_params, timeout=10)
         fallback.raise_for_status()
         fallback_data = fallback.json()
+        # With sl=auto this endpoint returns [[translation, detected_language]]
+        # rather than [translation]. Keep detection on Google's side and never
+        # accidentally display the detected-language metadata as translated text.
+        if (
+            source_api == 'auto'
+            and isinstance(fallback_data, list)
+            and len(fallback_data) == 1
+            and isinstance(fallback_data[0], list)
+            and len(fallback_data[0]) == 2
+            and all(isinstance(value, str) for value in fallback_data[0])
+        ):
+            return _validated_translation(fallback_data[0][0], 'Google')
         if (
             isinstance(fallback_data, list)
             and fallback_data
@@ -1599,8 +1611,8 @@ def _translate_chunks(text, byte_limit, translate_chunk, *, cache=None, engine='
             if cache is not None and len(chunks) > 1:
                 cache.save(content, result, engine, segment=True)
         translated.append(restore_boundary_whitespace(chunk, result))
-        _check_translation_cancelled(cancel_callback)
         if partial_callback and len(chunks) > 1:
+            _check_translation_cancelled(cancel_callback)
             partial_callback(''.join(translated), index + 1, len(chunks))
     return ''.join(translated)
 
@@ -1648,10 +1660,10 @@ def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=N
     """Translate through the public Lingva APIs."""
     # Список публичных инстансов Lingva
     instances = [
-        # Active Vercel deployment. Keep it first: the older public domains
-        # below remain useful fallbacks but currently fail intermittently.
+        # Try another instance of the selected provider on failure. lingva.ml
+        # is intentionally excluded: it returned HTTP 200 while echoing the
+        # original sentences instead of translating them (2026-09-19).
         'https://lingva.vercel.app',
-        'https://lingva.ml',
         'https://translate.plausibility.cloud',
     ]
     session = _get_http_session()
