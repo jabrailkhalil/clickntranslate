@@ -215,6 +215,7 @@ DEFAULT_CONFIG = {
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
     "notifications": False,
+    "button_tooltips_enabled": True,
     "history": False,
     "start_minimized": False,
     "show_update_info": True,  # Показывать Welcome окно при первом запуске
@@ -7075,6 +7076,9 @@ class DarkThemeApp(QMainWindow):
         self._init_status_tooltip()
 
         self.load_config()
+        QApplication.instance().setProperty(
+            "buttonTooltipsEnabled", bool(self.config.get("button_tooltips_enabled", True))
+        )
 
         from ui_scaling import MainWindowScaleController
         self._ui_scale_controller = MainWindowScaleController(self)

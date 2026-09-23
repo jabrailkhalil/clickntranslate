@@ -111,6 +111,20 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         point = child.mapTo(widget, QPoint(0, 0))
         return point.x(), point.y(), child.width(), child.height()
 
+    def test_button_hover_setting_persists_and_updates_the_live_application(self):
+        app_value = self.app.property("buttonTooltipsEnabled")
+        try:
+            checkbox = self.settings.button_tooltips_checkbox
+            self.assertTrue(checkbox.isChecked())
+            checkbox.click()
+            self.assertFalse(self.parent.config["button_tooltips_enabled"])
+            self.assertFalse(self.app.property("buttonTooltipsEnabled"))
+            checkbox.click()
+            self.assertTrue(self.parent.config["button_tooltips_enabled"])
+            self.assertTrue(self.app.property("buttonTooltipsEnabled"))
+        finally:
+            self.app.setProperty("buttonTooltipsEnabled", app_value)
+
     def test_hotkeys_are_seven_aligned_rows_inside_one_card(self):
         self.settings.show_hotkeys_screen()
         self.app.processEvents()
