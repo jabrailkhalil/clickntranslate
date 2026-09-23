@@ -66,7 +66,7 @@ jobs:
           include-hidden-files: true
           retention-days: 7
       - name: Run regression suite with isolated user data
-        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml -x -vv
+        run: python tools/run_regression_tests.py --output .tmp/ui-ci --junitxml=test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
