@@ -426,3 +426,24 @@ def test_title_flag_is_smaller_and_left_aligned(app, monkeypatch):
         window.force_quit = True
         window.close()
         window.deleteLater()
+
+
+def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
+    with mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False), \
+            mock.patch.object(main.DarkThemeApp, '_maybe_check_updates_on_launch'):
+        window = main.DarkThemeApp()
+    window.show()
+    app.processEvents()
+    try:
+        preview = window.assistant_preview
+        preview.button.click()
+        app.processEvents()
+        assert window.settings_window is not None
+        assert window.settings_window.desktop_assistant_checkbox.isVisible()
+        assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
+        assert window.settings_window.desktop_assistant_checkbox.hasFocus()
+        assert window.config.get('desktop_assistant_enabled') is not True
+    finally:
+        window.force_quit = True
+        window.close()
+        window.deleteLater()
