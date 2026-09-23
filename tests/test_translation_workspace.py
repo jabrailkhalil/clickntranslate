@@ -267,7 +267,8 @@ def test_both_editors_wrap_and_remain_accessible_after_reflow(app, monkeypatch, 
                 editor.verticalScrollBar().setValue(editor.verticalScrollBar().maximum())
                 rect = QtCore.QRect(editor.mapTo(dialog, QtCore.QPoint()), editor.size())
                 assert dialog.rect().contains(rect)
-            for button in (dialog.translate_button, dialog.copy_button, dialog.close_button):
+            assert not dialog.close_button.isVisible()
+            for button in (dialog.translate_button, dialog.copy_button):
                 assert button.width() >= button.sizeHint().width(), (lang, button.text())
                 rect = QtCore.QRect(button.mapTo(dialog, QtCore.QPoint()), button.size())
                 assert dialog.rect().contains(rect)
