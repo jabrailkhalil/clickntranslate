@@ -57,8 +57,8 @@ def test_startup_news_is_localized_and_explains_user_benefits():
     }
     for language in ("en", "ru", "es", "de", "fr", "zh"):
         text = main.startup_news_text(language)
-        assert len(text["changes"]) == 4
-        assert text["promise"]
+        assert 'changes' not in text and 'promise' not in text
+        assert len(text['intro']) < 190
         assert text["continue"]
         assert "000" in f"{text['title']} {text['intro']}"
         milestone = f"{text['window']} {text['title']} {text['intro']}".lower()
@@ -67,9 +67,7 @@ def test_startup_news_is_localized_and_explains_user_benefits():
         html = main.startup_news_html(language, "9.9.9")
         assert "9.9.9" in html
         assert text["title"] in html
-        assert text["promise"] in html
-        for item in text["changes"]:
-            assert item in html
+        assert text['intro'] in html
 
 
 def test_startup_news_is_shown_once_per_announcement_and_remembered():
@@ -84,7 +82,7 @@ def test_startup_news_is_shown_once_per_announcement_and_remembered():
     assert dialog is not None
     assert dialog.isVisible()
     assert main.APP_VERSION in dialog.windowTitle()
-    assert main.startup_news_text("ru")["promise"] in dialog.text()
+    assert main.startup_news_text("ru")["intro"] in dialog.text()
 
     dialog.accept()
     app.processEvents()

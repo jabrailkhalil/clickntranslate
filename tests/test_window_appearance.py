@@ -73,7 +73,7 @@ def test_local_result_scale_keeps_global_setting_and_edits(appearance):
     assert other.size() == original
     assert dialog.text_edit.toPlainText() == 'Edited Hello'
     dialog.scale_increase.click()
-    assert dialog.scale_value.text() == '142%'
+    assert dialog.scale_value.text() == '138%'
 
 
 def test_copy_uses_edited_result(appearance):
@@ -233,7 +233,7 @@ def test_result_scale_steps_keep_the_arrow_under_the_pointer(appearance):
     dialog.move(800, 400)
     button = dialog.scale_increase
     point = button.mapToGlobal(button.rect().center())
-    for value in (105, 110, 115, 120):
+    for value in (101, 102, 103, 104):
         QTest.mouseClick(button, QtCore.Qt.LeftButton, pos=button.mapFromGlobal(point))
         appearance.app.processEvents()
         assert dialog.scale_value.text() == f'{value}%'

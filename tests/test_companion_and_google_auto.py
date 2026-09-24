@@ -21,10 +21,9 @@ def test_companion_tab_is_visually_third_and_focus_is_keyboard_only(window, app)
     assert sorted(range(4), key=lambda i: tabs[i].x()) == [0, 1, 3, 2]
     page = window.settings_window.settings_assistant_page
     toggle = page.toggle
-    toggle.focusInEvent(QtGui.QFocusEvent(QtCore.QEvent.FocusIn, QtCore.Qt.TabFocusReason))
-    assert toggle._keyboard_focus
-    QTest.mouseClick(toggle, QtCore.Qt.LeftButton)
-    assert not toggle._keyboard_focus
+    assert isinstance(toggle, QtWidgets.QCheckBox)
+    toggle.setFocus(QtCore.Qt.TabFocusReason)
+    QTest.keyClick(toggle, QtCore.Qt.Key_Space)
     assert toggle.isChecked()
 
 
@@ -37,7 +36,7 @@ def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appeara
     page.appearance_buttons['walking'].click()
     page.appearance_buttons[appearance].click()
     assert window.config['desktop_assistant_appearance'] == appearance
-    assert not page.motion_options.isEnabled()
+    assert page.motion_options.isHidden()
     assert not helper.anchor._animation.isActive()
     assert helper.anchor.movie.state() != QtGui.QMovie.Running
     position, image = helper.anchor.pos(), helper.anchor.grab().toImage()
@@ -45,11 +44,8 @@ def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appeara
     assert helper.anchor.pos() == position
     assert helper.anchor.grab().toImage() == image
     helper.toggle_menu()
-    assert helper.menu.section_pages['translation_section'].isVisible()
-    helper.menu.section_buttons['companion_section'].click()
-    assert not helper.menu.buttons['walk'].isEnabled()
-    assert helper.menu.buttons['home'].isEnabled()
-    assert helper.menu.buttons['settings'].isEnabled()
+    assert set(helper.menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'hide'}
+    assert all(button.isVisible() for button in helper.menu.buttons.values())
 
 
 def test_custom_image_cancel_preserves_selection_and_invalid_values_are_safe(window):
@@ -162,21 +158,23 @@ def test_companion_settings_and_menu_fit(window, app, language, selected_appeara
         window.set_ui_scale_percent(percent)
         for _ in range(4):
             app.processEvents()
-        scroll = page.findChild(QtWidgets.QScrollArea)
-        assert scroll.horizontalScrollBar().maximum() == 0
-        assert scroll.verticalScrollBar().maximum() == 0, (language, percent, scroll.verticalScrollBar().maximum())
+        assert not page.findChildren(QtWidgets.QScrollArea)
+        for button in (*page.appearance_buttons.values(), *page.values.values()):
+            if button.isVisible():
+                bounds = QtCore.QRect(button.mapTo(page, QtCore.QPoint()), button.size())
+                assert page.rect().contains(bounds), (language, percent, bounds)
         for button in page.appearance_buttons.values():
-            assert button.width() >= button.sizeHint().width()
+            if button.isVisible():
+                assert button.width() >= button.sizeHint().width()
+
     helper = window._desktop_assistant
     helper.toggle_menu()
     helper.menu.open_beside(QtCore.QRect(1100, 700, 88, 88), QtCore.QRect(0, 0, 2560, 1400))
-    for section in ('translation_section', 'companion_section'):
-        helper.menu.section_buttons[section].click()
-        app.processEvents()
-        for button in helper.menu.buttons.values():
-            if button.isVisible():
-                bounds = QtCore.QRect(button.mapTo(helper.menu, QtCore.QPoint()), button.size())
-                assert helper.menu.rect().contains(bounds), (language, section, bounds)
+    app.processEvents()
+    for button in helper.menu.buttons.values():
+        assert button.isVisible()
+        bounds = QtCore.QRect(button.mapTo(helper.menu, QtCore.QPoint()), button.size())
+        assert helper.menu.rect().contains(bounds), (language, bounds)
 
 
 def test_document_google_auto_is_kept_for_each_text_chunk():

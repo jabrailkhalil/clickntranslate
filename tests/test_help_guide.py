@@ -115,7 +115,7 @@ class GuideCoverageTest(unittest.TestCase):
     def test_the_guide_renders_for_every_language(self):
         for lang in LANGUAGES:
             html = main.help_text(lang)
-            self.assertIn("section-title", html)
+            self.assertIn("<h3>", html)
             for title, _items in main.HELP_CONTENT[lang]:
                 self.assertIn(title, html, (lang, title))
             # Unbalanced markup from a hand-edited string shows as raw tags.
@@ -126,9 +126,9 @@ class GuideCoverageTest(unittest.TestCase):
     def test_help_uses_a_real_light_palette(self):
         html = main.help_text("ru", "Светлая")
 
-        self.assertIn("body { color: #2b2532", html)
-        self.assertIn(".hero-title { color: #211b28", html)
-        self.assertNotIn("body { color: #e8e0f7", html)
+        self.assertIn("body { color:#302639", html)
+        self.assertIn("h3 { color:#755397", html)
+        self.assertNotIn("body { color:#eee7f5", html)
 
     def test_document_guide_covers_every_entry_point_and_partial_translation(self):
         fragment_clues = {

@@ -83,30 +83,29 @@ def test_tooltip_font_and_padding_follow_owner_scale_without_double_scaling(wind
         label.deleteLater()
 
 
-def test_companion_page_enable_blocks_every_setting_and_preserves_values(window, app):
+def test_companion_preferences_can_be_edited_before_enabling(window, app):
     window.show_assistant_settings()
-    settings = window.settings_window
-    page = settings.settings_assistant_page
-    assert settings._settings_page_index == 3
+    page = window.settings_window.settings_assistant_page
     assert not page.toggle.isChecked()
-    assert not page.options.isEnabled()
-    assert all(not slider.isEnabled() for slider, _, _ in page.sliders.values())
-    page.toggle.click()
     assert page.options.isEnabled()
-    assert window._desktop_assistant.anchor.behavior == 'idle'
-    assert not page.sliders['speed'][0].isEnabled()
+    assert page.motion_options.isHidden()
+    page.show_category('dynamic')
     page.appearance_buttons['walking'].click()
-    assert page.sliders['speed'][0].isEnabled()
-    page.sliders['size'][0].setValue(130)
+    assert page.motion_options.isVisible()
+    page.values['size'].setValue(130)
     assert window.config['desktop_assistant_size'] == 130
-    page.toggle.click()
-    assert not page.options.isEnabled()
-    assert window._desktop_assistant is None
+    assert getattr(window, '_desktop_assistant', None) is None
     page.toggle.click()
     assert window._desktop_assistant.anchor.behavior == 'walk'
-    assert page.sliders['size'][0].value() == 130
-    window._desktop_assistant.request_action('idle')
-    assert page.behavior.currentData() == 'idle'
+    page.toggle.click()
+    assert window._desktop_assistant is None
+    assert page.options.isEnabled()
+    page.toggle.click()
+    assert page.values['size'].value() == 130
+    page.show_category('static')
+    page.appearance_buttons['sleep_icon'].click()
+    assert page.motion_options.isHidden()
+    assert window._desktop_assistant.anchor.behavior == 'idle'
 
 
 def test_idle_hover_has_no_outline_and_walking_pauses_for_menu_capture_and_drag(window, app):

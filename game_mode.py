@@ -2179,7 +2179,7 @@ def _show_game_selector(target_window=0):
     return _game_selector_ref
 
 
-def _begin_game_session(regions, source_language, target_language, target_window=0, *, output_regions=None, output_styles=None):
+def _begin_game_session(regions, source_language, target_language, target_window=0, *, output_regions=None, output_styles=None, template_name=''):
     global _game_overlay_refs
     for overlay in list(_game_overlay_refs):
         try:
@@ -2211,6 +2211,9 @@ def _begin_game_session(regions, source_language, target_language, target_window
         )
         _game_overlay_refs.append(overlay)
     if _game_overlay_refs:
+        if output_regions is not None:
+            from dynamic_workspace import OutputControls
+            OutputControls(_game_overlay_refs, template_name)
         _schedule_game_focus_handoff(target_window, tuple(_game_overlay_refs))
     if not _game_overlay_refs:
         try:

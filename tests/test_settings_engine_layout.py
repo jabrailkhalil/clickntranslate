@@ -28,6 +28,9 @@ from settings_window import (  # noqa: E402
 
 
 class _SettingsParent(QWidget):
+    def set_main_assistant_visible(self, visible):
+        self.config["main_assistant_visible"] = bool(visible)
+
     def __init__(self):
         super().__init__()
         self.current_interface_language = "en"
@@ -685,7 +688,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 settings.update_check_on_launch_checkbox,
             )
             self.assertTrue(all(box.objectName() == "settingsPageCheckbox" for box in secondary_checks))
-            self.assertEqual({box.height() for box in secondary_checks}, {34})
+            self.assertEqual({box.height() for box in secondary_checks}, {settings.autostart_checkbox.height()})
 
             panel = self._rect_in_settings(settings, settings.settings_transfer_panel)
             buttons = [
@@ -723,7 +726,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 settings.game_show_original_checkbox,
             ):
                 self.assertEqual(box.objectName(), "settingsPageCheckbox")
-                self.assertEqual(box.height(), 34)
+                self.assertEqual(box.height(), settings.autostart_checkbox.height())
         finally:
             settings.close()
             parent.close()

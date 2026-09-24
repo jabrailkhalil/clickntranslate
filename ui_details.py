@@ -9,15 +9,17 @@ _SOCIAL_PATHS = {
 
 
 class _SocialIcon(QtGui.QIconEngine):
-    def __init__(self, kind):
+    def __init__(self, kind, dark=True):
         super().__init__()
         self.kind = kind
+        self.dark = dark
+        color = '#c4bdce' if dark else '#655276'
         self.renderer = QtSvg.QSvgRenderer(
             ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-             '<path fill="#c4bdce" d="' + _SOCIAL_PATHS[kind] + '"/></svg>').encode())
+             '<path fill="' + color + '" d="' + _SOCIAL_PATHS[kind] + '"/></svg>').encode())
 
     def clone(self):
-        return _SocialIcon(self.kind)
+        return _SocialIcon(self.kind, self.dark)
 
     def paint(self, painter, rect, mode, state):
         painter.save()
@@ -40,8 +42,8 @@ class _SocialIcon(QtGui.QIconEngine):
         return image
 
 
-def social_icon(kind):
-    return QtGui.QIcon(_SocialIcon(kind))
+def social_icon(kind, dark=True):
+    return QtGui.QIcon(_SocialIcon(kind, dark))
 
 
 class WelcomeCheckBox(QtWidgets.QCheckBox):

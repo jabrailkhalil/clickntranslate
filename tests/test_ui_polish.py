@@ -202,7 +202,7 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     second.hide()
 
 
-def test_preview_has_no_idle_timer_and_pauses_for_hover_focus_minimize(app, owner):
+def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimized(app, owner):
     owner.resize(300, 100)
     rail = AssistantPreview(owner, parent=owner)
     rail.resize(260, 18)
@@ -210,16 +210,16 @@ def test_preview_has_no_idle_timer_and_pauses_for_hover_focus_minimize(app, owne
     rail.show()
     rail.button.clearFocus()
     rail._hovered = False
-    rail._application_state_changed(QtCore.Qt.ApplicationActive)
+    rail._sync_animation()
     assert rail.timer.isActive()
     spy = QSignalSpy(rail.timer.timeout)
     rail.hide()
     QTest.qWait(200)
     assert not rail.timer.isActive() and len(spy) == 0
     rail.show()
-    rail._application_state_changed(QtCore.Qt.ApplicationInactive)
-    assert not rail.timer.isActive()
-    rail._application_state_changed(QtCore.Qt.ApplicationActive)
+    app.sendEvent(owner, QtCore.QEvent(QtCore.QEvent.WindowDeactivate))
+    QTest.qWait(200)
+    assert rail.timer.isActive() and len(spy) > 0
     rail._hovered = True
     rail._sync_animation()
     assert not rail.timer.isActive()
@@ -231,18 +231,23 @@ def test_preview_has_no_idle_timer_and_pauses_for_hover_focus_minimize(app, owne
     assert not rail.timer.isActive()
     owner.showNormal()
     rail.button.setParent(owner)  # Visual layout editor detaches widgets.
-    rail._application_state_changed(QtCore.Qt.ApplicationActive)
+    rail._sync_animation()
     assert not rail.timer.isActive()
 
 
-def test_preview_click_and_keyboard_open_settings_without_desktop_overlay(app, owner):
+def test_preview_click_and_keyboard_offer_settings_without_desktop_overlay(app, owner):
     rail = AssistantPreview(owner, parent=owner)
     owner.show()
     rail.show()
     spy = QSignalSpy(rail.settings_requested)
     rail.button.click()
+    assert len(spy) == 0
+    assert rail._choice_dialog.isVisible()
+    rail._choice_dialog.done(1)
     rail.button.setFocus()
     QTest.keyClick(rail.button, QtCore.Qt.Key_Space)
+    assert len(spy) == 1
+    rail._choice_dialog.done(1)
     assert len(spy) == 2
     assert owner.config['desktop_assistant_enabled'] is False
 
@@ -377,13 +382,15 @@ def test_tray_toggle_and_settings_use_one_state(app, owner, monkeypatch):
     owner.set_desktop_assistant_enabled = lambda enabled: main.DarkThemeApp.set_desktop_assistant_enabled(owner, enabled)
     main.DarkThemeApp.update_tray_menu(owner)
     action = owner._tray_assistant_action
-    assert action.isCheckable() and not action.isChecked()
+    from assistant_text import assistant_text
+    assert not action.isCheckable()
+    assert action.text() == assistant_text('ru', 'tray_show')
     action.trigger()
     assert owner.config['desktop_assistant_enabled'] is True
-    assert action.isChecked()
+    assert action.text() == assistant_text('ru', 'tray_hide')
     factory.assert_called_once_with(owner)
     owner.set_desktop_assistant_enabled(False)
-    assert not action.isChecked()
+    assert action.text() == assistant_text('ru', 'tray_show')
     factory.return_value.dispose.assert_called_once()
     assert owner.save_config.call_count == 2  # No toggled -> save -> toggled recursion.
 
@@ -413,7 +420,7 @@ def test_main_scaling_uses_local_dirty_rectangles_and_full_theme_refresh(app, ow
     window.deleteLater()
 
 
-def test_main_screen_has_translation_heading_and_larger_preview(app, owner):
+def test_main_screen_has_translation_heading_and_preview_in_shortcut_area(app, owner):
     owner.resize(920, 760)
     with mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False), \
             mock.patch.object(main.DarkThemeApp, '_maybe_check_updates_on_launch'):
@@ -425,7 +432,9 @@ def test_main_screen_has_translation_heading_and_larger_preview(app, owner):
     assert len(window.main_text_section.findChildren(QtWidgets.QLabel, 'mainTextSectionTitle')) == 1
     assert title.text() == main.hotkey_language_text(window.current_interface_language, 'text_section')
     assert title.alignment() & QtCore.Qt.AlignCenter
-    assert window.assistant_preview.height() >= 24
+    assert window.assistant_preview.height() == 22
+    assert window.assistant_preview.parentWidget() is window.main_hotkey_area
+    assert window.main_hotkey_area.rect().contains(window.assistant_preview.geometry())
     assert window.assistant_preview.button.width() >= 28
     line_y = window.assistant_preview.height() - 7
     image = window.assistant_preview.grab().toImage()
@@ -436,7 +445,7 @@ def test_main_screen_has_translation_heading_and_larger_preview(app, owner):
     window.deleteLater()
 
 
-def test_assistant_can_be_shooed_until_restart_without_persisting(app, owner):
+def test_desktop_dismissal_preserves_main_preview_and_saved_preferences(app, owner):
     class AssistantStub:
         def __init__(self):
             self.disposed = False
@@ -447,13 +456,16 @@ def test_assistant_can_be_shooed_until_restart_without_persisting(app, owner):
     owner._cached_settings_window = None
     owner.settings_window = None
     owner.assistant_preview = QtWidgets.QWidget(owner)
+    owner.show()
     owner.assistant_preview.show()
+    app.processEvents()
+    assert owner.assistant_preview.isVisible()
     owner._sync_desktop_assistant = lambda: main.DarkThemeApp._sync_desktop_assistant(owner)
     main.DarkThemeApp.dismiss_desktop_assistant_until_restart(owner)
     assert owner.config['desktop_assistant_enabled'] is True
     assert owner._desktop_assistant is None
     assert owner._desktop_assistant_suppressed_until_restart is True
-    assert not owner.assistant_preview.isVisible()
+    assert owner.assistant_preview.isVisible()
     owner.save_config.assert_not_called()
 
 
@@ -481,6 +493,11 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         preview = window.assistant_preview
         preview.button.click()
         app.processEvents()
+        assert preview._choice_dialog.isVisible()
+        preview._choice_dialog.done(1)
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        window.activateWindow()
+        app.processEvents()
         assert window.settings_window is not None
         assert window.settings_window.settings_assistant_page.isVisible()
         assert window.settings_window.desktop_assistant_checkbox is window.settings_window.settings_assistant_page.toggle
@@ -488,18 +505,21 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
         assert window.settings_window.desktop_assistant_checkbox.hasFocus()
         assert window.config.get('desktop_assistant_enabled') is not True
-        config = dict(window.config)
+        assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
         with mock.patch.object(window, 'save_config') as save:
-            window.settings_window.desktop_assistant_dismiss_button.click()
-            assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
-            assert window.config == config
-            save.assert_not_called()
+            window.settings_window.settings_assistant_page.main_visible.click()
+            assert window.config['main_assistant_visible'] is False
+            save.assert_called_once()
             window.show_main_screen()
             app.processEvents()
             assert window.assistant_preview.isHidden()
             window.show_desktop_assistant_settings()
             app.processEvents()
             assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
+            window.settings_window.settings_assistant_page.main_visible.click()
+            window.show_main_screen()
+            app.processEvents()
+            assert window.assistant_preview.isVisible()
     finally:
         window.force_quit = True
         window.close()

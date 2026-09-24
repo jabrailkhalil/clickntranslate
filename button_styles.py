@@ -11,7 +11,7 @@ BUTTON_FONT_SIZE = 13
 def _install_keyboard_focus_tracking():
     """Keep keyboard focus visible without leaving a ring after a mouse click."""
     from PyQt5.QtCore import QEvent, QObject, Qt
-    from PyQt5.QtWidgets import QApplication, QComboBox, QPushButton, QToolButton, QToolTip
+    from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip
 
     app = QApplication.instance()
     if app is None or hasattr(app, "_button_focus_filter"):
@@ -22,7 +22,7 @@ def _install_keyboard_focus_tracking():
             kind = event.type()
             if kind == QEvent.ToolTip:
                 if (app.property("buttonTooltipsEnabled") is False
-                        and isinstance(widget, (QPushButton, QToolButton))):
+                        and isinstance(widget, QAbstractButton)):
                     QToolTip.hideText()
                     event.accept()
                     return True

@@ -83,7 +83,7 @@ def run():
             window.apply_theme()
             QTest.qWait(50)
             save_capture(window, 'main-' + suffix + '.png')
-            window.show_desktop_assistant_settings()
+            window.show_assistant_settings()
             QTest.qWait(50)
             save_capture(window, 'companion-settings-' + suffix + '.png')
             window.show_main_screen()
@@ -132,9 +132,9 @@ def run():
                 window.activateWindow()
                 rail.button.clearFocus()
                 rail._hovered = False
-                rail._application_state_changed(QtCore.Qt.ApplicationActive)
+                rail._sync_animation()
                 if state == 'inactive':
-                    rail._application_state_changed(QtCore.Qt.ApplicationInactive)
+                    app.sendEvent(window, QtCore.QEvent(QtCore.QEvent.WindowDeactivate))
                 elif state == 'minimized':
                     window.showMinimized()
                 elif state == 'hidden':
@@ -162,6 +162,8 @@ def run():
         window.close()
         window.deleteLater()
         app.processEvents()
+        import logging
+        logging.shutdown()
     return 0
 
 

@@ -113,8 +113,8 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertTrue(caption.isHidden(), 'Redundant headings stay off-layout')
                     rail = self.window.assistant_preview
                     self.assertTrue(rail.isVisible())
-                    self.assertTrue(self.window.main_text_section.rect().contains(
-                        self.rect_in(self.window.main_text_section, rail)))
+                    self.assertTrue(self.window.main_hotkey_area.rect().contains(
+                        self.rect_in(self.window.main_hotkey_area, rail)))
                     self.assertTrue(self.window.text_input.accessibleName())
                     self.assertTrue(self.window.main_result_view.accessibleName())
                     for panel, name in ((self.window.main_shortcut_section, "mainShortcutSectionTitle"),):

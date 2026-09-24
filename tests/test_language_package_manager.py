@@ -29,6 +29,9 @@ from languages import LANGUAGES  # noqa: E402
 
 
 class _AppParent(QWidget):
+    def set_main_assistant_visible(self, visible):
+        self.config["main_assistant_visible"] = bool(visible)
+
     def __init__(self):
         super().__init__()
         self.current_interface_language = "en"
@@ -1117,6 +1120,9 @@ class EngineRemovalPlacementTest(unittest.TestCase):
 
 
 class _SettingsParent(QWidget):
+    def set_main_assistant_visible(self, visible):
+        self.config["main_assistant_visible"] = bool(visible)
+
     def __init__(self, lang="ru"):
         super().__init__()
         self.current_interface_language = lang

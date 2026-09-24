@@ -451,9 +451,9 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
         )
         observed["frameless"] = bool(dialog.windowFlags() & QtCore.Qt.FramelessWindowHint)
         help_text = dialog.findChild(QtWidgets.QTextEdit)
-        observed["github_at_end"] = help_text.toHtml().rfind("github.com/jabrailkhalil/clickntranslate") > help_text.toHtml().rfind("section-title")
+        observed["github_icon"] = any(button.accessibleName() == "GitHub" and not button.icon().isNull() for button in dialog.findChildren(QtWidgets.QToolButton))
         observed["external_links"] = help_text.openExternalLinks()
-        observed["telegram"] = dialog.findChild(QtWidgets.QPushButton, "helpTelegramButton") is not None
+        observed["telegram"] = any(button.accessibleName() == "Telegram" and not button.icon().isNull() for button in dialog.findChildren(QtWidgets.QToolButton))
         observed["bug_report"] = dialog.findChild(QtWidgets.QPushButton, "helpBugReportButton") is not None
         guide = dialog.findChild(QtWidgets.QPushButton, "helpGuideButton")
         observed["guide_fits"] = (
@@ -470,13 +470,13 @@ def test_faq_uses_custom_chrome_and_exposes_project_links():
 
     assert observed == {
         "frameless": True,
-        "github_at_end": True,
+        "github_icon": True,
         "external_links": True,
         "telegram": True,
         "bug_report": True,
         "guide_fits": True,
         "frame": True,
-        "version": f"Click'n'Translate · V{main.APP_VERSION}",
+        "version": f"V{main.APP_VERSION}",
     }
     assert "background-color: transparent" in main._HELP_STYLE
     owner.close()

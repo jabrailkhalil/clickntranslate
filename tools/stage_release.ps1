@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.7.1",
+    [string]$Version = "1.8.0",
     [switch]$SkipPyInstaller,
     # Separate private test builds from an existing stage and its user data.
     [ValidatePattern('^$|^[A-Za-z0-9][A-Za-z0-9._-]*$')][string]$StageName = "",

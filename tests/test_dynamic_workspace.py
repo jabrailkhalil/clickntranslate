@@ -45,18 +45,24 @@ def isolated(app, monkeypatch, tmp_path):
     game_mode.stop_game_mode()
 
 
+def make_overlay(*args, **kwargs):
+    overlay = workspace.PairedTranslationOverlay(*args, **kwargs)
+    workspace.OutputControls([overlay])
+    return overlay
+
+
 def select(selector, rect):
     QTest.mousePress(selector, QtCore.Qt.LeftButton, pos=rect.topLeft())
     QTest.mouseRelease(selector, QtCore.Qt.LeftButton, pos=rect.bottomRight())
 
 
-@pytest.mark.parametrize('theme,background', [('Темная', '#211d29'), ('Светлая', '#f5f1f8')])
+@pytest.mark.parametrize('theme,background', [('Темная', '#121212'), ('Светлая', '#f0edf3')])
 @pytest.mark.parametrize('windows', [False, True])
 def test_output_controls_paint_themed_background_on_translucent_surfaces(isolated, monkeypatch, theme, background, windows):
     config, _ = isolated
     config['theme'] = theme
     monkeypatch.setattr(workspace.platform_support, 'IS_WINDOWS', windows)
-    overlay = workspace.PairedTranslationOverlay(QtCore.QRect(50, 50, 150, 80), 'en', 'ru',
+    overlay = make_overlay(QtCore.QRect(50, 50, 150, 80), 'en', 'ru',
                                                 output_region=QtCore.QRect(300, 300, 200, 100))
     try:
         controls = overlay.controls
@@ -72,8 +78,9 @@ def test_output_controls_paint_themed_background_on_translucent_surfaces(isolate
         overlay.close()
 
 
-def test_source_requires_a_separate_output_and_enter_routes_both_bounds(isolated):
+def test_manual_mode_requires_output_and_enter_routes_both_bounds(isolated):
     selector = workspace.PairedRegionSelector()
+    selector.manual_output.setChecked(True)
     try:
         source, output = QtCore.QRect(50, 250, 220, 70), QtCore.QRect(380, 370, 260, 90)
         with mock.patch.object(game_mode, '_begin_game_session') as start:
@@ -95,6 +102,7 @@ def test_source_requires_a_separate_output_and_enter_routes_both_bounds(isolated
 
 def test_output_can_overlap_source_and_move_independently_then_delete_pair(isolated):
     selector = workspace.PairedRegionSelector()
+    selector.manual_output.setChecked(True)
     try:
         source = QtCore.QRect(100, 260, 280, 100)
         output = QtCore.QRect(150, 280, 180, 60)
@@ -114,29 +122,52 @@ def test_output_can_overlap_source_and_move_independently_then_delete_pair(isola
 
 def test_templates_survive_new_selector_and_keep_both_areas_languages_and_style(isolated):
     _, store = isolated
-    selector = workspace.PairedRegionSelector(store=store)
     source, output = QtCore.QRect(60, 240, 240, 70), QtCore.QRect(390, 380, 220, 80)
+    overlay = make_overlay(source, 'en', 'ru', output_region=output,
+                           style={'font_size': 27, 'opacity': 35, 'locked': False})
     try:
-        select(selector, source)
-        select(selector, output)
-        selector._styles[0] = output_style({'font_size': 27, 'opacity': 35, 'locked': False})
-        selector.template_combo.setEditText('Subtitles')
-        selector.save_template_button.click()
+        controls = overlay.controls
+        controls.gear.click()
+        controls.template_name.setEditText('Subtitles')
+        controls.save_button.click()
         assert store.path.exists()
     finally:
-        selector.close()
+        overlay.close()
     restored = workspace.PairedRegionSelector(store=TemplateStore(store.path))
     try:
-        restored._load_template(0)
+        restored._load_template(1)  # First row starts a new selection.
         assert restored._regions == [source]
         assert restored._outputs == [output]
         assert restored._styles == [{'font_size': 27, 'opacity': 35, 'locked': False}]
         assert restored.source_combo.currentData() == 'en'
         assert restored.target_combo.currentData() == 'ru'
-        restored._delete_template()
-        assert store.load() == []
     finally:
         restored.close()
+    overlay = make_overlay(source, 'en', 'ru', output_region=output)
+    try:
+        controls = overlay.controls
+        controls.gear.click()
+        controls.template_name.setEditText('Subtitles')
+        controls.delete_button.click()
+        assert store.load() == []
+    finally:
+        overlay.close()
+
+
+def test_default_selection_places_output_automatically_and_starts_in_one_step(isolated):
+    selector = workspace.PairedRegionSelector()
+    try:
+        source = QtCore.QRect(50, 250, 220, 70)
+        with mock.patch.object(game_mode, '_begin_game_session') as start:
+            select(selector, source)
+            output = selector._outputs[0]
+            assert output is not None and not output.intersects(source)
+            assert selector.start_button.isEnabled()
+            QTest.keyClick(selector, QtCore.Qt.Key_Return)
+            assert len(start.call_args.args[0]) == 1
+            assert start.call_args.kwargs['output_regions'] == [output.translated(selector.geometry().topLeft())]
+    finally:
+        selector.close()
 
 
 def screen(name, rect):
@@ -164,7 +195,7 @@ def test_malformed_template_file_is_not_overwritten_by_save(tmp_path):
 
 def test_output_contains_translation_only_and_reads_source_not_destination(isolated):
     source, output = QtCore.QRect(30, 260, 220, 70), QtCore.QRect(410, 370, 260, 90)
-    overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=output)
+    overlay = make_overlay(source, 'en', 'ru', output_region=output)
     try:
         assert overlay.geometry() == output
         assert overlay.region == source
@@ -192,11 +223,11 @@ def test_output_contains_translation_only_and_reads_source_not_destination(isola
 
 def test_micro_controls_resize_unlock_and_save_current_layout(isolated):
     _, store = isolated
-    overlay = workspace.PairedTranslationOverlay(QtCore.QRect(20, 250, 200, 60), 'en', 'ru', output_region=QtCore.QRect(350, 350, 250, 90))
+    overlay = make_overlay(QtCore.QRect(20, 250, 200, 60), 'en', 'ru', output_region=QtCore.QRect(350, 350, 250, 90))
     try:
         controls = overlay.controls
         assert controls.width() >= 200 and controls.panel.isHidden()
-        assert controls.gear.isVisible() and controls.quick_stop.isVisible()
+        assert controls.gear.isVisible() and controls.stop_button.isVisible()
         controls.gear.click()
         assert not controls.panel.isHidden() and controls.height() > 100
         assert not controls.move_button.isEnabled()
@@ -210,14 +241,14 @@ def test_micro_controls_resize_unlock_and_save_current_layout(isolated):
         assert overlay.output_rect == QtCore.QRect(before.x()+20, before.y()+10, before.width()+20, before.height()+10)
         controls.font_size.setValue(24)
         controls.opacity.setValue(42)
-        controls.template_name.setText('Game')
+        controls.template_name.setEditText('Game')
         controls.save_button.click()
         value = store.load()[0]
         assert value['pairs'][0]['style'] == {'font_size': 24, 'opacity': 42, 'locked': False}
         assert decode_rect(value['pairs'][0]['output'], QtWidgets.QApplication.screens()) == overlay.output_rect
         controls.gear.click()
         assert controls.width() >= 200 and controls.height() < 60
-        assert controls.quick_stop.isVisible()
+        assert controls.stop_button.isVisible()
     finally:
         overlay.close()
 
@@ -227,15 +258,16 @@ def test_public_entry_uses_paired_selector(isolated):
     try:
         assert isinstance(selector, workspace.PairedRegionSelector)
         assert selector.template_combo.isVisible()
-        assert selector.save_template_button.isVisible()
-        assert selector.delete_template_button.isVisible()
+        assert selector.manual_output.isVisible()
+        assert not selector.manual_output.isChecked()
+        assert not selector.template_combo.isEditable()
     finally:
         selector.close()
 
 
-def test_output_controls_large_dpi_fit_screen_with_scroll_and_keep_stop_visible(isolated, app):
+def test_output_controls_large_dpi_fit_screen_without_scrolling_and_keep_stop_visible(isolated, app):
     with mock.patch('ui_scaling.desktop_control_scale', return_value=3.):
-        overlay = workspace.PairedTranslationOverlay(
+        overlay = make_overlay(
             QtCore.QRect(20, 250, 200, 60), 'en', 'ru',
             output_region=QtCore.QRect(350, 350, 250, 90))
     try:
@@ -247,9 +279,9 @@ def test_output_controls_large_dpi_fit_screen_with_scroll_and_keep_stop_visible(
         app.processEvents()
         bounds = app.primaryScreen().availableGeometry()
         assert bounds.contains(controls.geometry())
-        assert controls.quick_stop.isVisible()
-        assert controls.panel_scroll.verticalScrollBar().maximum() > 0
-        assert controls.panel_scroll.isVisible()
+        assert controls.stop_button.isVisible()
+        assert not controls.findChildren(QtWidgets.QScrollArea)
+        assert controls.panel.isVisible()
     finally:
         overlay.close()
 
@@ -257,13 +289,13 @@ def test_output_controls_large_dpi_fit_screen_with_scroll_and_keep_stop_visible(
 @pytest.mark.parametrize('factor', [1., 1.5, 2.])
 def test_output_controls_scale_inherited_fonts_too(isolated, app, factor):
     with mock.patch('ui_scaling.desktop_control_scale', return_value=factor):
-        overlay = workspace.PairedTranslationOverlay(
+        overlay = make_overlay(
             QtCore.QRect(20, 250, 200, 60), 'en', 'ru',
             output_region=QtCore.QRect(350, 350, 250, 90))
     try:
         overlay.controls.gear.click()
         app.processEvents()
-        assert overlay.controls.font_size.font().pixelSize() == round(13 * factor)
+        assert overlay.controls.font_size.editor.font().pixelSize() == round(15 * factor)
         assert overlay.controls.template_name.font().pixelSize() == round(13 * factor)
         assert overlay.controls.locked.font().pixelSize() == round(13 * factor)
         assert overlay.controls.gear.font().pixelSize() == round(13 * factor)
@@ -275,7 +307,7 @@ def test_linux_disjoint_output_and_controls_remain_visible_during_capture(isolat
     source = QtCore.QRect(20, 250, 220, 70)
     with (mock.patch.object(workspace.platform_support, 'IS_WINDOWS', False),
           mock.patch.object(workspace.platform_support, 'IS_MAC', False)):
-        overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=QtCore.QRect(400, 350, 260, 90))
+        overlay = make_overlay(source, 'en', 'ru', output_region=QtCore.QRect(400, 350, 260, 90))
         overlay._capture_excluded = False
         try:
             def capture(*args):
@@ -294,7 +326,7 @@ def test_linux_overlapping_output_is_excluded_and_restored_after_capture_error(i
     source = QtCore.QRect(50, 250, 230, 80)
     with (mock.patch.object(workspace.platform_support, 'IS_WINDOWS', False),
           mock.patch.object(workspace.platform_support, 'IS_MAC', False)):
-        overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=source)
+        overlay = make_overlay(source, 'en', 'ru', output_region=source)
         overlay._capture_excluded = False
         try:
             def capture(*args):

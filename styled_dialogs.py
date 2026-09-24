@@ -16,6 +16,45 @@ from pathlib import Path
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 
+class CenteredFramelessDialog(QtWidgets.QDialog):
+    """Native, movable shell shared by the application's secondary windows."""
+
+    def __init__(self, parent=None, drag_height=86):
+        super().__init__(native_window_parent(parent), QtCore.Qt.Dialog | QtCore.Qt.FramelessWindowHint)
+        self._drag_position = None
+        self._drag_height = int(drag_height)
+        self._centered_once = False
+
+    def _center_on_owner(self):
+        from ui_scaling import center_window
+        center_window(self)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._centered_once:
+            self._centered_once = True
+            self._center_on_owner()
+            QtCore.QTimer.singleShot(0, self._center_on_owner)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton and event.pos().y() <= self._drag_height:
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_position is not None and event.buttons() & QtCore.Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_position = None
+        super().mouseReleaseEvent(event)
+
+
 # One definition for every tooltip in the application.  It used to be pasted
 # into four separate stylesheets, so any widget outside those four got the
 # system default instead and the popups did not match each other.

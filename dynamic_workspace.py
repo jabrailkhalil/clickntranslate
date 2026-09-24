@@ -8,6 +8,7 @@ from PyQt5.QtTest import QTest
 import game_mode
 import platform_support
 from button_styles import button_qss
+from number_controls import NumberStepper
 from dynamic_templates import TemplateStore, decode_rect, encode_rect, output_style, text
 from windows_overlay import configure_surface, rounded_region, set_surface_region
 
@@ -32,58 +33,111 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         for screen in self._screens:
             bounds = bounds.united(screen.geometry())
         self.setGeometry(bounds)
-        self.template_combo = QtWidgets.QComboBox(self)
-        self.template_combo.setEditable(True)
-        self.template_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
-        self.template_combo.lineEdit().setPlaceholderText(text(self._language, 'templates'))
-        self.template_combo.setFixedSize(248, 32)
-        self.template_combo.setStyleSheet('QComboBox { color:#f5f0fa; background:#211d29; border:1px solid #746087; border-radius:6px; padding:4px; }')
-        self.save_template_button = QtWidgets.QPushButton('+', self)
-        self.delete_template_button = QtWidgets.QPushButton('×', self)
-        for button, key in ((self.save_template_button, 'save'), (self.delete_template_button, 'delete')):
-            button.setFixedSize(32, 32)
-            button.setToolTip(text(self._language, key))
-            button.setStyleSheet(button_qss(True, compact=True))
-        self.save_template_button.clicked.connect(self._save_template)
-        self.delete_template_button.clicked.connect(self._delete_template)
+        factor = float(self.property('ui_effective_scale') or 1.0)
+        dark = self._config.get('theme', 'Темная') != 'Светлая'
+        self.toolbar = QtWidgets.QFrame(self)
+        self.toolbar.setObjectName('dynamicSelectionToolbar')
+        self.toolbar.setCursor(QtCore.Qt.ArrowCursor)
+        self.toolbar.setStyleSheet(f"""
+            QFrame#dynamicSelectionToolbar {{ background:{'#121212' if dark else '#f0edf3'};
+                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:8px; }}
+            QLabel, QCheckBox {{ background:transparent; border:0;
+                color:{'#eee7f5' if dark else '#302639'}; font-size:{round(13*factor)}px; }}
+            QComboBox {{ color:{'#eee7f5' if dark else '#302639'};
+                background:{'#211d28' if dark else '#faf8fc'};
+                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:6px; padding:3px 8px; }}
+            QComboBox QAbstractItemView {{ background:{'#211d28' if dark else '#faf8fc'};
+                color:{'#eee7f5' if dark else '#302639'};
+                selection-background-color:{'#3c3048' if dark else '#d9cbe5'}; }}
+        """)
+        layout = QtWidgets.QVBoxLayout(self.toolbar)
+        layout.setContentsMargins(round(12*factor), round(10*factor), round(12*factor), round(10*factor))
+        layout.setSpacing(round(8*factor))
+        heading = QtWidgets.QHBoxLayout()
+        self.step_label = QtWidgets.QLabel()
+        self.step_label.setWordWrap(True)
+        self.step_label.setStyleSheet(f'font-size:{round(15*factor)}px; font-weight:600;')
+        heading.addWidget(self.step_label, 1)
+        close = QtWidgets.QPushButton('×')
+        close.setFixedSize(round(28*factor), round(28*factor))
+        close.setAccessibleName(game_mode.game_text(self._language, 'close'))
+        close.setStyleSheet(button_qss(dark, 'close', icon=True))
+        close.clicked.connect(self.close)
+        heading.addWidget(close)
+        layout.addLayout(heading)
+        self.selection_controls = QtWidgets.QGridLayout()
+        self.selection_controls.setSpacing(round(6*factor))
+        self._controls_wrapped = None
+        for widget in (self.source_combo, self.swap_button, self.target_combo,
+                       self.undo_button, self.start_button):
+            widget.setParent(self.toolbar)
+            widget.show()
+        layout.addLayout(self.selection_controls)
+        options = QtWidgets.QHBoxLayout()
+        options.setSpacing(round(14*factor))
+        self.template_combo = QtWidgets.QComboBox()
+        self.template_combo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        self.template_combo.setAccessibleName(text(self._language, 'choose_template'))
+        self.template_combo.setMinimumHeight(round(28*factor))
         self.template_combo.activated.connect(self._load_template)
-        from window_appearance import scale_native_controls
-        factor = self.property('ui_effective_scale') or 1.0
-        for widget in (self.template_combo, self.save_template_button, self.delete_template_button):
-            scale_native_controls(widget, factor)
+        options.addWidget(self.template_combo, 1)
+        self.manual_output = QtWidgets.QCheckBox(text(self._language, 'manual_output'))
+        self.manual_output.setMinimumHeight(round(28*factor))
+        self.manual_output.toggled.connect(self._output_mode_changed)
+        options.addWidget(self.manual_output, 1)
+        layout.addLayout(options)
+        self.selection_note = QtWidgets.QLabel(text(self._language, 'simple_selection_hint'))
+        self.selection_note.setWordWrap(True)
+        self.selection_note.setStyleSheet(f'color:{"#b9b1c2" if dark else "#71647b"}; font-size:{round(12*factor)}px;')
+        layout.addWidget(self.selection_note)
+        from styled_dialogs import install_accent_controls
+        install_accent_controls(self.toolbar, dark=dark)
         self._refresh_templates()
         self._layout_controls()
         self._update_selection_controls()
-        for widget in (self.template_combo, self.save_template_button, self.delete_template_button):
-            widget.show()
+        self.toolbar.show()
 
     def _layout_controls(self):
-        if not hasattr(self, 'start_button'):
-            return
-        # Put the controls on the monitor under the pointer, not in a gap
-        # between monitors or on another display's title bar.
+        if not hasattr(self, 'toolbar'):
+            return super()._layout_controls()
         monitor = self._screen.geometry().translated(-self.geometry().topLeft())
-        languages = [self.source_combo, self.swap_button, self.target_combo]
-        actions = [self.undo_button, self.start_button]
-        controls = languages + actions
-        rows = [controls] if sum(widget.width() for widget in controls)+32 <= monitor.width()-24 else [languages, actions]
-        y = monitor.top()+20
-        for row in rows:
-            height = max(widget.height() for widget in row)
-            x = monitor.center().x()-(sum(widget.width() for widget in row)+8*(len(row)-1))//2
-            for widget in row:
-                widget.move(x, y)
-                x += widget.width()+8
-            y += height+8
-        self._caption_top = y
-        if not hasattr(self, 'template_combo'):
-            return
-        template_row = (self.template_combo, self.save_template_button, self.delete_template_button)
-        x = monitor.center().x() - (sum(w.width() for w in template_row) + 16) // 2
-        for widget in (self.template_combo, self.save_template_button, self.delete_template_button):
-            widget.move(x, y)
-            x += widget.width()+8
-        self._caption_top = y + max(w.height() for w in template_row) + 8
+        factor = float(self.property('ui_effective_scale') or 1.0)
+        self.toolbar.setFixedWidth(min(round(640*factor), monitor.width()-24))
+        if hasattr(self, 'selection_controls'):
+            controls = (self.source_combo, self.swap_button, self.target_combo,
+                        self.undo_button, self.start_button)
+            wrapped = sum(widget.width() for widget in controls)+round(48*factor) > self.toolbar.width()
+            if wrapped != self._controls_wrapped:
+                self._controls_wrapped = wrapped
+                for widget in controls:
+                    self.selection_controls.removeWidget(widget)
+                for column in range(6):
+                    self.selection_controls.setColumnStretch(column, 0)
+                for index, widget in enumerate(controls):
+                    row, column = ((1, index-3) if wrapped and index >= 3 else (0, index))
+                    self.selection_controls.addWidget(widget, row, column)
+                self.selection_controls.setColumnStretch(3 if wrapped else 5, 1)
+        self.toolbar.adjustSize()
+        self.toolbar.move(monitor.center().x()-self.toolbar.width()//2, monitor.top()+round(16*factor))
+        self._caption_top = self.toolbar.geometry().bottom()+8
+
+    def _default_output(self, source):
+        bounds = self._screen_local_bounds(source.center())
+        width = min(bounds.width(), max(260, source.width()))
+        height = min(bounds.height(), max(100, source.height()))
+        result = QtCore.QRect(source.right()+12, source.top(), width, height)
+        if result.right() > bounds.right():
+            result.moveTopLeft(QtCore.QPoint(source.left(), source.bottom()+12))
+        if result.bottom() > bounds.bottom():
+            result.moveTop(max(bounds.top(), source.top()-height-12))
+        result.moveLeft(max(bounds.left(), min(result.left(), bounds.right()-width+1)))
+        return result
+
+    def _output_mode_changed(self, manual):
+        if not manual and self._outputs and self._outputs[-1] is None:
+            self._outputs[-1] = self._default_output(self._regions[-1])
+        self.selection_note.setText(text(self._language, 'selection_hint' if manual else 'simple_selection_hint'))
+        self._update_selection_controls()
 
     def _complete(self):
         return bool(self._regions) and len(self._outputs) == len(self._regions) and all(rect is not None for rect in self._outputs)
@@ -95,62 +149,42 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self.start_button.setEnabled(complete and bool(self.source_combo.currentData() and self.target_combo.currentData()))
         self.start_button.setText(game_mode.game_text(self._language, 'start'))
         self.undo_button.setEnabled(bool(self._regions))
-        if hasattr(self, 'save_template_button'):
-            self.save_template_button.setEnabled(complete)
+        if hasattr(self, 'step_label'):
+            key = 'output' if self._outputs and self._outputs[-1] is None else ('simple_ready' if complete else 'source')
+            self.step_label.setText(text(self._language, key))
+            self._layout_controls()
         self.update()
 
-    def _refresh_templates(self, selected=''):
+    def _refresh_templates(self):
         try:
             values = self.store.load()
         except Exception:
             logging.getLogger('clickntranslate.game').exception('Unable to load dynamic templates')
             values = []
-            self.template_combo.setToolTip(text(self._language, 'save_error'))
-        self.template_combo.blockSignals(True)
-        self.template_combo.clear()
-        for value in values:
-            self.template_combo.addItem(value['name'], value)
-        self.template_combo.setCurrentIndex(-1)
-        self.template_combo.setEditText(selected)
-        self.template_combo.blockSignals(False)
-
-    def _save_template(self):
-        if not self._complete():
-            return
-        name = self.template_combo.currentText().strip()
-        if not name:
-            self.template_combo.lineEdit().setFocus()
-            self.template_combo.setToolTip(text(self._language, 'name_required'))
-            return
-        origin = self.geometry().topLeft()
-        value = make_template(name, [rect.translated(origin) for rect in self._regions],
-                              [rect.translated(origin) for rect in self._outputs], self._styles,
-                              str(self.source_combo.currentData()), str(self.target_combo.currentData()))
-        try:
-            self.store.save(value)
-            self._refresh_templates(name)
-            self.save_template_button.setToolTip(text(self._language, 'saved'))
-        except Exception:
-            logging.getLogger('clickntranslate.game').exception('Unable to save dynamic template')
-            self.template_combo.setToolTip(text(self._language, 'save_error'))
-
-    def _delete_template(self):
-        name = self.template_combo.currentText().strip()
-        try:
-            self.store.delete(name)
-            self._refresh_templates()
-        except Exception:
-            self.template_combo.setToolTip(text(self._language, 'save_error'))
+        with QtCore.QSignalBlocker(self.template_combo):
+            self.template_combo.clear()
+            self.template_combo.addItem(text(self._language, 'new_layout'), None)
+            for value in values:
+                self.template_combo.addItem(value['name'], value)
 
     def _load_template(self, index):
         value = self.template_combo.itemData(index)
         if not value:
+            self._regions, self._outputs, self._styles = [], [], []
+            self._selected_region = self._selected_hit = self._drag_hit = None
+            self._start = self._end = None
+            self.selection_note.setText(text(self._language, 'selection_hint' if self.manual_output.isChecked() else 'simple_selection_hint'))
+            self._update_selection_controls()
             return
         source_index = self.source_combo.findData(value['source_language'])
         targets = self._translation_targets_for_source(value['source_language'], self._config)
         if source_index < 0 or value['target_language'] not in targets:
-            self.template_combo.setToolTip(text(self._language, 'unavailable'))
+            self.selection_note.setText(text(self._language, 'unavailable'))
+            with QtCore.QSignalBlocker(self.template_combo):
+                self.template_combo.setCurrentIndex(0)
+            self._layout_controls()
             return
+        self.selection_note.setText(text(self._language, 'selection_hint' if self.manual_output.isChecked() else 'simple_selection_hint'))
         self.template_combo.setCurrentIndex(index)
         self.source_combo.setCurrentIndex(source_index)
         self._fill_targets(value['target_language'])
@@ -237,7 +271,7 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
                 self._outputs[-1] = rect
             elif len(self._regions) < 16:
                 self._regions.append(rect)
-                self._outputs.append(None)
+                self._outputs.append(None if self.manual_output.isChecked() else self._default_output(rect))
                 self._styles.append(output_style(opacity=int(self._config.get('game_overlay_opacity', 88))))
         self._update_selection_controls()
 
@@ -259,7 +293,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self._starting_session = True
         self.close()
         game_mode._begin_game_session(sources, str(self.source_combo.currentData()), str(self.target_combo.currentData()),
-                                      target_window, output_regions=outputs, output_styles=self._styles)
+                                      target_window, output_regions=outputs, output_styles=self._styles,
+                                      template_name=self.template_combo.currentText() if self.template_combo.currentData() else '')
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -288,20 +323,6 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
                 painter.fillRect(badge, QtGui.QColor('#211d29'))
                 painter.drawText(badge, QtCore.Qt.AlignCenter, label)
                 painter.drawText(self._remove_button_rect(rect), QtCore.Qt.AlignCenter, '×')
-        key = 'output' if self._outputs and self._outputs[-1] is None else ('ready' if self._regions else 'source')
-        monitor = self._screen.geometry().translated(-self.geometry().topLeft())
-        painter.setPen(QtGui.QColor('#e7e1ed'))
-        factor = self.property('ui_effective_scale') or 1.0
-        font = painter.font()
-        font.setPixelSize(round(18 * factor))
-        font.setBold(True)
-        painter.setFont(font)
-        height = round(36 * factor)
-        painter.drawText(QtCore.QRect(monitor.x()+12, self._caption_top, monitor.width()-24, height), QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter, text(self._language, key))
-        font.setPixelSize(round(14 * factor))
-        font.setBold(False)
-        painter.setFont(font)
-        painter.drawText(QtCore.QRect(monitor.x()+12, self._caption_top+height, monitor.width()-24, height), QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter, text(self._language, 'selection_hint'))
         painter.end()
 
 
@@ -324,7 +345,6 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
         self.original_label.hide()
         self._startup_frame_visible = False
         self._output_ready = True
-        self.controls = OutputControls(self)
         self._update_capture_shape()
 
     def _apply_style(self):
@@ -375,7 +395,7 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
         overlays = [item for item in game_mode._game_overlay_refs if not item._closed]
         if self not in overlays:
             overlays.append(self)
-        return [widget for item in overlays for widget in (item, getattr(item, 'controls', None)) if widget is not None]
+        return list(dict.fromkeys(widget for item in overlays for widget in (item, getattr(item, 'controls', None)) if widget is not None))
 
     def _grab_region(self):
         windows = self._capture_windows()
@@ -449,7 +469,7 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
         self.original_label.hide()
         if self.controls:
             error = game_mode.game_text(self.language, key) if key in {'capture_error', 'ocr_error', 'translation_error'} else ''
-            self.controls.set_error(error)
+            self.controls.set_error(error, self)
         self._update_capture_shape()
 
     def _target_is_active(self):
@@ -466,162 +486,259 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
     def closeEvent(self, event):
         super().closeEvent(event)
         if self.controls:
-            self.controls.close()
+            self.controls.detach(self)
 
 
 class OutputControls(QtWidgets.QFrame):
-    def __init__(self, overlay):
+    """One session toolbar for all outputs, with inline optional settings."""
+    def __init__(self, overlays, template_name=''):
         super().__init__(None, QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
-        self.overlay = overlay
+        self.overlays = list(overlays)
+        self.overlay = self.overlays[0]
+        self.language = self.overlay.language
         self._gesture = None
+        self._drag_offset = None
+        self._closing = False
+        self._errors = {}
+        self._placed = False
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
         configure_surface(self, windows=platform_support.IS_WINDOWS)
         if platform_support.IS_MAC:
             self.setAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow, True)
         self.setObjectName('outputControls')
-        dark = overlay.config.get('theme', 'Темная') != 'Светлая'
-        self.setStyleSheet(f'QFrame#outputControls {{ background:{"#211d29" if dark else "#f5f1f8"}; border:1px solid #746087; border-radius:6px; }}'
-                          f'QLabel, QCheckBox {{ color:{"#f5f0fa" if dark else "#302837"}; background:transparent; border:0; font:13px "Segoe UI"; }}'
-                          f'QLineEdit, QSpinBox {{ background:{"#302a3c" if dark else "#fff"}; color:{"#f5f0fa" if dark else "#302837"}; padding:4px; border:1px solid #746087; border-radius:4px; font:13px "Segoe UI"; }}')
+        dark = self.overlay.config.get('theme', 'Темная') != 'Светлая'
+        self._dark = dark
+        self.setStyleSheet(f"""
+            QFrame#outputControls {{ background:{'#121212' if dark else '#f0edf3'};
+                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:8px; }}
+            QLabel, QCheckBox {{ color:{'#eee7f5' if dark else '#302639'}; background:transparent; border:0; font-size:13px; }}
+            QLineEdit, QSpinBox, QComboBox {{ background:{'#211d28' if dark else '#faf8fc'};
+                color:{'#eee7f5' if dark else '#302639'}; border:1px solid {'#584963' if dark else '#bcaacb'};
+                border-radius:5px; padding:3px 6px; font-size:13px; }}
+            QComboBox QAbstractItemView {{ background:{'#211d28' if dark else '#faf8fc'};
+                color:{'#eee7f5' if dark else '#302639'}; selection-background-color:{'#3c3048' if dark else '#d9cbe5'}; }}
+        """)
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(3, 3, 3, 3)
-        root.setSpacing(4)
-        self.gear = QtWidgets.QToolButton()
-        self.gear.setText(text(overlay.language, 'settings'))
-        self.gear.setToolTip(text(overlay.language, 'settings'))
-        self.gear.setMinimumSize(130, 32)
-        self.gear.setStyleSheet(button_qss(dark, 'quiet', selector='QToolButton', compact=True))
-        toolbar = QtWidgets.QHBoxLayout()
-        toolbar.addWidget(self.gear, 1)
-        self.quick_stop = QtWidgets.QPushButton(game_mode.game_text(overlay.language, 'stop'))
-        self.quick_stop.setStyleSheet(button_qss(dark, 'secondary', compact=True))
-        self.quick_stop.setMinimumHeight(32)
-        self.quick_stop.clicked.connect(game_mode.stop_game_mode)
-        toolbar.addWidget(self.quick_stop)
-        root.addLayout(toolbar)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(8)
+        header = QtWidgets.QHBoxLayout()
+        header.setSpacing(6)
+        self.direction = QtWidgets.QLabel(f'{self.overlay.source_language.upper()} → {self.overlay.target_language.upper()}')
+        self.direction.setStyleSheet('font-size:13px; font-weight:600;')
+        self.direction.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        header.addWidget(self.direction, 1)
+        self.gear = QtWidgets.QPushButton(text(self.language, 'parameters'))
+        self.gear.setCheckable(True)
+        self.pause_button = QtWidgets.QPushButton(game_mode.game_text(self.language, 'pause'))
+        self.stop_button = QtWidgets.QPushButton(game_mode.game_text(self.language, 'stop'))
+        for button in (self.gear, self.pause_button, self.stop_button):
+            button.setFixedHeight(30)
+            button.setStyleSheet(button_qss(dark, 'quiet' if button is self.gear else 'secondary', compact=True))
+            header.addWidget(button)
+        root.addLayout(header)
         self.panel = QtWidgets.QWidget()
-        form = QtWidgets.QFormLayout(self.panel)
-        form.setContentsMargins(7, 3, 7, 6)
-        form.setSpacing(7)
-        self.font_size = QtWidgets.QSpinBox()
+        form = QtWidgets.QVBoxLayout(self.panel)
+        form.setContentsMargins(0, 2, 0, 0)
+        form.setSpacing(8)
+        self.output_combo = QtWidgets.QComboBox()
+        self.output_combo.setMinimumHeight(28)
+        self.output_combo.setAccessibleName(text(self.language, 'output_choice'))
+        form.addWidget(self.output_combo)
+        fields = QtWidgets.QGridLayout()
+        fields.setHorizontalSpacing(10)
+        fields.setVerticalSpacing(6)
+        self.font_size = NumberStepper(dark=dark)
         self.font_size.setRange(10, 48)
-        self.font_size.setValue(overlay.output_style['font_size'])
-        form.addRow(text(overlay.language, 'font'), self.font_size)
-        self.opacity = QtWidgets.QSpinBox()
+        self.opacity = NumberStepper(dark=dark)
         self.opacity.setRange(0, 100)
         self.opacity.setSuffix('%')
-        self.opacity.setValue(overlay.output_style['opacity'])
-        form.addRow(text(overlay.language, 'opacity'), self.opacity)
-        self.locked = QtWidgets.QCheckBox(text(overlay.language, 'locked'))
-        self.locked.setChecked(overlay.output_style['locked'])
-        self.move_button = QtWidgets.QToolButton()
-        self.resize_button = QtWidgets.QToolButton()
-        gesture_row = QtWidgets.QHBoxLayout()
-        gesture_row.addWidget(self.locked)
-        for button, label, key in ((self.move_button, '↔', 'move'), (self.resize_button, '↘', 'resize')):
-            button.setText(label)
-            button.setToolTip(text(overlay.language, key))
-            button.setFixedSize(28, 26)
-            button.setEnabled(not self.locked.isChecked())
+        for column, key, control in ((0, 'font', self.font_size), (1, 'opacity', self.opacity)):
+            label = QtWidgets.QLabel(text(self.language, key))
+            label.setBuddy(control)
+            control.setAccessibleName(text(self.language, key))
+            control.setKeyboardTracking(False)
+            control.setFixedHeight(28)
+            fields.addWidget(label, 0, column)
+            fields.addWidget(control, 1, column)
+            fields.setColumnStretch(column, 1)
+        form.addLayout(fields)
+        self.locked = QtWidgets.QCheckBox(text(self.language, 'locked'))
+        gestures = QtWidgets.QHBoxLayout()
+        gestures.setSpacing(6)
+        gestures.addWidget(self.locked, 1)
+        self.move_button = QtWidgets.QPushButton(text(self.language, 'move_short'))
+        self.resize_button = QtWidgets.QPushButton(text(self.language, 'resize_short'))
+        for button, key in ((self.move_button, 'move'), (self.resize_button, 'resize')):
+            button.setToolTip(text(self.language, key))
+            button.setFixedHeight(28)
+            button.setStyleSheet(button_qss(dark, compact=True))
             button.installEventFilter(self)
-            gesture_row.addWidget(button)
-        form.addRow(gesture_row)
-        self.template_name = QtWidgets.QLineEdit()
-        self.template_name.setMaxLength(80)
-        self.template_name.setPlaceholderText(text(overlay.language, 'templates'))
-        form.addRow(self.template_name)
-        self.save_button = QtWidgets.QPushButton(text(overlay.language, 'save'))
-        form.addRow(self.save_button)
+            gestures.addWidget(button)
+        form.addLayout(gestures)
+        template_label = QtWidgets.QLabel(text(self.language, 'session_template'))
+        template_label.setStyleSheet('font-size:12px;')
+        form.addWidget(template_label)
+        templates = QtWidgets.QHBoxLayout()
+        templates.setSpacing(6)
+        self.template_name = QtWidgets.QComboBox()
+        self.template_name.setEditable(True)
+        self.template_name.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        self.template_name.lineEdit().setMaxLength(80)
+        self.template_name.lineEdit().setPlaceholderText(text(self.language, 'templates'))
+        self.template_name.setMinimumWidth(0)
+        self.template_name.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        self.template_name.setFixedHeight(30)
+        templates.addWidget(self.template_name, 1)
+        self.save_button = QtWidgets.QPushButton(text(self.language, 'save_short'))
+        self.save_button.setStyleSheet(button_qss(dark, 'primary', compact=True))
+        self.save_button.setFixedHeight(30)
+        templates.addWidget(self.save_button)
+        self.delete_button = QtWidgets.QToolButton()
+        self.delete_button.setText('×')
+        self.delete_button.setToolTip(text(self.language, 'delete'))
+        self.delete_button.setAccessibleName(text(self.language, 'delete'))
+        self.delete_button.setStyleSheet(button_qss(dark, 'quiet', 'QToolButton', icon=True))
+        self.delete_button.setFixedSize(30, 30)
+        templates.addWidget(self.delete_button)
+        form.addLayout(templates)
         self.notice = QtWidgets.QLabel()
         self.notice.setWordWrap(True)
         self.notice.hide()
-        form.addRow(self.notice)
+        form.addWidget(self.notice)
+        root.addWidget(self.panel)
+        self.panel.hide()
         self.error_label = QtWidgets.QLabel()
         self.error_label.setWordWrap(True)
         self.error_label.hide()
-        form.addRow(self.error_label)
-        self.stop_button = QtWidgets.QPushButton(game_mode.game_text(overlay.language, 'stop'))
-        form.addRow(self.stop_button)
-        for button in (self.save_button, self.stop_button, self.move_button, self.resize_button):
-            selector = 'QToolButton' if isinstance(button, QtWidgets.QToolButton) else 'QPushButton'
-            button.setStyleSheet(button_qss(dark, compact=True, selector=selector, icon=isinstance(button, QtWidgets.QToolButton)))
-        self.save_button.setFixedHeight(28)
-        self.stop_button.setFixedHeight(26)
-        self.panel_scroll = QtWidgets.QScrollArea()
-        self.panel_scroll.setWidgetResizable(True)
-        self.panel_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.panel_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.panel_scroll.setStyleSheet('QScrollArea, QScrollArea > QWidget > QWidget { background:transparent; border:none; }')
-        self.panel_scroll.setWidget(self.panel)
-        root.addWidget(self.panel_scroll)
-        self.panel_scroll.hide()
-        self.panel.hide()
-        self.gear.clicked.connect(self._toggle_panel)
-        self.font_size.valueChanged.connect(lambda value: overlay.change_style(font_size=value))
-        self.opacity.valueChanged.connect(lambda value: overlay.change_style(opacity=value))
-        self.locked.toggled.connect(self._lock_changed)
-        self.save_button.clicked.connect(self._save)
+        root.addWidget(self.error_label)
+        self.gear.toggled.connect(self._toggle_panel)
+        self.pause_button.clicked.connect(self._toggle_pause)
         self.stop_button.clicked.connect(game_mode.stop_game_mode)
-        self.template_name.returnPressed.connect(self._save)
+        self.output_combo.currentIndexChanged.connect(self._select_output)
+        self.font_size.valueChanged.connect(lambda value: self.overlay.change_style(font_size=value))
+        self.opacity.valueChanged.connect(lambda value: self.overlay.change_style(opacity=value))
+        self.locked.toggled.connect(self._lock_changed)
+        self.template_name.lineEdit().returnPressed.connect(self._save)
+        self.template_name.editTextChanged.connect(self._update_template_actions)
+        self.save_button.clicked.connect(self._save)
+        self.delete_button.clicked.connect(self._delete_template)
+        self._refresh_templates(template_name)
+        self._refresh_outputs()
+        from styled_dialogs import install_accent_controls
+        install_accent_controls(self, dark=dark)
         from ui_scaling import desktop_control_scale
         from window_appearance import scale_native_controls
-        screen = QtWidgets.QApplication.screenAt(overlay.output_rect.center()) or QtWidgets.QApplication.primaryScreen()
-        self.ui_factor = desktop_control_scale(screen)
+        screen = QtWidgets.QApplication.screenAt(self.overlay.output_rect.center()) or QtWidgets.QApplication.primaryScreen()
+        available = screen.availableGeometry()
+        self.ui_factor = min(desktop_control_scale(screen), available.width()/430, available.height()/360)
         scale_native_controls(self, self.ui_factor)
+        for overlay in self.overlays:
+            overlay.controls = self
         self._resize_panel()
         self.show()
         self._capture_excluded = game_mode._exclude_from_windows_capture(self)
 
     def paintEvent(self, event):
-        # Translucent Linux/macOS surfaces suppress the automatic background.
-        # Paint the panel explicitly so labels retain their themed backing.
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtGui.QColor('#746087'), 1))
-        painter.setBrush(QtGui.QColor('#f5f1f8' if self.overlay.config.get('theme') == 'Светлая' else '#211d29'))
-        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 6, 6)
+        painter.setPen(QtGui.QPen(QtGui.QColor('#584963' if self._dark else '#bcaacb'), 1))
+        painter.setBrush(QtGui.QColor('#121212' if self._dark else '#f0edf3'))
+        radius = 8*self.ui_factor
+        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), radius, radius)
 
-    def _toggle_panel(self):
-        self.panel.setVisible(self.panel.isHidden())
-        self.panel_scroll.setVisible(not self.panel.isHidden())
+    def _toggle_panel(self, visible):
+        self.panel.setVisible(visible)
         self._resize_panel()
 
     def _resize_panel(self):
+        if not hasattr(self, 'ui_factor'):
+            return
         self.ensurePolished()
-        screen = QtWidgets.QApplication.screenAt(self.overlay.output_rect.center()) or QtWidgets.QApplication.primaryScreen()
-        width = round(310 * self.ui_factor)
-        self.setFixedWidth(min(width, screen.availableGeometry().width()))
-        margins = self.layout().contentsMargins()
-        height = max(self.gear.minimumHeight(), self.quick_stop.sizeHint().height()) + margins.top() + margins.bottom()
-        height += self.contentsMargins().top() + self.contentsMargins().bottom()
-        if not self.panel.isHidden():
-            height += self.panel.sizeHint().height() + self.layout().spacing() + 2 * self.panel_scroll.frameWidth()
-        self.setFixedHeight(min(height, screen.availableGeometry().height()))
-        set_surface_region(self, rounded_region(self.rect(), 6), windows=platform_support.IS_WINDOWS)
+        screen = self.screen() if self._placed else QtWidgets.QApplication.screenAt(self.overlay.output_rect.center())
+        screen = screen or QtWidgets.QApplication.primaryScreen()
+        self.setFixedWidth(min(round(430*self.ui_factor), screen.availableGeometry().width()))
+        self.layout().activate()
+        height = max(self.layout().totalHeightForWidth(self.width()), self.layout().minimumSize().height())
+        self.setFixedHeight(height)
+        set_surface_region(self, rounded_region(self.rect(), 8*self.ui_factor), windows=platform_support.IS_WINDOWS)
         self.place()
 
     def place(self):
-        rect = self.overlay.output_rect
-        screen = QtWidgets.QApplication.screenAt(rect.center()) or QtWidgets.QApplication.primaryScreen()
+        if not hasattr(self, 'ui_factor'):
+            return
+        screen = self.screen() if self._placed else QtWidgets.QApplication.screenAt(self.overlay.output_rect.center())
+        screen = screen or QtWidgets.QApplication.primaryScreen()
         bounds = screen.availableGeometry()
-        x = max(bounds.left(), min(rect.right()-self.width()+1, bounds.right()-self.width()+1))
-        y = rect.top()-self.height()-3
-        if y < bounds.top():
-            y = max(bounds.top(), min(rect.bottom()+3, bounds.bottom()-self.height()+1))
-        self.move(x, y)
+        point = self.pos() if self._placed else QtCore.QPoint(bounds.center().x()-self.width()//2, bounds.top()+12)
+        self.move(max(bounds.left(), min(point.x(), bounds.right()-self.width()+1)),
+                  max(bounds.top(), min(point.y(), bounds.bottom()-self.height()+1)))
+        self._placed = True
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton and event.pos().y() < self.gear.geometry().bottom()+8:
+            self._drag_offset = event.globalPos()-self.pos()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_offset is not None and event.buttons() & QtCore.Qt.LeftButton:
+            self.move(event.globalPos()-self._drag_offset)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_offset = None
+        self.place()
+
+    def _refresh_outputs(self):
+        with QtCore.QSignalBlocker(self.output_combo):
+            self.output_combo.clear()
+            for index, overlay in enumerate(self.overlays):
+                self.output_combo.addItem(text(self.language, 'area_number').format(number=index+1), overlay)
+            self.output_combo.setCurrentIndex(self.overlays.index(self.overlay))
+        self.output_combo.setVisible(len(self.overlays) > 1)
+        self._select_output()
+
+    def _select_output(self, *_):
+        self.overlay = self.output_combo.currentData() or self.overlay
+        self._cancel_gesture()
+        for field, key in ((self.font_size, 'font_size'), (self.opacity, 'opacity')):
+            with QtCore.QSignalBlocker(field):
+                field.setValue(self.overlay.output_style[key])
+        with QtCore.QSignalBlocker(self.locked):
+            self.locked.setChecked(self.overlay.output_style['locked'])
+        self.move_button.setEnabled(not self.locked.isChecked())
+        self.resize_button.setEnabled(not self.locked.isChecked())
+
+    def _toggle_pause(self):
+        paused = not all(item.paused for item in self.overlays)
+        for item in self.overlays:
+            if item.paused != paused:
+                item._toggle_pause()
+        self.pause_button.setText(game_mode.game_text(self.language, 'resume' if paused else 'pause'))
+        self._resize_panel()
 
     def _lock_changed(self, locked):
-        self._gesture = None
+        self._cancel_gesture()
         self.overlay.change_style(locked=locked)
         self.move_button.setEnabled(not locked)
         self.resize_button.setEnabled(not locked)
 
+    def _cancel_gesture(self):
+        if self._gesture is not None:
+            button = self._gesture[0]
+            self._gesture = None
+            button.setDown(False)
+            if QtWidgets.QWidget.mouseGrabber() is button:
+                button.releaseMouse()
+
     def eventFilter(self, watched, event):
+        if event.type() in (QtCore.QEvent.Hide, QtCore.QEvent.UngrabMouse):
+            self._cancel_gesture()
         if watched not in (self.move_button, self.resize_button) or self.overlay.output_style['locked']:
             return super().eventFilter(watched, event)
         if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
             self._gesture = (watched, event.globalPos(), QtCore.QRect(self.overlay.output_rect))
+            watched.setDown(True)
+            watched.grabMouse()
             return True
         if self._gesture and event.type() in (QtCore.QEvent.MouseMove, QtCore.QEvent.MouseButtonRelease):
             button, origin, rect = self._gesture
@@ -633,35 +750,100 @@ class OutputControls(QtWidgets.QFrame):
                 rect.setSize(rect.size()+QtCore.QSize(delta.x(), delta.y()))
             self.overlay.set_output_geometry(rect)
             if event.type() == QtCore.QEvent.MouseButtonRelease:
-                self._gesture = None
+                self._cancel_gesture()
             return True
         return super().eventFilter(watched, event)
 
-    def set_error(self, message):
-        if self.error_label.text() == message:
+    def set_error(self, message, overlay=None):
+        if self._closing:
             return
-        self.error_label.setText(message)
-        self.error_label.setVisible(bool(message))
-        self.gear.setToolTip(message or text(self.overlay.language, 'settings'))
-        self._resize_panel()
+        overlay = overlay or self.overlay
+        if message:
+            self._errors[overlay] = message
+        else:
+            self._errors.pop(overlay, None)
+        errors = [text(self.language, 'area_number').format(number=index+1)+': '+self._errors[item]
+                  for index, item in enumerate(self.overlays) if item in self._errors]
+        message = errors[0] if errors else ''
+        # Provider diagnostics can be arbitrarily long. Keep the session bar
+        # on-screen, with the complete message available on hover.
+        compact = self.error_label.fontMetrics().elidedText(
+            ' '.join(message.split()), QtCore.Qt.ElideRight,
+            max(80, self.width() - round(20 * self.ui_factor)))
+        if self.error_label.text() != compact or self.error_label.toolTip() != message:
+            self.error_label.setText(compact)
+            self.error_label.setToolTip(message)
+            self.error_label.setVisible(bool(message))
+            self._resize_panel()
+
+    def _refresh_templates(self, selected=''):
+        try:
+            names = [item['name'] for item in TemplateStore().load()]
+        except Exception:
+            names = []
+        with QtCore.QSignalBlocker(self.template_name):
+            self.template_name.clear()
+            self.template_name.addItems(names)
+            self.template_name.setCurrentIndex(-1)
+            self.template_name.setEditText(selected)
+        self._template_names = names
+        self._update_template_actions()
+
+    def _update_template_actions(self, *_):
+        name = self.template_name.currentText().strip()
+        self.save_button.setEnabled(bool(name))
+        self.delete_button.setEnabled(name in getattr(self, '_template_names', ()))
 
     def _save(self):
-        name = self.template_name.text().strip()
+        name = self.template_name.currentText().strip()
         if not name:
-            self.notice.setText(text(self.overlay.language, 'name_required'))
+            self.notice.setText(text(self.language, 'name_required'))
         else:
-            overlays = [item for item in game_mode._game_overlay_refs if isinstance(item, PairedTranslationOverlay) and not item._closed] or [self.overlay]
             try:
-                TemplateStore().save(make_template(name, [item.region for item in overlays], [item.output_rect for item in overlays],
-                    [item.output_style for item in overlays], self.overlay.source_language, self.overlay.target_language))
-                self.notice.setText(text(self.overlay.language, 'saved'))
+                TemplateStore().save(make_template(name, [item.region for item in self.overlays],
+                    [item.output_rect for item in self.overlays], [item.output_style for item in self.overlays],
+                    self.overlay.source_language, self.overlay.target_language))
+                self.notice.setText(text(self.language, 'saved'))
+                self._refresh_templates(name)
             except Exception:
                 logging.getLogger('clickntranslate.game').exception('Unable to save output layout')
-                self.notice.setText(text(self.overlay.language, 'save_error'))
+                self.notice.setText(text(self.language, 'save_error'))
         self.notice.show()
         self._resize_panel()
 
+    def _delete_template(self):
+        name = self.template_name.currentText().strip()
+        if name not in self._template_names:
+            return
+        try:
+            TemplateStore().delete(name)
+            self._refresh_templates()
+            self.notice.hide()
+        except Exception:
+            self.notice.setText(text(self.language, 'save_error'))
+            self.notice.show()
+        self._resize_panel()
+
+    def detach(self, overlay):
+        overlay.controls = None
+        self._errors.pop(overlay, None)
+        if overlay in self.overlays:
+            self.overlays.remove(overlay)
+        if not self.overlays:
+            self._closing = True
+            self.close()
+        else:
+            if self.overlay is overlay:
+                self.overlay = self.overlays[0]
+            self._refresh_outputs()
+            self.set_error('', overlay)
+            self._resize_panel()
+
     def closeEvent(self, event):
-        if not self.overlay._closed:
-            self.overlay.close()
+        self._cancel_gesture()
+        if not self._closing:
+            self._closing = True
+            for overlay in self.overlays:
+                overlay.controls = None
+            game_mode.stop_game_mode()
         event.accept()

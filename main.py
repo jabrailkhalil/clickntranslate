@@ -98,6 +98,7 @@ from guide_setup import (
     SetupGuideCard, setup_labels, setting_body,
 )
 from styled_dialogs import (
+    CenteredFramelessDialog,
     NativeDialogFrameFilter,
     StyledMessageBox,
     StatusPopup,
@@ -171,7 +172,7 @@ DEFAULT_REPLACE_SELECTION_HOTKEY = "Ctrl+Shift+Q"
 DEFAULT_TOGGLE_WINDOW_HOTKEY = "Ctrl+Shift+Space"
 DEFAULT_GAME_HOTKEY = "Ctrl+Alt+G"
 HOTKEY_DEFAULTS_REVISION = 5
-STARTUP_NEWS_ID = "community-1000-downloads-gaming"
+STARTUP_NEWS_ID = "version-1.8-3000-downloads"
 LAYOUT_EDITOR_MODE = "--layout-editor" in sys.argv
 
 # Defaults used by the normal application and by the developer-only visual
@@ -197,20 +198,21 @@ from assistant_settings import ASSISTANT_DEFAULTS, assistant_preferences
 
 DEFAULT_CONFIG = {
     **ASSISTANT_DEFAULTS,
-    "theme": "Темная",
+    "theme": "Светлая",
     "ui_scale_percent": DEFAULT_SCALE,
     "desktop_assistant_enabled": False,
     "desktop_assistant_position": None,
     "interface_language": "en",
+    "translation_defaults_language": "en",
     "autostart": False,
     "autostart_backend": AUTOSTART_BACKEND,
     "translation_mode": "English",
-    "main_translation_source_language": "en",
-    "main_translation_target_language": "ru",
-    "selection_translate_source_language": "en",
-    "selection_translate_target_language": "ru",
-    "replace_selection_source_language": "en",
-    "replace_selection_target_language": "ru",
+    "main_translation_source_language": "ru",
+    "main_translation_target_language": "en",
+    "selection_translate_source_language": "ru",
+    "selection_translate_target_language": "en",
+    "replace_selection_source_language": "ru",
+    "replace_selection_target_language": "en",
     "hotkey_language_editor_mode": "selection",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
@@ -225,7 +227,7 @@ DEFAULT_CONFIG = {
     "translator_engine": "Google",
     "allow_online_provider_fallback": False,
     "copy_history": False,
-    "copy_translated_text": False,  # Все галочки отключены по умолчанию
+    "copy_translated_text": False,
     # Ctrl+C/Ctrl+V are used internally for selected-text workflows. Restore
     # the user's previous clipboard after a successful visible translation or
     # replacement unless the result was explicitly requested in the clipboard.
@@ -236,12 +238,12 @@ DEFAULT_CONFIG = {
     "ocr_dim_strength": 60,
     "debug_ocr_artifacts": False,
     "last_ocr_language": "ru",
-    "ocr_translate_source_language": "en",
-    "ocr_translate_target_language": "ru",
-    "fullscreen_translate_from": "en",
-    "fullscreen_translate_to": "ru",
-    "game_translate_source_language": "en",
-    "game_translate_target_language": "ru",
+    "ocr_translate_source_language": "ru",
+    "ocr_translate_target_language": "en",
+    "fullscreen_translate_from": "ru",
+    "fullscreen_translate_to": "en",
+    "game_translate_source_language": "ru",
+    "game_translate_target_language": "en",
     # Dynamic translation continuously replaces text inside selected areas.
     "game_capture_mode": "region",
     "game_capture_interval_ms": 850,
@@ -294,11 +296,45 @@ def result_window_hidden_for(config, mode):
     return mode in result_window_hidden_modes(config)
 
 
+TRANSLATION_PAIR_KEYS = (
+    ('main_translation_source_language', 'main_translation_target_language'),
+    ('selection_translate_source_language', 'selection_translate_target_language'),
+    ('replace_selection_source_language', 'replace_selection_target_language'),
+    ('ocr_translate_source_language', 'ocr_translate_target_language'),
+    ('fullscreen_translate_from', 'fullscreen_translate_to'),
+    ('game_translate_source_language', 'game_translate_target_language'),
+)
+
+
+def fresh_config(interface_language='en'):
+    """First-run/reset defaults; every mode translates into the UI language."""
+    language = normalize_interface_language(interface_language)
+    config = dict(DEFAULT_CONFIG, interface_language=language, translation_defaults_language=language)
+    source = 'ru' if language == 'en' else 'en'
+    for source_key, target_key in TRANSLATION_PAIR_KEYS:
+        config[source_key], config[target_key] = source, language
+    return config
+
+
+def follow_default_translation_language(config, language):
+    """Follow the initial language choice only for pairs still at their defaults."""
+    previous = config.get('translation_defaults_language')
+    if previous not in INTERFACE_LANGUAGE_BY_CODE:
+        return  # Older installations keep their saved translation directions.
+    old, new = fresh_config(previous), fresh_config(language)
+    for source_key, target_key in TRANSLATION_PAIR_KEYS:
+        if (config.get(source_key), config.get(target_key)) == (old[source_key], old[target_key]):
+            config[source_key], config[target_key] = new[source_key], new[target_key]
+    config['translation_defaults_language'] = new['interface_language']
+
+
 def merge_config_defaults(config):
     """Add newly introduced defaults without restoring intentionally empty values."""
     source = config if isinstance(config, dict) else {}
     missing_keys = tuple(key for key in DEFAULT_CONFIG if key not in source)
-    merged = DEFAULT_CONFIG.copy()
+    merged = fresh_config(source.get('interface_language', DEFAULT_CONFIG['interface_language']))
+    if source and 'translation_defaults_language' not in source:
+        merged['translation_defaults_language'] = ''
     merged.update(source)
     if platform_support.IS_MAC and str(merged.get("ocr_engine", "")).lower() not in platform_support.available_ocr_engines():
         # Importing Windows settings cannot retain a WinRT selection on a Mac.
@@ -319,12 +355,12 @@ def merge_config_defaults(config):
     if "selection_translate_source_language" not in source:
         merged["selection_translate_source_language"] = source.get(
             "main_translation_source_language",
-            DEFAULT_CONFIG["selection_translate_source_language"],
+            merged["selection_translate_source_language"],
         )
     if "selection_translate_target_language" not in source:
         merged["selection_translate_target_language"] = source.get(
             "main_translation_target_language",
-            DEFAULT_CONFIG["selection_translate_target_language"],
+            merged["selection_translate_target_language"],
         )
     if "replace_selection_source_language" not in source:
         merged["replace_selection_source_language"] = merged[
@@ -337,12 +373,12 @@ def merge_config_defaults(config):
     if "fullscreen_translate_from" not in source:
         merged["fullscreen_translate_from"] = source.get(
             "ocr_translate_source_language",
-            DEFAULT_CONFIG["fullscreen_translate_from"],
+            merged["fullscreen_translate_from"],
         )
     if "fullscreen_translate_to" not in source:
         merged["fullscreen_translate_to"] = source.get(
             "ocr_translate_target_language",
-            DEFAULT_CONFIG["fullscreen_translate_to"],
+            merged["fullscreen_translate_to"],
         )
     # Default hotkeys have evolved. Migrate only values that exactly match a
     # shortcut previously shipped by us; custom and intentionally empty values
@@ -1281,33 +1317,51 @@ class HotkeyListenerThread(threading.Thread):
         self._stop_event = threading.Event()
         self._registered = False
         self._mac_registration = None
-        self.modifiers, self.vk = self.parse_hotkey(self.hotkey_str)
+        self._double_registration = None
+        from double_tap_hotkeys import parse_double_tap
+        self._double_tap = parse_double_tap(hotkey_str)
+        self.modifiers, self.vk = (0, self._double_tap[1]) if self._double_tap else self.parse_hotkey(self.hotkey_str)
         if self.vk is None:
             print("Неверный формат горячей клавиши.")
     
     def start(self):
+        if self._double_tap:
+            try:
+                from double_tap_hotkeys import registry
+                self._double_registration = registry().register(
+                    self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self._invoke))
+            except Exception:
+                logging.exception('Could not register double-tap shortcut')
+                hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+            return
         if not platform_support.IS_MAC:
             return super().start()
         try:
             from macos_hotkeys import registry
             self._mac_registration = registry().register(
-                self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self.callback))
+                self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self._invoke))
         except Exception:
             logging.exception("Could not register macOS shortcut")
             hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
 
     def is_alive(self):
+        if self._double_tap:
+            return self._double_registration is not None
         if platform_support.IS_MAC:
             return self._mac_registration is not None
         return super().is_alive()
 
     def join(self, timeout=None):
-        if not platform_support.IS_MAC:
+        if not self._double_tap and not platform_support.IS_MAC:
             return super().join(timeout)
 
     def stop(self):
         """Остановить поток и отменить регистрацию горячей клавиши."""
         self._stop_event.set()
+        if self._double_registration is not None:
+            from double_tap_hotkeys import registry
+            registry().unregister(self._double_registration)
+            self._double_registration = None
         if self._mac_registration is not None:
             from macos_hotkeys import registry
             registry().unregister(self._mac_registration)
@@ -1318,6 +1372,16 @@ class HotkeyListenerThread(threading.Thread):
                 self._registered = False
             except Exception:
                 pass
+
+    def _invoke(self):
+        if self._stop_event.is_set():
+            return
+        focus = QApplication.focusWidget()
+        while focus is not None:
+            if isinstance(focus, QtWidgets.QKeySequenceEdit):
+                return  # Recording a shortcut must not launch its old action.
+            focus = focus.parentWidget()
+        self.callback()
 
     def parse_hotkey(self, hotkey_str):
         if platform_support.IS_MAC:
@@ -1433,7 +1497,7 @@ class HotkeyListenerThread(threading.Thread):
                 if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
                     try:
                         print(f"Hotkey pressed: {self.hotkey_str}")
-                        hotkey_dispatcher.triggered.emit(self.callback)
+                        hotkey_dispatcher.triggered.emit(self._invoke)
                     except Exception as e:
                         print(f"Error handling hotkey press: {e}")
                 ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
@@ -2224,10 +2288,10 @@ WELCOME_TEXT = {
         "window": "News",
         "eyebrow": "Portable screen translator",
         "title": "Welcome to Click'n'Translate!",
-        "body": "I am taking Click'n'Translate seriously: fixes and releases are now checked carefully. And I give you my word — this project will always remain free for everyone.",
+        "body": "Version {version} brings a major update to the interface and everyday workflows. Thank you for your support — already 3,000 downloads!",
         "feature_ocr": "Screen OCR",
         "feature_translate": "Online + offline",
-        "feature_updates": "Always free",
+        "feature_updates": "3,000 downloads",
         "telegram": "Open Telegram",
         "checkbox": "Don't show this window again",
         "guide": "Show me around",
@@ -2238,10 +2302,10 @@ WELCOME_TEXT = {
         "window": "Новости",
         "eyebrow": "Портативный экранный переводчик",
         "title": "Добро пожаловать в Click'n'Translate!",
-        "body": "Я всерьёз взялся за Click'n'Translate: исправления и релизы теперь тщательно проверяются. И даю слово — этот проект всегда останется бесплатным для всех.",
+        "body": "Версия {version} — большое обновление интерфейса и удобства работы. Спасибо за поддержку — уже 3 000 скачиваний!",
         "feature_ocr": "OCR с экрана",
         "feature_translate": "Онлайн + офлайн",
-        "feature_updates": "Всегда бесплатно",
+        "feature_updates": "3 000 скачиваний",
         "telegram": "Открыть Telegram",
         "checkbox": "Больше не показывать это окно",
         "guide": "Пройти обучение",
@@ -2252,10 +2316,10 @@ WELCOME_TEXT = {
         "window": "Noticias",
         "eyebrow": "Traductor de pantalla portátil",
         "title": "¡Bienvenido a Click'n'Translate!",
-        "body": "Me tomo en serio Click'n'Translate: ahora reviso cuidadosamente cada corrección y versión. Y doy mi palabra: este proyecto siempre será gratuito para todos.",
+        "body": "La versión {version} trae una gran actualización de la interfaz y del uso diario. ¡Gracias por su apoyo: ya son 3.000 descargas!",
         "feature_ocr": "OCR de pantalla",
         "feature_translate": "Online + offline",
-        "feature_updates": "Siempre gratis",
+        "feature_updates": "3.000 descargas",
         "telegram": "Abrir Telegram",
         "checkbox": "No volver a mostrar esta ventana",
         "guide": "Ver guía",
@@ -2266,10 +2330,10 @@ WELCOME_TEXT = {
         "window": "Neuigkeiten",
         "eyebrow": "Portabler Bildschirmübersetzer",
         "title": "Willkommen bei Click'n'Translate!",
-        "body": "Ich nehme Click'n'Translate ernst: Korrekturen und Releases werden jetzt sorgfältig geprüft. Und ich gebe mein Wort: Dieses Projekt bleibt für alle immer kostenlos.",
+        "body": "Version {version} bringt eine große Überarbeitung der Oberfläche und der täglichen Bedienung. Danke für eure Unterstützung — schon 3.000 Downloads!",
         "feature_ocr": "Bildschirm-OCR",
         "feature_translate": "Online + offline",
-        "feature_updates": "Immer kostenlos",
+        "feature_updates": "3.000 Downloads",
         "telegram": "Telegram öffnen",
         "checkbox": "Dieses Fenster nicht mehr anzeigen",
         "guide": "Tour starten",
@@ -2280,10 +2344,10 @@ WELCOME_TEXT = {
         "window": "Actualités",
         "eyebrow": "Traducteur d'écran portable",
         "title": "Bienvenue dans Click'n'Translate !",
-        "body": "Je prends Click'n'Translate au sérieux : les correctifs et les versions sont désormais vérifiés avec soin. Et je donne ma parole : ce projet restera toujours gratuit pour tous.",
+        "body": "La version {version} apporte une grande refonte de l’interface et de l’utilisation au quotidien. Merci pour votre soutien — déjà 3 000 téléchargements !",
         "feature_ocr": "OCR d'écran",
         "feature_translate": "En ligne + hors ligne",
-        "feature_updates": "Toujours gratuit",
+        "feature_updates": "3 000 téléchargements",
         "telegram": "Ouvrir Telegram",
         "checkbox": "Ne plus afficher cette fenêtre",
         "guide": "Voir le guide",
@@ -2294,10 +2358,10 @@ WELCOME_TEXT = {
         "window": "更新",
         "eyebrow": "便携式屏幕翻译器",
         "title": "欢迎使用 Click'n'Translate！",
-        "body": "我会认真、长期地维护 Click'n'Translate，并仔细检查每次修复和发布。我保证：这个项目将永远对所有人免费。",
+        "body": "{version} 版大幅改进了界面和日常使用体验。感谢大家的支持，下载量已达 3,000 次！",
         "feature_ocr": "屏幕 OCR",
         "feature_translate": "在线 + 离线翻译",
-        "feature_updates": "永久免费",
+        "feature_updates": "3,000 次下载",
         "telegram": "打开 Telegram",
         "checkbox": "不再显示此窗口",
         "guide": "开始引导",
@@ -2310,101 +2374,19 @@ WELCOME_TEXT = {
 def welcome_text(lang):
     return {
         **WELCOME_TEXT.get(lang, WELCOME_TEXT["en"]),
+        "body": WELCOME_TEXT.get(lang, WELCOME_TEXT["en"])["body"].format(version=APP_VERSION),
         "guide": GUIDE_SETUP_INTRO.get(lang, GUIDE_SETUP_INTRO["en"])[2],
     }
 
 
 STARTUP_NEWS_TEXT = {
-    "en": {
-        "window": "1,000 downloads · V{version}",
-        "title": "1,000 downloads",
-        "intro": "Click'n'Translate has now been downloaded 1,000 times. Thank you to everyone who chose the project and helps it grow.",
-        "changes_title": "New in the app",
-        "changes": (
-            "Dynamic translation is now a separate mode with Ctrl+Alt+G and its own language pair.",
-            "Dynamic translation continuously replaces text inside one or more areas you select.",
-            "Click any hotkey badge on the main screen to open its exact setting.",
-            "Dynamic OCR skips unchanged frames and keeps the translation overlay out of its own capture.",
-        ),
-        "promise_title": "My promise",
-        "promise": "I give you my word: Click'n'Translate will always remain a free project for everyone.",
-        "continue": "Got it",
-    },
-    "ru": {
-        "window": "1000 скачиваний · V{version}",
-        "title": "Уже 1000 скачиваний",
-        "intro": "Click'n'Translate скачали уже 1000 раз. Спасибо каждому, кто выбрал проект и помогает ему расти.",
-        "changes_title": "Что нового в программе",
-        "changes": (
-            "«Динамический перевод» стал отдельным режимом с Ctrl+Alt+G и собственной парой языков.",
-            "В динамическом режиме можно выбрать сразу несколько областей, и перевод будет постоянно обновляться прямо поверх них.",
-            "Нажмите любую плашку горячей клавиши в главном окне, чтобы сразу открыть её настройку.",
-            "Динамический OCR пропускает неизменившиеся кадры и не захватывает собственное наложение.",
-        ),
-        "promise_title": "Моё обещание",
-        "promise": "Даю слово: Click'n'Translate всегда останется бесплатным проектом для всех.",
-        "continue": "Понятно",
-    },
-    "es": {
-        "window": "1.000 descargas · V{version}",
-        "title": "1.000 descargas",
-        "intro": "Click'n'Translate ya se ha descargado 1.000 veces. Gracias a todos los que eligieron el proyecto y lo ayudan a crecer.",
-        "changes_title": "Novedades de la aplicación",
-        "changes": (
-            "La traducción dinámica es un modo independiente con Ctrl+Alt+G y su propio par de idiomas.",
-            "El modo dinámico reemplaza texto continuamente en una o varias zonas elegidas.",
-            "Pulsa cualquier insignia de atajo para abrir directamente su ajuste.",
-            "El OCR dinámico omite cuadros sin cambios y excluye su propia superposición de la captura.",
-        ),
-        "promise_title": "Mi promesa",
-        "promise": "Doy mi palabra: Click'n'Translate siempre será un proyecto gratuito para todos.",
-        "continue": "Entendido",
-    },
-    "de": {
-        "window": "1.000 Downloads · V{version}",
-        "title": "1.000 Downloads",
-        "intro": "Click'n'Translate wurde bereits 1.000-mal heruntergeladen. Danke an alle, die das Projekt gewählt haben und wachsen lassen.",
-        "changes_title": "Neu in der App",
-        "changes": (
-            "Dynamische Übersetzung ist ein eigener Modus mit Ctrl+Alt+G und einem separaten Sprachpaar.",
-            "Der dynamische Modus ersetzt Text fortlaufend in einem oder mehreren gewählten Bereichen.",
-            "Ein Klick auf ein Hotkey-Feld öffnet direkt die zugehörige Einstellung.",
-            "Dynamische OCR überspringt unveränderte Bilder und schließt das eigene Overlay von der Aufnahme aus.",
-        ),
-        "promise_title": "Mein Versprechen",
-        "promise": "Ich gebe mein Wort: Click'n'Translate bleibt für alle immer ein kostenloses Projekt.",
-        "continue": "Verstanden",
-    },
-    "fr": {
-        "window": "1 000 téléchargements · V{version}",
-        "title": "1 000 téléchargements",
-        "intro": "Click'n'Translate a déjà été téléchargé 1 000 fois. Merci à toutes les personnes qui ont choisi le projet et le font grandir.",
-        "changes_title": "Nouveautés de l’application",
-        "changes": (
-            "La traduction dynamique devient un mode distinct avec Ctrl+Alt+G et sa propre paire de langues.",
-            "Le mode dynamique remplace le texte en continu dans une ou plusieurs zones choisies.",
-            "Cliquez sur une pastille de raccourci pour ouvrir directement son réglage.",
-            "L’OCR dynamique ignore les images inchangées et exclut sa propre superposition de la capture.",
-        ),
-        "promise_title": "Ma promesse",
-        "promise": "Je donne ma parole : Click'n'Translate restera toujours un projet gratuit pour tous.",
-        "continue": "Compris",
-    },
-    "zh": {
-        "window": "1,000 次下载 · V{version}",
-        "title": "已达 1,000 次下载",
-        "intro": "Click'n'Translate 已被下载 1,000 次。感谢每一位选择并帮助项目成长的人。",
-        "changes_title": "应用新功能",
-        "changes": (
-            "“动态翻译”现为独立模式，默认快捷键为 Ctrl+Alt+G，并拥有单独语言对。",
-            "动态模式会在你选择的一个或多个区域中持续替换文字。",
-            "点击主窗口中的任意快捷键标签，可直接打开对应设置。",
-            "动态 OCR 会跳过未变化画面，并从捕获中排除自身叠加层。",
-        ),
-        "promise_title": "我的承诺",
-        "promise": "我保证：Click'n'Translate 将永远是一个对所有人免费的项目。",
-        "continue": "知道了",
-    },
+    language: {
+        "window": copy["window"] + " · V{version}",
+        "title": copy["feature_updates"],
+        "intro": copy["body"].format(version=APP_VERSION),
+        "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了'}[language],
+    }
+    for language, copy in WELCOME_TEXT.items()
 }
 
 
@@ -2414,15 +2396,10 @@ def startup_news_text(lang):
 
 def startup_news_html(lang, version=APP_VERSION):
     text = startup_news_text(lang)
-    items = "".join(f"<li>{item}</li>" for item in text["changes"])
     return (
         f"<div style='line-height:1.35'>"
         f"<div style='font-size:18px;font-weight:800'>{text['title']}</div>"
         f"<p>{text['intro']}</p>"
-        f"<div style='font-weight:800'>{text['changes_title']}</div>"
-        f"<ul style='margin-top:6px;margin-bottom:10px'>{items}</ul>"
-        f"<div style='font-weight:800;color:#9b78c8'>{text['promise_title']}</div>"
-        f"<p><b>{text['promise']}</b></p>"
         f"<div style='font-size:11px'>Click'n'Translate · V{version}</div>"
         f"</div>"
     )
@@ -3666,17 +3643,20 @@ def help_text(lang, theme="Темная"):
         + BUG_REPORT_HELP_CONTENT.get(lang, BUG_REPORT_HELP_CONTENT["en"])
     )
     intro = HELP_INTRO.get(lang, HELP_INTRO["en"])
-    style = _HELP_STYLE if theme != "Светлая" else _HELP_STYLE_LIGHT
-    blocks = [style, f'<div class="hero"><div class="hero-title">Click&apos;n&apos;Translate</div><div class="hero-subtitle">{intro}</div></div>']
+    dark = theme != 'Светлая'
+    ink = '#eee7f5' if dark else '#302639'
+    accent = '#b9a1d5' if dark else '#755397'
+    style = f"""<style>
+        body {{ color:{ink}; font-family:'Segoe UI'; font-size:13px; }}
+        h3 {{ color:{accent}; font-size:14px; font-weight:600; margin:16px 0 6px; }}
+        p {{ margin:6px 0; line-height:1.35; }}
+        a {{ color:{accent}; }}
+        .item-title, .kbd {{ font-weight:600; }}
+    </style>"""
+    blocks = [style, f'<p>{intro}</p>']
     for title, items in sections:
-        blocks.append(f'<div class="section"><div class="section-title">{title}</div>')
-        for item in items:
-            blocks.append(f'<div class="item">{item}</div>')
-        blocks.append("</div>")
-    blocks.append(
-        '<div class="footer"><a href="https://github.com/jabrailkhalil/clickntranslate">'
-        f'{help_action_text(lang, "github")}</a></div>'
-    )
+        blocks.append(f'<h3>{title}</h3>')
+        blocks.extend(f'<p>{item}</p>' for item in items)
     return "\n".join(blocks)
 
 THEMES = {
@@ -3708,7 +3688,7 @@ def resource_path(relative_path):
     """ Получить абсолютный путь к ресурсу, работает для dev и для PyInstaller """
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
 
 ARGOS_PACKAGE_DIALOG_TEXT = {
@@ -4171,45 +4151,6 @@ class TranslateOnEnterTextEdit(QTextEdit):
         super().keyPressEvent(event)
 
 
-class CenteredFramelessDialog(QDialog):
-    """Shared movable dark-window shell used by secondary app windows."""
-
-    def __init__(self, parent=None, drag_height=86):
-        super().__init__(parent)
-        self._drag_position = None
-        self._drag_height = int(drag_height)
-        self._centered_once = False
-
-    def _center_on_owner(self):
-        from ui_scaling import center_window
-        center_window(self)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not self._centered_once:
-            self._centered_once = True
-            self._center_on_owner()
-            QTimer.singleShot(0, self._center_on_owner)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and event.pos().y() <= self._drag_height:
-            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
-            event.accept()
-            return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        if self._drag_position is not None and event.buttons() & Qt.LeftButton:
-            self.move(event.globalPos() - self._drag_position)
-            event.accept()
-            return
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        self._drag_position = None
-        super().mouseReleaseEvent(event)
-
-
 def _update_translation_editor(editor, text, *, reset=False):
     """Append completed parts without jumping away from the user's reading position."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
@@ -4283,6 +4224,8 @@ class TranslationResultDialog(QDialog):
         outer.setContentsMargins(8, 8, 8, 8)
         self.frame = QFrame(self)
         self.frame.setObjectName("translationResultFrame")
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(self, self.frame, 12)
         outer.addWidget(self.frame)
         layout = QVBoxLayout(self.frame)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -4306,27 +4249,20 @@ class TranslationResultDialog(QDialog):
         _populate_grouped_translator_combo(self.engine_combo, self.lang)
         self.set_window_engine(str(config.get('translator_engine', 'Google')))
         header.addWidget(self.engine_combo, 0, 1)
-        from ui_scaling import ScalePercentEdit, ScaleArrowButton
-        self.scale_decrease = ScaleArrowButton(self)
-        self.scale_decrease.setText("‹")
-        self.scale_decrease.setFixedSize(26, 28)
-        self.scale_decrease.setToolTip(settings_text(self.lang, "ui_scale_decrease"))
-        self.scale_value = ScalePercentEdit(self)
+        from ui_scaling import ScalePercentEdit
+        from number_controls import StepperFrame
+        self.scale_value = ScalePercentEdit()
         self.scale_value.setObjectName("translationResultScale")
-        self.scale_value.setFixedSize(52, 28)
         self.scale_value.setAccessibleName(settings_text(self.lang, "ui_scale"))
         self.scale_value.setToolTip(tooltip_text(settings_text(self.lang, "ui_scale_edit_hint")))
-        self.scale_increase = ScaleArrowButton(self)
-        self.scale_increase.setText("›")
-        self.scale_increase.setFixedSize(26, 28)
-        self.scale_increase.setToolTip(settings_text(self.lang, "ui_scale_increase"))
-        self.scale_control = QFrame(self)
+        self.scale_control = StepperFrame(self.scale_value, self, dark=theme != 'Светлая')
         self.scale_control.setObjectName("translationResultScaleControl")
-        scale_layout = QHBoxLayout(self.scale_control)
-        scale_layout.setContentsMargins(2, 0, 2, 0)
-        scale_layout.setSpacing(0)
-        for control in (self.scale_decrease, self.scale_value, self.scale_increase):
-            scale_layout.addWidget(control)
+        self.scale_control.setFixedSize(112, 28)
+        self.scale_decrease = self.scale_control.decrease
+        self.scale_increase = self.scale_control.increase
+        for button, key in ((self.scale_decrease, 'ui_scale_decrease'), (self.scale_increase, 'ui_scale_increase')):
+            button.setAccessibleName(settings_text(self.lang, key))
+            button.setToolTip(settings_text(self.lang, key))
         header.addWidget(self.scale_control, 0, 2)
         self.scale_decrease.clicked.connect(lambda: self._step_scale(-1, self.scale_decrease))
         self.scale_increase.clicked.connect(lambda: self._step_scale(1, self.scale_increase))
@@ -4819,15 +4755,12 @@ class TranslationResultDialog(QDialog):
             QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
             QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
-            QFrame#translationResultScaleControl {{ border:1px solid {edge}; border-radius:6px; }}
-            QLineEdit#translationResultScale {{ color:{ink}; background:transparent; border:0; font-size:12px; }}
             QScrollBar:vertical {{ background:{surface}; width:10px; margin:2px; }}
             QScrollBar::handle:vertical {{ background:{edge}; min-height:24px; border-radius:4px; }}
             QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{scrollbar_active}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
         """ + standard_buttons(dark, compact=False))
-        for button in (self.scale_decrease, self.scale_increase):
-            button.setStyleSheet(button_qss(dark, "quiet", selector="QToolButton", icon=True, radius=4))
+        self.scale_control.set_theme(dark)
         self.source_toggle.setStyleSheet(
             button_qss(dark, "quiet", selector="QToolButton", compact=True, radius=4)
             + "QToolButton { font-size:12px; padding:0 5px; }")
@@ -4877,7 +4810,8 @@ class TranslationResultDialog(QDialog):
             value = int(self.scale_value.text().strip().rstrip('%'))
         except ValueError:
             value = manager.window_percent(self)
-        manager.set_window_percent(self, value + direction * 5, anchor_widget or self.scale_value)
+        from ui_scaling import SCALE_STEP
+        manager.set_window_percent(self, value + direction * SCALE_STEP, anchor_widget or self.scale_value)
 
     def _remember_language_pair(self):
         """Keep the pair selected here in sync with future app translations."""
@@ -5021,6 +4955,8 @@ class WelcomeDialog(QDialog):
 
         card = QFrame(self)
         card.setObjectName("welcomeCard")
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(self, card, 20)
         self.main_layout.addWidget(card)
 
         card_layout = QVBoxLayout(card)
@@ -5247,6 +5183,7 @@ class WelcomeDialog(QDialog):
             self.parent.current_interface_language = self.lang
             if hasattr(self.parent, "config"):
                 self.parent.config["interface_language"] = self.lang
+                follow_default_translation_language(self.parent.config, self.lang)
             if hasattr(self.parent, "save_config"):
                 self.parent.save_config()
         self.init_ui()
@@ -5342,6 +5279,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         self.window_frame = QFrame(self)
         self.window_frame.setObjectName("docWindowFrame")
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(self, self.window_frame, 12)
         self.window_frame.setAttribute(Qt.WA_StyledBackground, True)
         root_layout.addWidget(self.window_frame)
 
@@ -5575,7 +5514,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         return frame
 
     def _apply_dialog_theme(self):
-        is_dark = self.theme_name == DEFAULT_CONFIG["theme"]
+        is_dark = self.theme_name == "Темная"
         bg = "#161319" if is_dark else "#f0edf3"
         top = "#211d28" if is_dark else "#e9e4ed"
         pane = "#211d28" if is_dark else "#f2edf6"
@@ -5742,7 +5681,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             combo.set_popup_background(pane)
 
     def _apply_native_frame_theme(self):
-        apply_windows_dark_frame(self, self.theme_name == DEFAULT_CONFIG["theme"])
+        apply_windows_dark_frame(self, self.theme_name == "Темная")
 
     def refresh_theme(self, theme_name):
         self.setUpdatesEnabled(False)
@@ -6804,6 +6743,55 @@ class HotkeyReferenceRow(QPushButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAutoDefault(False)
+        self._pointer_inside = False
+        self.setMouseTracking(True)
+
+    def enterEvent(self, event):
+        # Only one reference may own hover. Graphics proxies can retain Qt's
+        # native :hover state after opening another window or rebuilding a page.
+        parent = self.parentWidget()
+        if parent is not None:
+            for row in parent.findChildren(HotkeyReferenceRow):
+                row._pointer_inside = row is self
+                row.update()
+        self._pointer_inside = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._pointer_inside = False
+        self.update()
+        super().leaveEvent(event)
+
+    def hideEvent(self, event):
+        self._pointer_inside = False
+        self.setDown(False)
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        from ui_scaling import native_window_parent
+        native_window_parent(self).installEventFilter(self)
+        super().showEvent(event)
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QtCore.QEvent.WindowDeactivate, QtCore.QEvent.Hide):
+            self._pointer_inside = False
+            self.setDown(False)
+            self.update()
+        return super().eventFilter(watched, event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        from ui_scaling import native_window_parent
+        owner = native_window_parent(self)
+        if not owner.isActiveWindow():
+            return
+        hovered = self._pointer_inside and self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos()))
+        keyboard = self.hasFocus() and bool(self.property('keyboardFocus'))
+        if hovered or keyboard:
+            painter = QtGui.QPainter(self)
+            color = self.property('referencePressed') if self.isDown() else self.property('referenceHover')
+            painter.fillRect(self.rect().adjusted(0, 0, 0, -1), QtGui.QColor(color or '#282230'))
 
     def sizeHint(self):
         # QPushButton normally measures its own text. This button's content
@@ -6834,6 +6822,8 @@ class HotkeyLanguageDialog(QDialog):
 
         root = QFrame(self)
         root.setObjectName("hotkeyLanguageCard")
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(self, root, 14)
         root.setGeometry(self.rect())
         shadow = QGraphicsDropShadowEffect(root)
         shadow.setBlurRadius(24)
@@ -7099,7 +7089,7 @@ class DarkThemeApp(QMainWindow):
                 else:
                     self.config["first_run_guide_completed"] = True
                     self.config["first_run_guide_pending"] = False
-                # New users read the same long-term commitment in Welcome and
+                # New users read the same version introduction in Welcome and
                 # do not need a second modal announcement immediately after it.
                 self.config["last_seen_startup_news_id"] = STARTUP_NEWS_ID
                 self.config["last_seen_startup_news_version"] = APP_VERSION
@@ -7282,7 +7272,7 @@ class DarkThemeApp(QMainWindow):
                 except OSError:
                     pass
         else:
-            self.config = DEFAULT_CONFIG.copy()
+            self.config = fresh_config()
             write_json(config_path, self.config, indent=4)
             invalidate_config_cache()
         # Извлекаем значения с дефолтами из DEFAULT_CONFIG
@@ -7428,11 +7418,12 @@ class DarkThemeApp(QMainWindow):
 
     def _sync_desktop_assistant(self):
         action = getattr(self, '_tray_assistant_action', None)
-        if action is not None:
-            with QtCore.QSignalBlocker(action):
-                action.setChecked(self.config.get('desktop_assistant_enabled') is True)
-        assistant = getattr(self, '_desktop_assistant', None)
         suppressed = bool(getattr(self, '_desktop_assistant_suppressed_until_restart', False))
+        if action is not None:
+            from assistant_text import assistant_text
+            visible = self.config.get('desktop_assistant_enabled') is True and not suppressed
+            action.setText(assistant_text(self.current_interface_language, 'tray_hide' if visible else 'tray_show'))
+        assistant = getattr(self, '_desktop_assistant', None)
         if self.config.get('desktop_assistant_enabled') is True and not suppressed:
             if assistant is None:
                 from desktop_assistant import DesktopAssistant
@@ -7444,27 +7435,38 @@ class DarkThemeApp(QMainWindow):
             self._desktop_assistant = None
 
     def dismiss_desktop_assistant_until_restart(self):
-        """Hide both assistant surfaces for this process only; do not persist it."""
+        """Dismiss the desktop companion; the main-window preference is separate."""
         self._desktop_assistant_suppressed_until_restart = True
-        preview = getattr(self, 'assistant_preview', None)
-        if preview is not None:
-            try:
-                preview.hide()
-            except RuntimeError:
-                pass
         self._sync_desktop_assistant()
         settings = self.settings_window or self._cached_settings_window
         button = getattr(settings, 'desktop_assistant_dismiss_button', None)
         if button is not None:
             button.setEnabled(False)
+        page = getattr(settings, 'settings_assistant_page', None)
+        if page is not None:
+            page.refresh()
 
     def set_desktop_assistant_enabled(self, enabled):
         self.config['desktop_assistant_enabled'] = bool(enabled)
+        if enabled:
+            self._desktop_assistant_suppressed_until_restart = False
         self.save_config()
         self._sync_desktop_assistant()
         settings = self.settings_window or self._cached_settings_window
         page = getattr(settings, 'settings_assistant_page', None)
         if page is not None:
+            page.refresh()
+
+    def set_main_assistant_visible(self, visible):
+        from PyQt5 import sip
+        self.config['main_assistant_visible'] = bool(visible)
+        self.save_config()
+        preview = getattr(self, 'assistant_preview', None)
+        if preview is not None and not sip.isdeleted(preview):
+            preview.setVisible(bool(visible))
+        settings = self.settings_window or self._cached_settings_window
+        page = getattr(settings, 'settings_assistant_page', None)
+        if page is not None and not sip.isdeleted(page):
             page.refresh()
 
     def show_assistant_settings(self):
@@ -8280,12 +8282,14 @@ class DarkThemeApp(QMainWindow):
         fullscreen_action.triggered.connect(self.launch_fullscreen_translate)
         game_action = tray_menu.addAction(ui_text(lang, "tray_game_translate"))
         game_action.triggered.connect(self.launch_game_translate)
-        tray_menu.addSeparator()
         from assistant_text import assistant_text
-        self._tray_assistant_action = tray_menu.addAction(assistant_text(lang, 'tray'))
-        self._tray_assistant_action.setCheckable(True)
-        self._tray_assistant_action.setChecked(self.config.get('desktop_assistant_enabled') is True)
-        self._tray_assistant_action.toggled.connect(self.set_desktop_assistant_enabled)
+        assistant_visible = (self.config.get('desktop_assistant_enabled') is True
+                             and not getattr(self, '_desktop_assistant_suppressed_until_restart', False))
+        self._tray_assistant_action = tray_menu.addAction(
+            assistant_text(lang, 'tray_hide' if assistant_visible else 'tray_show'))
+        self._tray_assistant_action.triggered.connect(lambda: self.set_desktop_assistant_enabled(
+            not (self.config.get('desktop_assistant_enabled') is True
+                 and not getattr(self, '_desktop_assistant_suppressed_until_restart', False))))
         tray_menu.addSeparator()
         exit_action = tray_menu.addAction(ui_text(lang, "tray_exit"))
         exit_action.triggered.connect(self.exit_app)
@@ -9861,6 +9865,7 @@ class DarkThemeApp(QMainWindow):
             return
         self.current_interface_language = language_code
         self.config["interface_language"] = language_code
+        follow_default_translation_language(self.config, language_code)
         self.save_config()
         self.refresh_interface_language_ui()
         if self.settings_window is not None:
@@ -9873,225 +9878,94 @@ class DarkThemeApp(QMainWindow):
         self.update_theme_icon()
 
     def show_help_dialog(self):
-        """Показать окно помощи с описанием переводчиков и OCR."""
-        lang = self.current_interface_language
-        theme = self.current_theme
-
-        dialog = CenteredFramelessDialog(self, drag_height=76)
-        dialog.setObjectName("helpDialogRoot")
-        dialog.setWindowTitle(help_action_text(lang, "title"))
-        dialog.setFixedSize(610, 620)
-        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        dialog.setAttribute(Qt.WA_TranslucentBackground, True)
-        dialog.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-
+        lang, theme = self.current_interface_language, self.current_theme
+        dark = theme != 'Светлая'
+        from button_styles import button_palette
+        from ui_details import social_icon
+        from rounded_windows import clip_rounded_window
+        colors = button_palette(dark)
+        dialog = CenteredFramelessDialog(self, drag_height=54)
+        dialog.setObjectName('helpDialogRoot')
+        dialog.setWindowTitle(help_action_text(lang, 'title'))
+        dialog.setFixedSize(620, 520)
+        dialog.setWindowIcon(QIcon(resource_path('icons/icon.ico')))
         outer = QVBoxLayout(dialog)
-        outer.setContentsMargins(10, 10, 10, 10)
-        outer.setSpacing(0)
+        outer.setContentsMargins(0, 0, 0, 0)
         frame = QFrame(dialog)
-        frame.setObjectName("helpDialogFrame")
+        frame.setObjectName('helpDialogFrame')
         outer.addWidget(frame)
-
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(14)
-
-        title_row = QHBoxLayout()
-        title_row.setSpacing(10)
-        icon = QLabel("?")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(38, 38)
-        icon.setStyleSheet("""
-            QLabel {
-                color: #111827;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #dfd4ff, stop:1 #8f6fd1);
-                border-radius: 14px;
-                font-size: 19px;
-                font-weight: 900;
-            }
+        clip_rounded_window(dialog, frame, 8)
+        dialog.setStyleSheet(f"""
+            QDialog#helpDialogRoot {{ background:transparent; }}
+            QFrame#helpDialogFrame {{ background:{THEMES[theme]['background']};
+                border:1px solid {colors['border']}; border-radius:8px; }}
+            QLabel {{ color:{colors['text']}; background:transparent; border:0; }}
         """)
-        title_row.addWidget(icon)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(16, 12, 16, 14)
+        layout.setSpacing(12)
+        header = QHBoxLayout()
+        title = QLabel(help_action_text(lang, 'title'))
+        title.setStyleSheet('font-size:18px; font-weight:600;')
+        header.addWidget(title)
+        version = QLabel(f'V{APP_VERSION}')
+        version.setObjectName('helpVersionLabel')
+        version.setStyleSheet(f'font-size:12px; color:{colors["disabled"]};')
+        header.addWidget(version)
+        header.addStretch(1)
+        close = QToolButton()
+        close.setObjectName('helpTitleClose')
+        close.setText('×')
+        close.setFixedSize(28, 28)
+        close.setAccessibleName(help_action_text(lang, 'close'))
+        close.setStyleSheet(button_qss(dark, 'close', 'QToolButton', icon=True))
+        close.clicked.connect(dialog.accept)
+        header.addWidget(close)
+        layout.addLayout(header)
 
-        title_stack = QVBoxLayout()
-        title_stack.setSpacing(0)
-        title_label = QLabel(help_action_text(lang, "title"))
-        title_color = "#ffffff" if theme == "Темная" else "#27212f"
-        subtitle_color = "#a994d2" if theme == "Темная" else "#735396"
-        title_label.setStyleSheet(
-            f"font-size: 21px; font-weight: 900; color: {title_color};"
-        )
-        # This fixed header stays visible while the FAQ body scrolls, so the
-        # installed version is always available when reporting a problem.
-        subtitle_label = QLabel(f"Click'n'Translate · V{APP_VERSION}")
-        subtitle_label.setObjectName("helpVersionLabel")
-        subtitle_label.setStyleSheet(
-            f"font-size: 12px; font-weight: 800; color: {subtitle_color};"
-        )
-        title_stack.addWidget(title_label)
-        title_stack.addWidget(subtitle_label)
-        title_row.addLayout(title_stack)
-        title_row.addStretch()
-        title_close = QToolButton(dialog)
-        title_close.setObjectName("helpTitleClose")
-        title_close.setText("×")
-        title_close.setFixedSize(34, 34)
-        title_close.setToolTip(tooltip_text(help_action_text(lang, "close")))
-        title_close.clicked.connect(dialog.accept)
-        title_row.addWidget(title_close, alignment=Qt.AlignTop)
-        layout.addLayout(title_row)
-
-        # Текст FAQ всегда строится из актуального языка интерфейса.
-        help_html = help_text(lang, theme)
-
-        text_edit = QTextBrowser()
-        text_edit.setReadOnly(True)
-        text_edit.setOpenExternalLinks(True)
-        text_edit.setHtml(help_html)
-        text_edit.setFocusPolicy(Qt.NoFocus)
-
-        # Стилизация под тему
-        if theme == "Темная":
-            dialog.setStyleSheet("""
-                QDialog#helpDialogRoot {
-                    background: transparent;
-                }
-                QFrame#helpDialogFrame {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #0f131c, stop:0.55 #15101f, stop:1 #241735);
-                    border: 1px solid rgba(197, 179, 233, 105);
-                    border-radius: 16px;
-                }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
-            text_edit.setStyleSheet("""
-                QTextEdit {
-                    background-color: rgba(9, 12, 20, 165);
-                    color: #e0e0e0;
-                    border: 1px solid rgba(197, 179, 233, 70);
-                    border-radius: 16px;
-                    padding: 15px;
-                    font-size: 13px;
-                    line-height: 1.5;
-                }
-                QScrollBar:vertical {
-                    background: transparent;
-                    width: 10px;
-                    margin: 4px 2px 4px 2px;
-                }
-                QScrollBar::handle:vertical {
-                    background: #8f6fd1;
-                    min-height: 30px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
-                    background: #c5b3e9;
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0;
-                    background: none;
-                }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                    background: none;
-                }
-            """)
-        else:
-            dialog.setStyleSheet("""
-                QDialog#helpDialogRoot {
-                    background: transparent;
-                }
-                QFrame#helpDialogFrame {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #f4f1f6, stop:0.58 #efebf2, stop:1 #e7e0eb);
-                    border: 1px solid #cdbce1;
-                    border-radius: 16px;
-                }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
-            text_edit.setStyleSheet("""
-                QTextEdit {
-                    background-color: #f3eff5;
-                    color: #2b2532;
-                    border: 1px solid #d7cde7;
-                    border-radius: 16px;
-                    padding: 15px;
-                    font-size: 13px;
-                    line-height: 1.5;
-                }
-                QScrollBar:vertical {
-                    background: #f1edf6;
-                    width: 10px;
-                    margin: 4px 2px 4px 2px;
-                }
-                QScrollBar::handle:vertical {
-                    background: #8f6fd1;
-                    min-height: 30px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {
-                    background: #7a5fa1;
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0;
-                    background: none;
-                }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                    background: transparent;
-                }
-            """)
-
-        layout.addWidget(text_edit)
-
-        # A single four-button row cannot fit the longest translations inside
-        # the fixed 610 px FAQ dialog.  Keep the important guide action on its
-        # own full-width row and place the three secondary actions below it.
-        button_grid = QGridLayout()
-        button_grid.setHorizontalSpacing(10)
-        button_grid.setVerticalSpacing(8)
-        for column in range(3):
-            button_grid.setColumnStretch(column, 1)
-
-        guide_btn = QPushButton(help_action_text(lang, "guide"))
-        guide_btn.setObjectName("helpGuideButton")
-        guide_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        guide_btn.setStyleSheet(button_qss(theme != "Светлая", "primary"))
-        guide_btn.clicked.connect(lambda: self._close_help_and_start_guide(dialog))
-        button_grid.addWidget(guide_btn, 0, 0, 1, 3)
-
-        telegram_btn = QPushButton(help_action_text(lang, "telegram"))
-        telegram_btn.setObjectName("helpTelegramButton")
-        secondary_button_style = button_qss(theme != "Светлая")
-        telegram_btn.setStyleSheet(secondary_button_style)
-        telegram_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        telegram_btn.clicked.connect(
-            lambda: webbrowser.open("https://t.me/jabrail_digital")
-        )
-        button_grid.addWidget(telegram_btn, 1, 0)
-
-        report_btn = QPushButton(help_action_text(lang, "report"))
-        report_btn.setObjectName("helpBugReportButton")
-        report_btn.setStyleSheet(telegram_btn.styleSheet())
-        report_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        report_btn.setToolTip(
-            tooltip_text(
-                "Creates a privacy-safe ZIP without clipboard, history or document text."
-                if lang != "ru" else
-                "Создаёт безопасный ZIP без буфера обмена, истории и текста документов."
-            )
-        )
-        report_btn.clicked.connect(lambda: self._create_bug_report(dialog))
-        button_grid.addWidget(report_btn, 1, 1)
-
-        # Кнопка закрытия
-        close_btn = QPushButton(help_action_text(lang, "close"))
-        close_btn.setStyleSheet(secondary_button_style)
-        close_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        close_btn.clicked.connect(dialog.close)
-        button_grid.addWidget(close_btn, 1, 2)
-        layout.addLayout(button_grid)
-
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        browser.setHtml(help_text(lang, theme))
+        browser.setStyleSheet(f"""
+            QTextBrowser {{ background:{'#18171c' if dark else '#faf8fc'};
+                color:{colors['text']}; border:1px solid {colors['border']}; border-radius:6px;
+                padding:10px; font-size:13px; }}
+            QScrollBar:vertical {{ background:transparent; width:8px; margin:4px 0; }}
+            QScrollBar::handle:vertical {{ background:{'#9a7fc1' if dark else '#9474b9'}; min-height:28px; border-radius:4px; }}
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{'#c5b3e9' if dark else '#755399'}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
+        """)
+        layout.addWidget(browser, 1)
+        footer = QHBoxLayout()
+        footer.setSpacing(8)
+        for kind, address in (('telegram', 'https://t.me/jabrail_digital'),
+                              ('github', 'https://github.com/jabrailkhalil')):
+            link = QToolButton()
+            link.setIcon(social_icon(kind, dark))
+            link.setIconSize(QSize(21, 21))
+            link.setFixedSize(32, 32)
+            link.setAccessibleName('Telegram' if kind == 'telegram' else 'GitHub')
+            link.setToolTip(link.accessibleName())
+            link.setStyleSheet(button_qss(dark, 'quiet', 'QToolButton', icon=True))
+            link.clicked.connect(lambda checked=False, url=address: webbrowser.open(url))
+            footer.addWidget(link)
+        footer.addStretch(1)
+        report = QPushButton(help_action_text(lang, 'report'))
+        report.setObjectName('helpBugReportButton')
+        report.setStyleSheet(button_qss(dark, compact=True))
+        report.setFixedHeight(32)
+        report.clicked.connect(lambda: self._create_bug_report(dialog))
+        footer.addWidget(report)
+        guide = QPushButton(help_action_text(lang, 'guide'))
+        guide.setObjectName('helpGuideButton')
+        guide.setStyleSheet(button_qss(dark, 'primary', compact=True))
+        guide.setFixedHeight(32)
+        guide.clicked.connect(lambda: self._close_help_and_start_guide(dialog))
+        footer.addWidget(guide)
+        layout.addLayout(footer)
         dialog.exec_()
-        self._complete_guide_step("help")
+        self._complete_guide_step('help')
 
     def _create_bug_report(self, parent=None):
         lang = self.current_interface_language
@@ -10180,7 +10054,11 @@ class DarkThemeApp(QMainWindow):
         The grid owns the row width; the key keeps its measured width and
         the caption receives the remaining space. No separate card surfaces.
         """
-        if platform_support.IS_MAC and sequence and sequence != "—":
+        from double_tap_hotkeys import parse_double_tap
+        double = parse_double_tap(sequence)
+        if double:
+            sequence = double[0] + ' ×2'
+        elif platform_support.IS_MAC and sequence and sequence != "—":
             sequence = QtGui.QKeySequence(sequence).toString(QtGui.QKeySequence.NativeText)
         pair = HotkeyReferenceRow()
         pair.setObjectName("mainHotkeyPair")
@@ -10284,10 +10162,9 @@ class DarkThemeApp(QMainWindow):
                     QPushButton#mainHotkeyPair {{ background:transparent; border:none;
                         border-bottom:1px solid {divider}; border-radius:0; padding:0; }}
                     QPushButton#mainHotkeyPair[lastShortcutRow="true"] {{ border-bottom-color:transparent; }}
-                    QPushButton#mainHotkeyPair:hover {{ background:{hover}; }}
-                    QPushButton#mainHotkeyPair[keyboardFocus="true"]:focus {{ background:{hover}; border-bottom-color:{focus}; }}
-                    QPushButton#mainHotkeyPair:pressed {{ background:{pressed}; border-bottom-color:{focus}; }}
                 """)
+                pair.setProperty('referenceHover', hover)
+                pair.setProperty('referencePressed', pressed)
                 pair.caption_label.setStyleSheet(
                     f"font-size: 13px; color:{caption}; background:transparent; border:none; padding:0; margin:0;"
                 )
@@ -10698,12 +10575,6 @@ class DarkThemeApp(QMainWindow):
                 )
             )
         text_section_layout.addWidget(self.main_composer, 1)
-        from assistant_preview import AssistantPreview
-        self.assistant_preview = AssistantPreview(self, self.current_interface_language, self.main_text_section)
-        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
-        text_section_layout.addWidget(self.assistant_preview)
-        if getattr(self, '_desktop_assistant_suppressed_until_restart', False):
-            self.assistant_preview.hide()
         self.main_layout.addWidget(self.main_text_section, 1)
 
         self._refresh_direction_summary()
@@ -10885,6 +10756,13 @@ class DarkThemeApp(QMainWindow):
                 used.add(key)
         slot_order = (slot_order + [None] * 8)[:8]
         self.main_hotkey_slot_order = list(slot_order)
+        from assistant_preview import AssistantPreview
+        self.assistant_preview = AssistantPreview(self, lang, self.main_hotkey_area)
+        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
+        self.assistant_preview.dismiss_requested.connect(lambda: self.set_main_assistant_visible(False))
+        preview_slot = slot_order.index(None)
+        hotkey_grid.addWidget(self.assistant_preview, preview_slot // 2, preview_slot % 2)
+        self.assistant_preview.setVisible(self.config.get('main_assistant_visible', True) is True)
         for slot, key in enumerate(slot_order):
             if key is None:
                 continue
@@ -11134,6 +11012,26 @@ class DarkThemeApp(QMainWindow):
             platform_support.copy_text(snapshot['translated_text'])
             save_copy_history(snapshot['translated_text'])
 
+    def open_text_translation(self):
+        """Open the editable translator directly, including from the tray companion."""
+        from PyQt5 import sip
+        dialog = getattr(self, '_manual_translation_dialog', None)
+        if dialog is None or sip.isdeleted(dialog) or dialog._closed:
+            dialog = show_translation_dialog(
+                self, '', auto_copy=False, lang=self.current_interface_language,
+                theme=self.current_theme,
+                source_lang=self.config.get('main_translation_source_language', 'en'),
+                target_lang=self.config.get('main_translation_target_language', 'ru'))
+            dialog.auto_copy = bool(self.config.get('copy_translated_text', False))
+            self._manual_translation_dialog = dialog
+            dialog.finished.connect(lambda _result: setattr(self, '_manual_translation_dialog', None))
+        else:
+            dialog.showNormal()
+            dialog.raise_()
+            dialog.activateWindow()
+        dialog.source_edit.setFocus(Qt.OtherFocusReason)
+        return dialog
+
     def _open_main_result_window(self):
         snapshot = getattr(self, '_main_result_snapshot', None)
         if self._main_translation_running:
@@ -11252,6 +11150,10 @@ class DarkThemeApp(QMainWindow):
         folder_action.triggered.connect(self._choose_document_directory_from_main)
 
     def show_main_context_menu(self, global_pos):
+        # Buttons on the embedded Settings page may ignore a right press.
+        # That event must not open the main page's document actions.
+        if getattr(self, 'settings_window', None) is not None:
+            return
         menu = QMenu(self)
         self._apply_main_context_menu_style(menu)
         self._add_document_context_actions(menu)

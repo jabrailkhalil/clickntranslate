@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.7.1.0",
+    [string]$Version = "1.8.0.0",
     [string]$OutputPath = "",
     # The default URL follows Version. The digest must come from the final
     # archive for that release; retaining an earlier release's hash breaks repair.

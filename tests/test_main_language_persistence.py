@@ -157,7 +157,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             "main_translation_source_language": "unknown",
             "main_translation_target_language": "unknown",
         })
-        self.assertEqual(invalid._configured_main_translation_pair(), ("en", "ru"))
+        self.assertEqual(invalid._configured_main_translation_pair(), ("ru", "en"))
 
         identical = _LanguageHarness({
             "main_translation_source_language": "ru",

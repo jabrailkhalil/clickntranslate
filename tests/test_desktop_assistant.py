@@ -29,7 +29,7 @@ def companion(app):
     owner.current_interface_language = 'ru'
     owner.current_theme = 'Темная'
     owner.save_config = mock.Mock()
-    for name in (*ACTION_METHODS.values(), 'show_window_from_tray', 'show_main_screen', 'show_settings'):
+    for name in (*ACTION_METHODS.values(), 'show_window_from_tray', 'show_main_screen', 'open_text_translation', 'show_settings'):
         setattr(owner, name, mock.Mock())
     helper = DesktopAssistant(owner)
     yield helper
@@ -70,7 +70,7 @@ def test_actions_reuse_existing_workflows_and_preserve_provider(companion, actio
     assert not companion.anchor.isVisible()
     companion.request_action(action)  # Ignore a duplicate click during dispatch.
     QTest.qWait(220)
-    method = {'text': 'show_main_screen', 'settings': 'show_settings'}.get(action, ACTION_METHODS.get(action))
+    method = {'text': 'open_text_translation', 'settings': 'show_settings'}.get(action, ACTION_METHODS.get(action))
     getattr(companion.owner, method).assert_called_once_with()
     assert companion.owner.config['translator_engine'] == 'DeepL'
     QTest.qWait(370)
@@ -115,8 +115,8 @@ def test_theme_and_language_change_replace_the_menu_immediately(companion):
     companion.refresh()
     assert not old_menu.isVisible()
     companion.toggle_menu()
-    assert companion.menu.windowTitle() == assistant_text('de', 'title')
-    assert '#f7f3fa' in companion.menu.styleSheet()
+    assert companion.menu.windowTitle() == assistant_text('de', 'translation_section')
+    assert companion.menu._background.name() == '#f0edf3'
     assert not companion.anchor.dark
 
 
@@ -212,10 +212,9 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
                 required = label.heightForWidth(label.width())
                 assert required <= label.height(), (language, key, label.text(), required, label.height())
             assert button.width() > 0
-        assert menu.header_widget.isVisible()
-        assert all(button.parentWidget() is menu.header_widget
-                   for button in menu.section_buttons.values())
-        assert menu.buttons['text'].parentWidget() is not menu.header_widget
+        assert set(menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'hide'}
+        assert not menu.findChildren(QtWidgets.QScrollArea)
+        assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()
         assert 'background:' in menu.buttons['text'].styleSheet()
         if app.platformName() != 'cocoa':

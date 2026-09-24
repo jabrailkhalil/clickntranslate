@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 BASE_WIDTH, BASE_HEIGHT = 700, 400
 # The compact Mac default is 560x320; keep the logical canvas unchanged.
 BASE_SCALE = 125 if sys.platform == 'darwin' else 80
-MIN_SCALE, DEFAULT_SCALE, MAX_SCALE, SCALE_STEP = 80, 100, 200, 5
+MIN_SCALE, DEFAULT_SCALE, MAX_SCALE, SCALE_STEP = 80, 100, 200, 1
 
 
 def configure_qt_platform():
@@ -194,6 +194,8 @@ def paint_scaled_icon(painter, button, option):
         QIcon.Active if option.state & QStyle.State_MouseOver else QIcon.Normal)
     state = QIcon.On if button.isChecked() else QIcon.Off
     pixmap = button.icon().pixmap(requested, mode, state)
+    if pixmap.isNull() and (mode != QIcon.Normal or state != QIcon.Off):
+        pixmap = button.icon().pixmap(requested, QIcon.Normal, QIcon.Off)
     if pixmap.isNull():
         return
     pixmap.setDevicePixelRatio(1)
@@ -514,20 +516,18 @@ def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
 
 
 def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
-    """Position an in-scene popup; only macOS draws the list inside the proxy.
+    """Fit scene-rendered lists to the canvas; native popups use screen bounds.
 
-    On Windows and X11 the popup of an embedded combo is still a native top
-    level window, but Qt reports a graphics proxy for it. Treating the scene
-    coordinates as desktop coordinates dropped the list at the canvas origin
-    (upper left of the window) instead of under the field. Returning False
-    sends the caller to the global-coordinate layout path instead.
+    Qt can embed a popup on Windows too. Its native handle does not mean it is
+    drawn there: WA_DontShowOnScreen marks the proxy-rendered surface. Using
+    desktop coordinates for that surface clips long rows at the canvas edge.
     """
-    if sys.platform != 'darwin':
-        return False
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()
     if reference is None or proxy is None:
+        return False
+    if sys.platform != 'darwin' and not popup.testAttribute(Qt.WA_DontShowOnScreen):
         return False
     anchor = QRect(combo.mapTo(root, QPoint()), combo.size())
     geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4)

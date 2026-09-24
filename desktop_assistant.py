@@ -238,173 +238,76 @@ class ActionButton(QtWidgets.QPushButton):
 
 
 class AssistantMenu(QtWidgets.QFrame):
+    """One translation launcher, without companion preferences or scrolling."""
     action_requested = QtCore.pyqtSignal(str)
     visibility_changed = QtCore.pyqtSignal(bool)
 
     def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='orb'):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.setObjectName('desktopAssistantMenu')
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        self.setAttribute(QtCore.Qt.WA_NoSystemBackground, True)
-        self.setWindowTitle(assistant_text(language, 'title'))
-        background, border = ('#201d28', '#746087') if dark else ('#f7f3fa', '#a18bb9')
-        header, header_border = ('#292431', '#4d425a') if dark else ('#eee8f4', '#d2c5dd')
-        self.setStyleSheet(f'''
-            QFrame#desktopAssistantMenu {{ background:{background}; border:1px solid {border}; border-radius:12px; }}
-            QFrame#assistantMenuHeader {{ background:{header}; border:1px solid {header_border}; border-radius:9px; }}
-            QFrame#assistantMenuDivider {{ background:{header_border}; border:0; max-height:1px; }}
-            QFrame#assistantMenuHeader QLabel {{ background:transparent; border:0; }}
-        ''')
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+        self.setWindowTitle(assistant_text(language, 'translation_section'))
+        self.factor = factor
+        self._background = QtGui.QColor('#121212' if dark else '#f0edf3')
+        self._border = QtGui.QColor('#584963' if dark else '#bcaacb')
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(self, self, 8)
+        self.setStyleSheet('QFrame#desktopAssistantMenu { background:transparent; border:0; }')
         outer = QtWidgets.QVBoxLayout(self)
-        outer.setContentsMargins(9, 9, 9, 9)
-        outer.setSpacing(7)
-        self.header_widget = QtWidgets.QFrame(self)
-        self.header_widget.setObjectName('assistantMenuHeader')
-        header_layout = QtWidgets.QVBoxLayout(self.header_widget)
-        header_layout.setContentsMargins(7, 5, 7, 7)
-        header_layout.setSpacing(5)
-        title_row = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel(assistant_text(language, 'title'))
-        title.setStyleSheet(f'color:{"#f5f0fa" if dark else "#302837"}; font-size:16px; font-weight:600; padding-left:8px;')
-        title_row.addWidget(title, 1)
+        outer.setContentsMargins(14, 12, 14, 12)
+        outer.setSpacing(10)
+        header = QtWidgets.QHBoxLayout()
+        title = QtWidgets.QLabel(assistant_text(language, 'translation_section'))
+        title.setStyleSheet(f'color:{"#eee7f5" if dark else "#302639"}; background:transparent; font-size:16px; font-weight:600;')
+        header.addWidget(title, 1)
         close = QtWidgets.QPushButton('×')
-        close.setAccessibleName(assistant_text(language, 'hide'))
-        close.setFixedSize(28, 28)
+        close.setFixedSize(26, 26)
+        close.setAccessibleName(assistant_text(language, 'close_menu'))
         close.setStyleSheet(button_qss(dark, 'close', icon=True))
         close.clicked.connect(self.hide)
-        title_row.addWidget(close)
-        header_layout.addLayout(title_row)
-        navigation = QtWidgets.QHBoxLayout()
-        navigation.setSpacing(6)
-        self.section_buttons = {}
-        self.section_pages = {}
-        for key in ('translation_section', 'companion_section'):
-            button = QtWidgets.QPushButton(assistant_text(language, key))
-            button.setCheckable(True)
-            button.setStyleSheet(button_qss(dark, 'secondary', compact=True))
-            button.setMinimumHeight(34)
-            button.clicked.connect(lambda checked=False, section=key: self.select_section(section))
-            self.section_buttons[key] = button
-            navigation.addWidget(button)
-        header_layout.addLayout(navigation)
-        outer.addWidget(self.header_widget)
-        divider = QtWidgets.QFrame(self)
-        divider.setObjectName('assistantMenuDivider')
-        divider.setFixedHeight(1)
-        outer.addWidget(divider)
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet('QScrollArea, QScrollArea > QWidget > QWidget { background:transparent; border:none; }')
-        content = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        header.addWidget(close)
+        outer.addLayout(header)
+        grid = QtWidgets.QGridLayout()
+        grid.setSpacing(8)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
         self.buttons = {}
-        self.factor = factor
-        for key in self.section_buttons:
-            page = QtWidgets.QWidget()
-            self.section_pages[key] = page
-            layout.addWidget(page)
-        translate_layout = QtWidgets.QGridLayout(self.section_pages['translation_section'])
-        translate_layout.setContentsMargins(2, 5, 2, 5)
-        translate_layout.setHorizontalSpacing(8)
-        translate_layout.setVerticalSpacing(8)
-        for index, action in enumerate(('text', 'area', 'screen', 'copy', 'dynamic', 'documents')):
+        for index, action in enumerate(('area', 'screen', 'text', 'copy', 'dynamic', 'documents')):
             button = ActionButton(*assistant_text(language, action), dark)
-            button.setMinimumHeight(80)
+            button.setMinimumHeight(68)
             button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
-            translate_layout.addWidget(button, index // 2, index % 2)
+            grid.addWidget(button, index // 2, index % 2)
             self.buttons[action] = button
-        companion_layout = QtWidgets.QVBoxLayout(self.section_pages['companion_section'])
-        companion_layout.setContentsMargins(4, 8, 4, 8)
-        companion_layout.setSpacing(10)
-        explanation = QtWidgets.QLabel(assistant_text(language, 'walking_hint' if appearance == 'walking' else 'static_hint'))
-        explanation.setWordWrap(True)
-        explanation.setStyleSheet(f'color:{"#bdb2ca" if dark else "#70647e"}; font-size:13px;')
-        companion_layout.addWidget(explanation)
-        modes = QtWidgets.QGridLayout()
-        for index, mode in enumerate(BEHAVIORS):
-            button = QtWidgets.QPushButton(assistant_text(language, 'pause_walk' if mode == 'idle' else mode))
-            button.setCheckable(True)
-            button.setChecked(mode == behavior)
-            button.setEnabled(appearance == 'walking')
-            button.setVisible(appearance == 'walking')
-            button.setStyleSheet(button_qss(dark, 'secondary', compact=True))
-            button.setMinimumHeight(30)
-            button.clicked.connect(lambda checked=False, key=mode: self.action_requested.emit(key))
-            modes.addWidget(button, index // 2, index % 2)
-            self.buttons[mode] = button
-        companion_layout.addLayout(modes)
-        heading = QtWidgets.QLabel(assistant_text(language, 'quick_actions'))
-        heading.setStyleSheet(explanation.styleSheet())
-        companion_layout.addWidget(heading)
-        fun = QtWidgets.QHBoxLayout()
-        for action in ('home',):
-            button = QtWidgets.QPushButton(assistant_text(language, action))
-            button.setStyleSheet(button_qss(dark, 'quiet', compact=True))
-            button.setMinimumHeight(30)
-            button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
-            fun.addWidget(button)
-            self.buttons[action] = button
-        companion_layout.addLayout(fun)
-        companion_layout.addStretch(1)
-        footer = QtWidgets.QHBoxLayout()
-        for action in ('settings', 'guide'):
-            button = QtWidgets.QPushButton(assistant_text(language, 'companion_settings' if action == 'settings' else action))
-            button.setStyleSheet(button_qss(dark, 'primary' if action == 'settings' else 'secondary', compact=True))
-            button.setMinimumHeight(32)
-            button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
-            footer.addWidget(button)
-            self.buttons[action] = button
-        layout.addLayout(footer)
-        hide = QtWidgets.QPushButton(assistant_text(language, 'hide'))
+        outer.addLayout(grid)
+        hide = QtWidgets.QPushButton(assistant_text(language, 'tray_hide'))
         hide.setStyleSheet(button_qss(dark, 'quiet', compact=True))
-        hide.setMinimumHeight(30)
-        hide.setToolTip(assistant_text(language, 'hide_hint'))
+        hide.setFixedHeight(28)
         hide.clicked.connect(lambda: self.action_requested.emit('hide'))
-        layout.addWidget(hide)
         self.buttons['hide'] = hide
-        scroll.setWidget(content)
-        outer.addWidget(scroll, 1)
-        self._content = content
-        self.select_section('translation_section')
+        outer.addWidget(hide, 0, QtCore.Qt.AlignRight)
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
 
-    def _apply_rounded_shape(self):
-        # On Windows and Linux the QWidget mask clips the native popup window,
-        # not just the rounded background painted by the stylesheet. Cocoa
-        # keeps its antialiased translucent corners and deliberately skips it.
-        from styled_dialogs import _apply_rounded_popup_mask
-        _apply_rounded_popup_mask(self, 12)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._apply_rounded_shape()
-
-    def select_section(self, section):
-        for key, page in self.section_pages.items():
-            page.setVisible(key == section)
-            self.section_buttons[key].setChecked(key == section)
-        if self.isVisible() and hasattr(self, '_placement'):
-            self.open_beside(*self._placement)
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(self._border, 1))
+        painter.setBrush(self._background)
+        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5),
+                                8 * self.factor, 8 * self.factor)
 
     def open_beside(self, anchor, available):
-        self._placement = (QtCore.QRect(anchor), QtCore.QRect(available))
         self.ensurePolished()
-        width = min(round(420 * self.factor), available.width())
-        content_width = max(80, width - round(34 * self.factor))
-        self._content.setMinimumHeight(0)
-        self._content.setMinimumHeight(self._content.layout().totalHeightForWidth(content_width))
-        height = min(max(round(330 * self.factor), self._content.minimumHeight() + round(108 * self.factor)), available.height())
+        width = min(round(430 * self.factor), available.width())
+        self.setFixedWidth(width)
+        self.layout().activate()
+        height = max(self.layout().totalHeightForWidth(width), self.layout().minimumSize().height())
         self.resize(width, height)
         x = anchor.left() - width - 8
         if x < available.left():
             x = anchor.right() + 9
-        point = clamp_position(QtCore.QPoint(x, anchor.bottom() - height + 1), self.size(), available)
-        self.move(point)
+        self.move(clamp_position(QtCore.QPoint(x, anchor.bottom() - self.height() + 1), self.size(), available))
         self.show()
 
     def showEvent(self, event):
@@ -504,7 +407,9 @@ class DesktopAssistant(QtCore.QObject):
         preferences = assistant_preferences(self.owner.config)
         screen = QtWidgets.QApplication.screenAt(self.anchor.geometry().center()) or self.anchor.screen()
         factor = desktop_control_scale(screen)
-        context = (self.owner.current_interface_language, self.owner.current_theme != 'Светлая', factor,
+        available = screen.availableGeometry()
+        menu_factor = min(factor, available.width()/430, available.height()/420)
+        context = (self.owner.current_interface_language, self.owner.current_theme != 'Светлая', menu_factor,
                    preferences['desktop_assistant_behavior'], preferences['desktop_assistant_appearance'])
         if context != self._context:
             if self.menu is not None:
@@ -626,10 +531,10 @@ class DesktopAssistant(QtCore.QObject):
                 # A newer hotkey or a modal dialog takes precedence over a
                 # menu click still waiting for the compositor to settle.
                 return
-            if self._action in ('text', 'settings', 'guide'):
+            if self._action in ('settings', 'guide'):
                 self.owner.show_window_from_tray(force_show=True)
             if self._action == 'text':
-                self.owner.show_main_screen()
+                self.owner.open_text_translation()
             elif self._action == 'settings':
                 show = getattr(self.owner, 'show_assistant_settings', self.owner.show_settings)
                 show()

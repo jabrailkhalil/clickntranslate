@@ -1,7 +1,6 @@
 """Monochrome outline icons, drawn at the title bar's actual display size."""
 
-import sys
-from pathlib import Path
+import math
 
 from PyQt5 import QtCore, QtGui
 
@@ -24,7 +23,7 @@ class _HeaderIcon(QtGui.QIconEngine):
             painter.scale(side / 24, side / 24)
             # A tall rectangular page looks larger than a circular badge at
             # the same measured height, so inset it without thinning its lines.
-            span = {'help': 18, 'home': 20, 'document': 19}[self.kind]
+            span = {'help': 18, 'home': 20, 'document': 19, 'settings': 22, 'image_add': 22}[self.kind]
             extent = 22 if self.kind == 'document' else 24
             glyph_scale = (extent - 1.5) / span
             painter.translate(12, 12)
@@ -67,6 +66,40 @@ class _HeaderIcon(QtGui.QIconEngine):
                 path.lineTo(7.8, 16.3)
                 path.quadTo(7.3, 16.3, 7.3, 15.8)
                 path.closeSubpath()
+            elif self.kind == 'settings':
+                # Draw every state and resolution locally: no image/plugin or
+                # working-directory dependency on another portable installation.
+                for index in range(48):
+                    angle = math.tau * index / 48 - math.pi / 2
+                    radius = 10.5 if index % 6 in (1, 2, 3, 4) else 8.2
+                    point = QtCore.QPointF(12 + math.cos(angle) * radius,
+                                          12 + math.sin(angle) * radius)
+                    if index == 0:
+                        path.moveTo(point)
+                    else:
+                        path.lineTo(point)
+                path.closeSubpath()
+                painter.drawEllipse(QtCore.QRectF(7.5, 7.5, 9, 9))
+                painter.drawEllipse(QtCore.QRectF(10, 10, 4, 4))
+            elif self.kind == 'image_add':
+                path.moveTo(13, 20)
+                path.lineTo(5, 20)
+                path.quadTo(3, 20, 3, 18)
+                path.lineTo(3, 5)
+                path.quadTo(3, 3, 5, 3)
+                path.lineTo(18, 3)
+                path.quadTo(20, 3, 20, 5)
+                path.lineTo(20, 12)
+                painter.drawEllipse(QtCore.QRectF(6, 6, 3, 3))
+                path.moveTo(3, 16)
+                path.lineTo(8, 11)
+                path.lineTo(12, 15)
+                path.lineTo(15, 12)
+                path.lineTo(17, 14)
+                path.moveTo(16, 19)
+                path.lineTo(22, 19)
+                path.moveTo(19, 16)
+                path.lineTo(19, 22)
             else:  # document
                 path.moveTo(5.5, 2.5)
                 path.lineTo(14, 2.5)
@@ -94,11 +127,6 @@ class _HeaderIcon(QtGui.QIconEngine):
 
 
 def header_icon(kind, theme):
-    if kind == 'settings':
-        # Keep the original gear the user preferred, including its centre rings.
-        base = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-        name = 'settings_light.png' if theme == 'Темная' else 'settings_dark.png'
-        return QtGui.QIcon(str(base / 'icons' / name))
-    if kind not in ('help', 'home', 'document'):
+    if kind not in ('help', 'home', 'document', 'settings', 'image_add'):
         raise ValueError(f'Unknown header icon: {kind}')
     return QtGui.QIcon(_HeaderIcon(kind, theme == 'Темная'))

@@ -29,9 +29,9 @@ def test_application_ack_is_atomic_and_uses_runtime_version(tmp_path, monkeypatc
         replace(source, destination)
 
     monkeypatch.setattr(update_handshake.os, 'replace', check_publish)
-    assert acknowledge_ready(['--show-after-update', f'--update-ack={ack}'], '1.7.1')
-    assert published == ['1.7.1']
-    assert ack.read_text(encoding='utf-8') == '1.7.1'
+    assert acknowledge_ready(['--show-after-update', f'--update-ack={ack}'], '1.7.2')
+    assert published == ['1.7.2']
+    assert ack.read_text(encoding='utf-8') == '1.7.2'
     assert list(ack.parent.iterdir()) == [ack]
 
 
@@ -41,9 +41,9 @@ def test_failed_ack_does_not_leave_an_empty_confirmation(tmp_path, monkeypatch):
     def fail(*args):
         raise PermissionError('simulated publication failure')
     monkeypatch.setattr(update_handshake.os, 'replace', fail)
-    assert not acknowledge_ready([f'--update-ack={ack}'], '1.7.1')
+    assert not acknowledge_ready([f'--update-ack={ack}'], '1.7.2')
     assert not list(tmp_path.iterdir())
-    assert not acknowledge_ready([], '1.7.1')
+    assert not acknowledge_ready([], '1.7.2')
 
 
 @pytest.fixture(scope='module')
@@ -57,7 +57,7 @@ def windows_binaries(tmp_path_factory):
     powershell = shutil.which('powershell.exe')
     for script, name in [('build_launcher.ps1', 'launcher.exe'), ('build_apply_updater.ps1', 'updater.exe')]:
         build = subprocess.run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-                                str(ROOT / 'tools' / script), '-Version', '1.7.1.0',
+                                str(ROOT / 'tools' / script), '-Version', '1.7.2.0',
                                 '-OutputPath', str(folder / name)],
                                capture_output=True, text=True, timeout=45)
         assert build.returncode == 0, build.stdout + build.stderr
@@ -70,7 +70,7 @@ def windows_binaries(tmp_path_factory):
                                capture_output=True, text=True, timeout=30)
         assert build.returncode == 0, build.stdout + build.stderr
 
-    for label, version in [('current', '1.7.1.0'), ('old', '1.7.0.0')]:
+    for label, version in [('current', '1.7.2.0'), ('old', '1.7.1.0')]:
         compile_program(label, '''
 using System;
 using System.IO;
@@ -85,7 +85,7 @@ class Child {
         if (args.Contains("--ready")) {
             Thread.Sleep(200);
             string ack = args.First(a => a.StartsWith("--update-ack=")).Substring(13);
-            File.WriteAllText(ack, "1.7.1");
+            File.WriteAllText(ack, "1.7.2");
         }
     }
 }
@@ -97,7 +97,7 @@ class Verify {
     static int Main(string[] args) {
         var method = Assembly.LoadFrom(args[0]).GetType("ClicknTranslateApplyUpdate")
             .GetMethod("VerifyInstalledFiles", BindingFlags.Static | BindingFlags.NonPublic);
-        try { method.Invoke(null, new object[] {args[1], "ClicknTranslate.exe", "1.7.1"}); return 0; }
+        try { method.Invoke(null, new object[] {args[1], "ClicknTranslate.exe", "1.7.2"}); return 0; }
         catch (TargetInvocationException e) { Console.WriteLine(e.InnerException.Message); return 7; }
     }
 }
@@ -108,11 +108,11 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-[assembly: AssemblyFileVersion("1.7.1.0")]
+[assembly: AssemblyFileVersion("1.7.2.0")]
 class Updatable {
     static void Main(string[] args) {
         string argument = args.FirstOrDefault(a => a.StartsWith("--update-ack="));
-        if (argument != null) File.WriteAllText(argument.Substring(13), "1.7.1");
+        if (argument != null) File.WriteAllText(argument.Substring(13), "1.7.2");
         Thread.Sleep(60000);
     }
 }
@@ -161,7 +161,7 @@ def test_launcher_waits_for_child_readiness_without_creating_ack(tmp_path, windo
     if ready:
         while time.monotonic() < deadline and not ack.exists():
             time.sleep(.02)
-        assert ack.read_text(encoding='utf-8') == '1.7.1'
+        assert ack.read_text(encoding='utf-8') == '1.7.2'
     else:
         assert not ack.exists(), 'Launching an unready child is not update success'
 
@@ -186,7 +186,7 @@ def test_missing_application_report_identifies_modules_and_interrupted_update(tm
     assert 'program_inventory: missing' in report
     assert 'update_marker: present' in report
     assert 'application_present=True' in report
-    assert 'version=1.7.1.0' in report
+    assert 'version=1.7.2.0' in report
     assert 'private settings must not be read' not in report
 
 
@@ -196,7 +196,7 @@ def test_update_rejects_old_app_under_new_launcher(tmp_path, windows_binaries, c
     shutil.copy2(windows_binaries / 'launcher.exe', tmp_path / 'ClicknTranslate.exe')
     shutil.copy2(windows_binaries / f'{child}.exe', tmp_path / 'app/ClicknTranslateApp.exe')
     add_runtime(tmp_path, windows_binaries)
-    write_manifest(tmp_path, '1.7.1')
+    write_manifest(tmp_path, '1.7.2')
     result = subprocess.run([str(windows_binaries / 'verify.exe'), str(windows_binaries / 'updater.exe'), str(tmp_path)],
                             capture_output=True, text=True, timeout=10)
     if child == 'old':
@@ -226,7 +226,7 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
     shutil.copy2(windows_binaries / 'launcher.exe', new / 'ClicknTranslate.exe')
     add_runtime(new, windows_binaries)
     shutil.copy2(windows_binaries / 'updatable.exe', new / 'app/ClicknTranslateApp.exe')
-    write_manifest(new, '1.7.1')
+    write_manifest(new, '1.7.2')
     if damage and damage != 'locked_backup':
         (new / damage).unlink()
     # Even a misplaced data folder in an archive may not overwrite user data.
@@ -241,11 +241,11 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
         compiler = Path(os.environ['LOCALAPPDATA']) / 'Programs/Inno Setup 6/ISCC.exe'
         if not compiler.exists():
             pytest.skip('Inno Setup is unavailable')
-        compilation = subprocess.run([str(compiler), '/DMyAppVersion=1.7.1', f'/DSourceDir={new}',
+        compilation = subprocess.run([str(compiler), '/DMyAppVersion=1.7.2', f'/DSourceDir={new}',
             f'/DReleaseDir={tmp_path}', '/DMyAppId={{' + str(uuid.uuid4()).upper() + '}',
             str(ROOT / 'installer/ClicknTranslate.iss')], capture_output=True, timeout=45)
         assert compilation.returncode == 0, compilation.stdout
-        archive = tmp_path / 'ClicknTranslate-Setup-v1.7.1-win64.exe'
+        archive = tmp_path / 'ClicknTranslate-Setup-v1.7.2-win64.exe'
     install = tmp_path / 'installed'
     install.mkdir()
     old = {'ClicknTranslate.exe': (windows_binaries / 'old.exe').read_bytes(),
@@ -273,7 +273,7 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
         with log.open('w') as output:
             result = subprocess.run([str(windows_binaries / 'apply.exe'), str(windows_binaries / 'updater.exe'),
                 '--mode', mode, '--app-dir', encoded(install), '--package', encoded(archive),
-                '--exe', encoded('ClicknTranslate.exe'), '--version', '1.7.1', '--pid', '2147483000'],
+                '--exe', encoded('ClicknTranslate.exe'), '--version', '1.7.2', '--pid', '2147483000'],
                 stdout=output, stderr=subprocess.STDOUT, timeout=75, creationflags=subprocess.CREATE_NO_WINDOW)
         details = log.read_text(encoding='utf-8', errors='replace')
         if damage:
@@ -282,7 +282,7 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
                 assert (install / relative).read_bytes() == content
         else:
             assert result.returncode == 0, details
-            assert verify_manifest(install, '1.7.1') == 8
+            assert verify_manifest(install, '1.7.2') == 8
             assert not (install / 'app/obsolete.py').exists()
             assert not (install / 'legacy.py').exists()
         for relative, content in user.items():

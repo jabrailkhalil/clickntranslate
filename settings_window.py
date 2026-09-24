@@ -1,4 +1,5 @@
 from button_styles import button_qss, button_palette, standard_buttons
+from number_controls import StepperFrame
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
 from PyQt5 import sip
 import os
@@ -1743,8 +1744,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR and updates",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
-        "game_intro": "Choose the text to read and a separate area for its translation. Adjust the output window and save layouts as templates.",
-        "game_launch": "Choose source and output",
+        "game_intro": 'Select text on screen. Translation appears nearby and updates automatically. One toolbar controls all areas.',
+        "game_launch": 'Select text on screen',
         "game_languages": "Languages:",
         "game_swap_languages": "Swap dynamic translation languages",
         "game_scan_interval": "Scan interval:",
@@ -1752,7 +1753,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pause when the target app is inactive",
         "game_pause_inactive_tooltip": "Pauses OCR when the window active at mode start is minimized or no longer in the foreground. Translation resumes automatically when you return.",
         "game_show_original": "Show recognized text with the translation",
-        "game_workflow_note": "Select the source, then the output area. Press Start. Use the small menu beside the output for text size, opacity, position and templates. Repeat the shortcut to stop.",
+        "game_workflow_note": 'Select text on screen. Translation appears nearby and updates automatically. One toolbar controls all areas.',
         "translation_mode": "Text translation mode: {mode}",
         "hotkeys": "Configure hotkeys",
         "save_and_back": "Save and return",
@@ -1860,8 +1861,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR и обновления",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
-        "game_intro": "Выберите исходный текст и отдельную область для перевода. Настройте окно вывода и сохраните расположение как шаблон.",
-        "game_launch": "Выбрать источник и вывод",
+        "game_intro": 'Выделите текст на экране. Перевод появится рядом и будет обновляться сам. Одна панель управляет всеми областями.',
+        "game_launch": 'Выделить текст на экране',
         "game_languages": "Языки:",
         "game_swap_languages": "Поменять языки динамического перевода местами",
         "game_scan_interval": "Частота проверки:",
@@ -1869,7 +1870,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Пауза, когда целевое окно неактивно",
         "game_pause_inactive_tooltip": "OCR приостанавливается, если окно, активное при запуске режима, свёрнуто или больше не находится на переднем плане. При возврате перевод продолжится автоматически.",
         "game_show_original": "Показывать распознанный текст вместе с переводом",
-        "game_workflow_note": "Выделите источник, затем место вывода и нажмите «Запустить». Маленькое меню у вывода: размер текста, прозрачность, закрепление и шаблоны. Повторная горячая клавиша остановит перевод.",
+        "game_workflow_note": 'Выделите текст на экране. Перевод появится рядом и будет обновляться сам. Одна панель управляет всеми областями.',
         "translation_mode": "Режим перевода текста: {mode}",
         # Обновлённый текст: теперь явно указывается мгновенный перевод выделенного текста
         "hotkeys": "Настроить горячие клавиши",
@@ -1977,8 +1978,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR y actualizaciones",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
-        "game_intro": "Elige el texto original y otra zona para la traducción. Ajusta la ventana de salida y guarda diseños como plantillas.",
-        "game_launch": "Elegir origen y salida",
+        "game_intro": 'Selecciona texto en pantalla. La traducción aparece al lado y se actualiza sola. Una barra controla todas las zonas.',
+        "game_launch": 'Seleccionar texto',
         "game_languages": "Idiomas:",
         "game_swap_languages": "Intercambiar idiomas de traducción dinámica",
         "game_scan_interval": "Intervalo de lectura:",
@@ -1986,7 +1987,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pausar si la aplicación vinculada está inactiva",
         "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
         "game_show_original": "Mostrar el texto reconocido junto con la traducción",
-        "game_workflow_note": "Selecciona el origen y después la salida; pulsa Iniciar. El menú junto a la salida permite ajustar tamaño, opacidad, posición y plantillas. Repite el atajo para detener.",
+        "game_workflow_note": 'Selecciona texto en pantalla. La traducción aparece al lado y se actualiza sola. Una barra controla todas las zonas.',
         "translation_mode": "Modo de traduccion: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
@@ -2093,8 +2094,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR und Updates",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
-        "game_intro": "Quelltext und einen eigenen Bereich für die Übersetzung wählen. Ausgabefenster anpassen und Anordnungen als Vorlagen speichern.",
-        "game_launch": "Quelle und Ausgabe wählen",
+        "game_intro": 'Text auf dem Bildschirm wählen. Die Übersetzung erscheint daneben und aktualisiert sich automatisch. Eine Leiste steuert alle Bereiche.',
+        "game_launch": 'Text auswählen',
         "game_languages": "Sprachen:",
         "game_swap_languages": "Sprachen der dynamischen Übersetzung tauschen",
         "game_scan_interval": "Scanintervall:",
@@ -2102,7 +2103,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pausieren, wenn die Ziel-App inaktiv ist",
         "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
         "game_show_original": "Erkannten Text zusammen mit der Übersetzung zeigen",
-        "game_workflow_note": "Quelle und dann Ausgabebereich auswählen; Start drücken. Das kleine Menü an der Ausgabe bietet Schriftgröße, Deckkraft, Position und Vorlagen. Erneutes Tastenkürzel beendet die Übersetzung.",
+        "game_workflow_note": 'Text auf dem Bildschirm wählen. Die Übersetzung erscheint daneben und aktualisiert sich automatisch. Eine Leiste steuert alle Bereiche.',
         "translation_mode": "Ubersetzungsmodus: {mode}",
         "hotkeys": "Tastenkurzel konfigurieren",
         "save_and_back": "Speichern und zuruck",
@@ -2209,8 +2210,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR et mises à jour",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
-        "game_intro": "Choisissez le texte source et une zone distincte pour la traduction. Réglez la sortie et enregistrez sa disposition comme modèle.",
-        "game_launch": "Choisir source et sortie",
+        "game_intro": 'Sélectionnez du texte. La traduction apparaît à côté et se met à jour automatiquement. Une barre gère toutes les zones.',
+        "game_launch": 'Sélectionner le texte',
         "game_languages": "Langues :",
         "game_swap_languages": "Inverser les langues de la traduction dynamique",
         "game_scan_interval": "Intervalle d’analyse :",
@@ -2218,7 +2219,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pause si l’application liée est inactive",
         "game_pause_inactive_tooltip": "L’OCR s’arrête si la fenêtre active au lancement du mode est réduite ou n’est plus au premier plan. La traduction reprend automatiquement au retour.",
         "game_show_original": "Afficher le texte reconnu avec la traduction",
-        "game_workflow_note": "Sélectionnez la source, puis la sortie et démarrez. Le petit menu près de la sortie règle la taille, l’opacité, la position et les modèles. Répétez le raccourci pour arrêter.",
+        "game_workflow_note": 'Sélectionnez du texte. La traduction apparaît à côté et se met à jour automatiquement. Une barre gère toutes les zones.',
         "translation_mode": "Mode de traduction : {mode}",
         "hotkeys": "Configurer les raccourcis",
         "save_and_back": "Enregistrer et revenir",
@@ -2325,8 +2326,8 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR 与更新",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
-        "game_intro": "选择原文和单独的译文显示区域。调整输出窗口，并将布局保存为模板。",
-        "game_launch": "选择原文和译文区域",
+        "game_intro": '框选屏幕文字，译文会在旁边自动更新。所有区域共用一个工具栏。',
+        "game_launch": '选择屏幕文字',
         "game_languages": "语言：",
         "game_swap_languages": "交换动态翻译语言",
         "game_scan_interval": "扫描间隔：",
@@ -2334,7 +2335,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "绑定应用未激活时暂停",
         "game_pause_inactive_tooltip": "如果启动模式时的活动窗口被最小化或不再位于前台，OCR 会暂停；返回该窗口后会自动继续翻译。",
         "game_show_original": "同时显示识别文本和译文",
-        "game_workflow_note": "先选择原文，再选择译文区域，然后点击开始。输出旁的小菜单可调整字号、透明度、位置并保存模板。再次按快捷键停止翻译。",
+        "game_workflow_note": '框选屏幕文字，译文会在旁边自动更新。所有区域共用一个工具栏。',
         "translation_mode": "文本翻译模式：{mode}",
         "hotkeys": "配置快捷键",
         "save_and_back": "保存并返回",
@@ -2437,12 +2438,12 @@ for _scale_lang, _scale_labels in {
 
 
 for _scale_lang, (_caption, _hint) in {
-    'en': ('Scale:', 'Enter a percentage and press Enter or leave the field. Escape cancels. Arrows change the scale by 5%.'),
-    'ru': ('Масштаб:', 'Введите процент и нажмите Enter или выйдите из поля. Escape отменяет ввод. Стрелки меняют масштаб на 5%.'),
-    'de': ('Skalierung:', 'Prozentwert eingeben und mit Enter oder Verlassen des Feldes übernehmen. Escape verwirft. Pfeile ändern um 5%.'),
-    'fr': ('Échelle :', 'Saisissez un pourcentage, puis Entrée ou quittez le champ. Échap annule. Les flèches changent de 5%.'),
-    'es': ('Escala:', 'Introduzca un porcentaje y pulse Intro o salga del campo. Escape cancela. Las flechas cambian un 5%.'),
-    'zh': ('缩放：', '输入百分比后按 Enter 或离开输入框生效。Escape 取消。箭头每次调整 5%。'),
+    'en': ('Scale:', 'Enter a percentage and press Enter or leave the field. Escape cancels. Arrows change the scale by 1%.'),
+    'ru': ('Масштаб:', 'Введите процент и нажмите Enter или выйдите из поля. Escape отменяет ввод. Стрелки меняют масштаб на 1%.'),
+    'de': ('Skalierung:', 'Prozentwert eingeben und mit Enter oder Verlassen des Feldes übernehmen. Escape verwirft. Pfeile ändern um 1%.'),
+    'fr': ('Échelle :', 'Saisissez un pourcentage, puis Entrée ou quittez le champ. Échap annule. Les flèches changent de 1%.'),
+    'es': ('Escala:', 'Introduzca un porcentaje y pulse Intro o salga del campo. Escape cancela. Las flechas cambian un 1%.'),
+    'zh': ('缩放：', '输入百分比后按 Enter 或离开输入框生效。Escape 取消。箭头每次调整 1%。'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
 
@@ -2821,16 +2822,99 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
         'Х': '[', 'Ъ': ']', 'Ж': ';', 'Э': "'", 'Б': ',', 'Ю': '.',
     }
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._double_text = ''
+        self._tap_down = set()
+        self._tap_candidate = None
+        self._tap_previous = None
+
+    def hotkeyText(self):
+        return self._double_text or self._normalize_hotkey(
+            self.keySequence().toString(QKeySequence.PortableText))
+
+    def setHotkeyText(self, text):
+        from double_tap_hotkeys import canonical_double_tap
+        self._double_text = canonical_double_tap(text) or ''
+        super().setKeySequence(QKeySequence() if self._double_text else QKeySequence(text))
+        self._show_double_tap()
+
+    def _show_double_tap(self):
+        if self._double_text:
+            editor = self.findChild(QLineEdit)
+            if editor is not None:
+                editor.setText(self._double_text.replace(', ', ' → '))
+
+    def clear(self):
+        self._double_text = ''
+        self._tap_candidate = self._tap_previous = None
+        self._tap_down.clear()
+        super().clear()
+
+    def focusOutEvent(self, event):
+        self._tap_candidate = self._tap_previous = None
+        self._tap_down.clear()
+        super().focusOutEvent(event)
+        self._show_double_tap()
+
     def keyPressEvent(self, event):
+        if event.isAutoRepeat():
+            self._tap_candidate = self._tap_previous = None
+            event.accept()
+            return
         if event.key() == Qt.Key_Escape:
             self.clear()
             self.editingFinished.emit()
+            return
+        key = event.key()
+        modifiers = {Qt.Key_Shift: ('Shift', Qt.ShiftModifier),
+                     Qt.Key_Control: ('Ctrl', Qt.ControlModifier),
+                     Qt.Key_Alt: ('Alt', Qt.AltModifier)}
+        if platform_support.IS_WINDOWS:
+            name, own_modifier = modifiers.get(key, (
+                self._normalize_hotkey(QKeySequence(key).toString(QKeySequence.PortableText)), 0))
+            clean = not self._tap_down and not (int(event.modifiers()) & ~int(own_modifier))
+            self._tap_down.add(key)
+            self._tap_candidate = (key, name, time.monotonic()) if clean else None
+            if not clean:
+                self._tap_previous = None
+        if key in modifiers:
+            event.accept()
+            return
+        if self._double_text:
+            self._double_text = ''
+            super().clear()
+        super().keyPressEvent(event)
+        seq_str = self.keySequence().toString(QKeySequence.PortableText)
+        normalized = self._normalize_hotkey(seq_str)
+        if normalized != seq_str:
+            self.setKeySequence(QKeySequence(normalized))
+
+    def keyReleaseEvent(self, event):
+        if event.isAutoRepeat():
+            event.accept()
+            return
+        from double_tap_hotkeys import TAP_INTERVAL, MAX_HOLD, canonical_double_tap
+        self._tap_down.discard(event.key())
+        candidate, self._tap_candidate = self._tap_candidate, None
+        now = time.monotonic()
+        if (candidate and candidate[0] == event.key() and not self._tap_down
+                and now - candidate[2] <= MAX_HOLD):
+            previous = self._tap_previous
+            text = canonical_double_tap(f'{candidate[1]}, {candidate[1]}')
+            if text and previous and previous[0] == candidate[0] and now - previous[1] <= TAP_INTERVAL:
+                self._tap_previous = None
+                self.setHotkeyText(text)
+                self.editingFinished.emit()
+                event.accept()
+                return
+            self._tap_previous = (candidate[0], now)
         else:
-            super().keyPressEvent(event)
-            seq_str = self.keySequence().toString()
-            normalized = self._normalize_hotkey(seq_str)
-            if normalized != seq_str:
-                self.setKeySequence(QKeySequence(normalized))
+            self._tap_previous = None
+        if event.key() not in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt):
+            super().keyReleaseEvent(event)
+        else:
+            event.accept()
 
     @classmethod
     def _normalize_hotkey(cls, hotkey_str):
@@ -7227,9 +7311,9 @@ class SettingsWindow(QWidget):
         # --- ГРУППА ЧЕКБОКСОВ ---
         # The layout margin already supplies the intended 5px top inset.
 
-        fixed_height = 34
+        fixed_height = 28
         engine_combo_width = 180
-        engine_control_height = 32
+        engine_control_height = 28
         # Three joined action rows must fit above the pager in the real
         # 672x334 settings viewport. At 36px Qt overlaps the rows and paints
         # over their lower borders; 31px keeps every frame intact.
@@ -7242,7 +7326,7 @@ class SettingsWindow(QWidget):
         form_grid = QGridLayout()
         form_grid.setContentsMargins(0, 0, 0, 0)
         form_grid.setHorizontalSpacing(8)
-        form_grid.setVerticalSpacing(self.main_layout.spacing())
+        form_grid.setVerticalSpacing(2)
         form_grid.setColumnStretch(0, 1)
         self.settings_form_grid = form_grid
         self.autostart_checkbox = QCheckBox(settings_text(lang, "autostart"))
@@ -7474,7 +7558,7 @@ class SettingsWindow(QWidget):
         )
         self.button_tooltips_checkbox.setStyleSheet("margin:0; padding:0;")
         self.button_tooltips_checkbox.setFixedHeight(fixed_height)
-        form_grid.addWidget(self.button_tooltips_checkbox, 4, 1, 1, 2, alignment=Qt.AlignLeft)
+        form_grid.addWidget(self.button_tooltips_checkbox, 5, 0, alignment=Qt.AlignLeft)
 
         self.ui_scale_label = QLabel(settings_text(lang, 'ui_scale_caption'))
         self.ui_scale_label.setObjectName('uiScaleLabel')
@@ -7485,29 +7569,21 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setFixedSize(engine_combo_width, engine_control_height)
         scale_outer = QHBoxLayout(self.ui_scale_control)
         scale_outer.setContentsMargins(3, 2, 3, 2)
-        scale_field = QFrame()
-        scale_field.setObjectName('uiScaleField')
-        scale_outer.addWidget(scale_field)
-        scale_controls = QHBoxLayout(scale_field)
-        scale_controls.setContentsMargins(2, 0, 2, 0)
-        scale_controls.setSpacing(0)
-        self.ui_scale_decrease = ScaleArrowButton()
-        self.ui_scale_increase = ScaleArrowButton()
-        for button, name, glyph, direction in (
-            (self.ui_scale_decrease, 'uiScaleDecrease', '‹', -1),
-            (self.ui_scale_increase, 'uiScaleIncrease', '›', 1),
+        self.ui_scale_value = ScalePercentEdit()
+        self.ui_scale_field = StepperFrame(self.ui_scale_value, dark=self.parent.current_theme != 'Светлая')
+        self.ui_scale_field.setObjectName('uiScaleField')
+        scale_outer.addWidget(self.ui_scale_field)
+        self.ui_scale_decrease = self.ui_scale_field.decrease
+        self.ui_scale_increase = self.ui_scale_field.increase
+        for button, name, direction in (
+            (self.ui_scale_decrease, 'uiScaleDecrease', -1),
+            (self.ui_scale_increase, 'uiScaleIncrease', 1),
         ):
             button.setObjectName(name)
-            button.setText(glyph)
-            button.setFixedSize(28, 24)
-            button.setFocusPolicy(Qt.StrongFocus)
-            button.setCursor(Qt.PointingHandCursor)
-            button.setAutoRepeat(False)
             description = settings_text(lang, 'ui_scale_decrease' if direction < 0 else 'ui_scale_increase')
             button.setAccessibleName(description)
-            button.setToolTip(tooltip_text(f'{description} (5%)'))
+            button.setToolTip(tooltip_text(f'{description} ({SCALE_STEP}%)'))
             button.clicked.connect(lambda checked=False, step=direction, anchor=button: self._step_ui_scale(step, anchor))
-        self.ui_scale_value = ScalePercentEdit()
         self.ui_scale_value.setText(f'{DEFAULT_SCALE}%')
         self.ui_scale_value.setObjectName('uiScaleValue')
         self.ui_scale_value.setAccessibleName(settings_text(lang, 'ui_scale'))
@@ -7517,9 +7593,6 @@ class SettingsWindow(QWidget):
         self.ui_scale_value.cancel_requested.connect(self._refresh_ui_scale)
         self.ui_scale_value.step_requested.connect(lambda step: self._step_ui_scale(step, self.ui_scale_value))
         self.ui_scale_label.setBuddy(self.ui_scale_value)
-        scale_controls.addWidget(self.ui_scale_decrease)
-        scale_controls.addWidget(self.ui_scale_value, 1)
-        scale_controls.addWidget(self.ui_scale_increase)
         form_grid.addWidget(self.ui_scale_label, 3, 1, Qt.AlignVCenter)
         form_grid.addWidget(self.ui_scale_control, 3, 2, Qt.AlignVCenter)
         scale_tooltip = tooltip_text(settings_text(lang, 'ui_scale_hint'))
@@ -7651,7 +7724,7 @@ class SettingsWindow(QWidget):
         self.settings_updates_page.setAttribute(Qt.WA_StyledBackground, True)
         updates_layout = QVBoxLayout(self.settings_updates_page)
         updates_layout.setContentsMargins(0, 0, 0, 0)
-        updates_layout.setSpacing(4)
+        updates_layout.setSpacing(2)
         updates_layout.setAlignment(Qt.AlignTop)
         page_checkbox_height = fixed_height
 
@@ -8313,7 +8386,9 @@ class SettingsWindow(QWidget):
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        return modern_combo_style(is_dark)
+        return modern_combo_style(is_dark, font_size=14) + '''
+            QComboBox { margin:1px 3px; padding:2px 28px 2px 10px; min-height:0; }
+        '''
 
     def _secondary_palette(self):
         if self.parent.current_theme == "Темная":
@@ -8564,23 +8639,21 @@ class SettingsWindow(QWidget):
 
         self.copy_hotkey_input = ClearableKeySequenceEdit()
         saved_copy_hotkey = self.parent.config.get("copy_hotkey", "")
-        self.copy_hotkey_input.setKeySequence(QKeySequence(saved_copy_hotkey))
+        self.copy_hotkey_input.setHotkeyText(saved_copy_hotkey)
         self.translate_hotkey_input = ClearableKeySequenceEdit()
         saved_translate_hotkey = self.parent.config.get("translate_hotkey", "")
-        self.translate_hotkey_input.setKeySequence(QKeySequence(saved_translate_hotkey))
+        self.translate_hotkey_input.setHotkeyText(saved_translate_hotkey)
         self.fullscreen_translate_hotkey_input = ClearableKeySequenceEdit()
         saved_fs_hotkey = self.parent.config.get("fullscreen_translate_hotkey", "")
-        self.fullscreen_translate_hotkey_input.setKeySequence(QKeySequence(saved_fs_hotkey))
+        self.fullscreen_translate_hotkey_input.setHotkeyText(saved_fs_hotkey)
         self.translate_selection_hotkey_input = ClearableKeySequenceEdit()
         saved_sel_hotkey = self.parent.config.get("translate_selection_hotkey", "")
-        self.translate_selection_hotkey_input.setKeySequence(QKeySequence(saved_sel_hotkey))
+        self.translate_selection_hotkey_input.setHotkeyText(saved_sel_hotkey)
         self.translate_replace_selection_hotkey_input = ClearableKeySequenceEdit()
         saved_replace_hotkey = self.parent.config.get(
             "translate_replace_selection_hotkey", ""
         )
-        self.translate_replace_selection_hotkey_input.setKeySequence(
-            QKeySequence(saved_replace_hotkey)
-        )
+        self.translate_replace_selection_hotkey_input.setHotkeyText(saved_replace_hotkey)
         if platform_support.IS_LINUX:
             self.translate_replace_selection_hotkey_input.setEnabled(False)
             self.translate_replace_selection_hotkey_input.setToolTip(
@@ -8588,10 +8661,10 @@ class SettingsWindow(QWidget):
             )
         self.toggle_window_hotkey_input = ClearableKeySequenceEdit()
         saved_toggle_hotkey = self.parent.config.get("toggle_window_hotkey", "")
-        self.toggle_window_hotkey_input.setKeySequence(QKeySequence(saved_toggle_hotkey))
+        self.toggle_window_hotkey_input.setHotkeyText(saved_toggle_hotkey)
         self.game_translate_hotkey_input = ClearableKeySequenceEdit()
         saved_game_hotkey = self.parent.config.get("game_translate_hotkey", "")
-        self.game_translate_hotkey_input.setKeySequence(QKeySequence(saved_game_hotkey))
+        self.game_translate_hotkey_input.setHotkeyText(saved_game_hotkey)
 
         hotkey_rows = (
             (settings_text(lang, "copy_hotkey_label"), self.copy_hotkey_input),
@@ -8628,7 +8701,7 @@ class SettingsWindow(QWidget):
         self.toggle_window_hotkey_input.editingFinished.connect(self.save_toggle_window_hotkey)
         self.game_translate_hotkey_input.editingFinished.connect(self.save_game_translate_hotkey)
 
-        remove_label = QLabel(settings_text(lang, "remove_hotkey"))
+        remove_label = QLabel(self._hotkey_edit_hint())
         remove_label.setObjectName("secondaryHint")
         remove_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.hotkey_hint_label = remove_label
@@ -8677,10 +8750,35 @@ class SettingsWindow(QWidget):
         QtCore.QTimer.singleShot(0, activate_field)
         return True
 
+    def _hotkey_edit_hint(self):
+        lang = self.parent.current_interface_language
+        if not platform_support.IS_WINDOWS:
+            return settings_text(lang, 'remove_hotkey')
+        hints = {
+            'ru': 'Сочетание или два нажатия (Shift → Shift). Esc — убрать.',
+            'en': 'Shortcut or double tap (Shift → Shift). Esc to clear.',
+            'de': 'Tastenkürzel oder zweimal (Shift → Shift). Esc löscht.',
+            'es': 'Atajo o doble pulsación (Shift → Shift). Esc: borrar.',
+            'fr': 'Raccourci ou double appui (Shift → Shift). Échap : effacer.',
+            'zh': '组合键或双击（Shift → Shift）。Esc 清除。',
+        }
+        return hints.get(lang, hints['en'])
+
     def _checked_hotkey(self, key):
         field = getattr(self, key + "_input")
-        hotkey = ClearableKeySequenceEdit._normalize_hotkey(
-            field.keySequence().toString(QKeySequence.PortableText))
+        hotkey = field.hotkeyText()
+        from double_tap_hotkeys import canonical_double_tap
+        double = canonical_double_tap(hotkey)
+        if ((double and not platform_support.IS_WINDOWS)
+                or (not double and QKeySequence(hotkey).count() > 1)):
+            with QtCore.QSignalBlocker(field):
+                field.setHotkeyText(self.parent.config.get(key, ''))
+            message = ('Используйте одно сочетание или два нажатия одной клавиши.'
+                       if self.parent.current_interface_language == 'ru' else
+                       'Use one shortcut or two taps of the same key (Windows).')
+            self.hotkey_hint_label.setText(message)
+            return None
+        hotkey = double or hotkey
         labels = {
             "copy_hotkey": "copy_hotkey_label",
             "translate_hotkey": "translate_hotkey_label",
@@ -8694,10 +8792,10 @@ class SettingsWindow(QWidget):
         hint = getattr(self, "hotkey_hint_label", None)
         for other, label in labels.items():
             existing = ClearableKeySequenceEdit._normalize_hotkey(str(self.parent.config.get(other, "") or ""))
-            existing = QKeySequence(existing).toString(QKeySequence.PortableText)
+            existing = canonical_double_tap(existing) or QKeySequence(existing).toString(QKeySequence.PortableText)
             if other != key and hotkey and existing.casefold() == hotkey.casefold():
                 blocker = QtCore.QSignalBlocker(field)
-                field.setKeySequence(QKeySequence(self.parent.config.get(key, "")))
+                field.setHotkeyText(self.parent.config.get(key, ""))
                 del blocker
                 messages = {
                     "ru": "{hotkey} уже занято: {action}",
@@ -8715,7 +8813,7 @@ class SettingsWindow(QWidget):
                 field.setToolTip(tooltip_text(message))
                 return None
         if hint is not None:
-            hint.setText(settings_text(lang, "remove_hotkey"))
+            hint.setText(self._hotkey_edit_hint())
             hint.setToolTip("")
         field.setToolTip("")
         return hotkey
@@ -10952,6 +11050,13 @@ finally {
             }}
             QLabel#assistantSection {{ color: #a88bcc; font-size: 13px; font-weight: 700; }}
             QLabel#assistantNote {{ color: {'#aaa0b8' if dark else '#71667d'}; font-size: 12px; }}
+            QLabel#assistantFieldLabel {{ font-size:13px; }}
+            QWidget#assistantVisibility QCheckBox {{ font-size:14px; spacing:8px; }}
+            QWidget#assistantOptions QSpinBox {{
+                color:{theme['text_color']}; background:{'#211d28' if dark else '#f2edf6'};
+                border:1px solid {'#584963' if dark else '#bcaacb'};
+                border-radius:6px; padding:2px 6px; font-size:13px;
+            }}
             QSlider#assistantSlider::groove:horizontal,
             QSlider#ocrDimStrengthSlider::groove:horizontal {{
                 height: 5px;
@@ -11034,29 +11139,15 @@ finally {
             }}
 
         """ + standard_buttons(dark, compact=True)
-        scale_background = '#17181d' if dark else '#e9e4ed'
-        scale_border = '#3d3948' if dark else '#d7cde7'
-        scale_ink = '#f4f6fb' if dark else '#202124'
-        style += button_qss(dark, 'quiet', 'QToolButton#uiScaleDecrease, QToolButton#uiScaleIncrease', icon=True, radius=4)
         style += button_qss(dark, 'secondary', 'QToolButton#assistantAppearance', compact=True)
-        style += f"""
-            QWidget#uiScaleControl {{ background: transparent; }}
-            QFrame#uiScaleField {{
-                background: {scale_background};
-                border: 1px solid {scale_border}; border-radius: 7px;
-            }}
-            QLineEdit#uiScaleValue {{
-                color: {scale_ink}; background: transparent; border: none;
-                padding: 0; margin: 0; min-height: 0; font-size: 15px; font-weight: 400;
-            }}
-            QToolButton#uiScaleDecrease:disabled, QToolButton#uiScaleIncrease:disabled {{
-                background: transparent; border-color: transparent;
-            }}
-        """
+        style += button_qss(dark, 'secondary', 'QPushButton#assistantCategory', compact=True)
+        style += 'QWidget#uiScaleControl { background:transparent; }'
         set_widget_stylesheet(self, style)
+        for control in self.findChildren(StepperFrame):
+            control.set_theme(dark)
         assistant_page = getattr(self, 'settings_assistant_page', None)
         if assistant_page is not None:
-            self._apply_engine_combo_style(assistant_page.behavior)
+            assistant_page.refresh_custom_icon()
         self._apply_action_panel_style()
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         navigation = getattr(self, "settings_page_navigation", None)
@@ -13492,83 +13583,13 @@ finally {
         reply = QMessageBox.Yes if box.clickedButton() == yes_btn else QMessageBox.No
         if reply != QMessageBox.Yes:
             return
-        # Default configuration
-        from assistant_settings import ASSISTANT_DEFAULTS
-        default_config = {
-            **ASSISTANT_DEFAULTS,
-            "theme": "Темная",
-            "desktop_assistant_enabled": False,
-            "desktop_assistant_position": None,
-            # Language is identity/navigation state, not a behaviour setting.
-            # Resetting it while the title-bar flag kept the previous icon made
-            # the application visibly contradict itself until the next launch.
-            "interface_language": lang,
-            "ocr_language": "ru",
-            "autostart": False,
-            "autostart_backend": (
-                "store_startup_task"
-                if portable_paths.is_windows_packaged()
-                else "startup_shortcut"
-            ),
-            "translation_mode": "English",
-            "main_translation_source_language": "en",
-            "main_translation_target_language": "ru",
-            "selection_translate_source_language": "en",
-            "selection_translate_target_language": "ru",
-            "replace_selection_source_language": "en",
-            "replace_selection_target_language": "ru",
-            "hotkey_language_editor_mode": "selection",
-            "ocr_hotkeys": "Ctrl+O",
-            "copy_hotkey": "Ctrl+Alt+C",
-            "translate_hotkey": "Ctrl+Alt+T",
-            "notifications": False,
-            "history": False,
-            "start_minimized": False,
-            "update_check_on_launch": True,
-            # Do not replay already acknowledged release notes after resetting
-            # unrelated behaviour settings.
-            "last_seen_startup_news_version": self.parent.config.get(
-                "last_seen_startup_news_version", ""
-            ),
-            "last_seen_startup_news_id": self.parent.config.get(
-                "last_seen_startup_news_id", ""
-            ),
-            "show_update_info": False,
-            "first_run_guide_completed": False,
-            "first_run_guide_pending": False,
-            "ocr_engine": platform_support.default_ocr_engine(),
-            "copy_translated_text": False,
-            "restore_clipboard_after_selection": True,
-            "freeze_screen_on_ocr": False,
-            "dim_screen_during_ocr": False,
-            "ocr_dim_strength": 60,
-            "debug_ocr_artifacts": False,
-            "copy_history": False,
-            "translator_engine": "Google",
-            "allow_online_provider_fallback": False,
-            "keep_visible_on_ocr": False,
-            "last_ocr_language": "ru",
-            "ocr_translate_source_language": "en",
-            "ocr_translate_target_language": "ru",
-            "fullscreen_translate_from": "en",
-            "fullscreen_translate_to": "ru",
-            "game_translate_source_language": "en",
-            "game_translate_target_language": "ru",
-            "game_capture_mode": "region",
-            "game_capture_interval_ms": 850,
-            "game_text_similarity": 0.90,
-            "game_pause_when_inactive": True,
-            "game_show_original_text": False,
-            "game_overlay_opacity": 88,
-            "no_screen_dimming": False,
-            "fullscreen_translate_hotkey": "Ctrl+Alt+F",
-            "translate_selection_hotkey": "Ctrl+Alt+Q",
-            "translate_replace_selection_hotkey": "Ctrl+Shift+Q",
-            "game_translate_hotkey": "Ctrl+Alt+G",
-            "toggle_window_hotkey": "Ctrl+Shift+Space",
-            "hotkey_defaults_revision": 5,
-            "result_window_hidden_modes": [],
-        }
+        from main import fresh_config
+        default_config = fresh_config(lang)
+        default_config.update(
+            show_update_info=False,
+            last_seen_startup_news_version=self.parent.config.get('last_seen_startup_news_version', ''),
+            last_seen_startup_news_id=self.parent.config.get('last_seen_startup_news_id', ''),
+        )
         # Save to disk
         config_path = get_data_file("config.json")
         try:

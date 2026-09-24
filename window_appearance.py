@@ -24,6 +24,11 @@ class _StoredAppearance:
 def themed_stylesheet(style, dark):
     """Bring legacy, explicitly coloured surfaces into the selected palette."""
     def block(match):
+        # These handles already supply light/dark and pressed colours. A bright
+        # pressed thumb is a control, not a light window surface to darken.
+        selector = match.string[match.string.rfind('}', 0, match.start()) + 1:match.start()]
+        if 'QScrollBar::handle' in selector:
+            return match.group(0)
         body = match.group(1)
         background = re.search(r'(?<!-)background(?:-color)?\s*:\s*(#[\da-fA-F]{3,6})', body)
         accent = False
