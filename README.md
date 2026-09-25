@@ -13,14 +13,12 @@ Free, open-source screen OCR and translation for **Windows, Linux and macOS**. C
 | Windows x64 | [Installer (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | A regular installation on Windows 10/11, x64. |
 | Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Running without installation; extract the entire archive. |
 | Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | A single-file application for Linux x86_64; make it executable before opening. |
-| Linux x86_64 | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.tar.gz) | An unpacked application folder for Linux x86_64. |
 | Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Installing on Apple Silicon (M1 and newer), macOS 13.4 or later. |
 | Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | Installing on an Intel Mac (x86_64), macOS 13.4 or later. |
-| Mac — Apple Silicon | [ZIP (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | The same Apple Silicon app in a ZIP archive. |
 
-[All downloads, SHA-256 checksums and signature files](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
+[All downloads and the signature/checksum archive](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
 
-Windows and macOS builds currently use a **self-signed certificate named `jabrailkhalil`**. Windows may show a SmartScreen warning; the Mac app has no Apple Developer ID or notarization, so Gatekeeper may block its first launch. Linux downloads have separate OpenPGP signatures. Choose **Apple Silicon** for M1 and newer chips, or **Intel** for Intel Macs. The DMG and ZIP marked Apple Silicon contain the same architecture.
+Windows and macOS builds currently use a **self-signed certificate named `jabrailkhalil`**. Windows may show a SmartScreen warning; the Mac app has no Apple Developer ID or notarization, so Gatekeeper may block its first launch. Linux downloads have separate OpenPGP signatures. Choose **Apple Silicon** for M1 and newer chips, or **Intel** for Intel Macs.
 
 ## What is included
 

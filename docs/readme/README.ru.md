@@ -13,14 +13,12 @@
 | Windows x64 | [Установщик (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | Обычная установка на Windows 10/11, x64. |
 | Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Запуск без установки; распакуйте архив целиком. |
 | Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | Один исполняемый файл для Linux x86_64; перед запуском разрешите его выполнение. |
-| Linux x86_64 | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.tar.gz) | Папка приложения для Linux x86_64; распакуйте перед запуском. |
 | Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Установка на Apple Silicon (M1 и новее), macOS 13.4 или новее. |
 | Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | Установка на Mac с процессором Intel (x86_64), macOS 13.4 или новее. |
-| Mac — Apple Silicon | [ZIP (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | То же приложение для Apple Silicon в ZIP-архиве. |
 
 [Все файлы, контрольные суммы SHA-256 и подписи](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
 
-В сборках Windows и macOS пока используется **самоподписанный сертификат `jabrailkhalil`**. Windows может показать предупреждение SmartScreen. У Mac-версии пока нет Apple Developer ID и нотариализации, поэтому Gatekeeper может заблокировать первый запуск. Для Linux доступны отдельные подписи OpenPGP. Выбирайте **Apple Silicon** для M1 и новее, **Intel** — для Mac с процессором Intel. DMG и ZIP с пометкой Apple Silicon содержат одну и ту же архитектуру.
+В сборках Windows и macOS пока используется **самоподписанный сертификат `jabrailkhalil`**. Windows может показать предупреждение SmartScreen. У Mac-версии пока нет Apple Developer ID и нотариализации, поэтому Gatekeeper может заблокировать первый запуск. Для Linux доступны отдельные подписи OpenPGP. Выбирайте **Apple Silicon** для M1 и новее, **Intel** — для Mac с процессором Intel.
 
 ## Возможности
 

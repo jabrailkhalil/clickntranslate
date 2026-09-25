@@ -1,8 +1,8 @@
 # Click'n'Translate on macOS — 1.8.0
 
 The 1.8.0 release includes native **Apple Silicon (arm64)** and **Intel (x86_64)**
-DMG packages for macOS 13.4 or newer. The Apple Silicon ZIP is an alternative
-package of the same app. The Apple Silicon app was built and tested on macOS 14.3,
+DMG packages for macOS 13.4 or newer. The Apple Silicon app was built and tested
+on macOS 14.3,
 including Cocoa UI, Apple Vision, RapidOCR, offline Argos translation, screen
 capture and permission prompts. Screen Recording and Accessibility were granted;
 automatic Cmd+C/V in a separate application was not checked in the final bundle.
