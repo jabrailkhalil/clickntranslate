@@ -250,18 +250,25 @@ def main():
         result['error'] = repr(error)
         raise
     finally:
-        result['finished_at'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
-        receipt.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding='utf-8')
-        stop_owned(install)
-        if helper_process is not None and helper_process.poll() is None:
-            helper_process.terminate()
-            helper_process.wait(timeout=10)
-        if setup_mode:
-            uninstaller = install / 'unins000.exe'
-            if uninstaller.exists():
-                subprocess.run([str(uninstaller), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
-                               env=env, cwd=temp, check=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
-        log.close()
+        try:
+            stop_owned(install)
+            if helper_process is not None and helper_process.poll() is None:
+                helper_process.terminate()
+                helper_process.wait(timeout=10)
+            if setup_mode:
+                uninstaller = install / 'unins000.exe'
+                if uninstaller.exists():
+                    subprocess.run([str(uninstaller), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
+                                   env=env, cwd=temp, check=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
+            result['cleanup_completed'] = True
+        except Exception as error:
+            result['status'] = 'failed'
+            result['cleanup_error'] = repr(error)
+            raise
+        finally:
+            result['finished_at'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
+            receipt.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding='utf-8')
+            log.close()
     print(json.dumps(result, ensure_ascii=True), flush=True)
     return 0
 
