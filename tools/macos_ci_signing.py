@@ -14,12 +14,15 @@ import subprocess
 import sys
 import tempfile
 
-from macos_signing import load_identity, run, sign, signing_directory
+if __package__:
+    from .macos_signing import load_identity, run, sign, signing_directory
+else:
+    from macos_signing import load_identity, run, sign, signing_directory
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CERTIFICATE = ROOT / 'packaging/macos/release-certificate.pem'
-EXPECTED_SHA1 = 'E5E6A8042F96479E560AED29881A6F06D4D374A2'
+EXPECTED_SHA1 = 'FC6752F0026D34E5B63433544AF788B8FC1899EF'
 BUNDLE_ID = 'io.github.jabrailkhalil.clickntranslate'
 REPOSITORY = 'jabrailkhalil/clickntranslate'
 KEYCHAIN_SECRET = 'MACOS_SIGNING_KEYCHAIN_BASE64'
