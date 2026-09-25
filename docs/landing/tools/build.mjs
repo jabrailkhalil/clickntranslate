@@ -22,6 +22,7 @@ const files = [
   "fr/index.html",
   "zh-CN/index.html",
   "assets/icon.png",
+  "assets/xynapse-logo.png",
   "assets/translation-demo.gif",
   "assets/area-ocr-demo.gif",
   "assets/selected-text-demo.gif",

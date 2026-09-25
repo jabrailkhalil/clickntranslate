@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xynapse.online</title>
+    <meta
+      name="description"
+      content="xynapse.online is the product home for Xynapse IDE, Click'n'Translate, and goallog."
+    />
+    <meta property="og:title" content="xynapse.online" />
+    <meta
+      property="og:description"
+      content="A Xynapse-style product dashboard for Xynapse IDE, Click'n'Translate, and goallog."
+    />
+    <meta property="og:image" content="https://xynapse.online/images/og.jpg" />
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #05070c;
+        --bg-2: #0a0f1b;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel-strong: rgba(255, 255, 255, 0.1);
+        --line: rgba(255, 255, 255, 0.14);
+        --line-strong: rgba(118, 226, 255, 0.42);
+        --text: #f7f9ff;
+        --muted: #aab4c7;
+        --soft: #dce7ff;
+        --cyan: #67e6ff;
+        --blue: #75a7ff;
+        --violet: #b4a0ff;
+        --pink: #ff9fd3;
+        --green: #8bf2bb;
+        --amber: #ffd06f;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          linear-gradient(135deg, rgba(103, 230, 255, 0.08), transparent 36%),
+          linear-gradient(225deg, rgba(255, 159, 211, 0.07), transparent 40%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 48%, #060811 100%);
+        color: var(--text);
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        content: "";
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: linear-gradient(to bottom, black, transparent 78%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .page {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        padding: 14px 0;
+        backdrop-filter: blur(18px);
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(5, 7, 12, 0.76);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+      }
+
+      .brand,
+      .navlinks,
+      .actions,
+      .metric-line,
+      .status-row {
+        display: flex;
+        align-items: center;
+      }
+
+      .brand {
+        gap: 10px;
+        font-weight: 820;
+      }
+
+      .mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background:
+          url("/images/logo.png") center/cover no-repeat,
+          linear-gradient(135deg, var(--cyan), var(--pink));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      }
+
+      .navlinks {
+        margin: 0;
+        padding: 0;
+        gap: 12px;
+        list-style: none;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .navlinks a {
+        padding: 8px 10px;
+        border-radius: 8px;
+      }
+
+      .navlinks a:hover {
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+        gap: 46px;
+        align-items: start;
+        padding: 54px 0 34px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        width: fit-content;
+        margin: 0 0 18px;
+        padding: 7px 10px;
+        border: 1px solid rgba(103, 230, 255, 0.34);
+        border-radius: 8px;
+        background: rgba(103, 230, 255, 0.08);
+        color: var(--cyan);
+        font-size: 13px;
+        font-weight: 780;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        font-size: 64px;
+        line-height: 1;
+      }
+
+      .lead {
+        max-width: 700px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.55;
+      }
+
+      .actions {
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        font-weight: 760;
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          background 160ms ease;
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--cyan), var(--violet));
+        color: #06101a;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
+        background: var(--panel-strong);
+      }
+
+      .launch-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .launch-link {
+        display: grid;
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        min-height: 82px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.055);
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          background 160ms ease;
+      }
+
+      .launch-link:hover {
+        transform: translateX(4px);
+        border-color: var(--line-strong);
+        background: var(--panel-strong);
+      }
+
+      .launch-link img {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+
+      .launch-copy strong {
+        display: block;
+        font-size: 17px;
+      }
+
+      .launch-copy span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .launch-destination {
+        color: var(--cyan);
+        font-size: 11px;
+        font-weight: 780;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .launch-arrow {
+        color: var(--soft);
+        font-size: 26px;
+        line-height: 1;
+      }
+
+      .signal-board {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.045));
+        box-shadow: var(--shadow);
+      }
+
+      .board-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .dots {
+        display: flex;
+        gap: 7px;
+      }
+
+      .dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--pink);
+      }
+
+      .dots span:nth-child(2) {
+        background: var(--amber);
+      }
+
+      .dots span:nth-child(3) {
+        background: var(--green);
+      }
+
+      .board-kicker {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .chart-wrap {
+        padding: 20px 18px 12px;
+      }
+
+      .chart {
+        width: 100%;
+        min-height: 232px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+          rgba(0, 0, 0, 0.14);
+        background-size: 100% 25%, 25% 100%;
+      }
+
+      .axis {
+        stroke: rgba(255, 255, 255, 0.22);
+        stroke-width: 1;
+      }
+
+      .growth-line {
+        fill: none;
+        stroke: url("#growthGradient");
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 5;
+      }
+
+      .area {
+        fill: url("#areaGradient");
+      }
+
+      .point {
+        fill: #08111e;
+        stroke: var(--cyan);
+        stroke-width: 3;
+      }
+
+      .chart-empty,
+      .chart-label {
+        fill: var(--muted);
+        font-family: inherit;
+        font-size: 12px;
+      }
+
+      .activity-status {
+        color: var(--cyan);
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+      }
+
+      .metric {
+        padding: 14px 15px;
+      }
+
+      .metric + .metric {
+        border-left: 1px solid var(--line);
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 24px;
+      }
+
+      .metric small {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      .section {
+        padding: 48px 0;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 22px;
+        margin-bottom: 18px;
+      }
+
+      .section-title h2 {
+        margin: 0;
+        font-size: 42px;
+        line-height: 1.08;
+      }
+
+      .section-title p {
+        max-width: 500px;
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .products {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .product {
+        display: flex;
+        min-height: 350px;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 22px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+      }
+
+      #xynapse-ide {
+        scroll-margin-top: 140px;
+      }
+
+      .product:hover {
+        border-color: var(--line-strong);
+        background: var(--panel-strong);
+      }
+
+      .product-icon {
+        width: 62px;
+        height: 62px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .product h3 {
+        margin: 18px 0 10px;
+        font-size: 25px;
+      }
+
+      .product p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--soft);
+        font-size: 12px;
+      }
+
+      @media (max-width: 920px) {
+        .hero,
+        .products {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          padding-top: 42px;
+        }
+
+        h1 {
+          font-size: 56px;
+        }
+
+        .section-title {
+          align-items: start;
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 22px, 1180px);
+        }
+
+        .nav {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .navlinks {
+          width: 100%;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          white-space: nowrap;
+        }
+
+        h1 {
+          font-size: 42px;
+        }
+
+        .lead {
+          font-size: 18px;
+        }
+
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+
+        .launch-link {
+          grid-template-columns: 44px minmax(0, 1fr) auto;
+          padding: 12px;
+        }
+
+        .launch-link img {
+          width: 44px;
+          height: 44px;
+        }
+
+        .metric + .metric {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+
+        .product {
+          min-height: 0;
+        }
+
+        .button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <nav class="page nav" aria-label="Main navigation">
+        <a class="brand" href="/">
+          <span class="mark" aria-hidden="true"></span>
+          <span>xynapse.online</span>
+        </a>
+        <ul class="navlinks" aria-label="Xynapse products">
+          <li><a href="#xynapse-ide">Xynapse IDE</a></li>
+          <li><a href="/clickntranslate/">Click'n'Translate</a></li>
+          <li><a href="/goallog/">goallog</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="hero" id="dashboard">
+        <div>
+          <p class="eyebrow">Xynapse products</p>
+          <h1>Choose where you want to go.</h1>
+          <p class="lead">
+            Three focused products for building software, translating your screen, and making
+            visible progress on the goals that matter.
+          </p>
+          <nav class="launch-list" aria-label="Choose a Xynapse product">
+            <a class="launch-link" href="#xynapse-ide">
+              <img src="/images/logo.png" alt="" />
+              <span class="launch-copy">
+                <strong>Xynapse IDE</strong>
+                <span>AI-assisted coding and developer workflows.</span>
+              </span>
+              <span><span class="launch-destination">Explore</span><span class="launch-arrow" aria-hidden="true">&rarr;</span></span>
+            </a>
+            <a class="launch-link" href="/clickntranslate/">
+              <img src="/images/clickntranslate-icon.png" alt="" />
+              <span class="launch-copy">
+                <strong>Click'n'Translate</strong>
+                <span>Offline OCR translation for desktop work.</span>
+              </span>
+              <span><span class="launch-destination">Explore</span><span class="launch-arrow" aria-hidden="true">&rarr;</span></span>
+            </a>
+            <a class="launch-link" href="/goallog/">
+              <img src="/images/goallog-icon.png" alt="" />
+              <span class="launch-copy">
+                <strong>goallog</strong>
+                <span>Goals, reports, profiles, and communities.</span>
+              </span>
+              <span><span class="launch-destination">Open app</span><span class="launch-arrow" aria-hidden="true">&rarr;</span></span>
+            </a>
+          </nav>
+        </div>
+
+        <aside class="signal-board" aria-label="User growth and development metrics">
+          <div class="board-head">
+            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="board-kicker activity-status" id="activity-status">Loading real activity</div>
+          </div>
+          <div class="chart-wrap">
+            <svg class="chart" viewBox="0 0 520 260" role="img" aria-label="Daily active goallog users over the last 14 days">
+              <defs>
+                <linearGradient id="growthGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+                  <stop offset="0%" stop-color="#67e6ff" />
+                  <stop offset="52%" stop-color="#75a7ff" />
+                  <stop offset="100%" stop-color="#ff9fd3" />
+                </linearGradient>
+                <linearGradient id="areaGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+                  <stop offset="0%" stop-color="#67e6ff" stop-opacity="0.22" />
+                  <stop offset="100%" stop-color="#67e6ff" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <line class="axis" x1="42" x2="486" y1="212" y2="212" />
+              <line class="axis" x1="42" x2="42" y1="34" y2="212" />
+              <path class="area" id="activity-area" d="" />
+              <path class="growth-line" id="activity-line" d="" />
+              <g id="activity-points"></g>
+              <text class="chart-empty" id="activity-empty" x="264" y="128" text-anchor="middle">Loading activity...</text>
+              <text class="chart-label" id="activity-start" x="42" y="235"></text>
+              <text class="chart-label" id="activity-end" x="486" y="235" text-anchor="end"></text>
+            </svg>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <strong id="active-today">--</strong>
+              <small>active users in 24 hours</small>
+            </div>
+            <div class="metric">
+              <strong id="active-week">--</strong>
+              <small>active users in 7 days</small>
+            </div>
+            <div class="metric">
+              <strong id="new-month">--</strong>
+              <small>new users in 30 days</small>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section" id="products">
+        <div class="section-title">
+          <h2>Products</h2>
+          <p>
+            The landing page keeps the Xynapse visual identity and gives each project a direct,
+            useful transition instead of a generic hub.
+          </p>
+        </div>
+
+        <div class="products">
+          <article class="product" id="xynapse-ide">
+            <div>
+              <img class="product-icon" src="/images/logo.png" alt="Xynapse icon" />
+              <h3>Xynapse IDE</h3>
+              <p>
+                AI-assisted development and coding workflows for practical software work,
+                automation, and repository-driven iteration.
+              </p>
+              <div class="chips">
+                <span class="chip">AI coding</span>
+                <span class="chip">IDE</span>
+                <span class="chip">Windows</span>
+              </div>
+            </div>
+            <div>
+              <a class="button" href="https://github.com/jabrailkhalil/xynapse/releases/download/v1.108.0/XynapseSetup-x64-1.108.0.exe">Download for Windows</a>
+              <p style="margin-top: 10px; font-size: 12px;">v1.108.0 · Windows x64</p>
+            </div>
+          </article>
+
+          <article class="product">
+            <div>
+              <img class="product-icon" src="/images/clickntranslate-icon.png" alt="Click'n'Translate icon" />
+              <h3>Click'n'Translate</h3>
+              <p>
+                Offline OCR translator for desktop workflows. Select text on screen,
+                recognize it locally, and move through translation faster.
+              </p>
+              <div class="chips">
+                <span class="chip">OCR</span>
+                <span class="chip">Desktop</span>
+                <span class="chip">Translation</span>
+              </div>
+            </div>
+            <a class="button" href="/clickntranslate/">Open Click'n'Translate</a>
+          </article>
+
+          <article class="product">
+            <div>
+              <img class="product-icon" src="/images/goallog-icon.png" alt="goallog icon" />
+              <h3>goallog</h3>
+              <p>
+                Social goal tracker for daily reports, public profiles, development metrics,
+                communities, likes, comments, and progress sharing.
+              </p>
+              <div class="chips">
+                <span class="chip">Goals</span>
+                <span class="chip">Profiles</span>
+                <span class="chip">PWA</span>
+              </div>
+            </div>
+            <a class="button" href="/goallog/">Open goallog</a>
+          </article>
+        </div>
+      </section>
+
+    </main>
+    <script>
+      (() => {
+        const ns = "http://www.w3.org/2000/svg";
+        const status = document.getElementById("activity-status");
+        const empty = document.getElementById("activity-empty");
+        const line = document.getElementById("activity-line");
+        const area = document.getElementById("activity-area");
+        const pointsGroup = document.getElementById("activity-points");
+        const startLabel = document.getElementById("activity-start");
+        const endLabel = document.getElementById("activity-end");
+
+        const compactDate = (value) => new Intl.DateTimeFormat("en", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        }).format(new Date(`${value}T00:00:00Z`));
+
+        const renderActivity = (payload) => {
+          const rows = Array.isArray(payload.daily) ? payload.daily : [];
+          if (!rows.length) throw new Error("No activity data");
+
+          const left = 42;
+          const right = 486;
+          const top = 34;
+          const bottom = 212;
+          const max = Math.max(1, ...rows.map((row) => Number(row.activeUsers) || 0));
+          const coordinates = rows.map((row, index) => ({
+            x: rows.length === 1 ? left : left + ((right - left) * index) / (rows.length - 1),
+            y: bottom - ((bottom - top) * (Number(row.activeUsers) || 0)) / max,
+            value: Number(row.activeUsers) || 0,
+          }));
+          const path = coordinates.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+
+          line.setAttribute("d", path);
+          area.setAttribute("d", `${path} L${right} ${bottom} L${left} ${bottom} Z`);
+          pointsGroup.replaceChildren(...coordinates.map((point) => {
+            const circle = document.createElementNS(ns, "circle");
+            circle.setAttribute("class", "point");
+            circle.setAttribute("cx", point.x.toFixed(1));
+            circle.setAttribute("cy", point.y.toFixed(1));
+            circle.setAttribute("r", "4");
+            const title = document.createElementNS(ns, "title");
+            title.textContent = `${point.value} active user${point.value === 1 ? "" : "s"}`;
+            circle.appendChild(title);
+            return circle;
+          }));
+
+          empty.textContent = "";
+          startLabel.textContent = compactDate(rows[0].day);
+          endLabel.textContent = compactDate(rows[rows.length - 1].day);
+          document.getElementById("active-today").textContent = payload.summary.activeToday;
+          document.getElementById("active-week").textContent = payload.summary.activeLast7Days;
+          document.getElementById("new-month").textContent = payload.summary.newUsersLast30Days;
+          status.textContent = `Live goallog activity · updated ${new Date(payload.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        };
+
+        fetch("/api/public/activity", { headers: { Accept: "application/json" } })
+          .then((response) => {
+            if (!response.ok) throw new Error(`Activity request failed: ${response.status}`);
+            return response.json();
+          })
+          .then(renderActivity)
+          .catch(() => {
+            status.textContent = "Activity temporarily unavailable";
+            empty.textContent = "Live activity is temporarily unavailable";
+          });
+      })();
+    </script>
+  </body>
+</html>

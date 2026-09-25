@@ -33,7 +33,9 @@ The six localized pages share one renderer and structured content. Font files,
 images and scripts are served by this site. The browser contacts GitHub's public
 API to resolve downloads; no new analytics or cookie service is included.
 
-The header brand links to the parent site at `https://xynapse.online/`.
+The header uses the parent site's Xynapse logo and wordmark and links to
+`https://xynapse.online/`. The product keeps its own icon in the page favicon
+and footer.
 The companion preview starts with the dark screenshot and can switch to light.
 CSS and JavaScript filenames include content hashes; language links include a
 shared build revision. The HTML cache policy is defined in
