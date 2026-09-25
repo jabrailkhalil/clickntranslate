@@ -99,7 +99,7 @@ mkdir -p "$APPDIR/usr/share/metainfo"
 cp -a "$DIST_DIR/." "$APPDIR/usr/bin/"
 cp "$ICON_PNG" "$APPDIR/usr/share/icons/hicolor/256x256/apps/clickntranslate.png"
 cp "$ICON_PNG" "$APPDIR/clickntranslate.png"
-cp "$REPO_DIR/packaging/linux/io.github.jabrailkhalil.clickntranslate.appdata.xml" \
+cp "$REPO_DIR/tools/packaging/linux/io.github.jabrailkhalil.clickntranslate.appdata.xml" \
     "$APPDIR/usr/share/metainfo/"
 
 "$PYTHON" - "$APPDIR" "$REPO_DIR" <<'PYTHON'
