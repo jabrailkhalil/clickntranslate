@@ -54,6 +54,22 @@ El espacio de documentos abre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` y 
 
 ![Actualizar con un clic (Windows)](../images/update-demo.gif)
 
+## Mascota de escritorio
+
+¿Prefieres hacer clic en lugar de memorizar atajos? Haz clic en la mascota para traducir un área o toda la pantalla, reconocer y copiar texto, abrir el traductor, iniciar la traducción dinámica o traducir un documento. Puedes ocultarla cuando no la necesites.
+
+| Tema claro | Tema oscuro |
+| --- | --- |
+| ![Tema claro](../images/mascot-light.png) | ![Tema oscuro](../images/mascot-dark.png) |
+
+## Traducción dinámica
+
+Selecciona una o varias áreas de la pantalla y los idiomas. La traducción se actualiza cuando cambia el texto, sobre el original o en un área separada.
+
+Ejemplo de configuración: el marco morado indica el área de lectura y el verde, un área separada para la traducción.
+
+<img src="../images/dynamic-translation-regions.png" alt="Ejemplo de configuración: el marco morado indica el área de lectura y el verde, un área separada para la traducción." width="760">
+
 ## Atajos de teclado
 
 | Atajo predeterminado | Acción |
@@ -68,7 +84,7 @@ El espacio de documentos abre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` y 
 
 Todos los atajos se pueden modificar o borrar en **Ajustes → Configurar atajos**. Las parejas de idiomas se recuerdan por separado para OCR, selección, sustitución, pantalla completa y traducción dinámica.
 
-La tabla muestra los atajos de Windows. En **macOS**, usa **Command** en lugar de Ctrl y **Option** en lugar de Alt. En **Linux**, asigna los comandos en los ajustes de teclado del escritorio: [guía de Linux](../../docs/LINUX.md).
+La tabla muestra los atajos de Windows. En **macOS**, usa **Command** en lugar de Ctrl y **Option** en lugar de Alt. En **Linux**, asigna los comandos en los ajustes de teclado del escritorio: [guía de Linux](../LINUX.md).
 
 ## Motores de traducción y OCR
 
@@ -84,13 +100,13 @@ En **Ajustes → Paquetes de idiomas** puedes instalar y eliminar motores OCR, i
 
 1. Descarga el archivo para tu sistema y abre la aplicación. Python ya está incluido.
 2. Elige el motor OCR, el proveedor de traducción y los idiomas en Ajustes. Descarga modelos para traducir sin conexión.
-3. Elige una acción de captura o traducción. En Mac, sigue las indicaciones para conceder permisos de **grabación de pantalla** y **accesibilidad**. En Linux, configura los atajos del escritorio con la [guía de Linux](../../docs/LINUX.md).
+3. Elige una acción de captura o traducción. En Mac, sigue las indicaciones para conceder permisos de **grabación de pantalla** y **accesibilidad**. En Linux, configura los atajos del escritorio con la [guía de Linux](../LINUX.md).
 
 El OCR se ejecuta localmente. La traducción en línea envía el texto al proveedor elegido; usa un motor sin conexión para traducir localmente. Consulta [Privacidad](../../PRIVACY.md).
 
 ## Ayuda y desarrollo
 
-[Linux](../../docs/LINUX.md) · [macOS y compilación](../../docs/MACOS.md) · [Informar de un problema](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licencia GPL-3.0](../../LICENSE)
+[Linux](../LINUX.md) · [macOS y compilación](../MACOS.md) · [Informar de un problema](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licencia GPL-3.0](../../LICENSE)
 
 Para un diagnóstico, abre **Ayuda → Informe de errores** y adjunta el ZIP generado al problema. No incluye texto del portapapeles, contenido de documentos, historiales ni credenciales.
 

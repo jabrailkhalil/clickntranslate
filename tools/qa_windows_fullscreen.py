@@ -12,7 +12,7 @@ from unittest import mock
 root = Path(__file__).resolve().parents[1]
 if sys.platform != 'win32':
     raise SystemExit('This probe requires Windows OCR and its English language pack.')
-sys.path.insert(0, str(root))
+sys.path[:0] = [str(root), str(root / 'src')]
 sys.argv[0] = str(root / '.tmp/windows-fullscreen-data/main.py')
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QSignalSpy

@@ -49,7 +49,7 @@ class LibreTranslateTest(unittest.TestCase):
         self.assertIn("API key", str(ctx.exception))
 
     def test_dead_instances_are_not_configured(self):
-        source = (ROOT / "translater.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/translater.py").read_text(encoding="utf-8")
 
         for dead in ("translate.argosopentech.com", "translate.terraprint.co", "lingva.pussthecat.org"):
             self.assertNotIn(f"'https://{dead}'", source)

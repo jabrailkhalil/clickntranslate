@@ -55,7 +55,7 @@ class HymtRunnerNameTest(unittest.TestCase):
 
 class HymtInstallPolicyTest(unittest.TestCase):
     def test_download_plan_is_windows_only(self):
-        source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
         plan_at = source.index("def _get_hymt_download_plan")
         body = source[plan_at:plan_at + 1400]
 
@@ -64,7 +64,7 @@ class HymtInstallPolicyTest(unittest.TestCase):
         self.assertLess(body.index("IS_WINDOWS"), body.index("HYMT_RUNTIME_URL_WIN64"))
 
     def test_engine_selection_explains_manual_setup_off_windows(self):
-        source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
         handler_at = source.index("def _on_translator_changed")
         body = source[handler_at:handler_at + 1500]
 

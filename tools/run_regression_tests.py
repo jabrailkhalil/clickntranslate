@@ -23,13 +23,16 @@ def run():
     options, arguments = parser.parse_known_args()
     output = options.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    sys.path[:0] = [str(root), str(root / 'tests')]
+    sys.path[:0] = [str(root), str(root / 'src'), str(root / 'tests')]
+    # Child Python probes need the same source layout as this runner.
+    os.environ['PYTHONPATH'] = os.pathsep.join(
+        [str(root), str(root / 'src'), os.environ.get('PYTHONPATH', '')])
     os.chdir(root)
     os.environ['QT_QPA_PLATFORM'] = options.qt_platform
     os.environ['PYTHONUTF8'] = '1'
     for key in ('XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_CONFIG_HOME'):
         os.environ[key] = str(output / key.lower())
-    shutil.copytree(root / 'icons', output / 'icons', dirs_exist_ok=True)
+    shutil.copytree(root / 'src/icons', output / 'icons', dirs_exist_ok=True)
     sys.argv[0] = str(output / 'main.py')
     if sys.platform == 'darwin':
         import macos_desktop

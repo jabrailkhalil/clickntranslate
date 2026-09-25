@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -474,7 +474,7 @@ def check_desktop():
               lambda: all(f"--{action}" in linux_desktop.desktop_entry_text("/opt/x")
                           for _n, _l, action in linux_desktop.DESKTOP_ACTIONS) or _fail("missing actions"))
         check(title, "icon converts to png",
-              lambda: os.path.basename(linux_desktop.install_icon(str(ROOT / "icons" / "icon.ico"))))
+              lambda: os.path.basename(linux_desktop.install_icon(str(ROOT / "src/icons" / "icon.ico"))))
     finally:
         for key, value in previous.items():
             if value is None:
@@ -645,7 +645,7 @@ def check_updates():
     check(title, "self-update only where helpers exist",
           lambda: f"in-app update: {platform_support.supports_in_app_update()}")
     if not platform_support.IS_WINDOWS:
-        source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
         check(title, "linux is offered the release page instead",
               lambda: "webbrowser.open(GITHUB_RELEASES_PAGE)" in source or _fail("no link path"))
 

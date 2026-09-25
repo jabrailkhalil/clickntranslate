@@ -4,8 +4,8 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "icons" / "icon.png"
-OUTPUT = ROOT / "installer" / "msix" / "Assets"
+SOURCE = ROOT / "src/icons" / "icon.png"
+OUTPUT = ROOT / "tools/installer" / "msix" / "Assets"
 BACKGROUND = (17, 17, 17, 255)
 
 

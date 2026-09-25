@@ -41,7 +41,7 @@ class RuntimeEngineInstallerTest(unittest.TestCase):
     """The optional OCR engines need an interpreter matching the frozen build."""
 
     def setUp(self):
-        self.source = (ROOT / "settings_window.py").read_text(encoding="utf-8")
+        self.source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
 
     def test_versioned_interpreter_is_probed_before_the_generic_one(self):
         start = self.source.index("def _find_rapidocr_install_python_command")

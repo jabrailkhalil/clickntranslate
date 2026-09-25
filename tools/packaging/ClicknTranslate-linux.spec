@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """Linux build.
 
-Mirrors ClicknTranslate.spec (one Qt GUI plus two non-Qt helper executables) with
+Mirrors tools/packaging/ClicknTranslate.spec (one Qt GUI plus two non-Qt helper executables) with
 the Windows-only pieces removed:
 
 * no WinRT — Windows OCR does not exist here, Tesseract is the default engine,
@@ -18,9 +18,15 @@ import sys as _sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
+from pathlib import Path as _Path
+import sys as _spec_sys
+_PROJECT_ROOT = _Path(SPECPATH).resolve().parents[1]
+_SOURCE_ROOT = _PROJECT_ROOT / 'src'
+_spec_sys.path[:0] = [str(_PROJECT_ROOT), str(_SOURCE_ROOT)]
+
 
 if _sys.platform != 'linux':
-    raise SystemExit('ClicknTranslate-linux.spec builds the Linux package; use ClicknTranslate.spec on Windows.')
+    raise SystemExit('Use the Linux spec on Linux and the Windows spec on Windows.')
 
 
 def _xcb_platform_libraries():
@@ -77,7 +83,7 @@ def _xcb_platform_libraries():
     return [(path, '.') for path in found.values()]
 
 
-gui_datas = [('icons', 'icons')]
+gui_datas = [(str(_SOURCE_ROOT / 'icons'), 'icons')]
 gui_binaries = _xcb_platform_libraries()
 gui_hiddenimports = ['pypdf']
 
@@ -102,7 +108,7 @@ argos_hiddenimports = [
 ]
 
 # stanza pulls torch and minisbd pulls onnxruntime, both only for sentence
-# splitting, which translater.py does itself.
+# splitting, which src/translater.py does itself.
 native_sbd_excludes = [
     'torch',
     'stanza',
@@ -207,8 +213,8 @@ ocr_worker_hiddenimports += [
 
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'main.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=gui_binaries,
     datas=gui_datas,
     hiddenimports=gui_hiddenimports,
@@ -231,8 +237,8 @@ a = Analysis(
 )
 
 worker_a = Analysis(
-    ['argos_worker.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'src/argos_worker.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=[],
     datas=[],
     hiddenimports=argos_hiddenimports,
@@ -250,8 +256,8 @@ worker_a = Analysis(
 )
 
 ocr_worker_a = Analysis(
-    ['ocr_worker.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'src/ocr_worker.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=ocr_worker_binaries,
     datas=ocr_worker_datas,
     hiddenimports=ocr_worker_hiddenimports,
@@ -382,7 +388,7 @@ coll = COLLECT(
 # build once produced a GUI executable whose embedded PYZ began with a mebibyte
 # of zeros while every artifact on disk was intact — PyInstaller still exited 0
 # and the app died at startup. Read the output back rather than trusting the
-# exit code. See the same check in ClicknTranslate.spec.
+# exit code. See the same check in tools/packaging/ClicknTranslate.spec.
 def _verify_frozen_executables(dist_root):
     from PyInstaller.archive.readers import CArchiveReader
 

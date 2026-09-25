@@ -139,9 +139,9 @@ class NativeOcrWorkerProtocolTest(unittest.TestCase):
 
 class NativeOcrWorkerPackagingTest(unittest.TestCase):
     def test_spec_builds_non_qt_worker_and_excludes_optional_engines(self):
-        spec_text = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
+        spec_text = (ROOT / "tools/packaging/ClicknTranslate.spec").read_text(encoding="utf-8")
 
-        self.assertIn("'ocr_worker.py'", spec_text)
+        self.assertIn("'src/ocr_worker.py'", spec_text)
         self.assertIn("name='OcrWorker'", spec_text)
         self.assertIn("'_internal/OcrWorker.exe'", spec_text)
         self.assertIn("contents_directory='.'", spec_text)

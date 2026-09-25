@@ -46,11 +46,11 @@ using System.Reflection;
         /reference:System.Core.dll `
         /reference:System.Drawing.dll `
         /reference:System.Windows.Forms.dll `
-        "/win32icon:$root\icons\icon.ico" `
-        "/win32manifest:$root\installer\windows\ClicknTranslate.exe.manifest" `
+        "/win32icon:$root\src\icons\icon.ico" `
+        "/win32manifest:$root\tools\installer\windows\ClicknTranslate.exe.manifest" `
         "/out:$OutputPath" `
-        "$root\launcher\ClicknTranslateLauncher.cs" `
-        "$root\launcher\SilentWinFormsDialog.cs" `
+        "$root\tools\launcher\ClicknTranslateLauncher.cs" `
+        "$root\tools\launcher\SilentWinFormsDialog.cs" `
         $versionSource
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) {

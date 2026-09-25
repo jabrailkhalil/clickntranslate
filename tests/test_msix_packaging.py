@@ -6,12 +6,12 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_TEMPLATE = ROOT / "installer" / "msix" / "AppxManifest.xml.in"
+MANIFEST_TEMPLATE = ROOT / "tools/installer" / "msix" / "AppxManifest.xml.in"
 BUILD_SCRIPT = ROOT / "tools" / "build_msix.ps1"
-PYINSTALLER_SPEC = ROOT / "ClicknTranslate.spec"
-EXE_MANIFEST = ROOT / "installer" / "windows" / "ClicknTranslate.exe.manifest"
-ASSET_DIR = ROOT / "installer" / "msix" / "Assets"
-SCREENSHOT_DIR = ROOT / "store" / "microsoft-store" / "assets" / "screenshots"
+PYINSTALLER_SPEC = ROOT / "tools/packaging/ClicknTranslate.spec"
+EXE_MANIFEST = ROOT / "tools/installer" / "windows" / "ClicknTranslate.exe.manifest"
+ASSET_DIR = ROOT / "tools/installer" / "msix" / "Assets"
+SCREENSHOT_DIR = ROOT / "docs/store" / "microsoft-store" / "assets" / "screenshots"
 
 
 class TestMsixPackaging(unittest.TestCase):

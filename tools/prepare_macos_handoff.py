@@ -2,7 +2,7 @@
 
 The archive is a source snapshot, not a Mac binary or a replacement for Git.
 Only application/build/test/documentation paths are eligible; user data, local
-models, credentials, environments and marketing projects are excluded.
+models, credentials, environments and web/video projects are excluded.
 """
 
 import argparse
@@ -16,19 +16,19 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DIRECTORIES = ('icons', 'tests', 'tools', 'docs', 'packaging', '.github', 'installer', 'launcher', 'store')
+DIRECTORIES = ('src', 'tests', 'tools', 'docs', '.github')
 EXCLUDED_PARTS = {'__pycache__', '.pytest_cache', 'data', 'build', 'dist', 'node_modules'}
 SOURCE_SUFFIXES = {'.py', '.sh', '.ps1', '.bat', '.cmd', '.md', '.txt', '.ini', '.spec',
                    '.yml', '.yaml', '.json', '.plist', '.xml', '.svg', '.png', '.ico',
                    '.desktop', '.c', '.h', '.cpp', '.cs', '.manifest', '.rc', '.iss', '.cff', '.bib',
                    '.in', '.ttf', '.otf', '.webp', '.jpg', '.jpeg', '.gif', '.qrc'}
-REQUIRED = {'main.py', 'settings_window.py', 'ClicknTranslate-macos.spec',
+REQUIRED = {'main.py', 'src/settings_window.py', 'tools/packaging/ClicknTranslate-macos.spec',
             'requirements-macos.txt', 'docs/MACOS_HANDOFF.md',
             'tools/setup_macos_env.sh', 'tools/build_macos_release.sh',
             'tools/smoke_macos_bundle.py', '.github/workflows/macos.yml',
-            'macos_desktop.py', 'macos_hotkeys.py', 'macos_ocr.py',
-            'button_styles.py', 'ui_scaling.py', 'window_appearance.py',
-            'icons/icon.png', 'packaging/macos/entitlements.plist'}
+            'src/macos_desktop.py', 'src/macos_hotkeys.py', 'src/macos_ocr.py',
+            'src/button_styles.py', 'src/ui_scaling.py', 'src/window_appearance.py',
+            'src/project_paths.py', 'src/icons/icon.png', 'tools/packaging/macos/entitlements.plist'}
 
 
 def source_files():
@@ -39,11 +39,13 @@ def source_files():
         relative = path.relative_to(ROOT)
         if path.is_symlink() or not path.is_file() or EXCLUDED_PARTS.intersection(relative.parts):
             continue
+        if relative.parts[:2] in {('docs', 'promotion'), ('docs', 'landing')}:
+            continue
         if relative.as_posix() in {'HANDOFF.md', 'build.py'}:
             continue
         if relative.parts[0] in DIRECTORIES:
             eligible = (path.suffix.lower() in SOURCE_SUFFIXES
-                        or relative.as_posix() == 'packaging/macos/release-certificate.pem')
+                        or relative.as_posix() == 'tools/packaging/macos/release-certificate.pem')
         else:
             eligible = (path.suffix.lower() in {'.py', '.spec', '.txt', '.md', '.ini', '.cff', '.bib', '.bat'}
                         or path.name in {'LICENSE', '.gitignore', '.gitattributes'})
@@ -115,7 +117,7 @@ def main():
     if args.verify:
         verify(args.verify)
         return
-    sys.path.insert(0, str(ROOT))
+    sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
     from app_version import APP_VERSION
     create(args.output or ROOT / 'releases' / f'Click-n-Translate-{APP_VERSION}-macos-source.zip')
 

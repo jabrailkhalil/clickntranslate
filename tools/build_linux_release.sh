@@ -39,7 +39,7 @@ echo "Click'n'Translate $VERSION ($ARCH)"
 # --- 1. PyInstaller ----------------------------------------------------------
 if [ "$SKIP_PYINSTALLER" -eq 0 ]; then
     echo "[1/4] Building with PyInstaller..."
-    (cd "$REPO_DIR" && "$PYTHON" -m PyInstaller ClicknTranslate-linux.spec --clean --noconfirm)
+    (cd "$REPO_DIR" && "$PYTHON" -m PyInstaller tools/packaging/ClicknTranslate-linux.spec --clean --noconfirm)
 fi
 
 if [ ! -x "$DIST_DIR/clickntranslate" ]; then
@@ -60,7 +60,7 @@ mkdir -p "$RELEASE_DIR"
 # The repository ships a Windows .ico; AppImage needs a PNG.
 ICON_PNG="$REPO_DIR/build/clickntranslate.png"
 echo "[2/4] Preparing the icon..."
-"$PYTHON" - "$REPO_DIR/icons/icon.ico" "$ICON_PNG" <<'PYTHON'
+"$PYTHON" - "$REPO_DIR/src/icons/icon.ico" "$ICON_PNG" <<'PYTHON'
 import sys
 from PIL import Image
 
@@ -104,7 +104,7 @@ cp "$REPO_DIR/packaging/linux/io.github.jabrailkhalil.clickntranslate.appdata.xm
 
 "$PYTHON" - "$APPDIR" "$REPO_DIR" <<'PYTHON'
 import sys, os
-sys.path.insert(0, sys.argv[2])
+sys.path[:0] = [sys.argv[2], os.path.join(sys.argv[2], 'src')]
 import linux_desktop
 import platform_support
 

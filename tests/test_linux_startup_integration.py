@@ -132,7 +132,7 @@ class IconConversionTest(unittest.TestCase):
     def test_ico_is_converted_to_png(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with mock.patch.dict(os.environ, {"XDG_DATA_HOME": temp_dir}, clear=False):
-                target = linux_desktop.install_icon(str(ROOT / "icons" / "icon.ico"))
+                target = linux_desktop.install_icon(str(ROOT / "src/icons" / "icon.ico"))
 
                 self.assertTrue(target.endswith(".png"))
                 from PIL import Image

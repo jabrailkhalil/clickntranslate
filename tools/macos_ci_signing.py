@@ -21,7 +21,7 @@ else:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CERTIFICATE = ROOT / 'packaging/macos/release-certificate.pem'
+CERTIFICATE = ROOT / 'tools/packaging/macos/release-certificate.pem'
 EXPECTED_SHA1 = 'FC6752F0026D34E5B63433544AF788B8FC1899EF'
 BUNDLE_ID = 'io.github.jabrailkhalil.clickntranslate'
 REPOSITORY = 'jabrailkhalil/clickntranslate'

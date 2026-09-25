@@ -8,7 +8,7 @@ args = parser.parse_args()
 if not re.fullmatch(r'1\.\d+\.\d+', args.new_version): parser.error('Invalid version')
 case = root / 'build/linux-update-audit' / ('1.7.0-to-' + args.new_version)
 case.mkdir(parents=True)
-sys.path.insert(0, str(root))
+sys.path[:0] = [str(root), str(root / 'src')]
 import single_instance
 from qa_published_update import download, release
 old, _ = download(release('1.7.0'), 'Click-n-Translate-1.7.0-linux-x86_64.AppImage', case)

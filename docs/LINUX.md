@@ -161,7 +161,7 @@ tools/setup_linux_env.sh              # creates ~/.venvs/clickntranslate
 tools/build_linux_release.sh          # tarball + AppImage in releases/
 ```
 
-`ClicknTranslate-linux.spec` builds three executables, mirroring the Windows
+`tools/packaging/ClicknTranslate-linux.spec` builds three executables, mirroring the Windows
 layout: the Qt GUI `clickntranslate`, plus `_internal/ArgosWorker` and
 `_internal/OcrWorker`. Argos and the neural OCR engines stay out of the Qt
 process because their native libraries must not be initialized inside it.

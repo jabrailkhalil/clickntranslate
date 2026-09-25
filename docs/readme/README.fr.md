@@ -54,6 +54,22 @@ L’espace de documents ouvre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` et
 
 ![Mettre à jour en un clic (Windows)](../images/update-demo.gif)
 
+## Compagnon de bureau
+
+Vous préférez cliquer plutôt que mémoriser des raccourcis ? Cliquez sur la mascotte pour traduire une zone ou tout l’écran, reconnaître et copier du texte, ouvrir le traducteur, lancer la traduction dynamique ou traduire un document. Vous pouvez la masquer quand vous n’en avez pas besoin.
+
+| Thème clair | Thème sombre |
+| --- | --- |
+| ![Thème clair](../images/mascot-light.png) | ![Thème sombre](../images/mascot-dark.png) |
+
+## Traduction dynamique
+
+Sélectionnez une ou plusieurs zones de l’écran et les langues. La traduction suit les changements du texte et s’affiche sur l’original ou dans une zone séparée.
+
+Exemple de configuration : le cadre violet délimite la zone à lire, le cadre vert une zone séparée pour la traduction.
+
+<img src="../images/dynamic-translation-regions.png" alt="Exemple de configuration : le cadre violet délimite la zone à lire, le cadre vert une zone séparée pour la traduction." width="760">
+
 ## Raccourcis clavier
 
 | Raccourci par défaut | Action |
@@ -68,7 +84,7 @@ L’espace de documents ouvre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` et
 
 Tous les raccourcis peuvent être modifiés ou effacés dans **Paramètres → Configurer les raccourcis**. Les paires de langues sont mémorisées séparément pour l'OCR, la sélection, le remplacement, le plein écran et la traduction dynamique.
 
-Le tableau indique les raccourcis Windows. Sur **macOS**, utilisez **Command** à la place de Ctrl et **Option** à la place de Alt. Sur **Linux**, associez les commandes dans les paramètres du bureau : [guide Linux](../../docs/LINUX.md).
+Le tableau indique les raccourcis Windows. Sur **macOS**, utilisez **Command** à la place de Ctrl et **Option** à la place de Alt. Sur **Linux**, associez les commandes dans les paramètres du bureau : [guide Linux](../LINUX.md).
 
 ## Moteurs de traduction et d’OCR
 
@@ -84,13 +100,13 @@ Dans **Paramètres → Paquets de langues**, installez ou supprimez moteurs OCR,
 
 1. Téléchargez le fichier adapté à votre système et ouvrez l’application. Python est inclus.
 2. Choisissez le moteur OCR, le service de traduction et les langues dans les paramètres. Téléchargez des modèles pour la traduction hors ligne.
-3. Choisissez une capture ou une traduction. Sur Mac, suivez les indications pour autoriser l’**enregistrement de l’écran** et l’**accessibilité**. Sur Linux, configurez les raccourcis du bureau avec le [guide Linux](../../docs/LINUX.md).
+3. Choisissez une capture ou une traduction. Sur Mac, suivez les indications pour autoriser l’**enregistrement de l’écran** et l’**accessibilité**. Sur Linux, configurez les raccourcis du bureau avec le [guide Linux](../LINUX.md).
 
 L’OCR fonctionne localement. La traduction en ligne envoie le texte au service choisi ; utilisez un moteur hors ligne pour une traduction locale. Voir [Confidentialité](../../PRIVACY.md).
 
 ## Aide et développement
 
-[Linux](../../docs/LINUX.md) · [macOS et compilation](../../docs/MACOS.md) · [Signaler un problème](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licence GPL-3.0](../../LICENSE)
+[Linux](../LINUX.md) · [macOS et compilation](../MACOS.md) · [Signaler un problème](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licence GPL-3.0](../../LICENSE)
 
 Pour un diagnostic, ouvrez **Aide → Rapport de bug** et joignez le ZIP créé au signalement. Il exclut le texte du presse-papiers, le contenu des documents, les historiques et les identifiants.
 

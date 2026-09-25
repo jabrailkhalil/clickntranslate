@@ -91,6 +91,8 @@ def application_path(info, current_path, cwd=''):
         root = script.parent
         if all((root / part).is_file() for part in ('translater.py', 'single_instance.py', 'icons/icon.ico')):
             return str(script)
+        if all((root / 'src' / part).is_file() for part in ('translater.py', 'single_instance.py', 'icons/icon.ico')):
+            return str(script)
         return ''
     return ''
 

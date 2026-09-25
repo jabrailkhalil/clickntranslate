@@ -5,7 +5,7 @@ import shutil
 import sys
 import zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path[:0] = [str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve().parents[1] / 'src')]
 from release_manifest import MANIFEST, program_files, verify_manifest
 
 

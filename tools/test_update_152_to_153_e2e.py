@@ -45,7 +45,7 @@ UPDATER = Path(os.environ.get(
     "CNT_UPDATE_HELPER",
     OLD_STAGE / "app" / "_internal" / "ClicknTranslateUpdater.exe",
 ))
-ISS = ROOT / "installer" / "ClicknTranslate.iss"
+ISS = ROOT / "tools/installer" / "ClicknTranslate.iss"
 ISCC = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 
 

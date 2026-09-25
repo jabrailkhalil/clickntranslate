@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class TestLauncher(unittest.TestCase):
     def test_launcher_uses_install_root_as_child_working_directory(self):
-        source = (ROOT / "launcher" / "ClicknTranslateLauncher.cs").read_text(
+        source = (ROOT / "tools/launcher" / "ClicknTranslateLauncher.cs").read_text(
             encoding="utf-8"
         )
 

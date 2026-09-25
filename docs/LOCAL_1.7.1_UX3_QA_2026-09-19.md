@@ -47,7 +47,7 @@
 Персонаж — Kirby. Дополнительные PNG загружены без изменений с
 [официального сайта Kirby](https://kirby.nintendo.com/) и
 [страницы способностей Nintendo](https://www.nintendo.com/jp/switch/a2jya/copy/index.html).
-Точные URL и условия происхождения: [README ресурсов](../icons/desktop-assistant/README.md).
+Точные URL и условия происхождения: [README ресурсов](../src/icons/desktop-assistant/README.md).
 Официальные картинки Nintendo/HAL не относятся к MIT-лицензии старого GIF;
 разрешение на публичное распространение не заявляется. Перед публичным
 релизом необходимо отдельно проверить права или заменить эти ресурсы.

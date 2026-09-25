@@ -21,7 +21,7 @@ def test_winrt_ocr_runtime_namespaces_are_required():
 
 
 def test_winrt_ocr_runtime_namespaces_are_packaged():
-    spec_text = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
+    spec_text = (ROOT / "tools/packaging/ClicknTranslate.spec").read_text(encoding="utf-8")
 
     for import_name in WINRT_PACKAGES.values():
         assert import_name in spec_text

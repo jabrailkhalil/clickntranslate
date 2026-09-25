@@ -54,6 +54,22 @@ The document workspace opens `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` and
 
 ![Update in one click (Windows)](docs/images/update-demo.gif)
 
+## Desktop companion
+
+Prefer clicking to remembering hotkeys? Click the mascot to open its action menu: translate an area or the full screen, recognize and copy text, open the translator, start Dynamic translation, or translate a document. You can hide the mascot when you do not need it.
+
+| Light theme | Dark theme |
+| --- | --- |
+| ![Light theme](docs/images/mascot-light.png) | ![Dark theme](docs/images/mascot-dark.png) |
+
+## Dynamic translation
+
+Select one or more screen regions and choose your languages. Translation follows changes in the selected text, with output over the original or in a separate region.
+
+Setup example: the purple frame marks the area to read; the green frame marks a separate area for the translation.
+
+<img src="docs/images/dynamic-translation-regions.png" alt="Setup example: the purple frame marks the area to read; the green frame marks a separate area for the translation." width="760">
+
 ## Default hotkeys
 
 | Default hotkey | Action |
@@ -89,6 +105,8 @@ Open **Settings → Language packages** to install or remove OCR engines, recogn
 OCR runs locally. Online translation sends the text to your selected provider; use an offline engine to keep translation local. See [Privacy](PRIVACY.md).
 
 ## Help and development
+
+[Source layout and developer commands](docs/REPOSITORY_LAYOUT.md).
 
 [Linux setup](docs/LINUX.md) · [macOS setup and builds](docs/MACOS.md) · [Report a problem](https://github.com/jabrailkhalil/clickntranslate/issues) · [License: GPL-3.0](LICENSE)
 

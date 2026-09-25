@@ -33,7 +33,7 @@ def test_manifest_covers_all_modules_and_excludes_user_data(package):
 
 def test_manifest_is_a_legacy_updater_requirement_not_an_unpacked_dependency():
     source = Path(__file__).resolve().parents[1]
-    updater = (source / 'launcher/ClicknTranslateApplyUpdate.cs').read_text(encoding='utf-8')
+    updater = (source / 'tools/launcher/ClicknTranslateApplyUpdate.cs').read_text(encoding='utf-8')
     program_files = updater[updater.index('private static IEnumerable<string> ProgramFiles'):]
     program_files = program_files[:program_files.index('private static void WaitForProcessExit')]
     assert 'Path.Combine(root, "program-files.sha256")' in program_files

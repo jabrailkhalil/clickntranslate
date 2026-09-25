@@ -3,10 +3,10 @@
   #define MyAppVersion "1.8.1"
 #endif
 #ifndef SourceDir
-  #define SourceDir "..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"
+  #define SourceDir "..\..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"
 #endif
 #ifndef ReleaseDir
-  #define ReleaseDir "..\releases"
+  #define ReleaseDir "..\..\releases"
 #endif
 #ifndef MyAppId
   #define MyAppId "{{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}"
@@ -29,7 +29,7 @@ ArchitecturesAllowed=x64compatible
 MinVersion=10.0
 OutputDir={#ReleaseDir}
 OutputBaseFilename=ClicknTranslate-Setup-v{#MyAppVersion}-win64
-SetupIconFile=..\icons\icon.ico
+SetupIconFile=..\..\src\icons\icon.ico
 UninstallDisplayIcon={app}\ClicknTranslate.exe
 Compression=lzma2/ultra64
 SolidCompression=yes

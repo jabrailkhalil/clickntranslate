@@ -37,7 +37,7 @@ if (-not $SkipPyInstaller) {
     Push-Location $repoRoot
     try {
         & (Join-Path $repoRoot ".venv\Scripts\python.exe") -m PyInstaller `
-            (Join-Path $repoRoot "ClicknTranslate.spec") --clean --noconfirm
+            (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
         if ($LASTEXITCODE -ne 0) {
             throw "PyInstaller failed with exit code $LASTEXITCODE."
         }
@@ -112,7 +112,7 @@ if (-not $CertificateThumbprint) {
 }
 
 # Hash the final signed bytes of every program module, library and worker.
-& (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'release_manifest.py') write $packageRoot $Version
+& (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'src/release_manifest.py') write $packageRoot $Version
 if ($LASTEXITCODE -ne 0) { throw 'Program manifest generation failed.' }
 
 # The installed updater from earlier versions requires this manifest beside

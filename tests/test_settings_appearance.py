@@ -253,7 +253,7 @@ class EngineComboTest(unittest.TestCase):
 
     def test_the_chevron_images_exist_and_are_transparent_pngs(self):
         for name in ("chevron_down_dark.png", "chevron_down_light.png"):
-            path = ROOT / "icons" / name
+            path = ROOT / "src/icons" / name
             self.assertTrue(path.is_file(), f"{name} is missing")
             image = QImage(str(path))
             self.assertFalse(image.isNull(), f"{name} is not a readable image")
@@ -267,8 +267,8 @@ class EngineComboTest(unittest.TestCase):
         self.assertNotIn("border-left", drop_down)
 
     def test_the_spec_ships_the_icons_folder(self):
-        for name in ("ClicknTranslate.spec", "ClicknTranslate-linux.spec"):
-            self.assertIn("('icons', 'icons')", (ROOT / name).read_text(encoding="utf-8"), name)
+        for name in ("tools/packaging/ClicknTranslate.spec", "tools/packaging/ClicknTranslate-linux.spec"):
+            self.assertIn("(str(_SOURCE_ROOT / 'icons'), 'icons')", (ROOT / name).read_text(encoding="utf-8"), name)
 
 
 class DropDownPlacementTest(unittest.TestCase):

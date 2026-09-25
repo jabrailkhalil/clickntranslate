@@ -438,7 +438,7 @@ class ArgosPackagingTest(unittest.TestCase):
                         self.assertEqual(translater._argos_worker_path(), expected)
 
     def test_spec_excludes_stanza_stack_and_keeps_argos_runtime(self):
-        spec_text = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
+        spec_text = (ROOT / "tools/packaging/ClicknTranslate.spec").read_text(encoding="utf-8")
 
         for excluded in ("'torch'", "'stanza'", "'minisbd'", "'onnxruntime'", "'spacy'", "'thinc'"):
             self.assertIn(excluded, spec_text)
@@ -446,7 +446,7 @@ class ArgosPackagingTest(unittest.TestCase):
             self.assertIn(required, spec_text)
         self.assertIn("ArgosWorker", spec_text)
         self.assertIn("'_internal/ArgosWorker.exe'", spec_text)
-        self.assertIn("'argos_worker.py'", spec_text)
+        self.assertIn("'src/argos_worker.py'", spec_text)
         for optional_ocr in ("'easyocr'", "'rapidocr'", "'rapidocr_onnxruntime'"):
             self.assertIn(optional_ocr, spec_text)
 

@@ -17,11 +17,11 @@ def test_release_version_is_synchronized_everywhere():
     four_part = version + ".0" if version.count(".") == 2 else version
 
     assert version == "1.8.1"
-    assert f'#define MyAppVersion "{version}"' in _read("installer/ClicknTranslate.iss")
-    assert f'version="{four_part}"' in _read("installer/windows/ClicknTranslate.exe.manifest")
-    assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateRepair.manifest")
-    assert f'version="{four_part}"' in _read("launcher/ClicknTranslateUpdateBootstrap.manifest")
-    assert f'version="{four_part}"' in _read("launcher/ClicknTranslateApplyUpdate.manifest")
+    assert f'#define MyAppVersion "{version}"' in _read("tools/installer/ClicknTranslate.iss")
+    assert f'version="{four_part}"' in _read("tools/installer/windows/ClicknTranslate.exe.manifest")
+    assert f'version="{four_part}"' in _read("tools/launcher/ClicknTranslateUpdateRepair.manifest")
+    assert f'version="{four_part}"' in _read("tools/launcher/ClicknTranslateUpdateBootstrap.manifest")
+    assert f'version="{four_part}"' in _read("tools/launcher/ClicknTranslateApplyUpdate.manifest")
     assert f'[string]$Version = "{version}"' in _read("tools/stage_release.ps1")
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_apply_updater.ps1")
     assert f'[string]$Version = "{four_part}"' in _read("tools/build_launcher.ps1")

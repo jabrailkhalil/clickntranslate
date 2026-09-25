@@ -36,8 +36,8 @@ on:
     paths:
       - '**.py'
       - 'requirements-macos.txt'
-      - 'ClicknTranslate-macos.spec'
-      - 'packaging/macos/**'
+      - 'tools/packaging/ClicknTranslate-macos.spec'
+      - 'tools/packaging/macos/**'
       - 'tools/*macos*'
       - '.github/workflows/macos.yml'
       - '.github/workflows/release.yml'

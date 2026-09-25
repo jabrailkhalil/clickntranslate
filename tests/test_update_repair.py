@@ -105,8 +105,8 @@ class TestUpdateRepair(unittest.TestCase):
 
     def test_release_repair_keeps_installer_permissions(self):
         source = (ROOT / "tools" / "build_update_repair.ps1").read_text(encoding="utf-8")
-        repair_source = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
-        repair_manifest = (ROOT / "launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
+        repair_source = (ROOT / "tools/launcher" / "ClicknTranslateUpdateRepair.cs").read_text(encoding="utf-8")
+        repair_manifest = (ROOT / "tools/launcher" / "ClicknTranslateUpdateRepair.manifest").read_text(encoding="utf-8")
         self.assertIn("ClicknTranslateUpdateRepair.manifest", source)
         self.assertIn('level="requireAdministrator"', repair_manifest)
         self.assertIn('Verb = "runas"', repair_source)

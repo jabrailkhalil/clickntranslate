@@ -5,8 +5,14 @@ import sys as _sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
-_app_version = _runpy.run_path('app_version.py')['APP_VERSION']
-_version_info = _runpy.run_path('tools/windows_version_info.py')['make_version_info']
+from pathlib import Path as _Path
+import sys as _spec_sys
+_PROJECT_ROOT = _Path(SPECPATH).resolve().parents[1]
+_SOURCE_ROOT = _PROJECT_ROOT / 'src'
+_spec_sys.path[:0] = [str(_PROJECT_ROOT), str(_SOURCE_ROOT)]
+
+_app_version = _runpy.run_path(str(_PROJECT_ROOT / 'app_version.py'))['APP_VERSION']
+_version_info = _runpy.run_path(str(_PROJECT_ROOT / 'tools/windows_version_info.py'))['make_version_info']
 
 
 # The optional OCR engines are pip-installed at runtime into a private folder and
@@ -19,7 +25,7 @@ _version_info = _runpy.run_path('tools/windows_version_info.py')['make_version_i
 # packages requiring >= 3.12, so EasyOCR and RapidOCR installs failed outright
 # with "Could not find a version that satisfies the requirement scipy==1.18.0".
 # Fail the build instead of shipping that again.
-_settings_source = open('settings_window.py', encoding='utf-8').read()
+_settings_source = open(_SOURCE_ROOT / 'settings_window.py', encoding='utf-8').read()
 _engine_python = _re.search(
     r'EASYOCR_PYTHON_VERSION\s*=\s*"(\d+)\.(\d+)\.\d+"', _settings_source
 )
@@ -35,7 +41,7 @@ if _engine_python:
         )
 
 
-gui_datas = [('icons', 'icons')]
+gui_datas = [(str(_SOURCE_ROOT / 'icons'), 'icons')]
 gui_binaries = []
 gui_hiddenimports = [
     'winrt.windows.media.ocr',
@@ -192,8 +198,8 @@ ocr_worker_hiddenimports += _stdlib_hiddenimports()
 
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'main.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=gui_binaries,
     datas=gui_datas,
     hiddenimports=gui_hiddenimports,
@@ -217,8 +223,8 @@ a = Analysis(
 )
 
 worker_a = Analysis(
-    ['argos_worker.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'src/argos_worker.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=[],
     datas=[],
     hiddenimports=argos_hiddenimports,
@@ -238,8 +244,8 @@ worker_a = Analysis(
 )
 
 ocr_worker_a = Analysis(
-    ['ocr_worker.py'],
-    pathex=[],
+    [str(_PROJECT_ROOT / 'src/ocr_worker.py')],
+    pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=ocr_worker_binaries,
     datas=ocr_worker_datas,
     hiddenimports=ocr_worker_hiddenimports,
@@ -373,8 +379,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icons\\icon.ico'],
-    manifest='installer\\windows\\ClicknTranslate.exe.manifest',
+    icon=[str(_SOURCE_ROOT / 'icons/icon.ico')],
+    manifest=str(_PROJECT_ROOT / 'tools/installer/windows/ClicknTranslate.exe.manifest'),
 )
 
 worker_exe = EXE(

@@ -102,13 +102,13 @@ def test_inno_calls_the_signing_gate_and_cannot_complete_without_a_certificate(p
     compiler = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/Inno Setup 6/ISCC.exe"
     if not compiler.exists():
         pytest.skip("Inno Setup is not installed on this runner")
-    # A small disposable package exercises the actual installer/uninstaller
+    # A small disposable package exercises the actual tools/installer/uninstaller
     # signing hook without building or installing the full application.
     command = f'$q{POWERSHELL}$q -NoProfile -NonInteractive -File $q{SIGN_SCRIPT}$q -FilePath $f'
     result = subprocess.run([
         str(compiler), f"/DSourceDir={package}", f"/DReleaseDir={tmp_path / 'output'}",
         "/DSignRelease=1", "/Fsigning-gate-test", f"/Scntsign={command}",
-        str(ROOT / "installer/ClicknTranslate.iss"),
+        str(ROOT / "tools/installer/ClicknTranslate.iss"),
     ], capture_output=True, text=True, timeout=90)
     assert result.returncode != 0
     output = result.stdout + result.stderr

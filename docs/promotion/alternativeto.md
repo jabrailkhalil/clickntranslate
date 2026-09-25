@@ -137,7 +137,7 @@ Explain the relationship rather than claiming identical functionality:
 
 ## Assets
 
-- Square application icon: `../icons/icon.png` (1024 x 1024 PNG).
+- Square application icon: `../../src/icons/icon.png` (1024 x 1024 PNG).
 - `gallery/01-overview.png` (1270 x 760 PNG).
 - `gallery/02-game-translation.png` (1270 x 760 PNG).
 - `gallery/03-area-ocr.png` (1270 x 760 PNG).

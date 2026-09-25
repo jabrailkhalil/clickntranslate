@@ -271,7 +271,7 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
             pytest.skip('Inno Setup is unavailable')
         compilation = subprocess.run([str(compiler), '/DMyAppVersion=1.7.2', f'/DSourceDir={new}',
             f'/DReleaseDir={tmp_path}', '/DMyAppId={{' + str(uuid.uuid4()).upper() + '}',
-            str(ROOT / 'installer/ClicknTranslate.iss')], capture_output=True, timeout=45)
+            str(ROOT / 'tools/installer/ClicknTranslate.iss')], capture_output=True, timeout=45)
         assert compilation.returncode == 0, compilation.stdout
         archive = tmp_path / 'ClicknTranslate-Setup-v1.7.2-win64.exe'
     install = tmp_path / 'installed'

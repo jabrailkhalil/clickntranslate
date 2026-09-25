@@ -48,7 +48,9 @@ DEFAULT_LAYOUT = {
         "grid_size": 8,
     },
 }
-DEFAULT_DRAFT_PATH = Path(__file__).with_name("ui_layout_draft.json")
+from project_paths import repository_root
+
+DEFAULT_DRAFT_PATH = repository_root() / "ui_layout_draft.json"
 
 
 def normalized_layout(values=None):

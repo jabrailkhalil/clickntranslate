@@ -117,7 +117,7 @@ class ClipboardHelperTest(unittest.TestCase):
 class ClipboardCallSiteTest(unittest.TestCase):
     def test_no_module_writes_the_clipboard_directly(self):
         """A direct pyperclip.copy would lose the text when the overlay exits."""
-        for name in ("ocr.py", "main.py"):
+        for name in ("src/ocr.py", "main.py"):
             source = (ROOT / name).read_text(encoding="utf-8")
             self.assertNotIn("pyperclip.copy(", source, name)
 

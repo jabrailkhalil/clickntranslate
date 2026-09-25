@@ -1,8 +1,14 @@
+import os
+import sys
+
+# Keep the public source entry point stable while implementation modules live in src/.
+# Frozen builds discover these modules through the explicit PyInstaller search path.
+if not getattr(sys, 'frozen', False):
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+
 from button_styles import button_qss, standard_buttons
 import json
 import getpass
-import os
-import sys
 import warnings  # suppress noisy third-party warnings
 # гасим предупреждение pkg_resources ДО первых сторонних импортов
 warnings.filterwarnings(
@@ -123,6 +129,7 @@ from settings_window import (
 from app_version import APP_VERSION
 import platform_support
 import portable_paths
+from project_paths import resource_root
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
@@ -1142,7 +1149,7 @@ def get_app_dir():
     """Directory with app resources (icons, etc). In PyInstaller — temp extraction dir."""
     if hasattr(sys, '_MEIPASS'):
         return sys._MEIPASS
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return str(resource_root())
 
 def get_portable_dir():
     """Directory next to the exe for portable data (config, history, cache).
@@ -3702,7 +3709,7 @@ def resource_path(relative_path):
     """ Получить абсолютный путь к ресурсу, работает для dev и для PyInstaller """
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+    return os.path.join(resource_root(), relative_path)
 
 
 ARGOS_PACKAGE_DIALOG_TEXT = {

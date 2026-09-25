@@ -27,7 +27,7 @@ def run():
     root = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    sys.path[:0] = [str(root), str(root / 'tests')]
+    sys.path[:0] = [str(root), str(root / 'src'), str(root / 'tests')]
     os.chdir(root)  # Application resource paths are relative to the source root.
     os.environ['QT_QPA_PLATFORM'] = 'offscreen'
     import portable_paths

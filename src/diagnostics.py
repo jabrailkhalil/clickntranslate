@@ -75,7 +75,8 @@ def _portable_root() -> Path:
         if executable.parent.name.lower() == "app":
             return executable.parent.parent
         return executable.parent
-    return Path(__file__).resolve().parent
+    from project_paths import repository_root
+    return repository_root()
 
 
 def _redactor() -> tuple[tuple[str, str], ...]:

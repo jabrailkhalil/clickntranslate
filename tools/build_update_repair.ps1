@@ -78,11 +78,11 @@ internal static class RepairBuildInfo
         /reference:System.IO.Compression.dll `
         /reference:System.IO.Compression.FileSystem.dll `
         /reference:System.Windows.Forms.dll `
-        "/win32icon:$root\icons\icon.ico" `
-        "/win32manifest:$root\launcher\ClicknTranslateUpdateRepair.manifest" `
+        "/win32icon:$root\src\icons\icon.ico" `
+        "/win32manifest:$root\tools\launcher\ClicknTranslateUpdateRepair.manifest" `
         "/out:$OutputPath" `
-        "$root\launcher\ClicknTranslateUpdateRepair.cs" `
-        "$root\launcher\SilentWinFormsDialog.cs" `
+        "$root\tools\launcher\ClicknTranslateUpdateRepair.cs" `
+        "$root\tools\launcher\SilentWinFormsDialog.cs" `
         $versionSource `
         $buildInfoSource
 

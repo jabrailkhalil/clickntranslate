@@ -53,11 +53,11 @@ using System.Reflection;
         /reference:System.IO.Compression.dll `
         /reference:System.IO.Compression.FileSystem.dll `
         /reference:System.Windows.Forms.dll `
-        "/win32icon:$root\icons\icon.ico" `
-        "/win32manifest:$root\launcher\ClicknTranslateApplyUpdate.manifest" `
+        "/win32icon:$root\src\icons\icon.ico" `
+        "/win32manifest:$root\tools\launcher\ClicknTranslateApplyUpdate.manifest" `
         "/out:$OutputPath" `
-        "$root\launcher\ClicknTranslateApplyUpdate.cs" `
-        "$root\launcher\SilentWinFormsDialog.cs" `
+        "$root\tools\launcher\ClicknTranslateApplyUpdate.cs" `
+        "$root\tools\launcher\SilentWinFormsDialog.cs" `
         $versionSource
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) {

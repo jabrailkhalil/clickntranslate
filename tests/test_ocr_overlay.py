@@ -527,7 +527,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
 
         # The stylesheet must live in exactly one place.
         for module_name in ("main", "settings_window"):
-            source = Path(ocr.__file__).with_name(f"{module_name}.py").read_text(encoding="utf-8")
+            import importlib.util
+            source = Path(importlib.util.find_spec(module_name).origin).read_text(encoding="utf-8")
             self.assertNotIn(
                 "background-color: #17131f;",
                 source,

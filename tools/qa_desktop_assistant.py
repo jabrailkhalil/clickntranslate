@@ -18,7 +18,7 @@ def run():
     parser.add_argument('--preview', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    sys.path[:0] = [str(root), str(root / 'tests')]
+    sys.path[:0] = [str(root), str(root / 'src'), str(root / 'tests')]
     sys.argv[0] = str(root / 'main.py')
     os.environ['QT_QPA_PLATFORM'] = 'windows:fontengine=freetype' if args.preview and sys.platform == 'win32' else 'offscreen'
     from PyQt5 import QtCore, QtWidgets

@@ -11,6 +11,7 @@ import time
 from xml.parsers.expat import ExpatError
 
 from platform_support import APP_ID
+from project_paths import repository_root, source_entry
 
 
 def user_data_dir():
@@ -32,7 +33,7 @@ def launch_arguments():
             raise RuntimeError("Autostart requires an installed .app bundle.")
         # LaunchServices gives the app its own identity for privacy permissions.
         return ["/usr/bin/open", "-a", bundle, "--args", "--autostart"]
-    script = str(Path(__file__).with_name("main.py").resolve())
+    script = str(source_entry())
     return [sys.executable, script, "--autostart"]
 
 
@@ -62,7 +63,7 @@ def set_autostart(enabled):
     entry = {"Label": APP_ID, "ProgramArguments": launch_arguments(),
              "RunAtLoad": True, "LimitLoadToSessionType": "Aqua"}
     if not getattr(sys, "frozen", False):
-        entry["WorkingDirectory"] = str(Path(__file__).resolve().parent)
+        entry["WorkingDirectory"] = str(repository_root())
     _write_launchagent(path, entry)
     return autostart_enabled()
 
@@ -96,7 +97,7 @@ def repair_autostart(restore_missing=False):
             return True
         entry['ProgramArguments'] = expected
         if not getattr(sys, 'frozen', False):
-            entry['WorkingDirectory'] = str(Path(__file__).resolve().parent)
+            entry['WorkingDirectory'] = str(repository_root())
         _write_launchagent(path, entry)
     except (OSError, ValueError, plistlib.InvalidFileException, ExpatError, RuntimeError):
         logging.exception('Could not repair macOS autostart; existing LaunchAgent preserved')

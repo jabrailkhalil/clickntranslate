@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-SPECS = ("ClicknTranslate.spec", "ClicknTranslate-linux.spec")
+SPECS = ("tools/packaging/ClicknTranslate.spec", "tools/packaging/ClicknTranslate-linux.spec")
 
 
 class SpecVerificationTest(unittest.TestCase):
@@ -39,8 +39,8 @@ class SpecVerificationTest(unittest.TestCase):
 
     def test_every_shipped_executable_is_checked(self):
         expected = {
-            "ClicknTranslate.spec": ("ClicknTranslate.exe", "ArgosWorker.exe", "OcrWorker.exe"),
-            "ClicknTranslate-linux.spec": ("clickntranslate", "ArgosWorker", "OcrWorker"),
+            "tools/packaging/ClicknTranslate.spec": ("ClicknTranslate.exe", "ArgosWorker.exe", "OcrWorker.exe"),
+            "tools/packaging/ClicknTranslate-linux.spec": ("clickntranslate", "ArgosWorker", "OcrWorker"),
         }
         for name, executables in expected.items():
             source = self._spec(name)
@@ -68,7 +68,7 @@ class VerificationLogicTest(unittest.TestCase):
     """Exercise the check itself, extracted from the spec, against fake payloads."""
 
     def _load_checker(self):
-        source = (ROOT / "ClicknTranslate.spec").read_text(encoding="utf-8")
+        source = (ROOT / "tools/packaging/ClicknTranslate.spec").read_text(encoding="utf-8")
         start = source.index("def _verify_frozen_executables")
         end = source.index("_verify_frozen_executables(_os.path.join(DISTPATH")
         namespace = {"_os": __import__("os")}

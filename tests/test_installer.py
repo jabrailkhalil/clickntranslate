@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_installer_uses_the_verified_launcher_release_layout():
-    source = (ROOT / "installer" / "ClicknTranslate.iss").read_text(encoding="utf-8")
+    source = (ROOT / "tools/installer" / "ClicknTranslate.iss").read_text(encoding="utf-8")
 
     assert '#define MyAppId "{{70f13ecd-bf6d-4c9d-bba6-3fb112272e36}"' in source
     assert 'AppId={#MyAppId}' in source
@@ -32,7 +32,7 @@ def test_installer_uses_the_verified_launcher_release_layout():
 
 
 def test_legacy_update_bootstrap_runs_the_verified_inno_installer():
-    source = (ROOT / "launcher" / "ClicknTranslateUpdateBootstrap.cs").read_text(encoding="utf-8")
+    source = (ROOT / "tools/launcher" / "ClicknTranslateUpdateBootstrap.cs").read_text(encoding="utf-8")
     build = (ROOT / "tools" / "build_update_bootstrap.ps1").read_text(encoding="utf-8")
 
     assert '"/CLOSEAPPLICATIONS"' in source

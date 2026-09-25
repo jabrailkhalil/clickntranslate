@@ -55,7 +55,7 @@ if (-not $SkipPyInstaller) {
     if (-not (Test-Path -LiteralPath $python)) {
         throw "Python environment not found: $python"
     }
-    & $python -m PyInstaller (Join-Path $repoRoot "ClicknTranslate.spec") --clean --noconfirm
+    & $python -m PyInstaller (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller build failed with exit code $LASTEXITCODE."
     }
@@ -93,10 +93,10 @@ if (Test-Path -LiteralPath $numpyPath) {
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
 }
 
-Copy-Item -LiteralPath (Join-Path $repoRoot "installer\msix\Assets") -Destination $stagePath -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot "tools\installer\msix\Assets") -Destination $stagePath -Recurse -Force
 
 $manifestTemplate = [System.IO.File]::ReadAllText(
-    (Join-Path $repoRoot "installer\msix\AppxManifest.xml.in"),
+    (Join-Path $repoRoot "tools\installer\msix\AppxManifest.xml.in"),
     [System.Text.Encoding]::UTF8
 )
 $manifest = $manifestTemplate.Replace("__IDENTITY_NAME__", (ConvertTo-XmlText $IdentityName))

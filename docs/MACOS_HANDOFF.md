@@ -157,7 +157,7 @@ smoke-тест сборки использует временные настро
 | Каталоги данных, системные команды, Homebrew | `platform_support.py`, `portable_paths.py` |
 | Установка и удаление OCR-пакетов | `settings_window.py`, `ocr_worker.py` |
 | Строго выбранный переводчик, дробление и отмена | `translater.py`, `translation_chunks.py`, `document_translation.py` |
-| Сборка и встроенные проверки | `ClicknTranslate-macos.spec`, `tools/build_macos_release.sh`, `macos_smoke.py`, `tools/smoke_macos_bundle.py` |
+| Сборка и встроенные проверки | `tools/packaging/ClicknTranslate-macos.spec`, `tools/build_macos_release.sh`, `macos_smoke.py`, `tools/smoke_macos_bundle.py` |
 
 При импорте настроек с недоступным Windows OCR выбор мигрирует в видимый
 Apple Vision до создания интерфейса. Выбор доступного движка сохраняется.

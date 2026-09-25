@@ -14,7 +14,7 @@ from unittest import mock
 root = Path(__file__).resolve().parents[1]
 if sys.platform != 'win32':
     raise SystemExit('Windows OCR with its English pack is required.')
-sys.path.insert(0, str(root))
+sys.path[:0] = [str(root), str(root / 'src')]
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.argv[0] = str(root / '.tmp/windows-live-data/main.py')
 from PyQt5 import QtCore, QtGui, QtWidgets

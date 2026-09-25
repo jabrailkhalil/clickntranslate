@@ -76,8 +76,8 @@ def test_source_autostart_keeps_resource_working_directory(mac, monkeypatch):
     monkeypatch.delattr(sys, 'frozen', raising=False)
     assert desktop.set_autostart(True)
     entry = plistlib.loads(desktop.autostart_path().read_bytes())
-    assert entry['WorkingDirectory'] == str(Path(desktop.__file__).resolve().parent)
-    assert entry['ProgramArguments'][1] == str(Path(desktop.__file__).with_name('main.py').resolve())
+    assert entry['WorkingDirectory'] == str(Path(desktop.__file__).resolve().parents[1])
+    assert entry['ProgramArguments'][1] == str(Path(desktop.__file__).resolve().parents[1] / 'main.py')
 
 
 def test_autostart_rejects_a_plist_without_a_dictionary(mac):

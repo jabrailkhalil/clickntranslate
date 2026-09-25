@@ -4,7 +4,7 @@ echo ================================================================
 echo          Click'n'Translate Release Builder
 echo ================================================================
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo [1/5] Setting up environment...
 if not exist ".venv" (
@@ -22,7 +22,7 @@ if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
 
 echo [3/5] Building executable...
-pyinstaller ClicknTranslate.spec --clean --noconfirm
+pyinstaller tools/packaging/ClicknTranslate.spec --clean --noconfirm
 
 echo [4/5] Adding extras...
 if not exist "dist\ClicknTranslate" (

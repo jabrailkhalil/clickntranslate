@@ -15,7 +15,7 @@ import time
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
 
 
 def run():

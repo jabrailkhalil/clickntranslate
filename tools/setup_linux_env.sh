@@ -5,7 +5,7 @@
 #
 # argostranslate is installed with --no-deps on purpose: its dependency tree
 # pulls stanza (and therefore torch, ~2 GB) only for sentence boundary
-# detection, which translater.py replaces with its own splitter. The runtime
+# detection, which src/translater.py replaces with its own splitter. The runtime
 # pieces Argos actually needs — ctranslate2 and sentencepiece — come from
 # requirements-linux.txt.
 

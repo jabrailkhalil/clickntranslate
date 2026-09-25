@@ -13,7 +13,7 @@ import sys
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
 sys.argv[0] = str(ROOT / '.tmp/linux-dynamic-output-data/main.py')
 
 from PyQt5 import QtCore, QtGui, QtWidgets

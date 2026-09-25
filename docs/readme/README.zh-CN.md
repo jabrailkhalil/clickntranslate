@@ -54,6 +54,22 @@ Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书*
 
 ![一键更新（Windows）](../images/update-demo.gif)
 
+## 桌面吉祥物助手
+
+不想记快捷键？点击吉祥物即可打开操作菜单：翻译选定区域或全屏、识别并复制文字、打开翻译器、启动动态翻译或翻译文档。不需要时可以隐藏助手。
+
+| 浅色主题 | 深色主题 |
+| --- | --- |
+| ![浅色主题](../images/mascot-light.png) | ![深色主题](../images/mascot-dark.png) |
+
+## 动态翻译
+
+选择一个或多个屏幕区域以及翻译语言。识别区域内的文字变化时，翻译会随之更新。译文可以覆盖原文，也可以显示在单独的区域中。
+
+设置示例：紫色边框为识别区域，绿色边框为单独的译文显示区域。
+
+<img src="../images/dynamic-translation-regions.png" alt="设置示例：紫色边框为识别区域，绿色边框为单独的译文显示区域。" width="760">
+
 ## 快捷键
 
 | 默认快捷键 | 操作 |
@@ -68,7 +84,7 @@ Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书*
 
 所有快捷键均可在 **设置 → 配置快捷键** 中修改或清除。OCR、选中文字、替换、全屏和动态翻译会分别记住所选语言对。
 
-表中列出 Windows 默认快捷键。在 **macOS** 上，用 **Command** 替代 Ctrl，用 **Option** 替代 Alt。在 **Linux** 上，请在桌面快捷键设置中绑定对应命令：[Linux 指南](../../docs/LINUX.md)。
+表中列出 Windows 默认快捷键。在 **macOS** 上，用 **Command** 替代 Ctrl，用 **Option** 替代 Alt。在 **Linux** 上，请在桌面快捷键设置中绑定对应命令：[Linux 指南](../LINUX.md)。
 
 ## 翻译与 OCR 引擎
 
@@ -84,13 +100,13 @@ Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书*
 
 1. 下载适合您系统的文件并打开应用。发行包已包含 Python 运行环境。
 2. 在设置中选择 OCR 引擎、翻译服务及语言。离线翻译需先下载语言模型。
-3. 选择捕获或翻译操作。在 Mac 上按照提示授予**屏幕录制**和**辅助功能**权限。Linux 桌面快捷键设置请参阅 [Linux 指南](../../docs/LINUX.md)。
+3. 选择捕获或翻译操作。在 Mac 上按照提示授予**屏幕录制**和**辅助功能**权限。Linux 桌面快捷键设置请参阅 [Linux 指南](../LINUX.md)。
 
 OCR 在本地运行。在线翻译会将文本发送给您选择的服务；如需本地翻译，请使用离线引擎。参阅[隐私说明](../../PRIVACY.md)。
 
 ## 帮助与开发
 
-[Linux 指南](../../docs/LINUX.md) · [macOS 指南与构建](../../docs/MACOS.md) · [反馈问题](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0 许可证](../../LICENSE)
+[Linux 指南](../LINUX.md) · [macOS 指南与构建](../MACOS.md) · [反馈问题](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0 许可证](../../LICENSE)
 
 如需诊断报告，请在应用中打开**帮助 → 错误报告**，并将生成的 ZIP 附在反馈中。报告不包含剪贴板文本、文档内容、历史记录或凭据。
 

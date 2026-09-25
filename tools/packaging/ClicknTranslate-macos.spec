@@ -7,6 +7,12 @@ from pathlib import Path
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
+from pathlib import Path as _Path
+import sys as _spec_sys
+_PROJECT_ROOT = _Path(SPECPATH).resolve().parents[1]
+_SOURCE_ROOT = _PROJECT_ROOT / 'src'
+_spec_sys.path[:0] = [str(_PROJECT_ROOT), str(_SOURCE_ROOT)]
+
 if sys.platform != 'darwin':
     raise SystemExit('Build this spec on macOS; cross-compilation is not supported.')
 
@@ -19,10 +25,10 @@ entitlements = None
 if identity:
     # AMFI's entitlement parser rejects CRLF XML accepted by plutil. Source
     # archives produced on Windows can carry CRLF, so serialize canonical XML.
-    entitlements_path = Path(SPECPATH) / 'build/macos/entitlements.plist'
+    entitlements_path = _PROJECT_ROOT / 'build/macos/entitlements.plist'
     entitlements_path.parent.mkdir(parents=True, exist_ok=True)
     entitlements_path.write_bytes(plistlib.dumps(plistlib.loads(
-        (Path(SPECPATH) / 'packaging/macos/entitlements.plist').read_bytes())))
+        (_PROJECT_ROOT / 'tools/packaging/macos/entitlements.plist').read_bytes())))
     entitlements = str(entitlements_path)
 common_excludes = ['tkinter', 'pytest', 'IPython', 'jupyter', 'tensorflow', 'keras',
                    'matplotlib', 'pandas', 'sklearn', 'stanza', 'minisbd', 'spacy', 'thinc']
@@ -33,12 +39,12 @@ gui_hidden = ['pypdf']
 for module in native_bridges:
     gui_hidden += collect_submodules(module)
 
-gui = Analysis(['main.py'], pathex=[SPECPATH],
-               datas=[('icons', 'icons')], binaries=[], hiddenimports=gui_hidden,
+gui = Analysis([str(_PROJECT_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
+               datas=[(str(_SOURCE_ROOT / 'icons'), 'icons')], binaries=[], hiddenimports=gui_hidden,
                excludes=[*common_excludes, *optional, 'argostranslate', 'ctranslate2',
                          'sentencepiece', 'onnxruntime', 'rapidocr_onnxruntime', 'cv2'],
                noarchive=False)
-argos = Analysis(['argos_worker.py'], pathex=[SPECPATH], datas=[], binaries=[],
+argos = Analysis([str(_PROJECT_ROOT / 'src/argos_worker.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)], datas=[], binaries=[],
                  hiddenimports=['argostranslate.package', 'argostranslate.translate', 'filelock', 'sacremoses'],
                  excludes=[*common_excludes, *optional, *native_bridges, 'PyQt5',
                            'onnxruntime', 'rapidocr_onnxruntime', 'cv2'], noarchive=False)
@@ -54,7 +60,7 @@ for module in sorted(sys.stdlib_module_names):
     stdlib.update(collect_submodules(module, on_error='ignore'))
 ocr_hidden = list(stdlib) + collect_submodules('rapidocr_onnxruntime') + collect_submodules('PIL') + [
     'onnxruntime', 'cv2', 'pyclipper', 'shapely', 'yaml', 'tqdm', 'six', 'numpy', 'PIL']
-ocr = Analysis(['ocr_worker.py'], pathex=[SPECPATH], binaries=[],
+ocr = Analysis([str(_PROJECT_ROOT / 'src/ocr_worker.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)], binaries=[],
                datas=collect_data_files('rapidocr_onnxruntime'), hiddenimports=ocr_hidden,
                excludes=[*common_excludes, *optional, *native_bridges, 'PyQt5',
                          'argostranslate', 'ctranslate2', 'sentencepiece'], noarchive=False)
@@ -75,7 +81,7 @@ collection = COLLECT(gui_exe, argos_exe, ocr_exe,
                      name='ClicknTranslate-macos', upx=False, strip=False)
 # BUNDLE relocates code to MacOS/Frameworks and resources to Resources, creating
 # the necessary links. Do not move helpers after signing or mutate the bundle.
-app = BUNDLE(collection, name='ClicknTranslate.app', icon='build/macos/icon.icns',
+app = BUNDLE(collection, name='ClicknTranslate.app', icon=str(_PROJECT_ROOT / 'build/macos/icon.icns'),
              bundle_identifier=APP_ID, codesign_identity=identity, entitlements_file=entitlements,
              info_plist={
                  # COLLECT sorts its executables and does not retain the GUI

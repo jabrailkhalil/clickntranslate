@@ -12,7 +12,7 @@ from app_version import APP_VERSION  # noqa: E402
 
 class AppStreamMetadataTest(unittest.TestCase):
     def setUp(self):
-        self.path = ROOT / "packaging" / "linux" / "io.github.jabrailkhalil.clickntranslate.appdata.xml"
+        self.path = ROOT / "tools/packaging" / "linux" / "io.github.jabrailkhalil.clickntranslate.appdata.xml"
         self.root = ET.parse(self.path).getroot()
 
     def test_metadata_identifies_a_desktop_application(self):

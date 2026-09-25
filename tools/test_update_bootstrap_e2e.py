@@ -49,7 +49,7 @@ def safe_remove_tree(path: Path) -> None:
 
 def extract_v150_updater_script(destination: Path) -> None:
     result = subprocess.run(
-        ["git", "show", "v1.5.0:settings_window.py"],
+        ["git", "show", "v1.5.0:src/settings_window.py"],
         cwd=ROOT,
         check=True,
         capture_output=True,

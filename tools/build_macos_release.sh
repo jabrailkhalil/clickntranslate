@@ -14,8 +14,8 @@ if [[ -z "${MACOS_CODESIGN_IDENTITY:-}" && "${CLICKNTRANSLATE_ALLOW_ADHOC:-0}" !
   "$PYTHON" tools/macos_signing.py check > build/macos/signing.json
   LOCAL_SIGNING=1
 fi
-"$PYTHON" -c "from PIL import Image; Image.open('icons/icon.png').convert('RGBA').save('build/macos/icon.icns')"
-"$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller ClicknTranslate-macos.spec
+"$PYTHON" -c "from PIL import Image; Image.open('src/icons/icon.png').convert('RGBA').save('build/macos/icon.icns')"
+"$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller tools/packaging/ClicknTranslate-macos.spec
 APP="dist/ClicknTranslate.app"
 if [[ "$LOCAL_SIGNING" == "1" ]]; then
   SIGN_ARGS=()

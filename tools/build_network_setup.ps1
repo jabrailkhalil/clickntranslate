@@ -36,8 +36,8 @@ using System.Reflection;
 "@, [System.Text.UTF8Encoding]::new($false))
     & $compiler /nologo /target:winexe /platform:x64 /optimize+ `
         /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
-        "/win32icon:$root\icons\icon.ico" "/win32manifest:$root\installer\windows\ClicknTranslate.exe.manifest" `
-        "/out:$OutputPath" "$root\launcher\ClicknTranslateNetworkSetup.cs" `
+        "/win32icon:$root\src\icons\icon.ico" "/win32manifest:$root\tools\installer\windows\ClicknTranslate.exe.manifest" `
+        "/out:$OutputPath" "$root\tools\launcher\ClicknTranslateNetworkSetup.cs" `
         (Join-Path $buildDir "Info.cs") (Join-Path $buildDir "Version.cs")
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) { throw "Network setup compilation failed." }
 }
