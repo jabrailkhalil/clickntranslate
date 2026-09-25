@@ -855,7 +855,7 @@ internal static class ClicknTranslateApplyUpdate
                     if (reported == version)
                     {
                         Thread.Sleep(8000);
-                        if (HasRunningProcessInAppDirectory(appDirectory)) return;
+                        if (HasRunningApplication(appDirectory)) return;
                         throw new InvalidOperationException("The updated application process did not remain running.");
                     }
                     throw new InvalidOperationException("The application reported a different version.");
@@ -869,9 +869,9 @@ internal static class ClicknTranslateApplyUpdate
             throw new TimeoutException("The updated application did not confirm startup.");
         }
 
-        private static bool HasRunningProcessInAppDirectory(string appDirectory)
+        private static bool HasRunningApplication(string appDirectory)
         {
-            string prefix = Path.GetFullPath(appDirectory).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            string mainExecutable = Path.GetFullPath(Path.Combine(appDirectory, "app", "ClicknTranslateApp.exe"));
             foreach (Process candidate in Process.GetProcesses())
             {
                 using (candidate)
@@ -879,7 +879,9 @@ internal static class ClicknTranslateApplyUpdate
                     try
                     {
                         string executable = candidate.MainModule == null ? string.Empty : candidate.MainModule.FileName;
-                        if (executable.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+                        // OCR/translation workers can outlive a crashed GUI.
+                        // Their presence does not prove that the app survived.
+                        if (executable.Equals(mainExecutable, StringComparison.OrdinalIgnoreCase)) return true;
                     }
                     catch { }
                 }

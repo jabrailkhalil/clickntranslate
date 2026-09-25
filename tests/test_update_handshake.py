@@ -139,6 +139,27 @@ class Apply {
     }
 }
 ''')
+    compile_program('crashing', '''
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Diagnostics;
+[assembly: AssemblyFileVersion("1.7.2.0")]
+class CrashingGui {
+    static void Main(string[] args) {
+        string argument = args.First(a => a.StartsWith("--update-ack="));
+        File.WriteAllText(argument.Substring(13), "1.7.2");
+        string directory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        Process.Start(new ProcessStartInfo {
+            FileName = Path.Combine(directory, "_internal", "OcrWorker.exe"),
+            UseShellExecute = false
+        });
+        Thread.Sleep(1000);
+    }
+}
+''')
     return folder
 
 
@@ -219,15 +240,18 @@ def add_runtime(root, binaries):
 
 
 @pytest.mark.parametrize('mode', ['zip', 'setup'])
-@pytest.mark.parametrize('damage', [None, 'app/_internal/provider.dll', 'app/_internal/OcrWorker.exe', 'locked_backup'])
+@pytest.mark.parametrize('damage', [None, 'app/_internal/provider.dll', 'app/_internal/OcrWorker.exe', 'locked_backup', 'gui_crash'])
 def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, windows_binaries, damage, mode):
     new = tmp_path / 'new'
     new.mkdir()
     shutil.copy2(windows_binaries / 'launcher.exe', new / 'ClicknTranslate.exe')
     add_runtime(new, windows_binaries)
     shutil.copy2(windows_binaries / 'updatable.exe', new / 'app/ClicknTranslateApp.exe')
+    if damage == 'gui_crash':
+        shutil.copy2(windows_binaries / 'crashing.exe', new / 'app/ClicknTranslateApp.exe')
+        shutil.copy2(windows_binaries / 'updatable.exe', new / 'app/_internal/OcrWorker.exe')
     write_manifest(new, '1.7.2')
-    if damage and damage != 'locked_backup':
+    if damage and damage not in ('locked_backup', 'gui_crash'):
         (new / damage).unlink()
     # Misplaced settings and downloaded models must never replace user data,
     # whether the update succeeds or rolls back after a damaged package.
