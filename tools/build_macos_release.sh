@@ -49,8 +49,21 @@ STAGE="$(mktemp -d "$(pwd)/build/macos/dmg.XXXXXX")"
 ditto "$APP" "$STAGE/ClicknTranslate.app"
 ln -s /Applications "$STAGE/Applications"
 OUTPUT="releases/Click-n-Translate-${VERSION}-macos-${ARCH}"
-hdiutil create -ov -volname "Click’n’Translate" -srcfolder "$STAGE" -format UDZO "$OUTPUT.dmg"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUTPUT.zip"
+# Keep the verified app ZIP even when DiskImages reports transient EBUSY.
+# Do not detach unrelated volumes or hide any other packaging failure.
+for attempt in 1 2 3; do
+  if LC_ALL=C hdiutil create -ov -volname "Click’n’Translate" -srcfolder "$STAGE" -format UDZO "$OUTPUT.dmg" > build/macos/dmg-create.log 2>&1; then
+    cat build/macos/dmg-create.log
+    break
+  fi
+  cat build/macos/dmg-create.log >&2
+  if [[ "$attempt" == "3" ]]; then exit 1; fi
+  case "$(cat build/macos/dmg-create.log)" in
+    *"Resource busy"*) sleep "$((attempt * 3))" ;;
+    *) exit 1 ;;
+  esac
+done
 shasum -a 256 "$OUTPUT.dmg" "$OUTPUT.zip" > "$OUTPUT.sha256"
 echo "Created $OUTPUT.dmg and .zip"
 if [[ -z "${MACOS_NOTARY_PROFILE:-}" ]]; then
