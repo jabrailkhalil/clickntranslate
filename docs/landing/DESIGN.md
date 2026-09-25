@@ -22,8 +22,8 @@ Updated September 2026 for the Windows, macOS and Linux releases.
 
 ## Decisions
 
-Warm white background, near-black text, restrained purple accents and a pale
-green community section. Actual application recordings and the owner's
+Near-black background, light text, restrained purple accents and a dark olive
+community section. Actual application recordings and the owner's
 screenshots explain the product. A tabbed demo replaces the old grid of
 simultaneously moving images. Visitors can hide animations; the system's
 reduced-motion preference is respected until the visitor explicitly chooses
@@ -32,6 +32,12 @@ playback. Companion previews switch between the supplied light/dark captures.
 The six localized pages share one renderer and structured content. Font files,
 images and scripts are served by this site. The browser contacts GitHub's public
 API to resolve downloads; no new analytics or cookie service is included.
+
+The header brand links to the parent site at `https://xynapse.online/`.
+The companion preview starts with the dark screenshot and can switch to light.
+CSS and JavaScript filenames include content hashes; language links include a
+shared build revision. The HTML cache policy is defined in
+`hosting/nginx-cache.conf` to prevent old localized pages from staying cached.
 
 ## Downloads
 

@@ -1,12 +1,12 @@
 :root {
-  --paper: #f7f6f2;
-  --ink: #25242a;
-  --muted: #6a6972;
-  --accent: #6750c4;
-  --line: #ddddd6;
-  --lavender: #e9e5f6;
+  --paper: #0b0b0d;
+  --ink: #f3f0f7;
+  --muted: #aaa6b2;
+  --accent: #b69af7;
+  --line: #2a282f;
+  --lavender: #272131;
   --font: Onest, "Segoe UI", Arial, sans-serif;
-  color-scheme: light;
+  color-scheme: dark;
   scroll-behavior: smooth;
   scroll-padding-top: 30px;
 }
@@ -54,7 +54,7 @@ summary:focus-visible,
   outline-offset: 5px;
 }
 ::selection {
-  background: #d6cdec;
+  background: #59416f;
 }
 figure,
 p,
@@ -91,7 +91,7 @@ p {
   top: -100px;
   left: 20px;
   background: var(--ink);
-  color: #fff;
+  color: #19181d;
   padding: 12px;
   z-index: 20;
 }
@@ -107,7 +107,7 @@ p {
 }
 .button {
   background: var(--ink);
-  color: #fff;
+  color: #19181d;
   min-height: 52px;
   border: 1px solid var(--ink);
   border-radius: 8px;
@@ -185,7 +185,7 @@ p {
   gap: 29px;
   margin-left: auto;
   font-size: 12px;
-  color: #55545d;
+  color: #b4afbb;
 }
 .desktop-nav a {
   display: flex;
@@ -231,9 +231,9 @@ p {
   width: 174px;
   padding: 6px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: #19181d;
   border-radius: 10px;
-  box-shadow: 0 10px 35px #25242a16;
+  box-shadow: 0 10px 35px #00000060;
 }
 .language-options a {
   padding: 8px 11px;
@@ -289,7 +289,7 @@ p {
   display: flex;
   align-items: center;
   gap: 13px;
-  color: #77757d;
+  color: #aaa3b1;
 }
 .platform-line svg {
   width: 16px;
@@ -297,7 +297,7 @@ p {
 }
 .platform-line span {
   font-size: 10px;
-  border-left: 1px solid #cdccd0;
+  border-left: 1px solid #413847;
   padding-left: 13px;
 }
 .hero-art {
@@ -309,7 +309,7 @@ p {
   content: "";
   position: absolute;
   inset: -5px -20px 3px 22px;
-  background: #e6e0f1;
+  background: #201929;
   border-radius: 40% 30% 35% 20%;
   z-index: -2;
   transform: rotate(-5deg);
@@ -318,7 +318,7 @@ p {
   content: "";
   position: absolute;
   inset: 50px 20px -15px -9px;
-  border: 1px solid #b9aecf;
+  border: 1px solid #51405f;
   border-radius: 9px;
   transform: rotate(5deg);
   z-index: -1;
@@ -329,11 +329,11 @@ p {
   gap: 9px;
   font-size: 10px;
   margin: 0 0 15px 10px;
-  color: #615573;
+  color: #b3a4c5;
 }
 .art-label [data-latest-version] {
   margin-left: auto;
-  background: #f7f6f299;
+  background: #201d2699;
   padding: 2px 9px;
   border-radius: 20px;
 }
@@ -341,16 +341,16 @@ p {
   display: inline-block;
   width: 6px;
   height: 6px;
-  background: #5b8768;
+  background: #87ba96;
   border-radius: 50%;
   flex: none;
 }
 .app-window {
-  border: 1px solid #d3cddc;
-  background: #fff;
+  border: 1px solid #3b3344;
+  background: #19181d;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 20px 32px -20px #392e6455;
+  box-shadow: 0 20px 32px -20px #00000080;
 }
 .window-bar {
   display: flex;
@@ -358,7 +358,7 @@ p {
   justify-content: space-between;
   padding: 13px 15px;
   font-size: 10px;
-  color: #777;
+  color: #aba4b3;
 }
 .window-bar svg {
   width: 13px;
@@ -372,7 +372,7 @@ p {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #d1cbd9;
+  background: #62576e;
 }
 .window-dots i:first-child {
   background: #ce9c98;
@@ -388,7 +388,7 @@ p {
   aspect-ratio: 640/365;
   display: grid;
   place-items: center;
-  background: #efedf2;
+  background: #111013;
 }
 .recording img {
   width: 100%;
@@ -402,7 +402,7 @@ p {
   gap: 10px;
   padding: 12px 13px;
   font-size: 9px;
-  color: #727079;
+  color: #b3aabd;
 }
 .app-window figcaption > span {
   display: flex;
@@ -421,16 +421,16 @@ p {
   border-bottom: 1px dotted currentColor;
   padding: 0;
   font-size: 10px;
-  color: #615a6d;
+  color: #b3a6c4;
 }
 .shortcut-sticker {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: #fff;
+  background: #19181d;
   padding: 14px 19px;
   border-radius: 9px;
-  box-shadow: 0 8px 25px #42306318;
+  box-shadow: 0 8px 25px #00000060;
   position: absolute;
   bottom: 13px;
   left: -15px;
@@ -447,18 +447,18 @@ kbd {
   font-size: 11px;
   display: inline-block;
   padding: 5px 8px;
-  background: #eceaf1;
-  border: 1px solid #dbd6e5;
+  background: #2a2335;
+  border: 1px solid #4a3a5e;
   border-bottom-width: 2px;
   border-radius: 5px;
-  color: #615275;
+  color: #d5c3ed;
 }
 .art-corner {
   position: absolute;
   right: 12px;
   bottom: -23px;
   font-size: 56px;
-  color: #ac9abd;
+  color: #806895;
   transform: rotate(-25deg);
 }
 .motion-placeholder {
@@ -470,7 +470,7 @@ kbd {
 .motion-placeholder > button {
   border: 0;
   display: inline-flex;
-  background: #e2dcf0;
+  background: #30243f;
   border-radius: 50%;
   padding: 17px;
   color: var(--accent);
@@ -486,17 +486,27 @@ kbd {
   position: relative;
   padding: 0;
 }
-.with-poster > img { width: 100%; height: 100%; object-fit: contain; }
+.with-poster > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .with-poster > button {
   position: absolute;
   right: 15px;
   bottom: 12px;
   padding: 14px;
   margin: 0;
-  background: #fff;
+  background: #19181d;
   box-shadow: 0 3px 15px #0002;
 }
-.with-poster > p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.with-poster > p {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
 .no-motion .motion-image {
   display: none;
 }
@@ -601,7 +611,7 @@ kbd {
   font-weight: 600;
 }
 .demo-tabs button:hover {
-  background: #efedf3;
+  background: #1b1822;
 }
 .demo-panel {
   display: grid;
@@ -634,7 +644,7 @@ kbd {
 }
 .demo-picture {
   min-height: 325px;
-  background: #eae8e3;
+  background: #18171b;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -659,7 +669,7 @@ kbd {
   padding-top: 48px;
 }
 .dynamic-band {
-  background: #28252f;
+  background: #151217;
   color: #f8f5fb;
   padding: 83px 0;
 }
@@ -697,8 +707,8 @@ kbd {
 .dynamic-picture {
   position: relative;
   display: block;
-  background: #17171b;
-  border: 1px solid #4b4158;
+  background: #09090b;
+  border: 1px solid #3d314a;
   border-radius: 12px;
   padding: 14px;
 }
@@ -726,7 +736,7 @@ kbd {
 .companion-picture {
   position: relative;
   padding: 29px 23px 23px;
-  background: #e8e3ef;
+  background: #1e1925;
   border-radius: 13px;
 }
 .companion-picture > img {
@@ -747,11 +757,11 @@ kbd {
   background: transparent;
   border: 0;
   border-radius: 5px;
-  color: #746b82;
+  color: #b9aec6;
   font-size: 11px;
 }
 .theme-switch button[aria-pressed="true"] {
-  background: #fff;
+  background: #19181d;
   color: var(--ink);
   box-shadow: 0 1px 4px #0000000a;
 }
@@ -798,7 +808,7 @@ kbd {
 }
 .download-section {
   padding: 88px 0 55px;
-  background: #eae5f5;
+  background: #17131d;
 }
 .download-section .section-intro {
   margin-bottom: 42px;
@@ -814,7 +824,7 @@ kbd {
   font-size: 10px;
   margin-top: 17px;
   padding: 6px 12px;
-  background: #f9f7fd;
+  background: #282132;
   border-radius: 20px;
 }
 .version-pill [data-latest-version] {
@@ -827,8 +837,8 @@ kbd {
 }
 .download-card {
   padding: 28px;
-  background: #fdfcfe;
-  border: 1px solid #d9d3e6;
+  background: #100e14;
+  border: 1px solid #3a2e45;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -836,7 +846,7 @@ kbd {
 .download-card > svg {
   width: 31px;
   height: 31px;
-  color: #615080;
+  color: #bca1e5;
   margin-bottom: 30px;
 }
 .download-card h3 {
@@ -858,7 +868,7 @@ kbd {
   justify-content: space-between;
   gap: 9px;
   background: var(--ink);
-  color: white;
+  color: #19181d;
   border-radius: 6px;
   padding: 11px 13px;
   font-size: 11px;
@@ -877,7 +887,7 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid #ded9e5;
+  border: 1px solid #41334f;
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 11px;
@@ -900,7 +910,7 @@ kbd {
   display: flex;
   gap: 5px;
   align-items: center;
-  color: #786887;
+  color: #b6a5c8;
 }
 .guide-link svg {
   width: 12px;
@@ -974,7 +984,7 @@ kbd {
   padding: 0 30px 23px 0;
 }
 .community {
-  background: #e9eccf;
+  background: #191e14;
   border-radius: 16px;
   padding: 56px 70px;
   display: grid;
@@ -989,7 +999,7 @@ kbd {
   font-weight: 400;
   line-height: 1;
   text-align: center;
-  color: #787f3e;
+  color: #b3bf76;
 }
 .community h2 {
   font-size: 39px;
@@ -999,7 +1009,7 @@ kbd {
   line-height: 1.85;
   max-width: 475px;
   margin-top: 20px;
-  color: #626650;
+  color: #b0b5a0;
 }
 .community .hero-actions {
   margin-top: 24px;
@@ -1039,7 +1049,7 @@ footer nav {
   display: flex;
   gap: 22px;
   font-size: 10px;
-  color: #77717d;
+  color: #a49dab;
 }
 @media (max-width: 1100px) {
   .wrap {

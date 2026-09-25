@@ -18,6 +18,7 @@ if (document.body.dataset.locale === "en") {
     const locale = supported.includes(saved) ? saved : detected;
     if (supported.includes(locale) && locale !== "en") {
       const destination = new URL(`${locale}/`, document.baseURI);
+      destination.searchParams.set("v", document.body.dataset.siteRevision);
       destination.hash = location.hash;
       location.replace(destination.href);
     }
@@ -118,11 +119,13 @@ reducedMotion.addEventListener("change", (event) => {
   }
 });
 updateMotion();
-document.querySelectorAll('[data-motion-play]').forEach(button => button.addEventListener('click', () => {
-  motionChosen = true;
-  motionAllowed = true;
-  updateMotion();
-}));
+document.querySelectorAll("[data-motion-play]").forEach((button) =>
+  button.addEventListener("click", () => {
+    motionChosen = true;
+    motionAllowed = true;
+    updateMotion();
+  }),
+);
 // Versioned asset names require resolving the latest stable release first.
 const patterns = {
   windows: /windows-x64-installer\.exe$/i,

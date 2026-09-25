@@ -1,6 +1,7 @@
 import { copyFile, cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { siteAssets } from "./site-assets.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "dist");
@@ -44,6 +45,9 @@ await cp(join(root, "assets/fonts"), join(output, "assets/fonts"), {
   recursive: true,
 });
 await cp(join(root, "licenses"), join(output, "licenses"), { recursive: true });
+const bundle = await siteAssets();
+await copyFile(join(root, "styles.css"), join(output, bundle.style));
+await copyFile(join(root, "app.js"), join(output, bundle.script));
 console.log(
   `Built ${files.length} public files plus local fonts and licenses in ${output}`,
 );

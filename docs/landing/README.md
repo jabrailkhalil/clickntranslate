@@ -42,3 +42,11 @@ and the application release assets are independent of this site.
 Download buttons resolve the latest stable GitHub release at page load. Windows
 has installer/portable choices, Mac has Apple Silicon/Intel choices, and Linux
 uses AppImage. API failures fall back to the latest release page.
+
+`tools/site-assets.mjs` generates content-hashed CSS/JS filenames and a shared
+page revision. All locales use the same assets and revision. The host includes
+`hosting/nginx-cache.conf` in its HTTPS server block: HTML is not cached,
+fingerprinted CSS/JS is immutable, and other site resources are revalidated.
+The file also includes the host's existing global security headers so adding
+cache headers does not discard them. Keep previous fingerprinted bundles during
+deployment for visitors who still have an older page open.
