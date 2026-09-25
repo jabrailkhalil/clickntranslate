@@ -161,7 +161,7 @@ jobs:
       - name: Keep build diagnostics on failure
         if: failure()
         run: |
-          python - <<'PY'
+          "$VENV/bin/python" - <<'PY'
           from pathlib import Path
           import subprocess
           import psutil
