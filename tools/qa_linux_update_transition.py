@@ -1,4 +1,4 @@
-import argparse, hashlib, json, os, re, socket, struct, subprocess, sys, time
+import argparse, hashlib, json, os, re, socket, struct, subprocess, sys, tempfile, time
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -20,8 +20,9 @@ old.chmod(0o755)
 new.chmod(0o755)
 env = dict(os.environ, QT_QPA_PLATFORM='xcb')
 for key in ('XDG_DATA_HOME','XDG_CACHE_HOME','XDG_CONFIG_HOME','XDG_RUNTIME_DIR'):
-    folder = case / key.lower()
-    folder.mkdir(mode=0o700)
+    # sockaddr_un has a short fixed path limit even when filesystem paths work.
+    folder = Path(tempfile.mkdtemp(prefix='cnt-mig-')) if key == 'XDG_RUNTIME_DIR' else case / key.lower()
+    folder.mkdir(mode=0o700, exist_ok=key == 'XDG_RUNTIME_DIR')
     env[key] = str(folder)
 data_root = Path(env['XDG_DATA_HOME'])/'clickntranslate'
 data = data_root/'data'
@@ -60,7 +61,15 @@ try:
                 assert single_instance.send_command_status('show',channel) is single_instance.CommandStatus.ACCEPTED
                 time.sleep(2)
                 assert proc.poll() is None
-                assert single_instance.send_command_status('quit',channel,target_pid=pid) is single_instance.CommandStatus.ACCEPTED
+                if version == '1.7.0':
+                    # The released 1.7 protocol has no quit command. Close its
+                    # actual X11 window; Xvfb has no tray, so this exits normally.
+                    windows = subprocess.check_output(['xdotool', 'search', '--onlyvisible', '--pid', str(pid),
+                                                       '--name', "^Click'n'Translate$"], text=True).split()
+                    assert len(windows) == 1, windows
+                    subprocess.run(['xdotool', 'windowclose', windows[0]], check=True)
+                else:
+                    assert single_instance.send_command_status('quit',channel,target_pid=pid) is single_instance.CommandStatus.ACCEPTED
                 assert proc.wait(timeout=20)==0
                 actual=json.loads((data/'config.json').read_text())
                 for key in ('interface_language','ui_scale_percent','theme','autostart','audit_marker'):
