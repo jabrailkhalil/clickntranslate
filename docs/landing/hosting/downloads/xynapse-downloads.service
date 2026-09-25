@@ -1,0 +1,20 @@
+[Unit]
+Description=Refresh public Xynapse application download totals
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+StateDirectory=xynapse-downloads
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 /usr/local/lib/xynapse-downloads/collect.py
+TimeoutStartSec=240
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/xynapse.online/statistics
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0022

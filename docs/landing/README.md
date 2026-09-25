@@ -61,3 +61,7 @@ The home page links Click'n'Translate to `/clickntranslate/`, goallog to
 Windows button downloads its published v1.108.0 installer directly; update that
 explicit version and link when maintaining the IDE release. It is independent
 of this landing page's automatic Click'n'Translate download resolver.
+
+The parent homepage's Downloads panel uses the separate server collector in
+`hosting/downloads/`, with totals by project and platform. See its README for
+counting rules, the 30-minute refresh timer and deployment paths.

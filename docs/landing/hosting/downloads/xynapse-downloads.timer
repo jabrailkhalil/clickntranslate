@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Xynapse download statistics every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+RandomizedDelaySec=30
+Persistent=true
+Unit=xynapse-downloads.service
+
+[Install]
+WantedBy=timers.target

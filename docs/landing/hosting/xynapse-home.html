@@ -289,116 +289,51 @@
         box-shadow: var(--shadow);
       }
 
-      .board-head {
+      .download-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding: 15px 16px;
+        gap: 16px;
+        padding: 20px 24px;
         border-bottom: 1px solid var(--line);
       }
-
-      .dots {
-        display: flex;
-        gap: 7px;
+      .download-head h2 { margin: 0; font-size: 16px; font-weight: 650; }
+      .download-badge { color: var(--muted); font-size: 12px; white-space: nowrap; }
+      .download-overview { padding: 26px 24px 22px; }
+      .download-overview strong {
+        display: block; font-size: clamp(44px, 6vw, 64px); font-weight: 750;
+        line-height: 1; letter-spacing: -.055em; font-variant-numeric: tabular-nums;
       }
-
-      .dots span {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--pink);
+      .download-overview p { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+      .download-controls { padding: 0 24px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .download-controls label { font-size: 12px; color: var(--muted); }
+      .download-controls select {
+        max-width: 65%; color: var(--soft); background: #111725; border: 1px solid var(--line);
+        padding: 7px 10px; border-radius: 6px; font: inherit; font-size: 12px;
       }
-
-      .dots span:nth-child(2) {
-        background: var(--amber);
+      .download-controls select:focus-visible, .download-method summary:focus-visible {
+        outline: 2px solid var(--cyan); outline-offset: 4px;
       }
-
-      .dots span:nth-child(3) {
-        background: var(--green);
-      }
-
-      .board-kicker {
-        color: var(--muted);
-        font-size: 12px;
-        text-transform: uppercase;
-      }
-
-      .chart-wrap {
-        padding: 20px 18px 12px;
-      }
-
-      .chart {
-        width: 100%;
-        min-height: 232px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        background:
-          linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-          rgba(0, 0, 0, 0.14);
-        background-size: 100% 25%, 25% 100%;
-      }
-
-      .axis {
-        stroke: rgba(255, 255, 255, 0.22);
-        stroke-width: 1;
-      }
-
-      .growth-line {
-        fill: none;
-        stroke: url("#growthGradient");
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 5;
-      }
-
-      .area {
-        fill: url("#areaGradient");
-      }
-
-      .point {
-        fill: #08111e;
-        stroke: var(--cyan);
-        stroke-width: 3;
-      }
-
-      .chart-empty,
-      .chart-label {
-        fill: var(--muted);
-        font-family: inherit;
-        font-size: 12px;
-      }
-
-      .activity-status {
-        color: var(--cyan);
-      }
-
-      .metrics {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        border-top: 1px solid var(--line);
-      }
-
-      .metric {
-        padding: 14px 15px;
-      }
-
-      .metric + .metric {
-        border-left: 1px solid var(--line);
-      }
-
-      .metric strong {
-        display: block;
-        font-size: 24px;
-      }
-
-      .metric small {
-        display: block;
-        margin-top: 5px;
-        color: var(--muted);
-        line-height: 1.35;
-      }
+      .download-bars { padding: 0 24px; margin: 0; }
+      .download-row { margin: 0 0 22px; }
+      .download-row-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+      .download-row-head img { width: 23px; height: 23px; object-fit: contain; border-radius: 5px; }
+      .download-row-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+      .download-row-head strong { margin-left: auto; font-size: 16px; font-variant-numeric: tabular-nums; }
+      .download-track { height: 8px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.055); }
+      .download-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--violet); }
+      [data-project="xynapse"] .download-fill { background: var(--cyan); }
+      .download-note { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; }
+      .download-web { padding-top: 18px; border-top: 1px solid var(--line); }
+      .download-web .download-row-head strong { font-size: 11px; font-weight: 500; color: var(--green); border: 1px solid rgba(139,242,187,.2); border-radius: 4px; padding: 4px 7px; }
+      .download-scale { display: flex; justify-content: space-between; margin: -8px 0 18px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .download-footer { padding: 15px 24px 18px; border-top: 1px solid var(--line); background: rgba(0,0,0,.1); }
+      .download-status { margin: 0; color: var(--green); font-size: 11px; line-height: 1.5; }
+      .download-status.is-delayed { color: var(--amber); }
+      .download-method { margin-top: 9px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+      .download-method summary { width: fit-content; cursor: pointer; }
+      .download-method p { margin: 9px 0 0; }
+      .is-unavailable .download-track { opacity: .4; }
 
       .section {
         padding: 48px 0;
@@ -532,10 +467,6 @@
           font-size: 18px;
         }
 
-        .metrics {
-          grid-template-columns: 1fr;
-        }
-
         .launch-link {
           grid-template-columns: 44px minmax(0, 1fr) auto;
           padding: 12px;
@@ -544,11 +475,6 @@
         .launch-link img {
           width: 44px;
           height: 44px;
-        }
-
-        .metric + .metric {
-          border-top: 1px solid var(--line);
-          border-left: 0;
         }
 
         .product {
@@ -613,47 +539,57 @@
           </nav>
         </div>
 
-        <aside class="signal-board" aria-label="User growth and development metrics">
-          <div class="board-head">
-            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="board-kicker activity-status" id="activity-status">Loading real activity</div>
+        <aside class="signal-board" id="download-board" aria-labelledby="download-heading" aria-busy="true">
+          <div class="download-head">
+            <h2 id="download-heading">Downloads</h2>
+            <span class="download-badge">All projects</span>
           </div>
-          <div class="chart-wrap">
-            <svg class="chart" viewBox="0 0 520 260" role="img" aria-label="Daily active goallog users over the last 14 days">
-              <defs>
-                <linearGradient id="growthGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                  <stop offset="0%" stop-color="#67e6ff" />
-                  <stop offset="52%" stop-color="#75a7ff" />
-                  <stop offset="100%" stop-color="#ff9fd3" />
-                </linearGradient>
-                <linearGradient id="areaGradient" x1="0%" x2="0%" y1="0%" y2="100%">
-                  <stop offset="0%" stop-color="#67e6ff" stop-opacity="0.22" />
-                  <stop offset="100%" stop-color="#67e6ff" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <line class="axis" x1="42" x2="486" y1="212" y2="212" />
-              <line class="axis" x1="42" x2="42" y1="34" y2="212" />
-              <path class="area" id="activity-area" d="" />
-              <path class="growth-line" id="activity-line" d="" />
-              <g id="activity-points"></g>
-              <text class="chart-empty" id="activity-empty" x="264" y="128" text-anchor="middle">Loading activity...</text>
-              <text class="chart-label" id="activity-start" x="42" y="235"></text>
-              <text class="chart-label" id="activity-end" x="486" y="235" text-anchor="end"></text>
-            </svg>
+          <div class="download-overview">
+            <strong id="download-total">—</strong>
+            <p id="download-total-label">Loading download counts…</p>
           </div>
-          <div class="metrics">
-            <div class="metric">
-              <strong id="active-today">--</strong>
-              <small>active users in 24 hours</small>
+          <div class="download-controls">
+            <label for="download-platform">Compare projects</label>
+            <select id="download-platform" disabled>
+              <option value="all">All platforms</option>
+              <option value="windows">Windows</option>
+              <option value="macos">macOS</option>
+              <option value="linux">Linux</option>
+            </select>
+          </div>
+          <div class="download-bars">
+            <div class="download-row" data-project="clickntranslate">
+              <div class="download-row-head">
+                <img src="/images/clickntranslate-icon.png" width="23" height="23" alt="">
+                <h3>Click’n’Translate</h3><strong data-count>—</strong>
+              </div>
+              <div class="download-track" data-track role="img" aria-label="Click’n’Translate downloads loading"><span class="download-fill" data-bar></span></div>
+              <span class="download-note" data-note>All published application releases</span>
             </div>
-            <div class="metric">
-              <strong id="active-week">--</strong>
-              <small>active users in 7 days</small>
+            <div class="download-row" data-project="xynapse">
+              <div class="download-row-head">
+                <img src="/images/logo.png" width="23" height="23" alt="">
+                <h3>Xynapse IDE</h3><strong data-count>—</strong>
+              </div>
+              <div class="download-track" data-track role="img" aria-label="Xynapse downloads loading"><span class="download-fill" data-bar></span></div>
+              <span class="download-note" data-note>Application and extension releases</span>
             </div>
-            <div class="metric">
-              <strong id="new-month">--</strong>
-              <small>new users in 30 days</small>
+            <div class="download-scale" aria-hidden="true"><span>0 downloads</span><span id="download-scale">—</span></div>
+            <div class="download-row download-web" data-project="goallog">
+              <div class="download-row-head">
+                <img src="/images/goallog-icon.png" width="23" height="23" alt="">
+                <h3>goallog</h3><strong>Web app</strong>
+              </div>
+              <span class="download-note">Runs in your browser · installations are not tracked.</span>
             </div>
+          </div>
+          <div class="download-footer">
+            <p class="download-status" id="download-status" role="status">Fetching download totals…</p>
+            <details class="download-method">
+              <summary>How these numbers are counted</summary>
+              <p>GitHub application-package downloads across available releases, refreshed every 30 minutes. Repeat downloads and app updates count too. Checksums, source code and support files are excluded. Web-app visits are not downloads.</p>
+            </details>
+            <noscript><p class="download-note">Enable JavaScript to view current download counts.</p></noscript>
           </div>
         </aside>
       </section>
@@ -725,73 +661,6 @@
       </section>
 
     </main>
-    <script>
-      (() => {
-        const ns = "http://www.w3.org/2000/svg";
-        const status = document.getElementById("activity-status");
-        const empty = document.getElementById("activity-empty");
-        const line = document.getElementById("activity-line");
-        const area = document.getElementById("activity-area");
-        const pointsGroup = document.getElementById("activity-points");
-        const startLabel = document.getElementById("activity-start");
-        const endLabel = document.getElementById("activity-end");
-
-        const compactDate = (value) => new Intl.DateTimeFormat("en", {
-          month: "short",
-          day: "numeric",
-          timeZone: "UTC",
-        }).format(new Date(`${value}T00:00:00Z`));
-
-        const renderActivity = (payload) => {
-          const rows = Array.isArray(payload.daily) ? payload.daily : [];
-          if (!rows.length) throw new Error("No activity data");
-
-          const left = 42;
-          const right = 486;
-          const top = 34;
-          const bottom = 212;
-          const max = Math.max(1, ...rows.map((row) => Number(row.activeUsers) || 0));
-          const coordinates = rows.map((row, index) => ({
-            x: rows.length === 1 ? left : left + ((right - left) * index) / (rows.length - 1),
-            y: bottom - ((bottom - top) * (Number(row.activeUsers) || 0)) / max,
-            value: Number(row.activeUsers) || 0,
-          }));
-          const path = coordinates.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
-
-          line.setAttribute("d", path);
-          area.setAttribute("d", `${path} L${right} ${bottom} L${left} ${bottom} Z`);
-          pointsGroup.replaceChildren(...coordinates.map((point) => {
-            const circle = document.createElementNS(ns, "circle");
-            circle.setAttribute("class", "point");
-            circle.setAttribute("cx", point.x.toFixed(1));
-            circle.setAttribute("cy", point.y.toFixed(1));
-            circle.setAttribute("r", "4");
-            const title = document.createElementNS(ns, "title");
-            title.textContent = `${point.value} active user${point.value === 1 ? "" : "s"}`;
-            circle.appendChild(title);
-            return circle;
-          }));
-
-          empty.textContent = "";
-          startLabel.textContent = compactDate(rows[0].day);
-          endLabel.textContent = compactDate(rows[rows.length - 1].day);
-          document.getElementById("active-today").textContent = payload.summary.activeToday;
-          document.getElementById("active-week").textContent = payload.summary.activeLast7Days;
-          document.getElementById("new-month").textContent = payload.summary.newUsersLast30Days;
-          status.textContent = `Live goallog activity · updated ${new Date(payload.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-        };
-
-        fetch("/api/public/activity", { headers: { Accept: "application/json" } })
-          .then((response) => {
-            if (!response.ok) throw new Error(`Activity request failed: ${response.status}`);
-            return response.json();
-          })
-          .then(renderActivity)
-          .catch(() => {
-            status.textContent = "Activity temporarily unavailable";
-            empty.textContent = "Live activity is temporarily unavailable";
-          });
-      })();
-    </script>
+    <script src="/xynapse-downloads.3f56960bbe86.js" defer></script>
   </body>
 </html>
