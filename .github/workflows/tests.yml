@@ -26,6 +26,7 @@ jobs:
           - os: ubuntu-latest
             requirements: requirements-linux.txt
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     env:
       QT_QPA_PLATFORM: offscreen
       PYTHONUTF8: "1"
@@ -50,7 +51,17 @@ jobs:
             python -m pip install --no-deps "argostranslate~=1.11.0"
           fi
       - name: Run tests
-        run: python -m pytest -q
+        run: python tools/run_ci_tests.py
+      - name: Keep test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ runner.os }}
+          path: |
+            build/ci-tests/plan.json
+            build/ci-tests/part-*/results.xml
+            build/ci-tests/part-*/run.json
+          if-no-files-found: ignore
 
   macos-signing:
     if: github.event_name == 'workflow_dispatch' && inputs.macos_signing_only
