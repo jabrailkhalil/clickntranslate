@@ -1,26 +1,21 @@
-# macOS port (1.7.1 development)
+# Click'n'Translate on macOS — 1.8.0
 
-**Portable audit (2026-09-19):** startup repair, Tesseract model retention and
-cancellation fixes; 28 new regression cases; dependency binaries checked for
-both architectures. See [the current audit](QA_MACOS_2026_09_19.md) for results
-and remaining native checks. No new Mac build or native run was made in this audit.
+The 1.8.0 release includes native **Apple Silicon (arm64)** DMG and ZIP packages
+for macOS 13.4 or newer. The final app was built and tested on macOS 14.3,
+including Cocoa UI, Apple Vision, RapidOCR, offline Argos translation, screen
+capture and permission prompts. Screen Recording and Accessibility were granted;
+automatic Cmd+C/V in a separate application was not checked in the final bundle.
+See the [current QA report](QA_1.8.0_2026-09-25.md) for results and limits.
 
-The source implements macOS support for Apple Silicon (`arm64`) and Intel
-(`x86_64`). The build targets macOS 13.4 or newer and Python 3.12. Separate native
-builds avoid requiring Rosetta or a mixture of incompatible native libraries.
+The app, embedded native code and DMG are self-signed as **jabrailkhalil**.
+There is no Apple Developer ID or notarization yet, so Gatekeeper can block first
+launch. This signature does not establish Apple-verified publisher trust.
 
-**Status (2026-09-07):** built on an Apple Silicon Mac running macOS 14.3,
-installed from DMG, and tested with native Cocoa, LaunchServices, Vision,
-the optional OCR engines and translation providers. See [the native QA report](MACOS_QA.md)
-for evidence and the remaining manual checks. Intel, macOS 13.4 runtime behavior,
-and several permission/input/display scenarios remain unverified. This is a
-self-signed development build, without Developer ID or notarization; it is
-not yet a notarized public release. Permanent release signing has been checked
-on both GitHub runner architectures; this does not establish Intel runtime QA.
+The source also supports Intel (`x86_64`), but this release contains **no Intel
+Mac build**. Native validation of this version was performed on Apple Silicon.
 
-For the next agent testing on a real Mac, see [the handoff checklist](MACOS_HANDOFF.md).
-It includes source-transfer instructions, exact commands, required manual checks,
-and the distinction between completed portable tests and pending native validation.
+[Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0)
+· [Earlier native audit](MACOS_QA.md) · [Development handoff](MACOS_HANDOFF.md)
 
 ## Run from source on a Mac
 

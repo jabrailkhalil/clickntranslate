@@ -53,9 +53,17 @@ class AssistantAnchor(QtWidgets.QWidget):
     def __init__(self):
         flags = QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint
         flags |= QtCore.Qt.WindowDoesNotAcceptFocus
+        if sys.platform == 'darwin':
+            # Cocoa otherwise adds a shadow around the transparent panel;
+            # at the compact size its cached bounds look like a square border.
+            flags |= QtCore.Qt.NoDropShadowWindowHint
         super().__init__(None, flags)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        if sys.platform == 'darwin':
+            # An NSPanel normally disappears when its app deactivates, including
+            # after the main window switches to the menu bar / accessory mode.
+            self.setAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setFixedSize(84, 84)

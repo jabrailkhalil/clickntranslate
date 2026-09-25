@@ -53,10 +53,11 @@ def test_welcome_checkbox_click_has_a_tick_and_survives_every_exit(app, owner, d
     checkbox.initStyleOption(option)
     rect = checkbox.style().subElementRect(QtWidgets.QStyle.SE_CheckBoxIndicator, option, checkbox)
     image = checkbox.grab().toImage()
-    # Actual dark stroke on a light selected indicator, not only a changed bool.
-    colors = [image.pixelColor(x, y).lightness() for x in range(rect.left()+3, rect.right()-2)
+    # White stroke on the accent fill must survive theme conversion.
+    ratio = image.devicePixelRatioF()
+    colors = [image.pixelColor(round(x*ratio), round(y*ratio)).lightness() for x in range(rect.left()+3, rect.right()-2)
               for y in range(rect.top()+3, rect.bottom()-2)]
-    assert max(colors) > 160 and min(colors) < 70
+    assert max(colors) > 230 and min(colors) < 150
     assert not dialog.findChildren(QtCore.QPropertyAnimation)
     getattr(dialog, dismiss)()
     assert owner.config['show_update_info'] is False
@@ -79,7 +80,7 @@ def test_welcome_keyboard_and_language_rebuild_keep_choice(app, owner):
     dialog.deleteLater()
 
 
-def test_welcome_links_are_icons_and_point_to_the_author(app, owner, monkeypatch):
+def test_welcome_links_are_icons_and_point_to_the_project(app, owner, monkeypatch):
     opened = mock.Mock()
     monkeypatch.setattr(main.webbrowser, 'open', opened)
     dialog = main.WelcomeDialog(owner)
@@ -92,7 +93,7 @@ def test_welcome_links_are_icons_and_point_to_the_author(app, owner, monkeypatch
         assert not pixmap.isNull()
         button.click()
     assert opened.call_args_list == [mock.call('https://t.me/jabrail_digital'),
-                                     mock.call('https://github.com/jabrailkhalil')]
+                                     mock.call('https://github.com/jabrailkhalil/clickntranslate')]
     dialog.close()
     dialog.deleteLater()
 
@@ -179,6 +180,57 @@ def test_followed_or_unknown_provider_never_falls_back_to_online(workspaces):
     assert dialog.window_engine == 'Local experimental provider'
     assert dialog.engine_combo.currentText() == 'Local experimental provider'
     assert not jobs
+
+
+def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
+    rail = AssistantPreview(owner, parent=owner)
+    owner.resize(300, 100)
+    owner.show()
+    rail.show()
+    app.processEvents()
+
+    rail.timer.stop()
+    rail.button.clearFocus()
+    rail.button.setAttribute(QtCore.Qt.WA_UnderMouse, False)
+    before = rail.button.grab().toImage()
+    rail.button.setFocus(QtCore.Qt.MouseFocusReason)
+    rail.button.setAttribute(QtCore.Qt.WA_UnderMouse, True)
+    app.sendEvent(rail.button, QtCore.QEvent(QtCore.QEvent.Enter))
+    assert rail.button.grab().toImage() == before
+    rail.hide()
+
+
+@pytest.mark.parametrize('theme', ['Светлая', 'Темная'])
+def test_welcome_language_menu_is_complete_rounded_and_anchored(app, owner, theme):
+    from window_appearance import install_window_appearance
+    appearance = install_window_appearance(app, 100, theme)
+    dialog = main.WelcomeDialog(owner)
+    try:
+        dialog.show()
+        app.processEvents()
+        dialog.show_language_menu()
+        app.processEvents()
+        menu = dialog._language_menu
+        assert len(menu.actions()) == len(main.INTERFACE_LANGUAGE_OPTIONS)
+        assert app.primaryScreen().availableGeometry().contains(menu.geometry())
+        assert not menu.mask().contains(QtCore.QPoint(0, 0))
+        for action in menu.actions():
+            rect = menu.actionGeometry(action)
+            assert menu.rect().contains(rect) and not rect.isEmpty()
+        anchor = dialog.flag_button.mapToGlobal(dialog.flag_button.rect().bottomRight())
+        assert abs(menu.geometry().right()-anchor.x()) <= 1
+        image = dialog.telegram_btn.icon().pixmap(24, 24).toImage()
+        values = [image.pixelColor(x,y).lightness() for x in range(image.width())
+                  for y in range(image.height()) if image.pixelColor(x,y).alpha() > 240]
+        assert bool(sum(values)/len(values) < 140) == (theme == 'Светлая')
+        menu.close()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        app.removeEventFilter(appearance)
+        del app._dialog_appearance
+        app.setProperty('ui_theme', None)
+        appearance.deleteLater()
 
 
 def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monkeypatch):
@@ -312,8 +364,9 @@ def test_faq_scrollbar_keeps_contrast_while_held(app, owner, monkeypatch, theme)
         QTest.mousePress(bar, QtCore.Qt.LeftButton, pos=point)
         QTest.qWait(40)
         image = bar.grab().toImage()
-        handle_color = image.pixelColor(point)
-        track = image.pixelColor(point.x(), min(image.height()-3, handle.bottom()+12))
+        ratio = image.devicePixelRatioF()
+        handle_color = image.pixelColor(round(point.x()*ratio), round(point.y()*ratio))
+        track = image.pixelColor(round(point.x()*ratio), round(min(bar.height()-3, handle.bottom()+12)*ratio))
         assert abs(handle_color.lightness() - track.lightness()) > 35
         QTest.mouseRelease(bar, QtCore.Qt.LeftButton, pos=point)
         captured.append(dialog)
@@ -355,9 +408,10 @@ def test_translation_result_scrollbar_keeps_contrast_while_held(app, owner, them
         QTest.mousePress(bar, QtCore.Qt.LeftButton, pos=point)
         QTest.qWait(40)
         image = bar.grab().toImage()
-        handle_color = image.pixelColor(point)
-        track_y = 2 if handle.top() > bar.height() // 2 else image.height() - 3
-        track = image.pixelColor(point.x(), track_y)
+        ratio = image.devicePixelRatioF()
+        handle_color = image.pixelColor(round(point.x()*ratio), round(point.y()*ratio))
+        track_y = 2 if handle.top() > bar.height() // 2 else bar.height() - 3
+        track = image.pixelColor(round(point.x()*ratio), round(track_y*ratio))
         assert abs(handle_color.lightness() - track.lightness()) > 35, (
             f'bar={bar.size()}, handle={handle}, handle_color={handle_color.name()}, '
             f'track_y={track_y}, track_color={track.name()}'

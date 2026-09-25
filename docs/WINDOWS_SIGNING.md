@@ -2,30 +2,26 @@
 
 ## Current status
 
-The next source version is **1.7.1**. The inspected local 1.7.0 release stage has
-five unsigned project executables. No code-signing certificate was available in
-the Windows CurrentUser/My or LocalMachine/My stores during the 2026-09-05 check.
-The scripts below prepare and verify signing; no trusted signature has been
-created and no certificate has been purchased. On 2026-09-05 the maintainer's
-application for the free SignPath Foundation program was sent through Gmail to
-the official support@signpath.io contact. Gmail confirmed sending. After the
-local VPN connection was repaired, the official Foundation application form
-was also submitted on the same day and confirmed "Form submitted". The form
-explicitly referenced the earlier email so the requests can be associated.
-On 2026-09-09 SignPath requested independent references demonstrating project
-usage and reputation; the maintainer replied with supporting material the same
-day. A Gmail check on 2026-09-22 found no later reply or approval. No local
-code-signing certificate was present in either Windows certificate store.
-The latest local package is the unsigned September 22 rebuild of 1.7.1. Defender
-found no threats in either its directory or ZIP; details and launch paths are in
-[the rebuild report](LOCAL_1.7.1_QA_2026-09-22.md). The earlier ux5 investigation
-is preserved in [the initial local check](WINDOWS_DEFENDER_2026-09-22.md).
+The **1.8.0** installer and application executables are Authenticode-signed
+with the maintainer's self-signed **jabrailkhalil** certificate and a DigiCert
+RFC 3161 timestamp. Independent cryptographic verification passed; a modified
+control file was rejected. The embedded uninstaller is signed by Inno Setup
+before packaging. See the [QA report](QA_1.8.0_2026-09-25.md).
 
-File version, publisher strings and SHA-256 checksums are useful metadata. They
-are **not** Authenticode signatures. A self-signed development certificate is
-not suitable for distributing the app publicly. A trusted signature identifies
-the publisher and protects the signed bytes; antivirus classification and
-SmartScreen reputation remain separate checks.
+This is a temporary development identity, **not a publicly trusted certificate**.
+Windows SmartScreen may warn, and the default certificate-chain check does not
+establish a trusted publisher. No certificate was added to the user's trusted
+root store. The maintainer explicitly approved distributing this release with
+these limitations disclosed in the download table.
+
+Public certificate SHA-1 thumbprint: `A0888D5CDEF8AED02740B5AF0EE34D1A1D7A535C`.
+The RSA private key is non-exportable and remains in the Windows certificate
+store. Detached OpenPGP signatures and SHA-256 checksums are also provided.
+
+The trusted-signing scripts below retain their stricter certificate-chain
+requirements. They are the intended path for a future publicly trusted signer.
+The previous SignPath application history follows; no SignPath approval or
+sponsorship is claimed for this release.
 
 ## Obtain a trusted signing identity
 

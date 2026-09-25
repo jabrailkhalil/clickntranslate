@@ -73,20 +73,14 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             widget.setParent(self.toolbar)
             widget.show()
         layout.addLayout(self.selection_controls)
-        options = QtWidgets.QHBoxLayout()
-        options.setSpacing(round(14*factor))
+        self._manual_output = bool(self._config.get('game_manual_output', False))
         self.template_combo = QtWidgets.QComboBox()
         self.template_combo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
         self.template_combo.setAccessibleName(text(self._language, 'choose_template'))
         self.template_combo.setMinimumHeight(round(28*factor))
         self.template_combo.activated.connect(self._load_template)
-        options.addWidget(self.template_combo, 1)
-        self.manual_output = QtWidgets.QCheckBox(text(self._language, 'manual_output'))
-        self.manual_output.setMinimumHeight(round(28*factor))
-        self.manual_output.toggled.connect(self._output_mode_changed)
-        options.addWidget(self.manual_output, 1)
-        layout.addLayout(options)
-        self.selection_note = QtWidgets.QLabel(text(self._language, 'simple_selection_hint'))
+        layout.addWidget(self.template_combo)
+        self.selection_note = QtWidgets.QLabel(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
         self.selection_note.setWordWrap(True)
         self.selection_note.setStyleSheet(f'color:{"#b9b1c2" if dark else "#71647b"}; font-size:{round(12*factor)}px;')
         layout.addWidget(self.selection_note)
@@ -121,24 +115,6 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self.toolbar.move(monitor.center().x()-self.toolbar.width()//2, monitor.top()+round(16*factor))
         self._caption_top = self.toolbar.geometry().bottom()+8
 
-    def _default_output(self, source):
-        bounds = self._screen_local_bounds(source.center())
-        width = min(bounds.width(), max(260, source.width()))
-        height = min(bounds.height(), max(100, source.height()))
-        result = QtCore.QRect(source.right()+12, source.top(), width, height)
-        if result.right() > bounds.right():
-            result.moveTopLeft(QtCore.QPoint(source.left(), source.bottom()+12))
-        if result.bottom() > bounds.bottom():
-            result.moveTop(max(bounds.top(), source.top()-height-12))
-        result.moveLeft(max(bounds.left(), min(result.left(), bounds.right()-width+1)))
-        return result
-
-    def _output_mode_changed(self, manual):
-        if not manual and self._outputs and self._outputs[-1] is None:
-            self._outputs[-1] = self._default_output(self._regions[-1])
-        self.selection_note.setText(text(self._language, 'selection_hint' if manual else 'simple_selection_hint'))
-        self._update_selection_controls()
-
     def _complete(self):
         return bool(self._regions) and len(self._outputs) == len(self._regions) and all(rect is not None for rect in self._outputs)
 
@@ -166,14 +142,16 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             self.template_combo.addItem(text(self._language, 'new_layout'), None)
             for value in values:
                 self.template_combo.addItem(value['name'], value)
+        self.template_combo.setVisible(bool(values))
 
     def _load_template(self, index):
         value = self.template_combo.itemData(index)
         if not value:
+            self._manual_output = bool(self._config.get('game_manual_output', False))
             self._regions, self._outputs, self._styles = [], [], []
             self._selected_region = self._selected_hit = self._drag_hit = None
             self._start = self._end = None
-            self.selection_note.setText(text(self._language, 'selection_hint' if self.manual_output.isChecked() else 'simple_selection_hint'))
+            self.selection_note.setText(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
             self._update_selection_controls()
             return
         source_index = self.source_combo.findData(value['source_language'])
@@ -184,13 +162,15 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
                 self.template_combo.setCurrentIndex(0)
             self._layout_controls()
             return
-        self.selection_note.setText(text(self._language, 'selection_hint' if self.manual_output.isChecked() else 'simple_selection_hint'))
+        self.selection_note.setText(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
         self.template_combo.setCurrentIndex(index)
         self.source_combo.setCurrentIndex(source_index)
         self._fill_targets(value['target_language'])
         origin = self.geometry().topLeft()
         self._regions = [decode_rect(pair['source'], self._screens).translated(-origin) for pair in value['pairs']]
         self._outputs = [decode_rect(pair['output'], self._screens).translated(-origin) for pair in value['pairs']]
+        self._manual_output = any(source != output for source, output in zip(self._regions, self._outputs))
+        self.selection_note.setText(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
         self._styles = [output_style(pair['style']) for pair in value['pairs']]
         self._selected_region = self._selected_hit = self._drag_hit = None
         self._start = self._end = None
@@ -209,6 +189,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
 
     def _hit(self, point):
         for index in reversed(range(len(self._regions))):
+            if not self._manual_output and self._regions[index].contains(point):
+                return index, 'source'
             for kind, rect in (('output', self._outputs[index]), ('source', self._regions[index])):
                 if rect is not None and rect.contains(point):
                     return index, kind
@@ -251,6 +233,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             point = event.pos()-self._move_offset
             rect.moveTopLeft(QtCore.QPoint(max(bounds.left(), min(point.x(), bounds.right()-rect.width()+1)),
                                            max(bounds.top(), min(point.y(), bounds.bottom()-rect.height()+1))))
+            if not self._manual_output:
+                self._outputs[self._drag_hit[0]] = QtCore.QRect(rect)
         elif self._start is not None:
             self._end = event.pos()
         self.update()
@@ -271,7 +255,7 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
                 self._outputs[-1] = rect
             elif len(self._regions) < 16:
                 self._regions.append(rect)
-                self._outputs.append(None if self.manual_output.isChecked() else self._default_output(rect))
+                self._outputs.append(None if self._manual_output else QtCore.QRect(rect))
                 self._styles.append(output_style(opacity=int(self._config.get('game_overlay_opacity', 88))))
         self._update_selection_controls()
 
@@ -292,6 +276,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self._persist_pair()
         self._starting_session = True
         self.close()
+        if platform_support.IS_WINDOWS:
+            target_window = game_mode._window_at_point(sources[0].center())
         game_mode._begin_game_session(sources, str(self.source_combo.currentData()), str(self.target_combo.currentData()),
                                       target_window, output_regions=outputs, output_styles=self._styles,
                                       template_name=self.template_combo.currentText() if self.template_combo.currentData() else '')
@@ -301,7 +287,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.fillRect(self.rect(), QtGui.QColor(4, 7, 12, 112))
         areas = [(index, kind, rect) for index, source in enumerate(self._regions)
-                 for kind, rect in (('source', source), ('output', self._outputs[index])) if rect is not None]
+                 for kind, rect in (('source', source), ('output', self._outputs[index]))
+                 if rect is not None and (kind == 'source' or rect != source)]
         if self._start is not None and self._end is not None:
             kind = 'output' if self._outputs and self._outputs[-1] is None else 'source'
             areas.append((-1, kind, QtCore.QRect(self._start, self._end).normalized()))
@@ -365,6 +352,14 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
         if self.controls:
             self.controls.place()
 
+    def _update_bound_region(self):
+        previous = QtCore.QRect(self.region)
+        follows_source = self.output_rect == previous
+        super()._update_bound_region()
+        if follows_source and self.region != previous:
+            self.output_rect = QtCore.QRect(self.region)
+            self._place_near_region()
+
     def moveEvent(self, event):
         super().moveEvent(event)
         if self._output_ready:
@@ -400,7 +395,7 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
     def _grab_region(self):
         windows = self._capture_windows()
         if platform_support.IS_WINDOWS:
-            if any(not widget._capture_excluded for widget in windows):
+            if any(widget.isVisible() and not widget._capture_excluded for widget in windows):
                 raise RuntimeError('Windows cannot exclude a translation window from capture')
             return super()._grab_region()
         # Mac's compositor excludes our windows from a grab automatically, and
@@ -636,8 +631,13 @@ class OutputControls(QtWidgets.QFrame):
         for overlay in self.overlays:
             overlay.controls = self
         self._resize_panel()
-        self.show()
-        self._capture_excluded = game_mode._exclude_from_windows_capture(self)
+        self._capture_excluded = False
+        self.set_toolbar_visible(self.overlay.config.get('game_show_toolbar', True))
+
+    def set_toolbar_visible(self, visible):
+        self.setVisible(bool(visible))
+        if visible:
+            self._capture_excluded = game_mode._exclude_from_windows_capture(self)
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)

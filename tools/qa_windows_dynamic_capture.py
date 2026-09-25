@@ -15,7 +15,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.argv[0] = str(ROOT / 'main.py')
+sys.argv[0] = str(ROOT / '.tmp/windows-dynamic-capture-data/main.py')
 if sys.platform != 'win32' or os.environ.get('QT_QPA_PLATFORM', '').startswith('offscreen'):
     raise SystemExit('This check requires the native Windows desktop.')
 

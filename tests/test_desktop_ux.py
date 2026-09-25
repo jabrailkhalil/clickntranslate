@@ -44,7 +44,7 @@ def test_desktop_controls_use_monitor_logical_dpi_not_double_dpr(dpi, dpr, expec
         assert desktop_control_scale(screen) == expected
 
 
-def test_capture_flags_are_larger_but_ignore_main_zoom(app):
+def test_compact_capture_flags_follow_dpi_but_ignore_main_zoom(app):
     from capture_widgets import CaptureLanguageCombo
     from window_appearance import style_capture_controls
     overlay = QtWidgets.QWidget()
@@ -57,8 +57,8 @@ def test_capture_flags_are_larger_but_ignore_main_zoom(app):
                 for percent in (80, 100, 150, 200):
                     before = overlay.geometry()
                     style_capture_controls(overlay, {'ui_scale_percent': percent}, [combo])
-                    assert combo.iconSize() == QtCore.QSize(28, 28) * dpi_factor
-                    assert combo.size() == QtCore.QSize(112, 44) * dpi_factor
+                    assert combo.iconSize() == QtCore.QSize(20, 20) * dpi_factor
+                    assert combo.size() == QtCore.QSize(108, 36) * dpi_factor
                     assert overlay.geometry() == before
     finally:
         overlay.deleteLater()

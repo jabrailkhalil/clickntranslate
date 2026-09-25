@@ -13,10 +13,11 @@ class _SocialIcon(QtGui.QIconEngine):
         super().__init__()
         self.kind = kind
         self.dark = dark
-        color = '#c4bdce' if dark else '#655276'
-        self.renderer = QtSvg.QSvgRenderer(
-            ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-             '<path fill="' + color + '" d="' + _SOCIAL_PATHS[kind] + '"/></svg>').encode())
+        self.renderers = {}
+        for use_dark, color in ((True, '#c4bdce'), (False, '#655276')):
+            self.renderers[use_dark] = QtSvg.QSvgRenderer(
+                ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+                 '<path fill="' + color + '" d="' + _SOCIAL_PATHS[kind] + '"/></svg>').encode())
 
     def clone(self):
         return _SocialIcon(self.kind, self.dark)
@@ -30,7 +31,11 @@ class _SocialIcon(QtGui.QIconEngine):
         target = QtCore.QRectF(rect.center().x() - side / 2 + inset / 2,
                               rect.center().y() - side / 2 + inset / 2,
                               max(1.0, side - inset), max(1.0, side - inset))
-        self.renderer.render(painter, target)
+        dark = self.dark
+        if dark is None:
+            app = QtWidgets.QApplication.instance()
+            dark = app is None or app.property('ui_theme') != 'Светлая'
+        self.renderers[bool(dark)].render(painter, target)
         painter.restore()
 
     def pixmap(self, size, mode, state):
@@ -65,7 +70,12 @@ class WelcomeCheckBox(QtWidgets.QCheckBox):
         rect = self.style().subElementRect(QtWidgets.QStyle.SE_CheckBoxIndicator, option, self)
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtGui.QColor('#21172e'), max(1.8, rect.width() / 8),
+        # The shared theme converter can recolour QSS indicator backgrounds.
+        # Paint fill and mark together so their contrast cannot diverge.
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor('#7a5fa1'))
+        painter.drawRoundedRect(QtCore.QRectF(rect).adjusted(.5, .5, -.5, -.5), 4, 4)
+        painter.setPen(QtGui.QPen(QtGui.QColor('#ffffff'), max(1.8, rect.width() / 8),
                                  QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
         path = QtGui.QPainterPath()
         path.moveTo(rect.x() + rect.width() * .23, rect.y() + rect.height() * .51)

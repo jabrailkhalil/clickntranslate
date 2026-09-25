@@ -176,8 +176,10 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             tr_label = self._rect_in_settings(settings, settings.translator_engine_label)
             tr_combo = self._rect_in_settings(settings, settings.translator_combo)
 
-            self.assertEqual(ocr_label[1] + ocr_label[3] / 2, ocr_combo[1] + ocr_combo[3] / 2)
-            self.assertEqual(tr_label[1] + tr_label[3] / 2, tr_combo[1] + tr_combo[3] / 2)
+            # Native styles may use odd control heights. Integer positioning
+            # can then align centers only to the nearest half logical pixel.
+            self.assertAlmostEqual(ocr_label[1] + ocr_label[3] / 2, ocr_combo[1] + ocr_combo[3] / 2, delta=.5)
+            self.assertAlmostEqual(tr_label[1] + tr_label[3] / 2, tr_combo[1] + tr_combo[3] / 2, delta=.5)
             self.assertEqual(ocr_combo[0], tr_combo[0])
             self.assertEqual(ocr_combo[2], 180)
             self.assertEqual(tr_combo[2], 180)
@@ -268,11 +270,12 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         # All three pickers are drop-downs now, so this one is exactly as wide
         # as an engine combo and the right column lines up.
         self.assertEqual(result[2], settings.ocr_engine_combo.width())
-        self.assertEqual(result[3], settings.ocr_engine_combo.height())
+        # Native proxy layouts may round their integer heights one pixel apart.
+        self.assertAlmostEqual(result[3], settings.ocr_engine_combo.height(), delta=1)
         self.assertEqual(ocr[0] + ocr[2], result[0] + result[2])
         self.assertEqual(translator[0] + translator[2], result[0] + result[2])
         label = self._rect_in_settings(settings, settings.result_window_label)
-        self.assertEqual(label[1] + label[3] / 2, result[1] + result[3] / 2)
+        self.assertAlmostEqual(label[1] + label[3] / 2, result[1] + result[3] / 2, delta=.5)
         self.assertTrue(settings.result_window_label.alignment() & Qt.AlignVCenter)
         # It sits directly below the translator row and shares that row with
         # the next checkbox, so the left column no longer has a blank gap.
@@ -306,7 +309,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             for checkbox, control in (
                 (autostart, ocr), (start_minimized, translator), (copy_translated, result)
             ):
-                self.assertEqual(checkbox[1] + checkbox[3] / 2, control[1] + control[3] / 2)
+                self.assertAlmostEqual(checkbox[1] + checkbox[3] / 2, control[1] + control[3] / 2, delta=.5)
             self.assertTrue(settings.main_layout.alignment() & Qt.AlignTop)
         finally:
             settings.close()

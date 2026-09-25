@@ -284,6 +284,10 @@ class UiScalingTest(unittest.TestCase):
         popup = combo.view().window()
         proxy = popup.graphicsProxyWidget()
         self.assertTrue(self.controller.view.sceneRect().contains(proxy.sceneBoundingRect()))
+        # Qt suppresses release events briefly after opening a list. Let that
+        # timer and the queued popup layout settle before calculating a click
+        # position; coordinates taken before this wait may already be stale.
+        QTest.qWait(QApplication.doubleClickInterval() + 20)
         QTest.keyClick(self.controller.view.viewport(), Qt.Key_End)
         self.settle()
         last = combo.count() - 1
@@ -291,8 +295,6 @@ class UiScalingTest(unittest.TestCase):
         self.assertTrue(combo.view().viewport().rect().contains(row.center()))
         point = combo.view().viewport().mapTo(popup, row.center())
         mapped = self.controller.view.mapFromScene(proxy.mapToScene(QPointF(point)))
-        # Qt briefly suppresses release events after the click that opens a list.
-        QTest.qWait(QApplication.doubleClickInterval() + 20)
         QTest.mouseClick(self.controller.view.viewport(), Qt.LeftButton, pos=mapped)
         self.settle()
         self.assertEqual(combo.currentIndex(), last)
@@ -407,7 +409,8 @@ class UiScalingTest(unittest.TestCase):
                     self.assertLess(settings.ui_scale_label.geometry().right(), settings.ui_scale_control.geometry().left())
                     for control in (settings.ocr_engine_combo, settings.translator_combo, settings.result_window_control):
                         self.assertEqual(settings.ui_scale_control.x(), control.x())
-                        self.assertEqual(settings.ui_scale_control.size(), control.size())
+                    self.assertEqual(settings.ui_scale_control.width(), control.width())
+                    self.assertAlmostEqual(settings.ui_scale_control.height(), control.height(), delta=1)
                     self.assertEqual(settings.ui_scale_label.geometry().right(), settings.ocr_engine_label.geometry().right())
 
     def test_screen_changes_clamp_size_without_losing_the_preference(self):

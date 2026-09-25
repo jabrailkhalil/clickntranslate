@@ -2,6 +2,8 @@
 """Native Mac bundle: Qt GUI and two isolated non-Qt inference helpers."""
 import os
 import platform
+import plistlib
+from pathlib import Path
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -13,7 +15,15 @@ from platform_support import APP_ID
 
 architecture = platform.machine()
 identity = os.environ.get('MACOS_CODESIGN_IDENTITY') or None
-entitlements = 'packaging/macos/entitlements.plist' if identity else None
+entitlements = None
+if identity:
+    # AMFI's entitlement parser rejects CRLF XML accepted by plutil. Source
+    # archives produced on Windows can carry CRLF, so serialize canonical XML.
+    entitlements_path = Path(SPECPATH) / 'build/macos/entitlements.plist'
+    entitlements_path.parent.mkdir(parents=True, exist_ok=True)
+    entitlements_path.write_bytes(plistlib.dumps(plistlib.loads(
+        (Path(SPECPATH) / 'packaging/macos/entitlements.plist').read_bytes())))
+    entitlements = str(entitlements_path)
 common_excludes = ['tkinter', 'pytest', 'IPython', 'jupyter', 'tensorflow', 'keras',
                    'matplotlib', 'pandas', 'sklearn', 'stanza', 'minisbd', 'spacy', 'thinc']
 optional = ['easyocr', 'torch', 'torchvision', 'skimage']

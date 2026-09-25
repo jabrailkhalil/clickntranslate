@@ -39,6 +39,8 @@ def isolated(app, monkeypatch, tmp_path):
     monkeypatch.setattr(ocr, '_write_ocr_config_updates', mock.Mock())
     monkeypatch.setattr(game_mode, '_exclude_from_windows_capture', lambda widget: True)
     monkeypatch.setattr(game_mode.GameTranslationOverlay, '_start_scanning', lambda self: None)
+    monkeypatch.setattr(game_mode, '_window_at_point', lambda point: 0)
+    monkeypatch.setattr(game_mode, '_schedule_game_focus_handoff', lambda *args: None)
     store = TemplateStore(tmp_path/'templates.json')
     monkeypatch.setattr(workspace, 'TemplateStore', lambda: store)
     yield config, store
@@ -79,8 +81,8 @@ def test_output_controls_paint_themed_background_on_translucent_surfaces(isolate
 
 
 def test_manual_mode_requires_output_and_enter_routes_both_bounds(isolated):
+    isolated[0]['game_manual_output'] = True
     selector = workspace.PairedRegionSelector()
-    selector.manual_output.setChecked(True)
     try:
         source, output = QtCore.QRect(50, 250, 220, 70), QtCore.QRect(380, 370, 260, 90)
         with mock.patch.object(game_mode, '_begin_game_session') as start:
@@ -101,8 +103,8 @@ def test_manual_mode_requires_output_and_enter_routes_both_bounds(isolated):
 
 
 def test_output_can_overlap_source_and_move_independently_then_delete_pair(isolated):
+    isolated[0]['game_manual_output'] = True
     selector = workspace.PairedRegionSelector()
-    selector.manual_output.setChecked(True)
     try:
         source = QtCore.QRect(100, 260, 280, 100)
         output = QtCore.QRect(150, 280, 180, 60)
@@ -154,18 +156,33 @@ def test_templates_survive_new_selector_and_keep_both_areas_languages_and_style(
         overlay.close()
 
 
-def test_default_selection_places_output_automatically_and_starts_in_one_step(isolated):
+def test_default_selection_overlays_source_and_starts_in_one_step(isolated):
     selector = workspace.PairedRegionSelector()
     try:
         source = QtCore.QRect(50, 250, 220, 70)
         with mock.patch.object(game_mode, '_begin_game_session') as start:
             select(selector, source)
             output = selector._outputs[0]
-            assert output is not None and not output.intersects(source)
+            assert output == source
             assert selector.start_button.isEnabled()
             QTest.keyClick(selector, QtCore.Qt.Key_Return)
             assert len(start.call_args.args[0]) == 1
             assert start.call_args.kwargs['output_regions'] == [output.translated(selector.geometry().topLeft())]
+    finally:
+        selector.close()
+
+
+def test_overlay_output_stays_attached_when_source_moves(isolated):
+    selector = workspace.PairedRegionSelector()
+    try:
+        select(selector, QtCore.QRect(50, 250, 220, 70))
+        assert selector._outputs == selector._regions
+        center = selector._regions[0].center()
+        QTest.mousePress(selector, QtCore.Qt.LeftButton, pos=center)
+        QTest.mouseRelease(selector, QtCore.Qt.LeftButton, pos=center+QtCore.QPoint(40, 20))
+        assert selector._outputs == selector._regions
+        assert selector._regions[0].topLeft() == QtCore.QPoint(90, 270)
+        assert selector.start_button.isEnabled()
     finally:
         selector.close()
 
@@ -227,6 +244,7 @@ def test_micro_controls_resize_unlock_and_save_current_layout(isolated):
     try:
         controls = overlay.controls
         assert controls.width() >= 200 and controls.panel.isHidden()
+        compact_height = controls.height()
         assert controls.gear.isVisible() and controls.stop_button.isVisible()
         controls.gear.click()
         assert not controls.panel.isHidden() and controls.height() > 100
@@ -247,7 +265,8 @@ def test_micro_controls_resize_unlock_and_save_current_layout(isolated):
         assert value['pairs'][0]['style'] == {'font_size': 24, 'opacity': 42, 'locked': False}
         assert decode_rect(value['pairs'][0]['output'], QtWidgets.QApplication.screens()) == overlay.output_rect
         controls.gear.click()
-        assert controls.width() >= 200 and controls.height() < 60
+        assert controls.width() >= 200 and controls.height() == compact_height
+        assert controls.height() < round(60 * controls.ui_factor)
         assert controls.stop_button.isVisible()
     finally:
         overlay.close()
@@ -257,12 +276,62 @@ def test_public_entry_uses_paired_selector(isolated):
     selector = game_mode._show_game_selector()
     try:
         assert isinstance(selector, workspace.PairedRegionSelector)
-        assert selector.template_combo.isVisible()
-        assert selector.manual_output.isVisible()
-        assert not selector.manual_output.isChecked()
+        assert not selector.template_combo.isVisible()
+        assert not hasattr(selector, 'manual_output')
+        assert not selector._manual_output
         assert not selector.template_combo.isEditable()
     finally:
         selector.close()
+
+
+def test_start_binds_to_selected_window_after_selector_is_closed(isolated, monkeypatch):
+    monkeypatch.setattr(workspace.platform_support, 'IS_WINDOWS', True)
+    selector = workspace.PairedRegionSelector(target_window=99)
+    try:
+        source = QtCore.QRect(50, 250, 220, 70)
+        select(selector, source)
+        def selected_window(point):
+            assert not selector.isVisible()
+            assert point == source.center()+selector.geometry().topLeft()
+            return 1234
+        monkeypatch.setattr(game_mode, '_window_at_point', selected_window)
+        with mock.patch.object(game_mode, '_begin_game_session') as start:
+            selector._start_selected_regions()
+        assert start.call_args.args[3] == 1234
+    finally:
+        selector.close()
+
+
+def test_hidden_toolbar_keeps_session_alive_and_can_be_restored(isolated):
+    isolated[0]['game_show_toolbar'] = False
+    overlay = make_overlay(QtCore.QRect(50, 250, 220, 70), 'en', 'ru',
+                           output_region=QtCore.QRect(50, 250, 220, 70))
+    try:
+        assert not overlay.controls.isVisible()
+        assert not overlay._closed
+        overlay._apply_translation(0, 'Original', 'Перевод', '')
+        assert overlay.card.isVisible()
+        assert overlay.translation_label.text() == 'Перевод'
+        overlay.controls.set_toolbar_visible(True)
+        assert overlay.controls.isVisible()
+        overlay.controls.set_toolbar_visible(False)
+        assert not overlay._closed
+    finally:
+        overlay.close()
+
+
+def test_in_place_output_follows_the_source_window_when_moved(isolated, monkeypatch):
+    monkeypatch.setattr(game_mode, '_window_rect', lambda handle: QtCore.QRect(0, 0, 1000, 800))
+    source = QtCore.QRect(50, 250, 220, 70)
+    overlay = make_overlay(source, 'en', 'ru', target_window=1234, output_region=source)
+    try:
+        monkeypatch.setattr(game_mode, '_window_rect', lambda handle: QtCore.QRect(100, 30, 1000, 800))
+        overlay._update_bound_region()
+        assert overlay.region == source.translated(100, 30)
+        assert overlay.output_rect == overlay.region
+        assert overlay.geometry() == overlay.region
+    finally:
+        overlay.close()
 
 
 def test_output_controls_large_dpi_fit_screen_without_scrolling_and_keep_stop_visible(isolated, app):

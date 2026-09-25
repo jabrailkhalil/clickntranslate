@@ -62,7 +62,7 @@ OCR_UI_TEXT = {
         "auto_unreliable_info": "Weak results were filtered out so noise is not sent to the translator.\n\nTry:\n• Select the text area more tightly, without extra borders or background\n• Choose the specific source language\n• Try another OCR engine or install the Windows OCR language pack",
         "not_recognized": "😔 Text not recognized", "not_recognized_info": "Try:\n• Select an area with larger text\n• Make sure the text has good contrast\n• Choose a different OCR engine in settings",
         "translate": "Translate", "ocr_init_failed": "OCR initialization failed", "screen_no_text": "No text recognized on screen",
-        "translation_failed": "Translation failed", "translating_screen": "Translating screen...", "fullscreen_hint": "ESC — close  |  RMB — drag",
+        "translation_failed": "Translation failed", "translating_screen": "Translating screen...", "fullscreen_hint": "Esc / Right-click — close",
         "no_installed_languages": "No OCR languages installed",
         "no_installed_translation_pairs": "No installed translation pairs",
         "install_languages_first": "Install a language first in Settings → Language packages.",
@@ -85,7 +85,7 @@ OCR_UI_TEXT = {
         "auto_unreliable_info": "Слабые результаты отфильтрованы, чтобы не отправлять мусор в переводчик.\n\nПопробуйте:\n• Выделить область точнее, без лишних рамок и фона\n• Выбрать конкретный язык текста\n• Попробовать другой OCR-движок или установить языковой пакет Windows OCR",
         "not_recognized": "😔 Текст не распознан", "not_recognized_info": "Попробуйте:\n• Выделить область с более крупным текстом\n• Убедиться, что текст контрастный\n• Выбрать другой OCR-движок в настройках",
         "translate": "Перевести", "ocr_init_failed": "Не удалось запустить OCR", "screen_no_text": "Текст на экране не распознан",
-        "translation_failed": "Ошибка перевода", "translating_screen": "Перевод экрана...", "fullscreen_hint": "ESC — закрыть  |  ПКМ — перетащить",
+        "translation_failed": "Ошибка перевода", "translating_screen": "Перевод экрана...", "fullscreen_hint": "Esc / ПКМ — закрыть",
         "no_installed_languages": "Нет установленных языков OCR",
         "no_installed_translation_pairs": "Нет установленных направлений перевода",
         "install_languages_first": "Сначала установите язык: Настройки → Языковые пакеты.",
@@ -105,7 +105,7 @@ OCR_UI_TEXT = {
         "auto_unreliable": "El texto no se reconoció de forma fiable", "auto_unreliable_info": "Los resultados débiles se filtraron para no enviar ruido al traductor.\n\nPrueba:\n• Selecciona el área con más precisión\n• Elige el idioma de origen\n• Usa otro motor OCR o instala el paquete de Windows OCR",
         "not_recognized": "😔 No se reconoció el texto", "not_recognized_info": "Prueba:\n• Selecciona texto más grande\n• Comprueba que tenga buen contraste\n• Elige otro motor OCR",
         "translate": "Traducir", "ocr_init_failed": "No se pudo iniciar OCR", "screen_no_text": "No se reconoció texto en la pantalla",
-        "translation_failed": "Error de traducción", "translating_screen": "Traduciendo la pantalla...", "fullscreen_hint": "ESC — cerrar  |  Botón derecho — arrastrar",
+        "translation_failed": "Error de traducción", "translating_screen": "Traduciendo la pantalla...", "fullscreen_hint": "Esc / Botón derecho — cerrar",
         "no_installed_languages": "No hay idiomas OCR instalados",
         "no_installed_translation_pairs": "No hay direcciones de traducción instaladas",
         "install_languages_first": "Instala primero un idioma en Ajustes → Paquetes de idioma.",
@@ -125,7 +125,7 @@ OCR_UI_TEXT = {
         "auto_unreliable": "Text wurde nicht zuverlässig erkannt", "auto_unreliable_info": "Schwache Ergebnisse wurden gefiltert, damit kein Rauschen übersetzt wird.\n\nVersuche:\n• Den Textbereich genauer auswählen\n• Die konkrete Ausgangssprache wählen\n• Eine andere OCR-Engine verwenden oder das Windows-OCR-Paket installieren",
         "not_recognized": "😔 Text nicht erkannt", "not_recognized_info": "Versuche:\n• Einen Bereich mit größerem Text auswählen\n• Auf guten Kontrast achten\n• Eine andere OCR-Engine wählen",
         "translate": "Übersetzen", "ocr_init_failed": "OCR konnte nicht gestartet werden", "screen_no_text": "Auf dem Bildschirm wurde kein Text erkannt",
-        "translation_failed": "Übersetzung fehlgeschlagen", "translating_screen": "Bildschirm wird übersetzt...", "fullscreen_hint": "ESC — schließen  |  Rechtsklick — ziehen",
+        "translation_failed": "Übersetzung fehlgeschlagen", "translating_screen": "Bildschirm wird übersetzt...", "fullscreen_hint": "Esc / Rechtsklick — schließen",
         "no_installed_languages": "Keine OCR-Sprachen installiert",
         "no_installed_translation_pairs": "Keine Übersetzungsrichtungen installiert",
         "install_languages_first": "Installiere zuerst eine Sprache unter Einstellungen → Sprachpakete.",
@@ -145,7 +145,7 @@ OCR_UI_TEXT = {
         "auto_unreliable": "Le texte n’a pas été reconnu de façon fiable", "auto_unreliable_info": "Les résultats faibles ont été filtrés pour ne pas envoyer de bruit au traducteur.\n\nEssayez :\n• Sélectionner la zone plus précisément\n• Choisir la langue source exacte\n• Utiliser un autre moteur OCR ou installer le module Windows OCR",
         "not_recognized": "😔 Texte non reconnu", "not_recognized_info": "Essayez :\n• Sélectionner une zone avec un texte plus grand\n• Vérifier le contraste\n• Choisir un autre moteur OCR",
         "translate": "Traduire", "ocr_init_failed": "Impossible de démarrer l’OCR", "screen_no_text": "Aucun texte reconnu à l’écran",
-        "translation_failed": "Échec de la traduction", "translating_screen": "Traduction de l’écran...", "fullscreen_hint": "ESC — fermer  |  Clic droit — déplacer",
+        "translation_failed": "Échec de la traduction", "translating_screen": "Traduction de l’écran...", "fullscreen_hint": "Échap / Clic droit — fermer",
         "no_installed_languages": "Aucune langue OCR installée",
         "no_installed_translation_pairs": "Aucune direction de traduction installée",
         "install_languages_first": "Installez d’abord une langue dans Réglages → Modules de langue.",
@@ -165,7 +165,7 @@ OCR_UI_TEXT = {
         "auto_unreliable": "未能可靠识别文本", "auto_unreliable_info": "已过滤置信度较低的结果，以免向翻译器发送噪声。\n\n请尝试：\n• 更精确地选择文本区域\n• 选择具体的源语言\n• 使用其他 OCR 引擎或安装 Windows OCR 语言包",
         "not_recognized": "😔 未识别到文本", "not_recognized_info": "请尝试：\n• 选择字号更大的文本区域\n• 确保文本对比度良好\n• 在设置中选择其他 OCR 引擎",
         "translate": "翻译", "ocr_init_failed": "OCR 初始化失败", "screen_no_text": "未识别到屏幕文字",
-        "translation_failed": "翻译失败", "translating_screen": "正在翻译屏幕...", "fullscreen_hint": "ESC — 关闭  |  右键 — 拖动",
+        "translation_failed": "翻译失败", "translating_screen": "正在翻译屏幕...", "fullscreen_hint": "Esc / 右键 — 关闭",
         "no_installed_languages": "未安装 OCR 语言",
         "no_installed_translation_pairs": "未安装翻译方向",
         "install_languages_first": "请先在设置 → 语言包中安装语言。",
@@ -6197,19 +6197,10 @@ class FullScreenTranslateOverlay(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.RightButton:
-            # ПКМ — перетаскивание оверлея
-            self._is_dragging = True
-            self._drag_offset = event.pos()
-            self.setCursor(QtCore.Qt.ClosedHandCursor)
-
-    def mouseMoveEvent(self, event):
-        if self._is_dragging:
-            self.move(self.pos() + event.pos() - self._drag_offset)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == QtCore.Qt.RightButton:
-            self._is_dragging = False
-            self.setCursor(QtCore.Qt.ArrowCursor)
+            event.accept()
+            self.close()
+            return
+        super().mousePressEvent(event)
 
     def closeEvent(self, event):
         global _fullscreen_overlay_ref

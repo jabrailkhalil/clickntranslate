@@ -229,9 +229,13 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
     write_manifest(new, '1.7.2')
     if damage and damage != 'locked_backup':
         (new / damage).unlink()
-    # Even a misplaced data folder in an archive may not overwrite user data.
-    (new / 'data').mkdir()
-    (new / 'data/config.json').write_bytes(b'package default settings')
+    # Misplaced settings and downloaded models must never replace user data,
+    # whether the update succeeds or rolls back after a damaged package.
+    for relative in ('data/config.json', 'data/history.json', 'data/nested/settings.json',
+                     'ocr/model.bin', 'translators/model.bin'):
+        payload = new / relative
+        payload.parent.mkdir(parents=True, exist_ok=True)
+        payload.write_bytes(b'package defaults must not be installed')
     archive = tmp_path / 'update.zip'
     with zipfile.ZipFile(archive, 'w') as output:
         for file in new.rglob('*'):
@@ -256,6 +260,7 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
     if damage == 'locked_backup':
         old['zz-locked.dll'] = b'locked original module'
     user = {'data/config.json': b'my settings', 'data/history.json': b'my history',
+            'data/nested/settings.json': b'my nested settings',
             'ocr/model.bin': b'my OCR model', 'translators/model.bin': b'my translator'}
     for relative, content in dict(old, **user).items():
         path = install / relative

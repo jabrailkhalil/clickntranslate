@@ -18,7 +18,9 @@ fi
 "$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller ClicknTranslate-macos.spec
 APP="dist/ClicknTranslate.app"
 if [[ "$LOCAL_SIGNING" == "1" ]]; then
-  "$PYTHON" tools/macos_signing.py sign "$APP" > build/macos/signing.json
+  SIGN_ARGS=()
+  if [[ "${CLICKNTRANSLATE_SIGN_ALL_CODE:-0}" == "1" ]]; then SIGN_ARGS+=(--all-code); fi
+  "$PYTHON" tools/macos_signing.py sign "$APP" "${SIGN_ARGS[@]}" > build/macos/signing.json
 fi
 codesign --verify --deep --strict --verbose=2 "$APP"
 "$PYTHON" tools/check_macos_compatibility.py "$APP"

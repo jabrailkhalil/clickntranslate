@@ -13,7 +13,7 @@ def test_installer_uses_the_verified_launcher_release_layout():
     assert 'AppVerName={#MyAppName} {#MyAppVersion}' not in source
     assert 'ClicknTranslate-v" + MyAppVersion + "-win64-stage\\ClicknTranslate' in source
     assert "ClicknTranslate-Setup-v{#MyAppVersion}-win64" in source
-    assert 'Excludes: "data\\*;program-files.sha256"' in source
+    assert 'Excludes: "\\data\\*,\\ocr\\*,\\translators\\*,\\program-files.sha256"' in source
     assert 'Source: "{#SourceDir}\\program-files.sha256"; DestDir: "{app}"; Attribs: hidden' in source
     assert 'Type: filesandordirs; Name: "{app}\\app"' in source
     assert 'Type: filesandordirs; Name: "{app}\\_internal"' in source

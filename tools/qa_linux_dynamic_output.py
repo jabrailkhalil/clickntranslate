@@ -14,7 +14,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.argv[0] = str(ROOT / 'main.py')
+sys.argv[0] = str(ROOT / '.tmp/linux-dynamic-output-data/main.py')
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QSignalSpy, QTest
@@ -85,6 +85,7 @@ def run():
             check('native_ocr', 'SOURCE TEXT' in recognized)
             worker.deleteLater()
             overlay = workspace.PairedTranslationOverlay(source, 'en', 'ru', output_region=output)
+            controls = workspace.OutputControls([overlay])
             game_mode._game_overlay_refs = [overlay]
             try:
                 overlay._apply_translation(0, 'SOURCE TEXT', 'Перевод только в выбранной области', '')
@@ -116,8 +117,9 @@ def run():
                 controls_image = controls.grab().toImage()
                 controls_image.save(str(folder/'settings.png'))
                 density = controls_image.devicePixelRatio()
-                color = controls_image.pixelColor(round(controls.width() * .5 * density), round(10 * density))
-                background = '#f5f1f8' if config['theme'] == 'Светлая' else '#211d29'
+                # Sample the frame margin, outside the first row's buttons.
+                color = controls_image.pixelColor(round(4 * density), round(controls.height() * .5 * density))
+                background = '#f0edf3' if config['theme'] == 'Светлая' else '#121212'
                 check('controls_background', color.alpha() == 255 and color.name() == background)
                 before = QtCore.QRect(overlay.output_rect)
                 for button, delta in ((controls.move_button, QtCore.QPoint(10, 5)),
@@ -128,13 +130,18 @@ def run():
                 expected = before.translated(10, 5)
                 expected.setSize(expected.size()+QtCore.QSize(20, 10))
                 check('move_resize', overlay.output_rect == expected and overlay.region == source)
-                controls.template_name.setText('Linux native fixture')
+                controls.template_name.setEditText('Linux native fixture')
                 controls.save_button.click()
                 saved = TemplateStore(store.path).load()[0]
                 check('template_roundtrip',
                     decode_rect(saved['pairs'][0]['source'], app.screens()) == source and
                     decode_rect(saved['pairs'][0]['output'], app.screens()) == overlay.output_rect and
                     saved['pairs'][0]['style'] == {'font_size': 26, 'opacity': 65, 'locked': False})
+                controls.set_toolbar_visible(False)
+                overlay._apply_translation(0, 'SOURCE TEXT', 'Обновление без панели', '')
+                check('hidden_toolbar_output', controls.isHidden() and overlay.isVisible()
+                      and overlay.translation_label.text() == 'Обновление без панели')
+                controls.set_toolbar_visible(True)
                 controls.stop_button.click()
                 check('stop_session', overlay._closed and not game_mode._game_overlay_refs)
             finally:

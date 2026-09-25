@@ -9,13 +9,39 @@ permissions:
   contents: write
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build_required: ${{ steps.release.outputs.build_required }}
+    steps:
+      - name: Keep an existing prepared release unchanged
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const tag = context.ref.replace('refs/tags/', '');
+            const exists = releases.some(release => release.tag_name === tag);
+            core.setOutput('build_required', String(!exists));
+            if (exists) {
+              core.info('A release already exists for this tag; keeping its prepared assets and description.');
+            }
+
   macos:
+    needs: plan
+    if: needs.plan.outputs.build_required == 'true'
     uses: ./.github/workflows/macos.yml
     secrets:
       MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
       MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
 
   linux:
+    needs: plan
+    if: needs.plan.outputs.build_required == 'true'
     runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
@@ -58,6 +84,13 @@ jobs:
     needs: [linux, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Select the version's download table
+        shell: bash
+        run: |
+          release_body="docs/RELEASE_${GITHUB_REF_NAME#v}.md"
+          test -s "$release_body"
+          echo "RELEASE_BODY=$release_body" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           pattern: '*release'
@@ -68,13 +101,7 @@ jobs:
         with:
           draft: true
           name: Click'n'Translate ${{ github.ref_name }}
-          body: |
-            | Version | Purpose |
-            |---|---|
-            | 1.7.1 | Clearer main-window sections, consistent controls and settings tabs, improved setup guide, Linux startup reliability, and Windows signing preparation. Signature status must be verified on the final artifacts. |
-            | 1.7.0 | Dynamic multi-area translation, mutually exclusive live modes, complete default hotkeys, settings transfer, guided onboarding, safe bug reports, and extensive UI reliability fixes. |
-            | 1.6.1 | Faster engine switching, refined language controls, startup diagnostics, and UI polish. |
-            | 1.6.0 | Reliable updater path handling, cross-platform CI, and complete release metadata. |
+          body_path: ${{ env.RELEASE_BODY }}
           files: |
             release-assets/*.AppImage
             release-assets/*.tar.gz

@@ -1,5 +1,6 @@
 """Native hit targets, translucent tips and explicit static/walking companions."""
 from unittest import mock
+import re
 
 import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -56,7 +57,11 @@ def test_main_composer_has_unified_frame_and_unframed_send_button(window, app):
         assert window.main_composer_divider.isVisible()
         assert 'QFrame#mainTextToolbar { background:transparent; border:0; }' in window.main_text_section.styleSheet()
         assert 'QFrame#mainInputPane, QFrame#mainResultPane { background:transparent; border:0; }' in window.main_composer.styleSheet()
-        assert 'QPushButton:disabled { background:transparent; border:0; }' in window.translate_button.styleSheet()
+        rules = re.findall(r'([^{}]+)\{([^{}]*)\}', window.translate_button.styleSheet())
+        disabled = [body for selectors, body in rules
+                    if any(selector.strip() == 'QPushButton:disabled' for selector in selectors.split(','))]
+        assert disabled
+        assert 'background:transparent' in disabled[-1] and 'border:0' in disabled[-1]
         assert window.main_input_pane.geometry().right() < window.main_result_pane.geometry().left()
 
 

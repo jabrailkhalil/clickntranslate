@@ -81,7 +81,13 @@ def shadow_mode_check(main, app, window):
         assert not rect.isEmpty(), (name, rect)
         menu = window.tray_icon.contextMenu()
         assert menu is window._tray_menu and menu.parent() is window
-        assert len([action for action in menu.actions() if not action.isSeparator()]) == 6
+        actions = [action for action in menu.actions() if not action.isSeparator()]
+        expected = [main.ui_text(window.current_interface_language, key) for key in
+                    ('tray_open', 'tray_copy', 'tray_translate', 'tray_translate_screen', 'tray_game_translate')]
+        expected.extend((window._tray_assistant_action.text(),
+                         main.ui_text(window.current_interface_language, 'tray_exit')))
+        assert [action.text() for action in actions] == expected
+        assert actions[5] is window._tray_assistant_action
         if visible and not minimized:
             assert window.pos() == position, (name, window.pos(), position)
         results.append({'state': name, 'activation_policy': policy, 'window_visible': visible,
@@ -441,6 +447,7 @@ def translation_draft_check(main, app, window, report_path, screenshots):
                     source_lang='en', target_lang='ru')
         dialog.show()
         app.processEvents()
+        selected_engine = dialog.engine_combo.currentData() or dialog.window_engine
         dialog.text_edit.selectAll()
         QTest.keyClicks(dialog.text_edit, 'My new draft')
         provider = mock.Mock(side_effect=reply) if isinstance(reply, Exception) else mock.Mock(return_value=reply)
@@ -452,7 +459,7 @@ def translation_draft_check(main, app, window, report_path, screenshots):
                 QTest.qWait(10)
             assert not dialog._retranslating
         assert provider.call_args.args == ('My new draft', 'en', 'ru')
-        assert provider.call_args.kwargs['engine'] == window.config['translator_engine']
+        assert provider.call_args.kwargs['engine'] == selected_engine
         assert dialog.source_edit.toPlainText() == 'My new draft'
         assert dialog.text_edit.toPlainText() == (reply if name == 'success' else 'My new draft')
         filename = f'{report_path.stem}-draft-{name}.png'
@@ -622,17 +629,23 @@ def compact_translation_views_check(main, app, window, report_path, screenshots)
             dialog_size = dialog.size()
             dialog.source_toggle.click()
             QTest.qWait(50)
-            assert dialog.size() == dialog_size and not dialog.source_panel.isVisible()
+            assert not dialog.source_panel.isVisible()
+            assert (dialog.width() < dialog_size.width()
+                    or dialog.height() < dialog_size.height()), (dialog.size(), dialog_size)
             assert dialog.result_panel.isVisible()
             assert dialog.source_edit.toPlainText() == source
             capture('workspace-collapsed', dialog)
             dialog.source_toggle.click()
+            QTest.qWait(50)
             assert dialog.source_panel.isVisible()
+            assert dialog.size() == dialog_size, (dialog.size(), dialog_size)
             dialog.close()
             dialog = None
             assert window.text_input.toPlainText() == source
             records.append({'theme': theme, 'main_size': [size.width(), size.height()],
-                            'inline_scrollable': True, 'source_preserved': True, 'collapse_restores_input': True})
+                            'inline_scrollable': True, 'source_preserved': True,
+                            'collapse_shrinks_window': True, 'expand_restores_size': True,
+                            'collapse_restores_input': True})
         return {'themes': records, 'provider_calls': False, 'scope': 'native presentation of a supplied result'}
     finally:
         if dialog is not None:
@@ -674,7 +687,11 @@ def run(main, report_path):
             assert window.isVisible() and window.text_input.width() > 0
             initial_frame = window.frameGeometry()
             initial_bounds = window.screen().availableGeometry()
-            assert initial_frame.center() == initial_bounds.center(), (initial_frame, initial_bounds)
+            center_delta = initial_frame.center() - initial_bounds.center()
+            # Native frame/layout rounding differs slightly between source
+            # Python and the frozen Retina app. Record the actual offset.
+            assert max(abs(center_delta.x()), abs(center_delta.y())) <= 4, (initial_frame, initial_bounds)
+            assert initial_bounds.contains(initial_frame), (initial_frame, initial_bounds)
             screenshots = []
             for theme in ('dark', 'light'):
                 expected_theme = 'Темная' if theme == 'dark' else 'Светлая'
@@ -730,6 +747,7 @@ def run(main, report_path):
             report_path.write_text(json.dumps({
                 "macos": platform.mac_ver()[0], "architecture": platform.machine(),
                 "python": platform.python_version(), "qt": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR,
+                "initial_center_offset": [center_delta.x(), center_delta.y()],
                 "screenshots": screenshots,
                 "gui": "ok", "settings": "ok", "theme": "ok", "hotkey_registration": "ok",
                 "hotkey_conflict_and_reregister": "ok",

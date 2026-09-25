@@ -9,6 +9,7 @@ from PyQt5 import QtCore, QtWidgets
 import ocr
 import translater
 from qt_layout_test_support import ensure_layout_fonts
+from PyQt5.QtTest import QTest
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -16,6 +17,24 @@ def application():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     ensure_layout_fonts(app)
     yield app
+
+
+def test_right_click_closes_fullscreen_translation_and_releases_mode(application, monkeypatch):
+    import mode_coordinator
+    release = mock.Mock()
+    monkeypatch.setattr(mode_coordinator, 'release_mode', release)
+    monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: {
+        'interface_language': 'ru', 'translator_engine': 'Google',
+        'fullscreen_translate_from': 'en', 'fullscreen_translate_to': 'ru'})
+    monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **kw: ['en', 'ru'])
+    monkeypatch.setattr(ocr.FullScreenTranslateOverlay, '_restart_translation_from_controls', lambda self: None)
+    overlay = ocr.FullScreenTranslateOverlay()
+    overlay.show()
+    application.processEvents()
+    QTest.mouseClick(overlay, QtCore.Qt.RightButton, pos=overlay.rect().center())
+    assert not overlay.isVisible()
+    release.assert_called_once_with('fullscreen')
+    assert ocr._fullscreen_overlay_ref is None
 
 
 @pytest.mark.parametrize('scale_x,scale_y', [(1, 1), (1.25, 1.25), (1.5, 1.5), (2, 2), (2, 1.5)])

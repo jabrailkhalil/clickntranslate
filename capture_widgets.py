@@ -20,7 +20,7 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
     def sizeHint(self, option, index):
         metrics = QtGui.QFontMetrics(self.combo.font())
         s = self.combo.ui_factor
-        return QtCore.QSize(max(round(196*s), metrics.horizontalAdvance(self.label(index)) + round(82*s)), round(40*s))
+        return QtCore.QSize(max(round(196*s), metrics.horizontalAdvance(self.label(index)) + round(70*s)), round(34*s))
 
     def paint(self, painter, option, index):
         s = self.combo.ui_factor
@@ -37,12 +37,12 @@ class _LanguageRow(QtWidgets.QStyledItemDelegate):
             painter.drawRoundedRect(rect, 6, 6)
         icon = index.data(QtCore.Qt.DecorationRole)
         if isinstance(icon, QtGui.QIcon):
-            icon.paint(painter, QtCore.QRect(round(rect.left() + 7*s), round(rect.center().y() - 14*s), round(28*s), round(28*s)))
+            icon.paint(painter, QtCore.QRect(round(rect.left() + 9*s), round(rect.center().y() - 10*s), round(20*s), round(20*s)))
         font = self.combo.font()
         font.setWeight(QtGui.QFont.DemiBold if chosen else QtGui.QFont.Normal)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(palette['text'] if enabled else palette['muted']))
-        label_rect = rect.adjusted(44*s, 0, -26*s, 0)
+        label_rect = rect.adjusted(38*s, 0, -26*s, 0)
         label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, int(label_rect.width()))
         painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
         if chosen and enabled:
@@ -104,8 +104,8 @@ class CaptureLanguageCombo(DropDownCombo):
         font = QtWidgets.QApplication.font()
         font.setPixelSize(max(12, round(14 * factor)))
         self.setFont(font)
-        self.setIconSize(QtCore.QSize(28, 28) * factor)
-        self.setFixedSize(QtCore.QSize(112, 44) * factor)
+        self.setIconSize(QtCore.QSize(20, 20) * factor)
+        self.setFixedSize(QtCore.QSize(108, 36) * factor)
         palette = self.palette()
         for role in (QtGui.QPalette.Text, QtGui.QPalette.WindowText, QtGui.QPalette.ButtonText):
             palette.setColor(role, QtGui.QColor(c['text']))
@@ -120,6 +120,34 @@ class CaptureLanguageCombo(DropDownCombo):
             QComboBox::down-arrow {{ image:none; }}
         """, factor))
         self._paint_popup_frame()
+
+    def paintEvent(self, event):
+        # Keep flag, label and chevron aligned across native styles and DPI.
+        s, c = self.ui_factor, self.colors
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        active = self.underMouse() or self.view().isVisible()
+        painter.setPen(QtGui.QPen(QtGui.QColor(c['accent'] if active else c['border']), 1))
+        painter.setBrush(QtGui.QColor(c['hover'] if active else c['surface']))
+        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 6*s, 6*s)
+        if not self.isEnabled():
+            painter.setOpacity(.5)
+        self.itemIcon(self.currentIndex()).paint(painter, QtCore.QRect(
+            round(10*s), round((self.height()-20*s)/2), round(20*s), round(20*s)))
+        font = self.font()
+        font.setWeight(QtGui.QFont.Medium)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(c['text']))
+        label = language_short_label(self.currentData()) if self.currentData() else self.currentText()
+        label_rect = QtCore.QRectF(38*s, 0, self.width()-62*s, self.height())
+        painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
+        painter.setPen(QtGui.QPen(QtGui.QColor(c['muted']), 1.5*s,
+                                QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        x, y = self.width()-15*s, self.height()/2
+        path = QtGui.QPainterPath(QtCore.QPointF(x-3*s, y-1.5*s))
+        path.lineTo(x, y+1.5*s)
+        path.lineTo(x+3*s, y-1.5*s)
+        painter.drawPath(path)
 
     def _paint_popup_frame(self):
         if not getattr(self, 'colors', None):
@@ -138,11 +166,6 @@ class CaptureLanguageCombo(DropDownCombo):
         """)
         set_widget_stylesheet(view, f"""
             QAbstractItemView {{ background:transparent; color:{c['text']}; border:0; outline:none; }}
-            QScrollBar:vertical {{ background:transparent; width:6px; margin:7px 0; border:0; }}
-            QScrollBar::handle:vertical {{ background:{c['border']}; border-radius:3px; min-height:28px; }}
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{c['accent']}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; border:0; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
         """)
         view.viewport().setAutoFillBackground(False)
 

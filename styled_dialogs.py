@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from button_styles import standard_buttons
+from scrollbar_styles import scrollbar_stylesheet, install_scrollbar_theme
 from ui_scaling import native_window_parent, interface_scale_factor
 
 import ctypes
@@ -425,9 +426,12 @@ def install_tooltip_style(app=None, dark=None) -> None:
     # The application rule stays constant. Replacing the entire application
     # stylesheet on every theme switch also repolishes rich-text documents and
     # can accidentally turn their already scaled font into a new baseline.
-    style = re.sub(r'QToolTip\s*\{[^}]*\}', '', existing).rstrip() + '\n' + tooltip_stylesheet(use_palette=True)
+    base = re.sub(r'/\* clickntranslate-scrollbars \*/.*?/\* end-clickntranslate-scrollbars \*/', '', existing, flags=re.S)
+    base = re.sub(r'QToolTip\s*\{[^}]*\}', '', base).rstrip()
+    style = base + '\n' + tooltip_stylesheet(use_palette=True) + scrollbar_stylesheet()
     if style != existing:
         app.setStyleSheet(style)
+    install_scrollbar_theme(app, _uses_dark_theme)
     palette = QtWidgets.QToolTip.palette()
     palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor('#303030' if dark else '#f7f7f7'))
     palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor('#f2f2f2' if dark else '#252525'))
@@ -691,6 +695,16 @@ def set_widget_stylesheet(widget, stylesheet):
         widget.setStyleSheet(stylesheet)
 
 
+def retain_control_style(widget, style):
+    """Destroy a proxy style only after all of its widgets finish teardown."""
+    # QProxyStyle forwards events to its base style; sending DeferredDelete to
+    # the proxy itself can leave the proxy alive with a deleted base. Queue
+    # deletion of a plain QObject owner instead, which deletes the whole tree.
+    lifetime = QtCore.QObject(QtWidgets.QApplication.instance())
+    style.setParent(lifetime)
+    widget.destroyed.connect(lifetime.deleteLater)
+
+
 def install_accent_controls(widget, dark: bool = True) -> None:
     """Use the accent-painted controls for `widget` and everything inside it."""
     if widget is None:
@@ -699,9 +713,10 @@ def install_accent_controls(widget, dark: bool = True) -> None:
         style = getattr(widget, '_accent_control_style', None)
         if style is None or sip.isdeleted(style):
             style = AccentControlStyle(dark)
-            # setStyle() does not take ownership. Keep one proxy for the
-            # lifetime of this widget instead of allocating one per theme.
-            style.setParent(widget)
+            # Children can still paint/clear focus while their owner is being
+            # destroyed. Keep the shared proxy alive until teardown finishes,
+            # then release it on the next event-loop pass.
+            retain_control_style(widget, style)
             widget._accent_control_style = style
         style.dark = bool(dark)
         # Drop-down popups are separate top-level widgets, so the check boxes on

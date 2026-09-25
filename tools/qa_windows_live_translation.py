@@ -16,7 +16,7 @@ if sys.platform != 'win32':
     raise SystemExit('Windows OCR with its English pack is required.')
 sys.path.insert(0, str(root))
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-sys.argv[0] = str(root / 'main.py')
+sys.argv[0] = str(root / '.tmp/windows-live-data/main.py')
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QSignalSpy, QTest
 import ocr

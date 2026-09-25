@@ -463,6 +463,9 @@ def style_capture_controls(overlay, config, controls):
     from capture_widgets import CaptureLanguageCombo
     from ui_scaling import desktop_control_scale
     controls = [widget for widget in controls if widget is not None]
+    app = QtWidgets.QApplication.instance()
+    if app is not None and 'button_tooltips_enabled' in config:
+        app.setProperty('buttonTooltipsEnabled', bool(config['button_tooltips_enabled']))
     dark = config.get('theme', 'Темная') != 'Светлая'
     for widget in controls:
         if widget.property('capture_base_size') is None:
@@ -498,7 +501,7 @@ def style_capture_controls(overlay, config, controls):
             style = button_qss(dark, 'secondary',
                                selector='QToolButton' if isinstance(widget, QtWidgets.QToolButton) else 'QPushButton',
                                icon=isinstance(widget, QtWidgets.QToolButton), compact=True)
-            widget.setFixedSize(round(max(36, widget.property('capture_base_size').width()) * factor), round(44 * factor))
+            widget.setFixedSize(round(max(36, widget.property('capture_base_size').width()) * factor), round(36 * factor))
             widget.setIconSize(widget.property('capture_base_icon') * factor)
         widget.setStyleSheet(scaled_stylesheet(style, factor))
         palette = widget.palette()

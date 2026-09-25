@@ -128,6 +128,17 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         finally:
             self.app.setProperty("buttonTooltipsEnabled", app_value)
 
+    def test_dynamic_settings_remember_output_mode_and_toggle_running_toolbar(self):
+        import game_mode
+        toolbar = mock.Mock()
+        overlay = mock.Mock(controls=toolbar)
+        with mock.patch.object(game_mode, '_game_overlay_refs', [overlay]):
+            self.settings.game_manual_output_checkbox.click()
+            self.assertTrue(self.parent.config['game_manual_output'])
+            self.settings.game_toolbar_checkbox.click()
+            self.assertFalse(self.parent.config['game_show_toolbar'])
+            toolbar.set_toolbar_visible.assert_called_once_with(False)
+
     def test_hotkeys_are_seven_aligned_rows_inside_one_card(self):
         self.settings.show_hotkeys_screen()
         self.app.processEvents()

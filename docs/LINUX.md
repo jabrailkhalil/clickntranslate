@@ -1,6 +1,11 @@
 # Click'n'Translate on Linux
 
-Latest source audit: [19 September 2026](QA_LINUX_2026_09_19.md) (Russian).
+Version **1.8.0** includes x86_64 AppImage and tar.gz packages, built and tested
+on Ubuntu 22.04.5 with native UI, OCR and offline translation checks. Separate
+OpenPGP signatures by `jabrailkhalil` and SHA-256 checksums accompany the downloads.
+See the [current QA report](QA_1.8.0_2026-09-25.md).
+
+Earlier source audit: [19 September 2026](QA_LINUX_2026_09_19.md) (Russian).
 It covers real X11 and two-output Wayland capture, mixed scaling, desktop
 launchers, autostart, clipboard, OCR and Argos package lifecycle. It also records
 the current Lingva service failure and the remaining desktop/build limitations.

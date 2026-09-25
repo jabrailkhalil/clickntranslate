@@ -1,121 +1,42 @@
-<div align="center">
-
 # Click'n'Translate
 
-### Windows 上最好的屏幕翻译和 OCR 应用。
-
-[**下载 Windows 版**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) · [便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip) · [最新版本](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
-
-![最新版本](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat-square&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=flat-square)
+适用于 **Windows、Linux 和 macOS** 的免费开源屏幕 OCR 与翻译工具。从应用、图片和游戏中提取文字，翻译选中文本，或持续翻译一个或多个屏幕区域。
 
 [English](../../README.md) · [Русский](README.ru.md) · **简体中文** · [Español](README.es.md) · [Français](README.fr.md)
 
-</div>
+## 下载 1.8.0
 
-![Click'n'Translate 的三种使用方式](../images/how-it-works.png)
-
-Click'n'Translate 是同类产品中最好的全能屏幕翻译应用。它可将 Windows 屏幕上的任何内容转换为可复制或可翻译的文字。选择一个区域，按下全局快捷键，然后继续工作——无需打开浏览器、手动输入或频繁切换窗口。
-
-## 实际演示
-
-![Click'n'Translate 将游戏文字翻译成中文和法语](../images/translation-demo-v2.gif)
-
-## 1.7.0 版本新增功能
-
-- **多区域动态翻译。** 选择一个或多个屏幕区域，文字变化时，覆盖在区域上的译文会自动更新。
-- **七个开箱即用的快捷键。** 所有主要操作首次启动即可使用，每个组合都可以修改或清除。
-- **同一时间只运行一种模式。** 启动新的交互模式会关闭旧模式；再次按下当前快捷键即可停止该模式。
-- **设置导入与导出。** 可将偏好和快捷键迁移到另一台电脑，不会包含历史记录、缓存或私人文字。
-- **安全的错误报告。** 可为 GitHub 或 Telegram 创建诊断包，其中不含剪贴板、文档、历史记录或凭据。
-- **更可靠的界面。** 修复了边框、主题、布局、通知、入门指南和文档翻译窗口。
-
-Click'n'Translate 已突破 **1,000 次下载**，并将始终保持免费和开源。
-
-## 为什么 Click'n'Translate 是最佳选择？
-
-- **翻译屏幕上看到的内容。** 捕获指定区域或整个屏幕，并立即进行翻译。
-- **复制无法选中的文字。** 从图片、视频、游戏、远程桌面和受保护的界面中提取文字。
-- **在线与离线自由选择。** 使用快速在线服务，或通过 Argos 和 Hy-MT 在本机处理文字。
-- **灵活选择 OCR 引擎。** 在同一个软件包管理器中使用 Windows OCR、Tesseract、RapidOCR 和 EasyOCR。
-- **在任何应用中使用。** 七个可自定义的全局快捷键随时可用。
-- **掌控自己的数据。** 翻译和复制历史记录可选启用，并保存在本机。
-
-## 七个快捷操作
-
-| 默认快捷键 | 操作 |
-| --- | --- |
-| `Ctrl + Alt + C` | 识别选定区域中的文字并复制 |
-| `Ctrl + Alt + T` | 捕获区域、识别文字并翻译 |
-| `Ctrl + Alt + F` | 翻译整个屏幕 |
-| `Ctrl + Alt + Q` | 翻译当前应用中选中的文字 |
-| `Ctrl + Shift + Q` | 用译文替换选中的文字 |
-| `Ctrl + Shift + Space` | 显示或隐藏 Click'n'Translate |
-| `Ctrl + Alt + G` | 启动或停止所选区域的动态翻译 |
-
-所有快捷键均可在 **设置 → 配置快捷键** 中修改或清除。OCR、选中文字、替换、全屏和动态翻译会分别记住所选语言对。
-
-## 翻译与 OCR 引擎
-
-| 类型 | 引擎 | 适用场景 |
+| 系统 | 下载 | 用途 |
 | --- | --- | --- |
-| 在线翻译 | Google、MyMemory、Lingva、LibreTranslate | 无需下载模型的快速翻译 |
-| 离线翻译 | Argos Translate、Hy-MT | 安装所选软件包后的本地私密翻译 |
-| OCR | Windows OCR、Tesseract、RapidOCR、EasyOCR | 识别不同文字系统和图像样式 |
+| Windows x64 | [安装程序 (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | 在 Windows 10/11 x64 上正常安装。 |
+| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | 无需安装；请完整解压后运行。 |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | Linux x86_64 单文件应用；启动前请赋予执行权限。 |
+| Linux x86_64 | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.tar.gz) | Linux x86_64 应用文件夹；解压后运行。 |
+| macOS arm64 | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | 适用于 Apple Silicon（M1 及更新芯片），要求 macOS 13.4 或更新版本。 |
+| macOS arm64 | [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | 同一 Apple Silicon 应用的 ZIP 压缩包。 |
 
-Click'n'Translate 提供 16 种可选的 OCR 与翻译语言，界面支持英语、俄语、西班牙语、德语、法语和中文。软件包管理器只会下载您选择的 OCR 语言和离线翻译方向。
+[全部下载、SHA-256 校验和及签名文件](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
 
-在同类 Windows 应用中，没有其他工具能像 Click'n'Translate 一样，将多种 OCR、在线与离线翻译、全局快捷键和完善的软件包管理如此出色地整合在一起。
+Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书**。Windows 可能显示 SmartScreen 警告；Mac 版本尚无 Apple Developer ID 签名或公证，Gatekeeper 可能阻止首次启动。Linux 下载提供独立的 OpenPGP 签名。本次发行不包含 Intel Mac 版本。
 
-> **隐私说明：**本地 OCR 和离线翻译引擎在您的电脑上处理文字。在线翻译服务会接收您主动提交翻译的文字。
+## 功能
 
-## 快速开始
+- 屏幕 OCR、选中文本翻译、全屏叠加和多区域动态翻译。
+- 在线翻译与本地 OCR；下载语言模型后可使用离线翻译。
+- 文档翻译、可配置快捷键和桌面助手。
+- 明暗主题、六种界面语言，以及每种模式独立的窗口偏好设置。
+- **1.8.0：**统一欢迎界面、改进语言菜单和动态叠加、macOS 权限引导，以及全应用细滚动条。
 
-1. 下载并运行 **[Windows 安装程序](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe)**。
-2. 启动 Click'n'Translate，选择界面语言、OCR 语言和翻译语言。
-3. 按下 `Ctrl + Alt + T`，选择一个区域，即可获得翻译。
-4. 如需离线翻译或其他 OCR 引擎，请打开 **设置 → 语言包**，只安装需要的组件。
+## 开始使用
 
-无需安装 Python，也无需注册账户。支持 64 位 Windows 10 和 Windows 11。在线翻译和下载可选软件包需要网络连接；已安装的离线引擎无需联网即可工作。
+1. 下载适合您系统的文件并打开应用。发行包已包含 Python 运行环境。
+2. 在设置中选择 OCR 引擎、翻译服务及语言。离线翻译需先下载语言模型。
+3. 选择捕获或翻译操作。在 Mac 上按照提示授予**屏幕录制**和**辅助功能**权限。Linux 桌面快捷键设置请参阅 [Linux 指南](../../docs/LINUX.md)。
 
-### 便携版
+OCR 在本地运行。在线翻译会将文本发送给您选择的服务；如需本地翻译，请使用离线引擎。参阅[隐私说明](../../PRIVACY.md)。
 
-下载[便携版 ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip)，将其解压到固定文件夹，然后运行 `ClicknTranslate.exe`。请在启用开机启动或创建快捷方式之前确定最终存放位置。
+## 帮助与开发
 
-### 从旧版本升级
+[Linux 指南](../../docs/LINUX.md) · [macOS 指南与构建](../../docs/MACOS.md) · [反馈问题](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0 许可证](../../LICENSE)
 
-1.5.0 之前版本的更新程序无法可靠地安装当前版本。如果从 1.4.x 升级，请关闭旧应用并手动安装一次 1.7.0。1.5.0 及更高版本的用户可以直接在应用内更新到 1.7.0。
-
-## 日常使用的最佳选择
-
-- 深色与浅色主题
-- 系统托盘和可选的 Windows 开机启动
-- 可自定义全局快捷键
-- 多个所选区域的动态翻译
-- 设置导入与导出
-- 创建安全的诊断错误报告
-- 本地复制与翻译历史记录
-- 下载进度和软件包卸载控制
-- 独立 OCR 与 Argos 工作进程，提高稳定性
-- 更新时保留用户数据
-
-## 从源代码运行
-
-```powershell
-git clone https://github.com/jabrailkhalil/clickntranslate.git
-cd clickntranslate
-pip install -r requirements.txt
-python main.py
-
-# 构建文件夹形式的 Windows 发行版
-python -m PyInstaller ClicknTranslate.spec --clean --noconfirm
-```
-
-正式版使用文件夹形式的 PyInstaller 构建，以获得更快的启动速度。可选 OCR 运行库和语言模型单独安装，避免让每次下载都达到数 GB。
-
-## 支持与反馈
-
-- 在应用中打开 **帮助 → 错误报告**，创建诊断包并附加到消息中。报告不包含私人文字、历史记录、文档内容或凭据。
-- [报告问题或提出功能建议](https://github.com/jabrailkhalil/clickntranslate/issues)
-- Telegram：[@jabrail_digital](https://t.me/jabrail_digital)
-
-如果这款最好的 Windows 屏幕翻译工具为您节省了时间，欢迎为仓库点亮 Star，帮助更多人发现它。
+Click’n’Translate 完全免费。如果对您有帮助，欢迎[在 GitHub 上为项目加星](https://github.com/jabrailkhalil/clickntranslate)，并[加入 Telegram](https://t.me/jabrail_digital)。

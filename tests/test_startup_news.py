@@ -1,8 +1,9 @@
 import os
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 import main
 
@@ -14,6 +15,19 @@ def _app():
     global _APP
     _APP = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     return _APP
+
+
+@pytest.fixture(autouse=True)
+def cleanup_news_windows():
+    yield
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        for window in app.topLevelWidgets():
+            if isinstance(window, _NewsOwner):
+                window.close()
+                window.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()
 
 
 class _NewsOwner(QtWidgets.QWidget):
@@ -81,8 +95,11 @@ def test_startup_news_is_shown_once_per_announcement_and_remembered():
     dialog = owner._startup_news_dialog
     assert dialog is not None
     assert dialog.isVisible()
-    assert main.APP_VERSION in dialog.windowTitle()
-    assert main.startup_news_text("ru")["intro"] in dialog.text()
+    assert isinstance(dialog, main.WelcomeDialog)
+    assert dialog.windowTitle() == main.welcome_text('ru')['window']
+    assert dialog.findChild(QtWidgets.QLabel, 'welcomeBody').text() == main.welcome_text('ru')['body']
+    assert not dialog.telegram_btn.icon().isNull()
+    assert not dialog.github_btn.icon().isNull()
 
     dialog.accept()
     app.processEvents()
@@ -127,9 +144,46 @@ def test_dialog_uses_the_current_application_interface_language():
         owner._maybe_show_startup_news()
         app.processEvents()
         dialog = owner._startup_news_dialog
-        text = main.startup_news_text(language)
-        assert text["title"] in dialog.text()
-        assert dialog.windowTitle() == text["window"].format(version=main.APP_VERSION)
+        text = main.welcome_text(language)
+        assert dialog.findChild(QtWidgets.QLabel, 'welcomeTitle').text() == text['title']
+        assert dialog.windowTitle() == text['window']
         dialog.reject()
         app.processEvents()
         owner.close()
+
+
+def test_announcement_preserves_hidden_welcome_and_can_start_setup(monkeypatch):
+    app = _app()
+    owner = _NewsOwner()
+    owner.config.update(show_update_info=False, first_run_guide_completed=True,
+                        first_run_guide_pending=False)
+    owner._maybe_show_startup_news()
+    app.processEvents()
+    dialog = owner._startup_news_dialog
+    assert dialog.checkbox.isChecked()
+    urls = []
+    monkeypatch.setattr(main.webbrowser, 'open', urls.append)
+    dialog.github_btn.click()
+    assert urls == ['https://github.com/jabrailkhalil/clickntranslate']
+    dialog.guide_btn.click()
+    app.processEvents()
+    assert owner.config['show_update_info'] is False
+    assert owner.config['first_run_guide_completed'] is False
+    assert owner.config['first_run_guide_pending'] is True
+    assert owner._startup_news_dialog is None
+    owner.close()
+
+
+def test_skipping_announcement_keeps_completed_setup():
+    app = _app()
+    owner = _NewsOwner()
+    owner.config.update(show_update_info=False, first_run_guide_completed=True,
+                        first_run_guide_pending=False)
+    owner._maybe_show_startup_news()
+    app.processEvents()
+    owner._startup_news_dialog.skip_btn.click()
+    app.processEvents()
+    assert owner.config['show_update_info'] is False
+    assert owner.config['first_run_guide_completed'] is True
+    assert owner.config['first_run_guide_pending'] is False
+    owner.close()

@@ -281,12 +281,13 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
         settings.settings_page_tabs[2].click()
         self.settle()
         self.assertEqual(settings._settings_page_index, 2)
-        self.assertTrue(settings.game_workflow_note.isVisible())
+        self.assertTrue(settings.game_help_button.isVisible())
+        self.assertTrue(settings.game_manual_output_checkbox.isVisible())
+        self.assertTrue(settings.game_toolbar_checkbox.isVisible())
         self.assertTrue(settings.game_launch_button.isVisible())
-        self.assertLess(
-            self.rect_in(settings, settings.game_workflow_note).bottom(),
-            self.rect_in(settings, settings.game_language_controls).top(),
-        )
+        with mock.patch.object(self.window, 'show_dynamic_translation_help') as help_dialog:
+            settings.game_help_button.click()
+        help_dialog.assert_called_once_with()
         with mock.patch.object(self.window, 'launch_game_translate') as launch:
             settings.game_launch_button.click()
         launch.assert_called_once_with()

@@ -20,9 +20,12 @@ def _install_keyboard_focus_tracking():
     class ButtonFocusFilter(QObject):
         def eventFilter(self, widget, event):
             kind = event.type()
-            if kind == QEvent.ToolTip:
-                if (app.property("buttonTooltipsEnabled") is False
-                        and isinstance(widget, QAbstractButton)):
+            if (kind == QEvent.DynamicPropertyChange and widget is app
+                    and event.propertyName() == b'buttonTooltipsEnabled'
+                    and app.property("buttonTooltipsEnabled") is False):
+                QToolTip.hideText()
+            if kind in (QEvent.ToolTip, QEvent.GraphicsSceneHelp):
+                if app.property("buttonTooltipsEnabled") is False:
                     QToolTip.hideText()
                     event.accept()
                     return True

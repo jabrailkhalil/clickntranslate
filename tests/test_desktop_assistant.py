@@ -1,4 +1,5 @@
 import os
+import sys
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from unittest import mock
@@ -62,6 +63,14 @@ def test_movie_and_capture_lifecycle_do_not_leave_the_companion_in_ocr(companion
     mode_coordinator.release_mode('game')
     assert companion.anchor.isVisible()
     assert companion.anchor.movie.state() == QtGui.QMovie.Running
+
+
+def test_macos_companion_opts_out_of_native_shadow_and_deactivation_hiding(companion):
+    if sys.platform == 'darwin':
+        assert companion.anchor.windowFlags() & QtCore.Qt.NoDropShadowWindowHint
+        assert companion.anchor.testAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow)
+    assert companion.anchor.testAttribute(QtCore.Qt.WA_TranslucentBackground)
+    assert companion.anchor.testAttribute(QtCore.Qt.WA_ShowWithoutActivating)
 
 
 @pytest.mark.parametrize('action', tuple(ACTION_METHODS) + ('text', 'settings'))
@@ -217,9 +226,13 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
         assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()
         assert 'background:' in menu.buttons['text'].styleSheet()
-        if app.platformName() != 'cocoa':
+        if sys.platform != 'darwin':
             assert not menu.mask().contains(QtCore.QPoint(0, 0))
             assert menu.mask().contains(menu.rect().center())
+        else:
+            image = menu.grab().toImage()
+            assert image.pixelColor(0, 0).alpha() < 20
+            assert image.pixelColor(image.width()//2, image.height()//2).alpha() > 240
         requested = []
         menu.action_requested.connect(requested.append)
         menu.buttons['screen'].click()

@@ -103,6 +103,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+        from styled_dialogs import install_tooltip_style
+        install_tooltip_style(cls.app)
 
     def setUp(self):
         self.parent = _AppParent()
@@ -214,7 +216,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertIn("PP-OCR detector", packages)
         self.assertIn("Chinese + English", packages)
         self.assertTrue(self.dialog.rapidocr_table.isColumnHidden(0))
-        self.assertIn("QScrollBar::handle:vertical", self.dialog.styleSheet())
+        self.assertIn("QScrollBar::handle:vertical", self.app.styleSheet())
 
     def test_constructor_does_not_run_native_engine_probes_on_the_ui_thread(self):
         self.assertEqual(self.owner.easyocr_status_checks, 0)
@@ -487,10 +489,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
                                  "#7a5fa1" if button.property("buttonRole") == "primary" else "#211d28")
         self.assertIn("QPushButton#languagePackageAction", self.dialog.styleSheet())
         for table in self._package_tables():
-            scrollbar_style = table.verticalScrollBar().styleSheet()
-            self.assertIn("QScrollBar::handle:vertical", scrollbar_style)
-            self.assertIn("height: 0px", scrollbar_style)
-            self.assertEqual(table.verticalScrollBar().width(), 10)
+            # A shared application rule also covers hidden package tabs.
+            self.assertFalse(table.verticalScrollBar().styleSheet())
+            self.assertEqual(table.verticalScrollBar().sizeHint().width(), 6)
+            self.assertEqual(table.horizontalScrollBar().sizeHint().height(), 6)
 
     def test_windows_capability_catalog_parses_supported_and_installed_states(self):
         completed = SimpleNamespace(

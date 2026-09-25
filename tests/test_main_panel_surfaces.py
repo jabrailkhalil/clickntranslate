@@ -6,6 +6,28 @@ from test_desktop_ux import app, window
 
 
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
+def test_send_arrow_has_no_tile_when_hovered_pressed_or_focused(window, app, theme):
+    from PyQt5.QtCore import Qt
+    window.current_theme = theme
+    window.apply_theme()
+    button = window.translate_button
+    surface = '#121116' if theme == 'Темная' else '#f8f5fb'
+    for hovered, pressed, focused in ((False, False, False), (True, False, False), (True, True, False), (False, False, True)):
+        button.setEnabled(True)
+        button.setAttribute(Qt.WA_UnderMouse, hovered)
+        button.setDown(pressed)
+        button.setProperty('keyboardFocus', focused)
+        button.setFocus(Qt.TabFocusReason if focused else Qt.MouseFocusReason)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        app.processEvents()
+        image = window.ui_root.grab().toImage()
+        ratio = image.devicePixelRatio()
+        point = button.mapTo(window.ui_root, QPoint(4, 4))
+        assert image.pixelColor(round(point.x()*ratio), round(point.y()*ratio)).name() == surface
+
+
+@pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 @pytest.mark.parametrize('percent', [100, 150, 200])
 def test_text_panel_matches_shortcut_surfaces_without_inner_card_edges(window, app, theme, percent):
     window.current_theme = theme

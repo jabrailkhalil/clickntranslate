@@ -423,7 +423,11 @@ class DropDownCombo(QComboBox):
         # honours the row limit and uses the styled scrollbar.
         self._drop_down_style = (_DropDownProxyStyle(QtWidgets.QStyleFactory.create('Fusion'))
                                  if sys.platform == 'darwin' else _DropDownProxyStyle())
-        self._drop_down_style.setParent(self)
+        # Popup children still use this style while QWidget tears down focus.
+        # Parenting the style to the combo deletes it before those children on
+        # X11, causing QStyleSheetStyle::event to call a freed base style.
+        from styled_dialogs import retain_control_style
+        retain_control_style(self, self._drop_down_style)
         self.setStyle(self._drop_down_style)
         self._laying_out_popup = False
         self._popup_model = None
@@ -451,9 +455,6 @@ class DropDownCombo(QComboBox):
         dark = QtGui.QColor(background).lightness() < 128
         text = "#f4f6fb" if dark else "#202124"
         hover = "#33313b" if dark else "#ddd6e4"
-        track = "#17161c" if dark else "#e3dde7"
-        handle = "#7A5FA1" if dark else "#9b87b6"
-        handle_hover = "#9A7FC1" if dark else "#7A5FA1"
         border = "#786989" if dark else "#897397"
         # Disabled section labels store their own ForegroundRole. A stylesheet
         # change alone leaves that brush in the previous theme (black on black
@@ -478,7 +479,7 @@ class DropDownCombo(QComboBox):
         popup.setAutoFillBackground(True)
         # The list is a top-level popup on Linux, so a parent selector such as
         # ``QComboBox QAbstractItemView`` does not reliably reach it.  Style the
-        # view and its scrollbar directly: otherwise the proxy popup falls back
+        # view directly: otherwise the proxy popup falls back
         # to the desktop's blue selection and native scrollbar.
         set_widget_stylesheet(view, f"""
             QAbstractItemView {{
@@ -504,28 +505,6 @@ class DropDownCombo(QComboBox):
             QAbstractItemView::item:selected {{
                 background-color: #7A5FA1;
                 color: #ffffff;
-            }}
-            QScrollBar:vertical {{
-                background: {track};
-                width: 10px;
-                margin: 3px 2px;
-                border: none;
-                border-radius: 5px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {handle};
-                min-height: 32px;
-                border: none;
-                border-radius: 4px;
-            }}
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background: {handle_hover}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0;
-                border: none;
-                background: transparent;
-            }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
-                background: transparent;
             }}
         """)
 
@@ -1032,6 +1011,11 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.set_dark(dark)
 
+    def _label_area(self):
+        # QSS already pads these compact tabs. Keep one additional pixel per
+        # side so fractional Cocoa glyph widths fit without reducing legibility.
+        return super()._label_area().adjusted(-1, 0, 1, 0)
+
     def set_dark(self, dark):
         self._dark = bool(dark)
         text = "#9b92a6" if dark else "#766d80"
@@ -1039,7 +1023,7 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{text};
                 border:1px solid transparent; border-radius:0;
-                padding:0 6px; font-size:13px; font-weight:500; }}
+                padding:0 3px; font-size:13px; font-weight:500; }}
             QPushButton:hover, QPushButton:checked, QPushButton:focus {{ color:{active}; }}
         """)
 
@@ -1744,7 +1728,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR and updates",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
-        "game_intro": 'Select text on screen. Translation appears nearby and updates automatically. One toolbar controls all areas.',
+        "game_intro": 'Select text on screen. Translation overlays it and updates automatically. Enable separate output to choose another area.',
         "game_launch": 'Select text on screen',
         "game_languages": "Languages:",
         "game_swap_languages": "Swap dynamic translation languages",
@@ -1753,7 +1737,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pause when the target app is inactive",
         "game_pause_inactive_tooltip": "Pauses OCR when the window active at mode start is minimized or no longer in the foreground. Translation resumes automatically when you return.",
         "game_show_original": "Show recognized text with the translation",
-        "game_workflow_note": 'Select text on screen. Translation appears nearby and updates automatically. One toolbar controls all areas.',
+        "game_workflow_note": 'Select text on screen. Translation overlays it and updates automatically. Enable separate output to choose another area.',
         "translation_mode": "Text translation mode: {mode}",
         "hotkeys": "Configure hotkeys",
         "save_and_back": "Save and return",
@@ -1861,7 +1845,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR и обновления",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
-        "game_intro": 'Выделите текст на экране. Перевод появится рядом и будет обновляться сам. Одна панель управляет всеми областями.',
+        "game_intro": 'Выделите текст на экране. Перевод появится поверх него и будет обновляться сам. Для отдельного вывода включите «Не накладывать на текст».',
         "game_launch": 'Выделить текст на экране',
         "game_languages": "Языки:",
         "game_swap_languages": "Поменять языки динамического перевода местами",
@@ -1870,7 +1854,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Пауза, когда целевое окно неактивно",
         "game_pause_inactive_tooltip": "OCR приостанавливается, если окно, активное при запуске режима, свёрнуто или больше не находится на переднем плане. При возврате перевод продолжится автоматически.",
         "game_show_original": "Показывать распознанный текст вместе с переводом",
-        "game_workflow_note": 'Выделите текст на экране. Перевод появится рядом и будет обновляться сам. Одна панель управляет всеми областями.',
+        "game_workflow_note": 'Выделите текст на экране. Перевод появится поверх него и будет обновляться сам. Для отдельного вывода включите «Не накладывать на текст».',
         "translation_mode": "Режим перевода текста: {mode}",
         # Обновлённый текст: теперь явно указывается мгновенный перевод выделенного текста
         "hotkeys": "Настроить горячие клавиши",
@@ -1978,7 +1962,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR y actualizaciones",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
-        "game_intro": 'Selecciona texto en pantalla. La traducción aparece al lado y se actualiza sola. Una barra controla todas las zonas.',
+        "game_intro": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
         "game_launch": 'Seleccionar texto',
         "game_languages": "Idiomas:",
         "game_swap_languages": "Intercambiar idiomas de traducción dinámica",
@@ -1987,7 +1971,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pausar si la aplicación vinculada está inactiva",
         "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
         "game_show_original": "Mostrar el texto reconocido junto con la traducción",
-        "game_workflow_note": 'Selecciona texto en pantalla. La traducción aparece al lado y se actualiza sola. Una barra controla todas las zonas.',
+        "game_workflow_note": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
         "translation_mode": "Modo de traduccion: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
@@ -2094,7 +2078,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR und Updates",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
-        "game_intro": 'Text auf dem Bildschirm wählen. Die Übersetzung erscheint daneben und aktualisiert sich automatisch. Eine Leiste steuert alle Bereiche.',
+        "game_intro": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
         "game_launch": 'Text auswählen',
         "game_languages": "Sprachen:",
         "game_swap_languages": "Sprachen der dynamischen Übersetzung tauschen",
@@ -2103,7 +2087,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pausieren, wenn die Ziel-App inaktiv ist",
         "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
         "game_show_original": "Erkannten Text zusammen mit der Übersetzung zeigen",
-        "game_workflow_note": 'Text auf dem Bildschirm wählen. Die Übersetzung erscheint daneben und aktualisiert sich automatisch. Eine Leiste steuert alle Bereiche.',
+        "game_workflow_note": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
         "translation_mode": "Ubersetzungsmodus: {mode}",
         "hotkeys": "Tastenkurzel konfigurieren",
         "save_and_back": "Speichern und zuruck",
@@ -2210,7 +2194,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR et mises à jour",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
-        "game_intro": 'Sélectionnez du texte. La traduction apparaît à côté et se met à jour automatiquement. Une barre gère toutes les zones.',
+        "game_intro": 'Sélectionnez du texte. La traduction le recouvre et se met à jour automatiquement. Activez la sortie séparée pour choisir une autre zone.',
         "game_launch": 'Sélectionner le texte',
         "game_languages": "Langues :",
         "game_swap_languages": "Inverser les langues de la traduction dynamique",
@@ -2219,12 +2203,12 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "Pause si l’application liée est inactive",
         "game_pause_inactive_tooltip": "L’OCR s’arrête si la fenêtre active au lancement du mode est réduite ou n’est plus au premier plan. La traduction reprend automatiquement au retour.",
         "game_show_original": "Afficher le texte reconnu avec la traduction",
-        "game_workflow_note": 'Sélectionnez du texte. La traduction apparaît à côté et se met à jour automatiquement. Une barre gère toutes les zones.',
+        "game_workflow_note": 'Sélectionnez du texte. La traduction le recouvre et se met à jour automatiquement. Activez la sortie séparée pour choisir une autre zone.',
         "translation_mode": "Mode de traduction : {mode}",
         "hotkeys": "Configurer les raccourcis",
         "save_and_back": "Enregistrer et revenir",
         "copy_to_clipboard": "Copier dans le presse-papiers",
-        "history": "Enregistrer l'historique des traductions",
+        "history": "Garder l'historique des traductions",
         "button_hover_tips": "Aide au survol des boutons",
         "test_ocr": "Tester l'OCR",
         "save": "Enregistrer",
@@ -2326,7 +2310,7 @@ SETTINGS_TEXT = {
         "settings_page_updates": "OCR 与更新",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
-        "game_intro": '框选屏幕文字，译文会在旁边自动更新。所有区域共用一个工具栏。',
+        "game_intro": '框选屏幕文字，译文会覆盖原文并自动更新。启用独立输出可选择另一处显示译文。',
         "game_launch": '选择屏幕文字',
         "game_languages": "语言：",
         "game_swap_languages": "交换动态翻译语言",
@@ -2335,7 +2319,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive": "绑定应用未激活时暂停",
         "game_pause_inactive_tooltip": "如果启动模式时的活动窗口被最小化或不再位于前台，OCR 会暂停；返回该窗口后会自动继续翻译。",
         "game_show_original": "同时显示识别文本和译文",
-        "game_workflow_note": '框选屏幕文字，译文会在旁边自动更新。所有区域共用一个工具栏。',
+        "game_workflow_note": '框选屏幕文字，译文会覆盖原文并自动更新。启用独立输出可选择另一处显示译文。',
         "translation_mode": "文本翻译模式：{mode}",
         "hotkeys": "配置快捷键",
         "save_and_back": "保存并返回",
@@ -3526,14 +3510,6 @@ class OcrLanguageManagerDialog(QDialog):
         ):
             self._apply_missing_engine_card_style(package_table)
         self._apply_package_tab_styles()
-        for package_table in (
-            self.windows_table,
-            self.tesseract_table,
-            self.easyocr_table,
-            self.rapidocr_table,
-            self.argos_table,
-        ):
-            self._apply_package_scrollbar_style(package_table)
         # Four OCR tabs must fit without tiny scroll arrows in the fixed-size
         # window, including at 125–150% Windows scaling.
         self.ocr_tabs.tabBar().setUsesScrollButtons(False)
@@ -3611,15 +3587,6 @@ class OcrLanguageManagerDialog(QDialog):
                 QLabel#languagePackageEmptyBody { color: #aeb2bf; font-size: 13px; }
                 QLineEdit { background: #17181d; color: #f4f6fb; border: 1px solid #34313f; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
-                QScrollBar:vertical { background: #14151a; width: 12px; margin: 0; border: none; }
-                QScrollBar::handle:vertical { background: #67577b; min-height: 36px; border-radius: 5px; margin: 2px; }
-                QScrollBar::handle:vertical:hover { background: #80699a; }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: transparent; }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-                QScrollBar:horizontal { background: #14151a; height: 12px; margin: 0; border: none; }
-                QScrollBar::handle:horizontal { background: #67577b; min-width: 36px; border-radius: 5px; margin: 2px; }
-                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
-                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """ + standard_buttons(self._is_dark_theme(), compact=False))
         else:
             self.setStyleSheet(chrome_style + """
@@ -3636,15 +3603,6 @@ class OcrLanguageManagerDialog(QDialog):
                 QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
                 QLineEdit { background: #f3eff5; color: #241f2a; border: 1px solid #bcb2c7; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
-                QScrollBar:vertical { background: #f1eff5; width: 12px; margin: 0; border: none; }
-                QScrollBar::handle:vertical { background: #9b87b6; min-height: 36px; border-radius: 5px; margin: 2px; }
-                QScrollBar::handle:vertical:hover { background: #7A5FA1; }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: transparent; }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-                QScrollBar:horizontal { background: #f1eff5; height: 12px; margin: 0; border: none; }
-                QScrollBar::handle:horizontal { background: #9b87b6; min-width: 36px; border-radius: 5px; margin: 2px; }
-                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: transparent; }
-                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """ + standard_buttons(self._is_dark_theme(), compact=False))
 
     def _apply_package_tab_styles(self):
@@ -3739,32 +3697,6 @@ class OcrLanguageManagerDialog(QDialog):
             }}
 
         """ + standard_buttons(dark, compact=False))
-
-    def _apply_package_scrollbar_style(self, table):
-        if table is None:
-            return
-        dark = self._is_dark_theme()
-        track = "#15161b" if dark else "#f1eff5"
-        handle = "#705b8d" if dark else "#9b87b6"
-        hover = "#8b70b2" if dark else "#7A5FA1"
-        vertical_style = f"""
-            QScrollBar:vertical {{ background: {track}; width: 10px; margin: 2px 1px; border: none; border-radius: 5px; }}
-            QScrollBar::handle:vertical {{ background: {handle}; min-height: 36px; border-radius: 4px; }}
-            QScrollBar::handle:vertical:hover {{ background: {hover}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; width: 0px; border: none; background: transparent; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-        """
-        horizontal_style = f"""
-            QScrollBar:horizontal {{ background: {track}; height: 10px; margin: 1px 2px; border: none; border-radius: 5px; }}
-            QScrollBar::handle:horizontal {{ background: {handle}; min-width: 36px; border-radius: 4px; }}
-            QScrollBar::handle:horizontal:hover {{ background: {hover}; }}
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ height: 0px; width: 0px; border: none; background: transparent; }}
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
-        """
-        table.verticalScrollBar().setStyleSheet(vertical_style)
-        table.verticalScrollBar().setFixedWidth(10)
-        table.horizontalScrollBar().setStyleSheet(horizontal_style)
-        table.horizontalScrollBar().setFixedHeight(10)
 
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_title_drag_widgets", ()):
@@ -6801,6 +6733,12 @@ class SettingsWindow(QWidget):
             app = QApplication.instance()
             if app is not None:
                 app.setProperty("buttonTooltipsEnabled", bool(value))
+        if key == 'game_show_toolbar':
+            import game_mode
+            controls = {getattr(overlay, 'controls', None) for overlay in game_mode._game_overlay_refs}
+            for toolbar in controls:
+                if toolbar is not None and hasattr(toolbar, 'set_toolbar_visible'):
+                    toolbar.set_toolbar_visible(bool(value))
         if key == "start_minimized":
             self.parent.start_minimized = value
         if key == "autostart":
@@ -8064,6 +8002,21 @@ class SettingsWindow(QWidget):
         # config value for older modes without exposing an ineffective option.
         self.game_show_original_checkbox.hide()
 
+        from dynamic_templates import text as dynamic_text
+        self.game_manual_output_checkbox = QCheckBox(dynamic_text(lang, 'manual_output'), self.settings_game_page)
+        self.game_toolbar_checkbox = QCheckBox(dynamic_text(lang, 'show_toolbar'), self.settings_game_page)
+        for row, checkbox, key, default in (
+                (5, self.game_manual_output_checkbox, 'game_manual_output', False),
+                (6, self.game_toolbar_checkbox, 'game_show_toolbar', True)):
+            checkbox.setChecked(bool(self.parent.config.get(key, default)))
+            checkbox.setFixedHeight(page_checkbox_height)
+            checkbox.setObjectName('settingsPageCheckbox')
+            checkbox.setStyleSheet('margin:0; padding:0;')
+            checkbox.toggled.connect(lambda state, setting=key: self.auto_save_setting(setting, bool(state)))
+            game_layout.addWidget(checkbox, row, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter)
+        self.game_toolbar_checkbox.setToolTip(tooltip_text(dynamic_text(lang, 'toolbar_hint').format(
+            hotkey=self.parent.config.get('game_translate_hotkey') or 'Ctrl+Alt+G')))
+
         self.game_workflow_note = QLabel(
             settings_text(lang, "game_intro"), self.settings_game_page
         )
@@ -8072,7 +8025,8 @@ class SettingsWindow(QWidget):
         self.game_workflow_note.setFixedHeight(44)
         self.game_workflow_note.setToolTip(tooltip_text(settings_text(lang, "game_workflow_note")))
         game_layout.addWidget(self.game_workflow_note, 0, 0, 1, 2)
-        game_layout.setRowStretch(6, 1)
+        self.game_workflow_note.hide()
+        game_layout.setRowStretch(7, 1)
         self.game_launch_button = OpticallyCenteredPushButton(
             settings_text(lang, "game_launch"), self.settings_game_page
         )
@@ -8085,8 +8039,8 @@ class SettingsWindow(QWidget):
         self.game_help_button = OpticallyCenteredPushButton(dynamic_text(lang, 'help'), self.settings_game_page)
         self.game_help_button.setFixedHeight(32)
         self.game_help_button.clicked.connect(lambda: getattr(self.parent, 'show_dynamic_translation_help', lambda: None)())
-        game_layout.addWidget(self.game_help_button, 7, 0)
-        game_layout.addWidget(self.game_launch_button, 7, 1)
+        game_layout.addWidget(self.game_help_button, 8, 0)
+        game_layout.addWidget(self.game_launch_button, 8, 1)
 
         # Build the hidden page from the known application language catalog.
         # Probing EasyOCR/Tesseract packages before Settings has even painted
@@ -8544,30 +8498,6 @@ class SettingsWindow(QWidget):
                 padding: 44px 12px;
             }}
 
-            QScrollBar:vertical {{
-                background: transparent;
-                width: 10px;
-                margin: 4px 1px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {colors['scroll']};
-                min-height: 30px;
-                border-radius: 4px;
-                margin: 1px;
-            }}
-            QScrollBar::handle:vertical:hover {{
-                background: {colors['accent']};
-            }}
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{
-                height: 0px;
-                background: transparent;
-                border: none;
-            }}
-            QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {{
-                background: transparent;
-            }}
         """ + standard_buttons(self.parent.current_theme != "Светлая", compact=True)
 
     def _create_secondary_shell(self, title, count_label=None):
@@ -11140,6 +11070,7 @@ finally {
 
         """ + standard_buttons(dark, compact=True)
         style += button_qss(dark, 'secondary', 'QToolButton#assistantAppearance', compact=True)
+        style += 'QToolButton#assistantAppearance { padding-left:5px; padding-right:5px; }'
         style += button_qss(dark, 'secondary', 'QPushButton#assistantCategory', compact=True)
         style += 'QWidget#uiScaleControl { background:transparent; }'
         set_widget_stylesheet(self, style)

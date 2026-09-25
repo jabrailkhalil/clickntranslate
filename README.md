@@ -1,319 +1,42 @@
-<div align="center">
-
 # Click'n'Translate
 
-### Translate any text on Windows — from games, images, videos, apps, and documents.
-
-**Click'n'Translate (ClicknTranslate)** is an open-source all-in-one screen translator and OCR tool for Windows.<br>
-Fast online translation · Private offline engines · Four OCR options · Seven ready-to-use hotkeys
-
-[**Download the Windows installer**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) · [**Portable ZIP**](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip) · [Release notes](https://github.com/jabrailkhalil/clickntranslate/releases/latest) · [**Telegram**](https://t.me/jabrail_digital)
-
-![Latest release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=for-the-badge&color=8b5cf6) ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb?style=for-the-badge) ![No account required](https://img.shields.io/badge/Account-Not%20required-16a34a?style=for-the-badge)
+Free, open-source screen OCR and translation for **Windows, Linux and macOS**. Capture text from apps, images and games, translate selected text, or follow changing text in one or more screen regions.
 
 **English** · [Русский](docs/readme/README.ru.md) · [简体中文](docs/readme/README.zh-CN.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md)
 
-</div>
+## Download 1.8.0
 
-![Three ways to use Click'n'Translate](docs/images/how-it-works.png)
-
-## New in 1.7.0
-
-The next version, **1.8.0**, is in development: [draft changes](docs/RELEASE_1.8.0.md)
-and [Windows signing status](docs/WINDOWS_SIGNING.md). Download links below remain
-on the published release.
-
-The 1.8.0 source also includes a **macOS port for Apple Silicon and Intel**:
-[setup, build instructions, and native validation status](docs/MACOS.md).
-Mac artifacts require the macOS build workflow; a signed public Mac release is not yet available.
-
-The shared UI and translation improvements for **Windows, Linux and macOS** are
-available in `main`: [how to pull them and what changed](docs/CROSS_PLATFORM_HANDOFF.md).
-This is a source update; the latest UI changes still await native QA on each OS.
-
-| Improvement | What it changes |
-| --- | --- |
-| **Dynamic multi-area translation** | Select one or several screen regions and keep their translated text updated in place |
-| **Seven default hotkeys** | Every major action works immediately and remains fully configurable |
-| **Clean mode switching** | Starting another interactive mode closes the previous one; pressing the active shortcut again stops that mode |
-| **Settings transfer** | Export your configuration and import it on another computer without moving histories, caches, or private text |
-| **Safe bug reports** | Create a diagnostic package for GitHub or Telegram without clipboard contents, document text, histories, or credentials |
-| **Refined interface** | More reliable layouts, borders, themes, notifications, onboarding, and document translation |
-
-Click'n'Translate has passed **1,000 downloads** and remains free and open source.
-
-## See it. Select it. Understand it.
-
-Click'n'Translate turns text anywhere on your Windows screen into something you can copy or understand. Select an area, press a global hotkey, and continue working — without retyping text, opening a browser tab, or breaking your flow.
-
-| When you need to… | Click'n'Translate does it with… | Result |
+| System | Download | Choose this for |
 | --- | --- | --- |
-| Copy text that cannot be selected | Area OCR | Clean text in your clipboard |
-| Translate part of an app, game, or image | OCR + translation | A focused translation window |
-| Understand an entire screen | Full-screen translation | Translated text placed over the original |
-| Translate highlighted text instantly | Selection translation | Your saved source and target language pair |
-| Write in another language | Selection replacement | Highlight your text and replace it with the translation |
-| Follow changing text | Dynamic translation | Live translations over one or several selected areas |
-| Translate a document | Drag and drop or `Ctrl + O` | Side-by-side original and translation |
+| Windows x64 | [Installer (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | A regular installation on Windows 10/11, x64. |
+| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Running without installation; extract the entire archive. |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | A single-file application for Linux x86_64; make it executable before opening. |
+| Linux x86_64 | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.tar.gz) | An unpacked application folder for Linux x86_64. |
+| macOS arm64 | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Installing on Apple Silicon (M1 and newer), macOS 13.4 or later. |
+| macOS arm64 | [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | The same Apple Silicon app in a ZIP archive. |
 
-> **One app instead of a collection of utilities:** screen capture, OCR, online translation, offline translation, document translation, histories, language packages, and configurable hotkeys all work together.
+[All downloads, SHA-256 checksums and signature files](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
 
-## See it in action
+Windows and macOS builds currently use a **self-signed certificate named `jabrailkhalil`**. Windows may show a SmartScreen warning; the Mac app has no Apple Developer ID or notarization, so Gatekeeper may block its first launch. Linux downloads have separate OpenPGP signatures. This release does not include an Intel Mac build.
 
-### Translate game text
+## What is included
 
-![Click'n'Translate translating game text](docs/images/translation-demo-v2.gif)
+- Screen OCR, selected-text translation, full-screen overlays and dynamic translation of multiple regions.
+- Online translation and local OCR; optional offline translation with downloaded language models.
+- Document translation, configurable shortcuts and a desktop companion.
+- Light and dark themes, six interface languages, and separate window preferences for each mode.
+- **1.8.0:** a shared welcome screen, clearer language menus, improved dynamic overlays, Mac permission guidance and thin scrollbars throughout the app.
 
-### Copy text from any screen area
+## Get started
 
-![Extracting text from a screen area with OCR](docs/images/area-ocr-demo-v2.gif)
+1. Download the file for your system and open the app. The Python runtime is included.
+2. Choose your OCR engine, translation provider and languages in Settings. Download language models if you want offline translation.
+3. Choose a capture or translation action. On Mac, follow the app’s prompts to grant **Screen Recording** and **Accessibility** permissions. On Linux, configure desktop shortcuts using the [Linux guide](docs/LINUX.md).
 
-### Translate selected text in any application
+OCR runs locally. Online translation sends the text to your selected provider; use an offline engine to keep translation local. See [Privacy](PRIVACY.md).
 
-![Translating selected text in any application](docs/images/selected-text-demo-v2.gif)
+## Help and development
 
-### Translate the full screen
+[Linux setup](docs/LINUX.md) · [macOS setup and builds](docs/MACOS.md) · [Report a problem](https://github.com/jabrailkhalil/clickntranslate/issues) · [License: GPL-3.0](LICENSE)
 
-![Replacing Chinese screen text with an English translation](docs/images/fullscreen-translation-demo-v2.gif)
-
-### Update in one click
-
-![Click'n'Translate downloading, installing, and reopening an update](docs/images/update-demo.gif)
-
-## Why Click'n'Translate stands out
-
-| Capability | What you get |
-| --- | --- |
-| **Instant screen translation** | Capture a region or the whole screen and translate it immediately |
-| **Dynamic translation** | Keep several selected screen areas translated as their contents change |
-| **Text extraction everywhere** | Copy text from games, video, images, remote desktops, and interfaces that block selection |
-| **Online and offline translation** | Choose speed and convenience, or keep translation on your PC |
-| **Four OCR engines** | Match the engine to the language, font, image quality, or task |
-| **Package manager** | Install and remove OCR languages and offline translation packages inside the app |
-| **Document workspace** | Translate `.txt`, `.md`, `.docx`, `.pdf`, `.html`, and `.rtf` files |
-| **Six interface languages** | English, Russian, Spanish, German, French, and Chinese |
-| **Optional local histories** | Keep copy and translation history only when you want it |
-
-## Choose the right engine for every task
-
-| Layer | Available engines | Connection | Best for |
-| --- | --- | --- | --- |
-| **Online translation** | Google, MyMemory, Lingva, LibreTranslate | Internet required | Fast everyday translation without model downloads |
-| **Offline translation** | Argos Translate, Hy-MT | Offline after installation | Private translation and unreliable connections |
-| **OCR** | Windows OCR, Tesseract, RapidOCR, EasyOCR | Local after installation | Different scripts, fonts, layouts, and image quality |
-
-### Online or offline? You decide.
-
-| | Online providers | Offline providers |
-| --- | --- | --- |
-| Setup | Ready immediately | Install the chosen engine or language package once |
-| Speed | Usually the fastest option | Depends on your PC and model |
-| Privacy | Selected text is sent to the provider | Text stays on your computer |
-| Availability | Requires internet | Works without internet after setup |
-| Best choice for | Everyday convenience | Sensitive text, travel, and private workflows |
-
-## Seven actions. Zero friction.
-
-| Default hotkey | Action |
-| --- | --- |
-| `Ctrl + Alt + C` | Extract text from an area and copy it |
-| `Ctrl + Alt + T` | Capture an area, recognize the text, and translate it |
-| `Ctrl + Alt + F` | Translate the entire screen |
-| `Ctrl + Alt + Q` | Translate selected text with the language pair from the main window |
-| `Ctrl + Shift + Q` | Replace selected text with its translation |
-| `Ctrl + Shift + Space` | Show or hide Click'n'Translate |
-| `Ctrl + Alt + G` | Start or stop Dynamic translation for selected screen areas |
-
-Every shortcut can be changed or cleared in **Settings → Configure hotkeys**. Your chosen language pair is remembered separately for OCR, selected text, replacement, full-screen, and Dynamic translation.
-
-## Language packages without the command line
-
-Open **Settings → Language packages** to manage everything from one place.
-
-| Package area | What you can manage |
-| --- | --- |
-| Windows OCR | Windows language capabilities and their real installation status |
-| Tesseract | Local engine and language data |
-| EasyOCR | Neural OCR engine and supported language models |
-| RapidOCR | Neural OCR runtime, detector, and recognition models |
-| Argos Translate | Offline translation directions installed before translation |
-| Hy-MT | Local language model and runtime |
-
-Installed packages are shown first. Downloads display progress, can continue in the background where supported, and removable packages can be deleted from the same window.
-
-## Install your way
-
-| Edition | Choose it when… | How to start |
-| --- | --- | --- |
-| **Windows installer** | You want the simplest setup, shortcuts, and reliable in-app updates | [Download the installer](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-x64-installer.exe) and run it |
-| **Portable ZIP** | You want a self-contained folder you can move or keep on another drive | [Download the ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-windows-portable-x64.zip), extract it, and run `ClicknTranslate.exe` |
-| **Linux AppImage** | You want a ready-to-run x86_64 Linux build | [Download the AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-linux-x86_64.AppImage), make it executable, and run it |
-| **Linux TAR** | You prefer an extracted portable Linux folder | [Download the archive](https://github.com/jabrailkhalil/clickntranslate/releases/latest/download/Click-n-Translate-1.7.0-linux-x86_64.tar.gz) and extract it |
-
-### Start translating in under a minute
-
-1. Install or extract Click'n'Translate.
-2. Choose the interface language, OCR engine, and translator.
-3. Press `Ctrl + Alt + T` and drag over any text on the screen.
-4. Add optional offline engines or OCR languages from **Settings → Language packages**.
-
-No account or separate Python installation is required. Click'n'Translate supports Windows 10 and Windows 11 x64. Internet access is needed for online translation and optional package downloads; installed offline engines work without it.
-
-## Made for real Windows workflows
-
-| Use case | Why it helps |
-| --- | --- |
-| Games and visual novels | Translate dialogue without leaving the game |
-| Changing subtitles and dialogue | Keep multiple chosen regions translated with Dynamic mode |
-| Images and videos | Extract text that was never selectable |
-| Work applications | Translate labels, messages, reports, and remote desktops |
-| Documents | Open common formats and work with original and translated text side by side |
-| Language learning | Compare source and translated text while reading |
-| Travel and offline work | Use downloaded OCR and translation packages without a connection |
-
-## Built for daily use
-
-| Experience | Reliability |
-| --- | --- |
-| Dark and light themes | Dedicated OCR and Argos worker processes |
-| System tray and optional Windows startup | Transactional updates with rollback protection |
-| Configurable global hotkeys | Automatic restart after a successful update |
-| Settings import and export | Mutually exclusive interactive modes with shortcut toggles |
-| Local copy and translation histories | User data preserved across updates |
-| Clear package download progress | Folder-based build for responsive startup |
-| Multilingual onboarding and FAQ | Optional engines isolated inside the app folder |
-
-## Privacy without guesswork
-
-| Mode | Where processing happens |
-| --- | --- |
-| Windows OCR, Tesseract, RapidOCR, EasyOCR | On your computer |
-| Argos Translate and Hy-MT | On your computer |
-| Google, MyMemory, Lingva, LibreTranslate | Text is sent to the selected online provider |
-| Copy and translation histories | Stored locally only when enabled |
-
-Read the full [privacy policy](PRIVACY.md).
-
-## Updating from an older version
-
-Users on **1.5.0 or newer** can update from inside the app. The updater downloads the new installer, shows progress through the complete update, protects the previous installation until replacement succeeds, and reopens Click'n'Translate when finished.
-
-The updater in versions older than 1.5.0 cannot install current releases reliably. If you are upgrading from 1.4.x, close the old app and install the latest version manually once. Future updates can then be installed from the app.
-
-## Frequently asked questions
-
-<details>
-<summary><strong>Does Click'n'Translate work offline?</strong></summary>
-
-Yes. Install an OCR engine and either Argos Translate or Hy-MT from **Language packages**. Online providers remain available when you prefer them.
-
-</details>
-
-<details>
-<summary><strong>Can it copy text from games, images, and video?</strong></summary>
-
-Yes. OCR works with pixels on the screen, so the source text does not need to be selectable.
-
-</details>
-
-<details>
-<summary><strong>Why are OCR and translation packages optional?</strong></summary>
-
-You download only the engines and languages you need. This keeps the main installer smaller and avoids bundling several gigabytes of models for every user.
-
-</details>
-
-<details>
-<summary><strong>Is the portable edition really self-contained?</strong></summary>
-
-The application, settings, histories, and optional packages stay with the extracted folder. Windows OCR language capabilities are operating-system components and are managed by Windows.
-
-</details>
-
-<details>
-<summary><strong>Which document formats are supported?</strong></summary>
-
-Click'n'Translate can open `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm`, and `.rtf`. Translations can be saved as text, Markdown, or a reopenable local session.
-
-</details>
-
-<details>
-<summary><strong>How does Dynamic translation work?</strong></summary>
-
-Press `Ctrl + Alt + G`, draw one or several regions, and finish the selection. Click'n'Translate periodically recognizes those regions and updates the translated overlays when their text changes. Press the same shortcut again to stop the session. Frequency, overlay opacity, original-text display, and inactive-window pausing are configurable.
-
-</details>
-
-<details>
-<summary><strong>Can I move my settings to another computer?</strong></summary>
-
-Yes. Use **Settings → Export settings** and import the resulting file on the other computer. The export contains preferences and hotkeys, but excludes histories, caches, downloaded models, clipboard contents, document text, and credentials.
-
-</details>
-
-## Build from source
-
-<details>
-<summary>Developer instructions</summary>
-
-```powershell
-git clone https://github.com/jabrailkhalil/clickntranslate.git
-cd clickntranslate
-pip install -r requirements.txt
-python main.py
-
-# Build the folder-based Windows distribution
-python -m PyInstaller ClicknTranslate.spec --clean --noconfirm
-```
-
-The release uses a folder-based PyInstaller build for responsive startup. Optional OCR runtimes and language models are installed separately instead of making every download several gigabytes.
-
-</details>
-
-## Research use and citation
-
-Click'n'Translate can be used as a versioned software substrate for experiments
-on screen-text OCR, multilingual interface accessibility, and local-versus-online
-translation workflows. The [research-use guide](docs/RESEARCH.md) defines a
-reproducible snapshot procedure, identifies observable outputs, and separates
-application behavior from experiment-specific analysis. Citation metadata is
-available in [`CITATION.cff`](CITATION.cff), and the draft software paper is in
-[`paper.md`](paper.md).
-
-Scientific claims belong in the study that performs the experiment. The project
-README and software paper describe the application and its research affordances;
-they do not claim that one OCR or translation engine is universally superior.
-
-## License
-
-Click'n'Translate is distributed under the
-[GNU General Public License v3.0](LICENSE). Third-party engines, models, and
-libraries retain their own licenses.
-
-## Support the project
-
-### Bug reports
-
-In the app, open **Help → Bug report**. Click'n'Translate creates a diagnostic
-ZIP on the desktop; attach that file to a GitHub issue or Telegram message. The
-report includes the app/OS versions, selected engines, executable checks and
-updater logs. It excludes clipboard contents, translation and copy histories,
-document text, credentials and OCR logs.
-
-If the app cannot start, click **Create bug report** in the startup error
-window. The launcher can create a safe startup report even when the main EXE is
-missing or quarantined.
-
-If Click'n'Translate saves you time:
-
-- ⭐ Star the repository so more Windows users can discover it.
-- 🐛 [Report a bug or request a feature](https://github.com/jabrailkhalil/clickntranslate/issues).
-- 💬 Follow updates or ask a question on Telegram: [@jabrail_digital](https://t.me/jabrail_digital).
-
-<div align="center">
-
-### Ready to translate anything on your screen?
-
-[**Download Click'n'Translate for Windows**](https://github.com/jabrailkhalil/clickntranslate/releases)
-
-</div>
+Click’n’Translate is free. If it helps you, please [star the project on GitHub](https://github.com/jabrailkhalil/clickntranslate) and [join us on Telegram](https://t.me/jabrail_digital).

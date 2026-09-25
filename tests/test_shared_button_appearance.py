@@ -8,7 +8,7 @@ import pytest
 from PyQt5.QtCore import QEvent, QPoint, Qt
 from PyQt5.QtGui import QHelpEvent, QPalette
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication, QPushButton, QToolButton, QWidget
+from PyQt5.QtWidgets import QApplication, QPushButton, QToolButton, QWidget, QLabel, QLineEdit, QComboBox
 
 import main
 from button_styles import button_palette, button_qss
@@ -22,6 +22,40 @@ def app():
     instance.setQuitOnLastWindowClosed(False)
     ensure_layout_fonts(instance)
     return instance
+
+
+@pytest.mark.parametrize('kind', ['accent', 'dropdown'])
+def test_control_style_survives_its_widgets_and_is_released_afterwards(app, kind):
+    from PyQt5 import sip
+    from PyQt5.QtWidgets import QCheckBox, QVBoxLayout
+    from settings_window import DropDownCombo
+    from styled_dialogs import install_accent_controls
+    for _ in range(3):
+        owner = QWidget()
+        layout = QVBoxLayout(owner)
+        control = DropDownCombo() if kind == 'dropdown' else QCheckBox('Check')
+        layout.addWidget(control)
+        if kind == 'dropdown':
+            control.addItems(['One', 'Two'])
+            style = control._drop_down_style
+        else:
+            install_accent_controls(owner)
+            style = owner._accent_control_style
+        assert style.parent().parent() is app
+        owner.show()
+        control.setFocus()
+        app.processEvents()
+        if kind == 'dropdown':
+            control.showPopup()
+            app.processEvents()
+            control.hidePopup()
+        owner.close()
+        sip.delete(owner)
+        assert not sip.isdeleted(style)
+        for _ in range(3):
+            app.processEvents()
+            app.sendPostedEvents(None, QEvent.DeferredDelete)
+        assert sip.isdeleted(style)
 
 
 @pytest.mark.parametrize("dark", [True, False])
@@ -55,8 +89,9 @@ def test_mouse_click_clears_the_ring_but_tab_focus_remains_visible(app, dark, bu
         owner.deleteLater()
 
 
-def test_button_hover_tips_can_be_disabled_and_restored(app):
-    button = QPushButton("Hover me")
+@pytest.mark.parametrize('widget_class', [QPushButton, QLabel, QLineEdit, QComboBox, QWidget])
+def test_button_hover_tips_can_be_disabled_and_restored(app, widget_class):
+    button = widget_class()
     button.setToolTip("A useful hint")
     button.setStyleSheet(button_qss(True))
     event_filter = app._button_focus_filter

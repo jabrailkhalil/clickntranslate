@@ -227,6 +227,26 @@ def _foreground_window():
         return 0
 
 
+def _window_at_point(point):
+    """Resolve the selected source after the selection surface has closed."""
+    if not platform_support.IS_WINDOWS:
+        return 0
+    try:
+        api = ctypes.WinDLL('user32', use_last_error=True)
+        api.WindowFromPoint.argtypes = [wintypes.POINT]
+        api.WindowFromPoint.restype = wintypes.HWND
+        api.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        api.GetAncestor.restype = wintypes.HWND
+        handle = api.WindowFromPoint(wintypes.POINT(point.x(), point.y()))
+        root = api.GetAncestor(handle, 2) if handle else 0  # GA_ROOT
+        if not root or _window_belongs_to_this_process(root):
+            return 0
+        return int(root)
+    except Exception:
+        logging.getLogger('clickntranslate.game').exception('Unable to resolve selected source window')
+        return 0
+
+
 def _window_rect(handle):
     if platform_support.IS_MAC and handle:
         from macos_desktop import window_info
@@ -2225,7 +2245,7 @@ def _begin_game_session(regions, source_language, target_language, target_window
 
 
 def _schedule_game_focus_handoff(target_window, overlays):
-    if not platform_support.IS_MAC or not target_window:
+    if not (platform_support.IS_MAC or platform_support.IS_WINDOWS) or not target_window:
         return
 
     def handoff():
@@ -2236,8 +2256,14 @@ def _schedule_game_focus_handoff(target_window, overlays):
                    for overlay in overlays):
             return
         try:
-            from macos_desktop import return_focus_to_window_application
-            restored = return_focus_to_window_application(target_window)
+            if platform_support.IS_MAC:
+                from macos_desktop import return_focus_to_window_application
+                restored = return_focus_to_window_application(target_window)
+            else:
+                api = ctypes.WinDLL('user32', use_last_error=True)
+                api.SetForegroundWindow.argtypes = [wintypes.HWND]
+                api.SetForegroundWindow.restype = wintypes.BOOL
+                restored = bool(api.SetForegroundWindow(target_window))
             logging.getLogger('clickntranslate.game').debug(
                 'Live overlay focus handoff; window=%s, restored=%s', target_window, restored)
         except Exception:

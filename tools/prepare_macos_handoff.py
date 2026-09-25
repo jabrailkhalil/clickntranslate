@@ -20,7 +20,7 @@ DIRECTORIES = ('icons', 'tests', 'tools', 'docs', 'packaging', '.github', 'insta
 EXCLUDED_PARTS = {'__pycache__', '.pytest_cache', 'data', 'build', 'dist', 'node_modules'}
 SOURCE_SUFFIXES = {'.py', '.sh', '.ps1', '.bat', '.cmd', '.md', '.txt', '.ini', '.spec',
                    '.yml', '.yaml', '.json', '.plist', '.xml', '.svg', '.png', '.ico',
-                   '.desktop', '.c', '.h', '.cpp', '.manifest', '.rc', '.iss', '.cff', '.bib',
+                   '.desktop', '.c', '.h', '.cpp', '.cs', '.manifest', '.rc', '.iss', '.cff', '.bib',
                    '.in', '.ttf', '.otf', '.webp', '.jpg', '.jpeg', '.gif', '.qrc'}
 REQUIRED = {'main.py', 'settings_window.py', 'ClicknTranslate-macos.spec',
             'requirements-macos.txt', 'docs/MACOS_HANDOFF.md',
@@ -42,7 +42,8 @@ def source_files():
         if relative.as_posix() in {'HANDOFF.md', 'build.py'}:
             continue
         if relative.parts[0] in DIRECTORIES:
-            eligible = path.suffix.lower() in SOURCE_SUFFIXES
+            eligible = (path.suffix.lower() in SOURCE_SUFFIXES
+                        or relative.as_posix() == 'packaging/macos/release-certificate.pem')
         else:
             eligible = (path.suffix.lower() in {'.py', '.spec', '.txt', '.md', '.ini', '.cff', '.bib', '.bat'}
                         or path.name in {'LICENSE', '.gitignore', '.gitattributes'})

@@ -149,11 +149,33 @@ def write_permission_report(output_path, capture=False):
     return report
 
 
+def request_permission(kind):
+    """Request access for this process and open the matching System Settings pane."""
+    if kind not in ('screen', 'accessibility'):
+        raise ValueError(f'Unknown macOS permission: {kind}')
+    if permission_granted(kind):
+        return True
+    if kind == 'screen':
+        import Quartz
+        Quartz.CGRequestScreenCaptureAccess()
+    else:
+        import ApplicationServices as AX
+        AX.AXIsProcessTrustedWithOptions({AX.kAXTrustedCheckOptionPrompt: True})
+    pane = 'Privacy_ScreenCapture' if kind == 'screen' else 'Privacy_Accessibility'
+    subprocess.Popen(['/usr/bin/open', f'x-apple.systempreferences:com.apple.preference.security?{pane}'])
+    # The main window floats above other apps. Hide this application's native
+    # windows together so neither it nor its modal guide covers System Settings.
+    # Dock / Cmd+Tab restores them with their original state and window levels.
+    import AppKit
+    AppKit.NSApplication.sharedApplication().hide_(None)
+    return permission_granted(kind)
+
+
 def ensure_permission(kind, parent=None, language="en"):
     """Explain a missing permission in the app's style, only on a user action.
 
-    Do not poll or display OS prompts during startup, tests, or background OCR.
-    The user grants permission in System Settings and then retries the action.
+    OS prompts are displayed only after a user clicks the settings button.
+    The startup permissions guide uses the same request function.
     """
     if permission_granted(kind):
         return True
@@ -170,14 +192,7 @@ def ensure_permission(kind, parent=None, language="en"):
     box.addButton(macos_text(language, "later"), StyledMessageBox.RejectRole)
     box.exec_()
     if box.clickedButton() is settings:
-        if kind == "screen":
-            import Quartz
-            Quartz.CGRequestScreenCaptureAccess()
-        else:
-            import ApplicationServices as AX
-            AX.AXIsProcessTrustedWithOptions({AX.kAXTrustedCheckOptionPrompt: True})
-        pane = "Privacy_ScreenCapture" if kind == "screen" else "Privacy_Accessibility"
-        subprocess.Popen(["/usr/bin/open", f"x-apple.systempreferences:com.apple.preference.security?{pane}"])
+        request_permission(kind)
     box.deleteLater()
     return False
 

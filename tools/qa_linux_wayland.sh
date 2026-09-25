@@ -20,6 +20,13 @@ cleanup() {
         kill "${pids[@]}" 2>/dev/null || true
         wait "${pids[@]}" 2>/dev/null || true
     fi
+    # The D-Bus-activated document portal mounts a FUSE filesystem here. Its
+    # process outlives our explicitly started helpers until the session ends.
+    # Unmount our private portal before removing its temporary directory.
+    if mountpoint -q "$RUNTIME/doc"; then
+        FUSE_UNMOUNT="$(command -v fusermount3 || command -v fusermount)"
+        "$FUSE_UNMOUNT" -u "$RUNTIME/doc"
+    fi
     rm -rf -- "$RUNTIME"
 }
 trap cleanup EXIT

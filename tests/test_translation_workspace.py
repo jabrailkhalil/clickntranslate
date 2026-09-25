@@ -359,11 +359,13 @@ def test_inflight_real_worker_cannot_overwrite_newer_user_state(app, workspace, 
         main.platform_support.copy_text.assert_not_called()
 
 
-def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, requests):
+def test_hiding_source_shrinks_window_and_restores_expanded_size(app, workspace, requests, monkeypatch):
+    monkeypatch.setattr(QtGui.QScreen, 'availableGeometry', lambda self: QtCore.QRect(0, 0, 1280, 900))
     drafts = (workspace.source_edit.toPlainText(), workspace.text_edit.toPlainText())
     for width in (900, 420):
         workspace.resize(width, 620)
         app.processEvents()
+        workspace._view_sizes.pop('collapsed_size', None)
         original_size = workspace.size()
         workspace.source_toggle.click()
         app.processEvents()
@@ -371,7 +373,10 @@ def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, req
         assert not workspace.swap_button.isVisible()
         assert workspace.result_panel.isVisible()
         assert workspace.result_panel.width() == workspace.editors.contentsRect().width()
-        assert workspace.size() == original_size
+        if width == 900:
+            assert workspace.width() < original_size.width() * .7
+        else:
+            assert workspace.height() < original_size.height() * .8
         workspace.refresh_theme('Светлая')
         workspace.resize(width + 20, 640)
         app.processEvents()
@@ -379,9 +384,57 @@ def test_hiding_source_preserves_drafts_and_fills_the_window(app, workspace, req
         assert workspace.source_toggle.text() == workspace.text['show_source']
         workspace.source_toggle.click()
         app.processEvents()
+        assert workspace.size() == original_size
         assert workspace.source_panel.isVisible() and workspace.swap_button.isVisible()
         assert (workspace.source_edit.toPlainText(), workspace.text_edit.toPlainText()) == drafts
         assert not requests  # Changing the view never submits a new translation.
+
+
+def test_result_view_preferences_survive_reopen_and_are_isolated_by_mode(app, monkeypatch):
+    monkeypatch.setattr(QtGui.QScreen, 'availableGeometry', lambda self: QtCore.QRect(0, 0, 1600, 1200))
+    owner = QtWidgets.QWidget()
+    owner.config = dict(main.DEFAULT_CONFIG, translator_engine='Google')
+    owner.save_config = mock.Mock()
+    monkeypatch.setattr(main.TranslationResultDialog, '_start_retranslate', lambda self: None)
+    dialogs = []
+    def open_result(mode):
+        dialog = main.TranslationResultDialog(owner, 'Перевод', auto_copy=False, result_mode=mode,
+                                              source_text='Source', source_lang='en', target_lang='ru')
+        dialogs.append(dialog)
+        dialog.show()
+        for _ in range(4):
+            app.processEvents()
+        return dialog
+    try:
+        area = open_result('area')
+        area.resize(760, 480)
+        app.processEvents()
+        area.source_toggle.click()
+        area._appearance_manager().set_window_percent(area, 110)
+        app.processEvents()
+        area.engine_combo.setCurrentIndex(area.engine_combo.findData('mymemory'))
+        area.resize(470, 410)
+        app.processEvents()
+        compact_size = area.size()
+        area.close()
+        assert owner.config['translator_engine'] == 'Google'
+        assert set(owner.config['result_window_preferences']) == {'ocr'}
+        restored = open_result('ocr')
+        assert restored._source_collapsed and restored.source_panel.isHidden()
+        assert restored.property('ui_scale_override') == 110
+        assert restored.window_engine == 'MyMemory'
+        assert abs(restored.width()-compact_size.width()) <= 2
+        assert abs(restored.height()-compact_size.height()) <= 2
+        for mode in ('selection', 'main'):
+            separate = open_result(mode)
+            assert not separate._source_collapsed
+            assert separate.property('ui_scale_override') is None
+            assert separate.window_engine == 'Google'
+    finally:
+        for dialog in dialogs:
+            dialog.close()
+            dialog.deleteLater()
+        owner.deleteLater()
 
 
 def test_stacked_editors_stay_inside_their_frames_at_default_scale(app, workspace):

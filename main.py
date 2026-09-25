@@ -249,6 +249,8 @@ DEFAULT_CONFIG = {
     "game_capture_interval_ms": 850,
     "game_text_similarity": 0.90,
     "game_pause_when_inactive": True,
+    "game_manual_output": False,
+    "game_show_toolbar": True,
     "game_show_original_text": False,
     "game_overlay_opacity": 88,
     "no_screen_dimming": False,
@@ -2293,6 +2295,8 @@ WELCOME_TEXT = {
         "feature_translate": "Online + offline",
         "feature_updates": "3,000 downloads",
         "telegram": "Open Telegram",
+        "github": "Star the project on GitHub",
+        "support": "Click'n'Translate is a free project. We'd be grateful if you joined us on Telegram and gave us a star on GitHub.",
         "checkbox": "Don't show this window again",
         "guide": "Show me around",
         "skip": "Skip",
@@ -2307,6 +2311,8 @@ WELCOME_TEXT = {
         "feature_translate": "Онлайн + офлайн",
         "feature_updates": "3 000 скачиваний",
         "telegram": "Открыть Telegram",
+        "github": "Поставить звезду проекту на GitHub",
+        "support": "Click'n'Translate — бесплатный проект. Будем благодарны, если вы присоединитесь к нашему Telegram и поставите звезду на GitHub.",
         "checkbox": "Больше не показывать это окно",
         "guide": "Пройти обучение",
         "skip": "Пропустить",
@@ -2321,6 +2327,8 @@ WELCOME_TEXT = {
         "feature_translate": "Online + offline",
         "feature_updates": "3.000 descargas",
         "telegram": "Abrir Telegram",
+        "github": "Dar una estrella al proyecto en GitHub",
+        "support": "Click'n'Translate es un proyecto gratuito. Nos alegraría que te unieras a nuestro Telegram y nos dieras una estrella en GitHub.",
         "checkbox": "No volver a mostrar esta ventana",
         "guide": "Ver guía",
         "skip": "Omitir",
@@ -2335,6 +2343,8 @@ WELCOME_TEXT = {
         "feature_translate": "Online + offline",
         "feature_updates": "3.000 Downloads",
         "telegram": "Telegram öffnen",
+        "github": "Dem Projekt auf GitHub einen Stern geben",
+        "support": "Click'n'Translate ist ein kostenloses Projekt. Wir freuen uns, wenn ihr unserem Telegram-Kanal beitretet und uns auf GitHub einen Stern gebt.",
         "checkbox": "Dieses Fenster nicht mehr anzeigen",
         "guide": "Tour starten",
         "skip": "Überspringen",
@@ -2349,6 +2359,8 @@ WELCOME_TEXT = {
         "feature_translate": "En ligne + hors ligne",
         "feature_updates": "3 000 téléchargements",
         "telegram": "Ouvrir Telegram",
+        "github": "Mettre une étoile au projet sur GitHub",
+        "support": "Click'n'Translate est un projet gratuit. Nous vous serions reconnaissants de rejoindre notre Telegram et de nous laisser une étoile sur GitHub.",
         "checkbox": "Ne plus afficher cette fenêtre",
         "guide": "Voir le guide",
         "skip": "Passer",
@@ -2363,6 +2375,8 @@ WELCOME_TEXT = {
         "feature_translate": "在线 + 离线翻译",
         "feature_updates": "3,000 次下载",
         "telegram": "打开 Telegram",
+        "github": "在 GitHub 上为项目点亮星标",
+        "support": "Click'n'Translate 是一个免费项目。欢迎加入我们的 Telegram，并在 GitHub 上为项目点亮星标。感谢你的支持！",
         "checkbox": "不再显示此窗口",
         "guide": "开始引导",
         "skip": "跳过",
@@ -3208,7 +3222,7 @@ HELP_CONTENT = {
             "<span class='item-title'>Demarrer avec le systeme</span> lance l'app en meme temps que Windows.",
             "<span class='item-title'>Demarrer en mode ombre</span> la lance cachee dans la zone de notification. Les raccourcis restent actifs.",
             "<span class='item-title'>Copier le texte traduit</span> place chaque traduction dans le presse-papiers.",
-            "<span class='item-title'>Enregistrer l'historique des copies</span> et <span class='item-title'>Enregistrer l'historique des traductions</span> conservent ce qui a ete copie et traduit. Desactives, rien n'est ecrit sur le disque.",
+            "<span class='item-title'>Enregistrer l'historique des copies</span> et <span class='item-title'>Garder l'historique des traductions</span> conservent ce qui a ete copie et traduit. Desactives, rien n'est ecrit sur le disque.",
             "<span class='item-title'>Garder la fenetre visible pendant l'OCR</span> empeche la fenetre principale de se cacher pendant la selection.",
             "<span class='item-title'>Figer l'ecran pendant l'OCR</span> immobilise l'image pour capturer un texte qui bouge ou disparait.",
         ]),
@@ -4188,12 +4202,27 @@ class TranslationResultDialog(QDialog):
         self.lang = lang if lang in TRANSLATION_RESULT_DIALOG_TEXT else "en"
         self.text = TRANSLATION_RESULT_DIALOG_TEXT[self.lang]
         self.result_mode = str(result_mode or "main").lower()
+        if self.result_mode == 'area':
+            self.result_mode = 'ocr'
         config = self._current_config()
-        self.source_code = str(source_lang or config.get("main_translation_source_language", "en")).lower()
+        preferences = config.get('result_window_preferences', {})
+        preferences = preferences.get(self.result_mode, {}) if isinstance(preferences, dict) else {}
+        self._mode_preferences = dict(preferences) if isinstance(preferences, dict) else {}
+        self._view_sizes = {}
+        for key in ('expanded_size', 'collapsed_size'):
+            size = self._mode_preferences.get(key)
+            if (isinstance(size, (list, tuple)) and len(size) == 2
+                    and all(isinstance(value, (int, float)) and 100 <= value <= 10000 for value in size)):
+                self._view_sizes[key] = QSize(round(size[0]), round(size[1]))
+        self._view_restored = False
+        self._engine_override = bool(self._mode_preferences.get('engine'))
+        pair_keys = HOTKEY_LANGUAGE_CONFIG_KEYS.get(self.result_mode,
+            ('main_translation_source_language', 'main_translation_target_language'))
+        self.source_code = str(source_lang or config.get(pair_keys[0], "en")).lower()
         if not valid_translation_source(self.source_code, config.get('translator_engine', 'Google')):
             self.source_code = "en"
         self.target_code = default_target_for_source(
-            self.source_code, str(target_lang or config.get("main_translation_target_language", "ru")).lower())
+            self.source_code, str(target_lang or config.get(pair_keys[1], "ru")).lower())
         self.pair_row_available = True
         self._drag_position = None
         self._stack_offset = QtCore.QPoint()
@@ -4206,6 +4235,9 @@ class TranslationResultDialog(QDialog):
         self._panel_orientation = None
         self._source_collapsed = False
         self._status_message = ""
+        saved_scale = self._mode_preferences.get('scale_percent')
+        if isinstance(saved_scale, (int, float)) and MIN_SCALE <= saved_scale <= MAX_SCALE:
+            self.setProperty('ui_scale_override', round(saved_scale))
 
         self.setObjectName("translationResultRoot")
         self.setWindowTitle(self.text["workspace_title"])
@@ -4247,7 +4279,7 @@ class TranslationResultDialog(QDialog):
         self.engine_combo.setAccessibleName(settings_text(self.lang, 'translator_engine'))
         from settings_window import _populate_grouped_translator_combo
         _populate_grouped_translator_combo(self.engine_combo, self.lang)
-        self.set_window_engine(str(config.get('translator_engine', 'Google')))
+        self.set_window_engine(str(self._mode_preferences.get('engine') or config.get('translator_engine', 'Google')))
         header.addWidget(self.engine_combo, 0, 1)
         from ui_scaling import ScalePercentEdit
         from number_controls import StepperFrame
@@ -4370,6 +4402,13 @@ class TranslationResultDialog(QDialog):
         self._update_actions()
         self._set_status(self.text["auto_copied"] if auto_copy else self.text["ready"])
         self.source_edit.setFocus(Qt.OtherFocusReason)
+        if self._mode_preferences.get('source_collapsed') is True:
+            with QtCore.QSignalBlocker(self.source_toggle):
+                self.source_toggle.setChecked(True)
+            self._set_source_collapsed(True, resize_window=False)
+        initial_size = self._view_sizes.get('collapsed_size' if self._source_collapsed else 'expanded_size')
+        if initial_size is not None:
+            self._resize_result_view(initial_size)
 
     def set_window_engine(self, engine):
         """Set an initial/followed provider without changing the app or sending text."""
@@ -4397,13 +4436,14 @@ class TranslationResultDialog(QDialog):
         key = self.engine_combo.currentData()
         if not key or key == self.window_engine.lower().replace('hy-mt', 'hymt'):
             return
+        self._engine_override = True
         self._invalidate_request()
         self.set_window_engine(self.engine_combo.currentText())
         self._start_retranslate()
 
-    def _reflow_engine_header(self):
+    def _reflow_engine_header(self, available_width=None):
         factor = float(self.property('ui_effective_scale') or 1)
-        compact = self.frame.width() < round(570 * factor)
+        compact = (self.frame.width() if available_width is None else available_width) < round(570 * factor)
         if compact == self._header_compact:
             return
         self._header_compact = compact
@@ -4459,13 +4499,100 @@ class TranslationResultDialog(QDialog):
         contents.addWidget(editor, 1)
         return panel
 
-    def _set_source_collapsed(self, collapsed):
+    def _remember_view_size(self):
+        factor = float(self.property('ui_effective_scale') or 1)
+        key = 'collapsed_size' if self._source_collapsed else 'expanded_size'
+        self._view_sizes[key] = self.size() / factor
+
+    def _sync_result_layout(self):
+        if getattr(self, '_syncing_result_layout', False):
+            return
+        # Invalidate from the editors outwards. Otherwise the outer layout
+        # keeps the two-panel minimum for one event-loop turn and blocks shrink.
+        self._syncing_result_layout = True
+        try:
+            for layout in (self.body_grid, self.frame.layout(), self.layout()):
+                layout.invalidate()
+                layout.activate()
+            self.setMinimumSize(self.minimumSizeHint())
+        finally:
+            self._syncing_result_layout = False
+
+    def _resize_result_view(self, size):
+        margins = self.layout().contentsMargins()
+        self._reflow_engine_header(size.width()-margins.left()-margins.right())
+        self._sync_result_layout()
+        manager = getattr(QApplication.instance(), '_dialog_appearance', None)
+        if manager is not None:
+            bounds = manager.available_geometry(self)
+        else:
+            from ui_scaling import window_position_context
+            bounds = window_position_context(self)[1]
+        self.resize(size.expandedTo(self.minimumSizeHint()).boundedTo(bounds.size()))
+        self._reflow_editors()
+
+    def _restore_mode_view(self):
+        if self._closed or self._view_restored:
+            return
+        self._view_restored = True
+        factor = float(self.property('ui_effective_scale') or 1)
+        key = 'collapsed_size' if self._source_collapsed else 'expanded_size'
+        size = self._view_sizes.get(key)
+        if size is not None:
+            self._resize_result_view(size * factor)
+        elif self._source_collapsed:
+            self._view_sizes.setdefault('expanded_size', self.size() / factor)
+            self._resize_result_view(QSize(round(self.width()/2), self.height()))
+        self._center_on_parent()
+
+    def _save_mode_preferences(self):
+        if not self._view_restored:
+            return
+        self._remember_view_size()
+        preferences = dict(self._mode_preferences)
+        preferences['source_collapsed'] = self._source_collapsed
+        for key, size in self._view_sizes.items():
+            preferences[key] = [size.width(), size.height()]
+        preferences['scale_percent'] = self.property('ui_scale_override')
+        if self._engine_override:
+            preferences['engine'] = self.window_engine
+        config = self._current_config()
+        modes = config.get('result_window_preferences', {})
+        modes = dict(modes) if isinstance(modes, dict) else {}
+        modes[self.result_mode] = preferences
+        config['result_window_preferences'] = modes
+        owner_save = getattr(self.parentWidget(), 'save_config', None)
+        if callable(owner_save):
+            owner_save()
+        else:
+            # Also synchronize the live main window when OCR owns this dialog.
+            from ocr import _write_ocr_config_updates
+            _write_ocr_config_updates({'result_window_preferences': modes})
+
+    def _set_source_collapsed(self, collapsed, *, resize_window=True):
+        horizontal = self._panel_orientation is True
+        removed = (self.source_panel.width() + self.swap_button.width() + 2*self.body_grid.horizontalSpacing()
+                   if horizontal else self.source_panel.height() + self.swap_button.height() + 2*self.body_grid.verticalSpacing())
+        before = self.size()
+        if resize_window:
+            self._remember_view_size()
         self._source_collapsed = bool(collapsed)
         caption = self.text["show_source" if collapsed else "hide_source"]
         self.source_toggle.setText(caption)
         self.source_toggle.setAccessibleName(caption)
         self.source_toggle.setToolTip(caption)
         self._reflow_editors()
+        if resize_window:
+            factor = float(self.property('ui_effective_scale') or 1)
+            key = 'collapsed_size' if collapsed else 'expanded_size'
+            size = self._view_sizes.get(key)
+            if size is not None:
+                target = size * factor
+            elif collapsed:
+                target = QSize(before.width()-removed, before.height()) if horizontal else QSize(before.width(), before.height()-removed)
+            else:
+                target = QSize(round(700*factor), round(420*factor))
+            self._resize_result_view(target)
         (self.text_edit if collapsed else self.source_edit).setFocus(Qt.OtherFocusReason)
 
     def _reflow_editors(self):
@@ -4507,6 +4634,8 @@ class TranslationResultDialog(QDialog):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reflow_editors()
+        if hasattr(self, 'body_grid'):
+            self._sync_result_layout()
         if hasattr(self, "status_label"):
             self._render_status()
 
@@ -4725,6 +4854,10 @@ class TranslationResultDialog(QDialog):
         self._set_status(self.text["copied"])
 
     def done(self, result):
+        try:
+            self._save_mode_preferences()
+        except (OSError, ValueError, RuntimeError):
+            logging.getLogger('clickntranslate.result').exception('Could not save result-window preferences')
         self._closed = True
         self._invalidate_request()
         super().done(result)
@@ -4737,13 +4870,13 @@ class TranslationResultDialog(QDialog):
             QTimer.singleShot(0, self._center_on_parent)
         QTimer.singleShot(0, self._reflow_editors)
         QTimer.singleShot(0, self._render_status)
+        QTimer.singleShot(0, self._restore_mode_view)
 
     def refresh_theme(self, theme):
         self.theme = theme
         dark = theme != "Светлая"
         background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
         ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
-        scrollbar_active = "#c5b3e9" if dark else "#674586"
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
             QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
@@ -4755,10 +4888,6 @@ class TranslationResultDialog(QDialog):
             QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
             QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
-            QScrollBar:vertical {{ background:{surface}; width:10px; margin:2px; }}
-            QScrollBar::handle:vertical {{ background:{edge}; min-height:24px; border-radius:4px; }}
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{scrollbar_active}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
         """ + standard_buttons(dark, compact=False))
         self.scale_control.set_theme(dark)
         self.source_toggle.setStyleSheet(
@@ -4774,11 +4903,13 @@ class TranslationResultDialog(QDialog):
         app = QApplication.instance()
         manager = getattr(app, '_dialog_appearance', None)
         if manager is None:
-            config = getattr(self.parentWidget(), 'config', {})
+            config = self._current_config()
             manager = install_window_appearance(app, config.get('ui_scale_percent', DEFAULT_SCALE), self.theme)
         return manager
 
     def _refresh_scale_caption(self):
+        self._reflow_editors()
+        self._sync_result_layout()
         manager = getattr(QApplication.instance(), '_dialog_appearance', None)
         value = manager.window_percent(self) if manager else DEFAULT_SCALE
         if self.property('ui_effective_scale') is not None:
@@ -4824,6 +4955,13 @@ class TranslationResultDialog(QDialog):
                 logging.getLogger("clickntranslate.result").exception(
                     "Could not remember the translation-result language pair"
                 )
+        else:
+            keys = HOTKEY_LANGUAGE_CONFIG_KEYS.get(self.result_mode)
+            if self.result_mode == 'main':
+                keys = ('main_translation_source_language', 'main_translation_target_language')
+            if keys:
+                from ocr import _write_ocr_config_updates
+                _write_ocr_config_updates({keys[0]: self.source_code, keys[1]: self.target_code})
 
     def _center_on_parent(self):
         from ui_scaling import center_window
@@ -4869,7 +5007,8 @@ class WelcomeDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        previous_checked = bool(getattr(getattr(self, "checkbox", None), "isChecked", lambda: False)())
+        previous_checked = (self.checkbox.isChecked() if hasattr(self, 'checkbox') else
+                            not getattr(self.parent, 'config', {}).get('show_update_info', True))
         self._stop_animations()
         self._clear_layout()
         text = welcome_text(self.lang)
@@ -4908,7 +5047,7 @@ class WelcomeDialog(QDialog):
                 font-size: 27px;
                 font-weight: 900;
             }
-            QLabel#welcomeBody {
+            QLabel#welcomeBody, QLabel#welcomeSupport {
                 color: #d8d2e8;
                 font-size: 14px;
                 line-height: 1.45;
@@ -5024,6 +5163,10 @@ class WelcomeDialog(QDialog):
             chip.setAlignment(Qt.AlignCenter)
             chips.addWidget(chip)
         card_layout.addLayout(chips)
+        support = QLabel(text["support"])
+        support.setObjectName("welcomeSupport")
+        support.setWordWrap(True)
+        card_layout.addWidget(support)
         card_layout.addStretch()
 
         from ui_details import WelcomeCheckBox, social_icon
@@ -5040,10 +5183,10 @@ class WelcomeDialog(QDialog):
         self.telegram_btn.clicked.connect(self.open_telegram)
         self.github_btn = QPushButton()
         self.github_btn.setObjectName("welcomeGitHub")
-        self.github_btn.clicked.connect(lambda: webbrowser.open("https://github.com/jabrailkhalil"))
+        self.github_btn.clicked.connect(lambda: webbrowser.open("https://github.com/jabrailkhalil/clickntranslate"))
         for button, kind, label in ((self.telegram_btn, 'telegram', text['telegram']),
-                                    (self.github_btn, 'github', 'GitHub · jabrailkhalil')):
-            button.setIcon(social_icon(kind))
+                                    (self.github_btn, 'github', text['github'])):
+            button.setIcon(social_icon(kind, dark=None))
             button.setIconSize(QSize(20, 20))
             button.setFixedSize(36, 36)
             button.setAccessibleName(label)
@@ -5151,18 +5294,22 @@ class WelcomeDialog(QDialog):
 
     def show_language_menu(self):
         menu = QMenu(self)
+        self._language_menu = menu
+        menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        from rounded_windows import clip_rounded_window
+        clip_rounded_window(menu, menu, 8)
         menu.setStyleSheet("""
             QMenu {
                 background-color: #0f131c;
                 color: #ffffff;
                 border: 1px solid #6f5a99;
-                border-radius: 10px;
-                padding: 6px;
+                border-radius: 8px;
+                padding: 5px;
             }
             QMenu::item {
-                padding: 8px 22px 8px 10px;
-                border-radius: 8px;
-                font-weight: 700;
+                padding: 7px 18px 7px 10px;
+                border-radius: 5px;
+                font-weight: 500;
             }
             QMenu::item:selected {
                 background-color: rgba(197, 179, 233, 64);
@@ -5175,7 +5322,18 @@ class WelcomeDialog(QDialog):
             selected = option["code"] == self.lang
             action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
-        menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+        menu.ensurePolished()
+        size = menu.sizeHint()
+        anchor = self.flag_button.mapToGlobal(self.flag_button.rect().bottomRight())
+        screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
+        bounds = screen.availableGeometry()
+        x = max(bounds.left(), min(anchor.x()-size.width()+1, bounds.right()-size.width()+1))
+        y = anchor.y()+6
+        if y+size.height() > bounds.bottom()+1:
+            y = self.flag_button.mapToGlobal(QtCore.QPoint()).y()-size.height()-6
+        y = max(bounds.top(), min(y, bounds.bottom()-size.height()+1))
+        menu.aboutToHide.connect(menu.deleteLater)
+        menu.popup(QtCore.QPoint(x, y))
 
     def set_language(self, language_code):
         self.lang = normalize_interface_language(language_code)
@@ -5639,24 +5797,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             }}
             QTextEdit#docEditor:focus {{
                 border: none;
-            }}
-            QScrollBar:vertical {{
-                background: transparent;
-                width: 10px;
-                margin: 5px 2px 5px 2px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {border};
-                min-height: 34px;
-                border-radius: 5px;
-            }}
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{
-                background: {accent};
-            }}
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{
-                height: 0;
-                background: none;
             }}
             QProgressBar#docProgress {{
                 background-color: {control};
@@ -8401,16 +8541,9 @@ class DarkThemeApp(QMainWindow):
             except RuntimeError:
                 pass
 
-        lang = normalize_interface_language(self.current_interface_language)
-        text = startup_news_text(lang)
-        box = QMessageBox(self)
-        box.setWindowTitle(text["window"].format(version=APP_VERSION))
-        box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        box.setIcon(QMessageBox.Information)
-        box.setTextFormat(Qt.RichText)
-        box.setText(startup_news_html(lang))
-        continue_button = box.addButton(text["continue"], QMessageBox.AcceptRole)
-        box.setDefaultButton(continue_button)
+        # Existing users get the same introduction and project links as a
+        # fresh installation, rather than a second, plain "Got it" dialog.
+        box = WelcomeDialog(self)
         self._startup_news_dialog = box
 
         def remember_and_close(_result):
@@ -8420,6 +8553,9 @@ class DarkThemeApp(QMainWindow):
             # Retain the version for compatibility with older configurations
             # and diagnostics, but the stable announcement ID is authoritative.
             self.config["last_seen_startup_news_version"] = APP_VERSION
+            if box.start_guide_requested:
+                self.config["first_run_guide_completed"] = False
+                self.config["first_run_guide_pending"] = True
             self.save_config()
             box.deleteLater()
             QTimer.singleShot(150, self._maybe_start_first_run_guide)
@@ -8517,6 +8653,12 @@ class DarkThemeApp(QMainWindow):
                     return
             except RuntimeError:
                 pass
+        if not self.isVisible():
+            return
+        if platform_support.IS_MAC and not LAYOUT_EDITOR_MODE:
+            from macos_permissions import maybe_show_permissions
+            if maybe_show_permissions(self):
+                return
         if not self.config.get("first_run_guide_pending", DEFAULT_CONFIG["first_run_guide_pending"]):
             return
         if self.config.get("first_run_guide_completed", DEFAULT_CONFIG["first_run_guide_completed"]):
@@ -9349,9 +9491,6 @@ class DarkThemeApp(QMainWindow):
         self._applied_main_theme = self.current_theme
         # Настроим стиль скроллбара в зависимости от темы
         # Настроим стиль скроллбара в зависимости от темы (как в FAQ)
-        scrollbar_bg = theme['button_background']
-        scrollbar_handle = '#7A5FA1'  # Фиолетовый
-        scrollbar_handle_hover = '#9A7FC1'
         is_dark = self.current_theme != "Светлая"
         shadow_surface = "#302938" if is_dark else "#e2d8ec"
         shadow_border = "#8c739f" if is_dark else "#927aa8"
@@ -9442,33 +9581,6 @@ class DarkThemeApp(QMainWindow):
                 background-color: {theme['item_selected_background']};
                 color: {theme['item_selected_color']};
             }}
-            QComboBox QAbstractItemView QScrollBar:vertical {{
-                background: {scrollbar_bg};
-                width: 10px;
-                margin: 3px 2px;
-                border: none;
-                border-radius: 5px;
-            }}
-            QComboBox QAbstractItemView QScrollBar::handle:vertical {{
-                background: {scrollbar_handle};
-                min-height: 32px;
-                border: none;
-                border-radius: 4px;
-            }}
-            QComboBox QAbstractItemView QScrollBar::handle:vertical:hover,
-            QComboBox QAbstractItemView QScrollBar::handle:vertical:pressed {{
-                background: {scrollbar_handle_hover};
-            }}
-            QComboBox QAbstractItemView QScrollBar::add-line:vertical,
-            QComboBox QAbstractItemView QScrollBar::sub-line:vertical {{
-                height: 0;
-                border: none;
-                background: transparent;
-            }}
-            QComboBox QAbstractItemView QScrollBar::add-page:vertical,
-            QComboBox QAbstractItemView QScrollBar::sub-page:vertical {{
-                background: transparent;
-            }}
 
             QLineEdit, QTextEdit {{
                 background-color: {theme['button_background']};
@@ -9482,28 +9594,6 @@ class DarkThemeApp(QMainWindow):
             }}
             QLineEdit:focus, QTextEdit:focus {{
                 border: 1px solid {input_border_focus};
-            }}
-            QTextEdit QScrollBar:vertical {{
-                background: {scrollbar_bg};
-                width: 12px;
-                margin: 4px 2px 4px 2px;
-                border-radius: 6px;
-            }}
-            QTextEdit QScrollBar::handle:vertical {{
-                background: {scrollbar_handle};
-                min-height: 30px;
-                border-radius: 5px;
-            }}
-            QTextEdit QScrollBar::handle:vertical:hover,
-            QTextEdit QScrollBar::handle:vertical:pressed {{
-                background: {scrollbar_handle_hover};
-            }}
-            QTextEdit QScrollBar::add-line:vertical, QTextEdit QScrollBar::sub-line:vertical {{
-                height: 0;
-                background: none;
-            }}
-            QTextEdit QScrollBar::add-page:vertical, QTextEdit QScrollBar::sub-page:vertical {{
-                background: none;
             }}
         """ + standard_buttons(is_dark, compact=False)
         # Keep the shadow action in the live window theme. A private stylesheet
@@ -9621,7 +9711,6 @@ class DarkThemeApp(QMainWindow):
             divider = "#433a4c" if is_dark else "#d7cde3"
             input_text = "#f2eff6" if is_dark else "#27222d"
             muted = "#b5acbf" if is_dark else "#655b70"
-            scrollbar_handle_active = "#c5b3e9" if is_dark else "#674586"
             section = getattr(self, "main_text_section", None)
             if isinstance(section, QFrame):
                 section.setStyleSheet(
@@ -9652,11 +9741,11 @@ class DarkThemeApp(QMainWindow):
                     " padding: 7px 9px; font-size: 14px; }"
                     "QTextEdit#mainComposerInput:disabled {"
                     f" color: {muted}; }}"
-                    "QScrollBar:vertical { background:transparent; width:6px; margin:3px 0; }"
-                    f"QScrollBar::handle:vertical {{ background:{border}; border-radius:3px; min-height:20px; }}"
-                    f"QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{scrollbar_handle_active}; }}"
-                    "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
-                    "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }"
+
+
+
+
+
                     + tooltip_stylesheet(is_dark)
                 )
             for caption in (getattr(self, 'main_input_caption', None), getattr(self, 'main_result_caption', None)):
@@ -9690,8 +9779,8 @@ class DarkThemeApp(QMainWindow):
                     action.setIconSize(QSize(24, 24))
             button.setStyleSheet(
                 button_qss(is_dark, "quiet", icon=True)
-                + 'QPushButton { border:0; } QPushButton:disabled { background:transparent; border:0; }'
-                + 'QPushButton[keyboardFocus="true"]:focus { border:0; }'
+                + 'QPushButton, QPushButton:hover, QPushButton:pressed, QPushButton:disabled,'
+                  'QPushButton[keyboardFocus="true"]:focus { background:transparent; border:0; }'
                 + tooltip_stylesheet(is_dark)
             )
             button.setIcon(send_arrow_icon("Темная" if is_dark else "Светлая"))
@@ -9930,17 +10019,12 @@ class DarkThemeApp(QMainWindow):
             QTextBrowser {{ background:{'#18171c' if dark else '#faf8fc'};
                 color:{colors['text']}; border:1px solid {colors['border']}; border-radius:6px;
                 padding:10px; font-size:13px; }}
-            QScrollBar:vertical {{ background:transparent; width:8px; margin:4px 0; }}
-            QScrollBar::handle:vertical {{ background:{'#9a7fc1' if dark else '#9474b9'}; min-height:28px; border-radius:4px; }}
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background:{'#c5b3e9' if dark else '#755399'}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
         """)
         layout.addWidget(browser, 1)
         footer = QHBoxLayout()
         footer.setSpacing(8)
         for kind, address in (('telegram', 'https://t.me/jabrail_digital'),
-                              ('github', 'https://github.com/jabrailkhalil')):
+                              ('github', 'https://github.com/jabrailkhalil/clickntranslate')):
             link = QToolButton()
             link.setIcon(social_icon(kind, dark))
             link.setIconSize(QSize(21, 21))

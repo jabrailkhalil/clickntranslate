@@ -67,9 +67,6 @@ class _PreviewButton(QtWidgets.QAbstractButton):
         else:
             painter.setPen(self.palette().text().color())
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, '✦')
-        if self.hasFocus() or self.underMouse():
-            painter.setPen(QtGui.QColor('#9a7fc1'))
-            painter.drawRoundedRect(self.rect().adjusted(0, 0, -1, -1), 3, 3)
 
     def enterEvent(self, event):
         self.rail._hovered = True

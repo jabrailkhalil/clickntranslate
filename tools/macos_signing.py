@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shlex
 import subprocess
@@ -52,10 +53,17 @@ def searchable_keychain(keychain):
                  *[item for item in current if item != str(keychain)]])
 
 
-def setup():
+def setup(name='ClicknTranslate Local Development'):
+    # Restrict the value interpolated into OpenSSL's configuration to one
+    # ordinary subject field; newlines and OpenSSL variable expansion are unsafe.
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}', name):
+        raise ValueError('Signing name must be 1-64 ASCII letters, digits, spaces, dots, underscores or hyphens.')
     directory = signing_directory()
     if (directory / 'identity.json').exists():
-        return load_identity()
+        identity = load_identity()
+        if identity.get('name', 'ClicknTranslate Local Development') != name:
+            raise RuntimeError('This directory contains another signing identity; choose a separate signing directory.')
+        return identity
     if directory.exists() and any(directory.iterdir()):
         raise RuntimeError(f'Incomplete signing setup preserved at {directory}; refusing to replace its key.')
     directory.mkdir(parents=True, mode=0o700, exist_ok=True)
@@ -73,13 +81,13 @@ def setup():
         with tempfile.TemporaryDirectory(prefix='identity-', dir=directory) as temporary:
             stage = Path(temporary)
             config = stage / 'openssl.cnf'
-            config.write_text('''[req]
+            config.write_text(f'''[req]
 distinguished_name = subject
 x509_extensions = code_signing
 prompt = no
 [subject]
-CN = ClicknTranslate Local Development
-O = ClicknTranslate Local Development
+CN = {name}
+O = {name}
 [code_signing]
 basicConstraints = critical,CA:FALSE
 keyUsage = critical,digitalSignature
@@ -96,7 +104,7 @@ subjectKeyIdentifier = hash
         run(['/usr/bin/security', 'set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:',
              '-s', '-k', password, keychain])
         fingerprint = run(['/usr/bin/openssl', 'x509', '-in', certificate, '-noout', '-fingerprint', '-sha1'])
-        identity = {'sha1': fingerprint.strip().split('=')[-1].replace(':', ''),
+        identity = {'name': name, 'sha1': fingerprint.strip().split('=')[-1].replace(':', ''),
                     'keychain': str(keychain), 'certificate': str(certificate),
                     'kind': 'local self-signed development', 'notarized': False}
         (directory / 'identity.json').write_text(json.dumps(identity, indent=2) + '\n')
@@ -141,7 +149,7 @@ def enable_signing(identity):
     return identity
 
 
-def sign(app):
+def sign(app, *, all_code=False):
     identity = load_identity()
     password = (signing_directory() / 'keychain-password').read_text()
     run(['/usr/bin/security', 'unlock-keychain', '-p', password, identity['keychain']])
@@ -150,6 +158,31 @@ def sign(app):
     # Preserve the development bundle's existing runtime behavior. Hardened
     # runtime/notarization belong to the separate Developer ID build path.
     with searchable_keychain(identity['keychain']):
+        if all_code:
+            # A local certificate has no Apple Team ID. Keep development code
+            # outside hardened runtime, while giving every native component
+            # the same stable author identity. Developer ID builds use the spec.
+            magic = {bytes.fromhex(value) for value in (
+                'feedface', 'cefaedfe', 'feedfacf', 'cffaedfe',
+                'cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca')}
+            native_count = 0
+            application = Path(app)
+            for path in sorted(application.rglob('*')):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                with path.open('rb') as stream:
+                    if stream.read(4) not in magic:
+                        continue
+                run(['/usr/bin/codesign', '--force', '--sign', identity['sha1'],
+                     '--keychain', identity['keychain'], '--timestamp=none', path])
+                native_count += 1
+            frameworks = [path for path in application.rglob('*.framework')
+                          if path.is_dir() and not path.is_symlink()]
+            for path in sorted(frameworks, key=lambda item: len(item.parts), reverse=True):
+                run(['/usr/bin/codesign', '--force', '--sign', identity['sha1'],
+                     '--keychain', identity['keychain'], '--timestamp=none', path])
+            identity = dict(identity, native_files_signed=native_count,
+                            frameworks_signed=len(frameworks), hardened_runtime=False)
         run(['/usr/bin/codesign', '--force', '--sign', identity['sha1'], '--keychain', identity['keychain'],
              '--timestamp=none', app])
     run(['/usr/bin/codesign', '--verify', '--deep', '--strict', app])
@@ -162,8 +195,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['setup', 'check', 'sign'])
     parser.add_argument('app', nargs='?')
+    parser.add_argument('--name', default='ClicknTranslate Local Development',
+                        help='Subject name for a new local setup; use a separate signing directory for each identity.')
+    parser.add_argument('--all-code', action='store_true',
+                        help='Sign every native component for a local development bundle, without hardened runtime.')
     args = parser.parse_args()
     if args.action == 'sign' and not args.app:
         parser.error('sign requires an .app path')
-    result = enable_signing(setup()) if args.action == 'setup' else sign(args.app) if args.action == 'sign' else load_identity()
+    result = enable_signing(setup(args.name)) if args.action == 'setup' else sign(args.app, all_code=args.all_code) if args.action == 'sign' else load_identity()
     print(json.dumps(result, indent=2))
