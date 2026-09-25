@@ -1,7 +1,8 @@
 # Click'n'Translate on macOS — 1.8.0
 
-The 1.8.0 release includes native **Apple Silicon (arm64)** DMG and ZIP packages
-for macOS 13.4 or newer. The final app was built and tested on macOS 14.3,
+The 1.8.0 release includes native **Apple Silicon (arm64)** and **Intel (x86_64)**
+DMG packages for macOS 13.4 or newer. The Apple Silicon ZIP is an alternative
+package of the same app. The Apple Silicon app was built and tested on macOS 14.3,
 including Cocoa UI, Apple Vision, RapidOCR, offline Argos translation, screen
 capture and permission prompts. Screen Recording and Accessibility were granted;
 automatic Cmd+C/V in a separate application was not checked in the final bundle.
@@ -11,8 +12,14 @@ The app, embedded native code and DMG are self-signed as **jabrailkhalil**.
 There is no Apple Developer ID or notarization yet, so Gatekeeper can block first
 launch. This signature does not establish Apple-verified publisher trust.
 
-The source also supports Intel (`x86_64`), but this release contains **no Intel
-Mac build**. Native validation of this version was performed on Apple Silicon.
+The Intel app was built on a native Intel GitHub runner from `5a789a3`, with
+application sources identical to release commit `414319d`; intervening changes
+only affect CI tools and tests. Platform tests and frozen GUI/OCR/helper checks
+passed. It was then signed
+with the same `jabrailkhalil` identity as Apple Silicon. The embedded Python
+archives were checked before and after signing; their contents did not change.
+The signed app also passed the extended smoke check through Rosetta on macOS 14.3.
+See the [Intel build report](QA_MACOS_INTEL_1.8.0_2026-09-25.md).
 
 [Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0)
 · [Earlier native audit](MACOS_QA.md) · [Development handoff](MACOS_HANDOFF.md)

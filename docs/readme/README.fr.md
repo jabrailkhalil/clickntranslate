@@ -14,12 +14,13 @@ OCR et traduction d’écran gratuits et open source pour **Windows, Linux et ma
 | Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Sans installation ; extrayez l’archive entière. |
 | Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | Application en un fichier pour Linux x86_64 ; autorisez son exécution. |
 | Linux x86_64 | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.tar.gz) | Dossier de l’application pour Linux x86_64 ; à extraire avant utilisation. |
-| macOS arm64 | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Installation sur Apple Silicon (M1 ou plus récent), avec macOS 13.4 ou plus récent. |
-| macOS arm64 | [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | La même application Apple Silicon dans une archive ZIP. |
+| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Installation sur Apple Silicon (M1 ou plus récent), avec macOS 13.4 ou plus récent. |
+| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | Installation sur Mac Intel (x86_64), avec macOS 13.4 ou plus récent. |
+| Mac — Apple Silicon | [ZIP (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.zip) | La même application Apple Silicon dans une archive ZIP. |
 
 [Tous les téléchargements, sommes SHA-256 et signatures](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
 
-Les versions Windows et macOS utilisent actuellement un **certificat autosigné nommé `jabrailkhalil`**. Windows peut afficher un avertissement SmartScreen. L’application Mac ne dispose pas encore d’un Developer ID Apple ni de notarisation ; Gatekeeper peut donc bloquer son premier lancement. Des signatures OpenPGP séparées sont disponibles pour Linux. Cette version ne comprend pas de compilation pour Mac Intel.
+Les versions Windows et macOS utilisent actuellement un **certificat autosigné nommé `jabrailkhalil`**. Windows peut afficher un avertissement SmartScreen. L’application Mac ne dispose pas encore d’un Developer ID Apple ni de notarisation ; Gatekeeper peut donc bloquer son premier lancement. Des signatures OpenPGP séparées sont disponibles pour Linux. Choisissez **Apple Silicon** pour les puces M1 ou plus récentes, ou **Intel** pour les Mac Intel. Le DMG et le ZIP Apple Silicon contiennent la même architecture.
 
 ## Fonctionnalités
 
