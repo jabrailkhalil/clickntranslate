@@ -26,6 +26,11 @@
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
+    <release version="1.8.1" date="2026-09-25" type="development">
+      <description>
+        <p>Maintenance release with stricter update package validation and verified migration paths.</p>
+      </description>
+    </release>
     <release version="1.8.0" date="2026-09-23" type="development">
       <description>
         <p>Improved translation and assistant windows, added a compact desktop mascot, and made button hover tips optional.</p>
