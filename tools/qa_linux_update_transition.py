@@ -30,7 +30,8 @@ data.mkdir(parents=True)
 config = dict(interface_language='ru',ui_scale_percent=100,theme='Светлая',
               update_check_on_launch=False,show_update_info=False,first_run_guide_completed=True,
               first_run_guide_pending=False,autostart=False,start_minimized=False,
-              desktop_assistant_enabled=False,hotkey_defaults_revision=5,audit_marker='linux-real-170-181')
+              desktop_assistant_enabled=False,hotkey_defaults_revision=5,
+              last_seen_startup_news_id='community-1000-downloads-gaming',audit_marker='linux-real-170-181')
 for key in ('copy_hotkey','translate_hotkey','fullscreen_translate_hotkey','translate_selection_hotkey',
             'translate_replace_selection_hotkey','game_translate_hotkey','toggle_window_hotkey'):
     config[key] = ''
