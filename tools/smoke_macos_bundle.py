@@ -10,6 +10,14 @@ import sys
 import tempfile
 
 
+def smoke_timeout(environment):
+    default = 300 if environment.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1' else 120
+    value = int(environment.get('CLICKNTRANSLATE_SMOKE_TIMEOUT', default))
+    if value <= 0:
+        raise ValueError('CLICKNTRANSLATE_SMOKE_TIMEOUT must be positive')
+    return value
+
+
 def main():
     if sys.platform != "darwin":
         raise SystemExit("Run the native smoke check on macOS.")
@@ -37,7 +45,7 @@ def main():
                             '--stderr', str(Path(temporary) / 'smoke-stderr.log'),
                             '--args', '--smoke-test', str(native_report)],
                            env=environment, check=True,
-                           timeout=300 if environment.get('CLICKNTRANSLATE_EXTENDED_SMOKE') == '1' else 120)
+                           timeout=smoke_timeout(environment))
         finally:
             for result in Path(temporary).iterdir():
                 shutil.copy2(result, report.parent / result.name)
