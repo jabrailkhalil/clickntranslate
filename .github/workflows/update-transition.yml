@@ -74,7 +74,7 @@ jobs:
       - name: Install desktop runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb xdotool libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-xinerama0
+          sudo apt-get install -y xvfb libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-xinerama0
       - name: Replace the published AppImage and verify existing data
         env:
           GH_TOKEN: ${{ github.token }}

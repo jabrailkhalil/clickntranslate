@@ -1,4 +1,4 @@
-import argparse, hashlib, json, os, re, socket, struct, subprocess, sys, tempfile, time
+import argparse, hashlib, json, os, re, signal, socket, struct, subprocess, sys, tempfile, time
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -63,20 +63,26 @@ try:
                 time.sleep(2)
                 assert proc.poll() is None
                 if version == '1.7.0':
-                    # The released 1.7 protocol has no quit command. Close its
-                    # actual X11 window; Xvfb has no tray, so this exits normally.
-                    windows = subprocess.check_output(['xdotool', 'search', '--onlyvisible', '--pid', str(pid),
-                                                       '--name', "^Click'n'Translate$"], text=True).split()
-                    assert len(windows) == 1, windows
-                    subprocess.run(['xdotool', 'windowclose', windows[0]], check=True)
+                    # 1.7 has no quit IPC, and Xvfb has no tray Exit menu. Stop
+                    # the GUI identified by our private socket before replacing
+                    # its AppImage. This is not evidence of graceful old shutdown.
+                    os.kill(pid, signal.SIGTERM)
+                    exit_code = proc.wait(timeout=20)
+                    graceful = False
+                    shutdown = 'SIGTERM to original GUI before manual replacement'
                 else:
                     assert single_instance.send_command_status('quit',channel,target_pid=pid) is single_instance.CommandStatus.ACCEPTED
-                assert proc.wait(timeout=20)==0
+                    exit_code = proc.wait(timeout=20)
+                    assert exit_code == 0
+                    graceful = True
+                    shutdown = 'application quit command'
                 actual=json.loads((data/'config.json').read_text())
                 for key in ('interface_language','ui_scale_percent','theme','autostart','audit_marker'):
                     assert actual[key]==config[key],key
                 for relative,expected in markers.items(): assert sha(data_root/relative)==expected,relative
-                report['launches'].append(dict(version=version,ready=True,graceful_exit=True,preferences_preserved=True,markers_preserved=True))
+                report['launches'].append(dict(version=version,ready=True,graceful_exit=graceful,
+                                               shutdown=shutdown,exit_code=exit_code,
+                                               preferences_preserved=True,markers_preserved=True))
             finally:
                 if proc.poll() is None:
                     proc.terminate()
