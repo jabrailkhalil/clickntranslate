@@ -2,9 +2,9 @@
 
 ## Release decision
 
-**Do not promote the existing 1.8.0 prerelease on the strength of unit tests.**
-The candidate fixes are being prepared as 1.8.1 so clients that downloaded
-1.8.0 also see a higher version. The published 1.8.0 assets remain unchanged.
+**1.8.1 was promoted after the final package checks passed.** The stable GitHub
+feed now returns 1.8.1, so clients that downloaded 1.8.0 also see a higher version.
+The published 1.8.0 prerelease and its assets remain unchanged.
 Results below identify the exact candidate they cover. They are not approval
 of subsequently rebuilt binaries.
 
@@ -51,6 +51,64 @@ make the download list shorter. The two Windows sidecars are machine inputs.
    the installer omits a nested `cv2/data/__init__.py` shipped in the ZIP. A test
    must use the actual installed helper and actual installed files, not assume
    every dependency is identical between those distribution formats.
+8. **An orphan OCR process could satisfy the startup health check.** The helper
+   now requires the exact main GUI executable to remain running. Added tests
+   cover both ZIP and installer updates where the GUI acknowledges readiness,
+   starts an OCR child, then crashes; those updates must roll back.
+
+## Final 1.8.1 candidate
+
+The final files are in `releases/1.8.1-final`, with eight public assets: five
+application downloads, two Windows compatibility checksums and one optional
+verification archive. The package hashes and final evidence are summarized in
+[the 1.8.1 QA report](QA_1.8.1_2026-09-25.md).
+
+All six real Windows transitions passed twice against the final bytes: locally
+and on clean Windows Server 2022 GitHub runners. The originals were 1.6.0 ZIP,
+1.6.1 ZIP, 1.7.0 ZIP/installer and 1.8.0 ZIP/installer. Each run invoked the
+helper shipped in the old release, checked all 3,956 candidate files, retained
+synthetic preferences and three data/model markers, and verified a second GUI
+startup. The clean-run receipts also confirm fixture cleanup completed.
+
+An additional untouched 1.7 GUI test passed the complete startup prompt,
+download, checksum, old-helper replacement and restart path with normal TEMP.
+It used a localhost mirror of the final bytes, not the live stable feed.
+The clean-run tests separately downloaded the public GitHub files. Their helper
+invocation is automated through the helper CLI, not by clicking the download UI.
+
+`tools/verify_update_evidence.py` checks that all six receipts match the exact
+final ZIP/installer hashes. Both local and public-download gates passed; receipts
+from the superseded candidate were rejected. Rebuilding a package invalidates
+these results until the new bytes pass again.
+
+Mac ARM and Intel manual 1.8.0 → 1.8.1 transitions passed with isolated HOME
+directories, retained preferences/model markers and a second startup. Both
+architectures retain the published 1.8.0 designated requirement and signer
+`FC6752F0026D34E5B63433544AF788B8FC1899EF`. This is a self-signed identity,
+not Apple Developer ID or notarization. CI initially stored a different older
+Mac certificate. The final packages use the existing local published identity;
+repository certificate pins and encrypted Actions signing secrets were then
+synchronized to that same identity. No replacement signing key was generated.
+The signing continuity probe passed on both native Mac architectures in
+[CI run 36165874223](https://github.com/jabrailkhalil/clickntranslate/actions/runs/36165874223):
+changed code kept the same designated requirement, and an ad-hoc replacement
+was rejected.
+
+The original 1.7 Linux AppImage requires glibc 2.38 and cannot start on the local
+Ubuntu 22.04 host. The final 1.8.1 AppImage runs there; the original-to-new
+transition is tested separately on Ubuntu 24.04. Early harness runs failed on
+an overlong test socket path and an extra welcome window. Those were fixture
+issues, not successful product migrations, and their failed receipts are kept.
+The final public-file transition passed in run `36165244387`. The original
+1.7 process was explicitly stopped with SIGTERM before manual replacement;
+its IPC has no quit operation and the headless test environment has no tray
+Exit menu. This is not proof of graceful old-version shutdown. Both 1.8.1
+launches acknowledged readiness, retained preferences/markers and quit normally.
+
+Known limits remain: an already-installed old Windows helper still has its
+original long-path limitation; current Mac/Linux clients open the download page
+instead of replacing the app automatically; power-loss recovery is not proven.
+Local Microsoft Defender was unavailable, so no local Defender pass is claimed.
 
 ## Executed migration evidence
 

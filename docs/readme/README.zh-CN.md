@@ -6,19 +6,21 @@
 
 ![Click'n'Translate 的三种使用方式](../images/how-it-works.png)
 
-## 下载 1.8.0
+## 下载 1.8.1
 
 | 系统 | 下载 | 用途 |
 | --- | --- | --- |
-| Windows x64 | [安装程序 (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | 在 Windows 10/11 x64 上正常安装。 |
-| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | 无需安装；请完整解压后运行。 |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | Linux x86_64 单文件应用；启动前请赋予执行权限。 |
-| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | 适用于 Apple Silicon（M1 及更新芯片），要求 macOS 13.4 或更新版本。 |
-| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | 适用于 Intel Mac（x86_64），要求 macOS 13.4 或更新版本。 |
+| Windows x64 | [安装程序 (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-x64-installer.exe) | 在 Windows 10/11 x64 上正常安装。 |
+| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-portable-x64.zip) | 无需安装；请完整解压后运行。 |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-linux-x86_64.AppImage) | Linux x86_64 单文件应用；启动前请赋予执行权限。 |
+| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-arm64.dmg) | 适用于 Apple Silicon（M1 及更新芯片），要求 macOS 13.4 或更新版本。 |
+| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-x86_64.dmg) | 适用于 Intel Mac（x86_64），要求 macOS 13.4 或更新版本。 |
 
-[全部下载、SHA-256 校验和及签名文件](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
+[全部下载、SHA-256 校验和及签名文件](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1).
 
 Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书**。Windows 可能显示 SmartScreen 警告；Mac 版本尚无 Apple Developer ID 签名或公证，Gatekeeper 可能阻止首次启动。Linux 下载提供独立的 OpenPGP 签名。M1 及更新芯片请选择 **Apple Silicon**，Intel 处理器的 Mac 请选择 **Intel**。
+
+**更新：**Windows 可在应用内更新。macOS 和 Linux 需下载新的 DMG/AppImage 并手动替换应用，请保留现有用户数据。
 
 ## 功能
 

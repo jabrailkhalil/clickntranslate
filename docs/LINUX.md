@@ -1,9 +1,11 @@
 # Click'n'Translate on Linux
 
-Version **1.8.0** includes x86_64 AppImage and tar.gz packages, built and tested
-on Ubuntu 22.04.5 with native UI, OCR and offline translation checks. Separate
-OpenPGP signatures by `jabrailkhalil` and SHA-256 checksums accompany the downloads.
-See the [current QA report](QA_1.8.0_2026-09-25.md).
+Version **1.8.1** is distributed as an x86_64 AppImage. The final package starts
+on Ubuntu 22.04.5; replacement of the original 1.7 AppImage is checked separately
+on Ubuntu 24.04 because the old binary requires glibc 2.38. Linux updates open
+the download page: replace the AppImage manually and retain your XDG user data.
+See the [current QA report](QA_1.8.1_2026-09-25.md) and the
+[earlier native OCR/capture audit](QA_1.8.0_2026-09-25.md).
 
 Earlier source audit: [19 September 2026](QA_LINUX_2026_09_19.md) (Russian).
 It covers real X11 and two-output Wayland capture, mixed scaling, desktop

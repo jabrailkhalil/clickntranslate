@@ -6,19 +6,21 @@
 
 ![Три способа использовать Click'n'Translate](../images/how-it-works.png)
 
-## Скачать 1.8.0
+## Скачать 1.8.1
 
 | Система | Скачать | Для чего |
 | --- | --- | --- |
-| Windows x64 | [Установщик (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | Обычная установка на Windows 10/11, x64. |
-| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Запуск без установки; распакуйте архив целиком. |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | Один исполняемый файл для Linux x86_64; перед запуском разрешите его выполнение. |
-| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Установка на Apple Silicon (M1 и новее), macOS 13.4 или новее. |
-| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | Установка на Mac с процессором Intel (x86_64), macOS 13.4 или новее. |
+| Windows x64 | [Установщик (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-x64-installer.exe) | Обычная установка на Windows 10/11, x64. |
+| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-portable-x64.zip) | Запуск без установки; распакуйте архив целиком. |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-linux-x86_64.AppImage) | Один исполняемый файл для Linux x86_64; перед запуском разрешите его выполнение. |
+| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-arm64.dmg) | Установка на Apple Silicon (M1 и новее), macOS 13.4 или новее. |
+| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-x86_64.dmg) | Установка на Mac с процессором Intel (x86_64), macOS 13.4 или новее. |
 
-[Все файлы, контрольные суммы SHA-256 и подписи](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
+[Все файлы, контрольные суммы SHA-256 и подписи](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1).
 
 В сборках Windows и macOS пока используется **самоподписанный сертификат `jabrailkhalil`**. Windows может показать предупреждение SmartScreen. У Mac-версии пока нет Apple Developer ID и нотариализации, поэтому Gatekeeper может заблокировать первый запуск. Для Linux доступны отдельные подписи OpenPGP. Выбирайте **Apple Silicon** для M1 и новее, **Intel** — для Mac с процессором Intel.
+
+**Обновления:** в Windows — через кнопку обновления в приложении. На macOS и Linux скачайте новый DMG/AppImage и замените приложение вручную, сохранив пользовательские данные. [Проверки и ограничения обновления](../UPDATE_AUDIT_2026-09-25.md).
 
 ## Возможности
 

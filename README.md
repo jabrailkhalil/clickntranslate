@@ -6,19 +6,21 @@ Free, open-source screen OCR and translation for **Windows, Linux and macOS**. C
 
 ![Three ways to use Click'n'Translate](docs/images/how-it-works.png)
 
-## Download 1.8.0
+## Download 1.8.1
 
 | System | Download | Choose this for |
 | --- | --- | --- |
-| Windows x64 | [Installer (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-x64-installer.exe) | A regular installation on Windows 10/11, x64. |
-| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-windows-portable-x64.zip) | Running without installation; extract the entire archive. |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-linux-x86_64.AppImage) | A single-file application for Linux x86_64; make it executable before opening. |
-| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-arm64.dmg) | Installing on Apple Silicon (M1 and newer), macOS 13.4 or later. |
-| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.0/Click-n-Translate-1.8.0-macos-x86_64.dmg) | Installing on an Intel Mac (x86_64), macOS 13.4 or later. |
+| Windows x64 | [Installer (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-x64-installer.exe) | A regular installation on Windows 10/11, x64. |
+| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-portable-x64.zip) | Running without installation; extract the entire archive. |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-linux-x86_64.AppImage) | A single-file application for Linux x86_64; make it executable before opening. |
+| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-arm64.dmg) | Installing on Apple Silicon (M1 and newer), macOS 13.4 or later. |
+| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-x86_64.dmg) | Installing on an Intel Mac (x86_64), macOS 13.4 or later. |
 
-[All downloads and the signature/checksum archive](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0).
+[All downloads and the signature/checksum archive](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1).
 
 Windows and macOS builds currently use a **self-signed certificate named `jabrailkhalil`**. Windows may show a SmartScreen warning; the Mac app has no Apple Developer ID or notarization, so Gatekeeper may block its first launch. Linux downloads have separate OpenPGP signatures. Choose **Apple Silicon** for M1 and newer chips, or **Intel** for Intel Macs.
+
+**Updates:** Windows uses the Update button in the app. On macOS and Linux, download the new DMG/AppImage and replace the application manually; keep your existing user data. [Update checks and limitations](docs/UPDATE_AUDIT_2026-09-25.md).
 
 ## What is included
 

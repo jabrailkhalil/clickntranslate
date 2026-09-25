@@ -1,28 +1,25 @@
-# Click'n'Translate on macOS — 1.8.0
+# Click'n'Translate on macOS — 1.8.1
 
-The 1.8.0 release includes native **Apple Silicon (arm64)** and **Intel (x86_64)**
-DMG packages for macOS 13.4 or newer. The Apple Silicon app was built and tested
-on macOS 14.3,
-including Cocoa UI, Apple Vision, RapidOCR, offline Argos translation, screen
-capture and permission prompts. Screen Recording and Accessibility were granted;
-automatic Cmd+C/V in a separate application was not checked in the final bundle.
-See the [current QA report](QA_1.8.0_2026-09-25.md) for results and limits.
+The release includes separate **Apple Silicon (arm64)** and **Intel (x86_64)**
+DMG packages for macOS 13.4 or newer. Final signed bundles passed GUI/settings,
+Vision OCR, Carbon registration, RapidOCR and Argos helper checks. Intel was
+also built and checked on a native Intel runner, then re-signed with the same
+published identity and checked under Rosetta on macOS 14.3.
 
-The app, embedded native code and DMG are self-signed as **jabrailkhalil**.
-There is no Apple Developer ID or notarization yet, so Gatekeeper can block first
-launch. This signature does not establish Apple-verified publisher trust.
+Both architectures passed manual 1.8.0 → 1.8.1 replacement with retained
+preferences/model markers and a second startup. Mac updates currently open the
+download page; replacing the application is manual. Keep existing user data.
+The designated requirement and **jabrailkhalil** signing identity remain the
+same as the published 1.8.0 bundles.
 
-The Intel app was built on a native Intel GitHub runner from `5a789a3`, with
-application sources identical to release commit `414319d`; intervening changes
-only affect CI tools and tests. Platform tests and frozen GUI/OCR/helper checks
-passed. It was then signed
-with the same `jabrailkhalil` identity as Apple Silicon. The embedded Python
-archives were checked before and after signing; their contents did not change.
-The signed app also passed the extended smoke check through Rosetta on macOS 14.3.
-See the [Intel build report](QA_MACOS_INTEL_1.8.0_2026-09-25.md).
+The app, embedded native code and DMG are self-signed. There is no Apple
+Developer ID or notarization yet, so Gatekeeper can block first launch.
+This signature does not establish Apple-verified publisher trust.
 
-[Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.0)
-· [Earlier native audit](MACOS_QA.md) · [Development handoff](MACOS_HANDOFF.md)
+[Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1)
+· [Current QA and limitations](QA_1.8.1_2026-09-25.md)
+· [Earlier capture and permissions audit](QA_1.8.0_2026-09-25.md)
+· [Development handoff](MACOS_HANDOFF.md)
 
 ## Run from source on a Mac
 
@@ -299,7 +296,7 @@ encrypted keychain from two repository Actions secrets:
 Explicit `prepare_release` runs restore the same signer without publishing a release.
 The same certificate signs both arm64 and Intel releases. Its public certificate
 is `packaging/macos/release-certificate.pem`; the pinned SHA-1 fingerprint is
-`E5E6A8042F96479E560AED29881A6F06D4D374A2`. Missing secrets or a mismatched signer
+`FC6752F0026D34E5B63433544AF788B8FC1899EF`. Missing secrets or a mismatched signer
 fail the release; there is no ad-hoc fallback. PR jobs never restore the key.
 
 To provision or restore these secrets from the original builder, authenticate
@@ -307,7 +304,8 @@ the official GitHub CLI as a repository administrator, then run:
 
 ```bash
 gh auth login --hostname github.com --web --scopes workflow
-.venv-macos/bin/python tools/macos_ci_signing.py upload
+CLICKNTRANSLATE_SIGNING_DIR="$HOME/Library/Application Support/ClicknTranslateBuild/signing-jabrailkhalil" \
+  .venv-macos/bin/python tools/macos_ci_signing.py upload
 ```
 
 The uploader reads the existing private directory, sends secret values to `gh`

@@ -89,6 +89,6 @@ Get-ChildItem macos-prepared -Filter BUILD.json -Recurse | ForEach-Object {
 нужен вход в GitHub. См. [правила хранения и скачивания GitHub](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).
 
 Подпись одна для обеих архитектур:
-`E5E6A8042F96479E560AED29881A6F06D4D374A2`. Она постоянная self-signed,
+`FC6752F0026D34E5B63433544AF788B8FC1899EF`. Она постоянная self-signed,
 без платного Apple Developer ID и без нотариализации. Подготовка файлов
 не публикует обновление для пользователей и не запускает GitHub Release.
