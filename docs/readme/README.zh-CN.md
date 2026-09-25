@@ -4,6 +4,8 @@
 
 [English](../../README.md) · [Русский](README.ru.md) · **简体中文** · [Español](README.es.md) · [Français](README.fr.md)
 
+![Click'n'Translate 的三种使用方式](../images/how-it-works.png)
+
 ## 下载 1.8.0
 
 | 系统 | 下载 | 用途 |
@@ -27,6 +29,56 @@ Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书*
 - 明暗主题、六种界面语言，以及每种模式独立的窗口偏好设置。
 - **1.8.0：**统一欢迎界面、改进语言菜单和动态叠加、macOS 权限引导，以及全应用细滚动条。
 
+文档工作区支持 `.txt`、`.md`、`.docx`、`.pdf`、`.html`、`.htm` 和 `.rtf`。可以并排编辑原文与译文，也可以隐藏原文以缩小窗口。设置中提供偏好导入/导出，以及可选的本地历史记录。
+
+## 实际演示
+
+### 翻译游戏文字
+
+![翻译游戏文字](../images/translation-demo-v2.gif)
+
+### 复制任意屏幕区域的文字
+
+![复制任意屏幕区域的文字](../images/area-ocr-demo-v2.gif)
+
+### 翻译应用中选中的文字
+
+![翻译应用中选中的文字](../images/selected-text-demo-v2.gif)
+
+### 翻译整个屏幕
+
+![翻译整个屏幕](../images/fullscreen-translation-demo-v2.gif)
+
+### 一键更新（Windows）
+
+![一键更新（Windows）](../images/update-demo.gif)
+
+## 快捷键
+
+| 默认快捷键 | 操作 |
+| --- | --- |
+| `Ctrl + Alt + C` | 识别选定区域中的文字并复制 |
+| `Ctrl + Alt + T` | 捕获区域、识别文字并翻译 |
+| `Ctrl + Alt + F` | 翻译整个屏幕 |
+| `Ctrl + Alt + Q` | 翻译当前应用中选中的文字 |
+| `Ctrl + Shift + Q` | 用译文替换选中的文字 |
+| `Ctrl + Shift + Space` | 显示或隐藏 Click'n'Translate |
+| `Ctrl + Alt + G` | 启动或停止所选区域的动态翻译 |
+
+所有快捷键均可在 **设置 → 配置快捷键** 中修改或清除。OCR、选中文字、替换、全屏和动态翻译会分别记住所选语言对。
+
+表中列出 Windows 默认快捷键。在 **macOS** 上，用 **Command** 替代 Ctrl，用 **Option** 替代 Alt。在 **Linux** 上，请在桌面快捷键设置中绑定对应命令：[Linux 指南](../../docs/LINUX.md)。
+
+## 翻译与 OCR 引擎
+
+| 类型 | 引擎 | 适用场景 |
+| --- | --- | --- |
+| 在线翻译 | Google、MyMemory、Lingva、LibreTranslate | 无需下载模型的快速翻译 |
+| 离线翻译 | Argos Translate、Hy-MT | 安装所选软件包后的本地私密翻译 |
+| OCR | Windows OCR / Apple Vision、Tesseract、RapidOCR、EasyOCR | 识别不同文字系统和图像样式 |
+
+在**设置 → 语言包**中安装或删除 OCR 引擎、识别语言和离线翻译模型。仅下载您选择的软件包；已安装的离线引擎无需联网。原生 OCR 在 Windows 上使用 Windows OCR，在 macOS 上使用 Apple Vision。在线翻译服务的可用性取决于服务商。
+
 ## 开始使用
 
 1. 下载适合您系统的文件并打开应用。发行包已包含 Python 运行环境。
@@ -38,5 +90,7 @@ OCR 在本地运行。在线翻译会将文本发送给您选择的服务；如�
 ## 帮助与开发
 
 [Linux 指南](../../docs/LINUX.md) · [macOS 指南与构建](../../docs/MACOS.md) · [反馈问题](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0 许可证](../../LICENSE)
+
+如需诊断报告，请在应用中打开**帮助 → 错误报告**，并将生成的 ZIP 附在反馈中。报告不包含剪贴板文本、文档内容、历史记录或凭据。
 
 Click’n’Translate 完全免费。如果对您有帮助，欢迎[在 GitHub 上为项目加星](https://github.com/jabrailkhalil/clickntranslate)，并[加入 Telegram](https://t.me/jabrail_digital)。

@@ -4,6 +4,8 @@ OCR y traducción de pantalla gratuitos y de código abierto para **Windows, Lin
 
 [English](../../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · **Español** · [Français](README.fr.md)
 
+![Tres formas de usar Click'n'Translate](../images/how-it-works.png)
+
 ## Descargar 1.8.0
 
 | Sistema | Descarga | Uso |
@@ -27,6 +29,56 @@ Las versiones de Windows y macOS usan por ahora un **certificado autofirmado lla
 - Temas claro y oscuro, seis idiomas de interfaz y preferencias de ventana independientes por modo.
 - **1.8.0:** bienvenida unificada, menús de idiomas más claros, mejoras de superposición dinámica, guía de permisos en Mac y barras de desplazamiento finas.
 
+El espacio de documentos abre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` y `.rtf`. Edita el original y la traducción en paralelo, u oculta el original para reducir la ventana. Ajustes incluye importación y exportación de preferencias e historiales locales opcionales.
+
+## Míralo en acción
+
+### Traducir texto de juegos
+
+![Traducir texto de juegos](../images/translation-demo-v2.gif)
+
+### Copiar texto de cualquier zona de la pantalla
+
+![Copiar texto de cualquier zona de la pantalla](../images/area-ocr-demo-v2.gif)
+
+### Traducir texto seleccionado en una aplicación
+
+![Traducir texto seleccionado en una aplicación](../images/selected-text-demo-v2.gif)
+
+### Traducir toda la pantalla
+
+![Traducir toda la pantalla](../images/fullscreen-translation-demo-v2.gif)
+
+### Actualizar con un clic (Windows)
+
+![Actualizar con un clic (Windows)](../images/update-demo.gif)
+
+## Atajos de teclado
+
+| Atajo predeterminado | Acción |
+| --- | --- |
+| `Ctrl + Alt + C` | Extraer el texto de un área y copiarlo |
+| `Ctrl + Alt + T` | Capturar un área, reconocer el texto y traducirlo |
+| `Ctrl + Alt + F` | Traducir la pantalla completa |
+| `Ctrl + Alt + Q` | Traducir el texto seleccionado en la aplicación activa |
+| `Ctrl + Shift + Q` | Sustituir el texto seleccionado por su traducción |
+| `Ctrl + Shift + Space` | Mostrar u ocultar Click'n'Translate |
+| `Ctrl + Alt + G` | Iniciar o detener la traducción dinámica de las áreas elegidas |
+
+Todos los atajos se pueden modificar o borrar en **Ajustes → Configurar atajos**. Las parejas de idiomas se recuerdan por separado para OCR, selección, sustitución, pantalla completa y traducción dinámica.
+
+La tabla muestra los atajos de Windows. En **macOS**, usa **Command** en lugar de Ctrl y **Option** en lugar de Alt. En **Linux**, asigna los comandos en los ajustes de teclado del escritorio: [guía de Linux](../../docs/LINUX.md).
+
+## Motores de traducción y OCR
+
+| Tipo | Motores | Recomendado para |
+| --- | --- | --- |
+| Traducción en línea | Google, MyMemory, Lingva, LibreTranslate | Traducción rápida sin descargar un modelo |
+| Traducción sin conexión | Argos Translate, Hy-MT | Traducción privada tras instalar los paquetes elegidos |
+| OCR | Windows OCR / Apple Vision, Tesseract, RapidOCR, EasyOCR | Extraer texto de distintos alfabetos y tipos de imagen |
+
+En **Ajustes → Paquetes de idiomas** puedes instalar y eliminar motores OCR, idiomas y modelos de traducción sin conexión. Solo se descargan los paquetes elegidos; los motores locales instalados funcionan sin internet. El OCR nativo es Windows OCR en Windows y Apple Vision en macOS. La disponibilidad de los traductores en línea depende del servicio.
+
 ## Primeros pasos
 
 1. Descarga el archivo para tu sistema y abre la aplicación. Python ya está incluido.
@@ -38,5 +90,7 @@ El OCR se ejecuta localmente. La traducción en línea envía el texto al provee
 ## Ayuda y desarrollo
 
 [Linux](../../docs/LINUX.md) · [macOS y compilación](../../docs/MACOS.md) · [Informar de un problema](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licencia GPL-3.0](../../LICENSE)
+
+Para un diagnóstico, abre **Ayuda → Informe de errores** y adjunta el ZIP generado al problema. No incluye texto del portapapeles, contenido de documentos, historiales ni credenciales.
 
 Click’n’Translate es gratuito. Si te resulta útil, agradecemos que [des una estrella al proyecto en GitHub](https://github.com/jabrailkhalil/clickntranslate) y [te unas a Telegram](https://t.me/jabrail_digital).
