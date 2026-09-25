@@ -1,4 +1,4 @@
-name: Published Windows update transitions
+name: Published update transitions
 
 on:
   workflow_dispatch:
@@ -53,4 +53,33 @@ jobs:
             build/update-audit/**/old-ready.txt
             build/update-audit/**/restart-ready.txt
             build/update-downloads/**/releases.json
+          if-no-files-found: warn
+
+  linux-manual-transition:
+    # Published 1.7 requires glibc 2.38; it cannot start on Ubuntu 22.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install desktop runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-xinerama0
+      - name: Replace the published AppImage and verify existing data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ inputs.candidate }}
+        run: xvfb-run -a python tools/qa_linux_update_transition.py --new-version "$CANDIDATE"
+      - name: Preserve Linux transition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-manual-transition
+          path: |
+            build/linux-update-audit/**/result.json
+            build/linux-update-audit/**/launch-*.log
+            build/linux-update-audit/**/ready-*.txt
           if-no-files-found: warn
