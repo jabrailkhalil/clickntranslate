@@ -673,10 +673,23 @@ internal static class ClicknTranslateApplyUpdate
             status.Text = "The update could not be installed";
             status.ForeColor = Palette.DangerText;
             detail.Text = rollbackCompleted
-                ? "The previous files were restored. Close other copies of the app and run Update again."
+                ? "The previous files were restored. " + FailureAdvice(eventArgs.Error)
                 : "Automatic recovery could not finish. Create a startup report or reinstall into the same folder."
                     + (string.IsNullOrWhiteSpace(recoveryBackup) ? "" : "\nRecovery files: " + recoveryBackup);
             closeButton.Enabled = true;
+        }
+
+        private static string FailureAdvice(Exception error)
+        {
+            if (error is PathTooLongException)
+                return "A file path is too long. Use a shorter installation or temporary folder and try again.";
+            if (error is UnauthorizedAccessException)
+                return "Windows denied access to a file. Check the folder permissions and antivirus report.";
+            if (error is InvalidDataException)
+                return "The update package is incomplete or damaged. Download the update again.";
+            if (error is TimeoutException)
+                return "The new version did not confirm startup. Create a startup report before trying again.";
+            return "Create a startup report to identify the problem before trying again.";
         }
 
         private void OnFormClosing(object sender, FormClosingEventArgs eventArgs)
@@ -696,10 +709,22 @@ internal static class ClicknTranslateApplyUpdate
             string marker = Path.Combine(request.AppDirectory, "data", ".update-in-progress");
             string backup = null;
             bool backupComplete = false;
+            string extract = null;
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(marker));
                 File.WriteAllText(marker, DateTime.UtcNow.ToString("O"), new UTF8Encoding(false));
+
+                // Verify an extracted ZIP before touching the working installation.
+                // A full disk, bad archive, or unsupported path must leave the old
+                // program intact; recovery should not be needed for preparation.
+                string payloadRoot = null;
+                if (request.Mode == "zip")
+                {
+                    extract = Path.Combine(Path.GetTempPath(), "cnt-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(extract);
+                    payloadRoot = PrepareZip(request.PackagePath, extract);
+                }
 
                 SetStatus("Waiting for Click'n'Translate to close…", "Do not start the app manually; it will reopen automatically.");
                 WaitForProcessExit(request.TargetProcessId, TimeSpan.FromSeconds(35));
@@ -714,7 +739,7 @@ internal static class ClicknTranslateApplyUpdate
 
                 if (request.Mode == "zip")
                 {
-                    InstallZip(request.PackagePath, request.AppDirectory);
+                    CopyDirectoryContents(payloadRoot, request.AppDirectory);
                 }
                 else
                 {
@@ -756,6 +781,7 @@ internal static class ClicknTranslateApplyUpdate
             }
             finally
             {
+                TryDeleteDirectory(extract);
                 TryDelete(marker);
                 if (!string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup))
                 {
@@ -765,31 +791,22 @@ internal static class ClicknTranslateApplyUpdate
             }
         }
 
-        private void InstallZip(string packagePath, string appDirectory)
+        private string PrepareZip(string packagePath, string extract)
         {
             SetStatus("Unpacking the portable update…", "This normally takes less than a minute.");
-            string extract = Path.Combine(Path.GetTempPath(), "clickntranslate_extract_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(extract);
-            try
+            ExtractZipSafely(packagePath, extract);
+            string launcher = Directory.GetFiles(extract, request.ExecutableName, SearchOption.AllDirectories).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(launcher))
             {
-                ExtractZipSafely(packagePath, extract);
-                string launcher = Directory.GetFiles(extract, request.ExecutableName, SearchOption.AllDirectories).FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(launcher))
-                {
-                    throw new InvalidDataException("The update archive does not contain the launcher.");
-                }
-                string payloadRoot = Path.GetDirectoryName(launcher);
-                if (!File.Exists(Path.Combine(payloadRoot, "app", "ClicknTranslateApp.exe")))
-                {
-                    throw new InvalidDataException("The update archive is incomplete.");
-                }
-                VerifyInstalledFiles(payloadRoot, request.ExecutableName, request.ExpectedVersion);
-                CopyDirectoryContents(payloadRoot, appDirectory);
+                throw new InvalidDataException("The update archive does not contain the launcher.");
             }
-            finally
+            string payloadRoot = Path.GetDirectoryName(launcher);
+            if (!File.Exists(Path.Combine(payloadRoot, "app", "ClicknTranslateApp.exe")))
             {
-                TryDeleteDirectory(extract);
+                throw new InvalidDataException("The update archive is incomplete.");
             }
+            VerifyInstalledFiles(payloadRoot, request.ExecutableName, request.ExpectedVersion);
+            return payloadRoot;
         }
 
         private void InstallSetup(string setupPath, string appDirectory)

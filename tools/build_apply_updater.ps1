@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.8.0.0",
+    [string]$Version = "1.8.1.0",
     [string]$OutputPath = ""
 )
 
@@ -37,6 +37,8 @@ using System.Reflection;
 [assembly: AssemblyProduct("Click'n'Translate")]
 [assembly: AssemblyVersion("$Version")]
 [assembly: AssemblyFileVersion("$Version")]
+// The Win32 longPathAware manifest alone does not enable modern .NET IO.
+[assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.6.2")]
 "@
     [System.IO.File]::WriteAllText($versionSource, $versionCode, [System.Text.UTF8Encoding]::new($false))
 

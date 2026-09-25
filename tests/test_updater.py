@@ -968,6 +968,8 @@ class TestTesseractInstallerHelpers(unittest.TestCase):
 class TestDownloadAndPrepareUpdate(unittest.TestCase):
     def test_download_prepare_success_invokes_restart_flow(self):
         class DummyUpdater:
+            _read_checksum = sw.SettingsWindow._read_checksum
+            _compute_sha256 = sw.SettingsWindow._compute_sha256
             def __init__(self):
                 self.parent = types.SimpleNamespace(current_interface_language="en")
                 self.download_calls = 0
@@ -977,8 +979,12 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
             def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
                 self.download_calls += 1
-                with zipfile.ZipFile(destination_path, "w") as zf:
-                    zf.writestr("ClicknTranslate.exe", b"exe")
+                if _url.endswith('.sha256'):
+                    Path(destination_path).write_text(self._compute_sha256(self.package), encoding='utf-8')
+                else:
+                    self.package = destination_path
+                    with zipfile.ZipFile(destination_path, "w") as zf:
+                        zf.writestr("ClicknTranslate.exe", b"exe")
                 if progress_callback:
                     progress_callback(1, 1)
 
@@ -1006,14 +1012,17 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                     "https://example.com/update.zip",
                     "ClicknTranslate-v1.3.4-win64.zip",
                     "1.3.4",
+                    "https://example.com/update.zip.sha256",
                 )
 
-        self.assertEqual(dummy.download_calls, 1)
+        self.assertEqual(dummy.download_calls, 2)
         self.assertEqual(dummy.apply_call, (".zip", "1.3.4"))
         self.assertIn("_on_update_ready_to_restart", invoke_calls)
 
     def test_installed_copy_downloads_and_launches_setup_package(self):
         class DummyUpdater:
+            _read_checksum = sw.SettingsWindow._read_checksum
+            _compute_sha256 = sw.SettingsWindow._compute_sha256
             def __init__(self):
                 self.parent = types.SimpleNamespace(current_interface_language="en")
                 self._update_cancel_requested = threading.Event()
@@ -1022,7 +1031,11 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 self.apply_calls = []
 
             def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
-                Path(destination_path).write_bytes(b"MZ" + b"setup")
+                if _url.endswith('.sha256'):
+                    Path(destination_path).write_text(self._compute_sha256(self.package), encoding='utf-8')
+                else:
+                    self.package = destination_path
+                    Path(destination_path).write_bytes(b"MZ" + b"setup")
                 if progress_callback:
                     progress_callback(7, 7)
 
@@ -1047,6 +1060,7 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 "https://example.com/setup.exe",
                 "ClicknTranslate-Setup-v1.5.2-win64.exe",
                 "1.5.2",
+                "https://example.com/setup.exe.sha256",
             )
 
         self.assertEqual(len(dummy.apply_calls), 1)
@@ -1056,6 +1070,8 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
 
     def test_download_prepare_failure_reports_error(self):
         class DummyUpdater:
+            _read_checksum = sw.SettingsWindow._read_checksum
+            _compute_sha256 = sw.SettingsWindow._compute_sha256
             def __init__(self):
                 self.parent = types.SimpleNamespace(current_interface_language="en")
                 self._update_cancel_requested = threading.Event()
@@ -1063,8 +1079,12 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 self._update_temp_dir = ""
 
             def _download_file(self, _url, destination_path, timeout=120, progress_callback=None, cancel_callback=None):
-                with zipfile.ZipFile(destination_path, "w") as zf:
-                    zf.writestr("ClicknTranslate.exe", b"exe")
+                if _url.endswith('.sha256'):
+                    Path(destination_path).write_text(self._compute_sha256(self.package), encoding='utf-8')
+                else:
+                    self.package = destination_path
+                    with zipfile.ZipFile(destination_path, "w") as zf:
+                        zf.writestr("ClicknTranslate.exe", b"exe")
                 if progress_callback:
                     progress_callback(1, 1)
 
@@ -1072,6 +1092,7 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                 return None
 
             def _launch_apply_updater(self, _package_path, _package_kind, _version):
+                self.apply_called = True
                 return False, "Updater launch failed"
 
             def _cleanup_update_temp_dir(self):
@@ -1091,9 +1112,11 @@ class TestDownloadAndPrepareUpdate(unittest.TestCase):
                     "https://example.com/update.zip",
                     "ClicknTranslate-v1.3.4-win64.zip",
                     "1.3.4",
+                    "https://example.com/update.zip.sha256",
                 )
 
         self.assertIn("_on_update_failed", invoke_calls)
+        self.assertTrue(dummy.apply_called)
 
 
 if __name__ == "__main__":

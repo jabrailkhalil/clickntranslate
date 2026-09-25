@@ -1,6 +1,6 @@
 #define MyAppName "Click'n'Translate"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.8.0"
+  #define MyAppVersion "1.8.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\releases\ClicknTranslate-v" + MyAppVersion + "-win64-stage\ClicknTranslate"

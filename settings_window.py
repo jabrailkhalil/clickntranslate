@@ -9698,6 +9698,7 @@ class SettingsWindow(QWidget):
                 if (
                     name.endswith(".exe")
                     and "clickntranslate" in compact_name
+                    and not any(token in name for token in ("arm64", "aarch64", "x86-installer", "win32"))
                     and ("setup" in name or "installer" in name)
                     and (asset.get("browser_download_url") or asset.get("url"))
                 ):
@@ -9728,10 +9729,14 @@ class SettingsWindow(QWidget):
 
         def _score(a):
             name = (a.get("name") or "").lower()
-            if any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime")):
+            compact_name = name.replace("-", "").replace("_", "")
+            if "clickntranslate" not in compact_name:
+                return -1
+            if any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime",
+                    "macos", "darwin", "linux", "arm64", "aarch64", "win32", "source", "verification", "signature")):
                 return -1
             score = 0
-            if "clickntranslate" in name:
+            if "clickntranslate" in compact_name:
                 score += 50
             if re.search(r"clickntranslate-v?\d", name):
                 score += 30
@@ -9781,28 +9786,26 @@ class SettingsWindow(QWidget):
 
     def _read_checksum(self, checksum_path, archive_name):
         try:
-            with open(checksum_path, "r", encoding="utf-8") as f:
+            with open(checksum_path, "r", encoding="utf-8-sig") as f:
                 content = f.read()
         except Exception:
             return ""
         archive_name = archive_name.lower()
-        for line in content.splitlines():
-            parts = re.findall(r"[0-9a-fA-F]{64}", line)
-            if not parts:
-                continue
-            low_line = line.lower()
-            if archive_name in low_line:
-                return parts[0].lower()
-        for line in content.splitlines():
-            tokens = line.strip().split()
-            if len(tokens) >= 2 and re.fullmatch(r"[0-9a-fA-F]{64}", tokens[0]):
-                if tokens[1].strip("*") == archive_name:
-                    return tokens[0].lower()
-        for line in content.splitlines():
-            token = re.search(r"[0-9a-fA-F]{64}", line)
-            if token:
-                return token.group(0).lower()
-        return ""
+        lines = [line.strip() for line in content.splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
+        # A per-file checksum may contain just its digest. A manifest must match
+        # the exact filename; a substring or another platform's hash is invalid.
+        if len(lines) == 1 and re.fullmatch(r"[0-9a-fA-F]{64}", lines[0]):
+            return lines[0].lower()
+        matches = []
+        for line in lines:
+            gnu = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(.+)", line)
+            bsd = re.fullmatch(r"SHA256\s*\((.+)\)\s*=\s*([0-9a-fA-F]{64})", line, re.IGNORECASE)
+            if gnu and gnu[2].lower() == archive_name:
+                matches.append(gnu[1].lower())
+            elif bsd and bsd[1].lower() == archive_name:
+                matches.append(bsd[2].lower())
+        return matches[0] if len(matches) == 1 else ""
 
     def _compute_sha256(self, filepath):
         digest = hashlib.sha256()
@@ -9999,6 +10002,8 @@ class SettingsWindow(QWidget):
                 raise RuntimeError("Unsupported update package type.")
             if package_kind == ".exe" and not _is_inno_installed_copy():
                 raise RuntimeError("Installer updates are available only for an installed copy.")
+            if not checksum_url:
+                raise RuntimeError("The release is missing its SHA256 checksum. Your current version has not been changed.")
 
             self._check_update_cancel_requested()
             self._update_phase = "downloading"
@@ -10026,12 +10031,13 @@ class SettingsWindow(QWidget):
                 self._update_phase = "verifying"
                 _emit_stage_text(stage_verify)
                 expected = self._read_checksum(checksum_path, safe_name)
-                if expected:
-                    actual = self._compute_sha256(package_path)
-                    if not actual:
-                        raise RuntimeError("Не удалось вычислить SHA256 для загруженного архива.")
-                    if actual != expected:
-                        raise RuntimeError("Контрольная сумма обновления не совпала (checksum mismatch).")
+                if not expected:
+                    raise RuntimeError("The release checksum is invalid or does not identify this update package.")
+                actual = self._compute_sha256(package_path)
+                if not actual:
+                    raise RuntimeError("Не удалось вычислить SHA256 для загруженного архива.")
+                if actual != expected:
+                    raise RuntimeError("Контрольная сумма обновления не совпала (checksum mismatch).")
             if package_kind == ".zip" and not zipfile.is_zipfile(package_path):
                 raise RuntimeError("Скачанный файл не является zip архивом.")
 

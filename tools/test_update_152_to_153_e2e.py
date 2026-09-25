@@ -39,7 +39,12 @@ NEW_ZIP = Path(os.environ.get(
     "CNT_NEW_ZIP",
     ROOT / "releases" / f"Click-n-Translate-{NEW_VERSION}-windows-portable-x64.zip",
 ))
-UPDATER = NEW_STAGE / "app" / "_internal" / "ClicknTranslateUpdater.exe"
+# An installed client cannot use the next release's helper before updating.
+# Keep any explicit override visible for tests of a candidate helper itself.
+UPDATER = Path(os.environ.get(
+    "CNT_UPDATE_HELPER",
+    OLD_STAGE / "app" / "_internal" / "ClicknTranslateUpdater.exe",
+))
 ISS = ROOT / "installer" / "ClicknTranslate.iss"
 ISCC = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 
