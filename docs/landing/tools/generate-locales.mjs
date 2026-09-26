@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { content, languages } from "./content.mjs";
+import { setup, setupSources } from "./setup-content.mjs";
 import { siteAssets } from "./site-assets.mjs";
 const bundle = await siteAssets();
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +47,13 @@ const shortcuts = [
   "Ctrl + Alt + Q",
 ];
 for (const [lang, t] of Object.entries(content)) {
+  const guide = setup[lang];
+  const steps = (items) =>
+    `<ol class="setup-steps">${items.map(([title, text]) => `<li><h3>${esc(title)}</h3><p>${esc(text)}</p></li>`).join("")}</ol>`;
+  const sources = setupSources
+    .map((url, i) => `<a href="${url}">${esc(guide.sourceLabels[i])}</a>`)
+    .join("");
+  const setupSection = `<section class="section setup wrap" id="setup"><div class="section-intro"><h2>${esc(guide.title)}</h2><p>${esc(guide.lead)}</p></div><p class="setup-trust">${esc(guide.trust)}</p><div class="setup-guides"><details id="setup-windows" class="setup-guide"><summary>${icon("windows")}<span>${esc(guide.windows)}</span><span aria-hidden="true">+</span></summary><div class="setup-body">${steps(guide.windowsSteps)}<p class="setup-note">${esc(guide.windowsNote)}</p></div></details><details id="setup-macos" class="setup-guide"><summary>${icon("mac")}<span>${esc(guide.macos)}</span><span aria-hidden="true">+</span></summary><div class="setup-body">${steps(guide.macSteps)}<p class="setup-note">${esc(guide.macNote)}</p><p class="setup-note">${esc(guide.macWarning)}</p></div></details><details id="setup-verify" class="setup-guide"><summary>${icon("lock")}<span>${esc(guide.verify)}</span><span aria-hidden="true">+</span></summary><div class="setup-body"><p>${esc(guide.verifyText)}</p><a class="text-link" href="${latest}">${esc(guide.official)} ${icon("arrow")}</a><p>Windows · PowerShell</p><pre><code>Get-FileHash -LiteralPath &quot;C:\\path\\to\\installer.exe&quot; -Algorithm SHA256</code></pre><p>macOS · Terminal</p><pre><code>shasum -a 256 &quot;/path/to/Click-n-Translate.dmg&quot;</code></pre></div></details></div><div class="setup-start"><h3>${esc(guide.use)}</h3><p>${esc(guide.useText)}</p></div><a class="text-link" href="${repo}/issues">${esc(guide.help)} ${icon("arrow")}</a><details class="setup-sources"><summary>${esc(guide.sources)}</summary><div>${sources}</div></details></section>`;
   const prefix = lang === "en" ? "" : "../",
     url = origin + (lang === "en" ? "" : `${lang}/`),
     asset = (name) => `${prefix}assets/${name}`;
@@ -84,12 +92,29 @@ ${t.modes.map((m, i) => `<div class="demo-panel" id="demo-${i}" role="tabpanel" 
 <section class="dynamic-band"><div class="feature-row wrap"><div class="feature-copy"><p class="eyebrow">${t.dynamicKicker}</p><h2>${t.dynamicTitle}</h2><p>${t.dynamicText}</p><kbd>Ctrl + Alt + G</kbd><p class="caption">${t.dynamicNote}</p></div><a class="dynamic-picture" href="${asset("dynamic-regions.png")}" target="_blank" rel="noopener"><img src="${asset("dynamic-regions.png")}" width="1467" height="1351" alt="${t.dynamicAlt}" loading="lazy">${icon("arrow")}</a></div></section>
 <section class="section companion wrap" id="companion"><div class="feature-row"><div class="companion-picture"><div class="theme-switch" role="group" aria-label="${t.companionNote}">${t.themes.map((label, i) => `<button type="button" aria-pressed="${i === 1}" data-theme-preview="${i === 0 ? "light" : "dark"}">${label}</button>`).join("")}</div><img id="companion-preview" src="${asset("mascot-dark.png")}" data-light="${asset("mascot-light.png")}" data-dark="${asset("mascot-dark.png")}" width="831" height="559" alt="${t.companionAlt}" loading="lazy"></div><div class="feature-copy"><img class="companion-character" src="${asset("companion.png")}" width="72" height="72" alt="" loading="lazy"><p class="eyebrow">${t.companionKicker}</p><h2>${t.companionTitle}</h2><p>${t.companionText}</p><p class="caption">${t.companionNote}</p></div></div></section>
 <section class="section control wrap" id="privacy"><p class="eyebrow">${t.controlKicker}</p><h2>${lines(t.controlTitle)}</h2><div class="control-grid">${t.controls.map((c, i) => `<article>${icon(["scan", "globe", "lock"][i])}<h3>${c[0]}</h3><p>${c[1]}</p></article>`).join("")}</div><a class="text-link" href="${repo}/blob/main/PRIVACY.md">${t.privacy}${icon("arrow")}</a></section>
-<section class="download-section" id="download"><div class="wrap"><div class="section-intro"><div><p class="eyebrow">${t.downloadKicker}</p><h2>${lines(t.downloadTitle)}</h2></div><div><p>${t.downloadLead}</p><span class="version-pill"><span class="status-dot"></span>${t.version} <span data-latest-version>v1.8.1</span></span></div></div><div class="download-grid"><article class="download-card">${icon("windows")}<h3>Windows</h3><p>${t.platform[0]}</p><div class="download-links">${downloadLink("windows", t.installer)}${downloadLink("portable", t.portable, "secondary-download")}</div></article><article class="download-card">${icon("mac")}<h3>macOS</h3><p>${t.platform[1]}</p><div class="download-links">${downloadLink("mac-arm", t.silicon)}${downloadLink("mac-intel", t.intel, "secondary-download")}</div><a class="guide-link" href="${repo}/blob/main/docs/MACOS.md">${t.installGuide}${icon("arrow")}</a></article><article class="download-card">${icon("linux")}<h3>Linux</h3><p>${t.platform[2]}</p><div class="download-links">${downloadLink("linux", t.appimage)}<p class="linux-note">${t.linuxNote}</p></div><a class="guide-link" href="${repo}/blob/main/docs/LINUX.md">${t.installGuide}${icon("arrow")}</a></article></div><div class="download-footnote"><p>${t.signing}</p><a href="${latest}">${t.allDownloads}${icon("arrow")}</a></div></div></section>
+<section class="download-section" id="download"><div class="wrap"><div class="section-intro"><div><p class="eyebrow">${t.downloadKicker}</p><h2>${lines(t.downloadTitle)}</h2></div><div><p>${t.downloadLead}</p><span class="version-pill"><span class="status-dot"></span>${t.version} <span data-latest-version>v1.8.1</span></span></div></div><div class="download-grid"><article class="download-card">${icon("windows")}<h3>Windows</h3><p>${t.platform[0]}</p><div class="download-links">${downloadLink("windows", t.installer)}${downloadLink("portable", t.portable, "secondary-download")}</div><a class="guide-link" href="#setup-windows">${t.installGuide}${icon("arrow")}</a></article><article class="download-card">${icon("mac")}<h3>macOS</h3><p>${t.platform[1]}</p><div class="download-links">${downloadLink("mac-arm", t.silicon)}${downloadLink("mac-intel", t.intel, "secondary-download")}</div><a class="guide-link" href="#setup-macos">${t.installGuide}${icon("arrow")}</a></article><article class="download-card">${icon("linux")}<h3>Linux</h3><p>${t.platform[2]}</p><div class="download-links">${downloadLink("linux", t.appimage)}<p class="linux-note">${t.linuxNote}</p></div><a class="guide-link" href="${repo}/blob/main/docs/LINUX.md">${t.installGuide}${icon("arrow")}</a></article></div><div class="download-footnote"><p>${t.signing}</p><a href="${latest}">${t.allDownloads}${icon("arrow")}</a></div></div></section>
+${setupSection}
 <section class="section faq wrap" id="faq"><div><p class="eyebrow">FAQ</p><h2>${t.faqTitle}</h2></div><div class="faq-list">${t.faqs.map((f) => `<details><summary>${f[0]}<span aria-hidden="true">+</span></summary><p>${f[1]}</p></details>`).join("")}</div></section>
 <section class="community wrap"><div class="community-symbol" aria-hidden="true">✳</div><div><h2>${lines(t.communityTitle)}</h2><p>${t.communityText}</p><div class="hero-actions"><a class="button" href="${repo}">${icon("star")}${t.star}</a><a class="text-link" href="https://t.me/jabrail_digital">${t.telegram}${icon("arrow")}</a></div></div></section></main>
 <footer class="wrap"><div><a class="brand" href="#top"><img src="${asset("icon.png")}" width="28" height="28" alt="">Click’n’Translate.</a><p>${t.footer}</p></div><nav><a href="${repo}/issues">${t.issues}</a><a href="${repo}">${t.source}</a><a href="${repo}/blob/main/LICENSE">${t.license}</a><a href="#top">${t.top} ↑</a></nav></footer></body></html>`;
   const directory = lang === "en" ? root : join(root, lang);
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "index.html"), html, "utf8");
+  const guideDirectory = join(root, "..", "guides");
+  await mkdir(guideDirectory, { recursive: true });
+  const markdownSteps = (items) =>
+    items
+      .map(([title, text], i) => `### ${i + 1}. ${title}\n\n${text}\n`)
+      .join("\n");
+  const markdown = `<!-- Generated from docs/landing/tools/setup-content.mjs. -->\n# ${guide.title}\n\n${Object.entries(
+    languages,
+  )
+    .map(([code, label]) =>
+      code === lang ? `**${label}**` : `[${label}](setup.${code}.md)`,
+    )
+    .join(
+      " · ",
+    )}\n\n${guide.lead}\n\n${guide.trust}\n\n[${guide.official}](${latest})\n\n<a id="windows"></a>\n\n## ${guide.windows}\n\n${markdownSteps(guide.windowsSteps)}\n${guide.windowsNote}\n\n<a id="macos"></a>\n\n## ${guide.macos}\n\n${markdownSteps(guide.macSteps)}\n${guide.macNote}\n\n${guide.macWarning}\n\n## ${guide.use}\n\n${guide.useText}\n\n## ${guide.verify}\n\n${guide.verifyText}\n\nWindows · PowerShell:\n\n\`\`\`powershell\nGet-FileHash -LiteralPath "C:\\path\\to\\installer.exe" -Algorithm SHA256\n\`\`\`\n\nmacOS · Terminal:\n\n\`\`\`sh\nshasum -a 256 "/path/to/Click-n-Translate.dmg"\n\`\`\`\n\n[${guide.help}](${repo}/issues)\n\n## ${guide.sources}\n\n${setupSources.map((url, i) => `- [${guide.sourceLabels[i]}](${url})`).join("\n")}\n`;
+  await writeFile(join(guideDirectory, `setup.${lang}.md`), markdown, "utf8");
 }
 console.log(`Generated ${Object.keys(content).length} localized pages.`);

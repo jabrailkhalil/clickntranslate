@@ -11,6 +11,7 @@ export async function siteAssets() {
     "styles.css",
     "app.js",
     "tools/content.mjs",
+    "tools/setup-content.mjs",
     "tools/generate-locales.mjs",
   ];
   const inputs = await Promise.all(

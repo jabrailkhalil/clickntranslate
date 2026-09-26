@@ -1,5 +1,7 @@
 # Windows code signing
 
+**Installing the app?** Use the [Windows first-launch guide](guides/setup.en.md#windows) / [инструкцию на русском](guides/setup.ru.md#windows). Users do not need to import a certificate or sign the application; this document describes developer signing.
+
 ## Current status
 
 The **1.8.0** installer and application executables are Authenticode-signed

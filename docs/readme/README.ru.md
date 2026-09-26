@@ -20,6 +20,8 @@
 
 В сборках Windows и macOS пока используется **самоподписанный сертификат `jabrailkhalil`**. Windows может показать предупреждение SmartScreen. У Mac-версии пока нет Apple Developer ID и нотариализации, поэтому Gatekeeper может заблокировать первый запуск. Для Linux доступны отдельные подписи OpenPGP. Выбирайте **Apple Silicon** для M1 и новее, **Intel** — для Mac с процессором Intel.
 
+**Первый запуск:** [Windows: SmartScreen и Defender](../guides/setup.ru.md#windows) · [Mac: разрешить запуск и выдать доступ к экрану](../guides/setup.ru.md#macos).
+
 **Обновления:** в Windows — через кнопку обновления в приложении. На macOS и Linux скачайте новый DMG/AppImage и замените приложение вручную, сохранив пользовательские данные. [Проверки и ограничения обновления](../UPDATE_AUDIT_2026-09-25.md).
 
 ## Возможности

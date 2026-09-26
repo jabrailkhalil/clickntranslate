@@ -1,5 +1,7 @@
 # Click'n'Translate on macOS — 1.8.1
 
+**Installing the downloaded DMG?** Follow the [Mac first-launch guide](guides/setup.en.md#macos) / [инструкцию на русском](guides/setup.ru.md#macos): Applications → Open Anyway → Screen Recording → Accessibility → restart. The technical notes below are for development and troubleshooting.
+
 The release includes separate **Apple Silicon (arm64)** and **Intel (x86_64)**
 DMG packages for macOS 13.4 or newer. Final signed bundles passed GUI/settings,
 Vision OCR, Carbon registration, RapidOCR and Argos helper checks. Intel was

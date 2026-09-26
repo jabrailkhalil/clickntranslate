@@ -20,6 +20,8 @@
 
 Windows 和 macOS 版本目前使用名为 **`jabrailkhalil` 的自签名证书**。Windows 可能显示 SmartScreen 警告；Mac 版本尚无 Apple Developer ID 签名或公证，Gatekeeper 可能阻止首次启动。Linux 下载提供独立的 OpenPGP 签名。M1 及更新芯片请选择 **Apple Silicon**，Intel 处理器的 Mac 请选择 **Intel**。
 
+**首次启动：**[Windows：SmartScreen 与 Defender](../guides/setup.zh-CN.md#windows) · [Mac：允许启动及屏幕权限](../guides/setup.zh-CN.md#macos)。
+
 **更新：**Windows 可在应用内更新。macOS 和 Linux 需下载新的 DMG/AppImage 并手动替换应用，请保留现有用户数据。
 
 ## 功能

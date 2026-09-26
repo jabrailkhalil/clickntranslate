@@ -20,6 +20,8 @@ OCR y traducción de pantalla gratuitos y de código abierto para **Windows, Lin
 
 Las versiones de Windows y macOS usan por ahora un **certificado autofirmado llamado `jabrailkhalil`**. Windows puede mostrar una advertencia de SmartScreen. La aplicación para Mac aún no tiene Developer ID de Apple ni notarización, por lo que Gatekeeper puede bloquear el primer inicio. Linux incluye firmas OpenPGP separadas. Elige **Apple Silicon** para chips M1 o posteriores, o **Intel** para Mac con procesador Intel.
 
+**Primer inicio:** [Windows: SmartScreen y Defender](../guides/setup.es.md#windows) · [Mac: abrir la app y conceder permisos](../guides/setup.es.md#macos).
+
 **Actualizaciones:** Windows se actualiza desde la aplicación. En macOS y Linux, descarga el nuevo DMG/AppImage y reemplaza la aplicación manualmente, conservando tus datos.
 
 ## Funciones

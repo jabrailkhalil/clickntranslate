@@ -65,3 +65,10 @@ of this landing page's automatic Click'n'Translate download resolver.
 The parent homepage's Downloads panel uses the separate server collector in
 `hosting/downloads/`, with totals by project and platform. See its README for
 counting rules, the 30-minute refresh timer and deployment paths.
+
+First-launch instructions live in `tools/setup-content.mjs`. The locale
+generator renders the website's Windows/Mac setup sections and the six
+`docs/guides/setup.*.md` files from that shared content. Edit the content, then
+run `npm run build`. Download-card links and `#setup-windows` / `#setup-macos`
+links open the appropriate guide. These links are also used by the READMEs and
+the existing release table; no application package changes are needed.

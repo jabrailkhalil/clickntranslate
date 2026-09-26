@@ -7,6 +7,7 @@ const supported = ["en", "ru", "es", "de", "fr", "zh-CN"];
 if (document.body.dataset.locale === "en") {
   try {
     const saved = localStorage.getItem("clickntranslate-site-language");
+    const requested = new URLSearchParams(location.search).get("lang");
     const preferred = (
       navigator.languages?.[0] ||
       navigator.language ||
@@ -15,7 +16,11 @@ if (document.body.dataset.locale === "en") {
     const detected = preferred.startsWith("zh")
       ? "zh-CN"
       : preferred.split("-")[0];
-    const locale = supported.includes(saved) ? saved : detected;
+    const locale = supported.includes(requested)
+      ? requested
+      : supported.includes(saved)
+        ? saved
+        : detected;
     if (supported.includes(locale) && locale !== "en") {
       const destination = new URL(`${locale}/`, document.baseURI);
       destination.searchParams.set("v", document.body.dataset.siteRevision);
@@ -36,8 +41,26 @@ document.querySelectorAll("[data-language-choice]").forEach((link) =>
     } catch {
       /* Links still work. */
     }
+    if (location.hash.startsWith("#setup")) {
+      const destination = new URL(link.href);
+      destination.hash = location.hash;
+      link.href = destination.href;
+    }
   }),
 );
+// Direct links from downloads, READMEs and release tables open the requested guide.
+function openSetupGuide() {
+  const target = document.getElementById(location.hash.slice(1));
+  if (target?.matches("details.setup-guide")) target.open = true;
+}
+document.querySelectorAll('a[href^="#setup-"]').forEach((link) => {
+  link.addEventListener("click", () => {
+    const target = document.getElementById(link.hash.slice(1));
+    if (target?.matches("details.setup-guide")) target.open = true;
+  });
+});
+window.addEventListener("hashchange", openSetupGuide);
+openSetupGuide();
 const languageMenu = document.querySelector(".language-menu");
 document.addEventListener("click", (event) => {
   if (!languageMenu.contains(event.target)) languageMenu.open = false;

@@ -157,6 +157,124 @@ p {
 .section {
   padding-block: 100px;
 }
+.setup-trust {
+  max-width: 900px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 30px;
+}
+.setup-guides {
+  border-top: 1px solid var(--line);
+}
+.setup-guide {
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 28px;
+}
+.setup-guide > summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 23px 0;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.setup-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.setup-guide > summary svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  color: var(--accent);
+}
+.setup-guide > summary span:last-child {
+  margin-left: auto;
+  color: var(--accent);
+}
+.setup-guide[open] > summary span:last-child {
+  transform: rotate(45deg);
+}
+.setup-body {
+  max-width: 900px;
+  padding: 0 0 30px 40px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.setup-body p {
+  color: var(--muted);
+  margin: 8px 0 18px;
+}
+.setup-steps {
+  padding-left: 21px;
+}
+.setup-steps li {
+  padding-left: 9px;
+  margin-bottom: 24px;
+}
+.setup-steps li::marker {
+  color: var(--accent);
+  font-weight: 600;
+}
+.setup-steps h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+.setup-body .setup-note {
+  border-left: 2px solid var(--accent);
+  padding-left: 18px;
+}
+.setup-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 15px;
+  background: #17141e;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.setup-start {
+  max-width: 900px;
+  padding: 24px 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.setup-start h3 {
+  font-size: 20px;
+}
+.setup-start p {
+  color: var(--muted);
+}
+.setup-sources {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.setup-sources summary {
+  cursor: pointer;
+}
+.setup-sources div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding-top: 14px;
+}
+.setup-sources a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 620px) {
+  .setup-guide > summary {
+    font-size: 16px;
+    gap: 10px;
+  }
+  .setup-body {
+    padding-left: 0;
+  }
+}
 .header {
   display: flex;
   align-items: center;
