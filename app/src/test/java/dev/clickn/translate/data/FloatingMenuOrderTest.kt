@@ -1,0 +1,262 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.data
+
+import dev.clickn.translate.R
+import dev.clickn.translate.overlay.MenuItem
+import dev.clickn.translate.overlay.MenuItemRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class FloatingMenuOrderTest {
+
+    @Test
+    fun allOrder_containsEveryKnownMenuItemOnce() {
+        val all = FloatingMenu.ALL_ORDER
+
+        assertEquals(MenuItemId.entries.toSet(), all.toSet())
+        assertEquals(all.toSet().size, all.size)
+    }
+
+    @Test
+    fun defaultOrder_placesLanguageThenPresetAfterAllModeSlots() {
+        assertEquals(
+            listOf(
+                MenuItemId.LOOP,
+                MenuItemId.REGION,
+                MenuItemId.FULL_SCREEN_SKILL,
+                MenuItemId.INPUT_TRANSLATE_SKILL,
+                MenuItemId.LANGUAGE_PAIR,
+            ),
+            FloatingMenu.DEFAULT_ORDER.take(5)
+        )
+    }
+
+    @Test
+    fun defaultOrderIncludesPresetAndSettingsEntries() {
+        assertTrue(MenuItemId.PRESET_SWITCH in FloatingMenu.DEFAULT_ORDER)
+        assertTrue(MenuItemId.SETTINGS in FloatingMenu.DEFAULT_ORDER)
+    }
+
+    @Test
+    fun oldCustomOrder_insertsInputTranslationBesideTheExistingSkillSlot() {
+        val oldCustom = listOf(
+            MenuItemId.REGION,
+            MenuItemId.FULL_SCREEN_SKILL,
+            MenuItemId.LOOP,
+            MenuItemId.HOME,
+            MenuItemId.SETTINGS,
+            MenuItemId.LANGUAGE_PAIR,
+            MenuItemId.PRESET_SWITCH,
+        )
+
+        val normalized = FloatingMenu.normalizeOrder(oldCustom)
+
+        assertEquals(
+            normalized.indexOf(MenuItemId.FULL_SCREEN_SKILL) + 1,
+            normalized.indexOf(MenuItemId.INPUT_TRANSLATE_SKILL),
+        )
+        assertEquals(MenuItemId.entries.toSet(), normalized.toSet())
+    }
+
+    @Test
+    fun normalizedOrder_preservesACompleteCustomOrder() {
+        val custom = FloatingMenu.DEFAULT_ORDER.reversed()
+
+        assertEquals(custom, FloatingMenu.normalizeOrder(custom))
+    }
+
+    @Test
+    fun pageSizeIsClampedToSupportedRange() {
+        assertEquals(2, FloatingMenu.coercePageSize(1))
+        assertEquals(5, FloatingMenu.coercePageSize(5))
+        assertEquals(6, FloatingMenu.coercePageSize(9))
+    }
+
+    @Test
+    fun paginationPageSizeSixIncludesNextPageButtonInTheSixSlots() {
+        val pages = MenuItemRegistry.paginate(fakeItems(7), pageSize = 6) {}
+
+        assertEquals(6, pages.first().size)
+        assertEquals(5, pages.first().count { it.labelRes != R.string.menu_next_page })
+        assertEquals(R.string.menu_next_page, pages.first().last().labelRes)
+    }
+
+    @Test
+    fun paginationPageSizeFourLoopsLastPageBackToFirstPage() {
+        val nextTargets = mutableListOf<Int>()
+        val pages = MenuItemRegistry.paginate(fakeItems(7), pageSize = 4) { nextTargets += it }
+
+        assertEquals(3, pages.size)
+        assertEquals(listOf(4, 4, 2), pages.map { it.size })
+        assertEquals(listOf(3, 3, 1), pages.map { page ->
+            page.count { it.labelRes != R.string.menu_next_page }
+        })
+        assertTrue(pages.all { it.last().labelRes == R.string.menu_next_page })
+
+        pages[0].last().onTap()
+        pages[1].last().onTap()
+        pages[2].last().onTap()
+
+        assertEquals(listOf(1, 2, 0), nextTargets)
+    }
+
+    @Test
+    fun paginationPageSizeTwoNeverShowsMoreThanTwoButtonsAndLastPageLoopsToFirstPage() {
+        val nextTargets = mutableListOf<Int>()
+        val pages = MenuItemRegistry.paginate(fakeItems(7), pageSize = 2) { nextTargets += it }
+
+        assertTrue(pages.all { it.size <= 2 })
+        assertEquals(7, pages.size)
+        assertEquals(2, pages.first().size)
+        assertEquals(1, pages.first().count { it.labelRes != R.string.menu_next_page })
+        assertTrue(pages.all { it.last().labelRes == R.string.menu_next_page })
+
+        pages.last().last().onTap()
+
+        assertEquals(listOf(0), nextTargets)
+    }
+
+    @Test
+    fun modeSlots_showEveryModeExceptTheCurrentOne() {
+        data class Case(
+            val current: FloatingSkill,
+            val expectedLabels: List<Int>,
+        )
+
+        val callbacks = MenuItemRegistry.Callbacks(
+            onSwitchToLoop = {},
+            onRegion = {},
+            onLanguagePair = {},
+            onOpenMain = {},
+            onOpenSettings = {},
+            onPresetSwitch = {},
+            onSwitchToFullScreen = {},
+            onSwitchToWordSelect = {},
+            onSwitchToInputTranslate = {},
+        )
+        listOf(
+            Case(
+                FloatingSkill.FULL_SCREEN,
+                listOf(
+                    R.string.menu_loop_translate,
+                    R.string.menu_word_select,
+                    R.string.menu_input_translate,
+                ),
+            ),
+            Case(
+                FloatingSkill.WORD_SELECT,
+                listOf(
+                    R.string.menu_loop_translate,
+                    R.string.menu_full_screen_skill,
+                    R.string.menu_input_translate,
+                ),
+            ),
+            Case(
+                FloatingSkill.LOOP,
+                listOf(
+                    R.string.menu_full_screen_skill,
+                    R.string.menu_word_select,
+                    R.string.menu_input_translate,
+                ),
+            ),
+            Case(
+                FloatingSkill.INPUT_TRANSLATE,
+                listOf(
+                    R.string.menu_loop_translate,
+                    R.string.menu_full_screen_skill,
+                    R.string.menu_word_select,
+                ),
+            ),
+        ).forEach { case ->
+            val items = MenuItemRegistry.build(
+                ids = listOf(
+                    MenuItemId.LOOP,
+                    MenuItemId.FULL_SCREEN_SKILL,
+                    MenuItemId.INPUT_TRANSLATE_SKILL,
+                ),
+                currentSkill = case.current,
+                callbacks = callbacks,
+            )
+
+            assertEquals(case.current.name, case.expectedLabels, items.map { it.labelRes })
+        }
+    }
+
+    @Test
+    fun modeSlots_reportTheActionTheyActuallySwitchTo() {
+        data class Case(
+            val slot: MenuItemId,
+            val current: FloatingSkill,
+            val expected: FloatingSkill,
+        )
+
+        listOf(
+            Case(MenuItemId.LOOP, FloatingSkill.FULL_SCREEN, FloatingSkill.LOOP),
+            Case(MenuItemId.LOOP, FloatingSkill.WORD_SELECT, FloatingSkill.LOOP),
+            Case(MenuItemId.LOOP, FloatingSkill.LOOP, FloatingSkill.FULL_SCREEN),
+            Case(MenuItemId.LOOP, FloatingSkill.INPUT_TRANSLATE, FloatingSkill.LOOP),
+            Case(MenuItemId.FULL_SCREEN_SKILL, FloatingSkill.FULL_SCREEN, FloatingSkill.WORD_SELECT),
+            Case(MenuItemId.FULL_SCREEN_SKILL, FloatingSkill.WORD_SELECT, FloatingSkill.FULL_SCREEN),
+            Case(MenuItemId.FULL_SCREEN_SKILL, FloatingSkill.LOOP, FloatingSkill.WORD_SELECT),
+            Case(MenuItemId.FULL_SCREEN_SKILL, FloatingSkill.INPUT_TRANSLATE, FloatingSkill.FULL_SCREEN),
+            Case(MenuItemId.INPUT_TRANSLATE_SKILL, FloatingSkill.FULL_SCREEN, FloatingSkill.INPUT_TRANSLATE),
+            Case(MenuItemId.INPUT_TRANSLATE_SKILL, FloatingSkill.WORD_SELECT, FloatingSkill.INPUT_TRANSLATE),
+            Case(MenuItemId.INPUT_TRANSLATE_SKILL, FloatingSkill.LOOP, FloatingSkill.INPUT_TRANSLATE),
+            Case(MenuItemId.INPUT_TRANSLATE_SKILL, FloatingSkill.INPUT_TRANSLATE, FloatingSkill.WORD_SELECT),
+        ).forEach { case ->
+            assertEquals(
+                "${case.slot} from ${case.current}",
+                case.expected,
+                MenuItemRegistry.targetSkill(case.slot, case.current),
+            )
+        }
+    }
+
+    @Test
+    fun nonModeSlots_doNotReportASkillTarget() {
+        MenuItemId.entries
+            .filterNot {
+                it == MenuItemId.LOOP ||
+                    it == MenuItemId.FULL_SCREEN_SKILL ||
+                    it == MenuItemId.INPUT_TRANSLATE_SKILL
+            }
+            .forEach { id ->
+                FloatingSkill.entries.forEach { current ->
+                    assertEquals("$id from $current", null, MenuItemRegistry.targetSkill(id, current))
+                }
+            }
+    }
+
+    @Test
+    fun loopMode_keepsEachConfiguredModeSlotUsableOnItsOwn() {
+        val callbacks = MenuItemRegistry.Callbacks(
+            onSwitchToLoop = {}, onRegion = {}, onLanguagePair = {}, onOpenMain = {},
+            onOpenSettings = {}, onPresetSwitch = {}, onSwitchToFullScreen = {},
+            onSwitchToWordSelect = {}, onSwitchToInputTranslate = {},
+        )
+        data class Case(val id: MenuItemId, val expectedLabel: Int)
+        listOf(
+            Case(MenuItemId.LOOP, R.string.menu_full_screen_skill),
+            Case(MenuItemId.FULL_SCREEN_SKILL, R.string.menu_word_select),
+            Case(MenuItemId.INPUT_TRANSLATE_SKILL, R.string.menu_input_translate),
+        ).forEach { case ->
+            val items = MenuItemRegistry.build(
+                ids = listOf(case.id),
+                currentSkill = FloatingSkill.LOOP,
+                callbacks = callbacks,
+            )
+            assertEquals(case.id.name, listOf(case.expectedLabel), items.map { it.labelRes })
+        }
+    }
+
+    private fun fakeItems(count: Int): List<MenuItem> =
+        (0 until count).map {
+            MenuItem(
+                iconRes = R.drawable.ic_menu_loop,
+                bgRes = R.drawable.bg_arc_menu_item,
+                labelRes = R.string.menu_loop_translate,
+                onTap = {}
+            )
+        }
+}

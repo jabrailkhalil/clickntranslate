@@ -1,0 +1,17 @@
+# ClickTranslate code owners
+# 见 https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/managing-repository-settings/about-code-owners
+#
+# 任何 PR 修改这些文件时，GitHub 会自动把 owner 加为 reviewer。
+# 顺序后写的规则覆盖先写的。
+
+# 默认所有文件
+*                               @jabrailkhalil
+
+# 翻译 / 本地化（接受社区翻译，无需 owner 强制 review，但仍要求 PR 流程）
+/app/src/main/res/values-*/     @jabrailkhalil
+
+# 发版相关 / CI / 签名相关 —— 只能由 owner 改
+/.github/workflows/             @jabrailkhalil
+/app/build.gradle.kts           @jabrailkhalil
+/CODEOWNERS                     @jabrailkhalil
+/.github/CODEOWNERS             @jabrailkhalil

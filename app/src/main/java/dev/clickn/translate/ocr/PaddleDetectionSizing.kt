@@ -1,0 +1,70 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.ocr
+
+import dev.clickn.translate.data.PaddleDetectionProfile
+import kotlin.math.roundToInt
+
+internal data class PaddleDetectionResizePlan(
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val targetWidth: Int,
+    val targetHeight: Int,
+) {
+    val scaleX: Float
+        get() = sourceWidth.toFloat() / targetWidth
+
+    val scaleY: Float
+        get() = sourceHeight.toFloat() / targetHeight
+
+    val inputPixels: Long
+        get() = targetWidth.toLong() * targetHeight
+
+    val resized: Boolean
+        get() = sourceWidth != targetWidth || sourceHeight != targetHeight
+}
+
+internal data class PaddleDetectionOutputScale(
+    val x: Float,
+    val y: Float,
+)
+
+internal object PaddleDetectionSizing {
+    private const val ALIGNMENT = 32
+
+    fun plan(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        profile: PaddleDetectionProfile,
+        maxSideOverride: Int? = null,
+    ): PaddleDetectionResizePlan {
+        val maxSide = maxSideOverride ?: profile.maxSideLen
+        require(maxSide >= ALIGNMENT && maxSide % ALIGNMENT == 0)
+        val safeWidth = sourceWidth.coerceAtLeast(1)
+        val safeHeight = sourceHeight.coerceAtLeast(1)
+        val longestSide = maxOf(safeWidth, safeHeight)
+        val resizeRatio = minOf(1f, maxSide.toFloat() / longestSide)
+        val targetWidth = align((safeWidth * resizeRatio).roundToInt(), maxSide)
+        val targetHeight = align((safeHeight * resizeRatio).roundToInt(), maxSide)
+        return PaddleDetectionResizePlan(
+            sourceWidth = safeWidth,
+            sourceHeight = safeHeight,
+            targetWidth = targetWidth,
+            targetHeight = targetHeight,
+        )
+    }
+
+    fun outputScale(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        outputWidth: Int,
+        outputHeight: Int,
+    ): PaddleDetectionOutputScale = PaddleDetectionOutputScale(
+        x = sourceWidth.coerceAtLeast(1).toFloat() / outputWidth.coerceAtLeast(1),
+        y = sourceHeight.coerceAtLeast(1).toFloat() / outputHeight.coerceAtLeast(1),
+    )
+
+    private fun align(value: Int, maxSideLen: Int): Int {
+        val rounded = ((value + ALIGNMENT / 2) / ALIGNMENT) * ALIGNMENT
+        return rounded.coerceIn(ALIGNMENT, maxSideLen)
+    }
+}

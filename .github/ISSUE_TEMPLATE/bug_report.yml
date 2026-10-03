@@ -1,0 +1,88 @@
+name: 🐞 Bug 报告
+description: 报告功能异常 / 崩溃 / 体验问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提 issue。请尽量填全下面的信息，让我们能稳定复现。
+        **不接受截图代替文字** —— 截图作为补充可以，但描述请用文字。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 发生了什么？预期应该是什么？
+      placeholder: |
+        我做了 A
+        我看到 B
+        我以为应该是 C
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 App
+        2. 设置 OCR 引擎为 …
+        3. 点 …
+        4. 观察到 …
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App 版本
+      description: 主页底部"关于"卡片里的版本号
+      placeholder: "0.1.0-M0"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 设备 / 系统
+      description: 厂商 + 型号 + Android 版本 + ROM
+      placeholder: "小米 13 / Android 14 / HyperOS 1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ocr-engine
+    attributes:
+      label: 使用的 OCR 引擎
+      options:
+        - ML Kit (auto)
+        - ML Kit (日文)
+        - ML Kit (中文)
+        - ML Kit (拉丁)
+        - PaddleOCR
+        - 百度 OCR
+        - 腾讯 OCR
+        - 不涉及 / 不确定
+
+  - type: dropdown
+    id: translator
+    attributes:
+      label: 使用的翻译引擎
+      options:
+        - OpenAI 兼容（DeepSeek / SiliconFlow / 智谱 / Ollama / OpenAI）
+        - DeepL
+        - 不涉及 / 不确定
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: 从主页 → 日志 → 复制 / 导出，粘到这里。**API Key 等 secret 自己脱敏**。
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图 / 录屏 / 同类工具对照等

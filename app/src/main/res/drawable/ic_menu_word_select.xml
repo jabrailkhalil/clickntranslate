@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Stylus / pen mark icon for word selection translation. -->
+    <group
+        android:scaleX="0.88"
+        android:scaleY="0.88"
+        android:pivotX="12"
+        android:pivotY="12">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M4,16.25V20h3.75L18.81,8.94l-3.75,-3.75L4,16.25zM6,18.01l0.15,-0.91l8.91,-8.91l1.75,1.75l-8.91,8.91L6,19v-0.99zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34c-0.39,-0.39 -1.02,-0.39 -1.41,0l-0.84,0.84l3.75,3.75l0.84,-0.84z" />
+        <!-- Word selection underline. -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M3,22h18v1.2H3z" />
+    </group>
+</vector>

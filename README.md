@@ -1,79 +1,44 @@
-# Click 'n Translate
+# Click’n’Translate для Android
 
-![Click 'n Translate Logo](icons/icon.ico)
+Перевод экрана, текста и фотографий в одном приложении.
 
-**Click 'n Translate** is a powerful, lightweight desktop application designed to make screen translation and text extraction (OCR) seamless and effortless. With a modern, user-friendly interface and robust features, it bridges the gap between seeing text on your screen and understanding it.
+[English](README.en.md) · [Сайт](https://clickn.dev) · [Telegram](https://t.me/jabrail_digital)
 
-## 🚀 Features
+## Android 0.2.0
 
-### 📷 Advanced OCR (Optical Character Recognition)
-- **Instant Text Capture**: Select any area on your screen to extract text instantly.
-- **Multi-Engine Support**: Choose between **Windows OCR** (native, fast), **Tesseract**, or **RapidOCR** for optimal accuracy.
-- **Language Support**: Seamlessly switch between **Russian** (ru) and **English** (en) recognition.
+- Четыре раздела: **Экран**, **Текст**, **История**, **Настройки**.
+- Крупная кнопка запуска, видимая пара языков и быстрый выбор сервиса.
+- Системная, светлая, тёмная и AMOLED-темы; пять цветовых акцентов.
+- Интерфейс на русском, английском, немецком, французском, испанском и китайском.
+- Google, Lingva, MyMemory и LibreTranslate; дополнительные API-сервисы и офлайн-модели.
+- Текстовый перевод с копированием, отправкой результата и локальной историей до 50 записей.
+- Перевод фото из галереи и системного меню «Поделиться».
+- Пошаговая настройка с проверкой разрешений после возврата из Android.
+- Расширенные настройки OCR, моделей, озвучивания, словарей, глоссария и плавающей кнопки.
 
-### 🌐 Instant Translation
-- **Automatic Translation**: Recognized text is immediately translated to your preferred language.
-- **Google Translate Integration**: Reliable and accurate translations powered by Google API.
-- **History Tracking**: Never lose a translation. The built-in history viewer saves your translation sessions locally.
+Требуется Android 8.0+ и 64-битное ARM-устройство. Локальные LLM доступны с Android 13. Для основного режима права root не нужны.
 
-### ⚡ Productivity & Workflow
-- **Global Hotkeys**:
-  - **`Ctrl + Alt + C`**: Quick Copy Mode (OCR & Copy to Clipboard).
-  - **`Ctrl + Alt + T`**: Quick Translate Mode (OCR & Translate).
-- **Overlay Mode**: A non-intrusive, stay-on-top overlay allows you to select text without leaving your current window.
-- **Clipboard Management**: Automatically copies recognized text to your clipboard.
-- **Copy History**: Maintains a separate history of all text copied via the tool.
+## Первый запуск
 
-### 🎨 Modern UI & Customization
-- **Dark & Light Themes**: Fully distinct themes to match your system preference or mood.
-- **System Tray Integration**: Minimized to tray to keep your taskbar clean.
-- **Smart Settings**: Configure behavior such as "Start Minimized", "Keep Visible on OCR", and more.
-- **Responsive Design**: Polished layout with rounded corners and smooth interactions.
+Мастер поможет выбрать язык интерфейса, пару языков, сервис перевода и разрешение «Поверх других приложений». Он откроет нужные системные настройки и покажет текущий статус разрешений. Уведомления, специальные возможности и параметры батареи объясняются отдельно. При необходимости мастер переводит прямо к разделам OCR, моделей и плавающей кнопки; после возврата сохраняется текущий шаг.
 
-## 🛠 Installation
+Google работает без ключа. MyMemory требует указать язык оригинала. Lingva позволяет настроить сервер; LibreTranslate — сервер и необязательный ключ. Проверка соединения отправляет пробную фразу выбранному сервису. API-ключи сохраняются через защищённое хранилище приложения.
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/jabrailkhalil/clickntranslate.git
-   cd clickntranslate
-   ```
+OCR по умолчанию распознаёт латиницу, китайский, японский и корейский текст. Для других письменностей выбери подходящий OCR. Скачай выбранные офлайн-модели до использования. Названия языков перевода доступны для всех поддерживаемых языков; конкретные языки зависят от выбранного сервиса.
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(Ensure you have Python 3.8+ installed)*
+Справка в правом верхнем углу повторно открывает мастер настройки. Перевод текста и фото работает без разрешения на захват экрана. История текста хранится локально, исключена из резервного копирования и удаляется кнопкой в разделе «История».
 
-3. **Run the application**:
-   ```bash
-   python main.py
-   ```
+## Сборка и проверка
 
-## 📦 Building form Source
-
-To create a standalone executable (`.exe`):
+Нужны JDK 17, Android SDK 35, Build Tools 35.0.0, NDK 26.1.10909125 и CMake 3.22.1. Укажи путь к SDK в `local.properties` (см. `local.properties.example`).
 
 ```bash
-python build.py
+git submodule update --init --recursive
+./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --continue
 ```
-This will generate a portable executable in the `dist` folder.
 
-## 🎮 How to Use
+В Windows используй `gradlew.bat`. APK: `app/build/outputs/apk/debug/app-debug.apk`. Android package: `dev.clickn.translate`; debug package: `dev.clickn.translate.debug`.
 
-1. **Launch the App**: The main window provides access to all settings.
-2. **Settings**:
-   - Select your OCR Engine (Windows recommended for Windows 10/11).
-   - Set your **Interface Language** and **Target Translation Language**.
-   - Customize Hotkeys if desired.
-3. **Capture**:
-   - Press **`Ctrl + Alt + T`**.
-   - Your screen will dim slightly (optional).
-   - Click and drag to select the text you want to translate.
-   - The result will appear in a popup dialog.
+Ветка `android` предназначена для разработки и ручного тестирования. Автоматическая публикация релизов отключена. Настольная версия развивается в `main`.
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-*Developed by Jabrail (jabrailkhalil)*
+[Настройка и режимы](docs/android-setup.md) · [Проверки и ограничения](docs/android-testing.md) · [Разработка](CONTRIBUTING.md)

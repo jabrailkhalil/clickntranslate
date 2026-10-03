@@ -1,0 +1,63 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.service
+
+import java.io.File
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WordSelectTtsUiAuditTest {
+
+    @Test
+    fun wordSelectTts_isManualAndProvidesSourceAndTranslationActions() {
+        val source = sourceFile("src/main/java/dev/clickn/translate/service/CaptureService.kt").readText()
+        val pipeline = source.substring(
+            source.indexOf("private suspend fun runWordSelectPipeline"),
+            source.indexOf("private fun cropRect", source.indexOf("private suspend fun runWordSelectPipeline")),
+        )
+
+        val requiredFragments = listOf(
+            "onSpeakSource = sourceSpeech",
+            "onSpeakTranslation = translationSpeech",
+            "onSpeakDictionary = dictionarySpeech",
+            "playbackId = \"word-select:${'$'}diagId:source\"",
+            "playbackId = \"word-select:${'$'}diagId:translation\"",
+            "playbackId = \"word-select:${'$'}diagId:dictionary\"",
+            "sourceEvidence = { sourceLanguageEvidence }",
+        )
+        requiredFragments.forEach { fragment ->
+            assertTrue("Missing manual word-select TTS wiring: $fragment", pipeline.contains(fragment))
+        }
+        assertFalse(
+            "Word-select completion must not automatically speak the final translation",
+            pipeline.contains("speakWordSelectTranslation(displayedTranslation"),
+        )
+
+        val speaker = source.substring(
+            source.indexOf("private suspend fun speakWordSelectText"),
+            source.indexOf("private fun logBlankLikeFrame", source.indexOf("private suspend fun speakWordSelectText")),
+        )
+        assertTrue("Persistent buttons toggle playback", speaker.contains("ttsEngine.toggle("))
+        assertTrue("Selection toolbar starts new playback", speaker.contains("ttsEngine.speak("))
+        assertTrue("Original text toggles with its actual language", speaker.contains("ttsEngine.toggleSource("))
+        assertTrue("Original text selection detects its own language", speaker.contains("ttsEngine.speakSource("))
+        assertFalse("Toggle must not discard resumable progress", speaker.contains("ttsEngine.stop()"))
+        assertTrue(
+            "TTS failures must be visible instead of log-only",
+            speaker.contains("overlay?.showErrorHint(ttsFailureMessage(error)"),
+        )
+
+        val actionFactory = source.substring(
+            source.indexOf("private fun wordSelectTtsAction"),
+            source.indexOf("private suspend fun speakWordSelectText"),
+        )
+        assertTrue(
+            "Word-select TTS clicks must preserve UI order on the main dispatcher",
+            actionFactory.contains("mainScope.launch {"),
+        )
+    }
+
+    private fun sourceFile(path: String): File =
+        listOf(File(path), File("app", path)).firstOrNull { it.isFile }
+            ?: error("Source file not found: $path")
+}

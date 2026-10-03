@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modified for Click'n'Translate on October 3, 2026. -->
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="overlay_bg">#B3000000</color>
+    <color name="overlay_text">#FFFFFFFF</color>
+    <color name="floating_button">#E68058CD</color>
+</resources>

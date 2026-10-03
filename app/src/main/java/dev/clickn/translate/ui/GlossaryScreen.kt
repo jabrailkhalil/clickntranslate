@@ -1,0 +1,1705 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
+import dev.clickn.translate.R
+import dev.clickn.translate.appcontext.ForegroundApp
+import dev.clickn.translate.appcontext.SELECTABLE_APP_ICON_SIZE_DP
+import dev.clickn.translate.appcontext.SelectableApp
+import dev.clickn.translate.appcontext.SelectableAppPolicy
+import dev.clickn.translate.data.Languages
+import dev.clickn.translate.glossary.GlossaryTermCategory
+import dev.clickn.translate.glossary.GlossaryTermEntity
+import dev.clickn.translate.translate.TranslationMemoryEntity
+import kotlinx.coroutines.launch
+
+private data class PendingGlossaryConflict(
+    val pending: GlossaryTermEntity,
+    val existing: GlossaryTermEntity,
+)
+
+private enum class TranslationLibraryTab {
+    TERMS,
+    PRESERVE_SOURCE,
+    MEMORY,
+}
+
+private enum class GlossaryAddRoute {
+    SINGLE,
+    BATCH,
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GlossaryScreen(
+    onBack: () -> Unit,
+    viewModel: GlossaryViewModel = hiltViewModel(),
+) {
+    val scope = rememberCoroutineScope()
+    val terms by viewModel.terms.collectAsState()
+    val memories by viewModel.memories.collectAsState()
+    val sourcePreservationEnabled by viewModel.sourcePreservationEnabled.collectAsState()
+    val glossaryEnabled by viewModel.glossaryEnabled.collectAsState()
+    val memoryEnabled by viewModel.memoryEnabled.collectAsState()
+    var selectedTab by rememberSaveable { mutableStateOf(TranslationLibraryTab.TERMS) }
+    var currentApp by remember { mutableStateOf<ForegroundApp?>(null) }
+    var defaultLanguages by remember { mutableStateOf("auto" to "zh-CN") }
+    var selectableApps by remember { mutableStateOf<List<SelectableApp>>(emptyList()) }
+    var appsLoading by remember { mutableStateOf(true) }
+    var editing by remember { mutableStateOf<GlossaryTermEntity?>(null) }
+    var showEditor by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
+    var showFilter by remember { mutableStateOf(false) }
+    var showMemoryFilter by remember { mutableStateOf(false) }
+    var listFilter by remember { mutableStateOf(GlossaryListFilter()) }
+    var preservationFilter by remember { mutableStateOf(GlossaryListFilter()) }
+    var editingPreservation by remember { mutableStateOf(false) }
+    var memoryQuery by rememberSaveable { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<GlossaryTermEntity?>(null) }
+    var pendingConflict by remember { mutableStateOf<PendingGlossaryConflict?>(null) }
+    var saveInProgress by remember { mutableStateOf(false) }
+    var addRoute by rememberSaveable { mutableStateOf<GlossaryAddRoute?>(null) }
+    var addMenuExpanded by rememberSaveable { mutableStateOf(false) }
+
+    val categoryLabels = mapOf(
+        GlossaryTermCategory.PERSON to stringResource(R.string.glossary_category_person),
+        GlossaryTermCategory.PLACE to stringResource(R.string.glossary_category_place),
+        GlossaryTermCategory.ORGANIZATION to stringResource(R.string.glossary_category_organization),
+        GlossaryTermCategory.TERM to stringResource(R.string.glossary_category_term),
+        GlossaryTermCategory.PRESERVE_SOURCE to
+            stringResource(R.string.source_preservation_category),
+    )
+    val globalScopeLabel = stringResource(R.string.glossary_scope_global)
+    val glossaryTerms = remember(terms) {
+        terms.filter { it.category != GlossaryTermCategory.PRESERVE_SOURCE }
+    }
+    val preservationTerms = remember(terms) {
+        terms.filter { it.category == GlossaryTermCategory.PRESERVE_SOURCE }
+    }
+    val visibleTerms = remember(glossaryTerms, listFilter, categoryLabels, globalScopeLabel) {
+        GlossaryListFilterPolicy.filter(
+            terms = glossaryTerms,
+            filter = listFilter,
+            categoryLabels = categoryLabels,
+            globalScopeLabel = globalScopeLabel,
+        )
+    }
+    val visiblePreservationTerms = remember(
+        preservationTerms,
+        preservationFilter,
+        categoryLabels,
+        globalScopeLabel,
+    ) {
+        GlossaryListFilterPolicy.filter(
+            terms = preservationTerms,
+            filter = preservationFilter,
+            categoryLabels = categoryLabels,
+            globalScopeLabel = globalScopeLabel,
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        currentApp = viewModel.currentApp()
+        defaultLanguages = viewModel.defaultLanguages()
+        selectableApps = runCatching { viewModel.selectableApps() }.getOrDefault(emptyList())
+        appsLoading = false
+    }
+    LaunchedEffect(selectedTab) {
+        addMenuExpanded = false
+    }
+    if (addRoute == GlossaryAddRoute.SINGLE) {
+        GlossaryAddScreen(
+            currentApp = currentApp,
+            selectableApps = selectableApps,
+            appsLoading = appsLoading,
+            defaultSourceLang = defaultLanguages.first,
+            defaultTargetLang = defaultLanguages.second,
+            viewModel = viewModel,
+            onBack = { addRoute = null },
+        )
+        return
+    }
+    if (addRoute == GlossaryAddRoute.BATCH) {
+        GlossaryImportScreen(
+            existingTerms = glossaryTerms,
+            currentApp = currentApp,
+            selectableApps = selectableApps,
+            appsLoading = appsLoading,
+            defaultSourceLang = defaultLanguages.first,
+            defaultTargetLang = defaultLanguages.second,
+            viewModel = viewModel,
+            onBack = { addRoute = null },
+        )
+        return
+    }
+
+    BackHandler {
+        if (addMenuExpanded) addMenuExpanded = false else onBack()
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.glossary_title))
+                        IconButton(
+                            onClick = { showHelp = true },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.HelpOutline,
+                                stringResource(R.string.translation_library_help),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            when (selectedTab) {
+                                TranslationLibraryTab.TERMS -> showFilter = true
+                                TranslationLibraryTab.PRESERVE_SOURCE -> showFilter = true
+                                TranslationLibraryTab.MEMORY -> showMemoryFilter = true
+                            }
+                        },
+                    ) {
+                        val filterActive = when (selectedTab) {
+                            TranslationLibraryTab.TERMS -> listFilter.isActive
+                            TranslationLibraryTab.PRESERVE_SOURCE -> preservationFilter.isActive
+                            TranslationLibraryTab.MEMORY -> memoryQuery.isNotBlank()
+                        }
+                        Icon(
+                            Icons.Default.Search,
+                            stringResource(
+                                if (selectedTab == TranslationLibraryTab.MEMORY)
+                                    R.string.translation_memory_filter
+                                else R.string.glossary_filter
+                            ),
+                            tint = if (filterActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
+        },
+        floatingActionButton = {
+            when (selectedTab) {
+                TranslationLibraryTab.TERMS -> GlossaryAddFabMenu(
+                    expanded = addMenuExpanded,
+                    onExpandedChange = { addMenuExpanded = it },
+                    onSingleAdd = {
+                        addMenuExpanded = false
+                        addRoute = GlossaryAddRoute.SINGLE
+                    },
+                    onBatchImport = {
+                        addMenuExpanded = false
+                        addRoute = GlossaryAddRoute.BATCH
+                    },
+                )
+                TranslationLibraryTab.PRESERVE_SOURCE -> {
+                    FloatingActionButton(onClick = {
+                        editing = null
+                        editingPreservation = true
+                        showEditor = true
+                    }) {
+                        Icon(Icons.Default.Add, stringResource(R.string.glossary_add))
+                    }
+                }
+                TranslationLibraryTab.MEMORY -> Unit
+            }
+        },
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+            SecondaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+                Tab(
+                    selected = selectedTab == TranslationLibraryTab.TERMS,
+                    onClick = { selectedTab = TranslationLibraryTab.TERMS },
+                    text = { Text(stringResource(R.string.translation_library_terms_tab)) },
+                )
+                Tab(
+                    selected = selectedTab == TranslationLibraryTab.PRESERVE_SOURCE,
+                    onClick = { selectedTab = TranslationLibraryTab.PRESERVE_SOURCE },
+                    text = { Text(stringResource(R.string.source_preservation_tab)) },
+                )
+                Tab(
+                    selected = selectedTab == TranslationLibraryTab.MEMORY,
+                    onClick = { selectedTab = TranslationLibraryTab.MEMORY },
+                    text = { Text(stringResource(R.string.translation_library_memory_tab)) },
+                )
+            }
+            when (selectedTab) {
+                TranslationLibraryTab.TERMS -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    glossaryEnabled?.let { enabled ->
+                        item(key = "glossary-master") {
+                            SourcePreservationMasterCard(
+                                disableAll = !enabled,
+                                onDisableAllChange = { viewModel.setGlossaryEnabled(!it) },
+                                labelRes = R.string.translation_library_disable_all,
+                                descriptionRes = null,
+                            )
+                        }
+                    }
+                    if (visibleTerms.isEmpty()) {
+                        item {
+                            Text(
+                                text = stringResource(
+                                    if (glossaryTerms.isEmpty()) {
+                                        R.string.glossary_empty
+                                    } else {
+                                        R.string.glossary_filter_empty
+                                    }
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            )
+                        }
+                    }
+                    items(visibleTerms, key = GlossaryTermEntity::id) { term ->
+                        GlossaryTermCard(
+                            term = term,
+                            onEdit = {
+                                editing = term
+                                editingPreservation = false
+                                showEditor = true
+                            },
+                            onDelete = { pendingDelete = term },
+                        )
+                    }
+                }
+                TranslationLibraryTab.PRESERVE_SOURCE -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    sourcePreservationEnabled?.let { enabled ->
+                        item(key = "source-preservation-master") {
+                            SourcePreservationMasterCard(
+                                disableAll = !enabled,
+                                onDisableAllChange = { disableAll ->
+                                    viewModel.setSourcePreservationEnabled(!disableAll)
+                                },
+                            )
+                        }
+                    }
+                    if (visiblePreservationTerms.isEmpty()) {
+                        item {
+                            Text(
+                                text = stringResource(
+                                    if (preservationTerms.isEmpty()) {
+                                        R.string.source_preservation_empty
+                                    } else {
+                                        R.string.glossary_filter_empty
+                                    }
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            )
+                        }
+                    }
+                    items(visiblePreservationTerms, key = GlossaryTermEntity::id) { term ->
+                        GlossaryTermCard(
+                            term = term,
+                            onEdit = {
+                                editing = term
+                                editingPreservation = true
+                                showEditor = true
+                            },
+                            onDelete = { pendingDelete = term },
+                        )
+                    }
+                }
+                TranslationLibraryTab.MEMORY -> TranslationMemoryPane(
+                    masterSwitch = {
+                        memoryEnabled?.let { enabled ->
+                            SourcePreservationMasterCard(
+                                disableAll = !enabled,
+                                onDisableAllChange = { viewModel.setMemoryEnabled(!it) },
+                                labelRes = R.string.translation_library_disable_all,
+                                descriptionRes = null,
+                            )
+                        }
+                    },
+                    entries = memories,
+                    query = memoryQuery,
+                    onUpdate = { id, correctedSource, correctedTranslation ->
+                        scope.launch {
+                            viewModel.updateMemory(id, correctedSource, correctedTranslation)
+                        }
+                    },
+                    onDelete = { id ->
+                        scope.launch { viewModel.deleteMemory(id) }
+                    },
+                )
+            }
+            }
+            if (addMenuExpanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { addMenuExpanded = false },
+                )
+            }
+        }
+    }
+
+    if (showHelp) {
+        TranslationLibraryHelpDialog(onDismiss = { showHelp = false })
+    }
+
+    if (showEditor) {
+        GlossaryTermEditor(
+            existing = editing,
+            currentApp = currentApp,
+            selectableApps = selectableApps,
+            appsLoading = appsLoading,
+            defaultSourceLang = defaultLanguages.first,
+            defaultTargetLang = defaultLanguages.second,
+            saving = saveInProgress,
+            sourcePreservationMode = editingPreservation,
+            onDismiss = { showEditor = false },
+            onSave = { term ->
+                if (saveInProgress) return@GlossaryTermEditor
+                saveInProgress = true
+                scope.launch {
+                    try {
+                        val conflict = viewModel.findConflict(term)
+                        if (conflict == null) {
+                            viewModel.upsert(term)
+                            showEditor = false
+                        } else {
+                            pendingConflict = PendingGlossaryConflict(term, conflict)
+                        }
+                    } finally {
+                        saveInProgress = false
+                    }
+                }
+            },
+        )
+    }
+
+    if (showFilter) {
+        val filteringPreservation = selectedTab == TranslationLibraryTab.PRESERVE_SOURCE
+        GlossaryFilterDialog(
+            terms = if (filteringPreservation) preservationTerms else glossaryTerms,
+            initial = if (filteringPreservation) preservationFilter else listFilter,
+            categoryLabels = categoryLabels,
+            availableCategories = if (filteringPreservation) {
+                listOf(GlossaryTermCategory.PRESERVE_SOURCE)
+            } else {
+                GlossaryTermCategory.entries.filterNot {
+                    it == GlossaryTermCategory.PRESERVE_SOURCE
+                }
+            },
+            globalScopeLabel = globalScopeLabel,
+            onDismiss = { showFilter = false },
+            onApply = {
+                if (filteringPreservation) preservationFilter = it else listFilter = it
+                showFilter = false
+            },
+        )
+    }
+
+    if (showMemoryFilter) {
+        TranslationMemoryFilterDialog(
+            entries = memories,
+            initialQuery = memoryQuery,
+            onDismiss = { showMemoryFilter = false },
+            onApply = {
+                memoryQuery = it
+                showMemoryFilter = false
+            },
+        )
+    }
+
+    pendingDelete?.let { term ->
+        GlossaryConfirmationDialog(
+            title = stringResource(
+                if (term.category == GlossaryTermCategory.PRESERVE_SOURCE)
+                    R.string.source_preservation_delete_title
+                else R.string.glossary_delete_confirm_title
+            ),
+            message = if (term.category == GlossaryTermCategory.PRESERVE_SOURCE) {
+                stringResource(R.string.source_preservation_delete_message, term.sourceTerm)
+            } else {
+                stringResource(
+                    R.string.glossary_delete_confirm_message,
+                    term.sourceTerm,
+                    term.targetTerm,
+                )
+            },
+            confirmLabel = stringResource(R.string.glossary_delete),
+            destructive = true,
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                pendingDelete = null
+                scope.launch { viewModel.delete(term.id) }
+            },
+        )
+    }
+
+    pendingConflict?.let { conflict ->
+        GlossaryConfirmationDialog(
+            title = stringResource(R.string.glossary_duplicate_title),
+            message = stringResource(
+                R.string.glossary_duplicate_message,
+                conflict.existing.sourceTerm,
+                conflict.existing.targetTerm,
+                conflict.pending.targetTerm,
+            ),
+            confirmLabel = stringResource(R.string.glossary_duplicate_overwrite),
+            destructive = false,
+            onDismiss = { pendingConflict = null },
+            onConfirm = {
+                pendingConflict = null
+                saveInProgress = true
+                scope.launch {
+                    try {
+                        viewModel.overwriteConflict(conflict.pending)
+                        showEditor = false
+                    } finally {
+                        saveInProgress = false
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun GlossaryAddFabMenu(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSingleAdd: () -> Unit,
+    onBatchImport: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ExtendedFloatingActionButton(
+                    text = { Text(stringResource(R.string.glossary_add_mode_batch)) },
+                    icon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    onClick = onBatchImport,
+                )
+                ExtendedFloatingActionButton(
+                    text = { Text(stringResource(R.string.glossary_add_mode_single)) },
+                    icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    onClick = onSingleAdd,
+                )
+            }
+        }
+        FloatingActionButton(onClick = { onExpandedChange(!expanded) }) {
+            Icon(
+                imageVector = if (expanded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = stringResource(
+                    if (expanded) R.string.glossary_add_menu_close else R.string.glossary_add
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslationLibraryHelpDialog(
+    onDismiss: () -> Unit,
+) {
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val dialogColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MaterialTheme(colorScheme = dialogColors) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column(modifier = Modifier.heightIn(max = 640.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.translation_library_help_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, stringResource(R.string.settings_color_cancel))
+                        }
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_preserve_title),
+                            body = stringResource(R.string.translation_library_help_preserve_body),
+                        )
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_terms_title),
+                            body = stringResource(R.string.translation_library_help_terms_body),
+                        )
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_memory_title),
+                            body = stringResource(R.string.translation_library_help_memory_body),
+                        )
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_priority_title),
+                            body = stringResource(R.string.translation_library_help_priority_body),
+                        )
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_add_title),
+                            body = stringResource(R.string.translation_library_help_add_body),
+                            imageRes = R.drawable.translation_correction_help,
+                            imageContentDescription = stringResource(
+                                R.string.translation_library_help_add_image_description
+                            ),
+                        )
+                        TranslationLibraryHelpSection(
+                            title = stringResource(R.string.translation_library_help_manage_title),
+                            body = stringResource(R.string.translation_library_help_manage_body),
+                        )
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(onClick = onDismiss) {
+                            Text(stringResource(R.string.translation_library_help_close))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TranslationLibraryHelpSection(
+    title: String,
+    body: String,
+    imageRes: Int? = null,
+    imageContentDescription: String? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (imageRes != null) {
+            Image(
+                painter = painterResource(imageRes),
+                contentDescription = imageContentDescription,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1117f / 633f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        RoundedCornerShape(8.dp),
+                    ),
+                contentScale = ContentScale.Fit,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslationMemoryFilterDialog(
+    entries: List<TranslationMemoryEntity>,
+    initialQuery: String,
+    onDismiss: () -> Unit,
+    onApply: (String) -> Unit,
+) {
+    var query by remember(initialQuery) { mutableStateOf(initialQuery) }
+    val resultCount = remember(entries, query) {
+        TranslationMemoryListFilterPolicy.filter(entries, query).size
+    }
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val dialogColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MaterialTheme(colorScheme = dialogColors) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.translation_memory_filter_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, stringResource(R.string.settings_color_cancel))
+                        }
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(stringResource(R.string.translation_memory_search_hint))
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null)
+                            },
+                            trailingIcon = if (query.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { query = "" }) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            stringResource(
+                                                R.string.translation_memory_clear_search
+                                            ),
+                                        )
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.translation_memory_filter_result_count,
+                                resultCount,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = { query = "" }) {
+                            Text(stringResource(R.string.glossary_filter_reset))
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text(stringResource(R.string.settings_color_cancel))
+                        }
+                        Button(onClick = { onApply(query) }) {
+                            Text(stringResource(R.string.glossary_filter_apply))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GlossaryFilterDialog(
+    terms: List<GlossaryTermEntity>,
+    initial: GlossaryListFilter,
+    categoryLabels: Map<GlossaryTermCategory, String>,
+    availableCategories: List<GlossaryTermCategory>,
+    globalScopeLabel: String,
+    onDismiss: () -> Unit,
+    onApply: (GlossaryListFilter) -> Unit,
+) {
+    var query by remember(initial) { mutableStateOf(initial.query) }
+    var categories by remember(initial) { mutableStateOf(initial.categories) }
+    var status by remember(initial) { mutableStateOf(initial.status) }
+    val draft = GlossaryListFilter(query = query, categories = categories, status = status)
+    val resultCount = remember(terms, draft, categoryLabels, globalScopeLabel) {
+        GlossaryListFilterPolicy.filter(terms, draft, categoryLabels, globalScopeLabel).size
+    }
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val dialogColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MaterialTheme(colorScheme = dialogColors) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column(modifier = Modifier.heightIn(max = 640.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.glossary_filter_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, stringResource(R.string.settings_color_cancel))
+                        }
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.glossary_filter_search_hint)) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = if (query.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { query = "" }) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            stringResource(R.string.glossary_app_picker_clear_search),
+                                        )
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                        )
+                        Text(
+                            stringResource(R.string.glossary_filter_status),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            EngineChip(
+                                status,
+                                GlossaryStatusFilter.ALL,
+                                stringResource(R.string.glossary_filter_all_statuses),
+                            ) { status = it }
+                            EngineChip(
+                                status,
+                                GlossaryStatusFilter.ENABLED,
+                                stringResource(R.string.glossary_status_enabled),
+                            ) { status = it }
+                            EngineChip(
+                                status,
+                                GlossaryStatusFilter.DISABLED,
+                                stringResource(R.string.glossary_status_disabled),
+                            ) { status = it }
+                        }
+                        Text(
+                            stringResource(R.string.glossary_category),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = categories.isEmpty(),
+                                onClick = { categories = emptySet() },
+                                label = { Text(stringResource(R.string.glossary_filter_all_categories)) },
+                            )
+                            availableCategories.forEach { category ->
+                                FilterChip(
+                                    selected = category in categories,
+                                    onClick = {
+                                        categories = if (category in categories) {
+                                            categories - category
+                                        } else {
+                                            categories + category
+                                        }
+                                    },
+                                    label = { Text(categoryLabels.getValue(category)) },
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(R.string.glossary_filter_result_count, resultCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            onClick = {
+                                query = ""
+                                categories = emptySet()
+                                status = GlossaryStatusFilter.ALL
+                            },
+                        ) { Text(stringResource(R.string.glossary_filter_reset)) }
+                        TextButton(onClick = onDismiss) {
+                            Text(stringResource(R.string.settings_color_cancel))
+                        }
+                        Button(onClick = { onApply(draft) }) {
+                            Text(stringResource(R.string.glossary_filter_apply))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun GlossaryConfirmationDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    destructive: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val dialogColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        MaterialTheme(colorScheme = dialogColors) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                    )
+                    HorizontalDivider(color = zinc.border)
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(20.dp),
+                    )
+                    HorizontalDivider(color = zinc.border)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text(stringResource(R.string.settings_color_cancel))
+                        }
+                        if (destructive) {
+                            DestructiveTextButton(label = confirmLabel, onClick = onConfirm)
+                        } else {
+                            Button(onClick = onConfirm) { Text(confirmLabel) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourcePreservationMasterCard(
+    disableAll: Boolean,
+    onDisableAllChange: (Boolean) -> Unit,
+    labelRes: Int = R.string.source_preservation_disable_all,
+    descriptionRes: Int? = R.string.source_preservation_disable_all_description,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            SwitchRow(
+                label = stringResource(labelRes),
+                checked = disableAll,
+                onChange = onDisableAllChange,
+            )
+            if (descriptionRes != null) Text(
+                text = stringResource(descriptionRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlossaryTermCard(
+    term: GlossaryTermEntity,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val context = LocalContext.current
+    val sourcePreservation = term.category == GlossaryTermCategory.PRESERVE_SOURCE
+    val scopeLabel = term.appLabel.ifBlank { stringResource(R.string.glossary_scope_global) }
+    val categoryLabel = glossaryCategoryLabel(term.category)
+    val sourceLanguage = Languages.nameOf(context, term.sourceLang)
+    val targetLanguage = if (sourcePreservation) "" else Languages.nameOf(context, term.targetLang)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = term.sourceTerm,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!sourcePreservation) {
+                    Text(
+                        text = term.targetTerm,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = "$scopeLabel | $categoryLabel",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (sourcePreservation) {
+                    Text(
+                        text = sourceLanguage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        text = "$sourceLanguage -> $targetLanguage",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            GlossaryTermStatus(term.enabled)
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, stringResource(R.string.glossary_edit))
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, stringResource(R.string.glossary_delete))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlossaryTermStatus(enabled: Boolean) {
+    val color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Row(
+        modifier = Modifier.padding(start = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (enabled) Icons.Default.Check else Icons.Default.Close,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = color,
+        )
+        Text(
+            text = stringResource(
+                if (enabled) R.string.glossary_status_enabled else R.string.glossary_status_disabled
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            maxLines = 1,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GlossaryTermEditor(
+    existing: GlossaryTermEntity?,
+    currentApp: ForegroundApp?,
+    selectableApps: List<SelectableApp>,
+    appsLoading: Boolean,
+    defaultSourceLang: String,
+    defaultTargetLang: String,
+    saving: Boolean,
+    sourcePreservationMode: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (GlossaryTermEntity) -> Unit,
+) {
+    var sourceTerm by remember(existing) { mutableStateOf(existing?.sourceTerm.orEmpty()) }
+    var targetTerm by remember(existing, sourcePreservationMode) {
+        mutableStateOf(existing?.targetTerm.orEmpty())
+    }
+    var sourceLang by remember(existing, sourcePreservationMode) {
+        mutableStateOf(existing?.sourceLang ?: if (sourcePreservationMode) "ja" else defaultSourceLang)
+    }
+    var targetLang by remember(existing, sourcePreservationMode) {
+        mutableStateOf(existing?.targetLang ?: if (sourcePreservationMode) "*" else defaultTargetLang)
+    }
+    val currentScopeApp = remember(currentApp) {
+        currentApp?.let { SelectableApp(packageName = it.packageName, displayName = it.displayName) }
+    }
+    val initialScope = remember(existing, currentScopeApp) {
+        GlossaryScopePolicy.initialSelection(
+            scopePackage = existing?.scopePackage.orEmpty(),
+            appLabel = existing?.appLabel.orEmpty(),
+            currentApp = currentScopeApp,
+        )
+    }
+    var scopeMode by remember(initialScope) { mutableStateOf(initialScope.mode) }
+    var selectedApp by remember(initialScope) { mutableStateOf(initialScope.selectedApp) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var category by remember(existing, sourcePreservationMode) {
+        mutableStateOf(
+            existing?.category ?: if (sourcePreservationMode) {
+                GlossaryTermCategory.PRESERVE_SOURCE
+            } else {
+                GlossaryTermCategory.TERM
+            }
+        )
+    }
+    var caseSensitive by remember(existing) { mutableStateOf(existing?.caseSensitive == true) }
+    var enabled by remember(existing) { mutableStateOf(existing?.enabled != false) }
+    val scopedApp = GlossaryScopePolicy.scopedApp(scopeMode, currentScopeApp, selectedApp)
+    val canSave = sourceTerm.isNotBlank() && (sourcePreservationMode || targetTerm.isNotBlank()) &&
+        GlossaryScopePolicy.isValid(scopeMode, currentScopeApp, selectedApp)
+
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val editorColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MaterialTheme(colorScheme = editorColors) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column(modifier = Modifier.heightIn(max = 640.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (sourcePreservationMode) {
+                                    if (existing == null) R.string.source_preservation_add
+                                    else R.string.source_preservation_edit
+                                } else {
+                                    if (existing == null) R.string.glossary_add else R.string.glossary_edit
+                                }
+                            ),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, stringResource(R.string.settings_color_cancel))
+                        }
+                    }
+                    HorizontalDivider(color = zinc.border)
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = sourceTerm,
+                    onValueChange = { sourceTerm = it },
+                    label = {
+                        Text(
+                            stringResource(
+                                if (sourcePreservationMode) R.string.source_preservation_source
+                                else R.string.glossary_source_term
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                if (!sourcePreservationMode) {
+                    OutlinedTextField(
+                        value = targetTerm,
+                        onValueChange = { targetTerm = it },
+                        label = { Text(stringResource(R.string.glossary_target_term)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                }
+                LanguagePicker(
+                    label = stringResource(R.string.glossary_source_language),
+                    currentCode = sourceLang,
+                    onSelect = { sourceLang = it },
+                )
+                if (!sourcePreservationMode) {
+                    LanguagePicker(
+                        label = stringResource(R.string.glossary_target_language),
+                        currentCode = targetLang,
+                        onSelect = { targetLang = it },
+                    )
+                }
+                Text(stringResource(R.string.glossary_scope), style = MaterialTheme.typography.labelLarge)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    EngineChip(
+                        scopeMode,
+                        GlossaryScopeMode.GLOBAL,
+                        stringResource(R.string.glossary_scope_global),
+                    ) { scopeMode = it }
+                    EngineChip(
+                        scopeMode,
+                        GlossaryScopeMode.CURRENT_APP,
+                        currentApp?.displayName ?: stringResource(R.string.glossary_current_app_unknown),
+                        enabled = currentApp != null,
+                    ) { scopeMode = it }
+                    EngineChip(
+                        scopeMode,
+                        GlossaryScopeMode.SELECTED_APP,
+                        stringResource(R.string.glossary_scope_select_app),
+                    ) {
+                        scopeMode = it
+                        showAppPicker = true
+                    }
+                }
+                if (scopeMode == GlossaryScopeMode.SELECTED_APP && selectedApp != null) {
+                    Surface(
+                        onClick = { showAppPicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = selectedApp!!.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = selectedApp!!.packageName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Icon(Icons.Default.Edit, stringResource(R.string.glossary_scope_select_app))
+                        }
+                    }
+                }
+                if (!sourcePreservationMode) {
+                    Text(stringResource(R.string.glossary_category), style = MaterialTheme.typography.labelLarge)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        GlossaryTermCategory.entries
+                            .filterNot { it == GlossaryTermCategory.PRESERVE_SOURCE }
+                            .forEach { option ->
+                                EngineChip(category, option, glossaryCategoryLabel(option)) { category = it }
+                            }
+                    }
+                }
+                SwitchRow(stringResource(R.string.glossary_case_sensitive), caseSensitive) {
+                    caseSensitive = it
+                }
+                SwitchRow(stringResource(R.string.glossary_enabled), enabled) { enabled = it }
+            }
+                    HorizontalDivider(color = zinc.border)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text(stringResource(R.string.settings_color_cancel))
+                        }
+                        Button(
+                            enabled = canSave && !saving,
+                            onClick = {
+                                val base = existing ?: GlossaryTermEntity(
+                                    sourceLang = sourceLang,
+                                    targetLang = if (sourcePreservationMode) "*" else targetLang,
+                                    sourceTerm = sourceTerm,
+                                    targetTerm = if (sourcePreservationMode) sourceTerm else targetTerm,
+                                )
+                                onSave(base.copy(
+                                    scopePackage = scopedApp?.packageName.orEmpty(),
+                                    appLabel = scopedApp?.displayName.orEmpty(),
+                                    sourceLang = sourceLang,
+                                    targetLang = if (sourcePreservationMode) "*" else targetLang,
+                                    sourceTerm = sourceTerm,
+                                    targetTerm = if (sourcePreservationMode) sourceTerm else targetTerm,
+                                    category = if (sourcePreservationMode) {
+                                        GlossaryTermCategory.PRESERVE_SOURCE
+                                    } else {
+                                        category
+                                    },
+                                    caseSensitive = caseSensitive,
+                                    enabled = enabled,
+                                ))
+                            },
+                        ) { Text(stringResource(R.string.settings_save)) }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAppPicker) {
+        GlossaryAppPickerDialog(
+            apps = selectableApps,
+            isLoading = appsLoading,
+            selectedPackage = selectedApp?.packageName,
+            onDismiss = { showAppPicker = false },
+            onSelect = { app ->
+                selectedApp = app
+                scopeMode = GlossaryScopeMode.SELECTED_APP
+                showAppPicker = false
+            },
+        )
+    }
+}
+
+@Composable
+internal fun GlossaryAppPickerDialog(
+    apps: List<SelectableApp>,
+    isLoading: Boolean,
+    selectedPackage: String?,
+    onDismiss: () -> Unit,
+    onSelect: (SelectableApp) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val filteredApps = remember(apps, query) { SelectableAppPolicy.filter(apps, query) }
+    val baseColors = MaterialTheme.colorScheme
+    val zinc = glossaryEditorZincPalette(baseColors.background.luminance() < 0.5f)
+    val pickerColors = baseColors.copy(
+        background = zinc.surface,
+        surface = zinc.surface,
+        surfaceVariant = zinc.mutedSurface,
+        surfaceContainer = zinc.surface,
+        surfaceContainerHigh = zinc.mutedSurface,
+        surfaceContainerHighest = zinc.border,
+        outline = zinc.outline,
+        outlineVariant = zinc.border,
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MaterialTheme(colorScheme = pickerColors) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .heightIn(max = 640.dp)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = zinc.surface,
+                border = BorderStroke(1.dp, zinc.border),
+                shadowElevation = 8.dp,
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.glossary_app_picker_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, stringResource(R.string.settings_color_cancel))
+                        }
+                    }
+                    HorizontalDivider(color = zinc.border)
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        placeholder = { Text(stringResource(R.string.glossary_app_picker_search_hint)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(Icons.Default.Close, stringResource(R.string.glossary_app_picker_clear_search))
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                        singleLine = true,
+                    )
+                    HorizontalDivider(color = zinc.border)
+                    LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                        when {
+                            isLoading -> item {
+                                PickerMessage(stringResource(R.string.glossary_app_picker_loading))
+                            }
+                            filteredApps.isEmpty() -> item {
+                                PickerMessage(stringResource(R.string.glossary_app_picker_empty))
+                            }
+                            else -> items(filteredApps, key = SelectableApp::packageName) { app ->
+                                Surface(
+                                    onClick = { onSelect(app) },
+                                    color = if (app.packageName == selectedPackage) {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        val icon = app.icon
+                                        if (icon != null) {
+                                            Image(
+                                                bitmap = remember(icon) { icon.asImageBitmap() },
+                                                contentDescription = null,
+                                                modifier = Modifier.size(SELECTABLE_APP_ICON_SIZE_DP.dp),
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier.size(SELECTABLE_APP_ICON_SIZE_DP.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Apps,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                        Column(
+                                            modifier = Modifier
+                                                .padding(start = 12.dp)
+                                                .weight(1f),
+                                        ) {
+                                            Text(
+                                                text = app.displayName,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Text(
+                                                text = app.packageName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (app.packageName == selectedPackage) {
+                                            Icon(Icons.Default.Check, contentDescription = null)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerMessage(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private data class GlossaryEditorZincPalette(
+    val surface: Color,
+    val mutedSurface: Color,
+    val border: Color,
+    val outline: Color,
+)
+
+private fun glossaryEditorZincPalette(dark: Boolean): GlossaryEditorZincPalette = if (dark) {
+    GlossaryEditorZincPalette(
+        surface = Color(0xFF18181B),
+        mutedSurface = Color(0xFF27272A),
+        border = Color(0xFF3F3F46),
+        outline = Color(0xFF71717A),
+    )
+} else {
+    GlossaryEditorZincPalette(
+        surface = Color(0xFFFAFAFA),
+        mutedSurface = Color(0xFFF4F4F5),
+        border = Color(0xFFE4E4E7),
+        outline = Color(0xFFA1A1AA),
+    )
+}
+
+@Composable
+private fun glossaryCategoryLabel(category: GlossaryTermCategory): String = when (category) {
+    GlossaryTermCategory.PERSON -> stringResource(R.string.glossary_category_person)
+    GlossaryTermCategory.PLACE -> stringResource(R.string.glossary_category_place)
+    GlossaryTermCategory.ORGANIZATION -> stringResource(R.string.glossary_category_organization)
+    GlossaryTermCategory.TERM -> stringResource(R.string.glossary_category_term)
+    GlossaryTermCategory.PRESERVE_SOURCE ->
+        stringResource(R.string.source_preservation_category)
+}

@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_title">设置你的翻译工具</string>
+    <string name="setup_intro">完成几个步骤，即可翻译文本、图片和其他应用。所有选项都可以随时更改。</string>
+    <string name="setup_next">继续</string>
+    <string name="setup_previous">返回</string>
+    <string name="setup_finish">完成设置</string>
+    <string name="setup_text_only">暂时使用文本和图片翻译</string>
+    <string name="setup_step">第 %1$d 步，共 %2$d 步</string>
+    <string name="setup_translation">语言和翻译服务</string>
+    <string name="setup_translation_body">选择你阅读的语言和翻译服务。Google 无需密钥。使用 MyMemory 或离线翻译时，请指定源语言。</string>
+    <string name="setup_overlay">在其他应用上显示翻译</string>
+    <string name="setup_overlay_body">打开 Android 设置，找到 Click’n’Translate 并启用“显示在其他应用上层”。返回后，状态会自动更新。</string>
+    <string name="setup_notifications">通知</string>
+    <string name="setup_notifications_body">允许通知后，你可以查看翻译服务状态、停止屏幕捕获并跟踪模型下载。不授予此权限也可以翻译。</string>
+    <string name="setup_enabled">已启用</string>
+    <string name="setup_pending">需要设置</string>
+    <string name="setup_open">打开对应设置</string>
+    <string name="setup_capture">如何捕获屏幕</string>
+    <string name="setup_capture_body">启动翻译时，Android 会请求屏幕共享授权。在 Android 14 及以上版本，请选择整个屏幕以翻译其他应用。你可以随时停止捕获。</string>
+    <string name="setup_accessibility">可选：无障碍服务</string>
+    <string name="setup_accessibility_body">在 Android 11 及以上版本，启用 Click’n’Translate 无障碍服务可避免反复请求屏幕共享授权。音量键快捷操作和输入翻译也需要此服务。仅在需要这些功能时启用。 如果 Android 13 或更高版本阻止启用此开关，请打开应用信息，点击右上角三点菜单并选择“允许受限设置”，然后返回启用服务。</string>
+    <string name="setup_recognition">文字识别和模型</string>
+    <string name="setup_recognition_body">默认 OCR 支持拉丁字母、中文、日文和韩文。识别西里尔字母或其他文字时，请选择合适的 OCR 服务。离线翻译模型需要先下载。</string>
+    <string name="setup_ocr">选择 OCR 并下载模型</string>
+    <string name="setup_models">翻译模型和 API 设置</string>
+    <string name="setup_background">保持翻译服务可用</string>
+    <string name="setup_background_body">如果手机在后台关闭悬浮窗，请允许 Click’n’Translate 在后台运行或解除电池限制。不同设备的设置名称可能不同。</string>
+    <string name="setup_battery">电池设置</string>
+    <string name="setup_ready">可以开始体验了</string>
+    <string name="setup_ready_body">在“屏幕”页点击“开始”，并授权屏幕共享。打开其他应用后，使用悬浮 CT 按钮选择区域。文本和图片翻译无需屏幕捕获。</string>
+    <string name="setup_shortcuts">悬浮按钮和快捷操作</string>
+    <string name="setup_reopen">重新运行设置向导</string>
+    <string name="setup_settings_unavailable">手机无法打开该设置。请手动打开 Android 设置并找到 Click’n’Translate。</string>
+    <string name="setup_restricted_settings">应用信息：受限设置</string>
+</resources>

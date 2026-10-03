@@ -1,0 +1,1722 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.onboarding
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import dev.clickn.translate.R
+import dev.clickn.translate.ui.CatalystAlertDialog
+import dev.clickn.translate.data.Languages
+import dev.clickn.translate.ui.LanguagePicker
+import dev.clickn.translate.ui.SettingsOptionDropdown
+import dev.clickn.translate.ui.rememberModelDownloadNotificationPermissionGate
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import timber.log.Timber
+import androidx.compose.runtime.collectAsState
+import dev.clickn.translate.translate.MlKitDownloadPhase
+import dev.clickn.translate.translate.MlKitModelDownloadState
+import dev.clickn.translate.ui.MlKitModelDownloadFeedback
+import dev.clickn.translate.ui.MlKitModelDownloadActions
+import dev.clickn.translate.ui.rememberMlKitModelDownloadSession
+import dev.clickn.translate.translate.TestResult
+import dev.clickn.translate.ui.ExternalBrowserLinkButton
+import dev.clickn.translate.ui.TranslatorConnectionTestPanel
+import dev.clickn.translate.ui.TranslatorModelPicker
+
+private sealed interface MlKitDownloadState {
+    data object Checking : MlKitDownloadState
+    data class Missing(val languages: Set<String>) : MlKitDownloadState
+    data class Downloading(val requestId: Long) : MlKitDownloadState
+    data object Ready : MlKitDownloadState
+    data object Unsupported : MlKitDownloadState
+    data class Error(val detail: String, val download: MlKitModelDownloadState? = null) : MlKitDownloadState
+}
+
+private sealed interface MangaOfflineDownloadState {
+    data object Checking : MangaOfflineDownloadState
+    data class Ready(val readiness: MangaOfflineModelReadiness) : MangaOfflineDownloadState
+    data class Downloading(
+        val readiness: MangaOfflineModelReadiness,
+        val status: String,
+    ) : MangaOfflineDownloadState
+    data class Error(
+        val readiness: MangaOfflineModelReadiness,
+        val detail: String,
+    ) : MangaOfflineDownloadState
+}
+
+private sealed interface RecommendedModelsDownloadState {
+    data object Checking : RecommendedModelsDownloadState
+    data class Ready(val readiness: RecommendedModelsReadiness) : RecommendedModelsDownloadState
+    data class Downloading(
+        val readiness: RecommendedModelsReadiness,
+        val status: String,
+    ) : RecommendedModelsDownloadState
+    data class Error(
+        val readiness: RecommendedModelsReadiness,
+        val detail: String,
+    ) : RecommendedModelsDownloadState
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OnboardingScreen(
+    firstRun: Boolean,
+    onFinished: () -> Unit,
+    onSkipped: () -> Unit,
+    viewModel: OnboardingViewModel = hiltViewModel(),
+) {
+    val scope = rememberCoroutineScope()
+    val continueModelDownloadAfterNotificationPermission =
+        rememberModelDownloadNotificationPermissionGate()
+    var draft by remember { mutableStateOf<OnboardingDraft?>(null) }
+    var stepIndex by rememberSaveable { mutableIntStateOf(0) }
+    var cloudMangaOcrReady by rememberSaveable { mutableStateOf(false) }
+    var navigating by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var showSkipConfirmation by rememberSaveable { mutableStateOf(false) }
+    var checkedDownloadState by remember { mutableStateOf<MlKitDownloadState>(MlKitDownloadState.Checking) }
+    var mangaDownloadState by remember {
+        mutableStateOf<MangaOfflineDownloadState>(MangaOfflineDownloadState.Checking)
+    }
+    var recommendedModelsDownloadState by remember {
+        mutableStateOf<RecommendedModelsDownloadState>(
+            RecommendedModelsDownloadState.Checking
+        )
+    }
+    LaunchedEffect(firstRun) {
+        draft = viewModel.loadDraft(firstRun)
+    }
+
+    val currentDraft = draft
+    if (currentDraft == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    val localLlmSupported = remember { viewModel.isLocalLlmSupported() }
+    val mlKitDownload = rememberMlKitModelDownloadSession { pair ->
+        viewModel.downloadMlKitLanguagePair(pair.first, pair.second)
+    }
+    val mlKitState by mlKitDownload.state.collectAsState()
+    val currentPair = currentDraft.sourceLang to currentDraft.targetLang
+    val downloadState = if (mlKitState.pair == currentPair) {
+        when (mlKitState.phase) {
+            MlKitDownloadPhase.DOWNLOADING -> MlKitDownloadState.Downloading(mlKitState.requestId)
+            MlKitDownloadPhase.READY -> MlKitDownloadState.Ready
+            MlKitDownloadPhase.FAILED, MlKitDownloadPhase.TIMED_OUT ->
+                MlKitDownloadState.Error(mlKitState.error.orEmpty(), mlKitState)
+            else -> checkedDownloadState
+        }
+    } else checkedDownloadState
+
+    fun startMlKitDownload() {
+        val missing = (checkedDownloadState as? MlKitDownloadState.Missing)?.languages.orEmpty()
+        mlKitDownload.start(currentPair, missing)
+    }
+
+    val mlKitCancelRequestId = mlKitState.requestId
+    fun stopWaitingForMlKitDownload() {
+        mlKitDownload.cancel(mlKitCancelRequestId)
+    }
+
+    val steps = OnboardingPolicy.stepsFor(currentDraft, localLlmSupported, cloudMangaOcrReady)
+    if (stepIndex > steps.lastIndex) stepIndex = steps.lastIndex
+    val currentStep = steps[stepIndex]
+
+    LaunchedEffect(currentStep, currentDraft.sourceLang, currentDraft.targetLang) {
+        if (currentStep != OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD ||
+            mlKitState.pair?.let { it != currentPair } == true
+        ) mlKitDownload.reset()
+        if (currentStep != OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD) return@LaunchedEffect
+        if (!OnboardingPolicy.isMlKitPairSupported(
+                currentDraft.sourceLang,
+                currentDraft.targetLang,
+            )
+        ) {
+            checkedDownloadState = MlKitDownloadState.Unsupported
+            return@LaunchedEffect
+        }
+        checkedDownloadState = MlKitDownloadState.Checking
+        checkedDownloadState = runCatching {
+            val missing = viewModel.missingMlKitLanguageModels(
+                currentDraft.sourceLang,
+                currentDraft.targetLang,
+            )
+            if (missing.isEmpty()) MlKitDownloadState.Ready
+            else MlKitDownloadState.Missing(missing)
+        }.getOrElse { MlKitDownloadState.Error(it.message ?: it.javaClass.simpleName) }
+    }
+
+    LaunchedEffect(
+        currentStep,
+        currentDraft.sourceLang,
+        currentDraft.targetLang,
+        currentDraft.translationMethod,
+    ) {
+        when (currentStep) {
+            OnboardingStep.MANGA_OFFLINE_DOWNLOAD -> {
+                mangaDownloadState = MangaOfflineDownloadState.Ready(
+                    viewModel.mangaOfflineModelReadiness(
+                        includeSakura = localLlmSupported &&
+                            OnboardingPolicy.usesSakuraMangaTranslation(currentDraft)
+                    )
+                )
+            }
+            OnboardingStep.RECOMMENDED_MODELS_DOWNLOAD ->
+                recommendedModelsDownloadState = RecommendedModelsDownloadState.Ready(
+                    viewModel.recommendedModelsReadiness(currentDraft)
+                )
+            else -> Unit
+        }
+    }
+
+    fun downloadRecommendedModels() {
+        val readiness = viewModel.recommendedModelsReadiness(currentDraft)
+        recommendedModelsDownloadState =
+            RecommendedModelsDownloadState.Downloading(readiness, "")
+        scope.launch {
+            runCatching {
+                viewModel.downloadMissingRecommendedModels(currentDraft) { status ->
+                    recommendedModelsDownloadState =
+                        RecommendedModelsDownloadState.Downloading(readiness, status)
+                }
+                viewModel.recommendedModelsReadiness(currentDraft)
+            }.onSuccess {
+                recommendedModelsDownloadState = RecommendedModelsDownloadState.Ready(it)
+            }.onFailure {
+                recommendedModelsDownloadState = RecommendedModelsDownloadState.Error(
+                    readiness = viewModel.recommendedModelsReadiness(currentDraft),
+                    detail = it.message ?: it.javaClass.simpleName,
+                )
+            }
+        }
+    }
+
+    fun downloadMangaOfflineModels() {
+        val includeSakura = localLlmSupported &&
+            OnboardingPolicy.usesSakuraMangaTranslation(currentDraft)
+        val readiness = viewModel.mangaOfflineModelReadiness(includeSakura)
+        mangaDownloadState = MangaOfflineDownloadState.Downloading(readiness, "")
+        scope.launch {
+            runCatching {
+                viewModel.downloadMissingMangaOfflineModels(includeSakura) { status ->
+                    mangaDownloadState =
+                        MangaOfflineDownloadState.Downloading(readiness, status)
+                }
+                viewModel.mangaOfflineModelReadiness(includeSakura)
+            }.onSuccess {
+                mangaDownloadState = MangaOfflineDownloadState.Ready(it)
+            }.onFailure {
+                mangaDownloadState = MangaOfflineDownloadState.Error(
+                    readiness = viewModel.mangaOfflineModelReadiness(includeSakura),
+                    detail = it.message ?: it.javaClass.simpleName,
+                )
+            }
+        }
+    }
+
+    fun requestRecommendedModelsDownload() {
+        continueModelDownloadAfterNotificationPermission(::downloadRecommendedModels)
+    }
+
+    fun requestMangaOfflineModelsDownload() {
+        continueModelDownloadAfterNotificationPermission(::downloadMangaOfflineModels)
+    }
+
+    fun moveStep(forward: Boolean) {
+        if (saving || navigating) return
+        navigating = true
+        scope.launch {
+            try {
+                val needsMangaOcrCheck =
+                    currentDraft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM &&
+                        OnboardingPolicy.usesJapaneseMangaOcr(currentDraft) &&
+                        currentStep in setOf(
+                            OnboardingStep.TRANSLATION_METHOD,
+                            OnboardingStep.MANGA_OFFLINE_DOWNLOAD,
+                            OnboardingStep.CLOUD_CONFIG,
+                        )
+                val ready = if (needsMangaOcrCheck) {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            viewModel.mangaOfflineModelReadiness(includeSakura = false).ocrReady
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Timber.w(error, "Failed to check onboarding manga OCR models")
+                        false // Keep the preparation page when readiness cannot be established.
+                    }
+                } else cloudMangaOcrReady
+                if (draft != currentDraft) return@launch
+                val nextIndex = OnboardingPolicy.adjacentStepIndex(
+                    currentDraft, localLlmSupported, ready, currentStep, forward,
+                )
+                cloudMangaOcrReady = ready
+                stepIndex = nextIndex
+            } finally {
+                navigating = false
+            }
+        }
+    }
+
+    fun goBack() {
+        if (stepIndex > 0) moveStep(forward = false)
+    }
+
+    fun continueSetup() {
+        if (saving || navigating) return
+        if (currentStep == OnboardingStep.SUMMARY) {
+            saving = true
+            scope.launch {
+                runCatching { viewModel.save(currentDraft) }
+                    .onSuccess { onFinished() }
+                    .onFailure { saving = false }
+            }
+        } else {
+            moveStep(forward = true)
+        }
+    }
+    BackHandler(enabled = stepIndex > 0, onBack = ::goBack)
+
+    if (showSkipConfirmation) {
+        CatalystAlertDialog(
+            onDismissRequest = { showSkipConfirmation = false },
+            title = { Text(stringResource(R.string.onboarding_skip_confirm_title)) },
+            text = { Text(stringResource(R.string.onboarding_skip_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !saving,
+                    onClick = {
+                        showSkipConfirmation = false
+                        onSkipped()
+                    },
+                ) {
+                    Text(stringResource(R.string.onboarding_skip_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSkipConfirmation = false }) {
+                    Text(stringResource(R.string.onboarding_skip_continue_action))
+                }
+            },
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text(stringResource(R.string.onboarding_title)) },
+                navigationIcon = {
+                    if (stepIndex > 0) {
+                        IconButton(onClick = ::goBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = { showSkipConfirmation = true },
+                        enabled = !saving && !navigating,
+                    ) {
+                        Text(stringResource(R.string.onboarding_skip))
+                    }
+                },
+            )
+        },
+    ) { contentPadding ->
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+        ) {
+            val expanded = maxWidth >= 760.dp
+            if (expanded) {
+                Row(Modifier.fillMaxSize()) {
+                    OnboardingProgressRail(
+                        current = stepIndex,
+                        total = steps.size,
+                        modifier = Modifier
+                            .width(280.dp)
+                            .fillMaxHeight(),
+                    )
+                    OnboardingPageSurface(
+                        modifier = Modifier.weight(1f),
+                        step = currentStep,
+                        draft = currentDraft,
+                        downloadState = downloadState,
+                        mangaDownloadState = mangaDownloadState,
+                        recommendedModelsDownloadState = recommendedModelsDownloadState,
+                        localLlmSupported = localLlmSupported,
+                        saving = saving || navigating,
+                        onDraftChange = { draft = it },
+                        onTestCloudConnection = viewModel::testCloudConnection,
+                        onDownload = ::startMlKitDownload,
+                        onStopMlKitDownload = ::stopWaitingForMlKitDownload,
+                        onDownloadRecommendedModels = ::requestRecommendedModelsDownload,
+                        onDownloadMangaModels = ::requestMangaOfflineModelsDownload,
+                        onNext = ::continueSetup,
+                    )
+                }
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    OnboardingProgressBar(stepIndex, steps.size)
+                    OnboardingPageSurface(
+                        modifier = Modifier.weight(1f),
+                        step = currentStep,
+                        draft = currentDraft,
+                        downloadState = downloadState,
+                        mangaDownloadState = mangaDownloadState,
+                        recommendedModelsDownloadState = recommendedModelsDownloadState,
+                        localLlmSupported = localLlmSupported,
+                        saving = saving || navigating,
+                        onDraftChange = { draft = it },
+                        onTestCloudConnection = viewModel::testCloudConnection,
+                        onDownload = ::startMlKitDownload,
+                        onStopMlKitDownload = ::stopWaitingForMlKitDownload,
+                        onDownloadRecommendedModels = ::requestRecommendedModelsDownload,
+                        onDownloadMangaModels = ::requestMangaOfflineModelsDownload,
+                        onNext = ::continueSetup,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingProgressRail(
+    current: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Icon(
+                Icons.Default.Language,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                stringResource(R.string.onboarding_rail_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                stringResource(R.string.onboarding_rail_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OnboardingProgressBar(current, total)
+        }
+    }
+}
+
+@Composable
+private fun OnboardingProgressBar(current: Int, total: Int) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            stringResource(R.string.onboarding_progress, current + 1, total),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LinearProgressIndicator(
+            progress = { (current + 1).toFloat() / total.coerceAtLeast(1) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+internal data class PersistentScrollbarGeometry(
+    val thumbTop: Float,
+    val thumbHeight: Float,
+)
+
+internal fun persistentScrollbarGeometry(
+    scrollValue: Int,
+    scrollMaxValue: Int,
+    viewportSize: Int,
+    trackHeight: Float,
+    minimumThumbHeight: Float,
+): PersistentScrollbarGeometry? {
+    if (scrollMaxValue <= 0 || viewportSize <= 0 || trackHeight <= 0f) return null
+
+    val contentHeight = viewportSize.toFloat() + scrollMaxValue
+    val thumbHeight = (trackHeight * viewportSize / contentHeight)
+        .coerceAtLeast(minimumThumbHeight.coerceIn(0f, trackHeight))
+        .coerceAtMost(trackHeight)
+    val thumbTop = (trackHeight - thumbHeight) *
+        (scrollValue.toFloat() / scrollMaxValue).coerceIn(0f, 1f)
+    return PersistentScrollbarGeometry(thumbTop = thumbTop, thumbHeight = thumbHeight)
+}
+
+private fun Modifier.persistentVerticalScrollbar(
+    scrollState: androidx.compose.foundation.ScrollState,
+    trackColor: Color,
+    thumbColor: Color,
+): Modifier = drawWithContent {
+    drawContent()
+    val verticalInset = 4.dp.toPx()
+    val trackHeight = (size.height - verticalInset * 2).coerceAtLeast(0f)
+    val geometry = persistentScrollbarGeometry(
+        scrollValue = scrollState.value,
+        scrollMaxValue = scrollState.maxValue,
+        viewportSize = scrollState.viewportSize,
+        trackHeight = trackHeight,
+        minimumThumbHeight = 40.dp.toPx(),
+    ) ?: return@drawWithContent
+
+    val barWidth = 6.dp.toPx().coerceAtMost(size.width)
+    val rightInset = 2.dp.toPx()
+    val left = size.width - rightInset - barWidth
+    val radius = CornerRadius(barWidth / 2f, barWidth / 2f)
+    drawRoundRect(
+        color = trackColor,
+        topLeft = Offset(left, verticalInset),
+        size = Size(barWidth, trackHeight),
+        cornerRadius = radius,
+    )
+    drawRoundRect(
+        color = thumbColor,
+        topLeft = Offset(left, verticalInset + geometry.thumbTop),
+        size = Size(barWidth, geometry.thumbHeight),
+        cornerRadius = radius,
+    )
+}
+
+@Composable
+private fun OnboardingPageSurface(
+    step: OnboardingStep,
+    draft: OnboardingDraft,
+    downloadState: MlKitDownloadState,
+    mangaDownloadState: MangaOfflineDownloadState,
+    recommendedModelsDownloadState: RecommendedModelsDownloadState,
+    localLlmSupported: Boolean,
+    saving: Boolean,
+    onDraftChange: (OnboardingDraft) -> Unit,
+    onTestCloudConnection: suspend (OnboardingDraft) -> TestResult,
+    onDownload: () -> Unit,
+    onStopMlKitDownload: () -> Unit,
+    onDownloadRecommendedModels: () -> Unit,
+    onDownloadMangaModels: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pageScrollState = rememberScrollState()
+    val scrollbarTrackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+    val scrollbarThumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+    LaunchedEffect(step) {
+        pageScrollState.scrollTo(0)
+    }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 760.dp)
+                .persistentVerticalScrollbar(
+                    scrollState = pageScrollState,
+                    trackColor = scrollbarTrackColor,
+                    thumbColor = scrollbarThumbColor,
+                )
+                .verticalScroll(pageScrollState)
+                .padding(
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 12.dp,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                tonalElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    when (step) {
+                        OnboardingStep.WELCOME -> WelcomePage()
+                        OnboardingStep.SOURCE_LANGUAGE -> SourceLanguagePage(
+                            draft,
+                            onDraftChange,
+                        )
+                        OnboardingStep.TARGET_LANGUAGE -> TargetLanguagePage(
+                            draft,
+                            onDraftChange,
+                        )
+                        OnboardingStep.DISPLAY_MODE -> DisplayModePage(
+                            draft,
+                            onDraftChange,
+                        )
+                        OnboardingStep.USAGE -> UsagePage(draft, onDraftChange)
+                        OnboardingStep.MANGA_DIRECTION -> MangaDirectionPage(
+                            draft,
+                            onDraftChange,
+                        )
+                        OnboardingStep.TRANSLATION_METHOD -> TranslationMethodPage(
+                            draft,
+                            localLlmSupported,
+                            onDraftChange,
+                        )
+                        OnboardingStep.RECOMMENDED_MODELS_DOWNLOAD ->
+                            RecommendedModelsDownloadPage(
+                                recommendedModelsDownloadState,
+                                onDownloadRecommendedModels,
+                            )
+                        OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD -> MlKitDownloadPage(
+                            draft,
+                            downloadState,
+                            onDownload,
+                            onStopMlKitDownload,
+                        )
+                        OnboardingStep.MANGA_OFFLINE_DOWNLOAD -> MangaOfflineDownloadPage(
+                            state = mangaDownloadState,
+                            includeSakura = localLlmSupported &&
+                                OnboardingPolicy.usesSakuraMangaTranslation(draft),
+                            onDownload = onDownloadMangaModels,
+                        )
+                        OnboardingStep.CLOUD_CONFIG -> CloudConfigPage(
+                            draft,
+                            onDraftChange,
+                            onTestCloudConnection,
+                        )
+                        OnboardingStep.TTS -> TtsPage(draft, onDraftChange)
+                        OnboardingStep.SUMMARY -> SummaryPage(draft, localLlmSupported)
+                    }
+                    HorizontalDivider()
+                    Button(
+                        onClick = onNext,
+                        enabled = canContinue(
+                            step,
+                            draft,
+                            downloadState,
+                            recommendedModelsDownloadState,
+                            localLlmSupported,
+                        ) && !saving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(
+                                stringResource(
+                                    when (step) {
+                                        OnboardingStep.WELCOME ->
+                                            R.string.onboarding_welcome_action
+                                        OnboardingStep.SUMMARY ->
+                                            R.string.onboarding_finish
+                                        else ->
+                                            R.string.onboarding_next
+                                    }
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomePage() {
+    Image(
+        painter = painterResource(R.drawable.brand_logo),
+        contentDescription = stringResource(R.string.app_name),
+        modifier = Modifier.size(80.dp),
+    )
+    Text(
+        text = stringResource(R.string.onboarding_welcome_title),
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        text = stringResource(R.string.onboarding_welcome_body),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_open_source_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = stringResource(R.string.onboarding_open_source_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = stringResource(R.string.onboarding_open_source_service_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SourceLanguagePage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.Language,
+        title = stringResource(R.string.onboarding_source_title),
+        body = stringResource(R.string.onboarding_source_body),
+    )
+    LanguagePicker(
+        label = stringResource(R.string.onboarding_source_label),
+        currentCode = draft.sourceLang,
+        allowAuto = false,
+        disabledLanguageCodes = setOf(draft.targetLang),
+        disabledStatusLabel = stringResource(R.string.lang_picker_already_target),
+        onSelect = { onDraftChange(draft.copy(sourceLang = it)) },
+    )
+}
+
+@Composable
+private fun TargetLanguagePage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.Language,
+        title = stringResource(R.string.onboarding_target_title),
+        body = stringResource(R.string.onboarding_target_body),
+    )
+    LanguagePicker(
+        label = stringResource(R.string.onboarding_target_label),
+        currentCode = draft.targetLang,
+        allowAuto = false,
+        disabledLanguageCodes = setOf(draft.sourceLang),
+        disabledStatusLabel = stringResource(R.string.lang_picker_already_source),
+        onSelect = { onDraftChange(draft.copy(targetLang = it)) },
+    )
+    if (draft.sourceLang == draft.targetLang) {
+        Text(
+            stringResource(R.string.onboarding_language_same_error),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun DisplayModePage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.ViewInAr,
+        title = stringResource(R.string.onboarding_display_title),
+        body = stringResource(R.string.onboarding_display_body),
+    )
+    ChoiceCard(
+        selected = draft.displayMode == OnboardingDisplayMode.ADAPTIVE_OVERLAY,
+        title = stringResource(R.string.onboarding_display_adaptive),
+        description = stringResource(R.string.onboarding_display_adaptive_desc),
+        onClick = {
+            onDraftChange(draft.copy(displayMode = OnboardingDisplayMode.ADAPTIVE_OVERLAY))
+        },
+    )
+    ChoiceCard(
+        selected = draft.displayMode == OnboardingDisplayMode.BELOW_SOURCE,
+        title = stringResource(R.string.onboarding_display_below),
+        description = stringResource(R.string.onboarding_display_below_desc),
+        onClick = {
+            onDraftChange(draft.copy(displayMode = OnboardingDisplayMode.BELOW_SOURCE))
+        },
+    )
+    ChoiceCard(
+        selected = draft.displayMode == OnboardingDisplayMode.FLOATING_WINDOW,
+        title = stringResource(R.string.onboarding_display_floating),
+        description = stringResource(R.string.onboarding_display_floating_desc),
+        onClick = {
+            onDraftChange(draft.copy(displayMode = OnboardingDisplayMode.FLOATING_WINDOW))
+        },
+    )
+}
+
+@Composable
+private fun UsagePage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.AutoMirrored.Filled.MenuBook,
+        title = stringResource(R.string.onboarding_usage_title),
+        body = stringResource(R.string.onboarding_usage_body),
+    )
+    ChoiceCard(
+        selected = draft.usage == OnboardingUsage.DAILY,
+        title = stringResource(R.string.onboarding_usage_daily),
+        description = stringResource(R.string.onboarding_usage_daily_desc),
+        onClick = { onDraftChange(draft.copy(usage = OnboardingUsage.DAILY)) },
+    )
+    ChoiceCard(
+        selected = draft.usage == OnboardingUsage.MANGA,
+        title = stringResource(R.string.onboarding_usage_manga),
+        description = stringResource(R.string.onboarding_usage_manga_desc),
+        onClick = { onDraftChange(draft.copy(usage = OnboardingUsage.MANGA)) },
+    )
+}
+
+@Composable
+private fun MangaDirectionPage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.AutoMirrored.Filled.MenuBook,
+        title = stringResource(R.string.onboarding_manga_direction_title),
+        body = stringResource(R.string.onboarding_manga_direction_body),
+    )
+    ChoiceCard(
+        selected = draft.mangaDirection ==
+            OnboardingMangaDirection.FOLLOW_RECOGNITION,
+        title = stringResource(R.string.onboarding_direction_auto),
+        description = stringResource(R.string.onboarding_direction_auto_desc),
+        onClick = {
+            onDraftChange(
+                draft.copy(
+                    mangaDirection = OnboardingMangaDirection.FOLLOW_RECOGNITION
+                )
+            )
+        },
+    )
+    ChoiceCard(
+        selected = draft.mangaDirection ==
+            OnboardingMangaDirection.HORIZONTAL_LEFT_TO_RIGHT,
+        title = stringResource(R.string.onboarding_direction_horizontal),
+        description = stringResource(R.string.onboarding_direction_horizontal_desc),
+        onClick = {
+            onDraftChange(
+                draft.copy(
+                    mangaDirection =
+                        OnboardingMangaDirection.HORIZONTAL_LEFT_TO_RIGHT
+                )
+            )
+        },
+    )
+    ChoiceCard(
+        selected = draft.mangaDirection ==
+            OnboardingMangaDirection.VERTICAL_RIGHT_TO_LEFT,
+        title = stringResource(R.string.onboarding_direction_vertical),
+        description = stringResource(R.string.onboarding_direction_vertical_desc),
+        onClick = {
+            onDraftChange(
+                draft.copy(
+                    mangaDirection = OnboardingMangaDirection.VERTICAL_RIGHT_TO_LEFT
+                )
+            )
+        },
+    )
+}
+
+@Composable
+private fun TranslationMethodPage(
+    draft: OnboardingDraft,
+    localLlmSupported: Boolean,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.PhoneAndroid,
+        title = stringResource(R.string.onboarding_method_title),
+        body = stringResource(R.string.onboarding_method_body),
+    )
+    ChoiceCard(
+        selected = draft.translationMethod == OnboardingTranslationMethod.OFFLINE,
+        title = stringResource(R.string.onboarding_method_offline),
+        description = stringResource(
+            if (
+                !localLlmSupported && draft.usage == OnboardingUsage.MANGA
+            ) {
+                R.string.onboarding_method_offline_mlkit_fallback_desc
+            } else if (
+                draft.usage == OnboardingUsage.MANGA &&
+                    OnboardingPolicy.isSakuraPairSupported(draft.sourceLang, draft.targetLang)
+            ) {
+                R.string.onboarding_method_offline_manga_desc
+            } else if (draft.usage == OnboardingUsage.MANGA) {
+                R.string.onboarding_method_offline_manga_multilingual_desc
+            } else {
+                R.string.onboarding_method_offline_desc
+            }
+        ),
+        onClick = {
+            onDraftChange(
+                draft.copy(translationMethod = OnboardingTranslationMethod.OFFLINE)
+            )
+        },
+    )
+    ChoiceCard(
+        selected = draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM,
+        title = stringResource(R.string.onboarding_method_cloud),
+        description = stringResource(R.string.onboarding_method_cloud_desc),
+        onClick = {
+            onDraftChange(
+                draft.copy(translationMethod = OnboardingTranslationMethod.CLOUD_LLM)
+            )
+        },
+    )
+    if (
+        draft.translationMethod == OnboardingTranslationMethod.OFFLINE &&
+        !OnboardingPolicy.canUseOfflineTranslation(draft, localLlmSupported)
+    ) {
+        Text(
+            stringResource(
+                R.string.onboarding_offline_pair_unsupported
+            ),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun RecommendedModelsDownloadPage(
+    state: RecommendedModelsDownloadState,
+    onDownload: () -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.Download,
+        title = stringResource(R.string.onboarding_recommended_models_title),
+        body = stringResource(R.string.onboarding_recommended_models_body),
+    )
+    when (state) {
+        RecommendedModelsDownloadState.Checking -> StatusRow(
+            loading = true,
+            text = stringResource(R.string.onboarding_recommended_models_checking),
+        )
+        else -> {
+            val readiness = when (state) {
+                is RecommendedModelsDownloadState.Ready -> state.readiness
+                is RecommendedModelsDownloadState.Downloading -> state.readiness
+                is RecommendedModelsDownloadState.Error -> state.readiness
+                RecommendedModelsDownloadState.Checking -> return
+            }
+            readiness.paddleVersion?.let { version ->
+                ModelRecommendationRow(
+                    title = stringResource(version.displayNameRes),
+                    detail = stringResource(R.string.onboarding_recommended_models_ocr_desc),
+                    ready = readiness.paddleReady,
+                )
+            }
+            if (readiness.includeHyMt2) {
+                ModelRecommendationRow(
+                    title = "Hy-MT2",
+                    detail = stringResource(
+                        if (readiness.hyMt2Supported) {
+                            R.string.onboarding_recommended_models_translation_desc
+                        } else {
+                            R.string.err_llm_device_unsupported
+                        }
+                    ),
+                    ready = readiness.hyMt2Ready,
+                )
+            }
+            when (state) {
+                is RecommendedModelsDownloadState.Downloading -> StatusRow(
+                    loading = true,
+                    text = state.status.ifBlank {
+                        stringResource(R.string.onboarding_recommended_models_downloading)
+                    },
+                )
+                is RecommendedModelsDownloadState.Error -> Text(
+                    stringResource(R.string.onboarding_recommended_models_error, state.detail),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                is RecommendedModelsDownloadState.Ready -> if (readiness.allReady) {
+                    StatusRow(
+                        loading = false,
+                        text = stringResource(R.string.onboarding_recommended_models_ready),
+                    )
+                }
+                RecommendedModelsDownloadState.Checking -> Unit
+            }
+            if (!readiness.hyMt2Supported) {
+                Text(
+                    stringResource(R.string.onboarding_local_llm_fallback_mlkit),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (readiness.hasDownloadableModels) {
+                OutlinedButton(
+                    onClick = onDownload,
+                    enabled = state !is RecommendedModelsDownloadState.Downloading,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null)
+                    Text(
+                        stringResource(R.string.onboarding_recommended_models_download),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                Text(
+                    stringResource(R.string.onboarding_recommended_models_optional),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MlKitDownloadPage(
+    draft: OnboardingDraft,
+    state: MlKitDownloadState,
+    onDownload: () -> Unit,
+    onStop: () -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.Download,
+        title = stringResource(R.string.onboarding_mlkit_title),
+        body = stringResource(
+            R.string.onboarding_mlkit_body,
+            Languages.nameOf(androidx.compose.ui.platform.LocalContext.current, draft.sourceLang),
+            Languages.nameOf(androidx.compose.ui.platform.LocalContext.current, draft.targetLang),
+        ),
+    )
+    when (state) {
+        MlKitDownloadState.Checking -> StatusRow(
+            loading = true,
+            text = stringResource(R.string.onboarding_mlkit_checking),
+        )
+        is MlKitDownloadState.Missing -> {
+            Text(
+                stringResource(
+                    R.string.onboarding_mlkit_missing,
+                    state.languages.sorted().joinToString(", "),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            MlKitModelDownloadActions(false, stringResource(R.string.onboarding_mlkit_download), onDownload, onStop, requestId = 0)
+        }
+        is MlKitDownloadState.Downloading -> {
+            MlKitModelDownloadActions(true, stringResource(R.string.onboarding_mlkit_download), onDownload, onStop, requestId = state.requestId)
+        }
+        MlKitDownloadState.Ready -> StatusRow(
+            loading = false,
+            text = stringResource(R.string.onboarding_mlkit_ready),
+        )
+        MlKitDownloadState.Unsupported -> Text(
+            stringResource(R.string.onboarding_mlkit_unsupported),
+            color = MaterialTheme.colorScheme.error,
+        )
+        is MlKitDownloadState.Error -> {
+            if (state.download != null) {
+                MlKitModelDownloadFeedback(state.download)
+            } else {
+                Text(
+                    stringResource(R.string.onboarding_mlkit_error, state.detail),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            MlKitModelDownloadActions(false, stringResource(R.string.onboarding_mlkit_retry), onDownload, onStop, requestId = 0)
+        }
+    }
+}
+
+@Composable
+private fun MangaOfflineDownloadPage(
+    state: MangaOfflineDownloadState,
+    includeSakura: Boolean,
+    onDownload: () -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.Download,
+        title = stringResource(
+            if (includeSakura) {
+                R.string.onboarding_manga_offline_title
+            } else {
+                R.string.onboarding_manga_ocr_title
+            }
+        ),
+        body = stringResource(
+            if (includeSakura) {
+                R.string.onboarding_manga_offline_body
+            } else {
+                R.string.onboarding_manga_ocr_body
+            }
+        ),
+    )
+    when (state) {
+        MangaOfflineDownloadState.Checking -> StatusRow(
+            loading = true,
+            text = stringResource(R.string.onboarding_manga_offline_checking),
+        )
+        else -> {
+            val readiness = when (state) {
+                is MangaOfflineDownloadState.Ready -> state.readiness
+                is MangaOfflineDownloadState.Downloading -> state.readiness
+                is MangaOfflineDownloadState.Error -> state.readiness
+                MangaOfflineDownloadState.Checking -> return
+            }
+            ModelRecommendationRow(
+                title = stringResource(R.string.onboarding_manga_offline_ocr),
+                detail = stringResource(R.string.onboarding_manga_offline_ocr_desc),
+                ready = readiness.ocrReady,
+            )
+            if (includeSakura) {
+                ModelRecommendationRow(
+                    title = stringResource(R.string.onboarding_manga_offline_sakura),
+                    detail = stringResource(
+                        if (readiness.sakuraSupported) {
+                            R.string.onboarding_manga_offline_sakura_desc
+                        } else {
+                            R.string.err_llm_device_unsupported
+                        }
+                    ),
+                    ready = readiness.sakuraReady,
+                )
+            }
+            when (state) {
+                is MangaOfflineDownloadState.Downloading -> StatusRow(
+                    loading = true,
+                    text = state.status.ifBlank {
+                        stringResource(R.string.onboarding_manga_offline_downloading)
+                    },
+                )
+                is MangaOfflineDownloadState.Error -> Text(
+                    stringResource(
+                        R.string.onboarding_manga_offline_error,
+                        state.detail,
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                is MangaOfflineDownloadState.Ready -> if (readiness.allReady) {
+                    StatusRow(
+                        loading = false,
+                        text = stringResource(
+                            if (includeSakura) {
+                                R.string.onboarding_manga_offline_ready
+                            } else {
+                                R.string.onboarding_manga_ocr_ready
+                            }
+                        ),
+                    )
+                }
+                MangaOfflineDownloadState.Checking -> Unit
+            }
+            if (!readiness.sakuraSupported) {
+                Text(
+                    stringResource(R.string.onboarding_local_llm_fallback_mlkit),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (readiness.hasDownloadableModels) {
+                OutlinedButton(
+                    onClick = onDownload,
+                    enabled = state !is MangaOfflineDownloadState.Downloading,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null)
+                    Text(
+                        stringResource(R.string.onboarding_manga_offline_download),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                Text(
+                    stringResource(R.string.onboarding_manga_offline_optional),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudConfigPage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+    onTestConnection: suspend (OnboardingDraft) -> TestResult,
+) {
+    var fetchedModels by remember(draft.cloudProvider, draft.cloudBaseUrl, draft.cloudApiKey) {
+        mutableStateOf<List<String>>(emptyList())
+    }
+    PageHeading(
+        icon = Icons.Default.Cloud,
+        title = stringResource(R.string.onboarding_cloud_title),
+        body = stringResource(R.string.onboarding_cloud_body),
+    )
+    CloudProvider.sortedChoices.chunked(2).forEach { rowProviders ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            rowProviders.forEach { provider ->
+                ChoiceChip(
+                    label = cloudProviderLabel(provider),
+                    selected = draft.cloudProvider == provider,
+                    onClick = {
+                        onDraftChange(OnboardingPolicy.selectCloudProvider(draft, provider))
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (rowProviders.size == 1) Spacer(Modifier.weight(1f))
+        }
+    }
+    draft.cloudProvider.documentationUrl?.let { url ->
+        ExternalBrowserLinkButton(
+            url = url,
+            actionLabel = stringResource(R.string.settings_mlkit_download_open_browser),
+        )
+    }
+    if (draft.cloudProvider.supportsRegions) {
+        key(draft.cloudProvider) {
+            SettingsOptionDropdown<CloudApiRegion?>(
+                label = stringResource(R.string.onboarding_cloud_region),
+                value = OnboardingPolicy.cloudApiRegion(draft),
+                options = CloudApiRegion.entries,
+                optionLabel = { region ->
+                    stringResource(when (region) {
+                        CloudApiRegion.MAINLAND_CHINA -> R.string.onboarding_cloud_region_mainland
+                        CloudApiRegion.INTERNATIONAL -> R.string.onboarding_cloud_region_international
+                        null -> R.string.onboarding_cloud_custom
+                    })
+                },
+                onValueChange = { region ->
+                    if (region != null) {
+                        onDraftChange(OnboardingPolicy.selectCloudApiRegion(draft, region))
+                    }
+                },
+            )
+        }
+    }
+    OutlinedTextField(
+        value = draft.cloudBaseUrl,
+        onValueChange = { onDraftChange(draft.copy(cloudBaseUrl = it)) },
+        label = { Text(stringResource(R.string.onboarding_cloud_url)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = draft.cloudApiKey,
+        onValueChange = { onDraftChange(draft.copy(cloudApiKey = it)) },
+        label = { Text(stringResource(R.string.onboarding_cloud_api_key)) },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = draft.cloudModel,
+        onValueChange = { onDraftChange(draft.copy(cloudModel = it)) },
+        label = { Text(stringResource(R.string.onboarding_cloud_model)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    TranslatorConnectionTestPanel(
+        inputKey = draft,
+        onTest = { onTestConnection(draft) },
+        onModels = { fetchedModels = it },
+    )
+    TranslatorModelPicker(fetchedModels) { onDraftChange(draft.copy(cloudModel = it)) }
+    OnboardingPolicy.cloudConfigError(draft)?.let { error ->
+        Text(
+            text = stringResource(
+                when (error) {
+                    CloudConfigError.BASE_URL_REQUIRED ->
+                        R.string.onboarding_cloud_error_url_required
+                    CloudConfigError.BASE_URL_INVALID ->
+                        R.string.onboarding_cloud_error_url_invalid
+                    CloudConfigError.API_KEY_REQUIRED ->
+                        R.string.onboarding_cloud_error_api_key
+                    CloudConfigError.MODEL_REQUIRED ->
+                        R.string.onboarding_cloud_error_model
+                }
+            ),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun cloudProviderLabel(provider: CloudProvider): String = when (provider) {
+    CloudProvider.CUSTOM -> stringResource(R.string.onboarding_cloud_custom)
+    CloudProvider.MODELSCOPE -> stringResource(R.string.onboarding_cloud_provider_modelscope)
+    CloudProvider.SCNET -> stringResource(R.string.onboarding_cloud_provider_scnet)
+    else -> provider.displayName
+}
+
+@Composable
+private fun TtsPage(
+    draft: OnboardingDraft,
+    onDraftChange: (OnboardingDraft) -> Unit,
+) {
+    PageHeading(
+        icon = Icons.Default.RecordVoiceOver,
+        title = stringResource(R.string.onboarding_tts_title),
+        body = stringResource(R.string.onboarding_tts_body),
+    )
+    OnboardingTtsChoice.entries.forEach { choice ->
+        val titleRes = when (choice) {
+            OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled
+            OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system
+            OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http
+            OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_volcengine
+            OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_minimax
+            OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_mimo
+        }
+        val descriptionRes = when (choice) {
+            OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled_desc
+            OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system_desc
+            OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http_desc
+            OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_online_desc
+            OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_online_desc
+            OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_online_desc
+        }
+        ChoiceCard(
+            selected = draft.ttsChoice == choice,
+            title = stringResource(titleRes),
+            description = stringResource(descriptionRes),
+            onClick = { onDraftChange(draft.copy(ttsChoice = choice)) },
+        )
+    }
+}
+
+@Composable
+private fun SummaryPage(
+    draft: OnboardingDraft,
+    localLlmSupported: Boolean,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    PageHeading(
+        icon = Icons.Default.CheckCircle,
+        title = stringResource(R.string.onboarding_summary_title),
+        body = stringResource(R.string.onboarding_summary_body),
+    )
+    SummaryRow(
+        stringResource(R.string.onboarding_summary_languages),
+        "${Languages.nameOf(context, draft.sourceLang)} → " +
+            Languages.nameOf(context, draft.targetLang),
+    )
+    SummaryRow(
+        stringResource(R.string.onboarding_summary_usage),
+        stringResource(
+            if (draft.usage == OnboardingUsage.MANGA) {
+                R.string.onboarding_usage_manga
+            } else {
+                R.string.onboarding_usage_daily
+            }
+        ),
+    )
+    SummaryRow(
+        stringResource(R.string.onboarding_summary_display),
+        stringResource(
+            if (draft.usage == OnboardingUsage.MANGA) {
+                R.string.onboarding_display_adaptive
+            } else {
+                when (draft.displayMode) {
+                    OnboardingDisplayMode.ADAPTIVE_OVERLAY ->
+                        R.string.onboarding_display_adaptive
+                    OnboardingDisplayMode.BELOW_SOURCE ->
+                        R.string.onboarding_display_below
+                    OnboardingDisplayMode.FLOATING_WINDOW ->
+                        R.string.onboarding_display_floating
+                }
+            }
+        ),
+    )
+    SummaryRow(
+        stringResource(R.string.onboarding_summary_translation),
+        if (draft.translationMethod == OnboardingTranslationMethod.OFFLINE) {
+            stringResource(
+                if (draft.usage != OnboardingUsage.MANGA || !localLlmSupported) {
+                    R.string.onboarding_summary_mlkit_offline
+                } else if (OnboardingPolicy.usesSakuraMangaTranslation(draft)) {
+                    R.string.onboarding_summary_manga_offline
+                } else if (draft.usage == OnboardingUsage.MANGA) {
+                    R.string.onboarding_summary_manga_multilingual_offline
+                } else {
+                    R.string.onboarding_method_offline
+                }
+            )
+        } else {
+            cloudProviderLabel(draft.cloudProvider)
+        },
+    )
+    SummaryRow(
+        stringResource(R.string.onboarding_summary_tts),
+        stringResource(
+            when (draft.ttsChoice) {
+                OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled
+                OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system
+                OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http
+                OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_volcengine
+                OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_minimax
+                OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_mimo
+            }
+        ),
+    )
+    if (draft.usage == OnboardingUsage.MANGA) {
+        Text(
+            stringResource(R.string.onboarding_summary_manga_defaults),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun ModelRecommendationRow(
+    title: String,
+    detail: String,
+    ready: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                if (ready) Icons.Default.CheckCircle else Icons.Default.Download,
+                contentDescription = null,
+                tint = if (ready) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(
+                        if (ready) {
+                            R.string.onboarding_model_ready
+                        } else {
+                            R.string.onboarding_model_not_downloaded
+                        }
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (ready) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PageHeading(icon: ImageVector, title: String, body: String) {
+    Icon(
+        icon,
+        contentDescription = null,
+        modifier = Modifier.size(38.dp),
+        tint = MaterialTheme.colorScheme.primary,
+    )
+    Text(
+        title,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        body,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun ChoiceCard(
+    selected: Boolean,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        border = if (selected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        },
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                if (selected) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant,
+        ),
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text = label,
+            modifier = Modifier.basicMarquee(),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun StatusRow(loading: Boolean, text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.4f),
+        )
+        Text(
+            value,
+            textAlign = TextAlign.End,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(0.6f),
+        )
+    }
+}
+
+private fun canContinue(
+    step: OnboardingStep,
+    draft: OnboardingDraft,
+    downloadState: MlKitDownloadState,
+    recommendedModelsDownloadState: RecommendedModelsDownloadState,
+    localLlmSupported: Boolean,
+): Boolean = when (step) {
+    OnboardingStep.SOURCE_LANGUAGE -> draft.sourceLang.isNotBlank() &&
+        draft.sourceLang != Languages.AUTO.code
+    OnboardingStep.TARGET_LANGUAGE -> draft.targetLang.isNotBlank() &&
+        draft.targetLang != Languages.AUTO.code &&
+        draft.targetLang != draft.sourceLang
+    OnboardingStep.TRANSLATION_METHOD -> when {
+        draft.translationMethod != OnboardingTranslationMethod.OFFLINE -> true
+        else -> OnboardingPolicy.canUseOfflineTranslation(draft, localLlmSupported)
+    }
+    OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD ->
+        downloadState == MlKitDownloadState.Ready
+    OnboardingStep.RECOMMENDED_MODELS_DOWNLOAD -> when (recommendedModelsDownloadState) {
+        RecommendedModelsDownloadState.Checking ->
+            !OnboardingPolicy.usesHyMt2MangaTranslation(draft)
+        is RecommendedModelsDownloadState.Ready ->
+            recommendedModelsDownloadState.readiness.requiredModelsReady
+        is RecommendedModelsDownloadState.Downloading ->
+            recommendedModelsDownloadState.readiness.requiredModelsReady
+        is RecommendedModelsDownloadState.Error ->
+            recommendedModelsDownloadState.readiness.requiredModelsReady
+    }
+    OnboardingStep.CLOUD_CONFIG -> OnboardingPolicy.cloudConfigError(draft) == null
+    else -> true
+}

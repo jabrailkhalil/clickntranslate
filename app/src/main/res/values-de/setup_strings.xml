@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_title">Richten Sie Ihren Übersetzer ein</string>
+    <string name="setup_intro">Ein paar Schritte, und Sie können Text, Fotos und andere Apps übersetzen. Sie können jede Option später ändern.</string>
+    <string name="setup_next">Fortsetzung</string>
+    <string name="setup_previous">Zurück zur Übersicht</string>
+    <string name="setup_finish">Fertigstellung</string>
+    <string name="setup_text_only">Text und Fotos jetzt verwenden</string>
+    <string name="setup_step">Schritt %1$d von %2$d</string>
+    <string name="setup_translation">Sprachen und Übersetzung</string>
+    <string name="setup_translation_body">Wählen Sie die Sprache, die Sie lesen, und einen Übersetzungsdienst. Google funktioniert ohne Schlüssel. Für MyMemory und Offline-Übersetzung wählen Sie eine bestimmte Quellsprache.</string>
+    <string name="setup_overlay">Übersetzungen über andere Apps anzeigen</string>
+    <string name="setup_overlay_body">Öffnen Sie Android-Einstellungen, finden Sie Click’n’Translate und aktivieren Sie “Über andere Apps anzeigen”. Zurückgeben Sie hier; der Status aktualisiert automatisch.</string>
+    <string name="setup_notifications">Notifikationen</string>
+    <string name="setup_notifications_body">Erlauben Sie Benachrichtigungen, um den Laufübersetzer zu sehen, stoppen Sie die Erfassung und folgen Sie Modell-Downloads. Übersetzung kann auch ohne diese Erlaubnis funktionieren.</string>
+    <string name="setup_enabled">Ermöglicht</string>
+    <string name="setup_pending">Bedarfs-Setup</string>
+    <string name="setup_open">Öffnen Sie die richtige Einstellung</string>
+    <string name="setup_capture">Wie man den Bildschirm erfasst</string>
+    <string name="setup_capture_body">Android wird nach dem Bildschirm-Sharing fragen, wenn Sie die Übersetzung starten. Auf Android 14+, wählen Sie den gesamten Bildschirm über Apps zu übersetzen. Sie können die Erfassung jederzeit stoppen.</string>
+    <string name="setup_accessibility">Optional: Zugänglichkeitsservice</string>
+    <string name="setup_accessibility_body">Auf Android 11+, aktivieren Sie den Click’n’Translate Zugänglichkeit Service für Screenshots ohne wiederholte Bildschirm-Sharing-Anforderungen. Es unterstützt auch Volume-key Shortcuts und Eingabe-Übersetzung. Nur aktivieren Sie es, wenn Sie diese Funktionen wollen. Wenn Android 13 oder neuer den Schalter blockiert, öffne die App-Info, dann das Dreipunktmenü und „Eingeschränkte Einstellungen zulassen“. Kehre zurück und aktiviere den Dienst.</string>
+    <string name="setup_recognition">Texterkennung und -modelle</string>
+    <string name="setup_recognition_body">Das Standard-OCR erkennt lateinische, chinesische, japanische und koreanische Skripte an. Wählen Sie für Cyrillic oder andere Skripte einen geeigneten OCR-Service. Offline-Übersetzungsmodelle müssen vor der Verwendung heruntergeladen werden.</string>
+    <string name="setup_ocr">Wählen Sie OCR und Download-Modelle</string>
+    <string name="setup_models">Übersetzungen und API-Einstellungen</string>
+    <string name="setup_background">Übersetzung verfügbar</string>
+    <string name="setup_background_body">Wenn Ihr Telefon die Overlay im Hintergrund aufhört, ermöglichen Hintergrundaktivität oder entfernen Sie die Batterie-Einschränkungen für Click’n’Translate. Android-Einstellungen variieren je nach Gerät.</string>
+    <string name="setup_battery">Batterieeinstellungen</string>
+    <string name="setup_ready">Bereit zu versuchen</string>
+    <string name="setup_ready_body">Öffnen Sie eine andere App und verwenden Sie die schwimmende CT-Taste, um eine Region auszuwählen. Text und Foto-Übersetzung sind ohne Bildschirmerfassung verfügbar.</string>
+    <string name="setup_shortcuts">Floating-Taste und Shortcuts</string>
+    <string name="setup_reopen">Starten Sie das Setup wieder</string>
+    <string name="setup_settings_unavailable">Ihr Telefon hat diese Einstellung nicht geöffnet. Öffnen Sie Android-Einstellungen und finden Sie Click’n’Translate manuell.</string>
+    <string name="setup_restricted_settings">App-Info: eingeschränkte Einstellungen</string>
+</resources>

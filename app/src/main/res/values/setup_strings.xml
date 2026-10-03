@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_title">Set up your translator</string>
+    <string name="setup_intro">A few steps, and you can translate text, photos and other apps. You can change every option later.</string>
+    <string name="setup_next">Continue</string>
+    <string name="setup_previous">Back</string>
+    <string name="setup_finish">Finish setup</string>
+    <string name="setup_text_only">Use text and photos for now</string>
+    <string name="setup_step">Step %1$d of %2$d</string>
+    <string name="setup_translation">Languages and translation</string>
+    <string name="setup_translation_body">Choose the language you read and a translation service. Google works without a key. For MyMemory and offline translation, choose a specific source language.</string>
+    <string name="setup_overlay">Show translations over other apps</string>
+    <string name="setup_overlay_body">Open Android settings, find Click’n’Translate and enable “Display over other apps”. Return here; the status updates automatically.</string>
+    <string name="setup_notifications">Notifications</string>
+    <string name="setup_notifications_body">Allow notifications to see the running translator, stop capture and follow model downloads. Translation can also work without this permission.</string>
+    <string name="setup_enabled">Enabled</string>
+    <string name="setup_pending">Needs setup</string>
+    <string name="setup_open">Open the right setting</string>
+    <string name="setup_capture">How to capture the screen</string>
+    <string name="setup_capture_body">Android will ask for screen sharing when you start translation. On Android 14+, choose the entire screen to translate across apps. You can stop capture at any time.</string>
+    <string name="setup_accessibility">Optional: accessibility service</string>
+    <string name="setup_accessibility_body">On Android 11+, enable the Click’n’Translate accessibility service for screenshots without repeated screen-sharing prompts. It also supports volume-key shortcuts and input translation. Only enable it if you want these features. If Android 13 or later blocks this switch, open App info, then the three-dot menu and Allow restricted settings. Return here to enable the service.</string>
+    <string name="setup_recognition">Text recognition and models</string>
+    <string name="setup_recognition_body">The default OCR recognizes Latin, Chinese, Japanese and Korean scripts. For Cyrillic or other scripts, select a suitable OCR service. Offline translation models must be downloaded before use.</string>
+    <string name="setup_ocr">Choose OCR and download models</string>
+    <string name="setup_models">Translation models and API settings</string>
+    <string name="setup_background">Keep translation available</string>
+    <string name="setup_background_body">If your phone stops the overlay in the background, allow background activity or remove battery restrictions for Click’n’Translate. Android settings vary by device.</string>
+    <string name="setup_battery">Battery settings</string>
+    <string name="setup_ready">Ready to try</string>
+    <string name="setup_ready_body">On the Screen tab, tap Start and confirm screen sharing. Open another app and use the floating CT button to select a region. Text and photo translation are available without screen capture.</string>
+    <string name="setup_shortcuts">Floating button and shortcuts</string>
+    <string name="setup_reopen">Run setup again</string>
+    <string name="setup_settings_unavailable">Your phone did not open that setting. Open Android settings and find Click’n’Translate manually.</string>
+    <string name="setup_restricted_settings">App info: restricted settings</string>
+</resources>

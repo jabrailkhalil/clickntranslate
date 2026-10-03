@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_title">Configurez▁votre▁traducteur</string>
+    <string name="setup_intro">▁Quelques▁étapes, et▁vous▁pouvez▁traduire du▁texte, des photos et d\'autres applications.▁Vous▁pouvez▁changer▁chaque option plus▁tard.</string>
+    <string name="setup_next">▁Continuer</string>
+    <string name="setup_previous">▁Précédent</string>
+    <string name="setup_finish">Configuration de▁finition</string>
+    <string name="setup_text_only">▁Utilisez le▁texte et les photos pour le moment</string>
+    <string name="setup_step">Étape %1$d sur %2$d</string>
+    <string name="setup_translation">▁Langues et▁traduction</string>
+    <string name="setup_translation_body">▁Choisissez la langue que▁vous lisez et un service de▁traduction. Google▁fonctionne sans▁clé. Pour MyMemory et la▁traduction▁hors▁ligne,▁choisissez une langue source▁spécifique.</string>
+    <string name="setup_overlay">▁Afficher les▁traductions sur d\'autres applications</string>
+    <string name="setup_overlay_body">▁Ouvrez les▁paramètres d\'Android ,▁trouvez Click.com et activez l\'affichage sur d\'autres applications . Revenez▁ici ; les▁mises à▁jour d\'état▁automatiquement .</string>
+    <string name="setup_notifications">Notifications</string>
+    <string name="setup_notifications_body">Autoriser les notifications pour▁voir le▁traducteur en▁cours d\'exécution,▁arrêter la capture et▁suivre les▁téléchargements de▁modèles. La▁traduction▁peut▁également▁fonctionner sans▁cette▁autorisation.</string>
+    <string name="setup_enabled">Activé</string>
+    <string name="setup_pending">Configuration des▁besoins</string>
+    <string name="setup_open">▁Ouvrir le bon▁réglage</string>
+    <string name="setup_capture">Comment▁capturer l\'écran</string>
+    <string name="setup_capture_body">Android▁demandera le▁partage d\'écran▁lorsque▁vous▁commencez la▁traduction. Sur Android 14+,▁choisissez l\'écran▁entier pour▁traduire à travers les applications.▁Vous▁pouvez▁arrêter la capture à▁tout moment.</string>
+    <string name="setup_accessibility">Facultatif: service d\'accessibilité</string>
+    <string name="setup_accessibility_body">Sur Android 11+, activez le service d\'accessibilité Click=\"n=\" pour les▁captures d\'écran sans invites de▁partage d\'écran▁répétées. Il▁prend▁également en charge les▁raccourcis-clés de volume et la▁traduction d\'entrée. Si Android 13 ou une version ultérieure bloque ce bouton, ouvre les infos de l’application, puis le menu à trois points et « Autoriser les paramètres restreints ». Reviens ici pour activer le service.</string>
+    <string name="setup_recognition">▁Reconnaissance▁textuelle et▁modèles</string>
+    <string name="setup_recognition_body">L\'OCR par▁défaut▁reconnaît les scripts latin,▁chinois,▁japonais et▁coréen. Pour les scripts cyrilliques ou▁autres,▁sélectionnez un service OCR▁approprié. Les▁modèles de▁traduction▁hors▁ligne▁doivent▁être▁téléchargés▁avant utilisation.</string>
+    <string name="setup_ocr">▁Choisir OCR et▁télécharger des▁modèles</string>
+    <string name="setup_models">▁Modèles de▁traduction et▁paramètres de l\'API</string>
+    <string name="setup_background">▁Garder la▁traduction▁disponible</string>
+    <string name="setup_background_body">Si▁votre▁téléphone▁arrête la superposition en▁arrière-plan,▁autorisez l\'activité de fond ou▁supprimez les restrictions de la▁batterie pour Click=\"n=\"Traduit par la▁Rédaction.</string>
+    <string name="setup_battery">▁Paramètres de la▁batterie</string>
+    <string name="setup_ready">▁Prêt à▁essayer</string>
+    <string name="setup_ready_body">▁Dans l\'onglet▁Écran,▁appuyez sur▁Démarrer et▁confirmer le▁partage d\'écran.▁Ouvrez une▁autre application et▁utilisez le▁bouton CT▁flottant pour▁sélectionner une▁région. La▁traduction▁texte et photo▁sont▁disponibles sans capture d\'écran.</string>
+    <string name="setup_shortcuts">Bouton▁flottant et▁raccourcis</string>
+    <string name="setup_reopen">Exécuter à▁nouveau l\'installation</string>
+    <string name="setup_settings_unavailable">▁Votre▁téléphone n\'a▁pas▁ouvert ce▁paramètre.▁Ouvrez les▁paramètres Android et▁trouvez Click-en-un▁manuellement.</string>
+    <string name="setup_restricted_settings">Infos de l’application : paramètres restreints</string>
+</resources>

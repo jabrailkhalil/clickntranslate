@@ -1,0 +1,128 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.overlay
+
+import java.io.File
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class TranslationCardOverlayCopySupportTest {
+
+    @Test
+    fun resultCard_keepsWholeTextActionsAndNativePartialSelection() {
+        val source = sourceFile().readText()
+        data class Case(
+            val name: String,
+            val predicate: (String) -> Boolean,
+        )
+
+        val cases = listOf(
+            Case("dictionary content uses one continuous selectable text host") {
+                it.contains("text = buildSelectableDictionaryText(wordResult") &&
+                    it.split("setTextIsSelectable(true)").size - 1 >= 3
+            },
+            Case("source translation and dictionary have section headers") {
+                listOf(
+                    "R.string.word_card_section_source",
+                    "R.string.word_card_section_translation",
+                    "R.string.word_card_section_dictionary",
+                ).all(it::contains)
+            },
+            Case("dictionary speech includes every rendered dictionary section") {
+                it.contains("val speechText = dictionaryPlainText(wordResult, labels)") &&
+                    it.contains("onClick = { action.onToggle(speechText) }")
+            },
+            Case("all selectable card sections install selected-text speech") {
+                it.countOccurrences("enableSelectionSpeech(") >= 3
+            },
+            Case("whole source copy action follows corrected OCR text") {
+                it.contains("copyToClipboard(currentSource)")
+            },
+            Case("whole translation copy action follows latest streamed text") {
+                it.contains("currentTranslation.takeIf") && it.contains("::copyToClipboard")
+            },
+            Case("fixed action row remains outside scroll content") {
+                it.indexOf("card.addView(actionRow)") > it.indexOf("card.addView(\n            scroll")
+            },
+            Case("copy panel uses a Dialog DecorView ActionMode host") {
+                it.contains("Dialog(context, R.style.Theme_ClickTranslate_Transparent)") &&
+                    it.contains("window.decorView.setBackgroundColor(Color.TRANSPARENT)")
+            },
+            Case("copy panel dialog remains a focusable overlay window") {
+                it.contains("window.setType(overlayType)") &&
+                    it.contains("WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE") &&
+                    it.contains("WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL")
+            },
+            Case("copy panel dismisses its dialog host") {
+                it.contains("currentDialog.dismiss()")
+            },
+            Case("raw WindowManager card host is removed") {
+                !it.contains("wm.addView(backdrop")
+            },
+        )
+
+        cases.forEach { case ->
+            assertTrue(case.name, case.predicate(source))
+        }
+        assertFalse(
+            "custom long-click copying must not replace Android text selection",
+            source.contains("setOnLongClickListener"),
+        )
+        listOf(
+            "wordResult.definitions.forEachIndexed",
+            "wordResult.difficultyNotes.forEach",
+            "wordResult.examples.forEach { example ->\n                container.addView",
+        ).forEach { oldSplitRenderer ->
+            assertFalse(
+                "dictionary rows must not be split into separate selection hosts: $oldSplitRenderer",
+                source.contains(oldSplitRenderer),
+            )
+        }
+    }
+
+    @Test
+    fun dictionaryResult_tableDriven_reflowsTheAlreadyVisibleCard() {
+        val source = sourceFile().readText()
+        val dictionaryRenderer = source.substring(
+            source.indexOf("private fun populateWordResult("),
+            source.indexOf("private fun dictionaryTextLabels("),
+        )
+        data class Case(
+            val name: String,
+            val requiredSource: String,
+        )
+
+        val cases = listOf(
+            Case(
+                "empty dictionary section is removed from layout",
+                "dictionarySection.visibility = if (hasDictionaryContent) View.VISIBLE else View.GONE",
+            ),
+            Case(
+                "structured word hides the duplicate translation section",
+                "refreshTranslationSectionVisibility()",
+            ),
+            Case("dictionary section requests measurement", "dictionarySection.requestLayout()"),
+            Case("scroll content requests measurement", "scrollContent.requestLayout()"),
+            Case("adaptive card requests measurement", "card.requestLayout()"),
+            Case("attached dialog root requests measurement", "rootView?.requestLayout()"),
+            Case("post-layout diagnostics report rendered children", "translationCard dictionary rendered children="),
+        )
+
+        cases.forEach { case ->
+            assertTrue(case.name, source.contains(case.requiredSource))
+        }
+        assertFalse(
+            "dictionary section reuses the source divider instead of adding a second line",
+            dictionaryRenderer.contains("buildDivider("),
+        )
+    }
+
+    private fun sourceFile(): File =
+        listOf(
+            File("src/main/java/dev/clickn/translate/overlay/TranslationCardOverlay.kt"),
+            File("app/src/main/java/dev/clickn/translate/overlay/TranslationCardOverlay.kt"),
+        ).firstOrNull(File::isFile) ?: error("TranslationCardOverlay.kt not found")
+
+    private fun String.countOccurrences(value: String): Int =
+        windowed(value.length).count { it == value }
+}

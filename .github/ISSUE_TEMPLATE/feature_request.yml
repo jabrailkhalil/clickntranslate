@@ -1,0 +1,32 @@
+name: ✨ 功能建议
+description: 提一个新功能、改进或新的 OCR / 翻译引擎接入
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决的问题 / 痛点
+      description: 用 1-2 句话描述当前体验差在哪、新功能能怎么改善
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 你脑子里的设计是怎样的？UI 怎么呈现？后端怎么对接？
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 其它候选方案
+      description: 还有什么思路？为什么不选？
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充
+      description: 参考链接 / 截图 / 同类工具对比等

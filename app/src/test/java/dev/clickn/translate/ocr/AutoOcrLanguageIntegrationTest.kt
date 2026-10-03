@@ -1,0 +1,29 @@
+// Modified for Click'n'Translate on October 3, 2026.
+package dev.clickn.translate.ocr
+
+import java.io.File
+import org.junit.Assert.*
+import org.junit.Test
+
+class AutoOcrLanguageIntegrationTest {
+    @Test fun realLanguageModelAndBoundedRoutingAreWired_tableDriven() {
+        val identifier = File("src/main/java/dev/clickn/translate/ocr/OcrTextLanguageIdentifier.kt").readText()
+        val auto = File("src/main/java/dev/clickn/translate/ocr/AutomaticOcrRecognizer.kt").readText()
+        listOf(
+            "bundled real language model" to File("build.gradle.kts").readText().contains("com.google.mlkit:language-id:17.0.6"),
+            "real client" to identifier.contains("LanguageIdentification.getClient()"),
+            "confidence scores considered" to identifier.contains("identifyPossibleLanguages(sample).await()"),
+            "bounded samples" to identifier.contains("text.take(1000)"),
+            "runtime uses identifier" to auto.contains("identifier.identify(sample)"),
+            "per-frame cache bounded" to auto.contains("languageCache.size >= 128"),
+            "translation source cannot bypass identification" to !auto.contains("settings.sourceLang"),
+            "refinement uses effective settings" to auto.contains("recognize(bitmap, selected.engine, effective)"),
+            "no first-language early exit" to !auto.substringAfter("val passes =")
+                .substringBefore("if (best.isEmpty())").contains("break"),
+            "refinement quality checked" to auto.contains("AutoOcrLanguagePolicy.canRefine("),
+            "regions from every pass compete" to auto.contains("selectAutoOcrRegions(passes.values.flatten()"),
+            "no whole-page winner" to !auto.contains("bestKind"),
+        ).forEach { (name, passed) -> assertTrue(name, passed) }
+    }
+
+}

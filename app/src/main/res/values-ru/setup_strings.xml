@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_title">Настроим переводчик</string>
+    <string name="setup_intro">Несколько шагов — и можно переводить текст, фото и другие приложения. Любую настройку можно изменить позже.</string>
+    <string name="setup_next">Продолжить</string>
+    <string name="setup_previous">Назад</string>
+    <string name="setup_finish">Завершить настройку</string>
+    <string name="setup_text_only">Пока использовать текст и фото</string>
+    <string name="setup_step">Шаг %1$d из %2$d</string>
+    <string name="setup_translation">Языки и перевод</string>
+    <string name="setup_translation_body">Выбери язык, на котором читаешь, и сервис перевода. Google работает без ключа. Для MyMemory и офлайн-перевода укажи язык оригинала.</string>
+    <string name="setup_overlay">Перевод поверх приложений</string>
+    <string name="setup_overlay_body">Открой настройки Android, найди Click’n’Translate и включи «Поверх других приложений». Вернись сюда — статус обновится автоматически.</string>
+    <string name="setup_notifications">Уведомления</string>
+    <string name="setup_notifications_body">Разреши уведомления: так можно видеть работу переводчика, останавливать захват и следить за загрузкой моделей. Перевод работает и без этого разрешения.</string>
+    <string name="setup_enabled">Включено</string>
+    <string name="setup_pending">Нужно настроить</string>
+    <string name="setup_open">Открыть нужную настройку</string>
+    <string name="setup_capture">Как захватывать экран</string>
+    <string name="setup_capture_body">При запуске перевода Android попросит разрешить трансляцию экрана. На Android 14 и новее выбери весь экран для перевода в разных приложениях. Захват можно остановить в любой момент.</string>
+    <string name="setup_accessibility">Дополнительно: специальные возможности</string>
+    <string name="setup_accessibility_body">На Android 11 и новее служба Click’n’Translate позволяет делать снимки без повторных запросов трансляции. Она также нужна для перевода ввода и запуска клавишами громкости. Включай её, если нужны эти функции. Если Android 13 или новее блокирует переключатель, открой сведения о приложении, затем меню ⋮ и «Разрешить ограниченные настройки». Вернись сюда и включи службу.</string>
+    <string name="setup_recognition">Распознавание текста и модели</string>
+    <string name="setup_recognition_body">OCR по умолчанию распознаёт латиницу, китайский, японский и корейский текст. Для кириллицы и других письменностей выбери подходящий сервис OCR. Модели офлайн-перевода нужно загрузить заранее.</string>
+    <string name="setup_ocr">Выбрать OCR и скачать модели</string>
+    <string name="setup_models">Модели перевода и параметры API</string>
+    <string name="setup_background">Чтобы переводчик оставался доступным</string>
+    <string name="setup_background_body">Если телефон закрывает переводчик в фоне, разреши фоновую работу или сними ограничения батареи для Click’n’Translate. Названия пунктов зависят от телефона.</string>
+    <string name="setup_battery">Настройки батареи</string>
+    <string name="setup_ready">Можно пробовать</string>
+    <string name="setup_ready_body">На вкладке «Экран» нажми «Начать» и подтверди трансляцию. Открой другое приложение и выдели область через плавающую кнопку CT. Перевод текста и фото доступен без захвата экрана.</string>
+    <string name="setup_shortcuts">Плавающая кнопка и быстрый запуск</string>
+    <string name="setup_reopen">Пройти настройку снова</string>
+    <string name="setup_settings_unavailable">Телефон не открыл этот пункт. Открой настройки Android и найди Click’n’Translate вручную.</string>
+    <string name="setup_restricted_settings">Сведения о приложении: ограниченные настройки</string>
+</resources>
