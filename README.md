@@ -110,9 +110,7 @@ OCR runs locally. Online translation sends the text to your selected provider; u
 
 If Click'n'Translate is not the right fit for your platform or workflow, these open-source projects are worth checking out:
 
-- [Screen Translator](https://github.com/ciddwd/overlay-translator) — real-time screen translation for Android with on-device/cloud OCR, overlays, offline options and Shizuku support.
 - [Translumo](https://github.com/ramjke/Translumo) — Windows real-time screen translation focused on games, subtitles and low-latency OCR.
-- [ScreenTranslator](https://github.com/OneMoreGres/ScreenTranslator) — screen capture, OCR and translation for Windows and Linux.
 - [LunaTranslator](https://github.com/HIllya51/LunaTranslator) — a feature-rich visual-novel translator with text hooking, OCR and multiple translation workflows.
 
 ## Help and development
