@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = ClickTranslateApp::class)
+@Config(sdk = [35], application = ClickTranslateApp::class, qualifiers = "en-rUS")
 @LooperMode(LooperMode.Mode.PAUSED)
 class LocaleRuntimeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
@@ -61,6 +61,8 @@ class LocaleRuntimeTest {
     }
     private fun resource(id: Int) = compose.activity.getString(id)
     private fun openAdvanced() {
+        compose.runOnIdle { AppLocalePrefs.write(compose.activity, "en") }
+        compose.waitForIdle()
         compose.onNodeWithText(resource(R.string.refine_quick_setup)).performClick()
         compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
         compose.onAllNodesWithText(resource(R.string.mobile_advanced)).onLast().performScrollTo().performClick()

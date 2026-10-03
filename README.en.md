@@ -4,7 +4,7 @@ Translate screens, text and photos in one app.
 
 [Русский](README.md) · [Website](https://clickn.dev) · [Telegram](https://t.me/jabrail_digital)
 
-## Android 0.2.0
+## Android 0.3.1
 
 - Four destinations: **Screen**, **Text**, **History**, **Settings**.
 - A prominent start button, visible language pair and direct service configuration.
@@ -17,6 +17,8 @@ Translate screens, text and photos in one app.
 - Advanced OCR, model, speech, dictionary, glossary and floating-button options.
 
 Requires Android 8.0+ and ARM64. Local LLMs require Android 13+. Root is not needed for the standard capture flow.
+
+[Interface changes and preview installation](docs/android-changes.md).
 
 ## Setup
 

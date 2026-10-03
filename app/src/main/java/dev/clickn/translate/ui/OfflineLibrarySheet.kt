@@ -28,7 +28,7 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
     var source by remember { mutableStateOf(initial.sourceLang) }
     var target by remember { mutableStateOf(initial.targetLang) }
     val pair = initial.copy(sourceLang = source, targetLang = target)
-    val languages = remember { MlKitLanguagePolicy.supportedLanguageTags.sortedBy { Locale.forLanguageTag(it).displayLanguage } }
+    val languages = remember { MlKitLanguagePolicy.supportedLanguageTags.map { MlKitLanguagePolicy.resolveTarget(it) }.distinct().sortedBy { Locale.forLanguageTag(it).displayLanguage } }
     val downloaded = models.downloadedLanguages + "en"
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.refine_offline), style = MaterialTheme.typography.headlineSmall) }

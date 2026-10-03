@@ -187,7 +187,7 @@ fun MobileShell(
                         checking = modelState.checking,
                         readiness = {
                             MobileReadinessPanel(current, modelState, overlayAllowed, accessibility, notifications, battery,
-                                onOverlay = ::grantOverlay, onService = ::openService, onOcr = { onAdvancedSection("ocr") }, onModels = { sheet = "offline" },
+                                onOverlay = ::grantOverlay, onService = ::openService, onOcr = { explanation = R.string.setup_recognition_body to { onAdvancedSection("ocr") } }, onModels = { sheet = "offline" },
                                 onAccessibility = { explanation = R.string.setup_accessibility_body to {
                                     openSetupAndroidSettings(context, Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
                                         .putExtra("android.intent.extra.COMPONENT_NAME", android.content.ComponentName(context, dev.clickn.translate.trigger.ClickTranslateAccessibilityService::class.java)), Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -198,9 +198,9 @@ fun MobileShell(
                                         notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                                     } else openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName))
                                 } },
-                                onBattery = { explanation = R.string.setup_battery to {
+                                onBattery = { explanation = R.string.setup_background_body to {
                                     openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")), Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                } })
+                                } }, onCapture = { explanation = R.string.refine_capture_ready_body to { sheet = "capture" } })
                         },
                     )
                     MobileTab.TEXT -> TextWorkspace(current, input, translation,
