@@ -20,8 +20,7 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
@@ -288,36 +287,37 @@ class TranslationGlossaryRepository @Inject constructor(
     private val dao: TranslationGlossaryDao,
     @ApplicationContext private val context: Context? = null,
 ) {
-    private val presetSeedMutex = Mutex()
-
-    fun observeAll(): Flow<List<GlossaryTermEntity>> = dao.observeAll()
-
-    suspend fun listAll(): List<GlossaryTermEntity> = dao.listAll()
-
-    suspend fun listEnabled(): List<GlossaryTermEntity> = dao.listEnabled()
-
-    suspend fun ensureSourcePreservationPresets() = presetSeedMutex.withLock {
-        val appContext = context ?: return@withLock
-        val prefs = appContext.getSharedPreferences(SOURCE_PRESERVATION_PREFS, Context.MODE_PRIVATE)
-        if (prefs.getBoolean(SOURCE_PRESERVATION_SEED_V1, false)) return@withLock
-        val terms = appContext.assets.open(SOURCE_PRESERVATION_ASSET).bufferedReader().useLines { lines ->
-            lines.map(String::trim)
-                .filter { it.isNotEmpty() && !it.startsWith("#") }
-                .distinct()
-                .map { source ->
-                    GlossaryTermEntity(
-                        sourceLang = "ja",
-                        targetLang = SOURCE_PRESERVATION_TARGET,
-                        sourceTerm = source,
-                        targetTerm = source,
-                        category = GlossaryTermCategory.PRESERVE_SOURCE,
-                    )
-                }
-                .toList()
-        }
-        dao.importTermsAtomically(terms)
-        prefs.edit().putBoolean(SOURCE_PRESERVATION_SEED_V1, true).apply()
+    private val bundledSounds: Set<String> by lazy {
+        context?.assets?.open(SOURCE_PRESERVATION_ASSET)?.bufferedReader()?.useLines { lines ->
+            lines.map(String::trim).filter { it.isNotEmpty() && !it.startsWith("#") }.toSet()
+        }.orEmpty()
     }
+    private val legacySeedInstalled: Boolean get() = context?.getSharedPreferences(
+        SOURCE_PRESERVATION_PREFS, Context.MODE_PRIVATE,
+    )?.getBoolean(SOURCE_PRESERVATION_SEED_V1, false) == true
+
+    @Synchronized
+    private fun userTerms(terms: List<GlossaryTermEntity>): List<GlossaryTermEntity> {
+        if (!legacySeedInstalled) return terms
+        val prefs = requireNotNull(context).getSharedPreferences(SOURCE_PRESERVATION_PREFS, Context.MODE_PRIVATE)
+        val legacyIds = prefs.getStringSet("legacy_seed_ids_v2", null) ?: terms
+            .filter { SourcePresetPolicy.isUntouchedLegacySeed(it, bundledSounds) }
+            .map { it.id.toString() }.toSet().also { ids ->
+                prefs.edit().putStringSet("legacy_seed_ids_v2", ids).apply()
+            }
+        return terms.filterNot {
+            it.id.toString() in legacyIds && SourcePresetPolicy.isUntouchedLegacySeed(it, bundledSounds)
+        }
+    }
+
+    fun observeAll(): Flow<List<GlossaryTermEntity>> = dao.observeAll().map(::userTerms)
+
+    suspend fun listAll(): List<GlossaryTermEntity> = userTerms(dao.listAll())
+
+    suspend fun listEnabled(): List<GlossaryTermEntity> = userTerms(dao.listEnabled())
+
+    suspend fun preservationTerms(includeMangaSounds: Boolean): List<GlossaryTermEntity> =
+        SourcePresetPolicy.activeTerms(listAll(), bundledSounds, includeMangaSounds)
 
     suspend fun matchingTerms(
         source: String,
@@ -329,7 +329,7 @@ class TranslationGlossaryRepository @Inject constructor(
         sourceLang = sourceLang,
         targetLang = targetLang,
         packageName = packageName,
-        terms = dao.listEnabled(),
+        terms = listEnabled(),
     )
 
     suspend fun upsert(term: GlossaryTermEntity): Long {
@@ -369,7 +369,7 @@ class TranslationGlossaryRepository @Inject constructor(
             targetLang = term.targetLang,
             normalizedSourceTerm = normalizedSource,
             caseSensitive = term.caseSensitive,
-        )?.takeIf { it.id != term.id }
+        )?.takeIf { it.id != term.id && userTerms(listOf(it)).isNotEmpty() }
     }
 
     suspend fun overwriteConflict(term: GlossaryTermEntity): Long {

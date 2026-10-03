@@ -478,7 +478,7 @@ class OverlayManager(
             text = message
             setTextColor(0xFFFFFFFF.toInt())
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            maxLines = 4
+            maxLines = if (durationMs >= 10_000L) 7 else 4
             ellipsize = android.text.TextUtils.TruncateAt.END
             maxWidth = maxW
         }

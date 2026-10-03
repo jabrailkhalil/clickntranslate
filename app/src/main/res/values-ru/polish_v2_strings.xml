@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">Выберите то, что помогает вашему переводу. Режимы работают независимо; при отключении ваши записи сохраняются.</string>
+    <string name="library_terms_mode">Свои термины</string>
+    <string name="library_terms_body">Задайте перевод имён и повторяющихся слов. Например, имя героя игры всегда будет одинаковым.</string>
+    <string name="library_memory_mode">Исправленные переводы</string>
+    <string name="library_memory_body">Повторно используйте перевод, который вы исправили в карточке результата. Одинаковые фразы будут переводиться одинаково.</string>
+    <string name="library_preservation_mode">Не переводить надписи</string>
+    <string name="library_preservation_body">Оставляйте точные слова на экране как есть: звуки, подписи или имена, которые вы добавили сами.</string>
+    <string name="library_manage_count">Открыть записи (%1$d)</string>
+    <string name="library_manga_pack">Звуки японской манги</string>
+    <string name="library_manga_pack_body">Необязательный встроенный набор звуков. Подходящие японские надписи остаются без перевода; весь список слов не засоряет ваш глоссарий.</string>
+    <string name="setup_simple_appearance">Выберите удобное оформление. Его можно поменять в настройках.</string>
+    <string name="setup_simple_languages">Выберите язык, на котором читаете. Для исходного языка обычно подходит автоопределение.</string>
+    <string name="setup_simple_usage_title">Как переводить</string>
+    <string name="setup_simple_usage_body">Экран: запустите захват, откройте другое приложение и нажмите плавающую кнопку. Удержание открывает выбор области и другие действия. Текст и фото переводятся внутри приложения. Разрешения запросим, когда они понадобятся.</string>
+    <string name="floating_keep_visible">Оставлять кнопку на экране</string>
+    <string name="floating_keep_visible_body">Выключено: кнопка скрывается через 45 секунд без действий или после закрытия карточки перевода. Вернуть её можно из уведомления захвата. Карточка закрывается после чтения; «Закрепить» оставляет её открытой.</string>
+    <string name="floating_show_button">Показать кнопку</string>
+    <string name="overlay_pin">Закрепить</string>
+    <string name="overlay_unpin">Открепить</string>
+    <string name="ocr_empty_capture_help">В захвате пустая или защищённая область. Разрешите захват всего экрана и повторите. Также можно поделиться текстом сообщения в Clickn.</string>
+    <string name="ocr_no_text_help">Текст не распознан. Выделите область побольше и проверьте язык OCR. Для кириллицы нужен OCR с поддержкой русского; также можно поделиться текстом сообщения в Clickn.</string>
+    <string name="logo_original">Оригинал</string>
+    <string name="logo_ocean">Океан</string>
+    <string name="logo_mint">Мята</string>
+    <string name="logo_sunset">Закат</string>
+    <string name="logo_choices_body">Выберите логотип ClicknTranslate для рабочего стола. Android может обновить значок с небольшой задержкой.</string>
+</resources>

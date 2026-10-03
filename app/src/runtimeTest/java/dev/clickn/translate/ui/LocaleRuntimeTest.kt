@@ -24,20 +24,20 @@ class LocaleRuntimeTest {
         setupClick("Interface language")
         compose.onNodeWithText("Русский").performClick()
         compose.waitForIdle()
-        assertSetupShown("Начать с этими настройками")
+        assertSetupShown("Выбери тему")
         assertEquals("ru", AppLocalePrefs.read(compose.activity))
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
-        assertSetupShown("Начать с этими настройками")
+        assertSetupShown("Выбери тему")
     }
     @Test fun allSixInterfaceLanguagesApplyInActualActivity() {
         val choices = listOf(
-            Triple("Русский", "Начать с этими настройками", "Язык интерфейса"),
-            Triple("Deutsch", "Mit diesen Einstellungen starten", "App-Sprache"),
-            Triple("Français", "Démarrer avec ces réglages", "Langue de l’interface"),
-            Triple("Español", "Empezar con estos ajustes", "Idioma de la interfaz"),
-            Triple("中文", "使用这些设置开始", "界面语言"),
-            Triple("English", "Start with these settings", "Interface language"),
+            Triple("Русский", "Выбери тему", "Язык интерфейса"),
+            Triple("Deutsch", "Wähle ein Design", "App-Sprache"),
+            Triple("Français", "Choisis un thème", "Langue de l’interface"),
+            Triple("Español", "Elige un tema", "Idioma de la interfaz"),
+            Triple("中文", "选择主题", "界面语言"),
+            Triple("English", "Choose a theme", "Interface language"),
         )
         var label = "Interface language"
         choices.forEach { (name, start, nextLabel) ->
@@ -61,7 +61,7 @@ class LocaleRuntimeTest {
         assertFalse(controller.isAppearanceLightStatusBars)
     }
     @Test fun characterChoiceCanScrollSelectAndSurviveRecreation() {
-        setupClick(resource(R.string.refine_quick_setup))
+        finishIntro()
         compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
         listClick(resource(R.string.refine_floating))
         // Includes the last row: all companions must be reachable on a small screen.
@@ -76,6 +76,12 @@ class LocaleRuntimeTest {
         assertEquals("chester", dev.clickn.translate.data.CompanionPrefs.read(compose.activity))
     }
 
+    private fun finishIntro() {
+        compose.onNodeWithText(resource(R.string.setup_next)).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(resource(R.string.setup_finish)).assertIsDisplayed().performClick()
+        compose.waitForIdle()
+    }
     private fun assertSetupShown(label: String) {
         compose.onNodeWithTag("setup-options").performScrollToNode(hasText(label))
         compose.onNodeWithText(label).assertIsDisplayed()
@@ -93,7 +99,7 @@ class LocaleRuntimeTest {
     private fun openAdvanced() {
         compose.runOnIdle { AppLocalePrefs.write(compose.activity, "en") }
         compose.waitForIdle()
-        setupClick(resource(R.string.refine_quick_setup))
+        finishIntro()
         compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
         listClick(resource(R.string.mobile_advanced))

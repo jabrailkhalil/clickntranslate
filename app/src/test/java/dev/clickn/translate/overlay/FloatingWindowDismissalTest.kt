@@ -87,7 +87,7 @@ class FloatingWindowDismissalTest {
             MarkerCase(
                 "capture service stops the shared TTS engine",
                 serviceSource,
-                "onFloatingWindowDismissed = { ttsEngine.stop() }",
+                "onFloatingWindowDismissed = {",
             ),
             MarkerCase(
                 "user dismiss handles playback before clearing",
@@ -112,7 +112,7 @@ class FloatingWindowDismissalTest {
             MarkerCase(
                 "capture service wires panel dismissal to the shared TTS engine",
                 serviceSource,
-                "onDismissed = { ttsEngine.stop() }",
+                "onDismissed = {",
             ),
             MarkerCase(
                 "process-text card wires dismissal to its speech engine",
@@ -122,6 +122,8 @@ class FloatingWindowDismissalTest {
         ).forEach { case ->
             assertTrue(case.name, case.source.contains(case.marker))
         }
+        assertTrue(serviceSource.substringAfter("onFloatingWindowDismissed = {")
+            .substringBefore("},").contains("ttsEngine.stop()"))
 
         assertEquals(
             "batch and streaming floating windows share the same dismiss handler",

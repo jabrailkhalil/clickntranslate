@@ -198,6 +198,17 @@ class FloatingButtonManager(
         onSingleTap()
     }
 
+    private val idleHideHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val idleHide = Runnable {
+        if (CompanionPrefs.keepVisible(context)) return@Runnable
+        if (tourStage != TourStage.NONE || arcMenuView != null || skill == FloatingSkill.LOOP) scheduleIdleHide()
+        else hide()
+    }
+    private fun scheduleIdleHide() {
+        idleHideHandler.removeCallbacks(idleHide)
+        if (!CompanionPrefs.keepVisible(context) && view != null) idleHideHandler.postDelayed(idleHide, 45_000L)
+    }
+
     private val autoDockHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val autoDockRunnable = Runnable {
         // 触发时再校验一次：吸附总开关开、autoDock 开、球已 show、当前未在 dock 态。
@@ -273,7 +284,7 @@ class FloatingButtonManager(
 
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
-        if (view != null) return
+        if (view != null) { scheduleIdleHide(); return }
 
         val density = context.resources.displayMetrics.density
         val size = (sizeDp.coerceIn(28, 128) * density).toInt()  // 球直径
@@ -390,6 +401,7 @@ class FloatingButtonManager(
             }
         }
         layoutParams = params
+        scheduleIdleHide()
         if (hiddenForCapture) container.visibility = View.INVISIBLE
         updateAccessibilityDescription()
 
@@ -516,6 +528,7 @@ class FloatingButtonManager(
     }
 
     fun hide() {
+        idleHideHandler.removeCallbacks(idleHide)
         stopAppearanceObserver?.invoke()
         stopAppearanceObserver = null
         hiddenForCapture = false
@@ -780,6 +793,7 @@ class FloatingButtonManager(
 
     /** 立即把球的主图标按当前 [skill] 切换。CaptureService 在切技能时 + settings collect 同步时调。 */
     fun applySkillIcon() {
+        scheduleIdleHide()
         if (skill != FloatingSkill.INPUT_TRANSLATE) cancelPendingInputTap()
         val icon = mainIcon
         val choice = CompanionPrefs.read(context)
@@ -1210,6 +1224,7 @@ class FloatingButtonManager(
             }
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    scheduleIdleHide()
                     // 取消自动贴边倒计时 + 上次的吸边动画 + 待机透明度。**不**立即 wake——
                     // 否则长按弹菜单时球会从贴边位置缩进 8dp，视觉错位。wake 推迟到拖动开始时。
                     cancelAutoDock()

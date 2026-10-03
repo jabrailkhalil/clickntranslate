@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">Choose what helps your translations. Each mode is independent; your entries stay saved when it is off.</string>
+    <string name="library_terms_mode">My terms</string>
+    <string name="library_terms_body">Set preferred translations for names and recurring terms. Example: a game character always keeps the same name.</string>
+    <string name="library_memory_mode">Corrected translations</string>
+    <string name="library_memory_body">Reuse translations you corrected in a result card. Repeated phrases stay consistent.</string>
+    <string name="library_preservation_mode">Leave text unchanged</string>
+    <string name="library_preservation_body">Keep exact words on screen without translating them: sound effects, labels, or names you add yourself.</string>
+    <string name="library_manage_count">Manage entries (%1$d)</string>
+    <string name="library_manga_pack">Japanese manga sounds</string>
+    <string name="library_manga_pack_body">Optional built-in sound effects pack. Keeps matching Japanese captions unchanged; the full word list stays out of your glossary.</string>
+    <string name="setup_simple_appearance">Choose a comfortable look. You can change it later in Settings.</string>
+    <string name="setup_simple_languages">Choose the language you read. Automatic source detection is usually enough.</string>
+    <string name="setup_simple_usage_title">How to translate</string>
+    <string name="setup_simple_usage_body">Screen: start capture, open another app, then tap the floating button. Hold it for selection and other actions. Text and photos work from the app. Permissions are requested when needed.</string>
+    <string name="floating_keep_visible">Keep the button visible</string>
+    <string name="floating_keep_visible_body">Off: the button hides after 45 seconds of inactivity or when you close a translation card. Bring it back from the capture notification. Cards close after reading; Pin keeps one open.</string>
+    <string name="floating_show_button">Show button</string>
+    <string name="overlay_pin">Pin</string>
+    <string name="overlay_unpin">Unpin</string>
+    <string name="ocr_empty_capture_help">The captured area is empty or protected. Allow capture of the whole screen, then retry. You can also share the message text to Clickn.</string>
+    <string name="ocr_no_text_help">No text recognized. Select a larger area and check the OCR language. For Cyrillic, choose an OCR service that supports it or share the message text to Clickn.</string>
+    <string name="logo_original">Original</string>
+    <string name="logo_ocean">Ocean</string>
+    <string name="logo_mint">Mint</string>
+    <string name="logo_sunset">Sunset</string>
+    <string name="logo_choices_body">Choose a ClicknTranslate logo for your home screen. Android may take a moment to refresh the icon.</string>
+</resources>

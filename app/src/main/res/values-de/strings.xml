@@ -1684,8 +1684,8 @@
     <string name="translation_library_help_manage_title">Wie Sie gespeicherte Objekte verwalten</string>
     <string name="translation_library_help_manage_body">Wechseln Sie zwischen den Allgemeinen Geschäftsbedingungen und den Translation-Speicher-Tabs. Verwenden Sie die Suchtaste in der oberen rechten Ecke, um einen Artikel zu finden. Jeder Artikel kann separat bearbeitet oder gelöscht werden.</string>
     <string name="translation_library_help_close">Verstanden</string>
-    <string name="translation_library_terms_tab">Allgemeines</string>
-    <string name="translation_library_memory_tab">Übersetzungsspeicher</string>
+    <string name="translation_library_terms_tab">Eigene Begriffe</string>
+    <string name="translation_library_memory_tab">Korrigierte Übersetzungen</string>
     <string name="translation_memory_filter">Übersetzungsspeicher filtern</string>
     <string name="translation_memory_filter_title">Übersetzungsspeicher filtern</string>
     <string name="translation_memory_search_hint">Suchquelle, Übersetzung, App oder Sprache</string>
@@ -1989,7 +1989,7 @@
     <string name="settings_translation_service_volc">Volcengine</string>
     <string name="settings_translation_service_baidu">Baidu</string>
     <string name="settings_translation_service_tencent">Tencent Cloud-Software</string>
-    <string name="source_preservation_tab">Quelle bleiben</string>
+    <string name="source_preservation_tab">Text unverändert lassen</string>
     <string name="source_preservation_category">Quelle bleiben</string>
     <string name="source_preservation_empty">Keine Quell-Reservierungseinträge.</string>
     <string name="source_preservation_disable_all">Alle Quellenkonservierung deaktivieren</string>

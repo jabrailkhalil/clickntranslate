@@ -38,6 +38,9 @@ internal object CaptureNotification {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        fun actionIntent(action: String, request: Int) = PendingIntent.getService(context, request,
+            Intent(context, CaptureService::class.java).setAction(action),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentTitle(context.getString(R.string.notif_title))
@@ -45,6 +48,10 @@ internal object CaptureNotification {
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(openMain)
+            .addAction(android.R.drawable.ic_menu_view, context.getString(R.string.floating_show_button),
+                actionIntent(CaptureService.ACTION_SHOW_BUTTON, 21))
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, context.getString(R.string.btn_stop),
+                actionIntent(CaptureService.ACTION_STOP, 22))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

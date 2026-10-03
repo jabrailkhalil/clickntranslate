@@ -1718,8 +1718,8 @@
     <string name="translation_library_help_manage_title">如何管理</string>
     <string name="translation_library_help_manage_body">在翻译库中切换“术语”和“翻译记忆”标签。点击右上角搜索按钮可以查找内容；每条记录都可以单独编辑或删除。</string>
     <string name="translation_library_help_close">知道了</string>
-    <string name="translation_library_terms_tab">术语</string>
-    <string name="translation_library_memory_tab">翻译记忆</string>
+    <string name="translation_library_terms_tab">我的术语</string>
+    <string name="translation_library_memory_tab">修正的翻译</string>
     <string name="translation_memory_filter">筛选翻译记忆</string>
     <string name="translation_memory_filter_title">筛选翻译记忆</string>
     <string name="translation_memory_search_hint">搜索原文、译文、应用或语言</string>
@@ -2024,7 +2024,7 @@
     <string name="settings_translation_service_volc">火山引擎</string>
     <string name="settings_translation_service_baidu">百度</string>
     <string name="settings_translation_service_tencent">腾讯云</string>
-    <string name="source_preservation_tab">原文保留</string>
+    <string name="source_preservation_tab">保留原文</string>
     <string name="source_preservation_category">原文保留</string>
     <string name="source_preservation_empty">暂无原文保留词条。</string>
     <string name="source_preservation_disable_all">全部停用原文保留</string>

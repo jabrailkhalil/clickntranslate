@@ -29,13 +29,20 @@ import org.robolectric.annotation.GraphicsMode
 class BrandIconRuntimeTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
     @Test fun presetsLeaveExactlyOneLauncherEntry() {
-        listOf(BrandIconPrefs.LOGO, BrandIconPrefs.MASCOT).forEach { choice ->
+        BrandIconPrefs.choices.forEach { choice ->
             BrandIconPrefs.write(context, choice)
-            val active = if (choice == BrandIconPrefs.LOGO) "LauncherLogo" else "LauncherMascot"
-            val inactive = if (choice == BrandIconPrefs.LOGO) "LauncherMascot" else "LauncherLogo"
-            assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED, context.packageManager.getComponentEnabledSetting(ComponentName(context.packageName, "dev.clickn.translate.$active")))
-            assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DISABLED, context.packageManager.getComponentEnabledSetting(ComponentName(context.packageName, "dev.clickn.translate.$inactive")))
+            assertEquals(choice, BrandIconPrefs.read(context))
+            (BrandIconPrefs.choices.map(BrandIconPrefs::componentName) + "LauncherMascot").forEach { name ->
+                val expected = if (name == BrandIconPrefs.componentName(choice)) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                assertEquals(expected, context.packageManager.getComponentEnabledSetting(ComponentName(context.packageName, "dev.clickn.translate.$name")))
+            }
         }
+    }
+    @Test fun oldMascotChoiceMigratesToOriginalLogo() {
+        context.getSharedPreferences("clickn_brand_icon", Context.MODE_PRIVATE).edit().putString("choice", "mascot").commit()
+        BrandIconPrefs.migrate(context)
+        assertEquals(BrandIconPrefs.LOGO, BrandIconPrefs.read(context))
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DISABLED, context.packageManager.getComponentEnabledSetting(ComponentName(context.packageName, "dev.clickn.translate.LauncherMascot")))
     }
     @Test fun customImagesAreBoundedAndFailedReplacementPreservesPicture() {
         val uri = Uri.parse("content://clickn.test/image")

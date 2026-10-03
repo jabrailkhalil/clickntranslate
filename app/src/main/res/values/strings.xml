@@ -1719,8 +1719,8 @@
     <string name="translation_library_help_manage_title">How to manage saved items</string>
     <string name="translation_library_help_manage_body">Switch between the Terms and Translation memory tabs. Use the search button in the top-right corner to find an item. Every item can be edited or deleted separately.</string>
     <string name="translation_library_help_close">Got it</string>
-    <string name="translation_library_terms_tab">Terms</string>
-    <string name="translation_library_memory_tab">Translation memory</string>
+    <string name="translation_library_terms_tab">My terms</string>
+    <string name="translation_library_memory_tab">Corrected translations</string>
     <string name="translation_memory_filter">Filter translation memory</string>
     <string name="translation_memory_filter_title">Filter translation memory</string>
     <string name="translation_memory_search_hint">Search source, translation, app, or language</string>
@@ -2025,7 +2025,7 @@
     <string name="settings_translation_service_volc">Volcengine</string>
     <string name="settings_translation_service_baidu">Baidu</string>
     <string name="settings_translation_service_tencent">Tencent Cloud</string>
-    <string name="source_preservation_tab">Keep source</string>
+    <string name="source_preservation_tab">Leave text unchanged</string>
     <string name="source_preservation_category">Keep source</string>
     <string name="source_preservation_empty">No source-preservation entries.</string>
     <string name="source_preservation_disable_all">Disable all source preservation</string>

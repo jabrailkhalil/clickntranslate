@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">Wähle hilfreiche Funktionen. Jeder Modus ist unabhängig; beim Ausschalten bleiben deine Einträge gespeichert.</string>
+    <string name="library_terms_mode">Eigene Begriffe</string>
+    <string name="library_terms_body">Lege Übersetzungen für Namen und wiederkehrende Begriffe fest. So bleibt ein Spielcharakter immer gleich benannt.</string>
+    <string name="library_memory_mode">Korrigierte Übersetzungen</string>
+    <string name="library_memory_body">Verwende Übersetzungen erneut, die du in einer Ergebniskarte korrigiert hast.</string>
+    <string name="library_preservation_mode">Text unverändert lassen</string>
+    <string name="library_preservation_body">Lasse eigene Wörter wie Geräusche, Beschriftungen oder Namen auf dem Bildschirm unverändert.</string>
+    <string name="library_manage_count">Einträge öffnen (%1$d)</string>
+    <string name="library_manga_pack">Japanische Manga-Geräusche</string>
+    <string name="library_manga_pack_body">Optionales Paket mit japanischen Lautwörtern. Passende Texte bleiben unverändert; die vollständige Liste erscheint nicht im Glossar.</string>
+    <string name="setup_simple_appearance">Wähle ein angenehmes Design. Du kannst es später ändern.</string>
+    <string name="setup_simple_languages">Wähle deine Lesesprache. Für die Ausgangssprache genügt meist die automatische Erkennung.</string>
+    <string name="setup_simple_usage_title">So übersetzt du</string>
+    <string name="setup_simple_usage_body">Bildschirm: Aufnahme starten, andere App öffnen und die schwebende Taste antippen. Gedrückt halten öffnet Auswahl und weitere Aktionen. Texte und Fotos werden in der App übersetzt. Berechtigungen fragen wir bei Bedarf ab.</string>
+    <string name="floating_keep_visible">Taste sichtbar lassen</string>
+    <string name="floating_keep_visible_body">Aus: Die Taste verschwindet nach 45 Sekunden ohne Aktion oder nach Schließen der Übersetzungskarte. Hole sie über die Aufnahmebenachrichtigung zurück. Anheften hält eine Karte offen.</string>
+    <string name="floating_show_button">Taste anzeigen</string>
+    <string name="overlay_pin">Anheften</string>
+    <string name="overlay_unpin">Lösen</string>
+    <string name="ocr_empty_capture_help">Der Aufnahmebereich ist leer oder geschützt. Erlaube die Aufnahme des gesamten Bildschirms und versuche es erneut. Du kannst Nachrichtentext auch mit Clickn teilen.</string>
+    <string name="ocr_no_text_help">Kein Text erkannt. Wähle einen größeren Bereich und prüfe die OCR-Sprache. Für kyrillischen Text brauchst du einen passenden OCR-Dienst oder kannst den Text mit Clickn teilen.</string>
+    <string name="logo_original">Original</string>
+    <string name="logo_ocean">Ozean</string>
+    <string name="logo_mint">Minze</string>
+    <string name="logo_sunset">Sonnenuntergang</string>
+    <string name="logo_choices_body">Wähle ein ClicknTranslate-Logo für den Startbildschirm. Android aktualisiert das Symbol möglicherweise etwas später.</string>
+</resources>

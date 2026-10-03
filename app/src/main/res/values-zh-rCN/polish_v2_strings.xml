@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">选择适合你的功能。每种模式独立工作，关闭后你的记录仍会保留。</string>
+    <string name="library_terms_mode">我的术语</string>
+    <string name="library_terms_body">为人名和常用术语指定译法。例如，让游戏角色的名字保持一致。</string>
+    <string name="library_memory_mode">修正的翻译</string>
+    <string name="library_memory_body">重复使用你在结果卡片中修正过的译文，让相同语句保持一致。</string>
+    <string name="library_preservation_mode">保留原文</string>
+    <string name="library_preservation_body">不翻译你添加的指定文字，例如音效、标签或名字。</string>
+    <string name="library_manage_count">查看记录（%1$d）</string>
+    <string name="library_manga_pack">日语漫画音效</string>
+    <string name="library_manga_pack_body">可选的内置音效包。匹配的日语音效保留原文；完整词表不会挤满你的术语表。</string>
+    <string name="setup_simple_appearance">选择舒适的外观，之后可在设置中更改。</string>
+    <string name="setup_simple_languages">选择你的阅读语言。原文语言通常可使用自动识别。</string>
+    <string name="setup_simple_usage_title">如何翻译</string>
+    <string name="setup_simple_usage_body">屏幕：启动捕获，打开其他应用，然后点击悬浮按钮。长按可选择区域或其他操作。文字和照片可在应用内翻译。需要时再请求权限。</string>
+    <string name="floating_keep_visible">保持按钮可见</string>
+    <string name="floating_keep_visible_body">关闭时：45 秒无操作或关闭翻译卡片后，按钮会隐藏。可通过捕获通知重新显示。固定可让卡片保持打开。</string>
+    <string name="floating_show_button">显示按钮</string>
+    <string name="overlay_pin">固定</string>
+    <string name="overlay_unpin">取消固定</string>
+    <string name="ocr_empty_capture_help">捕获区域为空或受保护。请允许捕获整个屏幕后重试，也可将消息文字分享给 Clickn。</string>
+    <string name="ocr_no_text_help">未识别到文字。请扩大选区并检查 OCR 语言。西里尔文字需要兼容的 OCR 服务，也可将文字分享给 Clickn。</string>
+    <string name="logo_original">原版</string>
+    <string name="logo_ocean">海洋</string>
+    <string name="logo_mint">薄荷</string>
+    <string name="logo_sunset">日落</string>
+    <string name="logo_choices_body">选择用于桌面的 ClicknTranslate 标志。Android 更新图标可能稍有延迟。</string>
+</resources>

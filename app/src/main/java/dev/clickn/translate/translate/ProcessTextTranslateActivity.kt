@@ -50,8 +50,11 @@ class ProcessTextTranslateActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
-            ?.toString()?.trim().orEmpty()
+        val text = when (intent.action) {
+            Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+            Intent.ACTION_SEND -> if (intent.type == "text/plain") intent.getCharSequenceExtra(Intent.EXTRA_TEXT) else null
+            else -> null
+        }?.toString()?.trim()?.take(20_000).orEmpty()
         if (text.isEmpty()) {
             finish(); return
         }
@@ -135,6 +138,7 @@ class ProcessTextTranslateActivity : ComponentActivity() {
                 card.show(
                     sourceText = text,
                     translation = translatingLabel,
+                    loading = true,
                     wordResult = null,
                     settings = settings,
                     onSpeakSource = sourceSpeech,
@@ -208,6 +212,7 @@ class ProcessTextTranslateActivity : ComponentActivity() {
                 )
             }
             withContext(Dispatchers.Main) {
+                if (!card.isShown()) return@withContext
                 card.show(
                     sourceText = text,
                     translation = presentation.translation,

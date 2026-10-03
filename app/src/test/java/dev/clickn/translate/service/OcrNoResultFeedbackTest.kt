@@ -18,8 +18,8 @@ class OcrNoResultFeedbackTest {
         data class Case(val name: String, val marker: String)
         val required = listOf(
             Case("diagnostic log remains", "R.string.log_msg_ocr_no_result_format"),
-            Case("same actionable message is used", "R.string.toast_ocr_unreliable_result"),
-            Case("message is shown in the overlay feedback bar", "overlay?.showErrorHint(message)"),
+            Case("same actionable message is used", "R.string.ocr_no_text_help"),
+            Case("message is shown in the overlay feedback bar", "overlay?.showErrorHint(message, durationMs = 12_000L)"),
         )
 
         required.forEach { case -> assertTrue(case.name, branch.contains(case.marker)) }

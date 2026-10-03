@@ -24,9 +24,15 @@ internal object CompanionPrefs {
     const val CUSTOM = "custom"
     private fun prefs(context: Context) = context.getSharedPreferences("clickn_floating_picture", Context.MODE_PRIVATE)
     private fun normalized(choice: String?): String =
-        choice?.takeIf { it in setOf(ACTION, LOGO, CUSTOM) || AppCompanion.entries.any { c -> c.id == it } } ?: ACTION
+        choice?.takeIf { it in setOf(ACTION, LOGO, CUSTOM) || AppCompanion.entries.any { c -> c.id == it } } ?: AppCompanion.CHESTER.id
 
-    fun read(context: Context): String = normalized(prefs(context).getString("choice", ACTION))
+    fun keepVisible(context: Context): Boolean = prefs(context).getBoolean("keep_visible", false)
+    fun setKeepVisible(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("keep_visible", enabled)
+            .putLong("revision", prefs(context).getLong("revision", 0) + 1).apply()
+    }
+
+    fun read(context: Context): String = normalized(prefs(context).getString("choice", AppCompanion.CHESTER.id))
     fun write(context: Context, choice: String) {
         require(normalized(choice) == choice)
         prefs(context).edit().putString("choice", choice)

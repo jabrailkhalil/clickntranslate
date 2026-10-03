@@ -214,6 +214,7 @@ class SettingsRepository internal constructor(
         val TranslationOutputDirection = stringPreferencesKey("translation_output_direction")
         val TranslationGlossaryEnabled = booleanPreferencesKey("translation_glossary_enabled")
         val SourcePreservationEnabled = booleanPreferencesKey("source_preservation_enabled")
+        val MangaSoundEffectsEnabled = booleanPreferencesKey("manga_sound_effects_enabled")
         val TranslationMemoryEnabled = booleanPreferencesKey("translation_memory_enabled")
         val ForegroundAppDetectionMode = stringPreferencesKey("foreground_app_detection_mode")
         val SendAppNameToTranslator = booleanPreferencesKey("send_app_name_to_translator")
@@ -824,6 +825,7 @@ class SettingsRepository internal constructor(
             prefs[Keys.TranslatorEng] = next.translatorEngine.name
             prefs[Keys.TranslationGlossaryEnabled] = next.translationGlossaryEnabled
             prefs[Keys.SourcePreservationEnabled] = next.sourcePreservationEnabled
+            prefs[Keys.MangaSoundEffectsEnabled] = next.mangaSoundEffectsEnabled
             prefs[Keys.TranslationMemoryEnabled] = next.translationMemoryEnabled
             prefs[Keys.ForegroundAppDetectionMode] = next.foregroundAppDetectionMode.name
             prefs[Keys.SendAppNameToTranslator] = next.sendAppNameToTranslator
@@ -1178,6 +1180,7 @@ class SettingsRepository internal constructor(
                 ?: default.translationGlossaryEnabled,
             sourcePreservationEnabled = this[Keys.SourcePreservationEnabled]
                 ?: default.sourcePreservationEnabled,
+            mangaSoundEffectsEnabled = this[Keys.MangaSoundEffectsEnabled] ?: false,
             translationMemoryEnabled = this[Keys.TranslationMemoryEnabled]
                 ?: default.translationMemoryEnabled,
             foregroundAppDetectionMode = runCatching {

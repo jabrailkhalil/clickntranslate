@@ -6,13 +6,6 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MobileSetupAndLocalesTest {
-    @Test fun screenSetupRequiresOverlayButOtherStepsRemainAvailable() {
-        for (step in 0..6) {
-            assertTrue(setupCanContinue(step, true))
-            assertEquals(step != 2, setupCanContinue(step, false))
-        }
-    }
-
     @Test fun guidedLanguageSelectionRequiresASourceForServicesWithoutDetection() {
         for (engine in listOf(dev.clickn.translate.data.TranslatorEngine.MYMEMORY, dev.clickn.translate.data.TranslatorEngine.GOOGLE_ML_KIT)) {
             assertFalse(setupLanguagePairReady(dev.clickn.translate.data.Settings(translatorEngine = engine)))

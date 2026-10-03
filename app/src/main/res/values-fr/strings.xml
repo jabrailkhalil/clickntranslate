@@ -1684,8 +1684,8 @@
     <string name="translation_library_help_manage_title">Comment gérer les éléments sauvegardés</string>
     <string name="translation_library_help_manage_body">Basculez entre les termes et les onglets de la mémoire de traduction. Utilisez le bouton de recherche dans le coin supérieur droit pour trouver un élément. Chaque élément peut être modifié ou supprimé séparément.</string>
     <string name="translation_library_help_close">Compris</string>
-    <string name="translation_library_terms_tab">Termes</string>
-    <string name="translation_library_memory_tab">Mémoire de traduction</string>
+    <string name="translation_library_terms_tab">Mes termes</string>
+    <string name="translation_library_memory_tab">Traductions corrigées</string>
     <string name="translation_memory_filter">Mémoire de traduction du filtre</string>
     <string name="translation_memory_filter_title">Mémoire de traduction du filtre</string>
     <string name="translation_memory_search_hint">Source de recherche, traduction, application ou langue</string>
@@ -1989,7 +1989,7 @@
     <string name="settings_translation_service_volc">Volcengine</string>
     <string name="settings_translation_service_baidu">Baidu</string>
     <string name="settings_translation_service_tencent">Tencent Nuage</string>
-    <string name="source_preservation_tab">Garder la source</string>
+    <string name="source_preservation_tab">Garder le texte original</string>
     <string name="source_preservation_category">Garder la source</string>
     <string name="source_preservation_empty">Pas d\'entrées de conservation de source.</string>
     <string name="source_preservation_disable_all">Désactiver toute conservation des sources</string>

@@ -1684,8 +1684,8 @@
     <string name="translation_library_help_manage_title">Cómo gestionar los elementos guardados</string>
     <string name="translation_library_help_manage_body">Cambiar entre las pestañas de memoria de Términos y Traducción. Utilice el botón de búsqueda en la esquina superior derecha para encontrar un elemento. Cada artículo puede ser editado o eliminado por separado.</string>
     <string name="translation_library_help_close">Lo tengo</string>
-    <string name="translation_library_terms_tab">Términos</string>
-    <string name="translation_library_memory_tab">Memoria de traducción</string>
+    <string name="translation_library_terms_tab">Mis términos</string>
+    <string name="translation_library_memory_tab">Traducciones corregidas</string>
     <string name="translation_memory_filter">Filtro de memoria de traducción</string>
     <string name="translation_memory_filter_title">Filtro de memoria de traducción</string>
     <string name="translation_memory_search_hint">Fuente de búsqueda, traducción, aplicación o idioma</string>
@@ -1989,7 +1989,7 @@
     <string name="settings_translation_service_volc">Volcengine</string>
     <string name="settings_translation_service_baidu">Baidu</string>
     <string name="settings_translation_service_tencent">Tencent Cloud</string>
-    <string name="source_preservation_tab">Mantenga la fuente</string>
+    <string name="source_preservation_tab">Mantener el texto original</string>
     <string name="source_preservation_category">Mantenga la fuente</string>
     <string name="source_preservation_empty">No hay entradas de conservación de fuentes.</string>
     <string name="source_preservation_disable_all">Desactivar toda conservación de la fuente</string>

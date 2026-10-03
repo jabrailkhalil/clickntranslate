@@ -90,9 +90,13 @@ class MobileScreenshotTest {
     @Test fun readiness() = render {
         Box(Modifier.padding(24.dp)) { MobileReadinessPanel(settings, MobileModelState(false, true, true), false, false, true, false, {}, {}, {}, {}, {}, {}, {}) }
     }
-    @Test fun brandIcons() = render {
-        Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            BrandLogo(Modifier.size(96.dp)); BrandLogo(Modifier.size(96.dp), BrandIconPrefs.MASCOT)
+    @Test fun brandIcons() = render { BrandIconSheet({}) }
+    @Test fun glossaryModes() = render {
+        GlossaryModesPane(true, true, false, 0, 0, 0, {}, {}, {}, {}, {}, {})
+    }
+    @Test fun mangaPack() = render {
+        Column(Modifier.padding(16.dp)) {
+            GlossaryModeCard(R.string.library_manga_pack, R.string.library_manga_pack_body, false, {}, null)
         }
     }
     @Test fun themePreviewsLight() = appearance(ThemeMode.LIGHT)

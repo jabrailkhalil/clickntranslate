@@ -89,8 +89,6 @@ fun MobileShell(
     var sheet by rememberSaveable { mutableStateOf("") }
     var iconRevision by remember { mutableIntStateOf(0) }
     val iconChoice = remember(iconRevision) { BrandIconPrefs.read(context) }
-    var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(iconRevision) { iconBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { BrandIconPrefs.bitmap(context) } }
     var provider by remember { mutableStateOf<TranslatorEngine?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     val modelState by viewModel.modelState.collectAsState()
@@ -164,7 +162,7 @@ fun MobileShell(
             else Column(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    BrandLogo(Modifier.size(44.dp), iconChoice, iconBitmap)
+                    BrandLogo(Modifier.size(44.dp), iconChoice)
                     Column(Modifier.padding(start = 12.dp).weight(1f)) {
                         Text(AppBrand.DISPLAY_NAME, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(tab.title), style = MaterialTheme.typography.labelMedium,
@@ -187,6 +185,7 @@ fun MobileShell(
                         onPermission = ::grantOverlay,
                         onPhoto = { gallery.launch("image/*") }, onText = { tabName = MobileTab.TEXT.name },
                         checking = modelState.checking,
+                        onShowButton = { context.startService(Intent(context, CaptureService::class.java).setAction(CaptureService.ACTION_SHOW_BUTTON)) },
                         readiness = {
                             MobileReadinessPanel(current, modelState, overlayAllowed, accessibility, notifications, battery,
                                 onOverlay = ::grantOverlay, onService = ::openService, onOcr = { explanation = R.string.setup_recognition_body to { onAdvancedSection("ocr") } }, onModels = { sheet = "offline" },
@@ -280,7 +279,7 @@ fun MobileShell(
 internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
     onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit, onProvider: () -> Unit,
     onStart: () -> Unit, onPermission: () -> Unit, onPhoto: () -> Unit, onText: () -> Unit,
-    checking: Boolean = false, readiness: @Composable () -> Unit = {}) {
+    checking: Boolean = false, readiness: @Composable () -> Unit = {}, onShowButton: () -> Unit = {}) {
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(
@@ -294,11 +293,14 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
                     style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Text(stringResource(R.string.mobile_hero_body), Modifier.padding(top = 8.dp, bottom = 16.dp),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Button(onClick = onStart, enabled = running || !checking, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                Button(onClick = if (running) onShowButton else onStart, enabled = running || !checking, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     colors = ButtonDefaults.buttonColors()) {
-                    Icon(if (running) Icons.Outlined.Stop else Icons.Outlined.CropFree, null)
+                    Icon(if (running) Icons.Outlined.Visibility else Icons.Outlined.CropFree, null)
                     Spacer(Modifier.width(10.dp))
-                    Text(stringResource(if (running) R.string.mobile_stop else R.string.mobile_start), fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(if (running) R.string.floating_show_button else R.string.mobile_start), fontWeight = FontWeight.SemiBold)
+                }
+                if (running) TextButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.mobile_stop))
                 }
             }
         }

@@ -107,7 +107,7 @@ class GlossaryAddScreenUiAuditTest {
             Case("batch file icon", "Icons.Default.Description"),
             Case("single edit icon", "Icons.Default.Edit"),
             Case("main action changes to close", "if (expanded) Icons.Default.Close else Icons.Default.Add"),
-            Case("back closes the menu first", "if (addMenuExpanded) addMenuExpanded = false else onBack()"),
+            Case("back closes the menu first", "if (addMenuExpanded) addMenuExpanded = false else if (selectedTab != TranslationLibraryTab.MODES) selectedTab = TranslationLibraryTab.MODES else onBack()"),
             Case("blank area closes the menu", "indication = null"),
             Case("tab changes close the menu", "LaunchedEffect(selectedTab)"),
         ).forEach { case -> assertTrue(case.name, case.marker in glossaryScreen || case.marker in menu) }

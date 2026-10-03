@@ -60,6 +60,7 @@ internal object SourcePreservationMatcher {
         val requested = requestedLanguage.trim()
         if (requested.equals("auto", ignoreCase = true)) return true
         val term = termLanguage.trim()
+        if (term.equals("auto", ignoreCase = true)) return true
         return term.equals(requested, ignoreCase = true) ||
             term.substringBefore('-').equals(requested.substringBefore('-'), ignoreCase = true)
     }
@@ -76,7 +77,6 @@ class SourcePreservationService @Inject constructor(
             return SourcePreservationPlan(blocks, blocks.indices.toList(), emptySet())
         }
         return try {
-            repository.ensureSourcePreservationPresets()
             val explicitScope = settings.runtimeTranslationScopePackage
             val packageName = explicitScope ?: foregroundAppResolver
                 .resolve(settings.foregroundAppDetectionMode)
@@ -85,7 +85,7 @@ class SourcePreservationService @Inject constructor(
                 sources = blocks.map(TextBlock::text),
                 sourceLang = settings.sourceLang,
                 packageName = packageName?.takeIf(String::isNotBlank),
-                terms = repository.listEnabled(),
+                terms = repository.preservationTerms(settings.mangaSoundEffectsEnabled),
                 preservationEnabled = settings.sourcePreservationEnabled,
             )
             val retainedIndexes = blocks.indices.filterNot(preserved::contains)

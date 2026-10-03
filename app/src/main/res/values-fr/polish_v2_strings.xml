@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">Choisissez les fonctions utiles. Chaque mode est indépendant ; vos entrées restent enregistrées quand il est désactivé.</string>
+    <string name="library_terms_mode">Mes termes</string>
+    <string name="library_terms_body">Définissez la traduction des noms et termes récurrents. Un personnage de jeu garde ainsi toujours le même nom.</string>
+    <string name="library_memory_mode">Traductions corrigées</string>
+    <string name="library_memory_body">Réutilisez les traductions que vous avez corrigées dans une fiche de résultat.</string>
+    <string name="library_preservation_mode">Garder le texte original</string>
+    <string name="library_preservation_body">Laissez tels quels les mots que vous ajoutez : bruitages, étiquettes ou noms.</string>
+    <string name="library_manage_count">Ouvrir les entrées (%1$d)</string>
+    <string name="library_manga_pack">Bruitages de mangas japonais</string>
+    <string name="library_manga_pack_body">Pack intégré facultatif. Les bruitages japonais correspondants restent inchangés ; la liste complète ne remplit pas votre glossaire.</string>
+    <string name="setup_simple_appearance">Choisissez un thème agréable. Vous pourrez le modifier plus tard.</string>
+    <string name="setup_simple_languages">Choisissez votre langue de lecture. La détection automatique suffit généralement pour la langue source.</string>
+    <string name="setup_simple_usage_title">Comment traduire</string>
+    <string name="setup_simple_usage_body">Écran : lancez la capture, ouvrez une autre appli et touchez le bouton flottant. Un appui long ouvre la sélection et les autres actions. Les textes et photos se traduisent dans cette appli. Les autorisations seront demandées au besoin.</string>
+    <string name="floating_keep_visible">Garder le bouton visible</string>
+    <string name="floating_keep_visible_body">Désactivé : le bouton disparaît après 45 secondes sans action ou à la fermeture de la fiche. Retrouvez-le depuis la notification de capture. Épingler garde une fiche ouverte.</string>
+    <string name="floating_show_button">Afficher le bouton</string>
+    <string name="overlay_pin">Épingler</string>
+    <string name="overlay_unpin">Désépingler</string>
+    <string name="ocr_empty_capture_help">La zone capturée est vide ou protégée. Autorisez la capture de tout l’écran puis réessayez. Vous pouvez aussi partager le texte du message avec Clickn.</string>
+    <string name="ocr_no_text_help">Aucun texte reconnu. Sélectionnez une zone plus grande et vérifiez la langue OCR. Pour le cyrillique, utilisez un service OCR compatible ou partagez le texte avec Clickn.</string>
+    <string name="logo_original">Original</string>
+    <string name="logo_ocean">Océan</string>
+    <string name="logo_mint">Menthe</string>
+    <string name="logo_sunset">Coucher de soleil</string>
+    <string name="logo_choices_body">Choisissez un logo ClicknTranslate pour l’écran d’accueil. Android peut actualiser l’icône avec un léger délai.</string>
+</resources>

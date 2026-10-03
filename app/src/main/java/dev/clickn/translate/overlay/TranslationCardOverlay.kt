@@ -67,29 +67,30 @@ internal fun translationCardSectionDividerCount(
     hasDictionaryContent: Boolean,
 ): Int = if (hasSourceContent && (showTranslationSection || hasDictionaryContent)) 1 else 0
 
-/**
- * 划词翻译结果浮卡。屏幕中下方居中弹出，**不**自动消失（卡片可能含多行释义，用户需要时间阅读）。
- *
- * 关闭方式：
- *  - 点右上 ✕
- *  - 点卡片外的灰背景
- *
- * 渲染分区：
- *  - 标题：原文（小字、单行）
- *  - 主区：句子译文（大字、可折行）；结构化单词结果直接使用字典区，不重复显示译文
- *  - 字典区（仅 [show] 传入的 wordResult 非空时）：音标 / 词性 / 释义 / 难点解释 / 例句
- *  - 动作行：复制原文 / 复制译文 按钮 + 点击短暂反馈
- *
- * 卡片背景 / 文字 / 边框 / 边框样式跟随 [Settings.overlayTheme]——和 [DraggableOverlayWindow]
- * 一致。Built-in foreground roles use the shared overlay palette; CUSTOM preserves user colors.
- * 未来改主题色需要两边一起改。
- */
+/** A reading card closes after inactivity. Pin or interact to keep reading. */
 class TranslationCardOverlay(
     context: Context,
     private val onDismissed: () -> Unit = {},
 ) {
     private val context = dev.clickn.translate.data.AppLocalePrefs.live(context)
     private var refreshingLocale = false
+    private val idleHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pinned = false
+    private var awaitingFinal = false
+    private var pinButton: TextView? = null
+    private var touching = false
+    private var speechBusy: () -> Boolean = { false }
+    private val idleDismiss = Runnable {
+        if (OverlayReadingPolicy.mayDismiss(translationLoading || awaitingFinal, pinned, touching, speechBusy())) dismiss()
+        else scheduleDismiss()
+    }
+    private fun scheduleDismiss() {
+        idleHandler.removeCallbacks(idleDismiss)
+        if (rootView != null && !translationLoading && !awaitingFinal && !pinned && !touching) {
+            idleHandler.postDelayed(idleDismiss, OverlayReadingPolicy.delayMs(
+                currentSource.length + currentTranslation.length + (currentWordResult?.toString()?.length ?: 0)))
+        }
+    }
 
     private val overlayType: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -129,6 +130,8 @@ class TranslationCardOverlay(
 
     /** 立即关闭已显示的卡片。 */
     fun dismiss() {
+        idleHandler.removeCallbacks(idleDismiss)
+        speechBusy = { false }
         val currentDialog = dialog
         dialog = null
         if (currentDialog != null) {
@@ -153,6 +156,8 @@ class TranslationCardOverlay(
         currentWordResult = null
         translationLoading = false
         textOnlyMode = false
+        awaitingFinal = false
+        pinButton = null
         translationFinal = false
         renderWordResult = null
         wordPreviewView = null
@@ -185,10 +190,12 @@ class TranslationCardOverlay(
         currentTranslation = normalized
         translationLoading = false
         translationFinal = final && normalized.isNotBlank()
+        if (final) awaitingFinal = false
         translationView?.apply {
             text = normalized
         }
         refreshTranslationSectionVisibility()
+        if (final) scheduleDismiss()
     }
 
     fun applyTranslationCorrection(draft: TranslationCorrectionDraft) {
@@ -203,6 +210,7 @@ class TranslationCardOverlay(
         currentWordResult = wordResult
         renderWordResult?.invoke(wordResult)
         refreshTranslationSectionVisibility()
+        if (!translationLoading) scheduleDismiss()
     }
 
     fun updateWordResultForSource(sourceText: String, wordResult: WordResult?) {
@@ -215,9 +223,10 @@ class TranslationCardOverlay(
         content: FloatingWordDetailsContent,
     ) {
         if (rootView == null || currentSource != sourceText) return
-        translationLoading = content.loading
         updateTranslation(content.translation, final = false)
+        translationLoading = content.loading
         updateWordResult(content.wordResult)
+        scheduleDismiss()
     }
 
     private fun refreshTranslationSectionVisibility() {
@@ -492,6 +501,15 @@ class TranslationCardOverlay(
         textOnly: Boolean = false,
     ) {
         dismiss()
+        pinned = false
+        awaitingFinal = loading
+        touching = false
+        speechBusy = {
+            listOfNotNull(onSpeakSource, onSpeakTranslation, onSpeakDictionary).any { action ->
+                val state = action.playbackState.value
+                state.playbackId == action.playbackId && state.phase != dev.clickn.translate.tts.TtsPlaybackPhase.IDLE
+            }
+        }
         textOnlyMode = textOnly
         setSourceWordLookupEnabled(!textOnly && settings.dictionaryTapLookupEnabled)
         currentSource = sourceText
@@ -599,6 +617,25 @@ class TranslationCardOverlay(
             speakSourceButton = speakButton
             topRow.addView(speakButton)
         }
+        val pinBtn = TextView(context).apply {
+            text = context.getString(R.string.overlay_pin)
+            setTextColor(accentColor)
+            gravity = Gravity.CENTER
+            minHeight = (44 * density).toInt()
+            setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
+            contentDescription = text
+            setOnClickListener {
+                pinned = !pinned
+                text = context.getString(if (pinned) R.string.overlay_unpin else R.string.overlay_pin)
+                contentDescription = text
+                scheduleDismiss()
+            }
+        }
+        closeBtn.minWidth = (44 * density).toInt()
+        closeBtn.minHeight = (44 * density).toInt()
+        closeBtn.gravity = Gravity.CENTER
+        pinButton = pinBtn
+        topRow.addView(pinBtn)
         topRow.addView(closeBtn)
         card.addView(topRow)
 
@@ -735,7 +772,12 @@ class TranslationCardOverlay(
                                 )
                             }
                             ?.let { action ->
-                                { action(currentSource, currentTranslation) }
+                                {
+                                    pinned = true
+                                    pinButton?.text = context.getString(R.string.overlay_unpin)
+                                    scheduleDismiss()
+                                    action(currentSource, currentTranslation)
+                                }
                             }
                     },
                     onSpeak = { selected -> onSpeakTranslation?.onStart?.invoke(selected) },
@@ -921,7 +963,18 @@ class TranslationCardOverlay(
 
         var pendingDialog: Dialog? = null
         runCatching {
-            val cardDialog = Dialog(context, R.style.Theme_ClickTranslate_Transparent)
+            val cardDialog = object : Dialog(context, R.style.Theme_ClickTranslate_Transparent) {
+                override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                        touching = true; idleHandler.removeCallbacks(idleDismiss)
+                    }
+                    val handled = super.dispatchTouchEvent(event)
+                    if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                        touching = false; scheduleDismiss()
+                    }
+                    return handled
+                }
+            }
                 .also { pendingDialog = it }
             cardDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
             cardDialog.setCancelable(false)
@@ -965,18 +1018,25 @@ class TranslationCardOverlay(
             )
             dialog = cardDialog
             rootView = backdrop
+            scheduleDismiss()
             dev.clickn.translate.data.AppLocalePrefs.observe(backdrop) {
                 val source = currentSource
                 val translated = currentTranslation
                 val word = currentWordResult
                 val isLoading = translationLoading
                 val wasFinal = translationFinal
+                val wasAwaiting = awaitingFinal
+                val wasPinned = pinned
                 refreshingLocale = true
                 try {
                     show(source, translated.takeUnless { isLoading && it.isBlank() }, word, settings, isLoading,
                         onSpeakSource, onSpeakTranslation, onSpeakDictionary,
                         onCorrectTranslation, onEnglishWordTapped, textOnly)
                     translationFinal = wasFinal
+                    awaitingFinal = wasAwaiting
+                    pinned = wasPinned
+                    pinButton?.text = context.getString(if (pinned) R.string.overlay_unpin else R.string.overlay_pin)
+                    scheduleDismiss()
                 } finally {
                     refreshingLocale = false
                 }

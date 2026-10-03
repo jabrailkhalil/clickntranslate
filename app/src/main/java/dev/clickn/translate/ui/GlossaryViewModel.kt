@@ -30,9 +30,6 @@ class GlossaryViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val translationMemoryRepository: TranslationMemoryRepository,
 ) : ViewModel() {
-    init {
-        viewModelScope.launch { glossaryRepository.ensureSourcePreservationPresets() }
-    }
 
     val terms = glossaryRepository.observeAll().stateIn(
         scope = viewModelScope,
@@ -54,6 +51,13 @@ class GlossaryViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null,
         )
+
+    val mangaSoundsEnabled = settingsRepository.settings.map { it.mangaSoundEffectsEnabled }
+        .distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setMangaSoundsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.update { it.copy(mangaSoundEffectsEnabled = enabled) } }
+    }
 
     suspend fun currentApp(): ForegroundApp? {
         val settings = settingsRepository.get()

@@ -2,25 +2,16 @@ package dev.clickn.translate.ui
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ShortcutInfo
-import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.drawable.Icon as AndroidIcon
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -28,24 +19,39 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.clickn.translate.R
 import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 internal object BrandIconPrefs {
     const val LOGO = "logo"
-    const val MASCOT = "mascot"
-    const val CUSTOM = "custom"
     private const val MAX_BYTES = 10 * 1024 * 1024
+    val choices = listOf(LOGO, "ocean", "mint", "sunset")
     fun read(context: Context): String = context.getSharedPreferences("clickn_brand_icon", Context.MODE_PRIVATE)
-        .getString("choice", LOGO)?.takeIf { it in setOf(LOGO, MASCOT, CUSTOM) } ?: LOGO
+        .getString("choice", LOGO)?.takeIf { it in choices } ?: LOGO
+    fun migrate(context: Context) {
+        val previous = context.getSharedPreferences("clickn_brand_icon", Context.MODE_PRIVATE).getString("choice", LOGO)
+        val desired = read(context)
+        val component = ComponentName(context.packageName, "dev.clickn.translate.${componentName(desired)}")
+        if (previous !in choices || context.packageManager.getComponentEnabledSetting(component) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+            write(context, desired)
+        }
+    }
+    fun componentName(choice: String): String = when (choice) {
+        "ocean" -> "LauncherOcean"
+        "mint" -> "LauncherMint"
+        "sunset" -> "LauncherSunset"
+        else -> "LauncherLogo"
+    }
     fun write(context: Context, choice: String) {
-        require(choice in setOf(LOGO, MASCOT, CUSTOM))
-        val active = if (choice == MASCOT) "LauncherMascot" else "LauncherLogo"
-        val inactive = if (choice == MASCOT) "LauncherLogo" else "LauncherMascot"
-        fun component(name: String) = ComponentName(context.packageName, "dev.clickn.translate.$name")
-        context.packageManager.setComponentEnabledSetting(component(active), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
-        context.packageManager.setComponentEnabledSetting(component(inactive), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+        require(choice in choices)
+        val active = componentName(choice)
+        val components = choices.map(::componentName) + "LauncherMascot"
+        // Enable the next entry first so launchers never lose every app entry.
+        (listOf(active) + components.filterNot { it == active }).forEach { name ->
+            context.packageManager.setComponentEnabledSetting(
+                ComponentName(context.packageName, "dev.clickn.translate.$name"),
+                if (name == active) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+        }
         context.getSharedPreferences("clickn_brand_icon", Context.MODE_PRIVATE).edit().putString("choice", choice).apply()
     }
     private fun pictureFile(context: Context, floating: Boolean) =
@@ -83,71 +89,46 @@ internal object BrandIconPrefs {
         } catch (error: Throwable) { atomic.failWrite(output); throw error }
         return image
     }
-    fun pinShortcut(context: Context, bitmap: Bitmap): Boolean {
-        val manager = context.getSystemService(ShortcutManager::class.java) ?: return false
-        if (!manager.isRequestPinShortcutSupported) return false
-        val square = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(square)
-        val scale = minOf(512f / bitmap.width, 512f / bitmap.height)
-        val width = bitmap.width * scale; val height = bitmap.height * scale
-        canvas.drawBitmap(bitmap, null, android.graphics.RectF((512 - width) / 2, (512 - height) / 2, (512 + width) / 2, (512 + height) / 2), android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG))
-        val info = ShortcutInfo.Builder(context, "clickn-custom-icon")
-            .setShortLabel(context.getString(R.string.app_name))
-            .setIcon(AndroidIcon.createWithAdaptiveBitmap(square))
-            .setIntent(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
-            .build()
-        return manager.requestPinShortcut(info, null)
-    }
+
+}
+
+internal fun brandLogoResource(choice: String): Int = when (choice) {
+    "ocean" -> R.drawable.ic_clickn_ocean
+    "mint" -> R.drawable.ic_clickn_mint
+    "sunset" -> R.drawable.ic_clickn_sunset
+    else -> R.drawable.ic_clickn_logo
 }
 
 @Composable
-internal fun BrandLogo(modifier: Modifier = Modifier, choice: String = BrandIconPrefs.LOGO, bitmap: Bitmap? = null) {
-    when {
-        choice == BrandIconPrefs.CUSTOM && bitmap != null -> Image(bitmap.asImageBitmap(), null, modifier, contentScale = ContentScale.Fit)
-        choice == BrandIconPrefs.MASCOT -> Image(painterResource(R.drawable.companion_doc), null, modifier, contentScale = ContentScale.Fit)
-        else -> Icon(painterResource(R.drawable.ic_clickn_logo), null, modifier, tint = Color.Unspecified)
-    }
+internal fun BrandLogo(modifier: Modifier = Modifier, choice: String = BrandIconPrefs.LOGO) {
+    Image(painterResource(brandLogoResource(choice)), null, modifier, contentScale = ContentScale.Fit)
 }
 
 @Composable
 internal fun BrandIconSheet(onChanged: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var choice by remember { mutableStateOf(BrandIconPrefs.read(context)) }
-    var picture by remember { mutableStateOf<Bitmap?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf(false) }
-    LaunchedEffect(choice) { picture = withContext(Dispatchers.IO) { BrandIconPrefs.bitmap(context) } }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) scope.launch {
-            busy = true; error = false
-            try {
-                picture = withContext(Dispatchers.IO) { BrandIconPrefs.importPicture(context, uri) }
-                BrandIconPrefs.write(context, BrandIconPrefs.CUSTOM)
-                choice = BrandIconPrefs.CUSTOM; onChanged()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) { error = true }
-            finally { busy = false }
-        }
-    }
     Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.refine_icon), style = MaterialTheme.typography.headlineSmall)
-        listOf(BrandIconPrefs.LOGO to R.string.refine_brand_logo, BrandIconPrefs.MASCOT to R.string.refine_brand_mascot).forEach { (option, label) ->
-            Surface(onClick = { BrandIconPrefs.write(context, option); choice = option; onChanged() }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    BrandLogo(Modifier.size(56.dp), option)
-                    Text(stringResource(label), Modifier.weight(1f))
-                    RadioButton(choice == option, onClick = null)
+        Text(stringResource(R.string.logo_choices_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        listOf(BrandIconPrefs.LOGO to R.string.logo_original, "ocean" to R.string.logo_ocean,
+            "mint" to R.string.logo_mint, "sunset" to R.string.logo_sunset).chunked(2).forEach { options ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                options.forEach { (option, label) ->
+                    Surface(onClick = { BrandIconPrefs.write(context, option); choice = option; onChanged() },
+                        modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.large,
+                        border = androidx.compose.foundation.BorderStroke(if (choice == option) 2.dp else 1.dp,
+                            if (choice == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                        Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BrandLogo(Modifier.size(64.dp), option)
+                            Text(stringResource(label))
+                            RadioButton(choice == option, onClick = null)
+                        }
+                    }
                 }
             }
         }
-        Text(stringResource(R.string.refine_custom_icon_body), style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick = { picker.launch("image/*") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refine_choose_image)) }
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        picture?.let { image ->
-            BrandLogo(Modifier.size(96.dp).align(Alignment.CenterHorizontally), BrandIconPrefs.CUSTOM, image)
-            Button(onClick = { error = !BrandIconPrefs.pinShortcut(context, image) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refine_add_shortcut)) }
-        }
-        if (error) Text(stringResource(R.string.refine_icon_error), color = MaterialTheme.colorScheme.error)
     }
 }

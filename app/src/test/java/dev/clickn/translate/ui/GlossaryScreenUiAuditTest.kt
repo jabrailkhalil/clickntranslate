@@ -28,7 +28,7 @@ class GlossaryScreenUiAuditTest {
         )
 
         listOf(
-            Case("system back handling", "if (addMenuExpanded) addMenuExpanded = false else onBack()"),
+            Case("system back handling", "if (addMenuExpanded) addMenuExpanded = false else if (selectedTab != TranslationLibraryTab.MODES) selectedTab = TranslationLibraryTab.MODES else onBack()"),
             Case("matching top app bar", "TopAppBarDefaults.topAppBarColors"),
             Case("term card", "private fun GlossaryTermCard"),
             Case("compact card radius", "RoundedCornerShape(8.dp)"),
@@ -150,9 +150,9 @@ class GlossaryScreenUiAuditTest {
         )
 
         listOf(
-            Case("terms tab", source, "R.string.translation_library_terms_tab"),
-            Case("source preservation tab", source, "R.string.source_preservation_tab"),
-            Case("translation memory tab", source, "R.string.translation_library_memory_tab"),
+            Case("terms mode", sourceFile("src/main/java/dev/clickn/translate/ui/GlossaryModesPane.kt").readText(), "R.string.translation_library_terms_tab"),
+            Case("preservation mode", sourceFile("src/main/java/dev/clickn/translate/ui/GlossaryModesPane.kt").readText(), "R.string.source_preservation_tab"),
+            Case("memory mode", sourceFile("src/main/java/dev/clickn/translate/ui/GlossaryModesPane.kt").readText(), "R.string.translation_library_memory_tab"),
             Case("memory flow is collected", source, "viewModel.memories.collectAsState()"),
             Case("memory search", memorySource, "TranslationMemoryListFilterPolicy.filter"),
             Case("memory query is owned by the library", source, "var memoryQuery by rememberSaveable"),

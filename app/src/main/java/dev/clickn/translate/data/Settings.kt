@@ -207,6 +207,7 @@ data class Settings(
     val translationGlossaryEnabled: Boolean = true,
     /** Master gate for source-preservation matching; individual entry states remain untouched. */
     val sourcePreservationEnabled: Boolean = true,
+    val mangaSoundEffectsEnabled: Boolean = false,
     val translationMemoryEnabled: Boolean = true,
     val foregroundAppDetectionMode: ForegroundAppDetectionMode = ForegroundAppDetectionMode.AUTO,
     val sendAppNameToTranslator: Boolean = false,

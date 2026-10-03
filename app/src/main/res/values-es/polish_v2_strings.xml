@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_modes_intro">Elige las funciones útiles. Cada modo es independiente; tus entradas se guardan aunque lo desactives.</string>
+    <string name="library_terms_mode">Mis términos</string>
+    <string name="library_terms_body">Define traducciones para nombres y términos repetidos. Así, un personaje siempre conserva el mismo nombre.</string>
+    <string name="library_memory_mode">Traducciones corregidas</string>
+    <string name="library_memory_body">Reutiliza las traducciones que corregiste en una tarjeta de resultados.</string>
+    <string name="library_preservation_mode">Mantener el texto original</string>
+    <string name="library_preservation_body">Deja sin traducir las palabras que añadas: sonidos, etiquetas o nombres.</string>
+    <string name="library_manage_count">Abrir entradas (%1$d)</string>
+    <string name="library_manga_pack">Sonidos de manga japonés</string>
+    <string name="library_manga_pack_body">Paquete opcional integrado. Los sonidos japoneses coincidentes se mantienen; la lista completa no llena tu glosario.</string>
+    <string name="setup_simple_appearance">Elige un tema cómodo. Puedes cambiarlo más adelante.</string>
+    <string name="setup_simple_languages">Elige el idioma en el que lees. La detección automática suele bastar para el idioma de origen.</string>
+    <string name="setup_simple_usage_title">Cómo traducir</string>
+    <string name="setup_simple_usage_body">Pantalla: inicia la captura, abre otra app y toca el botón flotante. Mantenlo pulsado para seleccionar y ver más acciones. Los textos y fotos se traducen dentro de la app. Pediremos permisos cuando hagan falta.</string>
+    <string name="floating_keep_visible">Mantener el botón visible</string>
+    <string name="floating_keep_visible_body">Desactivado: el botón se oculta tras 45 segundos sin acciones o al cerrar la tarjeta. Puedes recuperarlo desde la notificación de captura. Fijar mantiene una tarjeta abierta.</string>
+    <string name="floating_show_button">Mostrar botón</string>
+    <string name="overlay_pin">Fijar</string>
+    <string name="overlay_unpin">Desfijar</string>
+    <string name="ocr_empty_capture_help">La zona capturada está vacía o protegida. Permite capturar toda la pantalla y reintenta. También puedes compartir el texto del mensaje con Clickn.</string>
+    <string name="ocr_no_text_help">No se reconoció texto. Selecciona una zona mayor y revisa el idioma OCR. Para cirílico, usa un servicio OCR compatible o comparte el texto con Clickn.</string>
+    <string name="logo_original">Original</string>
+    <string name="logo_ocean">Océano</string>
+    <string name="logo_mint">Menta</string>
+    <string name="logo_sunset">Atardecer</string>
+    <string name="logo_choices_body">Elige un logo de ClicknTranslate para la pantalla de inicio. Android puede tardar un momento en actualizar el icono.</string>
+</resources>

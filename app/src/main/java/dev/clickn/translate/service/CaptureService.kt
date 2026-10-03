@@ -386,6 +386,7 @@ class CaptureService : Service() {
                 stopSelf()
             }
             ACTION_TRIGGER_ONCE -> triggerOnce()
+            ACTION_SHOW_BUTTON -> floatingButton?.show()
             ACTION_PICK_REGION -> showRegionPickerOverlay()
             ACTION_RUN_FLOATING_TOUR -> {
                 FloatingMenuTourPrefs.reset(this)
@@ -496,7 +497,10 @@ class CaptureService : Service() {
             ioScope = scope,
             onTranslationBlockDetailRequested = ::showTranslationBlockCopyPanel,
             onTranslationCorrectionRequested = ::showTranslationCorrection,
-            onFloatingWindowDismissed = { ttsEngine.stop() },
+            onFloatingWindowDismissed = {
+                ttsEngine.stop()
+                if (!dev.clickn.translate.data.CompanionPrefs.keepVisible(this@CaptureService)) floatingButton?.hide()
+            },
             onFloatingWordLookupRequested = ::lookupFloatingEnglishWord,
             onFloatingWordDetailsRequested = ::showFloatingEnglishWordDetails,
         )
@@ -530,8 +534,8 @@ class CaptureService : Service() {
             settingsRepository = settingsRepository,
             ioScope = scope
         ).also {
-            it.firstUseTourPending =
-                FloatingMenuTourPrefs.shouldShow(this@CaptureService)
+            // The introduction explains the button. The full gesture tour is available from Help.
+            it.firstUseTourPending = false
             it.onFirstUseTourCompleted = {
                 FloatingMenuTourPrefs.markCompleted(this@CaptureService)
             }
@@ -1171,7 +1175,10 @@ class CaptureService : Service() {
             val card = withContext(Dispatchers.Main) {
                 (translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
-                    onDismissed = { ttsEngine.stop() },
+                    onDismissed = {
+                        ttsEngine.stop()
+                        if (!dev.clickn.translate.data.CompanionPrefs.keepVisible(this@CaptureService)) floatingButton?.hide()
+                    },
                 ).also {
                     translationCard = it
                 }).also { shownCard ->
@@ -1284,8 +1291,8 @@ class CaptureService : Service() {
             logVerticalDiag(diagId, "wordSelect joined ${text.toDiagText()}")
             if (text.isEmpty()) {
                 dismissActiveCard()
-                val msg = getString(R.string.word_card_no_text)
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                val msg = getString(if (croppedStats.blankLike) R.string.ocr_empty_capture_help else R.string.ocr_no_text_help)
+                mainScope.launch { overlay?.showErrorHint(msg, durationMs = 12_000L) }
                 return
             }
             withContext(Dispatchers.Main) {
@@ -1661,7 +1668,10 @@ class CaptureService : Service() {
                 val copyOverlay = translationBlockCopyOverlay
                     ?: TranslationBlockCopyOverlay(
                         context = this@CaptureService,
-                        onDismissed = { ttsEngine.stop() },
+                        onDismissed = {
+                        ttsEngine.stop()
+                        if (!dev.clickn.translate.data.CompanionPrefs.keepVisible(this@CaptureService)) floatingButton?.hide()
+                    },
                     ).also {
                         translationBlockCopyOverlay = it
                     }
@@ -3287,8 +3297,8 @@ class CaptureService : Service() {
                     getString(R.string.log_msg_ocr_no_result_format, effectiveEngine.name),
                     elapsedMs = ocrElapsedMs
                 )
-                val message = getString(R.string.toast_ocr_unreliable_result)
-                mainScope.launch { overlay?.showErrorHint(message) }
+                val message = getString(R.string.ocr_no_text_help)
+                mainScope.launch { overlay?.showErrorHint(message, durationMs = 12_000L) }
                 return
             }
             val qualityIssue = findOcrResultQualityIssue(blocks)
@@ -3894,7 +3904,10 @@ class CaptureService : Service() {
                 translationBlockCopyOverlay?.dismiss()
                 val card = translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
-                    onDismissed = { ttsEngine.stop() },
+                    onDismissed = {
+                        ttsEngine.stop()
+                        if (!dev.clickn.translate.data.CompanionPrefs.keepVisible(this@CaptureService)) floatingButton?.hide()
+                    },
                 ).also { translationCard = it }
                 card.show(
                     sourceText = outcome.word,
@@ -5515,6 +5528,7 @@ class CaptureService : Service() {
     companion object {
         const val ACTION_START = "dev.clickn.translate.action.START"
         const val ACTION_STOP = "dev.clickn.translate.action.STOP"
+        const val ACTION_SHOW_BUTTON = "dev.clickn.translate.action.SHOW_BUTTON"
         const val ACTION_TRIGGER_ONCE = "dev.clickn.translate.action.TRIGGER_ONCE"
         const val ACTION_RUN_FLOATING_TOUR =
             "dev.clickn.translate.action.RUN_FLOATING_TOUR"

@@ -236,6 +236,7 @@ object SettingsFieldPolicy {
         portable("translatorEngine", R.string.settings_search_item_translator_engine),
         portable("translationGlossaryEnabled", R.string.settings_glossary_enabled),
         portable("sourcePreservationEnabled"),
+        portable("mangaSoundEffectsEnabled"),
         portable("translationMemoryEnabled"),
         portable("foregroundAppDetectionMode", R.string.settings_foreground_app_detection),
         portable("sendAppNameToTranslator", R.string.settings_send_app_name),

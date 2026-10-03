@@ -83,11 +83,21 @@
         <activity-alias android:name=".LauncherLogo" android:targetActivity=".ui.MainActivity" android:enabled="true" android:exported="true" android:icon="@mipmap/ic_launcher" android:label="${launcherLabel}">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity-alias>
-        <activity-alias android:name=".LauncherMascot" android:targetActivity=".ui.MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_mascot" android:label="${launcherLabel}">
+        <activity-alias android:name=".LauncherMascot" android:targetActivity=".ui.MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher" android:label="${launcherLabel}">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity-alias>
 
-        <!-- Unified user-initiated capture startup and optional system consent. -->
+               <activity-alias android:name=".LauncherOcean" android:targetActivity=".ui.MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_ocean" android:label="${launcherLabel}">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".LauncherMint" android:targetActivity=".ui.MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_mint" android:label="${launcherLabel}">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".LauncherSunset" android:targetActivity=".ui.MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_sunset" android:label="${launcherLabel}">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity-alias>
+
+ <!-- Unified user-initiated capture startup and optional system consent. -->
         <activity
             android:name=".capture.CaptureStartRequestActivity"
             android:exported="false"
@@ -136,6 +146,11 @@
             android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>

@@ -55,9 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -105,6 +103,7 @@ private data class PendingGlossaryConflict(
 )
 
 private enum class TranslationLibraryTab {
+    MODES,
     TERMS,
     PRESERVE_SOURCE,
     MEMORY,
@@ -127,9 +126,10 @@ fun GlossaryScreen(
     val sourcePreservationEnabled by viewModel.sourcePreservationEnabled.collectAsState()
     val glossaryEnabled by viewModel.glossaryEnabled.collectAsState()
     val memoryEnabled by viewModel.memoryEnabled.collectAsState()
-    var selectedTab by rememberSaveable { mutableStateOf(TranslationLibraryTab.TERMS) }
+    val mangaSoundsEnabled by viewModel.mangaSoundsEnabled.collectAsState()
+    var selectedTab by rememberSaveable { mutableStateOf(TranslationLibraryTab.MODES) }
     var currentApp by remember { mutableStateOf<ForegroundApp?>(null) }
-    var defaultLanguages by remember { mutableStateOf("auto" to "zh-CN") }
+    var defaultLanguages by remember { mutableStateOf("auto" to dev.clickn.translate.data.defaultTranslationTarget()) }
     var selectableApps by remember { mutableStateOf<List<SelectableApp>>(emptyList()) }
     var appsLoading by remember { mutableStateOf(true) }
     var editing by remember { mutableStateOf<GlossaryTermEntity?>(null) }
@@ -220,7 +220,7 @@ fun GlossaryScreen(
     }
 
     BackHandler {
-        if (addMenuExpanded) addMenuExpanded = false else onBack()
+        if (addMenuExpanded) addMenuExpanded = false else if (selectedTab != TranslationLibraryTab.MODES) selectedTab = TranslationLibraryTab.MODES else onBack()
     }
 
     Scaffold(
@@ -243,14 +243,15 @@ fun GlossaryScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (selectedTab == TranslationLibraryTab.MODES) onBack() else selectedTab = TranslationLibraryTab.MODES }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
                     }
                 },
                 actions = {
-                    IconButton(
+                    if (selectedTab != TranslationLibraryTab.MODES) IconButton(
                         onClick = {
                             when (selectedTab) {
+                                TranslationLibraryTab.MODES -> Unit
                                 TranslationLibraryTab.TERMS -> showFilter = true
                                 TranslationLibraryTab.PRESERVE_SOURCE -> showFilter = true
                                 TranslationLibraryTab.MEMORY -> showMemoryFilter = true
@@ -258,6 +259,7 @@ fun GlossaryScreen(
                         },
                     ) {
                         val filterActive = when (selectedTab) {
+                            TranslationLibraryTab.MODES -> false
                             TranslationLibraryTab.TERMS -> listFilter.isActive
                             TranslationLibraryTab.PRESERVE_SOURCE -> preservationFilter.isActive
                             TranslationLibraryTab.MEMORY -> memoryQuery.isNotBlank()
@@ -284,6 +286,7 @@ fun GlossaryScreen(
         },
         floatingActionButton = {
             when (selectedTab) {
+                TranslationLibraryTab.MODES -> Unit
                 TranslationLibraryTab.TERMS -> GlossaryAddFabMenu(
                     expanded = addMenuExpanded,
                     onExpandedChange = { addMenuExpanded = it },
@@ -311,24 +314,16 @@ fun GlossaryScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
-            SecondaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-                Tab(
-                    selected = selectedTab == TranslationLibraryTab.TERMS,
-                    onClick = { selectedTab = TranslationLibraryTab.TERMS },
-                    text = { Text(stringResource(R.string.translation_library_terms_tab)) },
-                )
-                Tab(
-                    selected = selectedTab == TranslationLibraryTab.PRESERVE_SOURCE,
-                    onClick = { selectedTab = TranslationLibraryTab.PRESERVE_SOURCE },
-                    text = { Text(stringResource(R.string.source_preservation_tab)) },
-                )
-                Tab(
-                    selected = selectedTab == TranslationLibraryTab.MEMORY,
-                    onClick = { selectedTab = TranslationLibraryTab.MEMORY },
-                    text = { Text(stringResource(R.string.translation_library_memory_tab)) },
-                )
-            }
             when (selectedTab) {
+                TranslationLibraryTab.MODES -> GlossaryModesPane(
+                    glossaryEnabled == true, memoryEnabled == true, sourcePreservationEnabled == true,
+                    glossaryTerms.size, memories.size, preservationTerms.size,
+                    viewModel::setGlossaryEnabled, viewModel::setMemoryEnabled,
+                    viewModel::setSourcePreservationEnabled,
+                    onTerms = { selectedTab = TranslationLibraryTab.TERMS },
+                    onMemory = { selectedTab = TranslationLibraryTab.MEMORY },
+                    onPreservation = { selectedTab = TranslationLibraryTab.PRESERVE_SOURCE },
+                )
                 TranslationLibraryTab.TERMS -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -385,6 +380,10 @@ fun GlossaryScreen(
                                 },
                             )
                         }
+                    }
+                    item(key = "manga-sounds-pack") {
+                        GlossaryModeCard(R.string.library_manga_pack, R.string.library_manga_pack_body,
+                            mangaSoundsEnabled, viewModel::setMangaSoundsEnabled, null)
                     }
                     if (visiblePreservationTerms.isEmpty()) {
                         item {
@@ -1235,7 +1234,7 @@ private fun GlossaryTermEditor(
         mutableStateOf(existing?.targetTerm.orEmpty())
     }
     var sourceLang by remember(existing, sourcePreservationMode) {
-        mutableStateOf(existing?.sourceLang ?: if (sourcePreservationMode) "ja" else defaultSourceLang)
+        mutableStateOf(existing?.sourceLang ?: defaultSourceLang)
     }
     var targetLang by remember(existing, sourcePreservationMode) {
         mutableStateOf(existing?.targetLang ?: if (sourcePreservationMode) "*" else defaultTargetLang)
