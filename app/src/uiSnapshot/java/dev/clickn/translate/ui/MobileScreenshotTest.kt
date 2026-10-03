@@ -1,5 +1,10 @@
 package dev.clickn.translate.ui
 
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.activity.result.contract.ActivityResultContract
+import androidx.core.app.ActivityOptionsCompat
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import androidx.compose.foundation.layout.*
@@ -34,7 +39,9 @@ class MobileScreenshotTest {
             CompositionLocalProvider(LocalThemeMode provides ThemeModeController(mode, {})) {
                 ClickTranslateTheme(mode) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).komiPaperGrid(mode, MaterialTheme.colorScheme.onBackground)) {
-                        ScreenHome(settings, false, true, {}, {}, {}, {}, {}, {}, {}, {})
+                        ScreenHome(settings, false, true, {}, {}, {}, {}, {}, {}, {}, {}, readiness = {
+                            MobileReadinessPanel(settings, MobileModelState(false, true, true), true, false, true, false, {}, {}, {}, {}, {}, {}, {})
+                        })
                     }
                 }
             }
@@ -86,6 +93,29 @@ class MobileScreenshotTest {
     @Test fun brandIcons() = render {
         Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             BrandLogo(Modifier.size(96.dp)); BrandLogo(Modifier.size(96.dp), BrandIconPrefs.MASCOT)
+        }
+    }
+    @Test fun themePreviewsLight() = appearance(ThemeMode.LIGHT)
+    @Test fun themePreviewsNight() = appearance(ThemeMode.PAPER_NIGHT)
+    private fun appearance(mode: Int) {
+        paparazzi.snapshot {
+            CompositionLocalProvider(LocalThemeMode provides ThemeModeController(mode, {}),
+                LocalThemeAccent provides ThemeAccentController(ThemeAccent.LAVENDER, {})) {
+                ClickTranslateTheme(mode) { Surface(Modifier.fillMaxSize()) { AppearanceSheet() } }
+            }
+        }
+    }
+    @Test fun floatingCharacters() {
+        val owner = object : ActivityResultRegistryOwner {
+            override val activityResultRegistry = object : ActivityResultRegistry() {
+                override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I,
+                    options: ActivityOptionsCompat?) = Unit
+            }
+        }
+        render {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner) {
+                FloatingAppearanceSheet(settings, {}, {})
+            }
         }
     }
     @Test fun translationReviewHelp() = render {

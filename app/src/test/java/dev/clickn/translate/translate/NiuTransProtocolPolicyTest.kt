@@ -155,12 +155,12 @@ class NiuTransProtocolPolicyTest {
             Case(
                 name = "empty success is rejected",
                 raw = """{"errorCode":"200","tgtText":" "}""",
-                expectedError = "返回空译文",
+                expectedError = "empty translation",
             ),
             Case(
                 name = "invalid JSON is rejected",
                 raw = "not-json",
-                expectedError = "响应解析失败",
+                expectedError = "response could not be parsed",
             ),
         ).forEach { case ->
             val parsed = runCatching { NiuTransProJsonResponsePolicy.parse(case.raw, json) }

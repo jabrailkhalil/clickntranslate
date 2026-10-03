@@ -22,7 +22,7 @@ data class Language(val code: String, @StringRes val nameRes: Int)
  * 与 Google 列表的差异：
  * - 把单一的 "zh" 拆成 [Languages.ZH_CN] / [Languages.ZH_TW]，方便用户区分简繁
  * - 第一项是 [Languages.AUTO]（"auto"），仅源语言侧有意义；目标语言侧选 auto 会被
- *   DeepLTranslator/OpenAiTranslator 视作回退到默认 "zh-CN"。
+ *   DeepLTranslator/OpenAiTranslator use their target-language fallback policy.
  *
  * 添加新语言时直接 append；在 values/strings.xml + values-en/strings.xml 同步加 lang_xx 资源。
  */

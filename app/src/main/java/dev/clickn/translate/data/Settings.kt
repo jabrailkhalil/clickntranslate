@@ -29,9 +29,10 @@ const val MAX_TTS_PLAYBACK_GAIN_DB = 24
 internal fun normalizedFloatingButtonAlpha(value: Float): Float =
     if (value.isFinite()) value.coerceIn(0.1f, 1f) else 1f
 
-fun defaultTranslationTarget(locale: java.util.Locale = java.util.Locale.getDefault()): String = when (locale.language) {
-    "ru", "de", "fr", "es", "ja", "ko", "it", "pt", "pl", "uk", "tr", "nl", "ar", "hi" -> locale.language
-    "zh" -> "zh-CN"
+fun defaultTranslationTarget(locale: java.util.Locale = java.util.Locale.getDefault()): String = when {
+    locale.language == "zh" -> if (locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO")) "zh-TW" else "zh-CN"
+    locale.language == "no" -> "nb"
+    Languages.ALL.any { it.code == locale.language } -> locale.language
     else -> "en"
 }
 
@@ -46,7 +47,7 @@ data class Settings(
     val anthropicModel: String = DEFAULT_ANTHROPIC_MODEL,
     /** BCP-47 源语言代码（如 "auto"/"ja"/"zh-CN"）。从全部 [Languages.ALL] 中选取。 */
     val sourceLang: String = Languages.AUTO.code,
-    val targetLang: String = "zh-CN",
+    val targetLang: String = defaultTranslationTarget(),
     val promptTemplate: String = DEFAULT_PROMPT,
     val openAiRequestOptions: OpenAiRequestOptions = OpenAiRequestOptions(),
     val ocrEngine: OcrEngineKind = OcrEngineKind.ML_KIT_AUTO,
@@ -602,7 +603,7 @@ data class TranslationPreset(
     val anthropicBaseUrl: String = DEFAULT_ANTHROPIC_BASE_URL,
     val anthropicModel: String = DEFAULT_ANTHROPIC_MODEL,
     val sourceLang: String = Languages.AUTO.code,
-    val targetLang: String = "zh-CN",
+    val targetLang: String = defaultTranslationTarget(),
     val promptTemplate: String = Settings.DEFAULT_PROMPT,
     val openAiRequestOptions: OpenAiRequestOptions = OpenAiRequestOptions(),
     val dictionaryPrompt: String = Settings.DEFAULT_DICTIONARY_PROMPT,
@@ -1508,17 +1509,6 @@ enum class LlmMirrorChoice {
     HF_MIRROR,
     /** 用户自定义 base URL，配 [Settings.localLlmMirrorUrl] 用。 */
     CUSTOM,
-}
-
-/** 常用目标语言预设（也允许 settings.targetLang 自由填）。 */
-object TargetLangPresets {
-    val ALL: List<Pair<String, String>> = listOf(
-        "中文（简体）" to "zh-CN",
-        "中文（繁体）" to "zh-TW",
-        "English" to "en",
-        "日本語" to "ja",
-        "한국어" to "ko"
-    )
 }
 
 /**

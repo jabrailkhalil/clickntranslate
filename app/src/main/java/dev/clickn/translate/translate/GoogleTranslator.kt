@@ -39,7 +39,7 @@ class GoogleTranslator @Inject constructor(
         if (trimmed.isEmpty()) return null
 
         val from = mapLang(settings.sourceLang)
-        val to = mapLang(settings.targetLang)
+        val to = mapTargetLang(settings.targetLang)
         val cacheKey = cache.key(trimmed, "google", to, from)
         cache.get(cacheKey, settings)?.let { return it }
 
@@ -57,7 +57,7 @@ class GoogleTranslator @Inject constructor(
     override suspend fun testConnection(settings: Settings): TestResult {
         return runCatching {
             val timedClient = client.withApiTimeout(settings.apiTimeoutSeconds)
-            val to = mapLang(settings.targetLang).ifEmpty { "zh-CN" }
+            val to = mapTargetLang(settings.targetLang)
             val result = callEndpoint("hello", "en", to, timedClient)
             TestResult(true, "OK hello→$result")
         }.getOrElse { TestResult(false, it.message ?: it.javaClass.simpleName) }
@@ -92,21 +92,26 @@ class GoogleTranslator @Inject constructor(
     private fun parseResponse(raw: String): String {
         return runCatching {
             val root = json.parseToJsonElement(raw) as? JsonArray
-                ?: throw TranslationException("Google 响应不是 JsonArray")
+                ?: throw TranslationException("Google response is not a JSON array")
             val segments = root.firstOrNull() as? JsonArray
-                ?: throw TranslationException("Google 响应缺 segments 数组")
+                ?: throw TranslationException("Google response is missing translation segments")
             val sb = StringBuilder()
             for (seg in segments) {
                 val arr = seg as? JsonArray ?: continue
                 val first = arr.firstOrNull() as? JsonPrimitive ?: continue
                 if (first.isString) sb.append(first.content)
             }
-            sb.toString().ifEmpty { throw TranslationException("Google 译文为空") }
+            sb.toString().ifEmpty { throw TranslationException("Google returned an empty translation") }
         }.getOrElse {
-            Timber.tag("GoogleTrans").w(it, "解析失败: %s", raw.take(200))
-            throw TranslationException("Google 解析失败: ${raw.take(200)}", it)
+            Timber.tag("GoogleTrans").w(it, "Response parsing failed: %s", raw.take(200))
+            throw TranslationException("Google response could not be parsed: ${raw.take(200)}", it)
         }
     }
+
+    private fun mapTargetLang(code: String): String = mapLang(
+        code.trim().takeUnless { it.isEmpty() || it.equals("auto", ignoreCase = true) }
+            ?: dev.clickn.translate.data.defaultTranslationTarget(),
+    )
 
     /** BCP-47 → Google 翻译期望的语言码。 */
     private fun mapLang(s: String): String {

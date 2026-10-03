@@ -123,7 +123,7 @@ class WordSelectImmediateCardTest {
 
         val overlay = sourceFile(
             "src/main/java/dev/clickn/translate/overlay/TranslationCardOverlay.kt",
-        ).readText()
+        ).readText().replace("\r\n", "\n")
         val cases = listOf(
             Case(
                 name = "blank source displays a recognition placeholder",
@@ -158,7 +158,7 @@ class WordSelectImmediateCardTest {
         localizedLoadingText.forEach { (path, expected) ->
             assertTrue(
                 "$path should define the loading message",
-                sourceFile(path).readText().contains(expected),
+                sourceFile(path).readText().replace("\r\n", "\n").contains(expected),
             )
         }
     }
@@ -166,7 +166,7 @@ class WordSelectImmediateCardTest {
     private fun wordSelectPipeline(): String {
         val source = sourceFile(
             "src/main/java/dev/clickn/translate/service/CaptureService.kt",
-        ).readText()
+        ).readText().replace("\r\n", "\n")
         val start = source.indexOf("private suspend fun runWordSelectPipeline")
         val end = source.indexOf("private fun cropRect", start)
         require(start >= 0 && end > start) { "Word-select pipeline not found" }

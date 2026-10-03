@@ -1755,7 +1755,7 @@
     <string name="glossary_import_file_title">Importation à partir d\'un JSON  fichier</string>
     <string name="glossary_import_file_empty">Aucun fichier sélectionné</string>
     <string name="glossary_import_choose_file">Choisir JSON  fichier</string>
-    <string name="glossary_import_format_hint">Prend en charge les fichiers de glossaire exportés, les tableaux source/cible, et les tableaux -文/-文.</string>
+    <string name="glossary_import_format_hint">Accepte les glossaires exportés et les tableaux avec les champs source/target.</string>
     <string name="glossary_import_apply_settings">Appliquer à cette importation</string>
     <string name="glossary_import_existing_terms">Correspondance des termes existants</string>
     <string name="glossary_import_conflict_skip">Sauter</string>

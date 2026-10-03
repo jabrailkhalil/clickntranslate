@@ -71,7 +71,7 @@ class BaiduFanyiTranslator @Inject constructor(
         if (sources.isEmpty()) return emptyList()
         validate(settings)
 
-        val targetCode = mapLang(settings.targetLang) ?: "zh"
+        val targetCode = mapLang(settings.targetLang) ?: (mapLang(dev.clickn.translate.data.defaultTranslationTarget()) ?: "en")
         val sourceCode = mapLang(settings.sourceLang) ?: "auto"
         val cacheModel = BaiduFanyiBatchPolicy.cacheModel(targetCode)
 
@@ -115,16 +115,16 @@ class BaiduFanyiTranslator @Inject constructor(
             timedClient.newCall(request).execute().use { r ->
                 val raw = r.body?.string().orEmpty()
                 if (!r.isSuccessful) {
-                    throw TranslationException("百度翻译 HTTP ${r.code}: ${raw.take(200)}")
+                    throw TranslationException("Baidu translation HTTP ${r.code}: ${raw.take(200)}")
                 }
                 runCatching { json.decodeFromString<BaiduFanyiResponse>(raw) }
                     .getOrElse {
-                        throw TranslationException("百度翻译解析失败: ${raw.take(200)}", it)
+                        throw TranslationException("Baidu translation response could not be parsed: ${raw.take(200)}", it)
                     }
             }
         }
         if (parsed.errorCode != null && parsed.errorCode != "52000") {
-            throw TranslationException("百度翻译 ${parsed.errorCode}: ${parsed.errorMsg ?: "unknown"}")
+            throw TranslationException("Baidu translation ${parsed.errorCode}: ${parsed.errorMsg ?: "unknown"}")
         }
         val results = parsed.transResult.orEmpty()
         BaiduFanyiBatchPolicy.requireResultCount(
@@ -147,18 +147,18 @@ class BaiduFanyiTranslator @Inject constructor(
 
     override suspend fun testConnection(settings: Settings): TestResult {
         if (settings.baiduFanyiAppId.isBlank() || settings.baiduFanyiSecretKey.isBlank()) {
-            return TestResult(false, "缺少百度翻译 APPID / 密钥")
+            return TestResult(false, "Baidu App ID / secret key is missing")
         }
         return runCatching {
             val out = translate("hello", settings)
-            if (out.isNullOrBlank()) TestResult(false, "返回空")
-            else TestResult(true, "OK 样例: ${out.take(40)}")
+            if (out.isNullOrBlank()) TestResult(false, "Empty response")
+            else TestResult(true, "OK sample: ${out.take(40)}")
         }.getOrElse { TestResult(false, it.message ?: it.javaClass.simpleName) }
     }
 
     private fun validate(settings: Settings) {
         if (settings.baiduFanyiAppId.isBlank() || settings.baiduFanyiSecretKey.isBlank()) {
-            throw TranslationException("百度翻译 APPID / 密钥 未配置")
+            throw TranslationException("Baidu App ID / secret key is not configured")
         }
     }
 

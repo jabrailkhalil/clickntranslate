@@ -7,7 +7,7 @@ import org.junit.Test
 class HyMt2TranslatorTest {
 
     @Test
-    fun normalizeTargetLang_defaultsBlankAndAutoToSimplifiedChinese() {
+    fun normalizeTargetLang_defaultsBlankAndAutoToUsersLanguage() {
         data class Case(
             val targetLang: String,
             val expected: String,
@@ -17,10 +17,10 @@ class HyMt2TranslatorTest {
             Case("zh-CN", "zh-CN"),
             Case(" zh-TW ", "zh-TW"),
             Case("en", "en"),
-            Case("auto", "zh-CN"),
-            Case(" AUTO ", "zh-CN"),
-            Case("", "zh-CN"),
-            Case("   ", "zh-CN"),
+            Case("auto", dev.clickn.translate.data.defaultTranslationTarget()),
+            Case(" AUTO ", dev.clickn.translate.data.defaultTranslationTarget()),
+            Case("", dev.clickn.translate.data.defaultTranslationTarget()),
+            Case("   ", dev.clickn.translate.data.defaultTranslationTarget()),
         )
 
         cases.forEach { case ->

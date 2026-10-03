@@ -47,7 +47,7 @@ class YoudaoPicTransTranslator @Inject constructor(
     override val isEndToEnd: Boolean get() = true
 
     override suspend fun translate(source: String, settings: Settings): String? =
-        throw TranslationException("有道图片翻译是端到端引擎，不支持单段文本翻译")
+        throw TranslationException("Youdao picture translation requires an image and does not support plain text")
 
     override fun translateStream(source: String, settings: Settings): Flow<String> = emptyFlow()
 
@@ -57,7 +57,7 @@ class YoudaoPicTransTranslator @Inject constructor(
      */
     override suspend fun testConnection(settings: Settings): TestResult {
         if (settings.youdaoAppKey.isBlank() || settings.youdaoAppSecret.isBlank()) {
-            return TestResult(false, "有道 AppKey/AppSecret 未配置")
+            return TestResult(false, "Youdao AppKey / AppSecret is not configured")
         }
         val tinyImg = withContext(Dispatchers.Default) {
             val bmp = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
@@ -90,18 +90,18 @@ class YoudaoPicTransTranslator @Inject constructor(
                     if (!r.isSuccessful) return@use TestResult(false, "HTTP ${r.code}: ${raw.take(200)}")
                     val parsed = runCatching {
                         json.decodeFromString<TestResp>(raw)
-                    }.getOrNull() ?: return@use TestResult(false, "解析失败: ${raw.take(200)}")
+                    }.getOrNull() ?: return@use TestResult(false, "Response could not be parsed: ${raw.take(200)}")
                     // 错误码参考有道公共错误码表，挑常用的；其余按 fail 兜底
                     when (parsed.errorCode) {
-                        "0" -> TestResult(true, "OK 有道图翻可用")
+                        "0" -> TestResult(true, "OK Youdao picture translation is available")
                         // 401 账户欠费 / 411 访问频率受限 / 412 长 query 频率受限：服务侧拒绝
                         // 但说明 key 已通过认证，记为成功
-                        "411", "412" -> TestResult(true, "OK key 有效，当前触发限流 (errorCode=${parsed.errorCode})")
-                        "401" -> TestResult(false, "账户欠费 (errorCode=401)")
+                        "411", "412" -> TestResult(true, "OK credentials are valid; the service is temporarily rate limited (errorCode=${parsed.errorCode})")
+                        "401" -> TestResult(false, "Account payment required (errorCode=401)")
                         "108", "109", "202", "203", "205" ->
-                            TestResult(false, "AppKey/Secret 无效或签名错 (errorCode=${parsed.errorCode})")
-                        "110" -> TestResult(false, "未开通图片翻译服务 (errorCode=110)")
-                        "111" -> TestResult(false, "开发者账户无效 (errorCode=111)")
+                            TestResult(false, "Invalid AppKey / secret or signature (errorCode=${parsed.errorCode})")
+                        "110" -> TestResult(false, "Picture translation service is not enabled (errorCode=110)")
+                        "111" -> TestResult(false, "Invalid developer account (errorCode=111)")
                         else -> TestResult(false, "errorCode=${parsed.errorCode}: ${raw.take(200)}")
                     }
                 }
@@ -117,7 +117,7 @@ class YoudaoPicTransTranslator @Inject constructor(
         settings: Settings
     ): List<Pair<TextBlock, String>> {
         if (settings.youdaoAppKey.isBlank() || settings.youdaoAppSecret.isBlank()) {
-            throw TranslationException("有道 AppKey/AppSecret 未配置")
+            throw TranslationException("Youdao AppKey / AppSecret is not configured")
         }
         val srcW = bitmap.width
         val srcH = bitmap.height
@@ -159,14 +159,14 @@ class YoudaoPicTransTranslator @Inject constructor(
             timed.newCall(req).execute().use { r ->
                 val raw = r.body?.string().orEmpty()
                 if (!r.isSuccessful) {
-                    throw TranslationException("有道图片翻译 HTTP ${r.code}: ${raw.take(200)}")
+                    throw TranslationException("Youdao picture translation HTTP ${r.code}: ${raw.take(200)}")
                 }
                 val parsed = runCatching { json.decodeFromString<PicTransResp>(raw) }
                     .getOrElse {
-                        throw TranslationException("有道图片翻译解析失败: ${raw.take(200)}", it)
+                        throw TranslationException("Youdao picture translation response could not be parsed: ${raw.take(200)}", it)
                     }
                 if (parsed.errorCode != "0") {
-                    throw TranslationException("有道图片翻译 errorCode=${parsed.errorCode}: ${raw.take(200)}")
+                    throw TranslationException("Youdao picture translation errorCode=${parsed.errorCode}: ${raw.take(200)}")
                 }
                 Timber.tag("YoudaoPicTrans").i(
                     "[resp] lanFrom=%s lanTo=%s regions=%d orientation=%s",
@@ -194,7 +194,7 @@ class YoudaoPicTransTranslator @Inject constructor(
         }
     }
 
-    /** sourceLang/targetLang BCP-47 → 有道图片翻译 from/to。 */
+    /** sourceLang/targetLang BCP-47 → Youdao picture translation from/to。 */
     private fun mapLang(s: String): String {
         val l = s.lowercase()
         if (l == "auto") return "auto"

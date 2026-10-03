@@ -63,10 +63,10 @@ class MlKitLanguagePolicyTest {
         val cases = listOf(
             Case("auto source is silent", { MlKitLanguagePolicy.resolveConfiguredSource("auto") }, null),
             Case("blank source is silent", { MlKitLanguagePolicy.resolveConfiguredSource(" ") }, null),
-            Case("auto target", { MlKitLanguagePolicy.resolveTarget("auto") }, "不能使用自动检测"),
-            Case("blank target", { MlKitLanguagePolicy.resolveTarget(" ") }, "必须明确指定"),
-            Case("unsupported source", { MlKitLanguagePolicy.resolveConfiguredSource("yue") }, "不支持源语言"),
-            Case("unsupported target", { MlKitLanguagePolicy.resolveTarget("zu") }, "不支持目标语言"),
+            Case("auto target", { MlKitLanguagePolicy.resolveTarget("auto") }, "requires an explicit target language"),
+            Case("blank target", { MlKitLanguagePolicy.resolveTarget(" ") }, "requires an explicit target language"),
+            Case("unsupported source", { MlKitLanguagePolicy.resolveConfiguredSource("yue") }, "does not support the source language"),
+            Case("unsupported target", { MlKitLanguagePolicy.resolveTarget("zu") }, "does not support the target language"),
         )
 
         cases.forEach { case ->

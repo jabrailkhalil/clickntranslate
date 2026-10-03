@@ -512,16 +512,16 @@ class TranslationBlockCopyOverlay(
     private fun palette(settings: Settings): TranslationBlockCopyPalette =
         when (settings.overlayTheme) {
             OverlayTheme.CLASSIC_DARK -> TranslationBlockCopyPalette(
-                0xE6000000.toInt(), 0xFFFFFFFF.toInt(), 0xCCB0BEC5.toInt(), 0xFF90CAF9.toInt(),
+                0xF2000000.toInt(), 0xFFFFFFFF.toInt(), 0xFFBEC9CF.toInt(), 0xFF90CAF9.toInt(),
             )
             OverlayTheme.AMBER_GOLD -> TranslationBlockCopyPalette(
-                0xF0241608.toInt(), 0xFFFFD27F.toInt(), 0xCCB68850.toInt(), 0xFFB8860B.toInt(),
+                0xF8241608.toInt(), 0xFFFFD27F.toInt(), 0xFFCFAD79.toInt(), 0xFFE3B65B.toInt(),
             )
             OverlayTheme.PAPER_LIGHT -> TranslationBlockCopyPalette(
-                0xF0F5EFE0.toInt(), 0xFF3E2A1F.toInt(), 0xCC8B6F47.toInt(), 0xFFB68850.toInt(),
+                0xFCF5EFE0.toInt(), 0xFF3E2A1F.toInt(), 0xFF614938.toInt(), 0xFF604426.toInt(),
             )
             OverlayTheme.FROST_GLASS -> TranslationBlockCopyPalette(
-                0xCC1E293B.toInt(), 0xFFE0F2FE.toInt(), 0xCC94A3B8.toInt(), 0xFF60A5FA.toInt(),
+                0xF51E293B.toInt(), 0xFFE0F2FE.toInt(), 0xFFCBD5E1.toInt(), 0xFF93C5FD.toInt(),
             )
             OverlayTheme.CUSTOM -> TranslationBlockCopyPalette(
                 settings.customBgColor,
@@ -534,9 +534,9 @@ class TranslationBlockCopyOverlay(
     private fun shellBackground(settings: Settings, density: Float): Drawable {
         val colors = palette(settings)
         val (strokeWidthDp, strokeColor) = when (settings.overlayTheme) {
-            OverlayTheme.AMBER_GOLD -> 2 to 0xFFB8860B.toInt()
-            OverlayTheme.PAPER_LIGHT -> 1 to 0xFFB68850.toInt()
-            OverlayTheme.FROST_GLASS -> 1 to 0xFF60A5FA.toInt()
+            OverlayTheme.AMBER_GOLD -> 2 to 0xFFE3B65B.toInt()
+            OverlayTheme.PAPER_LIGHT -> 1 to 0xFF604426.toInt()
+            OverlayTheme.FROST_GLASS -> 1 to 0xFF93C5FD.toInt()
             OverlayTheme.CUSTOM -> if (settings.customBorderWidth > 0) {
                 settings.customBorderWidth to settings.customBorderColor
             } else {

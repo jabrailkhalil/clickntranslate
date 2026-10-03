@@ -1755,7 +1755,7 @@
     <string name="glossary_import_file_title">Einfuhren aus einem JSON Datei</string>
     <string name="glossary_import_file_empty">Keine Datei ausgewählt</string>
     <string name="glossary_import_choose_file">Wählen Sie JSON Datei</string>
-    <string name="glossary_import_format_hint">Unterstützt exportierte Glossardateien, Quell-/Ziel-Arrays und ‡文/Eingabe文-Arrays.</string>
+    <string name="glossary_import_format_hint">Unterstützt exportierte Glossare und Arrays mit source/target-Feldern.</string>
     <string name="glossary_import_apply_settings">Anwendung auf diesen Import</string>
     <string name="glossary_import_existing_terms">Anpassung bestehender Begriffe</string>
     <string name="glossary_import_conflict_skip">Skip user information</string>

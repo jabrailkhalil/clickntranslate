@@ -48,9 +48,11 @@ internal object BrandIconPrefs {
         context.packageManager.setComponentEnabledSetting(component(inactive), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
         context.getSharedPreferences("clickn_brand_icon", Context.MODE_PRIVATE).edit().putString("choice", choice).apply()
     }
-    private fun pictureFile(context: Context) = File(context.filesDir, "clickn_custom_icon.png")
-    fun bitmap(context: Context): Bitmap? = runCatching { BitmapFactory.decodeFile(pictureFile(context).path) }.getOrNull()
-    fun importPicture(context: Context, uri: Uri): Bitmap {
+    private fun pictureFile(context: Context, floating: Boolean) =
+        File(context.filesDir, if (floating) "clickn_floating_picture.png" else "clickn_custom_icon.png")
+    fun bitmap(context: Context, floating: Boolean = false): Bitmap? =
+        runCatching { BitmapFactory.decodeFile(pictureFile(context, floating).path) }.getOrNull()
+    fun importPicture(context: Context, uri: Uri, floating: Boolean = false): Bitmap {
         require(uri.scheme == "content") { "Choose an image through the Android picker" }
         val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
             val out = java.io.ByteArrayOutputStream()
@@ -73,7 +75,7 @@ internal object BrandIconPrefs {
         val scale = minOf(1f, 512f / maxOf(decoded.width, decoded.height))
         val image = Bitmap.createScaledBitmap(decoded, maxOf(1, (decoded.width * scale).toInt()), maxOf(1, (decoded.height * scale).toInt()), true)
         if (image !== decoded) decoded.recycle()
-        val atomic = android.util.AtomicFile(pictureFile(context))
+        val atomic = android.util.AtomicFile(pictureFile(context, floating))
         val output = atomic.startWrite()
         try {
             check(image.compress(Bitmap.CompressFormat.PNG, 100, output))
@@ -102,7 +104,7 @@ internal object BrandIconPrefs {
 internal fun BrandLogo(modifier: Modifier = Modifier, choice: String = BrandIconPrefs.LOGO, bitmap: Bitmap? = null) {
     when {
         choice == BrandIconPrefs.CUSTOM && bitmap != null -> Image(bitmap.asImageBitmap(), null, modifier, contentScale = ContentScale.Fit)
-        choice == BrandIconPrefs.MASCOT -> Image(painterResource(R.drawable.mascot_orb), null, modifier, contentScale = ContentScale.Fit)
+        choice == BrandIconPrefs.MASCOT -> Image(painterResource(R.drawable.companion_doc), null, modifier, contentScale = ContentScale.Fit)
         else -> Icon(painterResource(R.drawable.ic_clickn_logo), null, modifier, tint = Color.Unspecified)
     }
 }

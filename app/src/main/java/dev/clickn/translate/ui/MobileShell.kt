@@ -13,6 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -220,7 +222,8 @@ fun MobileShell(
                         })
                     MobileTab.SETTINGS -> SettingsHub(current, onProvider = ::openService,
                         onAppearance = { sheet = "appearance" }, onLanguage = { sheet = "language" },
-                        onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" }, onIcon = { sheet = "icon" }, onOffline = { sheet = "offline" })
+                        onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" }, onIcon = { sheet = "icon" }, onOffline = { sheet = "offline" },
+                        onFloating = { sheet = "floating" })
                 }
             }
         }
@@ -239,13 +242,16 @@ fun MobileShell(
                         viewModel.update { mobileLanguagePair(it, source, code) }
                         sheet = ""
                     })
-                "services" -> ServicesSheet(current.translatorEngine) {
+                "services" -> ServicesSheet(current.translatorEngine, current.targetLang) {
                     provider = it; sheet = ""; viewModel.clearConnection()
                 }
                 "appearance" -> AppearanceSheet()
                 "language" -> InterfaceLanguageSheet { sheet = "" }
                 "capture" -> CaptureMethodSheet(viewModel)
                 "icon" -> BrandIconSheet { iconRevision++ }
+                "floating" -> FloatingAppearanceSheet(current, { viewModel.update(it) }) {
+                    sheet = ""; onAdvancedSection("floating")
+                }
                 "offline" -> OfflineLibrarySheet(current, viewModel) { section -> sheet = ""; onAdvancedSection(section) }
             }
         }
@@ -278,19 +284,18 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(
-                Brush.linearGradient(if (LocalThemeMode.current.mode in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primaryContainer) else listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
-                MaterialTheme.shapes.large).padding(24.dp)) {
+                MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large).padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.size(8.dp).background(if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .4f), CircleShape))
                     Text(stringResource(if (running) R.string.mobile_running else R.string.mobile_ready),
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
-                Text(stringResource(R.string.mobile_hero_title), Modifier.padding(top = 20.dp),
-                    style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(stringResource(R.string.mobile_hero_body), Modifier.padding(top = 12.dp, bottom = 24.dp),
+                Text(stringResource(R.string.mobile_hero_title), Modifier.padding(top = 12.dp),
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(stringResource(R.string.mobile_hero_body), Modifier.padding(top = 8.dp, bottom = 16.dp),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Button(onClick = onStart, enabled = running || !checking, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                    colors = if (LocalThemeMode.current.mode in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onPrimaryContainer, contentColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.buttonColors()) {
+                    colors = ButtonDefaults.buttonColors()) {
                     Icon(if (running) Icons.Outlined.Stop else Icons.Outlined.CropFree, null)
                     Spacer(Modifier.width(10.dp))
                     Text(stringResource(if (running) R.string.mobile_stop else R.string.mobile_start), fontWeight = FontWeight.SemiBold)
@@ -300,19 +305,10 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { ServiceRow(settings, onProvider) }
         item { readiness() }
-        if (!allowed) item {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium) {
-                Column(Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.mobile_permission_title), fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.mobile_permission_body), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = onPermission, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.mobile_permission_enable)) }
-                }
-            }
-        }
         item { SectionLabel(R.string.mobile_quick_actions) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ActionTile(R.string.mobile_photo, R.string.mobile_photo_body, Icons.Outlined.Image, onPhoto, Modifier.weight(1f))
-            ActionTile(R.string.mobile_text_action, R.string.mobile_text_hint, Icons.Outlined.Translate, onText, Modifier.weight(1f))
+        item { Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ActionTile(R.string.mobile_photo, R.string.mobile_photo_body, Icons.Outlined.Image, onPhoto, Modifier.weight(1f).fillMaxHeight())
+            ActionTile(R.string.mobile_text_action, R.string.mobile_text_hint, Icons.Outlined.Translate, onText, Modifier.weight(1f).fillMaxHeight())
         } }
     }
 }
@@ -320,9 +316,9 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
 @Composable
 internal fun LanguagePair(settings: Settings, onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit) {
     Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
             LanguageCell(R.string.mobile_source, settings.sourceLang, onSource, Modifier.weight(1f))
-            IconButton(onClick = onSwap, enabled = settings.sourceLang != "auto") { Icon(Icons.Outlined.SwapHoriz, stringResource(R.string.mobile_swap)) }
+            IconButton(onClick = onSwap, enabled = settings.sourceLang != "auto", modifier = Modifier.align(Alignment.CenterVertically)) { Icon(Icons.Outlined.SwapHoriz, stringResource(R.string.mobile_swap)) }
             LanguageCell(R.string.mobile_target, settings.targetLang, onTarget, Modifier.weight(1f))
         }
     }
@@ -442,13 +438,14 @@ internal fun HistoryWorkspace(entries: List<MobileHistoryEntry>, onImages: () ->
 
 @Composable
 internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearance: () -> Unit, onLanguage: () -> Unit,
-    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}) {
+    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}, onFloating: () -> Unit = {}) {
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
     fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingsRow(Icons.Outlined.Download, stringResource(R.string.refine_offline), stringResource(R.string.refine_offline_body), onOffline) }
         item { SettingsRow(Icons.Outlined.Image, stringResource(R.string.refine_icon), stringResource(R.string.refine_brand_logo), onIcon) }
+        item { SettingsRow(Icons.Outlined.TouchApp, stringResource(R.string.refine_floating), stringResource(R.string.polish_floating_summary), onFloating) }
         item { SectionLabel(R.string.mobile_services) }
         item { ServiceRow(settings, onProvider) }
         item { SettingsRow(Icons.Outlined.CropFree, stringResource(R.string.setup_capture),
@@ -548,18 +545,28 @@ internal fun providerName(engine: TranslatorEngine): String = when (engine) {
 }
 
 @Composable
-internal fun ServicesSheet(selected: TranslatorEngine, onSelect: (TranslatorEngine) -> Unit) {
+internal fun ServicesSheet(selected: TranslatorEngine, targetLang: String = defaultTranslationTarget(), onSelect: (TranslatorEngine) -> Unit) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    var showAll by rememberSaveable { mutableStateOf(false) }
     val free = setOf(TranslatorEngine.GOOGLE, TranslatorEngine.LINGVA, TranslatorEngine.MYMEMORY, TranslatorEngine.LIBRETRANSLATE)
     val offline = setOf(TranslatorEngine.GOOGLE_ML_KIT, TranslatorEngine.LOCAL_SAKURA, TranslatorEngine.LOCAL_HY_MT2)
     val available = TranslatorEngine.entries.filter { android.os.Build.VERSION.SDK_INT >= 33 || it !in setOf(TranslatorEngine.LOCAL_SAKURA, TranslatorEngine.LOCAL_HY_MT2) }.toSet()
+    val visible = if (showAll || chineseToolsRelevant(targetLang, locale)) available
+        else available - (specializedTranslationEngines - selected)
     LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.8f), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp)) {
         item { Text(stringResource(R.string.mobile_select_service), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        listOf(R.string.mobile_free_online to free, R.string.mobile_api_services to (available - free - offline), R.string.mobile_offline to (offline intersect available)).forEach { (label, engines) ->
+        listOf(R.string.mobile_free_online to free, R.string.mobile_api_services to (visible - free - offline), R.string.mobile_offline to (offline intersect visible)).forEach { (label, engines) ->
             item { Text(stringResource(label), Modifier.padding(top = 24.dp, bottom = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
             items(engines.toList(), key = { it.name }) { engine ->
                 ListItem(headlineContent = { Text(providerName(engine)) },
                     trailingContent = { Icon(if (engine == selected) Icons.Outlined.CheckCircle else Icons.AutoMirrored.Outlined.KeyboardArrowRight, null) },
                     modifier = Modifier.clickable { onSelect(engine) })
+            }
+        }
+        if (visible != available) item {
+            TextButton(onClick = { showAll = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.polish_more_services))
+                Icon(Icons.Outlined.ExpandMore, null)
             }
         }
     }
@@ -646,24 +653,16 @@ internal fun AppearanceSheet() {
     LazyColumn(Modifier.fillMaxWidth().testTag("appearance-options"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.mobile_appearance), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         item { SectionLabel(R.string.mobile_mode) }
-        listOf(ThemeMode.FOLLOW_SYSTEM to R.string.mobile_system, ThemeMode.LIGHT to R.string.mobile_light,
-            ThemeMode.DARK to R.string.mobile_dark, ThemeMode.AMOLED to R.string.mobile_amoled,
-            ThemeMode.PAPER_DAY to R.string.refine_paper_day, ThemeMode.PAPER_NIGHT to R.string.refine_paper_night,
-            ThemeMode.PAPER_NORD to R.string.refine_paper_nord).forEach { (mode, label) ->
-            item { ListItem(headlineContent = { Text(stringResource(label)) }, leadingContent = {
-                RadioButton(selected = theme.mode == mode, onClick = null)
-            }, modifier = Modifier.clickable { theme.setMode(mode) }) }
-        }
-        item { Text(stringResource(R.string.refine_theme_source), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        themeChoices.chunked(2).forEach { choices -> item { ThemeChoiceRow(choices) } }
         if (theme.mode !in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) {
             item { SectionLabel(R.string.mobile_accent) }
-            item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            item { FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 ThemeAccent.entries.forEach { choice ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { accent.setAccent(choice) }.padding(4.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.selectable(accent.accent == choice, role = Role.RadioButton, onClick = { accent.setAccent(choice) }).padding(4.dp)) {
                         Box(Modifier.size(44.dp).background(Color(choice.lightColor), CircleShape), contentAlignment = Alignment.Center) {
                             if (accent.accent == choice) Icon(Icons.Outlined.Check, null, tint = Color.White)
                         }
-                        Text(stringResource(choice.label), Modifier.padding(top = 8.dp), fontSize = 10.sp, maxLines = 1)
+                        Text(stringResource(choice.label), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelMedium, maxLines = 1)
                     }
                 }
             } }

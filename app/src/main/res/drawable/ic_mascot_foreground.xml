@@ -1,1 +1,3 @@
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:width="64dp" android:height="64dp" android:gravity="center"><bitmap android:src="@drawable/mascot_orb" android:gravity="fill"/></item></layer-list>
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/companion_doc" android:inset="18dp" />

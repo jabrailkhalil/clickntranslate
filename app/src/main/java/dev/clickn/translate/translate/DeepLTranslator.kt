@@ -74,7 +74,7 @@ class DeepLTranslator @Inject constructor(
                     translateOnce(trimmed, settings, DeeplProtocol.OFFICIAL, targetCode)
                 }.getOrElse { officialErr ->
                     throw TranslationException(
-                        "AUTO 两路都失败: deeplx=${primary.exceptionOrNull()?.message}; official=${officialErr.message}"
+                        "Both AUTO endpoints failed: deeplx=${primary.exceptionOrNull()?.message}; official=${officialErr.message}"
                     )
                 }
             }
@@ -223,12 +223,12 @@ class DeepLTranslator @Inject constructor(
             }
             DeeplProtocol.DEEPLX -> {
                 if (settings.deeplBaseUrl.isBlank()) {
-                    TestResult(false, "deeplx 协议需要先填 Base URL")
+                    TestResult(false, "Configure a Base URL for deeplx")
                 } else testTranslateProbe(settings, DeeplProtocol.DEEPLX)
             }
             DeeplProtocol.AUTO -> {
                 if (settings.deeplBaseUrl.isBlank() || settings.deeplApiKey.isBlank()) {
-                    TestResult(false, "AUTO 模式需要同时配 deeplx Base URL 和 DeepL 官方 API Key")
+                    TestResult(false, "AUTO mode requires both a deeplx Base URL and a DeepL API key")
                 } else {
                     val deeplxResult = testTranslateProbe(settings, DeeplProtocol.DEEPLX)
                     val officialResult = testOfficialUsage(settings)
@@ -371,7 +371,7 @@ class DeepLTranslator @Inject constructor(
 
     private fun requireDeeplxUrl(settings: Settings) {
         if (settings.deeplBaseUrl.isBlank()) {
-            throw TranslationException("deeplx 协议需要在设置里填 Base URL")
+            throw TranslationException("Configure a Base URL in settings for deeplx")
         }
     }
 

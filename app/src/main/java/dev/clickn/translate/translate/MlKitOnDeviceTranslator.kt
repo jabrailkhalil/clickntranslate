@@ -113,7 +113,7 @@ class MlKitOnDeviceTranslator @Inject constructor(
 
         val translated = translateWithClient(text, sourceLanguage, targetLanguage)
         if (translated.isBlank()) {
-            throw TranslationException("ML Kit 返回了空译文")
+            throw TranslationException("ML Kit returned an empty translation")
         }
         cache.put(cacheKey, translated, settings)
         return translated
@@ -231,7 +231,7 @@ class MlKitOnDeviceTranslator @Inject constructor(
             try {
                 it.translate(text)
             } catch (error: Exception) {
-                throw TranslationException("ML Kit 端侧翻译失败: ${error.message ?: error.javaClass.simpleName}", error)
+                throw TranslationException("ML Kit translation failed: ${error.message ?: error.javaClass.simpleName}", error)
             }
         }
     }
@@ -243,7 +243,7 @@ class MlKitOnDeviceTranslator @Inject constructor(
         clientFactory.create(sourceLanguage, targetLanguage)
     } catch (error: Exception) {
         throw TranslationException(
-            "ML Kit 翻译客户端创建失败: ${error.message ?: error.javaClass.simpleName}",
+            "ML Kit translation client could not be created: ${error.message ?: error.javaClass.simpleName}",
             error,
         )
     }
@@ -255,7 +255,7 @@ class MlKitOnDeviceTranslator @Inject constructor(
             throw error
         } catch (error: Exception) {
             throw TranslationException(
-                "ML Kit 语言模型下载失败: ${error.message ?: error.javaClass.simpleName}",
+                "ML Kit language model download failed: ${error.message ?: error.javaClass.simpleName}",
                 error,
             )
         }
@@ -286,15 +286,15 @@ internal object MlKitLanguagePolicy {
             // internal state is never rendered verbatim inside the translation overlay.
             throw TranslationException("")
         }
-        return requireSupported(normalized, role = "源")
+        return requireSupported(normalized, role = "source")
     }
 
     fun resolveTarget(languageTag: String): String {
         val normalized = normalize(languageTag)
         if (normalized.isEmpty() || normalized == "auto") {
-            throw TranslationException("ML Kit 目标语言必须明确指定，不能使用自动检测")
+            throw TranslationException("ML Kit requires an explicit target language")
         }
-        return requireSupported(normalized, role = "目标")
+        return requireSupported(normalized, role = "target")
     }
 
     /** ML Kit ships English in the SDK; every other model is language-specific and reusable. */
@@ -308,10 +308,10 @@ internal object MlKitLanguagePolicy {
     private fun requireSupported(normalizedTag: String, role: String): String {
         val canonicalTag = canonicalize(normalizedTag)
         if (canonicalTag !in supportedLanguageTags) {
-            throw TranslationException("ML Kit 不支持${role}语言: ${dev.clickn.translate.data.languageDisplayName(normalizedTag)}")
+            throw TranslationException("ML Kit does not support the ${role} language: ${dev.clickn.translate.data.languageDisplayName(normalizedTag)}")
         }
         return TranslateLanguage.fromLanguageTag(canonicalTag)
-            ?: throw TranslationException("ML Kit 不支持${role}语言: ${dev.clickn.translate.data.languageDisplayName(normalizedTag)}")
+            ?: throw TranslationException("ML Kit does not support the ${role} language: ${dev.clickn.translate.data.languageDisplayName(normalizedTag)}")
     }
 
     private fun canonicalize(normalizedTag: String): String =

@@ -62,7 +62,7 @@ class VolcTranslator @Inject constructor(
     override suspend fun translateBatch(sources: List<String>, settings: Settings): List<String?> {
         if (sources.isEmpty()) return emptyList()
         validate(settings)
-        val targetCode = mapLang(settings.targetLang) ?: "zh"
+        val targetCode = mapLang(settings.targetLang) ?: (mapLang(dev.clickn.translate.data.defaultTranslationTarget()) ?: "en")
         val sourceCode = mapLang(settings.sourceLang)  // null = auto
 
         // 先走 cache，构造 pending 子集
@@ -115,18 +115,18 @@ class VolcTranslator @Inject constructor(
 
     override suspend fun testConnection(settings: Settings): TestResult {
         if (settings.volcAccessKeyId.isBlank() || settings.volcSecretAccessKey.isBlank()) {
-            return TestResult(false, "缺少 Volc AccessKey / SecretKey")
+            return TestResult(false, "Volc AccessKey / SecretKey is missing")
         }
         return runCatching {
             val out = translate("hello", settings)
-            if (out.isNullOrBlank()) TestResult(false, "返回空")
-            else TestResult(true, "OK 样例: ${out.take(40)}")
+            if (out.isNullOrBlank()) TestResult(false, "Empty response")
+            else TestResult(true, "OK sample: ${out.take(40)}")
         }.getOrElse { TestResult(false, it.message ?: it.javaClass.simpleName) }
     }
 
     private fun validate(settings: Settings) {
         if (settings.volcAccessKeyId.isBlank() || settings.volcSecretAccessKey.isBlank()) {
-            throw TranslationException("Volc AccessKey / SecretKey 未配置")
+            throw TranslationException("Volc AccessKey / SecretKey is not configured")
         }
     }
 
@@ -207,7 +207,7 @@ class VolcTranslator @Inject constructor(
             }
             runCatching { json.decodeFromString<VolcResponse>(raw) }
                 .getOrElse {
-                    throw TranslationException("Volc 解析失败: ${raw.take(200)}", it)
+                    throw TranslationException("Volc response could not be parsed: ${raw.take(200)}", it)
                 }
         }
     }

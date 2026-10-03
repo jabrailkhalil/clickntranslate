@@ -98,7 +98,7 @@ internal object HyMt2PromptPolicy {
     fun normalizeTargetLang(targetLang: String): String {
         val normalized = targetLang.trim()
         return if (normalized.isBlank() || normalized.equals("auto", ignoreCase = true)) {
-            "zh-CN"
+            dev.clickn.translate.data.defaultTranslationTarget()
         } else {
             normalized.replace('_', '-')
         }

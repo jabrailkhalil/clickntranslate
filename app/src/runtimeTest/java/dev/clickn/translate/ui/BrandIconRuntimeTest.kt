@@ -7,6 +7,8 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.VectorDrawable
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.InsetDrawable
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.clickn.translate.ClickTranslateApp
@@ -46,12 +48,14 @@ class BrandIconRuntimeTest {
         assertEquals(512, BrandIconPrefs.bitmap(context)!!.width)
         assertThrows(IllegalArgumentException::class.java) { BrandIconPrefs.importPicture(context, Uri.parse("file:///etc/hosts")) }
     }
-    @Test fun logoIsVectorAtEveryLauncherDensity() {
+    @Test fun originalLogoIsUsedAtEveryLauncherDensity() {
         listOf(160, 320, 640).forEach { dpi ->
             val localized = context.createConfigurationContext(Configuration(context.resources.configuration).apply { densityDpi = dpi })
             val icon = localized.getDrawable(R.mipmap.ic_launcher) as AdaptiveIconDrawable
-            assertTrue(icon.foreground is VectorDrawable)
-            assertTrue(localized.getDrawable(R.drawable.brand_logo) is VectorDrawable)
+            val artwork = (icon.foreground as InsetDrawable).drawable as BitmapDrawable
+            assertEquals(1024, artwork.bitmap.width)
+            assertTrue(localized.getDrawable(R.drawable.brand_logo) is BitmapDrawable)
+            assertTrue(icon.monochrome is VectorDrawable)
         }
     }
 }

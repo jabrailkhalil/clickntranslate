@@ -16,8 +16,8 @@ class HyMt2PromptPolicyTest {
         data class Case(val code: String, val expected: String)
 
         listOf(
-            Case("", "Chinese"),
-            Case("auto", "Chinese"),
+            Case("", HyMt2PromptPolicy.targetLanguageName(dev.clickn.translate.data.defaultTranslationTarget())),
+            Case("auto", HyMt2PromptPolicy.targetLanguageName(dev.clickn.translate.data.defaultTranslationTarget())),
             Case("zh-CN", "Chinese"),
             Case("zh_TW", "Traditional Chinese"),
             Case("zh-Hant", "Traditional Chinese"),

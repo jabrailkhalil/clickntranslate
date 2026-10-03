@@ -62,12 +62,12 @@ class MlKitOnDeviceTranslatorTest {
         val cases = listOf(
             Case("auto source is silent", sourceLang = "auto", expectedMessage = null),
             Case("blank source is silent", sourceLang = " ", expectedMessage = null),
-            Case("unsupported source", sourceLang = "yue", expectedMessage = "不支持源语言"),
-            Case("auto target", targetLang = "auto", expectedMessage = "不能使用自动检测"),
-            Case("client creation", createFailure = true, expectedMessage = "客户端创建失败"),
-            Case("model download", downloadFailure = true, expectedMessage = "语言模型下载失败"),
-            Case("translation", translationFailure = true, expectedMessage = "端侧翻译失败"),
-            Case("blank result", blankTranslation = true, expectedMessage = "空译文"),
+            Case("unsupported source", sourceLang = "yue", expectedMessage = "does not support the source language"),
+            Case("auto target", targetLang = "auto", expectedMessage = "requires an explicit target language"),
+            Case("client creation", createFailure = true, expectedMessage = "client could not be created"),
+            Case("model download", downloadFailure = true, expectedMessage = "language model download failed"),
+            Case("translation", translationFailure = true, expectedMessage = "translation failed"),
+            Case("blank result", blankTranslation = true, expectedMessage = "empty translation"),
         )
 
         cases.forEach { case ->
@@ -183,12 +183,12 @@ class MlKitOnDeviceTranslatorTest {
             Case(
                 "client creation",
                 FakeClientFactory(createFailure = true),
-                "客户端创建失败",
+                "client could not be created",
             ),
             Case(
                 "model download",
                 FakeClientFactory(downloadFailure = true),
-                "语言模型下载失败",
+                "language model download failed",
             ),
         )
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_choose_theme">Choisis un thème</string>
+    <string name="polish_floating_body">Choisis un personnage ou ton image. Fais glisser le bouton pour le déplacer ; maintiens-le pour ouvrir le menu. Les changements sont immédiats.</string>
+    <string name="polish_floating_summary">Personnage, image, taille et transparence</string>
+    <string name="polish_action_icon">Icône de l’action</string>
+    <string name="polish_custom_picture">Mon image</string>
+    <string name="polish_button_actions">Actions et position du bouton</string>
+    <string name="polish_ready">Prêt à traduire l’écran</string>
+    <string name="polish_less">Réduire</string>
+    <string name="polish_readiness_details">Autorisations et vérifications</string>
+    <string name="polish_more_services">Autres services</string>
+    <string name="polish_specialized_models">Modèles spécialisés</string>
+    <string name="polish_specialized_body">Ces modèles prennent en charge certaines paires de langues. Ouvre-les selon tes besoins.</string>
+    <string name="companion_chester">Chester</string>
+    <string name="companion_doc">Doc</string>
+    <string name="companion_pancake">Pancake</string>
+    <string name="companion_mochi">Mochi</string>
+    <string name="companion_bubu">Bubu</string>
+    <string name="companion_momo">Momo</string>
+</resources>

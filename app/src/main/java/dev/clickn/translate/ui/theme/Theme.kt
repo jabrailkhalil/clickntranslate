@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.ColorScheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
@@ -25,7 +26,7 @@ private val ClickLight = lightColorScheme(
     surfaceVariant = Color(0xFFEDE7F2), onSurfaceVariant = Color(0xFF5F5669),
     surfaceTint = Color(0xFF6F3BBB), surfaceBright = Color(0xFFFFFBFF),
     surfaceDim = Color(0xFFE4DDE8), surfaceContainer = Color(0xFFF3EEF7),
-    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFFCF9FF),
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF3EEF7),
     surfaceContainerHigh = Color(0xFFEDE7F2), surfaceContainerHighest = Color(0xFFE6DFEC),
     inverseSurface = Color(0xFF2A2531), inverseOnSurface = Color(0xFFF3EEF7),
     inversePrimary = Color(0xFFB69AF7), outline = Color(0xFF82758D),
@@ -70,14 +71,34 @@ fun ClickTranslateTheme(
     accent: ThemeAccent = ThemeAccent.LAVENDER,
     content: @Composable () -> Unit,
 ) {
+    val colors = clickColorScheme(themeMode, accent, isSystemInDarkTheme())
+    MaterialTheme(
+        colorScheme = colors,
+        shapes = Shapes(
+            extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(12.dp),
+            medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(20.dp),
+            extraLarge = RoundedCornerShape(28.dp),
+        ),
+        content = {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides colors.onBackground) { content() }
+        },
+    )
+}
+
+internal fun clickColorScheme(
+    themeMode: Int,
+    accent: ThemeAccent = ThemeAccent.LAVENDER,
+    systemDark: Boolean = false,
+): ColorScheme {
+    komiPaperColors(themeMode)?.let { return it }
     val darkTheme = when (themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.AMOLED -> true
-        else -> isSystemInDarkTheme()
+        else -> systemDark
     }
     val base = if (darkTheme) ClickDark else ClickLight
     val primary = Color(if (darkTheme) accent.darkColor else accent.lightColor)
-    val palette = base.copy(
+    return base.copy(
         primary = primary,
         onPrimary = if (darkTheme) Color(0xFF101116) else Color.White,
         primaryContainer = lerp(primary, if (darkTheme) Color(0xFF111217) else Color.White, if (darkTheme) 0.73f else 0.89f),
@@ -86,15 +107,9 @@ fun ClickTranslateTheme(
         background = if (themeMode == ThemeMode.AMOLED) Color.Black else base.background,
         surface = if (themeMode == ThemeMode.AMOLED) Color(0xFF0D0D10) else base.surface,
         surfaceContainer = if (themeMode == ThemeMode.AMOLED) Color(0xFF121216) else base.surfaceContainer,
-    )
-    val paper = komiPaperColors(themeMode)
-    val colors = paper ?: palette
-    MaterialTheme(
-        colorScheme = colors,
-        shapes = if (paper != null) Shapes(small = RoundedCornerShape(0.dp), medium = RoundedCornerShape(0.dp), large = RoundedCornerShape(0.dp))
-            else Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(24.dp), large = RoundedCornerShape(32.dp)),
-        content = {
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides colors.onBackground) { content() }
-        },
+        surfaceContainerLowest = if (themeMode == ThemeMode.AMOLED) Color.Black else base.surfaceContainerLowest,
+        surfaceContainerLow = if (themeMode == ThemeMode.AMOLED) Color(0xFF0D0D10) else base.surfaceContainerLow,
+        surfaceContainerHigh = if (themeMode == ThemeMode.AMOLED) Color(0xFF1B1B20) else base.surfaceContainerHigh,
+        surfaceContainerHighest = if (themeMode == ThemeMode.AMOLED) Color(0xFF24242A) else base.surfaceContainerHighest,
     )
 }

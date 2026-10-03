@@ -33,7 +33,7 @@ class CommunityTranslationClientTest {
             assertFalse(body.toString().contains("other-secret"))
         }
         assertEquals("Bonjour", transport.translate("Hello", Settings(translatorEngine = TranslatorEngine.LIBRETRANSLATE,
-            libreTranslateBaseUrl = "https://my-server.example/custom/", libreTranslateApiKey = "own-key", apiKey = "other-secret")))
+            libreTranslateBaseUrl = "https://my-server.example/custom/", libreTranslateApiKey = "own-key", apiKey = "other-secret", targetLang = "zh-CN")))
     }
 
     @Test fun libreOmitsAnEmptyOptionalKey(): Unit = runBlocking {
@@ -70,7 +70,7 @@ class CommunityTranslationClientTest {
             assertEquals("person@example.com", request.url.queryParameter("de"))
         }
         val result = transport.translate("😀".repeat(251), Settings(translatorEngine = TranslatorEngine.MYMEMORY,
-            sourceLang = "en", myMemoryEmail = "person@example.com"))
+            sourceLang = "en", targetLang = "zh-CN", myMemoryEmail = "person@example.com"))
         assertEquals(3, requests)
         assertEquals("OK & 😀".repeat(3), result)
     }

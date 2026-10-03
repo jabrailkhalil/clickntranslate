@@ -108,6 +108,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
@@ -505,7 +506,7 @@ fun SettingsScreen(
     var prompt by remember { mutableStateOf("") }
     var openAiRequestOptions by remember { mutableStateOf(OpenAiRequestOptions()) }
     var promptAdvancedExpanded by remember { mutableStateOf(false) }
-    var targetLang by remember { mutableStateOf("zh-CN") }
+    var targetLang by remember { mutableStateOf(dev.clickn.translate.data.defaultTranslationTarget()) }
     var sourceLang by remember { mutableStateOf("auto") }
     var translatorEngine by remember { mutableStateOf(TranslatorEngine.OPENAI) }
     // 端侧 LLM 翻译：状态文本（"已就绪 XX MB" / "未下载" / "下载中 …"）。仅在 LOCAL_* 引擎时显示。
@@ -653,7 +654,7 @@ fun SettingsScreen(
     var placement by remember { mutableStateOf(OverlayPlacement.BELOW) }
     var overlayStyleMode by remember { mutableStateOf(OverlayStyleMode.FIXED) }
     var overlayTheme by remember { mutableStateOf(OverlayTheme.CLASSIC_DARK) }
-    var customBg by remember { mutableStateOf(0xE6000000.toInt()) }
+    var customBg by remember { mutableStateOf(0xF2000000.toInt()) }
     var customFg by remember { mutableStateOf(0xFFFFFFFF.toInt()) }
     var customBorder by remember { mutableStateOf(0) }
     var customBorderW by remember { mutableStateOf(0f) }
@@ -713,6 +714,7 @@ fun SettingsScreen(
     var floatingSnapEdge by remember { mutableStateOf(true) }
     var floatingAutoDock by remember { mutableStateOf(false) }
     var floatingDockInset by remember { mutableStateOf(0f) }
+    var showFloatingPicture by rememberSaveable { mutableStateOf(false) }
     // 弧菜单按钮顺序：拖动后即时通过 vm 的 saveArcMenuOrder 单字段落盘，**不**走主 save 的
     // dirty 流程（用户期望立刻生效，无需点保存）。
     var menuOrder by remember { mutableStateOf<List<MenuItemId>>(emptyList()) }
@@ -1813,6 +1815,7 @@ fun SettingsScreen(
             }
             TranslationPresetSection(
                 customPresets = translationPresets,
+                targetLang = targetLang,
                 activeId = matchingPresetId,
                 unsavedPreset = unsavedPreset,
                 message = presetMessage,
@@ -3426,6 +3429,15 @@ fun SettingsScreen(
             snackbarHostState = snackbarHostState,
         )
         return
+    }
+
+    if (showFloatingPicture) ModalBottomSheet(onDismissRequest = { showFloatingPicture = false }) {
+        FloatingAppearanceSheet(buildSnapshot(), onUpdate = { transform ->
+            val updated = transform(buildSnapshot())
+            floatingSize = updated.floatingButtonSizeDp.toFloat()
+            floatingAlpha = updated.floatingButtonAlpha
+            autoSaveFloatingButtonSettings()
+        }, onAdvanced = { showFloatingPicture = false })
     }
 
     Scaffold(
@@ -6102,6 +6114,9 @@ fun SettingsScreen(
             if (selectedCategory == SectionKeys.FLOATING) item(key = SectionKeys.FLOATING) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_FLOATING) {
             SectionCard(title = stringResource(R.string.settings_section_floating)) {
+                OutlinedButton(onClick = { showFloatingPicture = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.polish_floating_summary))
+                }
                 SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_floating_size) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_floating_size_format, floatingSize.toInt()), style = MaterialTheme.typography.labelLarge)
@@ -9067,13 +9082,13 @@ private fun overlayThemeColors(
     customBorderW: Int
 ): ThemeColors = when (theme) {
     OverlayTheme.CLASSIC_DARK ->
-        ThemeColors(bg = 0xE6000000.toInt(), fg = 0xFFFFFFFF.toInt(), border = 0, borderDp = 0)
+        ThemeColors(bg = 0xF2000000.toInt(), fg = 0xFFFFFFFF.toInt(), border = 0, borderDp = 0)
     OverlayTheme.AMBER_GOLD ->
-        ThemeColors(bg = 0xF0241608.toInt(), fg = 0xFFFFD27F.toInt(), border = 0xFFB8860B.toInt(), borderDp = 2)
+        ThemeColors(bg = 0xF8241608.toInt(), fg = 0xFFFFD27F.toInt(), border = 0xFFE3B65B.toInt(), borderDp = 2)
     OverlayTheme.PAPER_LIGHT ->
-        ThemeColors(bg = 0xF0F5EFE0.toInt(), fg = 0xFF3E2A1F.toInt(), border = 0xFFB68850.toInt(), borderDp = 1)
+        ThemeColors(bg = 0xFCF5EFE0.toInt(), fg = 0xFF3E2A1F.toInt(), border = 0xFF604426.toInt(), borderDp = 1)
     OverlayTheme.FROST_GLASS ->
-        ThemeColors(bg = 0xCC1E293B.toInt(), fg = 0xFFE0F2FE.toInt(), border = 0xFF60A5FA.toInt(), borderDp = 1)
+        ThemeColors(bg = 0xF51E293B.toInt(), fg = 0xFFE0F2FE.toInt(), border = 0xFF93C5FD.toInt(), borderDp = 1)
     OverlayTheme.CUSTOM ->
         ThemeColors(bg = customBg, fg = customFg, border = customBorder, borderDp = customBorderW.coerceAtLeast(0))
 }
@@ -9772,6 +9787,7 @@ internal fun settingsSearchEntryCount(): Int = SETTING_ITEMS.size
 @OptIn(ExperimentalLayoutApi::class)
 private fun TranslationPresetSection(
     customPresets: List<TranslationPreset>,
+    targetLang: String,
     activeId: String,
     unsavedPreset: TranslationPreset?,
     message: String?,
@@ -9824,7 +9840,10 @@ private fun TranslationPresetSection(
         }
     )
     HorizontalDivider()
-    val allPresets = TranslationPresetCatalog.all(customPresets)
+    val allPresets = dev.clickn.translate.data.visibleTranslationPresets(
+        TranslationPresetCatalog.all(customPresets), targetLang, activeId,
+        LocalContext.current.resources.configuration.locales[0],
+    )
         .filterNot { unsavedPreset != null && it.id == TranslationPresetCatalog.UNSAVED_DRAFT_ID }
     val existingPresetNames = allPresets.map { translationPresetDisplayName(it) }
     translationPresetVisibleItems(allPresets, presetsExpanded).forEach { preset ->
@@ -10712,19 +10731,7 @@ private fun AppLanguageSelector(beforeChange: () -> Unit = {}) {
  */
 @Composable
 private fun ThemeModeSelector() {
-    val controller = dev.clickn.translate.ui.theme.LocalThemeMode.current
-    val mode = controller.mode
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        listOf(
-            dev.clickn.translate.ui.theme.ThemeMode.FOLLOW_SYSTEM to R.string.settings_theme_follow_system,
-            dev.clickn.translate.ui.theme.ThemeMode.LIGHT to R.string.settings_theme_light,
-            dev.clickn.translate.ui.theme.ThemeMode.DARK to R.string.settings_theme_dark,
-            dev.clickn.translate.ui.theme.ThemeMode.AMOLED to R.string.mobile_amoled,
-            dev.clickn.translate.ui.theme.ThemeMode.PAPER_DAY to R.string.refine_paper_day,
-            dev.clickn.translate.ui.theme.ThemeMode.PAPER_NIGHT to R.string.refine_paper_night,
-            dev.clickn.translate.ui.theme.ThemeMode.PAPER_NORD to R.string.refine_paper_nord,
-        ).forEach { (choice, label) -> EngineChip(mode, choice, stringResource(label)) { controller.setMode(it) } }
-    }
+    ThemeChoices()
 }
 
 @Composable

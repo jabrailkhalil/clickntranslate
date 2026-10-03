@@ -106,9 +106,11 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
                 when (step) {
                     0 -> {
                         item { BrandLogo(Modifier.size(64.dp)) }
-                        item { Button(onClick = onFinished, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.refine_quick_setup)) } }
+                        item { Text(stringResource(R.string.polish_choose_theme), style = MaterialTheme.typography.titleMedium) }
+                        themeChoices.chunked(2).forEach { choices -> item { ThemeChoiceRow(choices) } }
                         item { SetupButton(R.string.mobile_interface_language, Icons.Outlined.Language) { sheet = "interface" } }
                         item { SetupButton(R.string.mobile_appearance, Icons.Outlined.Palette) { sheet = "appearance" } }
+                        item { Button(onClick = onFinished, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.refine_quick_setup)) } }
                     }
                     1 -> settings?.let { current ->
                         item { LanguagePair(current, { sheet = "source" }, { sheet = "target" }, {
@@ -176,7 +178,8 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
                     viewModel.update { mobileLanguagePair(it, source, code) }; sheet = ""
                 }
             }
-            "services" -> ServicesSheet(settings?.translatorEngine ?: TranslatorEngine.GOOGLE) {
+            "services" -> ServicesSheet(settings?.translatorEngine ?: TranslatorEngine.GOOGLE,
+                settings?.targetLang ?: dev.clickn.translate.data.defaultTranslationTarget()) {
                 selectedProvider = it; sheet = ""; viewModel.clearConnection()
             }
         }

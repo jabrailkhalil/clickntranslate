@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_choose_theme">Choose a theme</string>
+    <string name="polish_floating_body">Choose a character or your own picture. Drag the button to move it; hold it to open its menu. Changes apply immediately.</string>
+    <string name="polish_floating_summary">Character, picture, size and transparency</string>
+    <string name="polish_action_icon">Action icon</string>
+    <string name="polish_custom_picture">My picture</string>
+    <string name="polish_button_actions">Button actions and position</string>
+    <string name="polish_ready">Ready for screen translation</string>
+    <string name="polish_less">Show less</string>
+    <string name="polish_readiness_details">Permissions and checks</string>
+    <string name="polish_more_services">More services</string>
+    <string name="polish_specialized_models">Specialized models</string>
+    <string name="polish_specialized_body">These models support specific language pairs. Open them only if you need that pair.</string>
+    <string name="companion_chester">Chester</string>
+    <string name="companion_doc">Doc</string>
+    <string name="companion_pancake">Pancake</string>
+    <string name="companion_mochi">Mochi</string>
+    <string name="companion_bubu">Bubu</string>
+    <string name="companion_momo">Momo</string>
+</resources>

@@ -90,7 +90,7 @@ class DraggableOverlayWindow(
 
     @Volatile var theme: OverlayTheme = OverlayTheme.CLASSIC_DARK
     @Volatile var alpha: Float = 0.85f
-    @Volatile var customBg: Int = 0xE6000000.toInt()
+    @Volatile var customBg: Int = 0xF2000000.toInt()
     @Volatile var customFg: Int = 0xFFFFFFFF.toInt()
     @Volatile var customBorder: Int = 0
     @Volatile var customBorderWidthDp: Int = 0
@@ -1140,19 +1140,14 @@ class DraggableOverlayWindow(
         }
     }
 
-    private fun themeBgColor(): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xE6000000.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xF0241608.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xF0F5EFE0.toInt()
-        OverlayTheme.FROST_GLASS -> 0xCC1E293B.toInt()
-        OverlayTheme.CUSTOM -> customBg
-    }
+    private fun themeBgColor(): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.background ?: customBg
 
     /** 主题边框：(widthDp, color)。widthDp = 0 表示无边。 */
     private fun themeStroke(): Pair<Int, Int> = when (theme) {
-        OverlayTheme.AMBER_GOLD -> 2 to 0xFFB8860B.toInt()
-        OverlayTheme.PAPER_LIGHT -> 1 to 0xFFB68850.toInt()
-        OverlayTheme.FROST_GLASS -> 1 to 0xFF60A5FA.toInt()
+        OverlayTheme.AMBER_GOLD -> 2 to 0xFFE3B65B.toInt()
+        OverlayTheme.PAPER_LIGHT -> 1 to 0xFF604426.toInt()
+        OverlayTheme.FROST_GLASS -> 1 to 0xFF93C5FD.toInt()
         OverlayTheme.CUSTOM -> if (customBorderWidthDp > 0) customBorderWidthDp to customBorder else 0 to 0
         else -> 0 to 0
     }
@@ -1172,21 +1167,11 @@ class DraggableOverlayWindow(
             nb.coerceIn(0, 255)
     }
 
-    private fun themeFgColor(): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xFFFFFFFF.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xFFFFD27F.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xFF3E2A1F.toInt()
-        OverlayTheme.FROST_GLASS -> 0xFFE0F2FE.toInt()
-        OverlayTheme.CUSTOM -> customFg
-    }
+    private fun themeFgColor(): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.foreground ?: customFg
 
-    private fun themeFgMutedColor(): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0x80B0BEC5.toInt()
-        OverlayTheme.AMBER_GOLD -> 0x80B68850.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0x808B6F47.toInt()
-        OverlayTheme.FROST_GLASS -> 0x8094A3B8.toInt()
-        OverlayTheme.CUSTOM -> (customFg and 0xFFFFFF) or 0x80000000.toInt()
-    }
+    private fun themeFgMutedColor(): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.muted ?: ((customFg and 0xFFFFFF) or 0x80000000.toInt())
 
     companion object {
         const val DEFAULT_WIDTH_DP = 320

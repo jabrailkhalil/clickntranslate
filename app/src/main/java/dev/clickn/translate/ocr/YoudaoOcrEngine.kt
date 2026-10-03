@@ -49,7 +49,7 @@ class YoudaoOcrEngine @Inject constructor(
     ): List<TextBlock> {
         val s = settings
         if (s.youdaoAppKey.isBlank() || s.youdaoAppSecret.isBlank()) {
-            throw IllegalStateException("有道 AppKey/AppSecret 未配置")
+            throw IllegalStateException("Youdao AppKey / AppSecret is not configured")
         }
         val imgB64 = withContext(Dispatchers.Default) {
             ByteArrayOutputStream().use { out ->
@@ -82,12 +82,12 @@ class YoudaoOcrEngine @Inject constructor(
             timedClient.newCall(req).execute().use { r ->
                 val raw = r.body?.string().orEmpty()
                 if (!r.isSuccessful) {
-                    throw RuntimeException("有道 OCR HTTP ${r.code}: ${raw.take(200)}")
+                    throw RuntimeException("Youdao OCR HTTP ${r.code}: ${raw.take(200)}")
                 }
                 val parsed = runCatching { json.decodeFromString<YoudaoOcrResp>(raw) }
-                    .getOrElse { throw RuntimeException("有道 OCR 解析失败: ${raw.take(200)}", it) }
+                    .getOrElse { throw RuntimeException("Youdao OCR response could not be parsed: ${raw.take(200)}", it) }
                 if (parsed.errorCode != "0") {
-                    throw RuntimeException("有道 OCR errorCode=${parsed.errorCode}: ${raw.take(200)}")
+                    throw RuntimeException("Youdao OCR errorCode=${parsed.errorCode}: ${raw.take(200)}")
                 }
                 parsed.Result?.regions?.flatMap { region ->
                     region.lines.orEmpty().map { line ->
@@ -105,7 +105,7 @@ class YoudaoOcrEngine @Inject constructor(
 
     override fun close() { /* 共享 OkHttp，不释放 */ }
 
-    /** sourceLang → 有道 OCR langType。auto/zh-CHS/zh-CHT/en/ja/ko/fr/de/es/ru/pt/it。 */
+    /** sourceLang → Youdao OCR langType。auto/zh-CHS/zh-CHT/en/ja/ko/fr/de/es/ru/pt/it。 */
     private fun mapLangType(s: String): String {
         val core = s.substringBefore('-').lowercase()
         return when (s.lowercase()) {

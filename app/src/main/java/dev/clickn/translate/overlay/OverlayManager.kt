@@ -92,7 +92,7 @@ class OverlayManager(
     @Volatile var offsetX: Int = 0,
     @Volatile var offsetY: Int = 0,
     @Volatile var theme: OverlayTheme = OverlayTheme.CLASSIC_DARK,
-    @Volatile var customBg: Int = 0xE6000000.toInt(),
+    @Volatile var customBg: Int = 0xF2000000.toInt(),
     @Volatile var customFg: Int = 0xFFFFFFFF.toInt(),
     @Volatile var customBorder: Int = 0,
     @Volatile var customBorderWidthDp: Int = 0,
@@ -2357,36 +2357,26 @@ class OverlayManager(
 
     private fun Long?.toDiagPrefix(): String = this?.let { "capture#$it " } ?: ""
 
-    private fun themeFgColor(): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xFFFFFFFF.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xFFFFD27F.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xFF3E2A1F.toInt()
-        OverlayTheme.FROST_GLASS -> 0xFFE0F2FE.toInt()
-        OverlayTheme.CUSTOM -> customFg
-    }
+    private fun themeFgColor(): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.foreground ?: customFg
 
-    private fun themeFgMutedColor(): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xFFB0BEC5.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xFFB68850.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xFF8B6F47.toInt()
-        OverlayTheme.FROST_GLASS -> 0xFF94A3B8.toInt()
-        OverlayTheme.CUSTOM -> (customFg and 0xFFFFFF) or 0x99000000.toInt()
-    }
+    private fun themeFgMutedColor(): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.muted ?: ((customFg and 0xFFFFFF) or 0x99000000.toInt())
 
     private fun themeBg(): GradientDrawable = GradientDrawable().apply {
         cornerRadius = 8f
         setColor(when (theme) {
-            OverlayTheme.CLASSIC_DARK -> 0xE6000000.toInt()
-            OverlayTheme.AMBER_GOLD -> 0xF0241608.toInt()
-            OverlayTheme.PAPER_LIGHT -> 0xF0F5EFE0.toInt()
-            OverlayTheme.FROST_GLASS -> 0xCC1E293B.toInt()
+            OverlayTheme.CLASSIC_DARK -> 0xF2000000.toInt()
+            OverlayTheme.AMBER_GOLD -> 0xF8241608.toInt()
+            OverlayTheme.PAPER_LIGHT -> 0xFCF5EFE0.toInt()
+            OverlayTheme.FROST_GLASS -> 0xF51E293B.toInt()
             OverlayTheme.CUSTOM -> customBg
         })
         val density = context.resources.displayMetrics.density
         when (theme) {
-            OverlayTheme.AMBER_GOLD -> setStroke(2, 0xFFB8860B.toInt())
-            OverlayTheme.PAPER_LIGHT -> setStroke(1, 0xFFB68850.toInt())
-            OverlayTheme.FROST_GLASS -> setStroke(1, 0xFF60A5FA.toInt())
+            OverlayTheme.AMBER_GOLD -> setStroke(2, 0xFFE3B65B.toInt())
+            OverlayTheme.PAPER_LIGHT -> setStroke(1, 0xFF604426.toInt())
+            OverlayTheme.FROST_GLASS -> setStroke(1, 0xFF93C5FD.toInt())
             OverlayTheme.CUSTOM -> if (customBorderWidthDp > 0) {
                 val px = (customBorderWidthDp * density).toInt()
                 // BLOCKS 模式的 box 用 GradientDrawable，只支持 SOLID/DASHED/DOTTED；

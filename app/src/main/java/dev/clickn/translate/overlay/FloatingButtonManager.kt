@@ -25,6 +25,9 @@ import dev.clickn.translate.data.InputTranslationDoubleAction
 import dev.clickn.translate.data.MenuItemId
 import dev.clickn.translate.data.SettingsRepository
 import dev.clickn.translate.data.normalizedFloatingButtonAlpha
+import dev.clickn.translate.data.AppCompanion
+import dev.clickn.translate.data.CompanionPrefs
+import dev.clickn.translate.ui.BrandIconPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -130,6 +133,8 @@ class FloatingButtonManager(
 
     /** 主球图标 ImageView 引用，applySkillIcon 时改 src。 */
     private var mainIcon: ImageView? = null
+    private var actionBadge: ImageView? = null
+    private var stopAppearanceObserver: (() -> Unit)? = null
 
     /**
      * 长按腾位：弹菜单前若球距屏幕边不够展开扇形，把球 spring 到安全位置；菜单关闭时再 spring 回原位。
@@ -284,6 +289,24 @@ class FloatingButtonManager(
             setPadding(pad, pad, pad, pad)
         }
         mainIcon = iv
+        val badge = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            val inset = (3 * density).toInt()
+            setPadding(inset, inset, inset, inset)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(0xFF252033.toInt())
+                setStroke(density.toInt().coerceAtLeast(1), 0xFFFFFFFF.toInt())
+            }
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        actionBadge = badge
+        val artwork = FrameLayout(context).apply {
+            addView(iv, FrameLayout.LayoutParams(size, size))
+            val badgeSize = (size * .38f).toInt().coerceAtLeast((16 * density).toInt())
+            addView(badge, FrameLayout.LayoutParams(badgeSize, badgeSize, Gravity.BOTTOM or Gravity.END))
+        }
         // 循环模式进度环：叠加在 iv 上层 size×size 居中，stop 状态不绘任何东西
         val progress = LoopProgressView(context)
         val longPressGuide = LongPressGuideView(context)
@@ -294,7 +317,7 @@ class FloatingButtonManager(
             strokeColor = 0xFFFFFFFF.toInt()
             strokeWidthPx = 2f * density
             ballRadius = size / 2f
-            addView(iv, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
+            addView(artwork, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
             addView(progress, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
             addView(longPressGuide, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
         }
@@ -339,6 +362,10 @@ class FloatingButtonManager(
         }
         wm.addView(container, params)
         view = container
+        applySkillIcon()
+        stopAppearanceObserver = CompanionPrefs.observe(context) {
+            inputTapHandler.post { if (view != null) applySkillIcon() }
+        }
         dev.clickn.translate.data.AppLocalePrefs.observe(container) {
             updateAccessibilityDescription()
             if (inputTranslationGuideVisible) {
@@ -489,6 +516,8 @@ class FloatingButtonManager(
     }
 
     fun hide() {
+        stopAppearanceObserver?.invoke()
+        stopAppearanceObserver = null
         hiddenForCapture = false
         cancelFirstUseTour(markCompleted = false, dismissMenu = false)
         // hide 时若菜单还在 + 球已腾位 → 先把球位「回滚 到 positionBeforeMenu」再保存，不然下次
@@ -508,6 +537,7 @@ class FloatingButtonManager(
         longPressGuideView?.stop()
         longPressGuideView = null
         mainIcon = null
+        actionBadge = null
         cancelPendingInputTap()
         if (inputTranslationGuideVisible) {
             tourOverlay.dismiss()
@@ -751,7 +781,29 @@ class FloatingButtonManager(
     /** 立即把球的主图标按当前 [skill] 切换。CaptureService 在切技能时 + settings collect 同步时调。 */
     fun applySkillIcon() {
         if (skill != FloatingSkill.INPUT_TRANSLATE) cancelPendingInputTap()
-        mainIcon?.setImageResource(skillIconRes())
+        val icon = mainIcon
+        val choice = CompanionPrefs.read(context)
+        val companion = AppCompanion.entries.firstOrNull { it.id == choice }
+        val picture = if (choice == CompanionPrefs.CUSTOM) BrandIconPrefs.bitmap(context, floating = true) else null
+        val hasPicture = companion != null || choice == CompanionPrefs.LOGO || picture != null
+        icon?.scaleType = ImageView.ScaleType.FIT_CENTER
+        when {
+            picture != null -> icon?.setImageBitmap(picture)
+            companion != null -> icon?.setImageResource(companion.image)
+            choice == CompanionPrefs.LOGO -> icon?.setImageResource(R.drawable.ic_clickn_logo)
+            else -> icon?.setImageResource(skillIconRes())
+        }
+        val padding = if (hasPicture) 0 else (sizeDp * context.resources.displayMetrics.density * .18f).toInt()
+        icon?.setPadding(padding, padding, padding, padding)
+        actionBadge?.apply {
+            setImageResource(skillIconRes())
+            visibility = if (hasPicture) View.VISIBLE else View.GONE
+        }
+        (view as? LiquidFloatingContainer)?.apply {
+            fillColor = if (hasPicture) android.graphics.Color.TRANSPARENT
+                else androidx.core.content.ContextCompat.getColor(context, R.color.floating_button)
+            strokeWidthPx = if (hasPicture) 0f else 2f * context.resources.displayMetrics.density
+        }
         updateAccessibilityDescription()
     }
 

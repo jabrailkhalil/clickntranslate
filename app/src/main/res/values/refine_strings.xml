@@ -2,7 +2,7 @@
 <resources><string name="refine_add_shortcut">Add a picture shortcut</string>
     <string name="refine_android13">Available on Android 13 or newer</string>
     <string name="refine_brand_logo">Click’n’Translate logo</string>
-    <string name="refine_brand_mascot">Desktop companion</string>
+    <string name="refine_brand_mascot">Doc</string>
     <string name="refine_capture_ready">Screen capture</string>
     <string name="refine_capture_ready_body">Android asks for screen-sharing consent at startup. Accessibility is optional for repeated captures.</string>
     <string name="refine_checking">Checking…</string>

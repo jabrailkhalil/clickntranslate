@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_choose_theme">Wähle ein Design</string>
+    <string name="polish_floating_body">Wähle eine Figur oder ein eigenes Bild. Ziehe die Schaltfläche zum Verschieben; halte sie für das Menü gedrückt. Änderungen werden sofort angewendet.</string>
+    <string name="polish_floating_summary">Figur, Bild, Größe und Transparenz</string>
+    <string name="polish_action_icon">Aktionssymbol</string>
+    <string name="polish_custom_picture">Mein Bild</string>
+    <string name="polish_button_actions">Aktionen und Position</string>
+    <string name="polish_ready">Bereit für die Bildschirmübersetzung</string>
+    <string name="polish_less">Weniger anzeigen</string>
+    <string name="polish_readiness_details">Berechtigungen und Prüfungen</string>
+    <string name="polish_more_services">Weitere Dienste</string>
+    <string name="polish_specialized_models">Spezialisierte Modelle</string>
+    <string name="polish_specialized_body">Diese Modelle unterstützen bestimmte Sprachpaare. Öffne sie bei Bedarf.</string>
+    <string name="companion_chester">Chester</string>
+    <string name="companion_doc">Doc</string>
+    <string name="companion_pancake">Pfannkuchen</string>
+    <string name="companion_mochi">Mochi</string>
+    <string name="companion_bubu">Bubu</string>
+    <string name="companion_momo">Momo</string>
+</resources>

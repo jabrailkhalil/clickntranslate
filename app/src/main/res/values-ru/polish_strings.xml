@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_choose_theme">Выбери тему</string>
+    <string name="polish_floating_body">Выбери персонажа или свою картинку. Перетаскивай кнопку, чтобы передвинуть; удерживай, чтобы открыть меню. Изменения применяются сразу.</string>
+    <string name="polish_floating_summary">Персонаж, картинка, размер и прозрачность</string>
+    <string name="polish_action_icon">Значок действия</string>
+    <string name="polish_custom_picture">Моя картинка</string>
+    <string name="polish_button_actions">Действия и положение кнопки</string>
+    <string name="polish_ready">Можно переводить экран</string>
+    <string name="polish_less">Свернуть</string>
+    <string name="polish_readiness_details">Разрешения и проверки</string>
+    <string name="polish_more_services">Другие сервисы</string>
+    <string name="polish_specialized_models">Специализированные модели</string>
+    <string name="polish_specialized_body">Эти модели работают с отдельными парами языков. Открывай их, если нужна именно эта пара.</string>
+    <string name="companion_chester">Честер</string>
+    <string name="companion_doc">Док</string>
+    <string name="companion_pancake">Блинчик</string>
+    <string name="companion_mochi">Моти</string>
+    <string name="companion_bubu">Бубу</string>
+    <string name="companion_momo">Момо</string>
+</resources>

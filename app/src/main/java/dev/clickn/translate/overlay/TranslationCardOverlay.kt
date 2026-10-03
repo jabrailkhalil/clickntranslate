@@ -81,7 +81,7 @@ internal fun translationCardSectionDividerCount(
  *  - 动作行：复制原文 / 复制译文 按钮 + 点击短暂反馈
  *
  * 卡片背景 / 文字 / 边框 / 边框样式跟随 [Settings.overlayTheme]——和 [DraggableOverlayWindow]
- * 一致，五种内置主题 + CUSTOM。**主题取色函数与 DraggableOverlayWindow 内的实现保持同步**，
+ * 一致。Built-in foreground roles use the shared overlay palette; CUSTOM preserves user colors.
  * 未来改主题色需要两边一起改。
  */
 class TranslationCardOverlay(
@@ -1196,32 +1196,17 @@ class TranslationCardOverlay(
             }
         }.getOrNull()
 
-    // —— 主题色：与 DraggableOverlayWindow 同步。把两边维护成一致以保持视觉统一。——
+    // Shared built-in palettes keep all overlay windows consistent.
 
-    private fun themeBgColor(theme: OverlayTheme, s: Settings): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xE6000000.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xF0241608.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xF0F5EFE0.toInt()
-        OverlayTheme.FROST_GLASS -> 0xCC1E293B.toInt()
-        OverlayTheme.CUSTOM -> s.customBgColor
-    }
+    private fun themeBgColor(theme: OverlayTheme, s: Settings): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.background ?: s.customBgColor
 
-    private fun themeFgColor(theme: OverlayTheme, s: Settings): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xFFFFFFFF.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xFFFFD27F.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xFF3E2A1F.toInt()
-        OverlayTheme.FROST_GLASS -> 0xFFE0F2FE.toInt()
-        OverlayTheme.CUSTOM -> s.customFgColor
-    }
+    private fun themeFgColor(theme: OverlayTheme, s: Settings): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.foreground ?: s.customFgColor
 
     /** 次要文字色 (原文标题 / 例句原文 / 关闭键)。CUSTOM 时用 fg 半透明替代。 */
-    private fun themeFgMutedColor(theme: OverlayTheme, s: Settings): Int = when (theme) {
-        OverlayTheme.CLASSIC_DARK -> 0xCCB0BEC5.toInt()
-        OverlayTheme.AMBER_GOLD -> 0xCCB68850.toInt()
-        OverlayTheme.PAPER_LIGHT -> 0xCC8B6F47.toInt()
-        OverlayTheme.FROST_GLASS -> 0xCC94A3B8.toInt()
-        OverlayTheme.CUSTOM -> (s.customFgColor and 0x00FFFFFF) or 0xB0000000.toInt()
-    }
+    private fun themeFgMutedColor(theme: OverlayTheme, s: Settings): Int =
+        dev.clickn.translate.data.builtInOverlayPalette(theme)?.muted ?: ((s.customFgColor and 0x00FFFFFF) or 0xB0000000.toInt())
 
     /** label / 复制按钮色——主题强调色。默认主题用 stroke 颜色；CLASSIC_DARK / CUSTOM 用 fg 派生。 */
     private fun themeAccentColor(theme: OverlayTheme, s: Settings): Int =
@@ -1233,9 +1218,9 @@ class TranslationCardOverlay(
 
     /** 主题边框：(widthDp, color)。widthDp = 0 表示无边。 */
     private fun themeStroke(theme: OverlayTheme, s: Settings): Pair<Int, Int> = when (theme) {
-        OverlayTheme.AMBER_GOLD -> 2 to 0xFFB8860B.toInt()
-        OverlayTheme.PAPER_LIGHT -> 1 to 0xFFB68850.toInt()
-        OverlayTheme.FROST_GLASS -> 1 to 0xFF60A5FA.toInt()
+        OverlayTheme.AMBER_GOLD -> 2 to 0xFFE3B65B.toInt()
+        OverlayTheme.PAPER_LIGHT -> 1 to 0xFF604426.toInt()
+        OverlayTheme.FROST_GLASS -> 1 to 0xFF93C5FD.toInt()
         OverlayTheme.CUSTOM -> if (s.customBorderWidth > 0) s.customBorderWidth to s.customBorderColor else 0 to 0
         else -> 0 to 0
     }

@@ -26,9 +26,9 @@ internal fun translationActionAccentColor(
     customForegroundColor: Int,
 ): Int = when (theme) {
     OverlayTheme.CLASSIC_DARK -> 0xFF90CAF9.toInt()
-    OverlayTheme.AMBER_GOLD -> 0xFFB8860B.toInt()
-    OverlayTheme.PAPER_LIGHT -> 0xFFB68850.toInt()
-    OverlayTheme.FROST_GLASS -> 0xFF60A5FA.toInt()
+    OverlayTheme.AMBER_GOLD -> 0xFFE3B65B.toInt()
+    OverlayTheme.PAPER_LIGHT -> 0xFF604426.toInt()
+    OverlayTheme.FROST_GLASS -> 0xFF93C5FD.toInt()
     OverlayTheme.CUSTOM -> customBorderColor.takeIf { it != 0 } ?: customForegroundColor
 }
 

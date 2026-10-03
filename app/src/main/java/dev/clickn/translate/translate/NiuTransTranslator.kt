@@ -98,19 +98,19 @@ internal object NiuTransExecutionPolicy {
 internal object NiuTransBatchResponsePolicy {
     fun parse(body: JsonObject, expectedSources: List<String>): List<String?> {
         val items = body["tgtList"] as? JsonArray
-            ?: throw TranslationException("小牛翻译批量响应缺少 tgtList")
+            ?: throw TranslationException("NiuTrans batch response is missing tgtList")
         if (items.size != expectedSources.size) {
             throw TranslationException(
-                "小牛翻译批量结果数量不匹配: expected=${expectedSources.size}, actual=${items.size}",
+                "NiuTrans batch result count mismatch: expected=${expectedSources.size}, actual=${items.size}",
             )
         }
         return items.mapIndexed { index, element ->
             val item = element as? JsonObject
-                ?: throw TranslationException("小牛翻译批量结果格式错误: index=$index")
+                ?: throw TranslationException("Invalid NiuTrans batch result format: index=$index")
             fun value(key: String): String? = (item[key] as? JsonPrimitive)?.contentOrNull
             val returnedSource = value("srcText")
             if (returnedSource != null && returnedSource != expectedSources[index]) {
-                throw TranslationException("小牛翻译批量结果顺序不匹配: index=$index")
+                throw TranslationException("NiuTrans batch result order mismatch: index=$index")
             }
             val errorCode = value("errorCode")
             if (!errorCode.isNullOrBlank() && errorCode != "200") null
@@ -129,7 +129,7 @@ internal sealed interface NiuTransSseUpdate {
 internal object NiuTransSsePolicy {
     fun parse(data: String, json: Json): NiuTransSseUpdate {
         val body = runCatching { json.parseToJsonElement(data).jsonObject }
-            .getOrElse { throw TranslationException("小牛翻译流式响应解析失败: ${data.take(200)}", it) }
+            .getOrElse { throw TranslationException("NiuTrans stream response could not be parsed: ${data.take(200)}", it) }
         fun value(key: String): String? = (body[key] as? JsonPrimitive)?.contentOrNull
         return when (value("type")) {
             "start" -> NiuTransSseUpdate.Start
@@ -143,9 +143,9 @@ internal object NiuTransSsePolicy {
             )
             "error" -> NiuTransSseUpdate.Error(
                 code = value("errorCode"),
-                message = value("message") ?: "未知错误",
+                message = value("message") ?: "Unknown error",
             )
-            else -> throw TranslationException("小牛翻译未知流式事件: ${data.take(200)}")
+            else -> throw TranslationException("Unknown NiuTrans stream event: ${data.take(200)}")
         }
     }
 }
@@ -192,27 +192,27 @@ internal object NiuTransProJsonResponsePolicy {
     fun parse(raw: String, json: Json): String {
         val body = runCatching { json.parseToJsonElement(raw).jsonObject }
             .getOrElse {
-                throw TranslationException("小牛翻译响应解析失败: ${raw.take(MAX_DIAGNOSTIC_LENGTH)}", it)
+                throw TranslationException("NiuTrans response could not be parsed: ${raw.take(MAX_DIAGNOSTIC_LENGTH)}", it)
             }
         fun value(key: String): String? = (body[key] as? JsonPrimitive)?.contentOrNull
 
         val streamType = value("type")
         if (streamType == "error") {
             throw TranslationException(
-                "小牛翻译 ${value("errorCode") ?: "error"}: " +
-                    (value("message") ?: value("errorMsg") ?: "未知错误"),
+                "NiuTrans ${value("errorCode") ?: "error"}: " +
+                    (value("message") ?: value("errorMsg") ?: "Unknown error"),
             )
         }
         val errorCode = value("errorCode")
         if (!errorCode.isNullOrBlank() && errorCode != "200") {
             throw TranslationException(
-                "小牛翻译 $errorCode: ${value("errorMsg") ?: value("message") ?: "未知错误"}",
+                "NiuTrans $errorCode: ${value("errorMsg") ?: value("message") ?: "Unknown error"}",
             )
         }
         val resultCode = value("resultCode")
         if (!resultCode.isNullOrBlank() && resultCode != "200") {
             throw TranslationException(
-                "小牛翻译 $resultCode: ${value("resultMsg") ?: value("message") ?: "请求失败"}",
+                "NiuTrans $resultCode: ${value("resultMsg") ?: value("message") ?: "Request failed"}",
             )
         }
 
@@ -220,7 +220,7 @@ internal object NiuTransProJsonResponsePolicy {
             "done" -> value("result")
             else -> value("tgtText")
         }?.trim()?.takeIf(String::isNotEmpty)
-            ?: throw TranslationException("小牛翻译返回空译文")
+            ?: throw TranslationException("NiuTrans returned an empty translation")
     }
 
     fun isJsonContentType(contentType: String?): Boolean =
@@ -260,7 +260,7 @@ internal object NiuTransStreamEndPolicy {
         eventCount == 0 && nonSseBody.isNotBlank() ->
             NiuTransStreamEndResolution.JsonFallback(nonSseBody)
         else -> NiuTransStreamEndResolution.Incomplete(
-            "小牛翻译流式响应未正常结束 (events=$eventCount, deltas=$deltaCount)",
+            "NiuTrans stream ended unexpectedly (events=$eventCount, deltas=$deltaCount)",
         )
     }
 }
@@ -334,10 +334,10 @@ class NiuTransTranslator @Inject constructor(
                         val raw = response.body?.string().orEmpty()
                         responseSample = raw
                         completionOutcome = "http_${response.code}"
-                        throw TranslationException("小牛翻译 HTTP ${response.code}: ${raw.take(200)}")
+                        throw TranslationException("NiuTrans HTTP ${response.code}: ${raw.take(200)}")
                     }
                     val responseBody = response.body
-                        ?: throw TranslationException("小牛翻译返回空响应")
+                        ?: throw TranslationException("NiuTrans returned an empty response")
                     contentType = responseBody.contentType()?.toString()
                     if (NiuTransProJsonResponsePolicy.isJsonContentType(contentType)) {
                         val raw = responseBody.string()
@@ -383,7 +383,7 @@ class NiuTransTranslator @Inject constructor(
                             }
                             is NiuTransSseUpdate.Done -> {
                                 val finalText = update.result.trim().ifEmpty { accumulated.toString().trim() }
-                                if (finalText.isEmpty()) throw TranslationException("小牛翻译返回空译文")
+                                if (finalText.isEmpty()) throw TranslationException("NiuTrans returned an empty translation")
                                 if (finalText != accumulated.toString()) emit(finalText)
                                 cache.put(cacheKey, finalText, settings)
                                 completed = true
@@ -393,7 +393,7 @@ class NiuTransTranslator @Inject constructor(
                                 completionOutcome = "sse_error"
                                 responseSample = dataLines.joinToString("\n")
                                 throw TranslationException(
-                                    "小牛翻译 ${update.code ?: "error"}: ${update.message}",
+                                    "NiuTrans ${update.code ?: "error"}: ${update.message}",
                                 )
                             }
                         }
@@ -544,7 +544,7 @@ class NiuTransTranslator @Inject constructor(
                 NiuTransMode.PRO -> translatePro("hello", "en", "zh", settings, stream = false)
             }
             val elapsedMs = (System.nanoTime() - started) / 1_000_000L
-            if (translated.isNullOrBlank()) TestResult(false, "返回空译文")
+            if (translated.isNullOrBlank()) TestResult(false, "Empty translation")
             else TestResult(true, "OK ${elapsedMs}ms")
         }.getOrElse { TestResult(false, it.message ?: it.javaClass.simpleName) }
     }
@@ -671,7 +671,7 @@ class NiuTransTranslator @Inject constructor(
         val body = parseObject(executeRaw(endpoint, payload, settings))
         body.throwIfError()
         return body.string("tgtText")?.trim()?.takeIf(String::isNotEmpty)
-            ?: throw TranslationException("小牛翻译返回空译文")
+            ?: throw TranslationException("NiuTrans returned an empty translation")
     }
 
     private suspend fun executeRaw(
@@ -688,7 +688,7 @@ class NiuTransTranslator @Inject constructor(
             client.withApiTimeout(settings.apiTimeoutSeconds).newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw TranslationException("小牛翻译 HTTP ${response.code}: ${raw.take(200)}")
+                    throw TranslationException("NiuTrans HTTP ${response.code}: ${raw.take(200)}")
                 }
                 raw
             }
@@ -697,16 +697,16 @@ class NiuTransTranslator @Inject constructor(
 
     private fun parseObject(raw: String): JsonObject =
         runCatching { json.parseToJsonElement(raw).jsonObject }
-            .getOrElse { throw TranslationException("小牛翻译响应解析失败: ${raw.take(200)}", it) }
+            .getOrElse { throw TranslationException("NiuTrans response could not be parsed: ${raw.take(200)}", it) }
 
     private fun JsonObject.throwIfError() {
         val errorCode = string("errorCode")
         if (!errorCode.isNullOrBlank() && errorCode != "200") {
-            throw TranslationException("小牛翻译 $errorCode: ${string("errorMsg") ?: "未知错误"}")
+            throw TranslationException("NiuTrans $errorCode: ${string("errorMsg") ?: "Unknown error"}")
         }
         val resultCode = string("resultCode")
         if (!resultCode.isNullOrBlank() && resultCode != "200" && this["tgtList"] == null) {
-            throw TranslationException("小牛翻译 $resultCode: ${string("resultMsg") ?: "请求失败"}")
+            throw TranslationException("NiuTrans $resultCode: ${string("resultMsg") ?: "Request failed"}")
         }
     }
 
@@ -718,23 +718,23 @@ class NiuTransTranslator @Inject constructor(
             .toRequestBody(JSON_MEDIA_TYPE)
 
     private fun validateCredentials(settings: Settings) {
-        if (settings.niuTransApiKey.isBlank()) throw TranslationException("缺少小牛翻译 API Key")
+        if (settings.niuTransApiKey.isBlank()) throw TranslationException("NiuTrans API key is missing")
         if (settings.niuTransMode == NiuTransMode.FLASH && settings.niuTransAppId.isBlank()) {
-            throw TranslationException("Flash 需要配置小牛翻译 App ID")
+            throw TranslationException("NiuTrans Flash requires an App ID")
         }
     }
 
     private fun requireSource(settings: Settings): String =
         NiuTransLanguageCatalog.mapSource(settings.sourceLang, settings.niuTransMode)
-            ?: throw TranslationException("小牛翻译不支持源语言: ${dev.clickn.translate.data.languageDisplayName(settings.sourceLang)}")
+            ?: throw TranslationException("NiuTrans does not support the source language: ${dev.clickn.translate.data.languageDisplayName(settings.sourceLang)}")
 
     private fun requireTarget(settings: Settings): String =
         NiuTransLanguageCatalog.mapTarget(settings.targetLang, settings.niuTransMode)
-            ?: throw TranslationException("小牛翻译不支持目标语言: ${dev.clickn.translate.data.languageDisplayName(settings.targetLang)}")
+            ?: throw TranslationException("NiuTrans does not support the target language: ${dev.clickn.translate.data.languageDisplayName(settings.targetLang)}")
 
     private fun requireTextLength(text: String) {
         if (text.codePointCount(0, text.length) > NiuTransBatchPolicy.MAX_CHARACTERS) {
-            throw TranslationException("小牛翻译请求超过 5000 字符")
+            throw TranslationException("NiuTrans request exceeds 5000 characters")
         }
     }
 

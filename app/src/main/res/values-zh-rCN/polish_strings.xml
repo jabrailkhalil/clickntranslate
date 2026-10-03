@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_choose_theme">选择主题</string>
+    <string name="polish_floating_body">选择角色或自己的图片。拖动按钮可移动，长按可打开菜单。更改会立即生效。</string>
+    <string name="polish_floating_summary">角色、图片、大小和透明度</string>
+    <string name="polish_action_icon">操作图标</string>
+    <string name="polish_custom_picture">我的图片</string>
+    <string name="polish_button_actions">按钮操作和位置</string>
+    <string name="polish_ready">可以开始屏幕翻译</string>
+    <string name="polish_less">收起</string>
+    <string name="polish_readiness_details">权限和检查</string>
+    <string name="polish_more_services">更多服务</string>
+    <string name="polish_specialized_models">专用模型</string>
+    <string name="polish_specialized_body">这些模型仅支持特定语言对。需要对应语言对时再打开。</string>
+    <string name="companion_chester">Chester</string>
+    <string name="companion_doc">Doc</string>
+    <string name="companion_pancake">松饼</string>
+    <string name="companion_mochi">麻薯猫</string>
+    <string name="companion_bubu">布布</string>
+    <string name="companion_momo">桃桃</string>
+</resources>

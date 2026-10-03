@@ -60,7 +60,7 @@ class TencentTranslator @Inject constructor(
         if (sources.isEmpty()) return emptyList()
         validate(settings)
 
-        val targetCode = mapLang(settings.targetLang) ?: "zh"
+        val targetCode = mapLang(settings.targetLang) ?: (mapLang(dev.clickn.translate.data.defaultTranslationTarget()) ?: "en")
         val sourceCode = mapLang(settings.sourceLang) ?: "auto"
 
         val result = arrayOfNulls<String>(sources.size)
@@ -111,12 +111,12 @@ class TencentTranslator @Inject constructor(
                 }
                 runCatching { json.decodeFromString<TmtEnvelope>(raw) }
                     .getOrElse {
-                        throw TranslationException("Tencent TMT 解析失败: ${raw.take(200)}", it)
+                        throw TranslationException("Tencent TMT response could not be parsed: ${raw.take(200)}", it)
                     }
             }
         }
         val response = parsed.response
-            ?: throw TranslationException("Tencent TMT 空响应")
+            ?: throw TranslationException("Tencent TMT returned an empty response")
         if (response.error != null) {
             throw TranslationException(friendlyError(response.error))
         }
@@ -137,27 +137,27 @@ class TencentTranslator @Inject constructor(
 
     override suspend fun testConnection(settings: Settings): TestResult {
         if (settings.tencentSecretId.isBlank() || settings.tencentSecretKey.isBlank()) {
-            return TestResult(false, "缺少腾讯云 SecretId / SecretKey（在 OCR 配置里填）")
+            return TestResult(false, "Tencent SecretId / SecretKey is missing (configure it in OCR settings)")
         }
         // 先翻一段 hello 验证翻译功能；再额外查一次账户余额作为顺带反馈。余额查询失败
         // **不**导致整体失败——子账号通常缺财务读权限（finance:DescribeAccountBalance），
         // 没必要让用户因为这个被拒登就以为翻译不可用。
         val translateResult = runCatching {
             val out = translate("hello", settings)
-            if (out.isNullOrBlank()) Result.failure<String>(TranslationException("返回空"))
+            if (out.isNullOrBlank()) Result.failure<String>(TranslationException("Empty response"))
             else Result.success(out)
         }.getOrElse { Result.failure(it) }
 
         if (translateResult.isFailure) {
             val e = translateResult.exceptionOrNull()
-            return TestResult(false, e?.message ?: e?.javaClass?.simpleName ?: "未知错误")
+            return TestResult(false, e?.message ?: e?.javaClass?.simpleName ?: "Unknown error")
         }
         val sample = translateResult.getOrThrow().take(40)
         val balance = runCatching { queryBalance(settings) }.getOrNull()
         val msg = if (balance != null) {
-            "OK 余额 ¥%.2f 样例: %s".format(balance, sample)
+            "OK balance: ¥%.2f; sample: %s".format(balance, sample)
         } else {
-            "OK 样例: $sample （余额查询需要财务读权限，可忽略）"
+            "OK sample: $sample (balance access is optional)"
         }
         return TestResult(true, msg)
     }
@@ -198,7 +198,7 @@ class TencentTranslator @Inject constructor(
 
     private fun validate(settings: Settings) {
         if (settings.tencentSecretId.isBlank() || settings.tencentSecretKey.isBlank()) {
-            throw TranslationException("腾讯云 SecretId / SecretKey 未配置（与 OCR 共用，在 OCR 配置里填）")
+            throw TranslationException("Tencent SecretId / SecretKey is not configured (shared with OCR settings)")
         }
     }
 
@@ -210,20 +210,20 @@ class TencentTranslator @Inject constructor(
      */
     private fun friendlyError(error: ErrorBody): String {
         val code = error.code ?: "UnknownError"
-        val raw = error.message ?: "无 message"
+        val raw = error.message ?: "No message"
         val hint = when {
             code == "FailedOperation.UserNotRegistered" ->
-                "腾讯云翻译服务尚未开通。请到 https://console.cloud.tencent.com/tmt 点「立即开通」（个人免费 5 百万字符/月），然后重试。"
+                "Enable the translation service at https://console.cloud.tencent.com/tmt and retry."
             code == "FailedOperation.ServiceIsolate" ->
-                "账号已被隔离 / 欠费。请到腾讯云控制台检查账户余额与 TMT 服务状态。"
+                "Check your account balance and TMT service status in the Tencent console."
             code.startsWith("AuthFailure") ->
-                "鉴权失败。请检查 SecretId / SecretKey 是否正确、子账号是否有 QcloudTMTFullAccess 策略。"
+                "Check your SecretId / SecretKey and the QcloudTMTFullAccess policy."
             code == "RequestLimitExceeded" ->
-                "调用频率超限（默认 5 QPS）。"
+                "Request rate limit exceeded. Retry later."
             else -> null
         }
-        return if (hint != null) "腾讯翻译 $code: $raw\n→ $hint"
-        else "腾讯翻译 $code: $raw"
+        return if (hint != null) "Tencent translation $code: $raw\n→ $hint"
+        else "Tencent translation $code: $raw"
     }
 
     /**

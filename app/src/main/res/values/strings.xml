@@ -1790,7 +1790,7 @@
     <string name="glossary_import_file_title">Import from a JSON file</string>
     <string name="glossary_import_file_empty">No file selected</string>
     <string name="glossary_import_choose_file">Choose JSON file</string>
-    <string name="glossary_import_format_hint">Supports exported glossary files, source/target arrays, and 原文/译文 arrays.</string>
+    <string name="glossary_import_format_hint">Supports exported glossary files and arrays with source/target fields.</string>
     <string name="glossary_import_apply_settings">Apply to this import</string>
     <string name="glossary_import_existing_terms">Matching existing terms</string>
     <string name="glossary_import_conflict_skip">Skip</string>

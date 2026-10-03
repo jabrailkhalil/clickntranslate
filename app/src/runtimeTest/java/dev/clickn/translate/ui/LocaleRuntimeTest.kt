@@ -24,11 +24,11 @@ class LocaleRuntimeTest {
         setupClick("Interface language")
         compose.onNodeWithText("Русский").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Начать с этими настройками").performScrollTo().assertIsDisplayed()
+        assertSetupShown("Начать с этими настройками")
         assertEquals("ru", AppLocalePrefs.read(compose.activity))
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
-        compose.onNodeWithText("Начать с этими настройками").performScrollTo().assertIsDisplayed()
+        assertSetupShown("Начать с этими настройками")
     }
     @Test fun allSixInterfaceLanguagesApplyInActualActivity() {
         val choices = listOf(
@@ -44,14 +44,15 @@ class LocaleRuntimeTest {
             setupClick(label)
             compose.onNodeWithText(name).performClick()
             compose.waitForIdle()
-            compose.onNodeWithText(start).performScrollTo().assertIsDisplayed()
+            assertSetupShown(start)
             label = nextLabel
         }
     }
     @Test fun paperThemePersistsAcrossRecreation() {
-        setupClick("Appearance")
-        compose.onNodeWithTag("appearance-options").performScrollToNode(hasText("Paper Night"))
-        compose.onNodeWithText("Paper Night").performClick()
+        compose.onNodeWithTag("setup-options").performScrollToNode(hasTestTag("theme-${ThemeMode.PAPER_NIGHT}"))
+        compose.onNodeWithTag("theme-${ThemeMode.PAPER_NIGHT}").assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithTag("theme-${ThemeMode.PAPER_NIGHT}").performClick()
+        compose.waitForIdle()
         assertEquals(ThemeMode.PAPER_NIGHT, ThemeModePrefs.read(compose.activity))
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
@@ -59,8 +60,28 @@ class LocaleRuntimeTest {
         val controller = androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
         assertFalse(controller.isAppearanceLightStatusBars)
     }
-    private fun setupClick(label: String) {
+    @Test fun characterChoiceCanScrollSelectAndSurviveRecreation() {
+        setupClick(resource(R.string.refine_quick_setup))
+        compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
+        listClick(resource(R.string.refine_floating))
+        // Includes the last row: all companions must be reachable on a small screen.
+        listOf("momo", "doc", "chester").forEach { id ->
+            compose.onNodeWithTag("floating-appearance").performScrollToNode(hasTestTag("companion-$id"))
+            compose.onNodeWithTag("companion-$id").assertIsDisplayed().performClick()
+            compose.waitForIdle()
+            assertEquals(id, dev.clickn.translate.data.CompanionPrefs.read(compose.activity))
+        }
+        compose.activityRule.scenario.recreate()
+        compose.waitForIdle()
+        assertEquals("chester", dev.clickn.translate.data.CompanionPrefs.read(compose.activity))
+    }
+
+    private fun assertSetupShown(label: String) {
         compose.onNodeWithTag("setup-options").performScrollToNode(hasText(label))
+        compose.onNodeWithText(label).assertIsDisplayed()
+    }
+    private fun setupClick(label: String) {
+        assertSetupShown(label)
         compose.onNodeWithText(label).performClick()
     }
     private fun listClick(label: String) {
@@ -72,7 +93,7 @@ class LocaleRuntimeTest {
     private fun openAdvanced() {
         compose.runOnIdle { AppLocalePrefs.write(compose.activity, "en") }
         compose.waitForIdle()
-        compose.onNodeWithText(resource(R.string.refine_quick_setup)).performScrollTo().performClick()
+        setupClick(resource(R.string.refine_quick_setup))
         compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
         listClick(resource(R.string.mobile_advanced))

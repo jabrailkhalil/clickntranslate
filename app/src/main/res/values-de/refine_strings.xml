@@ -2,7 +2,7 @@
 <resources><string name="refine_add_shortcut">Bild-Verknüpfung hinzufügen</string>
     <string name="refine_android13">Ab Android 13 verfügbar</string>
     <string name="refine_brand_logo">Click’n’Translate-Logo</string>
-    <string name="refine_brand_mascot">Desktop-Begleiter</string>
+    <string name="refine_brand_mascot">Doc</string>
     <string name="refine_capture_ready">Bildschirmaufnahme</string>
     <string name="refine_capture_ready_body">Android fragt beim Start nach der Bildschirmfreigabe. Bedienungshilfen sind für wiederholte Aufnahmen optional.</string>
     <string name="refine_checking">Wird geprüft…</string>
