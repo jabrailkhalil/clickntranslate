@@ -1,44 +1,14 @@
 """Tiny in-window companion. No desktop overlay, capture, model or worker.
 
-Only a 20px sprite is animated, at most 12.5 times/s while its page is visible.
+Only a 20px sprite is animated, at most 60 times/s while its page is visible.
 The animation continues in inactive windows. Hidden/minimized pages have no
-running timer. GIFs are decoded once, not in paintEvent or in a timer callback.
+running timer. Artwork is decoded once; motion shares the desktop rig.
 """
-from functools import lru_cache
-from pathlib import Path
-import sys
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from assistant_text import assistant_text
-
-
-@lru_cache(maxsize=1)
-def preview_frames():
-    """One bounded cache: ten 32px frames and their mirrored versions (~70KiB).
-
-    Keep the source's stable union bounds so feet don't jump between frames.
-    Store at 2x the logical size for crisp high-DPI/zoomed rendering.
-    """
-    root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-    reader = QtGui.QImageReader(str(root / 'icons/desktop-assistant/kirby.gif'))
-    size = reader.size()
-    if size.isEmpty() or max(size.width(), size.height()) > 512:
-        return (), ()
-    images, bounds = [], QtCore.QRect()
-    while reader.canRead() and len(images) < 64:
-        image = reader.read()
-        if image.isNull():
-            break
-        images.append(image)
-        pixmap = QtGui.QPixmap.fromImage(image)
-        bounds = bounds.united(QtGui.QRegion(pixmap.mask()).boundingRect())
-    if bounds.isEmpty():
-        return (), ()
-    forward = tuple(QtGui.QPixmap.fromImage(image.copy(bounds).scaled(
-        32, 32, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)) for image in images)
-    reverse = tuple(frame.transformed(QtGui.QTransform().scale(-1, 1)) for frame in forward)
-    return forward, reverse
+from assistant_art import mascot_id
+from assistant_motion import PetMotion, paint_pet, skin
 
 
 class _PreviewButton(QtWidgets.QAbstractButton):
@@ -57,19 +27,20 @@ class _PreviewButton(QtWidgets.QAbstractButton):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        frames = self.rail.frames[0 if self.rail.direction > 0 else 1]
-        if frames:
-            pixmap = frames[self.rail.frame_index % len(frames)]
-            size = pixmap.size().scaled(20, 20, QtCore.Qt.KeepAspectRatio)
-            target = QtCore.QRect((self.width() - size.width()) // 2,
-                                  self.height() - size.height(), size.width(), size.height())
-            painter.drawPixmap(target, pixmap)
+        if self.rail.art:
+            motion = self.rail.motion
+            action = motion.action()
+            fraction = self.rail._x-round(self.rail._x)
+            paint_pet(painter, QtCore.QRectF((self.width()-22)/2+fraction, 0, 22, 22),
+                      self.rail.mascot, phase=motion.phase, time=motion.time,
+                      action=action, facing=self.rail.direction, crawl_phase=motion.crawl_phase)
         else:
             painter.setPen(self.palette().text().color())
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, '✦')
 
     def enterEvent(self, event):
         self.rail._hovered = True
+        self.rail.motion.interact()
         self.rail._sync_animation()
         self.update()
         super().enterEvent(event)
@@ -92,7 +63,7 @@ class _PreviewButton(QtWidgets.QAbstractButton):
 class AssistantPreview(QtWidgets.QWidget):
     settings_requested = QtCore.pyqtSignal()
     dismiss_requested = QtCore.pyqtSignal()
-    INTERVAL_MS = 80
+    INTERVAL_MS = 16
 
     def __init__(self, activity_owner, language='en', parent=None):
         super().__init__(parent)
@@ -106,18 +77,20 @@ class AssistantPreview(QtWidgets.QWidget):
         font.setPixelSize(13)
         self.setFont(font)
         self._hovered = False
-        self.frames = ((), ())  # Lazy: minimized startup does not even decode the GIF.
-        self.frame_index = 0
+        self.art = None
+        self.mascot = mascot_id(getattr(activity_owner, 'config', {}).get('desktop_assistant_mascot'))
+        self.motion = PetMotion(self.mascot)
+        self.motion.reactions = getattr(activity_owner, 'config', {}).get('desktop_assistant_reactions', True) is True
+        self.motion.set_activity(getattr(activity_owner, '_companion_activity', 'idle'))
         self.direction = 1
         self._x = 0.
-        self._frame_ms = 0
         self.button = _PreviewButton(self)
         hint = assistant_text(language, 'preview_hint')
         self.button.setAccessibleName(hint)
         self.button.setToolTip(hint)
         self.button.clicked.connect(self._show_menu)
         self.timer = QtCore.QTimer(self)
-        self.timer.setTimerType(QtCore.Qt.CoarseTimer)
+        self.timer.setTimerType(QtCore.Qt.PreciseTimer)
         self.timer.setInterval(self.INTERVAL_MS)
         self.timer.timeout.connect(self._tick)
         self._clock = QtCore.QElapsedTimer()
@@ -199,7 +172,7 @@ class AssistantPreview(QtWidgets.QWidget):
         active = (self.isVisible() and self.button.parentWidget() is self
                   and not self._owner.isMinimized()
                   and not self._hovered and not self._menu_open
-                  and self.width() > self.button.width() and bool(self.frames[0]))
+                  and self.width() > self.button.width() and bool(self.art))
         if active and not self.timer.isActive():
             self._clock.start()
             self.timer.start()
@@ -208,9 +181,20 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        if not self.frames[0]:
-            self.frames = preview_frames()
+        if self.art is None:
+            self.art = skin(self.mascot)
         self._sync_animation()
+
+    def set_mascot(self, mascot):
+        mascot = mascot_id(mascot)
+        if mascot == self.mascot:
+            return
+        self.mascot = mascot
+        self.art = skin(mascot) if self.isVisible() else None
+        self.motion.mascot = mascot
+        self.motion.crawl_phase = 0
+        self._sync_animation()
+        self.button.update()
 
     def hideEvent(self, event):
         self.timer.stop()
@@ -250,14 +234,12 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def _advance(self, elapsed):
         maximum = max(0, self.width() - self.button.width())
-        self._x += self.direction * 20 * elapsed / 1000
+        before = self._x
+        self._x += self.direction * self.motion.advance(elapsed / 1000, 10, 22)
         if self._x >= maximum:
             self._x, self.direction = float(maximum), -1
         elif self._x <= self._track_start():
             self._x, self.direction = float(self._track_start()), 1
-        self._frame_ms += elapsed
-        if self.frames[0] and self._frame_ms >= 110:
-            step, self._frame_ms = divmod(self._frame_ms, 110)
-            self.frame_index = (self.frame_index + step) % len(self.frames[0])
+        self.motion.moved(self._x-before, 22)
         self.button.move(round(self._x), 0)
         self.button.update()  # Invalidate only the 22x18 child, not the whole page.

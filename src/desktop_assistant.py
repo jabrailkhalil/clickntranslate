@@ -3,7 +3,6 @@
 No keyboard hooks, screen polling, translation engine or network access lives
 here. Capture ownership hides both windows before the first screenshot.
 """
-from pathlib import Path
 import logging
 import math
 import sys
@@ -14,7 +13,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from assistant_text import assistant_text
 from button_styles import button_qss
 from assistant_settings import BEHAVIORS, assistant_preferences
-from assistant_art import companion_art
+from assistant_art import DEFAULT_MASCOT, companion_art, mascot_id
+from assistant_motion import PetMotion, paint_pet
 from ui_scaling import desktop_control_scale
 import mode_coordinator
 
@@ -72,29 +72,29 @@ class AssistantAnchor(QtWidgets.QWidget):
         self._hover = False
         self.dark = True
         self.behavior = 'idle'
-        self.appearance = 'orb'
+        self.appearance = 'portrait'
+        self.mascot = DEFAULT_MASCOT
         self.custom_image = ''
         self.speed = 40
         self.facing = 1
-        self._walk_remainder = 0.0
+        self._walk_x = None
         self.menu_open = False
         self._clock = QtCore.QElapsedTimer()
         self._animation = QtCore.QTimer(self)
-        self._animation.setInterval(33)
+        self._animation.setTimerType(QtCore.Qt.PreciseTimer)
+        self._animation.setInterval(16)
         self._animation.timeout.connect(self._advance)
-        resource_root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-        self.movie = QtGui.QMovie(str(resource_root / 'icons/desktop-assistant/kirby.gif'), parent=self)
-        self.movie.setCacheMode(QtGui.QMovie.CacheAll)
-        # The upstream GIF has a large transparent margin. Use one stable
-        # union for every frame so the character has a useful size and does
-        # not wobble when its feet move; the source asset stays unchanged.
-        self._sprite_bounds = QtCore.QRect()
-        for index in range(self.movie.frameCount()):
-            self.movie.jumpToFrame(index)
-            bounds = QtGui.QRegion(self.movie.currentPixmap().mask()).boundingRect()
-            self._sprite_bounds = self._sprite_bounds.united(bounds)
-        self.movie.jumpToFrame(0)
-        self.movie.frameChanged.connect(lambda _: self.update())
+        self.motion = PetMotion(self.mascot)
+
+    def set_mascot(self, mascot):
+        mascot = mascot_id(mascot)
+        if mascot == self.mascot:
+            return
+        self.mascot = mascot
+        self.motion.mascot = mascot
+        self.motion.crawl_phase = 0
+        self._sync_motion()
+        self.update()
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -103,19 +103,26 @@ class AssistantAnchor(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
         walking = self.appearance == 'walking'
         if walking:
-            pixmap = self.movie.currentPixmap()
-        else:
-            pixmap = companion_art(self.appearance, self.custom_image)
+            # Keep the fractional movement inside the sprite while the native
+            # window itself can only move in whole logical pixels.
+            rect = QtCore.QRectF(self.rect())
+            if self._walk_x is not None and abs(self._walk_x-self.x()) < 1:
+                rect.translate(self._walk_x-self.x(), 0)
+            action = self.motion.action()
+            # Hover, click and drag freeze the current animation frame. The
+            # old wave/drag substitution used a smaller, separate body rig.
+            paint_pet(painter, rect, self.mascot,
+                      phase=self.motion.phase, time=self.motion.time, action=action,
+                      facing=self.facing, crawl_phase=self.motion.crawl_phase)
+            return
+        pixmap = companion_art(self.appearance, self.custom_image, self.mascot)
         if not pixmap.isNull():
-            source = self._sprite_bounds if walking and not self._sprite_bounds.isEmpty() else pixmap.rect()
-            extent = round(self.width() * .86)
+            source = pixmap.rect()
+            extent = self.width()
             size = source.size().scaled(extent, extent, QtCore.Qt.KeepAspectRatio)
-            # The walking sprite never changes into unrelated 3D art. Static
-            # shortcuts are centered and have no animation or breathing timer.
-            baseline = self.height() * .93 if walking else (self.height() + size.height()) / 2
+            # Static poses are centered and have no animation timer.
+            baseline = (self.height() + size.height()) / 2
             painter.translate(self.width() / 2, baseline)
-            if walking:
-                painter.scale(self.facing, 1)
             target = QtCore.QRect(-size.width() // 2, -size.height(), size.width(), size.height())
             painter.drawPixmap(target, pixmap, source)
         else:
@@ -129,9 +136,6 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def _sync_motion(self):
         active = self.appearance == 'walking' and self.isVisible() and not self._hover and self._press is None and not self.menu_open
-        if self.movie.state() == QtGui.QMovie.NotRunning:
-            self.movie.start()
-        self.movie.setPaused(not (active and self.behavior == 'walk'))
         animate = active and self.behavior == 'walk'
         if animate and not self._animation.isActive():
             self._clock.start()
@@ -152,18 +156,20 @@ class AssistantAnchor(QtWidgets.QWidget):
         if self.appearance == 'walking' and self.behavior == 'walk':
             screen = QtWidgets.QApplication.screenAt(self.geometry().center()) or self.screen()
             bounds = screen.availableGeometry()
-            self._walk_remainder += self.speed * desktop_control_scale(screen) * dt
-            step = int(self._walk_remainder)
-            self._walk_remainder -= step
-            target = self.pos() + QtCore.QPoint(step * self.facing, 0)
-            clamped = clamp_position(target, self.size(), bounds)
-            if clamped != target:
+            if self._walk_x is None or round(self._walk_x) != self.x():
+                self._walk_x = float(self.x())
+            distance = self.motion.advance(dt, self.speed * desktop_control_scale(screen), self.width())
+            target_x = self._walk_x + distance*self.facing
+            clamped_x = max(float(bounds.left()), min(target_x, float(bounds.right()-self.width()+1)))
+            self.motion.moved(clamped_x-self._walk_x, self.width())
+            self._walk_x = clamped_x
+            if clamped_x != target_x:
                 self.facing *= -1
-            self.move(clamped)
+                self.motion.crawl_phase = 0
+            self.move(round(clamped_x), self.y())
         self.update()
 
     def hideEvent(self, event):
-        self.movie.setPaused(True)
         self._animation.stop()
         self._press = None
         self._hover = False
@@ -171,6 +177,7 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def enterEvent(self, event):
         self._hover = True
+        self.motion.interact()
         self._sync_motion()
         self.update()
 
@@ -181,6 +188,7 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
+            self.motion.interact()
             self._press = event.globalPos()
             self._origin = self.pos()
             self._dragging = False
@@ -250,7 +258,7 @@ class AssistantMenu(QtWidgets.QFrame):
     action_requested = QtCore.pyqtSignal(str)
     visibility_changed = QtCore.pyqtSignal(bool)
 
-    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='orb'):
+    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='portrait'):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.setObjectName('desktopAssistantMenu')
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -340,6 +348,7 @@ class DesktopAssistant(QtCore.QObject):
         super().__init__(owner)
         self.owner = owner
         self.anchor = AssistantAnchor()
+        self.anchor.motion.set_activity(getattr(owner, '_companion_activity', 'idle'))
         self.menu = None
         self._context = None
         self._closed = False
@@ -436,6 +445,8 @@ class DesktopAssistant(QtCore.QObject):
             self.restore_position()
         self.anchor.speed = preferences['desktop_assistant_speed']
         self.anchor.appearance = preferences['desktop_assistant_appearance']
+        self.anchor.set_mascot(preferences['desktop_assistant_mascot'])
+        self.anchor.motion.reactions = preferences['desktop_assistant_reactions']
         self.anchor.custom_image = preferences['desktop_assistant_image']
         self.anchor.setProperty('ui_effective_scale', factor)
         if self.anchor.behavior != preferences['desktop_assistant_behavior']:
@@ -578,7 +589,6 @@ class DesktopAssistant(QtCore.QObject):
         if self.menu is not None:
             self.menu.close()
             self.menu.deleteLater()
-        self.anchor.movie.stop()
         self.anchor._animation.stop()
         self.anchor.close()
         self.anchor.deleteLater()

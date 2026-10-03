@@ -1,0 +1,115 @@
+{
+  "source_sha256": "9f75f8b9fcd49f424bbda18b94e579f72afadab7c41a9e1b73638ffdcbbc2550",
+  "source_size": [
+    114,
+    105
+  ],
+  "source_crop": [
+    30,
+    43,
+    96,
+    109
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "duration_ms": 110,
+      "bounds": [
+        38,
+        57,
+        87,
+        105
+      ]
+    },
+    {
+      "index": 1,
+      "duration_ms": 110,
+      "bounds": [
+        39,
+        55,
+        87,
+        105
+      ]
+    },
+    {
+      "index": 2,
+      "duration_ms": 110,
+      "bounds": [
+        38,
+        53,
+        90,
+        105
+      ]
+    },
+    {
+      "index": 3,
+      "duration_ms": 110,
+      "bounds": [
+        36,
+        51,
+        93,
+        105
+      ]
+    },
+    {
+      "index": 4,
+      "duration_ms": 110,
+      "bounds": [
+        36,
+        52,
+        94,
+        105
+      ]
+    },
+    {
+      "index": 5,
+      "duration_ms": 110,
+      "bounds": [
+        38,
+        54,
+        87,
+        104
+      ]
+    },
+    {
+      "index": 6,
+      "duration_ms": 110,
+      "bounds": [
+        36,
+        51,
+        89,
+        104
+      ]
+    },
+    {
+      "index": 7,
+      "duration_ms": 110,
+      "bounds": [
+        34,
+        52,
+        91,
+        105
+      ]
+    },
+    {
+      "index": 8,
+      "duration_ms": 110,
+      "bounds": [
+        32,
+        51,
+        93,
+        105
+      ]
+    },
+    {
+      "index": 9,
+      "duration_ms": 110,
+      "bounds": [
+        36,
+        52,
+        90,
+        105
+      ]
+    }
+  ]
+}

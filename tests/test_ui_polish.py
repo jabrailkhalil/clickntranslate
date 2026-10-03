@@ -7,7 +7,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest, QSignalSpy
 
 import main
-from assistant_preview import AssistantPreview, preview_frames
+from assistant_preview import AssistantPreview
 from capture_widgets import CaptureLanguageCombo
 from languages import LANGUAGES, language_icon_path
 from qt_layout_test_support import ensure_layout_fonts
@@ -184,6 +184,7 @@ def test_followed_or_unknown_provider_never_falls_back_to_online(workspaces):
 
 def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
     rail = AssistantPreview(owner, parent=owner)
+    rail.motion.reactions = False  # Isolate the focus outline from the optional greeting.
     owner.resize(300, 100)
     owner.show()
     rail.show()
@@ -236,16 +237,16 @@ def test_welcome_language_menu_is_complete_rounded_and_anchored(app, owner, them
 def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monkeypatch):
     rail = AssistantPreview(owner, parent=owner)
     second = AssistantPreview(owner, parent=owner)
-    assert not rail.frames[0]  # No eagerly loaded animation for a hidden page.
+    assert rail.art is None  # No eagerly loaded animation for a hidden page.
     owner.resize(250, 100)
     owner.show()
     rail.show()
     second.show()
     app.processEvents()
-    assert rail.frames is second.frames
-    assert len(rail.frames[0]) == 10
-    memory = sum(p.width() * p.height() * 4 for row in rail.frames for p in row)
-    assert memory <= 80 * 1024
+    assert rail.art is second.art
+    assert len(rail.art) == 16
+    memory = sum(p.width() * p.height() * 4 for p in rail.art.values())
+    assert memory <= 4 * 1024 * 1024
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     for _ in range(200):
         rail._advance(80)

@@ -98,6 +98,12 @@ data/**/*.log
 *.ps1
 *.sh
 
+# Python mascot previews must be available after cloning the work branch.
+!/preview-pancake-cycle.cmd
+!/preview-mascots.cmd
+!/compare-mascots.cmd
+!/run-mascot-app.cmd
+
 !/tools/build_release.bat
 !/tools/installer/windows/CreateShortcut.bat
 # Every release build script must be tracked.  Whitelisting them one by one is

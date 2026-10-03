@@ -41,28 +41,28 @@ def companion(app):
     app.processEvents()
 
 
-def test_movie_and_capture_lifecycle_do_not_leave_the_companion_in_ocr(companion, app):
+def test_animation_and_capture_lifecycle_do_not_leave_the_companion_in_ocr(companion, app):
     companion.owner.config['desktop_assistant_appearance'] = 'walking'
     companion.refresh()
-    assert companion.anchor.movie.isValid()
+    assert not companion.anchor.grab().isNull()
     assert companion.anchor.isVisible()
-    assert companion.anchor.movie.state() == QtGui.QMovie.Paused
+    assert not companion.anchor._animation.isActive()
     companion.request_action('walk')
-    assert companion.anchor.movie.state() == QtGui.QMovie.Running
+    assert companion.anchor._animation.isActive()
     companion.toggle_menu()
     assert companion.menu.isVisible()
-    assert companion.anchor.movie.state() == QtGui.QMovie.Paused
+    assert not companion.anchor._animation.isActive()
     mode_coordinator.request_mode('capture:translate', lambda: None)
     # Synchronous: already hidden when request_mode returns to the grabber.
     assert not companion.anchor.isVisible()
     assert not companion.menu.isVisible()
-    assert companion.anchor.movie.state() == QtGui.QMovie.Paused
+    assert not companion.anchor._animation.isActive()
     mode_coordinator.request_mode('game', lambda: None)
     mode_coordinator.release_mode('capture:translate')
     assert not companion.anchor.isVisible()
     mode_coordinator.release_mode('game')
     assert companion.anchor.isVisible()
-    assert companion.anchor.movie.state() == QtGui.QMovie.Running
+    assert companion.anchor._animation.isActive()
 
 
 def test_macos_companion_opts_out_of_native_shadow_and_deactivation_hiding(companion):
@@ -265,7 +265,7 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
             name = f'qa-capture-{cycle}-{index}'
             assert mode_coordinator.request_mode(name, lambda: None)
             assert not helper.anchor.isVisible() and not helper.menu.isVisible()
-            assert helper.anchor.movie.state() != QtGui.QMovie.Running
+            assert not helper.anchor._animation.isActive()
             mode_coordinator.release_mode(name)
             assert helper.anchor.isVisible()
             app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)

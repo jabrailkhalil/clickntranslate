@@ -202,6 +202,7 @@ SETTINGS_ACTIONS_FOOTER_GAP = 6
 
 # --- Единственная константа с дефолтной конфигурацией ---
 from assistant_settings import ASSISTANT_DEFAULTS, assistant_preferences
+from assistant_motion import notify_activity
 
 DEFAULT_CONFIG = {
     **ASSISTANT_DEFAULTS,
@@ -5426,6 +5427,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
     def _request_translation_cancel(self):
         if self.translation_running and self._translation_cancel_event is not None:
             self._translation_cancel_event.set()
+            notify_activity(self.parent_app, 'idle', f'document:{id(self)}')
             self.translate_file_button.setEnabled(False)
             self._set_status(doc_text(self.lang, 'canceling_translation'))
 
@@ -5976,6 +5978,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_status(doc_text(self.lang, "loaded"))
 
     def _on_document_error(self, message):
+        if self.translation_running:
+            canceled = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
+            notify_activity(self.parent_app, 'idle' if canceled else 'error', f'document:{id(self)}')
         self.translation_running = False
         self._translation_cancel_event = None
         self.progress_bar.setRange(0, 100)
@@ -6022,6 +6027,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not text or self.translation_running:
             return
         self.translation_running = True
+        notify_activity(self.parent_app, 'busy', f'document:{id(self)}')
         self._translation_cancel_event = threading.Event()
         cancel_event = self._translation_cancel_event
         self.translated_text = ""
@@ -6091,6 +6097,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self.progress_bar.setValue(100)
         self._set_busy(False)
         failed = sum(1 for result in self.translation_results if getattr(result, "error", ""))
+        notify_activity(self.parent_app, 'idle' if canceled else 'error' if failed or friendly_failure else 'success',
+                        f'document:{id(self)}')
         if canceled:
             self._set_status(doc_text(self.lang, 'translation_canceled'))
         elif friendly_failure:
@@ -11551,6 +11559,7 @@ class DarkThemeApp(QMainWindow):
     def _finish_main_translation_state(self, translated_text=None, error=''):
         self._update_main_preview_windows(translated_text, error=error)
         self._main_translation_running = False
+        notify_activity(self, 'idle' if self._argos_cancel_requested.is_set() else 'error' if error else 'success')
         self._main_result_progress = None
         self._argos_install_required = False
         self._argos_cancel_enabled = False
@@ -11624,6 +11633,7 @@ class DarkThemeApp(QMainWindow):
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
 
         self._main_translation_running = True
+        notify_activity(self, 'busy')
         self._argos_install_required = not package_installed
         self._argos_cancel_enabled = not package_installed
         self._argos_active_pair = pair_label

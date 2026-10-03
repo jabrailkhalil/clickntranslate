@@ -96,14 +96,14 @@ def test_light_hover_tip_has_no_opaque_native_corners(app):
         styled_dialogs.install_tooltip_style(app)
 
 
-@pytest.mark.parametrize('old_mode,new_appearance', [('idle', 'orb'), ('walk', 'walking'), ('sleep', 'sleep_icon'), ('look', 'orb'), ({}, 'orb')])
+@pytest.mark.parametrize('old_mode,new_appearance', [('idle', 'portrait'), ('walk', 'walking'), ('sleep', 'sleep_icon'), ('look', 'portrait'), ({}, 'portrait')])
 def test_legacy_companion_modes_migrate_without_fake_animation(old_mode, new_appearance):
     prefs = assistant_preferences({'desktop_assistant_appearance': 'animated', 'desktop_assistant_behavior': old_mode})
     assert prefs['desktop_assistant_appearance'] == new_appearance
     assert prefs['desktop_assistant_behavior'] in ('idle', 'walk')
 
 
-def test_walking_sprite_stays_consistent_when_paused_and_ignores_hover_ticks(window, app):
+def test_walking_sprite_greets_on_hover_and_freezes_when_paused(window, app):
     window.config.update(desktop_assistant_appearance='walking', desktop_assistant_behavior='walk')
     window.set_desktop_assistant_enabled(True)
     anchor = window._desktop_assistant.anchor
@@ -113,7 +113,11 @@ def test_walking_sprite_stays_consistent_when_paused_and_ignores_hover_ticks(win
     anchor._advance(1.)
     assert anchor.pos() == position and anchor.grab().toImage() == image
     window._desktop_assistant.request_action('idle')
-    assert anchor.grab().toImage() == image
+    paused = anchor.grab().toImage()
+    phase, time = anchor.motion.phase, anchor.motion.time
+    anchor._advance(1.)
+    assert anchor.grab().toImage() == paused
+    assert (anchor.motion.phase, anchor.motion.time) == (phase, time)
     anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
     assert not anchor._animation.isActive()
     window._desktop_assistant.request_action('walk')

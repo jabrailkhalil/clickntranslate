@@ -27,18 +27,19 @@ def test_companion_tab_is_visually_third_and_focus_is_keyboard_only(window, app)
     assert toggle.isChecked()
 
 
-@pytest.mark.parametrize('appearance', ['orb', 'portrait', 'star', 'sleep_icon'])
+@pytest.mark.parametrize('appearance', ['portrait', 'star', 'sleep_icon', 'sleep_alt', 'hero'])
 def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appearance):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
     page.toggle.click()
     helper = window._desktop_assistant
     page.appearance_buttons['walking'].click()
-    page.appearance_buttons[appearance].click()
+    page.pose_combo.setCurrentIndex(page.pose_combo.findData(appearance))
+    page.choose_appearance(appearance)
     assert window.config['desktop_assistant_appearance'] == appearance
     assert page.motion_options.isHidden()
     assert not helper.anchor._animation.isActive()
-    assert helper.anchor.movie.state() != QtGui.QMovie.Running
+    assert helper.anchor.motion.time == 0
     position, image = helper.anchor.pos(), helper.anchor.grab().toImage()
     helper.anchor._advance(2.)
     assert helper.anchor.pos() == position
@@ -54,10 +55,10 @@ def test_custom_image_cancel_preserves_selection_and_invalid_values_are_safe(win
     page.toggle.click()
     with mock.patch.object(QtWidgets.QFileDialog, 'getOpenFileName', return_value=('', '')):
         page.appearance_buttons['custom'].click()
-    assert page.appearance_buttons['orb'].isChecked()
-    assert window.config['desktop_assistant_appearance'] == 'orb'
+    assert page.pose_combo.currentData() == 'portrait'
+    assert window.config['desktop_assistant_appearance'] == 'portrait'
     values = assistant_preferences({'desktop_assistant_image': [], 'desktop_assistant_appearance': {}})
-    assert values['desktop_assistant_image'] == '' and values['desktop_assistant_appearance'] == 'orb'
+    assert values['desktop_assistant_image'] == '' and values['desktop_assistant_appearance'] == 'portrait'
     assert not companion_art('custom', 'missing-file.png').isNull()
 
 
@@ -71,14 +72,14 @@ def test_custom_image_and_sleep_pose(window, tmp_path):
         page.appearance_buttons['custom'].click()
     assert window.config['desktop_assistant_image'] == str(custom)
     assert page.appearance_buttons['custom'].isChecked()
-    page.appearance_buttons['portrait'].click()
+    page.choose_appearance('portrait')
     helper = window._desktop_assistant
     idle = helper.anchor.grab().toImage()
-    page.appearance_buttons['sleep_icon'].click()
+    page.pose_combo.setCurrentIndex(page.pose_combo.findData('sleep_icon'))
     sleeping = helper.anchor.grab().toImage()
     assert sleeping != idle
     assert not helper.anchor._animation.isActive()
-    assert helper.anchor.movie.state() == QtGui.QMovie.Paused
+    assert helper.anchor.motion.time == 0
     helper.request_action('walk')  # Static icons cannot start walking.
     assert not helper.anchor._animation.isActive()
 
@@ -134,7 +135,7 @@ def test_google_auto_fallback_response(payload, expected):
     assert all(call.kwargs['params']['sl'] == 'auto' for call in session.get.call_args_list)
 
 
-@pytest.mark.parametrize('appearance', ['orb', 'portrait', 'star', 'sleep_icon'])
+@pytest.mark.parametrize('appearance', ['portrait', 'star', 'sleep_icon', 'sleep_alt', 'hero'])
 def test_builtin_art_is_valid_with_transparent_background(app, appearance):
     pixmap = companion_art(appearance)
     assert not pixmap.isNull()
@@ -143,8 +144,10 @@ def test_builtin_art_is_valid_with_transparent_background(app, appearance):
 
 
 @pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh'])
-@pytest.mark.parametrize('selected_appearance', ['orb', 'walking'])
+@pytest.mark.parametrize('selected_appearance', ['portrait', 'walking'])
 def test_companion_settings_and_menu_fit(window, app, language, selected_appearance):
+    from qt_layout_test_support import ensure_layout_fonts
+    ensure_layout_fonts(app)
     window.current_interface_language = language
     window.config['interface_language'] = language
     window.show_assistant_settings()
@@ -159,13 +162,15 @@ def test_companion_settings_and_menu_fit(window, app, language, selected_appeara
         for _ in range(4):
             app.processEvents()
         assert not page.findChildren(QtWidgets.QScrollArea)
-        for button in (*page.appearance_buttons.values(), *page.values.values()):
+        for button in (*page.appearance_buttons.values(), *page.values.values(),
+                       page.pause_walk, page.mascot_combo):
             if button.isVisible():
                 bounds = QtCore.QRect(button.mapTo(page, QtCore.QPoint()), button.size())
                 assert page.rect().contains(bounds), (language, percent, bounds)
+                assert button.visibleRegion().contains(button.rect()), (language, percent, button.objectName(), bounds)
         for button in page.appearance_buttons.values():
             if button.isVisible():
-                assert button.width() >= button.sizeHint().width()
+                assert button.width() >= button.sizeHint().width(), (language, percent, button.text())
 
     helper = window._desktop_assistant
     helper.toggle_menu()

@@ -10987,6 +10987,11 @@ finally {
             QLabel#assistantSection {{ color: #a88bcc; font-size: 13px; font-weight: 700; }}
             QLabel#assistantNote {{ color: {'#aaa0b8' if dark else '#71667d'}; font-size: 12px; }}
             QLabel#assistantFieldLabel {{ font-size:13px; }}
+            QLabel#assistantMascotPreview {{
+                background:{'#19171d' if dark else '#f8f6fb'};
+                border:1px solid {'#403749' if dark else '#ded5e8'};
+                border-radius:8px;
+            }}
             QWidget#assistantVisibility QCheckBox {{ font-size:14px; spacing:8px; }}
             QWidget#assistantOptions QSpinBox {{
                 color:{theme['text_color']}; background:{'#211d28' if dark else '#f2edf6'};

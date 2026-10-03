@@ -103,7 +103,7 @@ def test_companion_preferences_can_be_edited_before_enabling(window, app):
     page.toggle.click()
     assert page.values['size'].value() == 130
     page.show_category('static')
-    page.appearance_buttons['sleep_icon'].click()
+    page.pose_combo.setCurrentIndex(page.pose_combo.findData('sleep_icon'))
     assert page.motion_options.isHidden()
     assert window._desktop_assistant.anchor.behavior == 'idle'
 

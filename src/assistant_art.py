@@ -1,4 +1,4 @@
-"""Unmodified companion artwork, decoded once and fitted by Qt at render time."""
+"""Companion artwork, decoded once and fitted by Qt at render time."""
 from functools import lru_cache
 from pathlib import Path
 import sys
@@ -6,8 +6,14 @@ import sys
 from PyQt5 import QtCore, QtGui
 
 
-APPEARANCES = ('orb', 'portrait', 'star', 'sleep_icon', 'walking', 'custom')
-STATIC_FILES = {'orb': 'purple-orb.png', 'portrait': 'kirby-stand.png', 'star': 'kirby-star.png', 'sleep_icon': 'kirby-sleep.png'}
+MASCOTS = ('pancake', 'mochi', 'bubu', 'momo', 'orbit')
+DEFAULT_MASCOT = MASCOTS[0]
+APPEARANCES = ('portrait', 'happy', 'curious', 'thinking', 'surprised', 'sad',
+               'sleep_alt', 'sleep_icon', 'star', 'hero', 'working', 'walking', 'custom')
+EXPRESSIONS = {'portrait': 'neutral', 'happy': 'happy', 'curious': 'curious',
+               'thinking': 'thinking', 'surprised': 'surprised', 'sad': 'sad',
+               'sleep_alt': 'sleepy'}
+SPECIAL_POSES = {'sleep_icon': 'sleep', 'star': 'proud', 'hero': 'success', 'working': 'work'}
 MAX_IMAGE_BYTES = 10_000_000
 MAX_IMAGE_SIDE = 8192
 
@@ -21,6 +27,14 @@ class ImageLoadError(ValueError):
 
 def art_path(name):
     return str(Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'icons/desktop-assistant' / name)
+
+
+def mascot_id(value):
+    return value if value in MASCOTS else DEFAULT_MASCOT
+
+
+def walking_art_path(mascot=DEFAULT_MASCOT):
+    return art_path(f'{mascot_id(mascot)}/walk.gif')
 
 
 def _decode_pixmap(path):
@@ -41,14 +55,15 @@ def _decode_pixmap(path):
     pixels = size.width() * size.height()
     if pixels > pixel_limit:
         raise ImageLoadError('image_pixels', pixels=pixels/1_000_000, limit=pixel_limit/1_000_000)
-    reader.setScaledSize(size.scaled(512, 512, QtCore.Qt.KeepAspectRatio))
+    if max(size.width(), size.height()) > 512:
+        reader.setScaledSize(size.scaled(512, 512, QtCore.Qt.KeepAspectRatio))
     image = reader.read()
     if image.isNull():
         raise ImageLoadError('image_decode', detail=reader.errorString())
     return QtGui.QPixmap.fromImage(image)
 
 
-@lru_cache(maxsize=6)
+@lru_cache(maxsize=36)
 def _read_pixmap(path, modified=0):
     return _decode_pixmap(path)
 
@@ -74,23 +89,14 @@ def load_custom_art(filename):
     return _read_custom_pixmap(str(path), stat.st_mtime_ns)
 
 
-def companion_art(appearance, custom_image=''):
-    if appearance == 'walking':
-        # Match the runtime sprite's visible silhouette in the picker, without
-        # modifying the GIF resource or showing a different 3D character.
-        try:
-            pixmap = _read_pixmap(art_path('kirby.gif'))
-        except ImageLoadError:
-            pixmap = QtGui.QPixmap()
-        if not pixmap.isNull():
-            return pixmap.copy(QtGui.QRegion(pixmap.mask()).boundingRect())
+def companion_art(appearance, custom_image='', mascot=DEFAULT_MASCOT):
     if appearance == 'custom':
         try:
             return load_custom_art(custom_image)
         except (OSError, ValueError):
             pass
-    filename = STATIC_FILES.get(appearance, 'purple-orb.png')
-    try:
-        return _read_pixmap(art_path(filename))
-    except ImageLoadError:
-        return QtGui.QPixmap()
+    from assistant_motion import pose_pixmap
+    if appearance == 'walking':
+        return pose_pixmap(mascot_id(mascot), special='walk')
+    return pose_pixmap(mascot_id(mascot), EXPRESSIONS.get(appearance, 'neutral'),
+                       SPECIAL_POSES.get(appearance, ''))
