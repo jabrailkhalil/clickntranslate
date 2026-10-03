@@ -3465,7 +3465,7 @@ fun SettingsScreen(
                         }
                     },
                     navigationIcon = {
-                        val navigateBack = {
+                        val navigateBack: () -> Unit = {
                             if (overlayRenderingOpen) overlayRenderingOpen = false
                             else if (selectedCategory != null) { selectedCategory = null; scope.launch { listState.scrollToItem(0) } }
                             else tryBack()

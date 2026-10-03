@@ -121,7 +121,7 @@ class MobileViewModel @Inject constructor(
             _offlineBusy.value = true; _offlineError.value = false
             try {
                 val pair = mobileMlKitPair(s)
-                translator.downloadMlKitLanguagePair(pair.sourceLang, pair.targetLang, maxOf(120, s.timeoutSeconds))
+                translator.downloadMlKitLanguagePair(pair.sourceLang, pair.targetLang, maxOf(120, s.apiTimeoutSeconds))
                 repo.update { it.copy(translatorEngine = pair.translatorEngine, sourceLang = pair.sourceLang, targetLang = pair.targetLang) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _offlineError.value = true }

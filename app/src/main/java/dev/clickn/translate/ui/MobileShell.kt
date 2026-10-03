@@ -74,6 +74,7 @@ fun MobileShell(
     onHelp: () -> Unit,
     onImages: (List<String>) -> Unit,
     onImageHistory: () -> Unit,
+    onAdvancedSection: (String) -> Unit = { onAdvanced() },
     viewModel: MobileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -90,14 +91,29 @@ fun MobileShell(
     LaunchedEffect(iconRevision) { iconBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { BrandIconPrefs.bitmap(context) } }
     var provider by remember { mutableStateOf<TranslatorEngine?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
+    val modelState by viewModel.modelState.collectAsState()
+    var pendingStart by rememberSaveable { mutableStateOf(false) }
+    var explanation by remember { mutableStateOf<Pair<Int, () -> Unit>?>(null) }
+    var accessibility by remember { mutableStateOf(dev.clickn.translate.trigger.AccessibilityServiceStatus.isEnabled(context)) }
+    var notifications by remember { mutableStateOf(hasMobileNotifications(context)) }
+    var battery by remember { mutableStateOf(hasMobileBatteryExemption(context)) }
+    val permissionPrefs = remember { context.getSharedPreferences("clickn_permissions", Context.MODE_PRIVATE) }
+    val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notifications = it }
+    LaunchedEffect(settings) { settings?.let(viewModel::refreshModels) }
     var overlayAllowed by remember { mutableStateOf(AndroidSettings.canDrawOverlays(context)) }
     LaunchedEffect(Unit) {
         if (CaptureStartPreference.mode.value == null) CaptureStartPreference.select(CaptureStartMode.SYSTEM)
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle) {
+    DisposableEffect(lifecycle, settings) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) overlayAllowed = AndroidSettings.canDrawOverlays(context)
+            if (event == Lifecycle.Event.ON_RESUME) {
+                overlayAllowed = AndroidSettings.canDrawOverlays(context)
+                accessibility = dev.clickn.translate.trigger.AccessibilityServiceStatus.isEnabled(context)
+                notifications = hasMobileNotifications(context)
+                battery = hasMobileBatteryExemption(context)
+                settings?.let(viewModel::refreshModels)
+            }
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
@@ -108,11 +124,25 @@ fun MobileShell(
     val tab = MobileTab.valueOf(tabName)
     fun openService() { sheet = "services" }
     fun editInput(value: String) { input = value; viewModel.resetTranslation() }
-    fun grantOverlay() {
-        openOverlayPermissionSettings(context)
+    fun grantOverlay() { explanation = R.string.setup_overlay_body to { openOverlayPermissionSettings(context) } }
+    fun preflight(current: Settings, screen: Boolean): Boolean {
+        if (current.sourceLang == "auto" && current.translatorEngine in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT)) { sheet = "source"; return false }
+        if (translationNeedsConfiguration(current)) { provider = current.translatorEngine; return false }
+        if (modelState.checking) return false
+        if (current.translatorEngine in offlineTranslationEngines && modelState.translationReady != true) { sheet = "offline"; return false }
+        if (screen && modelState.ocrReady != true) { onAdvancedSection("ocr"); return false }
+        if (screen && !overlayAllowed) { pendingStart = true; grantOverlay(); return false }
+        return true
+    }
+    LaunchedEffect(pendingStart, overlayAllowed, modelState, settings) {
+        val current = settings
+        if (pendingStart && overlayAllowed && current != null && !modelState.checking) {
+            pendingStart = false
+            if (preflight(current, true)) context.startActivity(CaptureStartRequestActivity.newIntent(context))
+        }
     }
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                 MobileTab.entries.forEach { destination ->
@@ -150,12 +180,28 @@ fun MobileShell(
                         onProvider = ::openService,
                         onStart = {
                             if (running) context.startService(Intent(context, CaptureService::class.java).setAction(CaptureService.ACTION_STOP))
-                            else if (current.sourceLang == "auto" && current.translatorEngine in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT)) sheet = "source"
-                            else if (!overlayAllowed) grantOverlay()
-                            else context.startActivity(CaptureStartRequestActivity.newIntent(context))
+                            else if (preflight(current, true)) context.startActivity(CaptureStartRequestActivity.newIntent(context))
                         },
                         onPermission = ::grantOverlay,
                         onPhoto = { gallery.launch("image/*") }, onText = { tabName = MobileTab.TEXT.name },
+                        checking = modelState.checking,
+                        readiness = {
+                            MobileReadinessPanel(current, modelState, overlayAllowed, accessibility, notifications, battery,
+                                onOverlay = ::grantOverlay, onService = ::openService, onOcr = { onAdvancedSection("ocr") }, onModels = { sheet = "offline" },
+                                onAccessibility = { explanation = R.string.setup_accessibility_body to {
+                                    openSetupAndroidSettings(context, Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                                        .putExtra("android.intent.extra.COMPONENT_NAME", android.content.ComponentName(context, dev.clickn.translate.trigger.ClickTranslateAccessibilityService::class.java)), Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
+                                } },
+                                onNotifications = { explanation = R.string.setup_notifications_body to {
+                                    if (android.os.Build.VERSION.SDK_INT >= 33 && !notifications && !permissionPrefs.getBoolean("notifications_requested", false)) {
+                                        permissionPrefs.edit().putBoolean("notifications_requested", true).apply()
+                                        notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                    } else openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName))
+                                } },
+                                onBattery = { explanation = R.string.setup_battery to {
+                                    openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")), Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                } })
+                        },
                     )
                     MobileTab.TEXT -> TextWorkspace(current, input, translation,
                         onInput = ::editInput, onSource = { sheet = "source" }, onTarget = { sheet = "target" },
@@ -164,7 +210,7 @@ fun MobileShell(
                             viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
                         } },
                         onProvider = ::openService,
-                        onTranslate = { if (translation.busy) viewModel.resetTranslation() else viewModel.translate(input) },
+                        onTranslate = { if (translation.busy) viewModel.resetTranslation() else if (preflight(current, false)) viewModel.translate(input) },
                     )
                     MobileTab.HISTORY -> HistoryWorkspace(history, onImageHistory,
                         onClear = { confirmClear = true }, onEntry = {
@@ -200,6 +246,7 @@ fun MobileShell(
                 "language" -> InterfaceLanguageSheet { sheet = "" }
                 "capture" -> CaptureMethodSheet(viewModel)
                 "icon" -> BrandIconSheet { iconRevision++ }
+                "offline" -> OfflineLibrarySheet(current, viewModel) { section -> sheet = ""; onAdvancedSection(section) }
             }
         }
     }
@@ -208,6 +255,12 @@ fun MobileShell(
             onDismiss = { provider = null; viewModel.clearConnection() }, onAdvanced = {
                 provider = null; viewModel.clearConnection(); onAdvanced()
             })
+    }
+    explanation?.let { (body, action) ->
+        AlertDialog(onDismissRequest = { explanation = null; pendingStart = false },
+            title = { Text(stringResource(R.string.refine_readiness)) }, text = { Text(stringResource(body)) },
+            confirmButton = { TextButton(onClick = { explanation = null; action() }) { Text(stringResource(R.string.mobile_permission_enable)) } },
+            dismissButton = { TextButton(onClick = { explanation = null; pendingStart = false }) { Text(stringResource(R.string.mobile_cancel)) } })
     }
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false },
         title = { Text(stringResource(R.string.mobile_clear_history)) },
@@ -220,11 +273,12 @@ fun MobileShell(
 @Composable
 internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
     onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit, onProvider: () -> Unit,
-    onStart: () -> Unit, onPermission: () -> Unit, onPhoto: () -> Unit, onText: () -> Unit) {
+    onStart: () -> Unit, onPermission: () -> Unit, onPhoto: () -> Unit, onText: () -> Unit,
+    checking: Boolean = false, readiness: @Composable () -> Unit = {}) {
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(
-                Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
+                Brush.linearGradient(if (LocalThemeMode.current.mode in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primaryContainer) else listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
                 MaterialTheme.shapes.large).padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.size(8.dp).background(if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .4f), CircleShape))
@@ -235,7 +289,8 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
                     style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Text(stringResource(R.string.mobile_hero_body), Modifier.padding(top = 12.dp, bottom = 24.dp),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                Button(onClick = onStart, enabled = running || !checking, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                    colors = if (LocalThemeMode.current.mode in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onPrimaryContainer, contentColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.buttonColors()) {
                     Icon(if (running) Icons.Outlined.Stop else Icons.Outlined.CropFree, null)
                     Spacer(Modifier.width(10.dp))
                     Text(stringResource(if (running) R.string.mobile_stop else R.string.mobile_start), fontWeight = FontWeight.SemiBold)
@@ -244,6 +299,7 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
         }
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { ServiceRow(settings, onProvider) }
+        item { readiness() }
         if (!allowed) item {
             Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.padding(20.dp)) {
@@ -515,7 +571,7 @@ private data class ProviderField(val label: String, val secret: Boolean = false,
 @Composable
 internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewModel: MobileViewModel,
     onDismiss: () -> Unit, onAdvanced: () -> Unit) {
-    var draft by remember(engine) { mutableStateOf(current.copy(translatorEngine = engine)) }
+    var draft by remember(engine) { mutableStateOf(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(current) else current.copy(translatorEngine = engine)) }
     val testing by viewModel.testing.collectAsState()
     val connection by viewModel.connection.collectAsState()
     val server = stringResource(R.string.mobile_server)
@@ -572,7 +628,7 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
                     viewModel.resetTranslation()
                     val saved = draft
                     viewModel.update { existing ->
-                        fields.fold(existing.copy(translatorEngine = engine)) { s,field -> field.write(s, field.read(saved)) }
+                        fields.fold(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(existing) else existing.copy(translatorEngine = engine)) { s,field -> field.write(s, field.read(saved)) }
                             .let { if (engine == TranslatorEngine.DEEPL) it.copy(deeplPro = saved.deeplPro) else it }
                     }
                     onDismiss()
@@ -653,3 +709,9 @@ fun MobileWelcomeScreen(onFinished: () -> Unit) {
         }
     }
 }
+
+
+private fun hasMobileNotifications(context: Context): Boolean = android.os.Build.VERSION.SDK_INT < 33 ||
+    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+private fun hasMobileBatteryExemption(context: Context): Boolean =
+    context.getSystemService(android.os.PowerManager::class.java)?.isIgnoringBatteryOptimizations(context.packageName) == true

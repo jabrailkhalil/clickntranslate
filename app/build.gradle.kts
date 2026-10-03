@@ -120,7 +120,8 @@ android {
         freeCompilerArgs += listOf(
             "-opt-in=kotlinx.serialization.ExperimentalSerializationApi",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi"
         )
     }
 
@@ -232,4 +233,17 @@ if (providers.gradleProperty("uiSnapshots").isPresent) {
             jvmArgs("-javaagent:${snapshotAgent.singleFile.absolutePath}")
         }
     }
+}
+
+// Android runtime tests are opt-in and never become APK dependencies.
+if (providers.gradleProperty("runtimeUiTests").isPresent) {
+    android.testOptions.unitTests.isIncludeAndroidResources = true
+    android.sourceSets.getByName("test").java.srcDir("src/runtimeTest/java")
+    dependencies.add("testImplementation", "org.robolectric:robolectric:4.16.1")
+    dependencies.add("testImplementation", dependencies.platform(libs.androidx.compose.bom))
+    dependencies.add("testImplementation", "androidx.compose.ui:ui-test-junit4")
+    dependencies.add("debugImplementation", "androidx.compose.ui:ui-test-manifest")
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach { maxHeapSize = "3g" }
+} else {
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach { exclude("**/*RuntimeTest*") }
 }

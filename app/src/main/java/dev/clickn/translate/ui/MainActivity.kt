@@ -229,6 +229,7 @@ private fun AppRoot(
         when (route) {
             Route.Main -> screenState.SaveableStateProvider("mobile") { MobileShell(
                 onAdvanced = { settingsReturn = Route.Main.name; settingsSection = null; routeName = Route.Settings.name },
+                onAdvancedSection = { section -> settingsReturn = Route.Main.name; settingsSection = section; routeName = Route.Settings.name },
                 onLogs = { routeName = Route.Logs.name },
                 onHelp = {
                     val decision = FloatingTourRerunPolicy.onHelpOpened()
