@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -83,6 +84,10 @@ fun MobileShell(
     var tabName by rememberSaveable { mutableStateOf(MobileTab.SCREEN.name) }
     var input by rememberSaveable { mutableStateOf("") }
     var sheet by rememberSaveable { mutableStateOf("") }
+    var iconRevision by remember { mutableIntStateOf(0) }
+    val iconChoice = remember(iconRevision) { BrandIconPrefs.read(context) }
+    var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(iconRevision) { iconBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { BrandIconPrefs.bitmap(context) } }
     var provider by remember { mutableStateOf<TranslatorEngine?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var overlayAllowed by remember { mutableStateOf(AndroidSettings.canDrawOverlays(context)) }
@@ -127,10 +132,7 @@ fun MobileShell(
             else Column(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center) {
-                        Text("CT", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                    }
+                    BrandLogo(Modifier.size(44.dp), iconChoice, iconBitmap)
                     Column(Modifier.padding(start = 12.dp).weight(1f)) {
                         Text(AppBrand.DISPLAY_NAME, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(tab.title), style = MaterialTheme.typography.labelMedium,
@@ -172,7 +174,7 @@ fun MobileShell(
                         })
                     MobileTab.SETTINGS -> SettingsHub(current, onProvider = ::openService,
                         onAppearance = { sheet = "appearance" }, onLanguage = { sheet = "language" },
-                        onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" })
+                        onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" }, onIcon = { sheet = "icon" }, onOffline = { sheet = "offline" })
                 }
             }
         }
@@ -188,7 +190,7 @@ fun MobileShell(
                     onSelect = { code ->
                         val source = sheet == "source"
                         viewModel.resetTranslation()
-                        viewModel.update { if (source) it.copy(sourceLang = code) else it.copy(targetLang = code) }
+                        viewModel.update { mobileLanguagePair(it, source, code) }
                         sheet = ""
                     })
                 "services" -> ServicesSheet(current.translatorEngine) {
@@ -197,6 +199,7 @@ fun MobileShell(
                 "appearance" -> AppearanceSheet()
                 "language" -> InterfaceLanguageSheet { sheet = "" }
                 "capture" -> CaptureMethodSheet(viewModel)
+                "icon" -> BrandIconSheet { iconRevision++ }
             }
         }
     }
@@ -222,7 +225,7 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
         item {
             Column(Modifier.fillMaxWidth().background(
                 Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
-                RoundedCornerShape(32.dp)).padding(24.dp)) {
+                MaterialTheme.shapes.large).padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.size(8.dp).background(if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .4f), CircleShape))
                     Text(stringResource(if (running) R.string.mobile_running else R.string.mobile_ready),
@@ -242,7 +245,7 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { ServiceRow(settings, onProvider) }
         if (!allowed) item {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(24.dp)) {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.padding(20.dp)) {
                     Text(stringResource(R.string.mobile_permission_title), fontWeight = FontWeight.SemiBold)
                     Text(stringResource(R.string.mobile_permission_body), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
@@ -260,7 +263,7 @@ internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
 
 @Composable
 internal fun LanguagePair(settings: Settings, onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             LanguageCell(R.string.mobile_source, settings.sourceLang, onSource, Modifier.weight(1f))
             IconButton(onClick = onSwap, enabled = settings.sourceLang != "auto") { Icon(Icons.Outlined.SwapHoriz, stringResource(R.string.mobile_swap)) }
@@ -294,7 +297,7 @@ internal fun ServiceRow(settings: Settings, onClick: () -> Unit) {
 
 @Composable
 private fun ActionTile(title: Int, body: Int, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
-    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, modifier = modifier, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.padding(20.dp)) {
             Icon(icon, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
             Text(stringResource(title), Modifier.padding(top = 20.dp), fontWeight = FontWeight.Bold)
@@ -316,7 +319,7 @@ internal fun TextWorkspace(settings: Settings, input: String, state: MobileTrans
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.imePadding()) {
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { OutlinedTextField(input, onInput, modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.mobile_text_hint)) }, minLines = 6, maxLines = 12, shape = RoundedCornerShape(24.dp)) }
+            placeholder = { Text(stringResource(R.string.mobile_text_hint)) }, minLines = 6, maxLines = 12, shape = MaterialTheme.shapes.medium) }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { clipboard?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.let(onInput) }) {
                 Icon(Icons.Outlined.ContentPaste, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mobile_paste))
@@ -331,7 +334,7 @@ internal fun TextWorkspace(settings: Settings, input: String, state: MobileTrans
             else { Icon(Icons.Outlined.Translate, null); Spacer(Modifier.width(12.dp)) }
             Text(stringResource(if (state.busy) R.string.mobile_cancel else R.string.mobile_translate))
         } }
-        item { Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        item { Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(Modifier.fillMaxWidth().padding(24.dp)) {
                 SectionLabel(R.string.mobile_result)
                 Text(if (state.error != null) stringResource(R.string.mobile_error)
@@ -367,7 +370,7 @@ internal fun HistoryWorkspace(entries: List<MobileHistoryEntry>, onImages: () ->
                 TextButton(onClick = onClear) { Text(stringResource(R.string.mobile_clear_history)) }
             } }
             items(entries, key = { it.id }) { entry ->
-                Surface(onClick = { onEntry(entry) }, shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Surface(onClick = { onEntry(entry) }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.fillMaxWidth().padding(20.dp)) {
                         Text("${languageName(entry.from)} → ${languageName(entry.to)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(entry.translated, Modifier.padding(top = 10.dp), maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
@@ -383,11 +386,13 @@ internal fun HistoryWorkspace(entries: List<MobileHistoryEntry>, onImages: () ->
 
 @Composable
 internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearance: () -> Unit, onLanguage: () -> Unit,
-    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}) {
+    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}) {
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
     fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { SettingsRow(Icons.Outlined.Download, stringResource(R.string.refine_offline), stringResource(R.string.refine_offline_body), onOffline) }
+        item { SettingsRow(Icons.Outlined.Image, stringResource(R.string.refine_icon), stringResource(R.string.refine_brand_logo), onIcon) }
         item { SectionLabel(R.string.mobile_services) }
         item { ServiceRow(settings, onProvider) }
         item { SettingsRow(Icons.Outlined.CropFree, stringResource(R.string.setup_capture),
@@ -435,7 +440,7 @@ private fun CaptureMethodSheet(viewModel: MobileViewModel) {
 
 @Composable
 private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
@@ -455,7 +460,7 @@ internal fun LanguageSheet(isSource: Boolean, selected: String, allowAuto: Boole
     Column(Modifier.fillMaxWidth().fillMaxHeight(.8f).padding(horizontal = 24.dp)) {
         Text(stringResource(if (isSource) R.string.mobile_source else R.string.mobile_target), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 16.dp), singleLine = true,
-            leadingIcon = { Icon(Icons.Outlined.Search, null) }, shape = RoundedCornerShape(18.dp))
+            leadingIcon = { Icon(Icons.Outlined.Search, null) }, shape = MaterialTheme.shapes.small)
         val choices = Languages.ALL.filter { (isSource && allowAuto || it.code != "auto") &&
             (allowedCodes == null || it.code.substringBefore('-') in allowedCodes) &&
             (query.isBlank() || it.code.contains(query, true) || Locale.forLanguageTag(it.code).getDisplayName(locale).contains(query, true)) }
@@ -544,7 +549,7 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
             items(fields) { field ->
                 var visible by remember { mutableStateOf(false) }
                 OutlinedTextField(field.read(draft), { draft = field.write(draft, it); viewModel.clearConnection() }, Modifier.fillMaxWidth(),
-                    label = { Text(field.label) }, isError = field.label == server && !validConfig, singleLine = true, shape = RoundedCornerShape(18.dp),
+                    label = { Text(field.label) }, isError = field.label == server && !validConfig, singleLine = true, shape = MaterialTheme.shapes.small,
                     visualTransformation = if (field.secret && !visible) PasswordVisualTransformation() else VisualTransformation.None,
                     trailingIcon = if (field.secret) ({ IconButton(onClick = { visible = !visible }) {
                         Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
@@ -582,25 +587,31 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
 internal fun AppearanceSheet() {
     val theme = LocalThemeMode.current
     val accent = LocalThemeAccent.current
-    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxWidth().testTag("appearance-options"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.mobile_appearance), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         item { SectionLabel(R.string.mobile_mode) }
-        listOf(ThemeMode.FOLLOW_SYSTEM to R.string.mobile_system, ThemeMode.LIGHT to R.string.mobile_light, ThemeMode.DARK to R.string.mobile_dark, ThemeMode.AMOLED to R.string.mobile_amoled).forEach { (mode, label) ->
+        listOf(ThemeMode.FOLLOW_SYSTEM to R.string.mobile_system, ThemeMode.LIGHT to R.string.mobile_light,
+            ThemeMode.DARK to R.string.mobile_dark, ThemeMode.AMOLED to R.string.mobile_amoled,
+            ThemeMode.PAPER_DAY to R.string.refine_paper_day, ThemeMode.PAPER_NIGHT to R.string.refine_paper_night,
+            ThemeMode.PAPER_NORD to R.string.refine_paper_nord).forEach { (mode, label) ->
             item { ListItem(headlineContent = { Text(stringResource(label)) }, leadingContent = {
                 RadioButton(selected = theme.mode == mode, onClick = null)
             }, modifier = Modifier.clickable { theme.setMode(mode) }) }
         }
-        item { SectionLabel(R.string.mobile_accent) }
-        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            ThemeAccent.entries.forEach { choice ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { accent.setAccent(choice) }.padding(4.dp)) {
-                    Box(Modifier.size(44.dp).background(Color(choice.lightColor), CircleShape), contentAlignment = Alignment.Center) {
-                        if (accent.accent == choice) Icon(Icons.Outlined.Check, null, tint = Color.White)
+        item { Text(stringResource(R.string.refine_theme_source), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (theme.mode !in ThemeMode.PAPER_DAY..ThemeMode.PAPER_NORD) {
+            item { SectionLabel(R.string.mobile_accent) }
+            item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ThemeAccent.entries.forEach { choice ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { accent.setAccent(choice) }.padding(4.dp)) {
+                        Box(Modifier.size(44.dp).background(Color(choice.lightColor), CircleShape), contentAlignment = Alignment.Center) {
+                            if (accent.accent == choice) Icon(Icons.Outlined.Check, null, tint = Color.White)
+                        }
+                        Text(stringResource(choice.label), Modifier.padding(top = 8.dp), fontSize = 10.sp, maxLines = 1)
                     }
-                    Text(stringResource(choice.label), Modifier.padding(top = 8.dp), fontSize = 10.sp, maxLines = 1)
                 }
-            }
-        } }
+            } }
+        }
     }
 }
 
@@ -616,7 +627,7 @@ internal fun InterfaceLanguageSheet(onDismiss: () -> Unit) {
         items(choices) { (tag,label) ->
             ListItem(headlineContent = { Text(label) }, trailingContent = { if (current == tag) Icon(Icons.Outlined.Check, null) },
                 modifier = Modifier.clickable {
-                    AppLocalePrefs.write(context, tag); onDismiss(); (context as? Activity)?.recreate()
+                    AppLocalePrefs.write(context, tag); onDismiss()
                 })
         }
     }

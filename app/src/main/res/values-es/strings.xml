@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="settings_about_user_guide">Guía de usuario</string>
     <string name="settings_share_entire_screen">Compartir pantalla completa</string>
@@ -1396,7 +1396,7 @@
     <string name="input_translation_replace_unconfirmed_copied">Incapaz de confirmar si el texto fue reemplazado. La traducción fue copiada.</string>
     <string name="input_translation_service_disconnected_copied">El servicio de accesibilidad está desconectado. Incapaz de reemplazar el texto; la traducción fue copiada.</string>
     <string name="word_select_hint_drawing">Arrastre un rectángulo alrededor del texto para traducir</string>
-    <string name="word_select_btn_translate">Traducir</string>
+<string name="word_select_btn_translate">Traducir</string>
     <string name="word_select_btn_cancel">Cancelar</string>
     <string name="word_select_btn_redraw">Redraw</string>
     <string name="settings_section_word_select">Traducción de Word-select</string>
@@ -1680,7 +1680,7 @@
     <string name="translation_library_help_priority_body">La preservación de la fuente se verifica primero. Un partido exacto se queda en la imagen y nunca entra borrando o traducción.\n\nPara el texto restante, la aplicación revisa primero la memoria de traducción. Si no hay coincidencias de memoria, encuentra los términos pertinentes y traduce normalmente.\n\nEfecto de sonido mantenido como obra de arte → añadir a Mantén fuente\nCorrected sentence → guardar a la memoria de traducción\nNombre incorrecto o palabra fija → añadir un término</string>
     <string name="translation_library_help_add_title">Cómo añadir correcciones</string>
     <string name="translation_library_help_add_body">Larga impresión de una traducción mostrada y elegir “Traducción de textos” OCR fuente y traducción, guardar el resultado de la memoria de traducción, y añadir texto fijo seleccionado a los términos del juego actual o términos globales.\n\nAhorrar actualiza inmediatamente la traducción actual y pone la corrección a disposición de futuras traducciones.</string>
-    <string name="translation_library_help_add_image_description">Ejemplo de elegir “Traducción de textos” después de una traducción larga</string>
+    <string name="translation_library_help_add_image_description">Ejemplo de corrección tras mantener pulsado el texto traducido.</string>
     <string name="translation_library_help_manage_title">Cómo gestionar los elementos guardados</string>
     <string name="translation_library_help_manage_body">Cambiar entre las pestañas de memoria de Términos y Traducción. Utilice el botón de búsqueda en la esquina superior derecha para encontrar un elemento. Cada artículo puede ser editado o eliminado por separado.</string>
     <string name="translation_library_help_close">Lo tengo</string>
@@ -2005,4 +2005,4 @@
     <string name="brand_community_label">Telegram comunidad</string>
     <string name="brand_join_community">Abierto Telegram</string>
     <string name="brand_downloads_label">Visit clickn.dev</string>
-</resources>
+    </resources>

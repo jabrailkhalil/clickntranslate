@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="setup_title">Настроим переводчик</string>
     <string name="setup_intro">Несколько шагов — и можно переводить текст, фото и другие приложения. Любую настройку можно изменить позже.</string>
@@ -28,9 +28,9 @@
     <string name="setup_background_body">Если телефон закрывает переводчик в фоне, разреши фоновую работу или сними ограничения батареи для Click’n’Translate. Названия пунктов зависят от телефона.</string>
     <string name="setup_battery">Настройки батареи</string>
     <string name="setup_ready">Можно пробовать</string>
-    <string name="setup_ready_body">На вкладке «Экран» нажми «Начать» и подтверди трансляцию. Открой другое приложение и выдели область через плавающую кнопку CT. Перевод текста и фото доступен без захвата экрана.</string>
+    <string name="setup_ready_body">На вкладке «Экран» нажми «Начать» и разреши захват экрана. Открой другое приложение и выдели текст через плавающую кнопку с логотипом. Перевод текста и фото доступен без захвата экрана.</string>
     <string name="setup_shortcuts">Плавающая кнопка и быстрый запуск</string>
     <string name="setup_reopen">Пройти настройку снова</string>
     <string name="setup_settings_unavailable">Телефон не открыл этот пункт. Открой настройки Android и найди Click’n’Translate вручную.</string>
     <string name="setup_restricted_settings">Сведения о приложении: ограниченные настройки</string>
-</resources>
+    </resources>

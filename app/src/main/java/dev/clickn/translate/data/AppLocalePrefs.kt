@@ -70,6 +70,25 @@ object AppLocalePrefs {
         if (view.isAttachedToWindow) prefs.registerOnSharedPreferenceChangeListener(listener)
     }
 
+    fun observe(context: Context, onChange: () -> Unit): () -> Unit {
+        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_TAG || key == null) onChange()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /** Keep the Activity chain for Hilt and activity-result launchers. */
+    fun uiContext(base: Context): Context {
+        val localized = wrap(base)
+        return object : ContextWrapper(base) {
+            override fun getResources() = localized.resources
+            override fun getAssets() = localized.assets
+            override fun getTheme() = localized.theme
+        }
+    }
+
     fun read(context: Context): String = context
         .getSharedPreferences(FILE, Context.MODE_PRIVATE)
         .getString(KEY_TAG, "") ?: ""

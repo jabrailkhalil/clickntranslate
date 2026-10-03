@@ -1,36 +1,36 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="setup_title">Configurez▁votre▁traducteur</string>
-    <string name="setup_intro">▁Quelques▁étapes, et▁vous▁pouvez▁traduire du▁texte, des photos et d\'autres applications.▁Vous▁pouvez▁changer▁chaque option plus▁tard.</string>
-    <string name="setup_next">▁Continuer</string>
-    <string name="setup_previous">▁Précédent</string>
-    <string name="setup_finish">Configuration de▁finition</string>
-    <string name="setup_text_only">▁Utilisez le▁texte et les photos pour le moment</string>
+    <string name="setup_title">Configurons le traducteur</string>
+    <string name="setup_intro">Quelques étapes pour traduire du texte, des photos et le contenu des autres applications. Chaque réglage peut être modifié plus tard.</string>
+    <string name="setup_next">Continuer</string>
+    <string name="setup_previous">Retour</string>
+    <string name="setup_finish">Terminer la configuration</string>
+    <string name="setup_text_only">Utiliser le texte et les photos pour le moment</string>
     <string name="setup_step">Étape %1$d sur %2$d</string>
-    <string name="setup_translation">▁Langues et▁traduction</string>
-    <string name="setup_translation_body">▁Choisissez la langue que▁vous lisez et un service de▁traduction. Google▁fonctionne sans▁clé. Pour MyMemory et la▁traduction▁hors▁ligne,▁choisissez une langue source▁spécifique.</string>
-    <string name="setup_overlay">▁Afficher les▁traductions sur d\'autres applications</string>
-    <string name="setup_overlay_body">▁Ouvrez les▁paramètres d\'Android ,▁trouvez Click.com et activez l\'affichage sur d\'autres applications . Revenez▁ici ; les▁mises à▁jour d\'état▁automatiquement .</string>
+    <string name="setup_translation">Langues et traduction</string>
+    <string name="setup_translation_body">Choisis les langues et un service de traduction. Google fonctionne sans clé. MyMemory et la traduction hors ligne demandent une langue source précise.</string>
+    <string name="setup_overlay">Traduction par-dessus les applications</string>
+    <string name="setup_overlay_body">Ouvre les paramètres Android, trouve Click’n’Translate et autorise l’affichage par-dessus les autres applications. Reviens ici : le statut se met à jour automatiquement.</string>
     <string name="setup_notifications">Notifications</string>
-    <string name="setup_notifications_body">Autoriser les notifications pour▁voir le▁traducteur en▁cours d\'exécution,▁arrêter la capture et▁suivre les▁téléchargements de▁modèles. La▁traduction▁peut▁également▁fonctionner sans▁cette▁autorisation.</string>
+    <string name="setup_notifications_body">Les notifications permettent de suivre le traducteur, d’arrêter la capture et de voir les téléchargements de modèles. La traduction fonctionne aussi sans cette autorisation.</string>
     <string name="setup_enabled">Activé</string>
-    <string name="setup_pending">Configuration des▁besoins</string>
-    <string name="setup_open">▁Ouvrir le bon▁réglage</string>
-    <string name="setup_capture">Comment▁capturer l\'écran</string>
-    <string name="setup_capture_body">Android▁demandera le▁partage d\'écran▁lorsque▁vous▁commencez la▁traduction. Sur Android 14+,▁choisissez l\'écran▁entier pour▁traduire à travers les applications.▁Vous▁pouvez▁arrêter la capture à▁tout moment.</string>
-    <string name="setup_accessibility">Facultatif: service d\'accessibilité</string>
-    <string name="setup_accessibility_body">Sur Android 11+, activez le service d\'accessibilité Click=\"n=\" pour les▁captures d\'écran sans invites de▁partage d\'écran▁répétées. Il▁prend▁également en charge les▁raccourcis-clés de volume et la▁traduction d\'entrée. Si Android 13 ou une version ultérieure bloque ce bouton, ouvre les infos de l’application, puis le menu à trois points et « Autoriser les paramètres restreints ». Reviens ici pour activer le service.</string>
-    <string name="setup_recognition">▁Reconnaissance▁textuelle et▁modèles</string>
-    <string name="setup_recognition_body">L\'OCR par▁défaut▁reconnaît les scripts latin,▁chinois,▁japonais et▁coréen. Pour les scripts cyrilliques ou▁autres,▁sélectionnez un service OCR▁approprié. Les▁modèles de▁traduction▁hors▁ligne▁doivent▁être▁téléchargés▁avant utilisation.</string>
-    <string name="setup_ocr">▁Choisir OCR et▁télécharger des▁modèles</string>
-    <string name="setup_models">▁Modèles de▁traduction et▁paramètres de l\'API</string>
-    <string name="setup_background">▁Garder la▁traduction▁disponible</string>
-    <string name="setup_background_body">Si▁votre▁téléphone▁arrête la superposition en▁arrière-plan,▁autorisez l\'activité de fond ou▁supprimez les restrictions de la▁batterie pour Click=\"n=\"Traduit par la▁Rédaction.</string>
-    <string name="setup_battery">▁Paramètres de la▁batterie</string>
-    <string name="setup_ready">▁Prêt à▁essayer</string>
-    <string name="setup_ready_body">▁Dans l\'onglet▁Écran,▁appuyez sur▁Démarrer et▁confirmer le▁partage d\'écran.▁Ouvrez une▁autre application et▁utilisez le▁bouton CT▁flottant pour▁sélectionner une▁région. La▁traduction▁texte et photo▁sont▁disponibles sans capture d\'écran.</string>
-    <string name="setup_shortcuts">Bouton▁flottant et▁raccourcis</string>
-    <string name="setup_reopen">Exécuter à▁nouveau l\'installation</string>
-    <string name="setup_settings_unavailable">▁Votre▁téléphone n\'a▁pas▁ouvert ce▁paramètre.▁Ouvrez les▁paramètres Android et▁trouvez Click-en-un▁manuellement.</string>
-    <string name="setup_restricted_settings">Infos de l’application : paramètres restreints</string>
-</resources>
+    <string name="setup_pending">À configurer</string>
+    <string name="setup_open">Ouvrir le réglage</string>
+    <string name="setup_capture">Capture de l’écran</string>
+    <string name="setup_capture_body">Android demandera l’autorisation de partager l’écran au démarrage. Sur Android 14 ou plus récent, choisis l’écran entier pour traduire dans différentes applications. La capture peut être arrêtée à tout moment.</string>
+    <string name="setup_accessibility">Facultatif : accessibilité</string>
+    <string name="setup_accessibility_body">Sur Android 11 ou plus récent, le service Click’n’Translate permet les captures sans demandes répétées de partage. Il sert aussi à traduire les champs de saisie et à utiliser les touches de volume. Active-le si tu veux ces fonctions. Si Android 13 ou plus récent bloque le bouton, ouvre les informations de l’application, puis le menu ⋮ et « Autoriser les paramètres restreints ». Reviens activer le service.</string>
+    <string name="setup_recognition">Reconnaissance du texte et modèles</string>
+    <string name="setup_recognition_body">L’OCR intégré reconnaît les écritures latine, chinoise, japonaise et coréenne. Pour le cyrillique ou d’autres écritures, choisis un moteur adapté. Les modèles hors ligne doivent être téléchargés avant utilisation.</string>
+    <string name="setup_ocr">Choisir l’OCR et télécharger les modèles</string>
+    <string name="setup_models">Modèles de traduction et paramètres API</string>
+    <string name="setup_background">Garder le traducteur disponible</string>
+    <string name="setup_background_body">Si le téléphone ferme le traducteur en arrière-plan, autorise son activité en arrière-plan ou retire les restrictions de batterie pour Click’n’Translate. Les noms des réglages varient selon le téléphone.</string>
+    <string name="setup_battery">Paramètres de batterie</string>
+    <string name="setup_ready">Prêt à essayer</string>
+    <string name="setup_ready_body">Dans l’onglet Écran, appuie sur Démarrer et autorise le partage. Ouvre une autre application et utilise le bouton flottant avec le logo pour sélectionner le texte. Le texte et les photos peuvent être traduits sans capture d’écran.</string>
+    <string name="setup_shortcuts">Bouton flottant et raccourcis</string>
+    <string name="setup_reopen">Recommencer la configuration</string>
+    <string name="setup_settings_unavailable">Ce réglage n’a pas pu être ouvert. Ouvre les paramètres Android et trouve Click’n’Translate manuellement.</string>
+    <string name="setup_restricted_settings">Informations de l’application : paramètres restreints</string>
+    </resources>

@@ -50,10 +50,11 @@ android {
 
     defaultConfig {
         applicationId = "dev.clickn.translate"
+        manifestPlaceholders["launcherLabel"] = "@string/app_name"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.3.1"
         buildConfigField("String", "MOBILE_RELEASE_API_URL", "\"$mobileReleaseApiUrl\"")
 
         // Controlled local-LLM A/B switch. PP remains device-policy selected (6 on the
@@ -103,7 +104,8 @@ android {
             }
         }
         debug {
-            applicationIdSuffix = ".debug"
+            applicationIdSuffix = if (providers.gradleProperty("previewBuild").isPresent) ".preview" else ".debug"
+            manifestPlaceholders["launcherLabel"] = if (providers.gradleProperty("previewBuild").isPresent) "Click’n’Translate Preview" else "@string/app_name"
             isDebuggable = true
         }
     }

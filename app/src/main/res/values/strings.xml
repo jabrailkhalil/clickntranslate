@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <!-- Modified for Click'n'Translate on October 3, 2026. -->
 <resources>
     <string name="settings_about_user_guide">User Guide</string>
@@ -14,18 +14,15 @@
     <string name="settings_auto_ocr_delete_language_confirm">Confirm deletion of %1$s?</string>
     <string name="settings_auto_ocr_description">Choose a recognition method for each language. Applies only when “Auto” is selected.</string>
     <string name="app_name">Click\'n\'Translate</string>
-
     <!-- Common -->
     <string name="common_back">Back</string>
     <string name="common_close">Close</string>
-
     <!-- Main -->
     <string name="title_main">Real-time screen translation</string>
     <string name="status_ready">Ready</string>
     <string name="status_running">Running</string>
     <string name="status_no_overlay_perm">Overlay permission not granted</string>
     <string name="status_awaiting_projection">Waiting for capture permission…</string>
-
     <string name="btn_start">Start capture service</string>
     <string name="btn_stop">Stop</string>
     <string name="btn_request_overlay">Grant overlay permission</string>
@@ -40,7 +37,6 @@
     <string name="rom_battery_pending">Not on battery whitelist</string>
     <string name="region_info_full">Current: full screen</string>
     <string name="region_info_set">Region: %1$d × %2$d @ (%3$d, %4$d)</string>
-
     <string name="main_logs">Logs</string>
     <string name="main_settings">Settings</string>
     <string name="main_action_grant_overlay_first">Grant overlay first</string>
@@ -177,7 +173,6 @@
     <string name="gallery_notification_channel">Gallery translation tasks</string>
     <string name="gallery_notification_title">Translating gallery images</string>
     <string name="gallery_notification_progress">%1$d / %2$d processed</string>
-
     <!-- Settings -->
     <string name="settings_title">Translation settings</string>
     <string name="settings_base_url">Base URL</string>
@@ -262,7 +257,6 @@
     <string name="shizuku_status_no_perm">Shizuku running but not granted (tap Start to request)</string>
     <string name="shizuku_status_not_running">Shizuku not running (start it via ADB / wireless debugging)</string>
     <string name="shizuku_status_not_installed">Shizuku not installed (optional; default MediaProjection works)</string>
-
     <string name="settings_unsaved_title">Unsaved changes</string>
     <string name="settings_unsaved_msg">Save your changes before going back?</string>
     <string name="settings_unsaved_save">Save and go back</string>
@@ -415,7 +409,6 @@
     <string name="settings_niutrans_memory_library_id">Translation memory ID (optional)</string>
     <string name="settings_niutrans_tip">Flash supports batch translation. Pro supports streaming translation.</string>
     <string name="settings_niutrans_advanced">Advanced</string>
-
     <!-- TTS output -->
     <string name="settings_tts_enable">Enable TTS output</string>
     <string name="settings_tts_enable_hint">Shows speaker buttons after source and translated text in word-select translation. Speech starts only when a speaker button is tapped.</string>
@@ -607,7 +600,6 @@
     <string name="settings_tts_mimo_select_sample">Select sample</string>
     <string name="settings_tts_mimo_clear_sample">Clear voice sample</string>
     <string name="settings_tts_mimo_sample_hint">Official limit: MP3/WAV only; base64-encoded sample must not exceed 10 MB.</string>
-
     <!-- Translation engine connection test -->
     <string name="settings_test_connection">Test connection</string>
     <string name="settings_test_testing">Testing…</string>
@@ -619,7 +611,6 @@
     <string name="settings_test_ok_anthropic_message_format">OK Anthropic model=%1$s %2$d ms</string>
     <string name="settings_test_deepl_403_hint">check Free/Pro endpoint toggle matches your key</string>
     <string name="settings_test_pick_model">Pick a model from the list</string>
-
     <string name="settings_prompt_label">Prompt template ({source} {target} will be substituted)</string>
     <string name="settings_prompt_warn_missing_format">Current prompt doesn\'t use the %1$s placeholder; the prompt text won\'t follow language changes.</string>
     <string name="settings_prompt_warn_hint_format">Note: a hidden rule still forces the target language to \"%1$s\", so the output language stays correct.</string>
@@ -872,7 +863,6 @@
     <string name="settings_paddle_progress_done_format">✓ %1$s done (%2$d KB) @ %3$s</string>
     <string name="settings_paddle_progress_format">[%1$s] %2$s %3$d%% (%4$d/%5$d KB)</string>
     <string name="settings_paddle_progress_simple_format">[%1$s] %2$s %3$d KB</string>
-
     <!-- Settings search index labels -->
     <string name="settings_search_item_translator_engine">Translator engine</string>
     <string name="settings_search_item_base_url">Base URL</string>
@@ -958,7 +948,6 @@
     <string name="settings_paddle_status_missing_hint">PaddleOCR not downloaded. Use Auto download, or import local model files.</string>
     <string name="settings_paddle_download_failed_format">Download failed: %1$s</string>
     <string name="settings_paddle_imported_format">Imported %1$d files → %2$s</string>
-
     <!-- manga-ocr 端侧（l0wgear/manga-ocr-2025-onnx，日漫专用，~160MB，需开代理） -->
     <string name="settings_ocr_chip_manga_ocr_ja">Manga OCR (JA)</string>
     <string name="ocr_engine_manga_ocr_ja">MANGA_OCR_JA</string>
@@ -978,7 +967,6 @@
     <string name="settings_manga_ocr_progress_failed_format">[%1$s] %2$s failed: %3$s</string>
     <string name="settings_manga_ocr_download_failed_format">Download failed: %1$s</string>
     <string name="settings_manga_ocr_imported_format">Imported %1$d files → %2$s</string>
-
     <!-- Logs page -->
     <string name="log_title">Logs</string>
     <string name="log_copy">Copy to clipboard</string>
@@ -1023,7 +1011,6 @@
     <string name="log_action_collapse">Collapse</string>
     <string name="log_action_copy_full">Copy full log</string>
     <string name="log_action_share_full">Share full log</string>
-
     <!-- Language picker -->
     <string name="lang_picker_search_placeholder">Search languages</string>
     <string name="lang_picker_no_match">No matching language</string>
@@ -1032,7 +1019,6 @@
     <string name="lang_picker_already_source">Source selected</string>
     <string name="lang_picker_pin">Pin</string>
     <string name="lang_picker_unpin">Unpin</string>
-
     <!-- CaptureService toasts -->
     <string name="toast_loop_off">Auto translate off</string>
     <string name="toast_loop_on">Auto translate on (every %1$ss)</string>
@@ -1041,7 +1027,6 @@
     <string name="toast_shizuku_dry_run_failed">Shizuku capture isn\'t working — likely not paired via ADB. Open the Shizuku app and start it with ADB / wireless debug, or switch to MediaProjection on the main screen.</string>
     <string name="toast_ocr_failed_format">OCR failed [%1$s]: %2$s</string>
     <string name="toast_ocr_unreliable_result">OCR confidence is too low to detect valid text. Adjust the capture region. If the captured image is blank, black, or blurred, check whether screen-sharing protection is enabled.</string>
-
     <!-- Floating button arc menu (long press) -->
     <string name="menu_loop_translate">Loop</string>
     <string name="toast_skill_switched_loop">Loop mode selected. Tap the floating ball to start.</string>
@@ -1068,7 +1053,6 @@
     <string name="settings_floating_dock_inset_hint">0 = flush against the system edge. Raise this to avoid full-gesture edge trigger zones.</string>
     <string name="settings_floating_dock_inset_preview_start">Show edge preview</string>
     <string name="settings_floating_dock_inset_preview_stop">Hide edge preview</string>
-
     <!-- Internal logs (written by LogRepository) -->
     <string name="log_msg_loop_off">Loop mode off</string>
     <string name="log_msg_loop_on">Loop mode on</string>
@@ -1085,7 +1069,6 @@
     <string name="log_msg_translate_exception_format">Translate exception [%1$s]</string>
     <string name="log_msg_batch_translate_failed_format">Batch translate failed [%1$s]</string>
     <string name="log_msg_stream_translate_failed_format">Stream translate failed [%1$s]</string>
-
     <!-- Engine name labels -->
     <string name="ocr_engine_ml_kit_auto">ML_KIT_AUTO</string>
     <string name="ocr_engine_ml_kit_latin">ML_KIT_LATIN</string>
@@ -1097,17 +1080,14 @@
     <string name="ocr_engine_paddle_onnx">PADDLE_ONNX</string>
     <string name="translator_engine_openai">OPENAI</string>
     <string name="translator_engine_deepl">DEEPL</string>
-
     <!-- Notification -->
     <string name="notif_channel_name">Capture &amp; translate service</string>
     <string name="notif_channel_desc">Foreground capture + OCR + translate</string>
     <string name="notif_title">Click\'n\'Translate running</string>
     <string name="notif_text">Tap the floating ball to run its current mode long-press for menu</string>
-
     <!-- Accessibility -->
     <string name="a11y_desc">Used for volume-key shortcuts and Input Translation. Input-field text is read only when you tap the floating ball; password input fields are never read.</string>
     <string name="a11y_summary">Click\'n\'Translate Shortcuts</string>
-
     <!-- Baidu OCR endpoint names / quotas -->
     <string name="baidu_endpoint_general_basic_name">Standard (no location)</string>
     <string name="baidu_endpoint_general_name">Standard + location</string>
@@ -1116,7 +1096,6 @@
     <string name="baidu_endpoint_webimage_name">Web image OCR</string>
     <string name="baidu_endpoint_quota_1000_day">1000/day free</string>
     <string name="baidu_endpoint_quota_500_day">500/day free</string>
-
     <!-- OCR language parameter (Baidu language_type / Tencent LanguageType) -->
     <string name="settings_baidu_lang_label">Recognition language (language_type)</string>
     <string name="settings_tencent_lang_label">Recognition language (LanguageType)</string>
@@ -1128,7 +1107,6 @@
     <string name="ocr_lang_mix">Mixed multilingual (auto)</string>
     <string name="lang_th">Thai</string>
     <string name="lang_vi">Vietnamese</string>
-
     <!-- Source-language → OCR engine linkage prompt -->
     <string name="ocr_lang_issue_title">OCR engine may not recognize this</string>
     <string name="ocr_lang_issue_msg">Source language is \"%1$s\"; the current OCR engine may not recognize it well.\nRecommend switching to \"%2$s\".</string>
@@ -1138,7 +1116,6 @@
     <string name="ocr_lang_issue_btn_apply">Apply</string>
     <string name="ocr_lang_issue_btn_setup">Go to settings</string>
     <string name="ocr_lang_issue_btn_keep">Keep as-is</string>
-
     <!-- Check for updates (GitHub Releases API) -->
     <string name="update_btn_check">Check for updates</string>
     <string name="update_btn_checking">Checking…</string>
@@ -1154,7 +1131,6 @@
     <string name="update_dialog_btn_ok">OK</string>
     <string name="update_dialog_btn_close">Close</string>
     <string name="update_dialog_btn_open_release">Open Release page</string>
-
     <!-- Tencent OCR endpoint names / desc -->
     <string name="tencent_endpoint_general_basic_name">General print</string>
     <string name="tencent_endpoint_general_accurate_name">Accurate</string>
@@ -1162,16 +1138,13 @@
     <string name="tencent_endpoint_general_basic_desc">Most common, 1000/month free</string>
     <string name="tencent_endpoint_general_accurate_desc">More accurate but slower, 1000/month free</string>
     <string name="tencent_endpoint_recognize_agent_desc">LLM-enhanced, good for complex layout / handwriting</string>
-
     <!-- Region picker -->
     <string name="region_picker_hint_drawing">Drag to select the translation area double-tap for full screen</string>
     <string name="region_picker_btn_confirm">Confirm</string>
     <string name="region_picker_btn_cancel">Cancel</string>
     <string name="region_picker_btn_redo">Redraw</string>
-
     <!-- Default prompt -->
     <string name="default_prompt">You are a professional translator. Translate the following {source} text into {target}. Rules:\n1. Keep proper nouns (names of people, places, etc.);\n2. Sound natural and fluent, avoid literal phrasing;\n3. Output the translation only — no explanations, no quotes.\nText:\n</string>
-
     <!-- Engine error messages (surface to toast / overlay [!] marker / log page) -->
     <string name="err_openai_no_api_key">API Key not configured</string>
     <string name="err_openai_parse_failed_format">Failed to parse response: %1$s</string>
@@ -1196,7 +1169,6 @@
     <string name="err_manga_ocr_not_ready">Manga OCR model not ready. Tap \"Download Manga OCR model\" in Settings.</string>
     <string name="err_manga_ocr_all_mirrors_failed_format">%1$s failed: %2$s. huggingface.co unreachable — please enable proxy / VPN, or use \"Import from device files\".</string>
     <string name="err_manga_ocr_rename_failed_format">rename %1$s → %2$s failed</string>
-
     <!-- 端侧 LLM 翻译 -->
     <string name="err_llm_not_ready">%1$s model not ready. Tap \"Download model\" in Settings → On-device LLM translator.</string>
     <string name="err_llm_device_unsupported">On-device LLM translator requires Android 13+. Your device is not supported.</string>
@@ -1267,7 +1239,6 @@
     <string name="settings_translator_group_local_llm">On-device LLM (no network, model downloaded on demand)</string>
     <string name="settings_translator_group_cloud_llm">Cloud LLM</string>
     <string name="settings_translator_group_cloud">Cloud translator</string>
-
     <!-- Language names (matched 1:1 to Languages.kt nameRes) -->
     <string name="lang_auto">Auto detect</string>
     <string name="lang_sq">Albanian</string>
@@ -1382,7 +1353,6 @@
     <string name="lang_zh_cn">Chinese (Simplified)</string>
     <string name="lang_zh_tw">Chinese (Traditional)</string>
     <string name="lang_zu">Zulu</string>
-
     <!-- 0.4: arc menu skill switching + word selection translation -->
     <string name="menu_word_select">Word Select</string>
     <string name="menu_full_screen_skill">Full-screen Translate</string>
@@ -1453,7 +1423,6 @@
     <string name="input_translation_replace_failed_copied">This input field does not support replacement. The translation was copied.</string>
     <string name="input_translation_replace_unconfirmed_copied">Unable to confirm whether the text was replaced. The translation was copied.</string>
     <string name="input_translation_service_disconnected_copied">The accessibility service is disconnected. Unable to replace the text; the translation was copied.</string>
-
     <!-- Word selection overlay -->
     <string name="word_select_hint_drawing">Drag a rectangle around text to translate</string>
     <string name="word_select_btn_translate">Translate</string>
@@ -1504,7 +1473,6 @@
     <string name="translation_correction_save_failed">Could not save correction: %1$s</string>
     <string name="word_card_pause_speech">Pause speech</string>
     <string name="word_card_resume_speech">Resume speech</string>
-
     <!-- Translation card -->
     <string name="word_card_loading">Translating…</string>
     <string name="floating_word_lookup_failed">Lookup failed</string>
@@ -1532,7 +1500,6 @@
     <string name="translation_block_copy_panel_translation">Translation</string>
     <string name="translation_block_direct_accessibility">Translation: %1$s. Tap to close. Long press to select text and open the system copy menu.</string>
     <string name="translation_block_open_panel_accessibility">Translation: %1$s. Double tap to open the selectable copy panel.</string>
-
     <!-- 系统文字选中菜单的「Click\'n\'Translate翻译」入口 -->
     <string name="process_text_label">Click\'n\'Translate</string>
     <string name="process_text_translating">Translating…</string>
@@ -1542,7 +1509,6 @@
     <string name="toast_word_select_translate_failed_format">Translate (%1$s) failed: %2$s</string>
     <string name="toast_tts_failed_format">Speech failed: %1$s</string>
     <string name="toast_tts_language_unavailable_format">Speech failed: the system voice engine does not support %1$s. Change the speech language or install its voice data.</string>
-
     <!-- Settings: arc menu order -->
     <string name="settings_section_arc_menu">Arc Menu Buttons</string>
     <string name="settings_arc_menu_page_size">Buttons per page: %1$d</string>
@@ -1616,7 +1582,6 @@
     <string name="preset_quick_applied_format">Preset applied: %1$s</string>
     <string name="language_quick_title">Source → Target</string>
     <string name="language_quick_updated_format">Language: %1$s → %2$s</string>
-
     <!-- Settings: dictionary prompt -->
     <string name="settings_dictionary_prompt_title">Dictionary Prompt (Word Select, OpenAI / Anthropic compatible)</string>
     <string name="settings_dictionary_prompt_desc">When the selected region looks like a word or fixed phrase, this prompt requests structured pronunciation, parts of speech, definitions, usage notes, and examples. If the result cannot be parsed, Word Select falls back to plain translation.</string>
@@ -1626,7 +1591,6 @@
     <string name="settings_reset_confirm_message">Your current custom prompt will be overwritten by the default for this UI language. This can\'t be undone.</string>
     <string name="settings_reset_confirm_yes">Reset</string>
     <string name="settings_reset_confirm_no">Cancel</string>
-
     <!-- Text orientation auto-detect -->
     <string name="settings_text_orientation_section_title">Auto-detect orientation</string>
     <string name="settings_capture_content_orientation_label">Content orientation correction</string>
@@ -1642,7 +1606,6 @@
     <string name="settings_orient_vertical_rtl">Vertical (R→L)</string>
     <string name="settings_orient_stacked">Stacked (logo)</string>
     <string name="settings_orient_manual_active_hint">Manual lock active — auto detection is bypassed.</string>
-
     <string name="settings_orientation_model_name">ONNX orientation models</string>
     <string name="settings_orientation_model_desc">Optional PaddleOCR orientation pack (~7.5 MB): whole-image 0/90/180/270 classification plus text-line 0/180 classification. It can route vertical screens before OCR and rerun upside-down horizontal text once with boxes mapped back.</string>
     <string name="settings_orientation_model_status_ready_format">Orientation model ready (%1$d KB)</string>
@@ -1657,11 +1620,10 @@
     <string name="settings_orientation_model_progress_format">[%1$s] %2$s %3$d%% (%4$d/%5$d KB)</string>
     <string name="settings_orientation_model_progress_simple_format">[%1$s] %2$s %3$d KB</string>
     <string name="settings_orientation_model_download_failed_format">Download failed: %1$s</string>
-    <string name="settings_orientation_model_imported_format">Imported %1$d files -> %2$s</string>
+    <string name="settings_orientation_model_imported_format">Imported %1$d files -&gt; %2$s</string>
     <string name="err_orientation_model_not_ready">Orientation model not ready. Download or import the ONNX model in Settings.</string>
     <string name="err_orientation_model_all_mirrors_failed_format">%1$s failed: %2$s. Check network/proxy, or use local import.</string>
-    <string name="err_orientation_model_rename_failed_format">rename %1$s -> %2$s failed</string>
-
+    <string name="err_orientation_model_rename_failed_format">rename %1$s -&gt; %2$s failed</string>
     <!-- Default dictionary prompt -->
     <string name="default_dictionary_prompt">You are a {source}→{target} bilingual dictionary assistant. Treat the user input as a single word or fixed phrase and output ONLY the following JSON — no markdown, no code fence, no explanation.\n{\n  \"lemma\": \"canonical form in {source}; empty string if unknown\",\n  \"phonetic\": \"phonetic / pronunciation in {source}; empty string if unknown\",\n  \"senses\": [\n    {\n      \"pos\": \"part of speech, e.g. n./v./adj.\",\n      \"definitions\": [\"meanings in {target} that belong only to this part of speech\"],\n      \"form_note\": \"explain in {target} how this form relates to the lemma; empty string if not applicable\"\n    }\n  ],\n  \"inflections\": [\"form label: inflected form in {source}; empty array when not applicable\"],\n  \"synonyms\": [\"common synonym or near-synonym in {source}; empty array if unknown\"],\n  \"difficulty_notes\": [\"explain in {target} any rare meaning, specialized domain, acronym expansion, cultural reference, or easily confused usage; empty array for ordinary terms\"],\n  \"examples\": [\n    { \"src\": \"{source} example\", \"dst\": \"{target} translation\" }\n  ]\n}\nRules:\n1. Must be valid JSON with exactly these keys, and every definition must stay inside the sense for its own part of speech;\n2. Use empty string / empty array for missing info;\n3. Include at most 6 applicable inflections, 5 synonyms, and 2 examples;\n4. Rare words, specialized terms, acronyms, culture-specific names, and easily confused usages require concise difficulty notes (at most 3) without repeating the definitions; use an empty array for ordinary terms;\n5. Never translate the whole thing as a sentence — always a dictionary lookup.\n</string>
     <string name="settings_translation_output_layout_label">Translation layout</string>
@@ -1753,7 +1715,7 @@
     <string name="translation_library_help_priority_body">Source preservation is checked first. An exact match stays in the image and never enters erasing or translation.\n\nFor the remaining text, the app checks translation memory first. If no memory matches, it finds relevant terms and translates normally.\n\nSound effect kept as artwork → add to Keep source\nCorrected sentence → save to translation memory\nIncorrect name or fixed word → add a term</string>
     <string name="translation_library_help_add_title">How to add corrections</string>
     <string name="translation_library_help_add_body">Long-press a displayed translation and choose “Proofread translation”. You can correct the OCR source and translation, save the result to translation memory, and add selected fixed wording to the current game’s terms or global terms.\n\nSaving immediately updates the current translation and makes the correction available to future translations.</string>
-    <string name="translation_library_help_add_image_description">Example of choosing “Proofread translation” after long-pressing a translation</string>
+    <string name="translation_library_help_add_image_description">Example of the review action after long-pressing translated text.</string>
     <string name="translation_library_help_manage_title">How to manage saved items</string>
     <string name="translation_library_help_manage_body">Switch between the Terms and Translation memory tabs. Use the search button in the top-right corner to find an item. Every item can be edited or deleted separately.</string>
     <string name="translation_library_help_close">Got it</string>
@@ -1805,9 +1767,9 @@
     <string name="glossary_status_enabled">Enabled</string>
     <string name="glossary_status_disabled">Disabled</string>
     <string name="glossary_delete_confirm_title">Delete glossary entry?</string>
-    <string name="glossary_delete_confirm_message">Delete “%1$s -> %2$s”? This cannot be undone.</string>
+    <string name="glossary_delete_confirm_message">Delete “%1$s -&gt; %2$s”? This cannot be undone.</string>
     <string name="glossary_duplicate_title">Duplicate glossary entry</string>
-    <string name="glossary_duplicate_message">An entry with the same scope, language pair, source term, and case rule already exists: “%1$s -> %2$s”. Replace its translation with “%3$s”?</string>
+    <string name="glossary_duplicate_message">An entry with the same scope, language pair, source term, and case rule already exists: “%1$s -&gt; %2$s”. Replace its translation with “%3$s”?</string>
     <string name="glossary_duplicate_overwrite">Replace existing</string>
     <string name="glossary_category">Category</string>
     <string name="glossary_category_person">Person</string>
@@ -1910,7 +1872,6 @@
     <string name="onboarding_progress">Step %1$d of %2$d</string>
     <string name="onboarding_rail_title">Set up your translator</string>
     <string name="onboarding_rail_body">One choice per page. You can rerun this guide from the System compatibility section on the home screen.</string>
-
     <string name="onboarding_welcome_title">Welcome to Click\'n\'Translate</string>
     <string name="onboarding_welcome_body">A few quick choices will set up what you translate most often, your languages, display behavior, and translation services. You can change any of these later in Settings.</string>
     <string name="onboarding_open_source_title">Open source and free to use</string>
@@ -1924,7 +1885,6 @@
     <string name="onboarding_target_body">This controls both the translated text and the model downloaded for offline translation.</string>
     <string name="onboarding_target_label">Target language</string>
     <string name="onboarding_language_same_error">Source and target languages must be different.</string>
-
     <string name="onboarding_display_title">How should translations appear?</string>
     <string name="onboarding_display_body">Choose how translations should appear for everyday content. You can change this later in Settings.</string>
     <string name="onboarding_display_adaptive">Adaptive in-place overlay</string>
@@ -1933,14 +1893,12 @@
     <string name="onboarding_display_below_desc">Keep the original visible and place a fixed-style translation below it.</string>
     <string name="onboarding_display_floating">Floating result window</string>
     <string name="onboarding_display_floating_desc">Collect source and translated text in a movable, resizable window.</string>
-
     <string name="onboarding_usage_title">What will you translate most often?</string>
     <string name="onboarding_usage_body">This applies a safe baseline. Every option remains editable in Settings.</string>
     <string name="onboarding_usage_daily">Everyday content</string>
     <string name="onboarding_usage_daily_desc">Apps, games, subtitles, menus, and general text.</string>
     <string name="onboarding_usage_manga">Manga and comics</string>
     <string name="onboarding_usage_manga_desc">Best for manga, webtoons, and graphic novels, including speech bubbles, vertical text, and independent text in the artwork.</string>
-
     <string name="onboarding_manga_direction_title">How should manga translations flow?</string>
     <string name="onboarding_manga_direction_body">Choose a preferred output layout. Automatic is the safest default for mixed pages.</string>
     <string name="onboarding_direction_auto">Follow recognition</string>
@@ -1949,7 +1907,6 @@
     <string name="onboarding_direction_horizontal_desc">Render translated lines horizontally from left to right.</string>
     <string name="onboarding_direction_vertical">Vertical, right to left</string>
     <string name="onboarding_direction_vertical_desc">Use traditional manga-style vertical columns ordered from right to left.</string>
-
     <string name="onboarding_method_title">How should text be translated?</string>
     <string name="onboarding_method_body">Offline translation keeps text on the device. Only Cloud LLM supports word-select translation; TTS can be used with either translation method.</string>
     <string name="onboarding_method_offline">Offline translation</string>
@@ -1961,7 +1918,6 @@
     <string name="onboarding_method_cloud_desc">Only this option supports word-select translation. Choose a provider and enter its URL, API key, and model name.</string>
     <string name="onboarding_offline_pair_unsupported">Offline translation does not support this language pair. Change the languages or choose Cloud LLM.</string>
     <string name="onboarding_manga_offline_pair_unsupported">Sakura only supports Japanese → Simplified Chinese. Change the languages or choose Cloud LLM.</string>
-
     <string name="onboarding_mlkit_title">Download the offline language pack</string>
     <string name="onboarding_mlkit_body">Prepare %1$s → %2$s before your first translation. Each required model is about 30 MB; Wi-Fi is recommended.</string>
     <string name="onboarding_mlkit_checking">Checking models already on this device…</string>
@@ -1972,7 +1928,6 @@
     <string name="onboarding_mlkit_unsupported">Offline translation does not support this language pair. Choose Cloud LLM or go back and change the languages.</string>
     <string name="onboarding_mlkit_error">Download failed: %1$s</string>
     <string name="onboarding_mlkit_retry">Try download again</string>
-
     <string name="onboarding_paddle_ocr_title">Prepare the recommended OCR model</string>
     <string name="onboarding_paddle_ocr_body">PaddleOCR has been selected for %1$s. Recommended model: %2$s.</string>
     <string name="onboarding_paddle_ocr_model_desc">On-device OCR model. Once downloaded, text recognition works offline.</string>
@@ -2015,7 +1970,6 @@
     <string name="onboarding_manga_offline_optional">You may continue now. Background downloads remain visible in Settings.</string>
     <string name="onboarding_model_ready">Ready</string>
     <string name="onboarding_model_not_downloaded">Not downloaded</string>
-
     <string name="onboarding_cloud_title">Choose and configure a cloud LLM</string>
     <string name="onboarding_cloud_body">Providers are sorted by name. The order does not indicate recommendations or rankings.\nFollow the instructions on your provider’s official website to get an API Key, then enter it below. You can change the address and model name as needed.</string>
     <string name="settings_test_balance_format">Balance: %1$s</string>
@@ -2033,7 +1987,6 @@
     <string name="onboarding_cloud_error_url_invalid">Enter a complete HTTP or HTTPS URL with a valid host.</string>
     <string name="onboarding_cloud_error_api_key">Enter an API key, or use Skip and configure it later.</string>
     <string name="onboarding_cloud_error_model">Enter a model name.</string>
-
     <string name="onboarding_tts_title">How should translations be read aloud?</string>
     <string name="onboarding_tts_body">TTS is independent of the translation method. System speech can use voice data installed on the device; HTTP and online providers need additional setup later.</string>
     <string name="onboarding_tts_disabled">Do not enable TTS</string>
@@ -2046,7 +1999,6 @@
     <string name="onboarding_tts_minimax">MiniMax</string>
     <string name="onboarding_tts_mimo">MiMo</string>
     <string name="onboarding_tts_online_desc">Uses the provider API. Add its credentials and voice options in TTS Settings after setup.</string>
-
     <string name="onboarding_summary_title">Ready to translate</string>
     <string name="onboarding_summary_body">Review the baseline below. Saving only changes related translation and display settings.</string>
     <string name="onboarding_summary_languages">Languages</string>
@@ -2089,4 +2041,4 @@
     <string name="brand_community_label">Telegram community</string>
     <string name="brand_join_community">Open Telegram</string>
     <string name="brand_downloads_label">Visit clickn.dev</string>
-</resources>
+    </resources>

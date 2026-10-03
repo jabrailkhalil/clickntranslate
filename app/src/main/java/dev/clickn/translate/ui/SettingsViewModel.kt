@@ -113,6 +113,10 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun load(): Settings = repo.get()
 
+    private var localeChangeDraft: Settings? = null
+    internal fun retainLocaleChangeDraft(value: Settings?) { localeChangeDraft = value }
+    internal fun consumeLocaleChangeDraft(): Settings? = localeChangeDraft.also { localeChangeDraft = null }
+
     private val recentLanguageMutex = Mutex()
 
     internal fun rememberMlKitSourceLanguage(languageTag: String) =

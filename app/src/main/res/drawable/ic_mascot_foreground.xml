@@ -1,0 +1,1 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:width="64dp" android:height="64dp" android:gravity="center"><bitmap android:src="@drawable/mascot_orb" android:gravity="fill"/></item></layer-list>

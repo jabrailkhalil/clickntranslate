@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="mobile_nav_screen">Bildschirm</string>
     <string name="mobile_nav_text">Text</string>
@@ -101,4 +101,4 @@
     <string name="settings_app_lang_de">Deutsch</string>
     <string name="settings_app_lang_fr">Français</string>
     <string name="settings_app_lang_es">Español</string>
-</resources>
+    </resources>

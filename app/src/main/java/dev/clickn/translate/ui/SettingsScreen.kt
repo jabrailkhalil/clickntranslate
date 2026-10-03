@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -111,9 +112,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
@@ -826,6 +824,7 @@ fun SettingsScreen(
     // dirty 检测：load 时 capture 一份初始 Settings，之后跟 buildSnapshot() 比 equals。
     // 旧版手写两份 List<Any?>，每加 Settings 字段都要在两个 list 同步加，反复犯"忘改一边"的 bug。
     // 现在用 data class equals 自动覆盖所有字段——加字段只改 buildSnapshot() 一处。
+    var selectedCategory by rememberSaveable { mutableStateOf(initialSection?.takeIf { key -> advancedCategories.any { it.key == key } }) }
     var initialSettings by remember { mutableStateOf<Settings?>(null) }
     fun autoSaveFloatingButtonSettings() {
         if (initialSettings == null) return
@@ -2119,6 +2118,7 @@ fun SettingsScreen(
         when {
             showAutoOcrSettings -> showAutoOcrSettings = false
             overlayRenderingOpen -> overlayRenderingOpen = false
+            selectedCategory != null -> { selectedCategory = null; scope.launch { listState.scrollToItem(0) } }
             else -> tryBack()
         }
     }
@@ -2731,9 +2731,8 @@ fun SettingsScreen(
                                 rec.baiduEndpoint?.let { baiduEndpoint = it }
                                 rec.tencentEndpoint?.let { tencentEndpoint = it }
                                 scope.launch {
-                                    settingsSectionIndex(SectionKeys.OCR)?.let { index ->
-                                        listState.animateScrollToItem(index)
-                                    }
+                                    selectedCategory = SectionKeys.OCR
+                                    listState.scrollToItem(0)
                                 }
                             } else {
                                 ocrEngine = rec.engine
@@ -2773,7 +2772,8 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(Unit) {
-        val s = viewModel.loadForScreen(context)
+        val persisted = viewModel.loadForScreen(context)
+        val s = viewModel.consumeLocaleChangeDraft() ?: persisted
         // suspend 操作必须在 Snapshot 块外做完
         val migratedPrompt = s.promptTemplate
         val paddleStatusPlaceholder = context.getString(R.string.settings_paddle_status_checking)
@@ -2978,7 +2978,7 @@ fun SettingsScreen(
             // Keep the complete repository value as the baseline. Rebuilding it while
             // initialSettings is still null would start from Settings defaults and lose fields
             // owned by services or other screens before the first export.
-            initialSettings = s
+            initialSettings = persisted
         }
     }
 
@@ -2986,7 +2986,8 @@ fun SettingsScreen(
     val settingsLoaded = initialSettings != null
     LaunchedEffect(initialSection, settingsLoaded) {
         if (settingsLoaded && initialSection != null) {
-            settingsSectionIndex(initialSection)?.let { index -> listState.scrollToItem(index) }
+            selectedCategory = initialSection.takeIf { key -> advancedCategories.any { it.key == key } }
+            listState.scrollToItem(0)
         }
     }
     LaunchedEffect(settingsLoaded, translatorEngine, sourceLang, targetLang, mlKitModelRefreshVersion, mlKitModelDeleteRunning) {
@@ -3465,7 +3466,9 @@ fun SettingsScreen(
                     },
                     navigationIcon = {
                         val navigateBack = {
-                            if (overlayRenderingOpen) overlayRenderingOpen = false else tryBack()
+                            if (overlayRenderingOpen) overlayRenderingOpen = false
+                            else if (selectedCategory != null) { selectedCategory = null; scope.launch { listState.scrollToItem(0) } }
+                            else tryBack()
                         }
                         IconButton(onClick = if (searchActive) closeSearch else navigateBack) {
                             Icon(
@@ -3495,7 +3498,7 @@ fun SettingsScreen(
             }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            if (dirty) ExtendedFloatingActionButton(
                 onClick = {
                     // 防护：load 完成前 state 是默认占位值，此时保存会把空字符串 / 默认 enum
                     // 写入 DataStore，覆盖用户实际数据。LaunchedEffect 完成（~13ms）才把
@@ -3542,6 +3545,11 @@ fun SettingsScreen(
                         Box(modifier = Modifier.size(80.dp))
                     }
                 }
+            } else if (selectedCategory == null) {
+                AdvancedSettingsDirectory(if (settingsLoaded) buildSnapshot() else null) { key ->
+                    selectedCategory = key
+                    scope.launch { listState.scrollToItem(0) }
+                }
             } else {
             // 直接 inflate Column——不显示 spinner，避免"按下设置 → spinner → UI"那段空白卡顿感。
             // state 默认值（空字符串 / 默认 enum）会先短暂显示，LaunchedEffect 在 ~13ms 内 Snapshot
@@ -3555,7 +3563,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
             // —— 通用 ——
-            item(key = SectionKeys.GENERAL) {
+            if (selectedCategory == SectionKeys.GENERAL) item(key = SectionKeys.GENERAL) {
                 SectionCard(title = null) {
                     SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_APP_LANGUAGE) {
                         Text(
@@ -3563,7 +3571,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        AppLanguageSelector()
+                        AppLanguageSelector(beforeChange = { viewModel.retainLocaleChangeDraft(if (dirty) buildSnapshot() else null) })
                     }
                     HorizontalDivider()
                     SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_THEME_MODE) {
@@ -3577,14 +3585,14 @@ fun SettingsScreen(
                 }
             }
 
-            item(key = SectionKeys.PRESETS) {
+            if (selectedCategory == SectionKeys.PRESETS) item(key = SectionKeys.PRESETS) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_PRESETS) {
                     translationPresetSection()
                 }
             }
 
             // —— 翻译引擎 ——
-            item(key = SectionKeys.TRANSLATE) {
+            if (selectedCategory == SectionKeys.TRANSLATE) item(key = SectionKeys.TRANSLATE) {
             SectionCard(title = stringResource(R.string.settings_section_translator)) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRANSLATOR_ENGINE) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3941,19 +3949,15 @@ fun SettingsScreen(
                             dev.clickn.translate.data.NiuTransMode.PRO to
                                 R.string.settings_niutrans_pro,
                         )
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             niuTransModes.forEachIndexed { index, (mode, labelRes) ->
-                                SegmentedButton(
+                                SettingChoiceChip(
                                     selected = niuTransMode == mode,
                                     onClick = {
                                         if (niuTransMode != mode) {
                                             niuTransMode = mode
                                         }
                                     },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = index,
-                                        count = niuTransModes.size,
-                                    ),
                                     icon = {},
                                     label = { Text(stringResource(labelRes)) },
                                 )
@@ -4492,7 +4496,7 @@ fun SettingsScreen(
             // 灰显 + 禁用 chip 让用户一眼明白 + 不能误操作。
             }
 
-            item(key = SectionKeys.TTS) {
+            if (selectedCategory == SectionKeys.TTS) item(key = SectionKeys.TTS) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TTS) {
                     SectionCard(title = stringResource(R.string.settings_section_tts)) {
                         TtsSettings(
@@ -4766,7 +4770,7 @@ fun SettingsScreen(
                 }
             }
 
-            item(key = SectionKeys.OCR) {
+            if (selectedCategory == SectionKeys.OCR) item(key = SectionKeys.OCR) {
             val ocrSectionDisabled = translatorEngine == TranslatorEngine.YOUDAO_PICTRANS
             SectionCard(
                 title = stringResource(R.string.settings_section_ocr),
@@ -5173,11 +5177,9 @@ fun SettingsScreen(
                     )
                     val detectionProfiles =
                         dev.clickn.translate.data.PaddleDetectionProfile.entries
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         detectionProfiles.forEachIndexed { index, profile ->
-                            SegmentedButton(
+                            SettingChoiceChip(
                                 selected = paddleDetectionProfile == profile,
                                 onClick = {
                                     if (paddleDetectionProfile != profile) {
@@ -5187,10 +5189,6 @@ fun SettingsScreen(
                                         }
                                     }
                                 },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = detectionProfiles.size,
-                                ),
                                 // The default check icon animates its width and shifts the label.
                                 // Keep the connected control, but make selection changes immediate.
                                 icon = {},
@@ -5356,7 +5354,7 @@ fun SettingsScreen(
             }
 
             // —— 译文显示 ——
-            item(key = SectionKeys.OVERLAY) {
+            if (selectedCategory == SectionKeys.OVERLAY) item(key = SectionKeys.OVERLAY) {
             SectionCard(title = stringResource(R.string.settings_section_overlay)) {
                 val overlayThemeLabel = stringResource(
                     when (overlayTheme) {
@@ -5390,19 +5388,8 @@ fun SettingsScreen(
                         RenderMode.BLOCKS to R.string.settings_render_blocks_chip,
                         RenderMode.FLOATING_WINDOW to R.string.settings_render_floating_window_chip,
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        renderModeOptions.forEachIndexed { index, (mode, labelRes) ->
-                            SegmentedButton(
-                                selected = renderMode == mode,
-                                onClick = { if (renderMode != mode) renderMode = mode },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = renderModeOptions.size,
-                                ),
-                                icon = {},
-                                label = { Text(stringResource(labelRes)) },
-                            )
-                        }
+                    SettingChoiceCards(renderMode, renderModeOptions) { mode ->
+                        if (renderMode != mode) renderMode = mode
                     }
                     if (renderMode == RenderMode.FLOATING_WINDOW) {
                         Text(
@@ -5498,19 +5485,15 @@ fun SettingsScreen(
                         TranslationBlockInteractionMode.OPEN_COPY_PANEL to
                             R.string.settings_translation_block_interaction_open_panel,
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         translationBlockCopyOptions.forEachIndexed { index, (mode, labelRes) ->
-                            SegmentedButton(
+                            SettingChoiceChip(
                                 selected = translationBlockInteractionMode == mode,
                                 onClick = {
                                     if (translationBlockInteractionMode != mode) {
                                         translationBlockInteractionMode = mode
                                     }
                                 },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = translationBlockCopyOptions.size,
-                                ),
                                 icon = {},
                                 label = { Text(stringResource(labelRes)) },
                             )
@@ -5608,19 +5591,15 @@ fun SettingsScreen(
                                     R.string.settings_merge_strength_all
                             }
                         }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             mergeStrengthOptions.forEachIndexed { index, (strength, labelRes) ->
-                                SegmentedButton(
+                                SettingChoiceChip(
                                     selected = shownMergeStrength == strength,
                                     onClick = {
                                         if (mergeStrength != strength) {
                                             mergeStrength = strength
                                         }
                                     },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = index,
-                                        count = mergeStrengthOptions.size,
-                                    ),
                                     icon = {},
                                     label = { Text(stringResource(labelRes)) },
                                 )
@@ -5651,7 +5630,7 @@ fun SettingsScreen(
             }
 
             // —— 划词翻译 ——
-            item(key = SectionKeys.WORD_SELECT) {
+            if (selectedCategory == SectionKeys.WORD_SELECT) item(key = SectionKeys.WORD_SELECT) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_WORD_SELECT) {
             SectionCard(title = stringResource(R.string.settings_section_word_select)) {
                 SwitchRow(
@@ -5712,7 +5691,7 @@ fun SettingsScreen(
             }
             }
 
-            item(key = SectionKeys.CAPTURE_REGION) {
+            if (selectedCategory == SectionKeys.CAPTURE_REGION) item(key = SectionKeys.CAPTURE_REGION) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_CAPTURE_REGION) {
             SectionCard(title = stringResource(R.string.settings_section_capture_region)) {
                 SwitchRow(
@@ -5830,7 +5809,7 @@ fun SettingsScreen(
             }
 
             // —— 输入翻译 ——
-            item(key = SectionKeys.INPUT_TRANSLATION) {
+            if (selectedCategory == SectionKeys.INPUT_TRANSLATION) item(key = SectionKeys.INPUT_TRANSLATION) {
             SettingsSearchTarget(
                 searchTargetRegistry,
                 R.string.settings_search_item_input_translation,
@@ -5845,9 +5824,9 @@ fun SettingsScreen(
                     stringResource(R.string.settings_input_translation_double_action),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     InputTranslationDoubleAction.entries.forEachIndexed { index, action ->
-                        SegmentedButton(
+                        SettingChoiceChip(
                             selected = inputTranslationDoubleAction == action,
                             onClick = {
                                 inputTranslationDoubleAction = action
@@ -5855,10 +5834,6 @@ fun SettingsScreen(
                                     viewModel.saveInputTranslationDoubleAction(action)
                                 }
                             },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = InputTranslationDoubleAction.entries.size,
-                            ),
                             icon = {},
                             label = {
                                 Text(
@@ -5911,7 +5886,7 @@ fun SettingsScreen(
             }
 
             // —— 循环触发器 ——
-            item(key = SectionKeys.TRIGGER) {
+            if (selectedCategory == SectionKeys.TRIGGER) item(key = SectionKeys.TRIGGER) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRIGGER) {
             SectionCard(title = stringResource(R.string.settings_section_trigger)) {
                 SettingsSearchTarget(
@@ -6124,7 +6099,7 @@ fun SettingsScreen(
 
             }
 
-            item(key = SectionKeys.FLOATING) {
+            if (selectedCategory == SectionKeys.FLOATING) item(key = SectionKeys.FLOATING) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_FLOATING) {
             SectionCard(title = stringResource(R.string.settings_section_floating)) {
                 SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_floating_size) {
@@ -6228,7 +6203,7 @@ fun SettingsScreen(
 
             }
 
-            item(key = SectionKeys.ARC_MENU) {
+            if (selectedCategory == SectionKeys.ARC_MENU) item(key = SectionKeys.ARC_MENU) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_ARC_MENU) {
             SectionCard(
                 title = stringResource(R.string.settings_section_arc_menu),
@@ -6277,7 +6252,7 @@ fun SettingsScreen(
 
             }
 
-            item(key = SectionKeys.DEVELOPER) {
+            if (selectedCategory == SectionKeys.DEVELOPER) item(key = SectionKeys.DEVELOPER) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_DEVELOPER) {
             SectionCard(
                 title = stringResource(R.string.settings_section_developer),
@@ -6349,7 +6324,7 @@ fun SettingsScreen(
 
             }
 
-            item(key = SectionKeys.NETWORK) {
+            if (selectedCategory == SectionKeys.NETWORK) item(key = SectionKeys.NETWORK) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_NETWORK) {
             SectionCard(title = stringResource(R.string.settings_section_network)) {
                 SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_api_timeout) {
@@ -6621,8 +6596,10 @@ fun SettingsScreen(
                                             return@clickable
                                         }
                                         scope.launch {
-                                            settingsSectionIndex(entry.sectionKey)?.let { index ->
-                                                listState.scrollToItem(index)
+                                            run {
+                                                selectedCategory = entry.sectionKey
+                                                withFrameNanos { }
+                                                listState.scrollToItem(0)
                                                 repeat(4) {
                                                     withFrameNanos { }
                                                     val requester = searchTargetRegistry.latest(entry.targetId)
@@ -7806,9 +7783,9 @@ private fun TranslationContextModeSelector(
             style = MaterialTheme.typography.labelLarge,
         )
         val modes = TranslationContextMode.entries
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             modes.forEachIndexed { index, mode ->
-                SegmentedButton(
+                SettingChoiceChip(
                     selected = value == mode,
                     onClick = {
                         if (!canSelectTranslationContextMode(supportsContext, mode)) {
@@ -7817,7 +7794,6 @@ private fun TranslationContextModeSelector(
                             onValueChange(mode)
                         }
                     },
-                    shape = SegmentedButtonDefaults.itemShape(index, modes.size),
                     icon = {},
                     label = {
                         Text(
@@ -10487,8 +10463,9 @@ internal fun SectionCard(
         }
     Card(
         modifier = cardModifier,
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -10498,7 +10475,7 @@ internal fun SectionCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (title != null) {
@@ -10658,7 +10635,7 @@ private val APP_LANGUAGE_OPTIONS: List<AppLanguageOption> = listOf(
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun AppLanguageSelector() {
+private fun AppLanguageSelector(beforeChange: () -> Unit = {}) {
     // 归一化系统返回的 BCP-47（"zh-Hans-CN" / "zh" / "en-US" 等）到 options 里精确 tag。
     fun normalize(raw: String): String {
         if (raw.isEmpty()) return ""
@@ -10683,11 +10660,12 @@ private fun AppLanguageSelector() {
 
     val apply: (String) -> Unit = { newTag ->
         if (newTag != tag) {
+            beforeChange()
             tag = newTag
             // 自管持久化：MainActivity.attachBaseContext 会在 recreate 后读 prefs 并包装
             // Configuration locale，绕开 AppCompatDelegate 在 ComponentActivity 上的持久化不稳问题。
             dev.clickn.translate.data.AppLocalePrefs.write(context, newTag)
-            (context as? android.app.Activity)?.recreate()
+
         }
     }
 
@@ -10736,10 +10714,16 @@ private fun AppLanguageSelector() {
 private fun ThemeModeSelector() {
     val controller = dev.clickn.translate.ui.theme.LocalThemeMode.current
     val mode = controller.mode
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        EngineChip(mode, dev.clickn.translate.ui.theme.ThemeMode.FOLLOW_SYSTEM, stringResource(R.string.settings_theme_follow_system)) { controller.setMode(it) }
-        EngineChip(mode, dev.clickn.translate.ui.theme.ThemeMode.LIGHT, stringResource(R.string.settings_theme_light)) { controller.setMode(it) }
-        EngineChip(mode, dev.clickn.translate.ui.theme.ThemeMode.DARK, stringResource(R.string.settings_theme_dark)) { controller.setMode(it) }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        listOf(
+            dev.clickn.translate.ui.theme.ThemeMode.FOLLOW_SYSTEM to R.string.settings_theme_follow_system,
+            dev.clickn.translate.ui.theme.ThemeMode.LIGHT to R.string.settings_theme_light,
+            dev.clickn.translate.ui.theme.ThemeMode.DARK to R.string.settings_theme_dark,
+            dev.clickn.translate.ui.theme.ThemeMode.AMOLED to R.string.mobile_amoled,
+            dev.clickn.translate.ui.theme.ThemeMode.PAPER_DAY to R.string.refine_paper_day,
+            dev.clickn.translate.ui.theme.ThemeMode.PAPER_NIGHT to R.string.refine_paper_night,
+            dev.clickn.translate.ui.theme.ThemeMode.PAPER_NORD to R.string.refine_paper_nord,
+        ).forEach { (choice, label) -> EngineChip(mode, choice, stringResource(label)) { controller.setMode(it) } }
     }
 }
 
@@ -10751,32 +10735,13 @@ internal fun SwitchRow(
     helpText: String? = null,
     onChange: (Boolean) -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surface,
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline
-            )
-        )
-        Text(
-            text = label,
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .weight(1f)
-                .alpha(if (enabled) 1f else 0.4f)
-        )
-        helpText?.let { SettingHelpTooltip(text = it) }
-    }
+    ListItem(
+        headlineContent = { Text(label, modifier = Modifier.alpha(if (enabled) 1f else .4f)) },
+        supportingContent = helpText?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
+        modifier = Modifier.fillMaxWidth().toggleable(value = checked, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 @Composable
@@ -10866,6 +10831,7 @@ internal fun <T> EngineChip(
     onSelect: (T) -> Unit
 ) {
     FilterChip(
+        shape = MaterialTheme.shapes.small,
         selected = current == target,
         onClick = { onSelect(target) },
         label = { Text(label) },

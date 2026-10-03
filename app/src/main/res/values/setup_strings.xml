@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="setup_title">Set up your translator</string>
     <string name="setup_intro">A few steps, and you can translate text, photos and other apps. You can change every option later.</string>
@@ -28,9 +28,9 @@
     <string name="setup_background_body">If your phone stops the overlay in the background, allow background activity or remove battery restrictions for Click’n’Translate. Android settings vary by device.</string>
     <string name="setup_battery">Battery settings</string>
     <string name="setup_ready">Ready to try</string>
-    <string name="setup_ready_body">On the Screen tab, tap Start and confirm screen sharing. Open another app and use the floating CT button to select a region. Text and photo translation are available without screen capture.</string>
+    <string name="setup_ready_body">On the Screen tab, tap Start and confirm screen sharing. Open another app and use the floating logo button to select text. Text and photo translation are available without screen capture.</string>
     <string name="setup_shortcuts">Floating button and shortcuts</string>
     <string name="setup_reopen">Run setup again</string>
     <string name="setup_settings_unavailable">Your phone did not open that setting. Open Android settings and find Click’n’Translate manually.</string>
     <string name="setup_restricted_settings">App info: restricted settings</string>
-</resources>
+    </resources>

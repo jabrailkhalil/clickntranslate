@@ -59,6 +59,9 @@ object ThemeMode {
     const val LIGHT = 1
     const val DARK = 2
     const val AMOLED = 3
+    const val PAPER_DAY = 4
+    const val PAPER_NIGHT = 5
+    const val PAPER_NORD = 6
 }
 
 @Composable
@@ -84,9 +87,14 @@ fun ClickTranslateTheme(
         surface = if (themeMode == ThemeMode.AMOLED) Color(0xFF0D0D10) else base.surface,
         surfaceContainer = if (themeMode == ThemeMode.AMOLED) Color(0xFF121216) else base.surfaceContainer,
     )
+    val paper = komiPaperColors(themeMode)
+    val colors = paper ?: palette
     MaterialTheme(
-        colorScheme = palette,
-        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(24.dp), large = RoundedCornerShape(32.dp)),
-        content = content,
+        colorScheme = colors,
+        shapes = if (paper != null) Shapes(small = RoundedCornerShape(0.dp), medium = RoundedCornerShape(0.dp), large = RoundedCornerShape(0.dp))
+            else Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(24.dp), large = RoundedCornerShape(32.dp)),
+        content = {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides colors.onBackground) { content() }
+        },
     )
 }

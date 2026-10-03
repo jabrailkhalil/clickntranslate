@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="setup_title">设置你的翻译工具</string>
     <string name="setup_intro">完成几个步骤，即可翻译文本、图片和其他应用。所有选项都可以随时更改。</string>
@@ -28,9 +28,9 @@
     <string name="setup_background_body">如果手机在后台关闭悬浮窗，请允许 Click’n’Translate 在后台运行或解除电池限制。不同设备的设置名称可能不同。</string>
     <string name="setup_battery">电池设置</string>
     <string name="setup_ready">可以开始体验了</string>
-    <string name="setup_ready_body">在“屏幕”页点击“开始”，并授权屏幕共享。打开其他应用后，使用悬浮 CT 按钮选择区域。文本和图片翻译无需屏幕捕获。</string>
+    <string name="setup_ready_body">在“屏幕”页点击“开始”，并授权屏幕共享。打开其他应用后，使用带有标志的悬浮按钮选择文本。文本和图片翻译无需屏幕捕获。</string>
     <string name="setup_shortcuts">悬浮按钮和快捷操作</string>
     <string name="setup_reopen">重新运行设置向导</string>
     <string name="setup_settings_unavailable">手机无法打开该设置。请手动打开 Android 设置并找到 Click’n’Translate。</string>
     <string name="setup_restricted_settings">应用信息：受限设置</string>
-</resources>
+    </resources>

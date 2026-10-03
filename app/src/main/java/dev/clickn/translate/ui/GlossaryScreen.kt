@@ -72,6 +72,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -686,10 +688,7 @@ private fun TranslationLibraryHelpDialog(
                         TranslationLibraryHelpSection(
                             title = stringResource(R.string.translation_library_help_add_title),
                             body = stringResource(R.string.translation_library_help_add_body),
-                            imageRes = R.drawable.translation_correction_help,
-                            imageContentDescription = stringResource(
-                                R.string.translation_library_help_add_image_description
-                            ),
+                            illustration = { TranslationReviewHelpIllustration() },
                         )
                         TranslationLibraryHelpSection(
                             title = stringResource(R.string.translation_library_help_manage_title),
@@ -717,8 +716,7 @@ private fun TranslationLibraryHelpDialog(
 private fun TranslationLibraryHelpSection(
     title: String,
     body: String,
-    imageRes: Int? = null,
-    imageContentDescription: String? = null,
+    illustration: (@Composable () -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(text = title, style = MaterialTheme.typography.titleSmall)
@@ -727,22 +725,7 @@ private fun TranslationLibraryHelpSection(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (imageRes != null) {
-            Image(
-                painter = painterResource(imageRes),
-                contentDescription = imageContentDescription,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1117f / 633f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant,
-                        RoundedCornerShape(8.dp),
-                    ),
-                contentScale = ContentScale.Fit,
-            )
-        }
+        illustration?.invoke()
     }
 }
 
@@ -1702,4 +1685,20 @@ private fun glossaryCategoryLabel(category: GlossaryTermCategory): String = when
     GlossaryTermCategory.TERM -> stringResource(R.string.glossary_category_term)
     GlossaryTermCategory.PRESERVE_SOURCE ->
         stringResource(R.string.source_preservation_category)
+}
+
+
+@Composable
+internal fun TranslationReviewHelpIllustration() {
+    val description = stringResource(R.string.translation_library_help_add_image_description)
+    androidx.compose.material3.Surface(
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = description },
+        shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.translation_correction_action), style = MaterialTheme.typography.labelLarge)
+        }
+    }
 }

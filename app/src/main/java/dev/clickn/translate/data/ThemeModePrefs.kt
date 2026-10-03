@@ -20,7 +20,7 @@ object ThemeModePrefs {
         // 兼容旧版本写入的 AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM = -1：
         // 1 和 2 与新常量恰好同值，其它视为跟随系统。
         return when (raw) {
-            ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.AMOLED -> raw
+            ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.AMOLED, ThemeMode.PAPER_DAY, ThemeMode.PAPER_NIGHT, ThemeMode.PAPER_NORD -> raw
             else -> ThemeMode.FOLLOW_SYSTEM
         }
     }

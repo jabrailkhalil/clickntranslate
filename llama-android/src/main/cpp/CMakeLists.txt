@@ -9,6 +9,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 project("ai-chat" VERSION 1.0.0 LANGUAGES C CXX)
+set_property(GLOBAL PROPERTY JOB_POOLS clickn_compile=2 clickn_link=1)
+set(CMAKE_JOB_POOL_COMPILE clickn_compile)
+set(CMAKE_JOB_POOL_LINK clickn_link)
 
 # Compile out the app's native Logcat sink in Release, including error logs and
 # formatting arguments. In-app runtime logs and JNI performance metrics are separate.

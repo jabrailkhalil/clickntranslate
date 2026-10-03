@@ -1,0 +1,6 @@
+Komi Store theme palettes and paper grid
+Source: https://github.com/komi-store/komi-store
+Revision: d8ef884e8fd07902b091dff8619e27c0e25626cc
+Files: MangaColors.kt, MangaShape.kt, decoration/GridPaper.kt
+License: Apache-2.0 (included in this directory)
+Modified: mapped the existing Day, Night and Nord palettes to Android Material 3 color roles.

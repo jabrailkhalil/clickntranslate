@@ -82,7 +82,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
             Surface {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Button(onClick = {
-                        if (step == 3) CaptureStartPreference.select(CaptureStartMode.SYSTEM)
+                        if (step == 3 && CaptureStartPreference.mode.value == null) CaptureStartPreference.select(CaptureStartMode.SYSTEM)
                         if (step < stepTitles.lastIndex) step++ else onFinished()
                     }, enabled = setupCanContinue(step, overlay) && (step != 1 || setupLanguagePairReady(settings)), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
                         Text(stringResource(if (step == stepTitles.lastIndex) R.string.setup_finish else R.string.setup_next))
@@ -104,6 +104,8 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
                 }
                 when (step) {
                     0 -> {
+                        item { BrandLogo(Modifier.size(64.dp)) }
+                        item { Button(onClick = onFinished, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(stringResource(R.string.refine_quick_setup)) } }
                         item { SetupButton(R.string.mobile_interface_language, Icons.Outlined.Language) { sheet = "interface" } }
                         item { SetupButton(R.string.mobile_appearance, Icons.Outlined.Palette) { sheet = "appearance" } }
                     }
@@ -170,7 +172,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
                 LanguageSheet(source, if (source) current.sourceLang else current.targetLang,
                     allowAuto = current.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT),
                     allowedCodes = if (current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) dev.clickn.translate.translate.MlKitLanguagePolicy.supportedLanguageTags else null) { code ->
-                    viewModel.update { if (source) it.copy(sourceLang = code) else it.copy(targetLang = code) }; sheet = ""
+                    viewModel.update { mobileLanguagePair(it, source, code) }; sheet = ""
                 }
             }
             "services" -> ServicesSheet(settings?.translatorEngine ?: TranslatorEngine.GOOGLE) {

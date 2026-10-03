@@ -1,36 +1,36 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="setup_title">Configura tu traductor</string>
-    <string name="setup_intro">Algunos pasos, y puede traducir texto, fotos y otras aplicaciones. Puede cambiar cada opción más adelante.</string>
+    <string name="setup_title">Configuremos el traductor</string>
+    <string name="setup_intro">En unos pasos podrás traducir texto, fotos y el contenido de otras aplicaciones. Puedes cambiar los ajustes después.</string>
     <string name="setup_next">Continuar</string>
     <string name="setup_previous">Atrás.</string>
-    <string name="setup_finish">Acabado de configuración</string>
-    <string name="setup_text_only">Use texto y fotos por ahora</string>
+    <string name="setup_finish">Terminar la configuración</string>
+    <string name="setup_text_only">Usar texto y fotos por ahora</string>
     <string name="setup_step">Paso %1$d de %2$d</string>
     <string name="setup_translation">Idiomas y traducción</string>
-    <string name="setup_translation_body">Elija el idioma que lee y un servicio de traducción. Google funciona sin una clave. Para MyMemory y la traducción offline, elija un idioma de origen específico.</string>
-    <string name="setup_overlay">Mostrar traducciones sobre otras aplicaciones</string>
-    <string name="setup_overlay_body">Abrir la configuración de Android, encontrar Click’n’Translate y habilitar “Display over other apps”. Volver aquí; el estado actualiza automáticamente.</string>
+    <string name="setup_translation_body">Elige los idiomas y un servicio de traducción. Google funciona sin clave. MyMemory y la traducción sin conexión necesitan un idioma de origen específico.</string>
+    <string name="setup_overlay">Traducción sobre otras aplicaciones</string>
+    <string name="setup_overlay_body">Abre los ajustes de Android, busca Click’n’Translate y permite que se muestre sobre otras aplicaciones. Vuelve aquí: el estado se actualizará automáticamente.</string>
     <string name="setup_notifications">Notificaciones</string>
-    <string name="setup_notifications_body">Permitir notificaciones para ver el traductor en funcionamiento, detener captura y seguir descargas de modelos. La traducción también puede funcionar sin este permiso.</string>
+    <string name="setup_notifications_body">Las notificaciones permiten detener la captura y seguir las descargas de modelos. La traducción también funciona sin este permiso.</string>
     <string name="setup_enabled">Enabled</string>
-    <string name="setup_pending">Necesidades de configuración</string>
-    <string name="setup_open">Abra la configuración correcta</string>
+    <string name="setup_pending">Pendiente de configurar</string>
+    <string name="setup_open">Abrir el ajuste</string>
     <string name="setup_capture">Cómo capturar la pantalla</string>
-    <string name="setup_capture_body">Android te pedirá que compartas la pantalla cuando inicies la traducción. En Android 14+, elige toda la pantalla para traducir a través de las aplicaciones. Puedes dejar de capturar en cualquier momento.</string>
-    <string name="setup_accessibility">Opcional: servicio de accesibilidad</string>
-    <string name="setup_accessibility_body">En Android 11+, habilitar el servicio de accesibilidad de Click’n’Translate para capturas de pantalla sin repetidos avisos de participación de pantalla. También admite atajos de volumen-key y traducción de entrada. Si Android 13 o posterior bloquea el interruptor, abre la información de la app, después el menú de tres puntos y «Permitir ajustes restringidos». Vuelve aquí para activar el servicio.</string>
+    <string name="setup_capture_body">Android pedirá permiso para compartir la pantalla al iniciar. En Android 14 o posterior, elige la pantalla completa para traducir en distintas aplicaciones. Puedes detener la captura cuando quieras.</string>
+    <string name="setup_accessibility">Opcional: accesibilidad</string>
+    <string name="setup_accessibility_body">En Android 11 o posterior, el servicio de Click’n’Translate permite capturas sin solicitudes repetidas de compartir pantalla. También sirve para traducir campos de texto y usar las teclas de volumen. Actívalo si quieres estas funciones. Si Android 13 o posterior bloquea el interruptor, abre la información de la app, después el menú ⋮ y «Permitir ajustes restringidos». Vuelve para activar el servicio.</string>
     <string name="setup_recognition">Reconocimiento de textos y modelos</string>
-    <string name="setup_recognition_body">El OCR predeterminado reconoce los scripts latinos, chinos, japoneses y coreanos. Para Cyrillic u otros scripts, seleccione un servicio OCR adecuado.</string>
+    <string name="setup_recognition_body">El OCR integrado reconoce las escrituras latina, china, japonesa y coreana. Para el cirílico u otras escrituras, elige un motor adecuado. Los modelos sin conexión deben descargarse antes de usarlos.</string>
     <string name="setup_ocr">Elija OCR y descargar modelos</string>
     <string name="setup_models">Modelos de traducción y configuración de API</string>
     <string name="setup_background">Mantenga la traducción disponible</string>
-    <string name="setup_background_body">Si su teléfono detiene la sobrecarga en el fondo, permite la actividad de fondo o eliminar las restricciones de la batería para Click’n’Translate. Los ajustes de Android varían por dispositivo.</string>
+    <string name="setup_background_body">Si el teléfono cierra el traductor en segundo plano, permite su actividad en segundo plano o quita las restricciones de batería para Click’n’Translate. Los nombres de los ajustes varían según el teléfono.</string>
     <string name="setup_battery">Ajustes de la batería</string>
     <string name="setup_ready">Listo para probar</string>
-    <string name="setup_ready_body">En la pestaña Pantalla, grifo Comience y confirme el uso compartido de pantalla. Abra otra aplicación y utilice el botón TC flotante para seleccionar una región. Traducción de texto y foto están disponibles sin captura de pantalla.</string>
+    <string name="setup_ready_body">En la pestaña Pantalla, pulsa Iniciar y permite compartir la pantalla. Abre otra app y selecciona el texto con el botón flotante del logotipo. Puedes traducir texto y fotos sin capturar la pantalla.</string>
     <string name="setup_shortcuts">Botón flotante y atajos</string>
-    <string name="setup_reopen">Corre la configuración de nuevo</string>
-    <string name="setup_settings_unavailable">Su teléfono no abrió ese ajuste. Abra la configuración de Android y encuentre Click’n’Translate manualmente.</string>
+    <string name="setup_reopen">Repetir la configuración</string>
+    <string name="setup_settings_unavailable">No se pudo abrir este ajuste. Abre los ajustes de Android y busca Click’n’Translate manualmente.</string>
     <string name="setup_restricted_settings">Información de la app: ajustes restringidos</string>
-</resources>
+    </resources>

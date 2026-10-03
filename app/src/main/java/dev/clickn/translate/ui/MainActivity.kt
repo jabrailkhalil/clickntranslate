@@ -13,6 +13,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.luminance
+import androidx.core.view.WindowCompat
+import dev.clickn.translate.ui.theme.komiPaperGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -68,7 +74,20 @@ class MainActivity : ComponentActivity() {
         acceptLaunchIntent(intent)
         enableEdgeToEdge()
         setContent {
-            val context = LocalContext.current
+            val activityContext = this@MainActivity
+            var localeTag by remember { mutableStateOf(AppLocalePrefs.read(activityContext)) }
+            DisposableEffect(activityContext) {
+                val stop = AppLocalePrefs.observe(activityContext) {
+                    val chosen = AppLocalePrefs.read(activityContext)
+                    if (chosen != localeTag) {
+                        localeTag = chosen
+                        activityContext.recreate()
+                    }
+                }
+                onDispose { stop() }
+            }
+            val systemConfiguration = LocalConfiguration.current
+            val context = remember(localeTag, systemConfiguration) { AppLocalePrefs.uiContext(activityContext) }
             // 主题模式：从 prefs 初始化；切换后通过 CompositionLocal 透传到 ClickTranslateTheme，
             // 无需重建 Activity 即可瞬时生效。
             var themeMode by remember { mutableIntStateOf(ThemeModePrefs.read(context)) }
@@ -84,8 +103,15 @@ class MainActivity : ComponentActivity() {
                 accent = choice
                 ThemeAccentPrefs.write(context, choice)
             }
-            CompositionLocalProvider(LocalThemeMode provides controller, LocalThemeAccent provides accentController) {
+            CompositionLocalProvider(LocalContext provides context, LocalConfiguration provides context.resources.configuration, LocalThemeMode provides controller, LocalThemeAccent provides accentController) {
                 ClickTranslateTheme(themeMode = themeMode, accent = accent) {
+                    val lightBars = MaterialTheme.colorScheme.background.luminance() > .5f
+                    SideEffect {
+                        WindowCompat.getInsetsController(window, window.decorView).apply {
+                            isAppearanceLightStatusBars = lightBars
+                            isAppearanceLightNavigationBars = lightBars
+                        }
+                    }
                     AppRoot(routeRequest, galleryShareRequest)
                 }
             }
@@ -198,6 +224,7 @@ private fun AppRoot(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .komiPaperGrid(LocalThemeMode.current.mode, MaterialTheme.colorScheme.onBackground)
     ) {
         when (route) {
             Route.Main -> screenState.SaveableStateProvider("mobile") { MobileShell(

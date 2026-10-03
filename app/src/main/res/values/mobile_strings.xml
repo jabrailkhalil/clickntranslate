@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="mobile_nav_screen">Screen</string>
     <string name="mobile_nav_text">Text</string>
@@ -104,4 +104,4 @@
     <string name="settings_engine_lingva" translatable="false">Lingva</string>
     <string name="settings_engine_mymemory" translatable="false">MyMemory</string>
     <string name="settings_engine_libretranslate" translatable="false">LibreTranslate</string>
-</resources>
+    </resources>

@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
     <string name="settings_about_user_guide">Benutzerhandbuch</string>
     <string name="settings_share_entire_screen">Ganzer Bildschirm teilen</string>
@@ -1396,7 +1396,7 @@
     <string name="input_translation_replace_unconfirmed_copied">Unfähig zu bestätigen, ob der Text ersetzt wurde. Die Übersetzung wurde kopiert.</string>
     <string name="input_translation_service_disconnected_copied">Der Zugänglichkeitsservice ist abgeschaltet. Unfähig, den Text zu ersetzen; die Übersetzung wurde kopiert.</string>
     <string name="word_select_hint_drawing">Ziehen Sie ein Rechteck um Text, um zu übersetzen</string>
-    <string name="word_select_btn_translate">Übersetzen</string>
+<string name="word_select_btn_translate">Übersetzen</string>
     <string name="word_select_btn_cancel">Abbrechen</string>
     <string name="word_select_btn_redraw">Zurückziehen</string>
     <string name="settings_section_word_select">Übersetzung auswählen</string>
@@ -1680,7 +1680,7 @@
     <string name="translation_library_help_priority_body">Die Quellkonservierung wird zuerst überprüft. Eine exakte Übereinstimmung bleibt im Bild und tritt nie in das Löschen oder die Übersetzung ein.\n\nFür den übrigen Text prüft die App zunächst den Translationsspeicher. Wenn kein Speicher übereinstimmt, findet sie relevante Begriffe und übersetzt normalerweise.\n\nSound-Effekt als Artwork gehalten → Hinzufügen zur Quelle zu halten\nKorrigierter Satz → Speichern in Übersetzungsspeicher\nFalscher Name oder festes Wort → Fügen Sie einen Begriff hinzu</string>
     <string name="translation_library_help_add_title">Wie man Korrekturen hinzufügt</string>
     <string name="translation_library_help_add_body">Lang drücken Sie eine angezeigte Übersetzung und wählen Sie “Proofread Translation”. Sie können die Korrektur OCR Quell und Übersetzung, speichern Sie das Ergebnis in den Übersetzungsspeicher, und fügen Sie ausgewählte feste Formulierungen zu den aktuellen Spielbedingungen oder globalen Begriffen hinzu.\n\nDie Speicherung aktualisiert sofort die aktuelle Übersetzung und stellt die Korrektur für zukünftige Übersetzungen zur Verfügung.</string>
-    <string name="translation_library_help_add_image_description">Beispiel für die Wahl der „Proofread Translation“ nach dem Langdrücken einer Übersetzung</string>
+    <string name="translation_library_help_add_image_description">Beispiel der Korrekturaktion nach langem Drücken auf übersetzten Text.</string>
     <string name="translation_library_help_manage_title">Wie Sie gespeicherte Objekte verwalten</string>
     <string name="translation_library_help_manage_body">Wechseln Sie zwischen den Allgemeinen Geschäftsbedingungen und den Translation-Speicher-Tabs. Verwenden Sie die Suchtaste in der oberen rechten Ecke, um einen Artikel zu finden. Jeder Artikel kann separat bearbeitet oder gelöscht werden.</string>
     <string name="translation_library_help_close">Verstanden</string>
@@ -2005,4 +2005,4 @@
     <string name="brand_community_label">Telegram Gemeinschaft</string>
     <string name="brand_join_community">Öffne Telegram</string>
     <string name="brand_downloads_label">Besuchen Sie clickn.dev</string>
-</resources>
+    </resources>
