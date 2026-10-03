@@ -5,6 +5,11 @@ on:
     branches: [android]
   push:
     branches: [android]
+    paths-ignore:
+      - 'artifacts/**'
+      - 'docs/**'
+      - 'output/imagegen/**'
+      - 'app/src/test/snapshots/**'
   workflow_dispatch:
 
 permissions:
