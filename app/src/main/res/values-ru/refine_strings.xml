@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources><string name="refine_add_shortcut">Добавить ярлык с картинкой</string>
     <string name="refine_android13">Доступно на Android 13 или новее</string>
-    <string name="refine_brand_logo">Логотип Click’n’Translate</string>
+    <string name="refine_brand_logo">Логотип</string>
     <string name="refine_brand_mascot">Док</string>
     <string name="refine_capture_ready">Захват экрана</string>
     <string name="refine_capture_ready_body">При запуске Android спросит разрешение на трансляцию экрана. Для повторного захвата можно включить службу специальных возможностей.</string>

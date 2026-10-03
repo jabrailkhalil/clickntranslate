@@ -49,19 +49,21 @@ class PreviewLifecycleRuntimeTest {
     @Test fun pinKeepsAResultOpenUntilUnpinned() {
         val card = TranslationCardOverlay(app)
         try {
-            card.show("hello", "привет", null, Settings())
-            val root = TranslationCardOverlay::class.java.getDeclaredField("rootView")
+            card.show("hello", null, null, Settings(), loading = true)
+            fun root() = TranslationCardOverlay::class.java.getDeclaredField("rootView")
                 .apply { isAccessible = true }.get(card) as View
-            fun find(view: View): TextView? {
-                if (view is TextView && view.text.toString() == app.getString(R.string.overlay_pin)) return view
-                if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
+            fun find(view: View, label: Int): TextView? {
+                if (view is TextView && view.text.toString() == app.getString(label)) return view
+                if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i), label)?.let { return it }
                 return null
             }
-            val pin = requireNotNull(find(root))
-            pin.performClick()
+            requireNotNull(find(root(), R.string.overlay_pin)).performClick()
+            // Shared text re-renders the same card when final speech actions are available.
+            card.show("hello", "привет", null, Settings())
+            val unpin = requireNotNull(find(root(), R.string.overlay_unpin))
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(90))
             assertTrue(card.isShown())
-            pin.performClick()
+            unpin.performClick()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(70))
             assertFalse(card.isShown())
         } finally { card.dismiss() }

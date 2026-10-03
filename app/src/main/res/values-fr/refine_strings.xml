@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources><string name="refine_add_shortcut">Ajouter un raccourci avec l’image</string>
     <string name="refine_android13">Disponible à partir d’Android 13</string>
-    <string name="refine_brand_logo">Logo Click’n’Translate</string>
+    <string name="refine_brand_logo">Logo</string>
     <string name="refine_brand_mascot">Doc</string>
     <string name="refine_capture_ready">Capture de l’écran</string>
     <string name="refine_capture_ready_body">Android demande le partage d’écran au lancement. L’accessibilité est facultative pour les captures répétées.</string>

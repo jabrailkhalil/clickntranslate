@@ -500,8 +500,9 @@ class TranslationCardOverlay(
         onEnglishWordTapped: ((word: String, anchorInWindow: Rect) -> Unit)? = null,
         textOnly: Boolean = false,
     ) {
+        val keepPinned = pinned && currentSource == sourceText && isShown()
         dismiss()
-        pinned = false
+        pinned = keepPinned
         awaitingFinal = loading
         touching = false
         speechBusy = {
@@ -618,7 +619,7 @@ class TranslationCardOverlay(
             topRow.addView(speakButton)
         }
         val pinBtn = TextView(context).apply {
-            text = context.getString(R.string.overlay_pin)
+            text = context.getString(if (pinned) R.string.overlay_unpin else R.string.overlay_pin)
             setTextColor(accentColor)
             gravity = Gravity.CENTER
             minHeight = (44 * density).toInt()

@@ -15,7 +15,7 @@ Subject: Chester: compact sitting orange fox with cream muzzle and chest and a c
 
 ```text
 Use case: stylized-concept. Asset type: production static transparent companion sprite for ClicknTranslate Android floating button. Redraw this original character from the attached identity reference. Style: coherent premium friendly 2.5D sticker illustration, tidy rounded silhouette, clean anatomy, crisp contours, restrained smooth shading, expressive glossy eyes. Warm charcoal contour and subtle light rim for visibility on black and white screens. One complete character centered, calm neutral front three-quarter pose, upright, square composition with generous transparent margins, maximum dimension occupies 78 percent of image. Clear at 48dp. True transparent alpha. No scenery, no ground shadow, no labels, no text, no watermark, no logos, no extra props, no dark cat, no background or checkerboard. Not animation.
-Subject: Pancake (Р‘Р»РёРЅС‡РёРє): round golden pancake buddy, butter pat on top, little hands and feet.
+Subject: Pancake (Блинчик): round golden pancake buddy, butter pat on top, little hands and feet.
 ```
 
 ## companions: doc
@@ -63,4 +63,3 @@ Use case: logo-brand. Asset type: alternate Android app icon for ClicknTranslate
 ```text
 Use case: logo-brand. Asset type: alternate Android app icon for ClicknTranslate. Attached image is the ORIGINAL ClicknTranslate CT logo identity reference. Keep its recognizable white uppercase CT monogram geometry and rounded square tile shape. Create only a refined color variation with crisp simple lettering and tasteful smooth gradient. Sunset: warm coral to rich tangerine gradient, white CT. Exact text: CT. One centered rounded square icon filling 92% of square canvas, transparent outer corners. No other text, no mascot, no paper plane, no Telegram logo, no extra symbols, no bevel, no scenery, no shadow outside the tile, no checkerboard, no watermark. Legible at 48dp.
 ```
-

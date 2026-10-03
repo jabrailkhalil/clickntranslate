@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="launcher_ocean_background">#0866D8</color>
+    <color name="launcher_mint_background">#009C94</color>
+    <color name="launcher_sunset_background">#FF664B</color>
+</resources>

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources><string name="refine_add_shortcut">添加图片快捷方式</string>
     <string name="refine_android13">需要 Android 13 或更高版本</string>
-    <string name="refine_brand_logo">Click’n’Translate 标志</string>
+    <string name="refine_brand_logo">标志</string>
     <string name="refine_brand_mascot">Doc</string>
     <string name="refine_capture_ready">屏幕捕获</string>
     <string name="refine_capture_ready_body">启动时 Android 会请求屏幕共享许可。无障碍服务可用于重复捕获，非必需。</string>

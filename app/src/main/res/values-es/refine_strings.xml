@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources><string name="refine_add_shortcut">Añadir acceso directo con imagen</string>
     <string name="refine_android13">Disponible a partir de Android 13</string>
-    <string name="refine_brand_logo">Logotipo de Click’n’Translate</string>
+    <string name="refine_brand_logo">Logotipo</string>
     <string name="refine_brand_mascot">Doc</string>
     <string name="refine_capture_ready">Captura de pantalla</string>
     <string name="refine_capture_ready_body">Android pedirá compartir la pantalla al iniciar. La accesibilidad es opcional para capturas repetidas.</string>
