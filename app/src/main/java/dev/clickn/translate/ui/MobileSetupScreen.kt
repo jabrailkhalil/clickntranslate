@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -95,7 +96,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.widthIn(max = 640.dp).fillMaxWidth(), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            LazyColumn(Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("setup-options"), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 item {
                     Text(stringResource(R.string.setup_step, step + 1, stepTitles.size), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                     LinearProgressIndicator(progress = { (step + 1f) / stepTitles.size }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))

@@ -21,14 +21,14 @@ import org.robolectric.annotation.LooperMode
 class LocaleRuntimeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     @Test fun russianChoiceAppliesToStartupImmediately() {
-        compose.onNodeWithText("Interface language").performClick()
+        setupClick("Interface language")
         compose.onNodeWithText("Русский").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Начать с этими настройками").assertIsDisplayed()
+        compose.onNodeWithText("Начать с этими настройками").performScrollTo().assertIsDisplayed()
         assertEquals("ru", AppLocalePrefs.read(compose.activity))
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
-        compose.onNodeWithText("Начать с этими настройками").assertIsDisplayed()
+        compose.onNodeWithText("Начать с этими настройками").performScrollTo().assertIsDisplayed()
     }
     @Test fun allSixInterfaceLanguagesApplyInActualActivity() {
         val choices = listOf(
@@ -41,15 +41,15 @@ class LocaleRuntimeTest {
         )
         var label = "Interface language"
         choices.forEach { (name, start, nextLabel) ->
-            compose.onNodeWithText(label).performClick()
+            setupClick(label)
             compose.onNodeWithText(name).performClick()
             compose.waitForIdle()
-            compose.onNodeWithText(start).assertIsDisplayed()
+            compose.onNodeWithText(start).performScrollTo().assertIsDisplayed()
             label = nextLabel
         }
     }
     @Test fun paperThemePersistsAcrossRecreation() {
-        compose.onNodeWithText("Appearance").performClick()
+        setupClick("Appearance")
         compose.onNodeWithTag("appearance-options").performScrollToNode(hasText("Paper Night"))
         compose.onNodeWithText("Paper Night").performClick()
         assertEquals(ThemeMode.PAPER_NIGHT, ThemeModePrefs.read(compose.activity))
@@ -59,19 +59,29 @@ class LocaleRuntimeTest {
         val controller = androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
         assertFalse(controller.isAppearanceLightStatusBars)
     }
+    private fun setupClick(label: String) {
+        compose.onNodeWithTag("setup-options").performScrollToNode(hasText(label))
+        compose.onNodeWithText(label).performClick()
+    }
+    private fun listClick(label: String) {
+        val row = hasText(label) and hasClickAction()
+        compose.onNode(hasScrollAction()).performScrollToNode(row)
+        compose.onNode(row).performClick()
+    }
     private fun resource(id: Int) = compose.activity.getString(id)
     private fun openAdvanced() {
         compose.runOnIdle { AppLocalePrefs.write(compose.activity, "en") }
         compose.waitForIdle()
-        compose.onNodeWithText(resource(R.string.refine_quick_setup)).performClick()
+        compose.onNodeWithText(resource(R.string.refine_quick_setup)).performScrollTo().performClick()
         compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
-        compose.onAllNodesWithText(resource(R.string.mobile_advanced)).onLast().performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
+        listClick(resource(R.string.mobile_advanced))
     }
     @Test fun displayModeChoiceSavesTheActualSetting() {
         val repo = (compose.activity.application as ClickTranslateApp).settingsRepository
         kotlinx.coroutines.runBlocking { repo.update { it.copy(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS) } }
         openAdvanced()
-        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        listClick(resource(R.string.refine_overlay))
         compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().performClick()
         compose.onNodeWithText(resource(R.string.settings_save_btn), useUnmergedTree = true).performClick()
         compose.waitUntil(10_000) { kotlinx.coroutines.runBlocking { repo.get().renderMode == dev.clickn.translate.data.RenderMode.FLOATING_WINDOW } }
@@ -80,15 +90,15 @@ class LocaleRuntimeTest {
         val repo = (compose.activity.application as ClickTranslateApp).settingsRepository
         kotlinx.coroutines.runBlocking { repo.update { it.copy(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS) } }
         openAdvanced()
-        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        listClick(resource(R.string.refine_overlay))
         compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().performClick()
         compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
-        compose.onNodeWithText(resource(R.string.refine_general)).performClick()
+        listClick(resource(R.string.refine_general))
         compose.onNodeWithText(resource(R.string.settings_app_lang_en)).performClick()
         compose.onNodeWithText(resource(R.string.settings_app_lang_ru)).performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
-        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        listClick(resource(R.string.refine_overlay))
         compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().assertIsSelected()
         assertEquals(dev.clickn.translate.data.RenderMode.BLOCKS, kotlinx.coroutines.runBlocking { repo.get().renderMode })
         compose.onNodeWithText(resource(R.string.settings_save_btn), useUnmergedTree = true).performClick()
