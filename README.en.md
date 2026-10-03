@@ -32,7 +32,7 @@ The help button reopens setup. Text and image translation work without screen-ca
 
 ## Build
 
-Use JDK 17, Android SDK 35, Build Tools 35.0.0, NDK 26.1.10909125 and CMake 3.22.1. Set the SDK path in `local.properties` (see `local.properties.example`).
+Use JDK 17, Android SDK 35, Build Tools 35.0.0, NDK 26.1.10909125 and CMake 3.22.1. Set the SDK path in `local.properties` (see `local.properties.example`). Ninja must also be on PATH for the host Vulkan shader generator; the Android SDK CMake `bin` directory contains it.
 
 ```bash
 git submodule update --init --recursive
