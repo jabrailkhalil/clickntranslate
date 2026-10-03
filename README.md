@@ -106,13 +106,6 @@ Open **Settings → Language packages** to install or remove OCR engines, recogn
 
 OCR runs locally. Online translation sends the text to your selected provider; use an offline engine to keep translation local. See [Privacy](PRIVACY.md).
 
-## Related screen translation projects
-
-If Click'n'Translate is not the right fit for your platform or workflow, these open-source projects are worth checking out:
-
-- [Translumo](https://github.com/ramjke/Translumo) — Windows real-time screen translation focused on games, subtitles and low-latency OCR.
-- [LunaTranslator](https://github.com/HIllya51/LunaTranslator) — a feature-rich visual-novel translator with text hooking, OCR and multiple translation workflows.
-
 ## Help and development
 
 [Source layout and developer commands](docs/REPOSITORY_LAYOUT.md).
