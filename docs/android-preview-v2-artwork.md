@@ -4,6 +4,18 @@ Generated with the built-in ImageGen tool, using our existing character and CT l
 
 Full-size masters: `output/imagegen/android-v2/`. Packaged assets: `app/src/main/res/drawable-nodpi/`. Cropping transparent margins, uniform centering and downscaling to 512px are the only post-processing.
 
+| Character or logo | Master | Packaged PNG |
+| --- | --- | --- |
+| Chester | [companion_chester.png](../output/imagegen/android-v2/companion_chester.png) | [companion_chester.png](../app/src/main/res/drawable-nodpi/companion_chester.png) |
+| Pancake | [companion_pancake.png](../output/imagegen/android-v2/companion_pancake.png) | [companion_pancake.png](../app/src/main/res/drawable-nodpi/companion_pancake.png) |
+| Doc | [companion_doc.png](../output/imagegen/android-v2/companion_doc.png) | [companion_doc.png](../app/src/main/res/drawable-nodpi/companion_doc.png) |
+| Bubu | [companion_bubu.png](../output/imagegen/android-v2/companion_bubu.png) | [companion_bubu.png](../app/src/main/res/drawable-nodpi/companion_bubu.png) |
+| Mochi | [companion_mochi.png](../output/imagegen/android-v2/companion_mochi.png) | [companion_mochi.png](../app/src/main/res/drawable-nodpi/companion_mochi.png) |
+| Momo | [companion_momo.png](../output/imagegen/android-v2/companion_momo.png) | [companion_momo.png](../app/src/main/res/drawable-nodpi/companion_momo.png) |
+| Ocean | [ic_clickn_ocean.png](../output/imagegen/android-v2/ic_clickn_ocean.png) | [ic_clickn_ocean.png](../app/src/main/res/drawable-nodpi/ic_clickn_ocean.png) |
+| Mint | [ic_clickn_mint.png](../output/imagegen/android-v2/ic_clickn_mint.png) | [ic_clickn_mint.png](../app/src/main/res/drawable-nodpi/ic_clickn_mint.png) |
+| Sunset | [ic_clickn_sunset.png](../output/imagegen/android-v2/ic_clickn_sunset.png) | [ic_clickn_sunset.png](../app/src/main/res/drawable-nodpi/ic_clickn_sunset.png) |
+
 ## companions: chester
 
 ```text

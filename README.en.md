@@ -4,31 +4,34 @@ Translate screens, text and photos in one app.
 
 [Русский](README.md) · [Website](https://clickn.dev) · [Telegram](https://t.me/jabrail_digital)
 
-## Android 0.3.1
+## Android 0.3.2 — preview
 
 - Four destinations: **Screen**, **Text**, **History**, **Settings**.
 - A prominent start button, visible language pair and direct service configuration.
-- System, light, dark and AMOLED appearance with five accent colors.
+- Seven theme thumbnails, including paper Day, Night and Nord, with five accent colors.
 - English, Russian, German, French, Spanish and Chinese interface languages.
 - Google, Lingva, MyMemory and LibreTranslate, additional API services and offline models.
 - Text translation with copy, sharing and local history of up to 50 entries.
 - Gallery translation and image sharing from other apps.
-- Guided setup that checks permissions again when you return from Android settings.
+- Two setup steps: appearance, then languages and a short usage guide.
+- Glossary mode cards and a separate opt-in Japanese sound-effects pack.
+- Six static companions and imported pictures for the floating button.
+- Reading cards and the button hide after inactivity; pin a result to keep it open.
 - Advanced OCR, model, speech, dictionary, glossary and floating-button options.
 
 Requires Android 8.0+ and ARM64. Local LLMs require Android 13+. Root is not needed for the standard capture flow.
 
-[Interface changes and preview installation](docs/android-changes.md).
+[Download preview APK 0.3.2](artifacts/android/README.md) · [Changes and limitations](docs/android-preview-v2.md).
 
 ## Setup
 
-The guide helps choose interface and translation languages, a service and the overlay permission. It opens the relevant Android settings and refreshes permission states when you return. Notifications, accessibility and battery settings are explained separately. Links to OCR, model and floating-button settings take you to the corresponding section and preserve the guide step.
+Choose a theme thumbnail and interface language, then the translation languages. Setup preserves the existing service; new installations use Google. Overlay permission and screen-capture consent are requested when starting screen translation. Other permission, service and model checks are available on the home screen and in settings.
 
 Google needs no key. MyMemory requires an explicit source language. Lingva accepts a server URL; LibreTranslate accepts a server URL and an optional key. Connection testing sends a sample phrase to the selected service. API keys use the app’s protected credential storage.
 
 Default OCR recognizes Latin, Chinese, Japanese and Korean scripts. Choose a suitable OCR service for other scripts. Download offline models before use. Translation language support depends on the selected service.
 
-The help button reopens setup. Text and image translation work without screen-capture permission. Text history stays on the device, is excluded from backup and can be cleared on the History tab.
+The help button reopens setup. Text and image translation work without screen-capture permission. Share a Telegram message to Clickn to translate its text without OCR. Text history stays on the device, is excluded from backup and can be cleared on the History tab.
 
 ## Build
 
