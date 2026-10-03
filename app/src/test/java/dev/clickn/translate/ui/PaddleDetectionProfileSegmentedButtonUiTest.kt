@@ -19,9 +19,8 @@ class PaddleDetectionProfileSegmentedButtonUiTest {
         data class Case(val name: String, val marker: String)
 
         listOf(
-            Case("single-choice row", "SingleChoiceSegmentedButtonRow("),
-            Case("connected segment", "SegmentedButton("),
-            Case("position-aware shape", "SegmentedButtonDefaults.itemShape("),
+            Case("single-choice row", "FlowRow("),
+            Case("connected segment", "SettingChoiceChip("),
             Case("current selection", "selected = paddleDetectionProfile == profile"),
             Case("skip redundant save", "if (paddleDetectionProfile != profile)"),
             Case("persist selection", "viewModel.savePaddleDetectionProfile(profile)"),

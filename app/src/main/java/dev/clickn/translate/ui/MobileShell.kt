@@ -694,9 +694,7 @@ fun MobileWelcomeScreen(onFinished: () -> Unit) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             Column(Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                Box(Modifier.size(88.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(28.dp)), contentAlignment = Alignment.Center) {
-                    Text("CT", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
+                BrandLogo(Modifier.size(88.dp))
                 Text(stringResource(R.string.mobile_welcome), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                 listOf(Icons.Outlined.CropFree to R.string.mobile_welcome_screen, Icons.Outlined.Translate to R.string.mobile_welcome_text, Icons.Outlined.Palette to R.string.mobile_welcome_style).forEach { (icon,text) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {

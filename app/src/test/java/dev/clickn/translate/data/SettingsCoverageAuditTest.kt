@@ -135,7 +135,8 @@ class SettingsCoverageAuditTest {
         )
         assertTrue(
             "initial snapshot must retain the complete repository Settings value",
-            settingsScreenSource.contains("initialSettings = s"),
+            settingsScreenSource.contains("initialSettings = persisted") &&
+                settingsScreenSource.contains("val s = viewModel.consumeLocaleChangeDraft() ?: persisted"),
         )
         assertTrue(
             "Settings export must use buildSettingsTransferSnapshot",

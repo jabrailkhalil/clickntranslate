@@ -26,10 +26,9 @@ class TranslationContextModeSegmentedUiTest {
         val end = source.indexOf("private fun translationContextModeLabelRes", start)
         val snippet = source.substring(start, end)
         listOf(
-            "SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth())",
+            "FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp))",
             "modes.forEachIndexed { index, mode ->",
-            "SegmentedButton(",
-            "SegmentedButtonDefaults.itemShape(index, modes.size)",
+            "SettingChoiceChip(",
             "selected = value == mode",
             "icon = {}",
         ).forEach { marker -> assertTrue(marker, marker in snippet) }

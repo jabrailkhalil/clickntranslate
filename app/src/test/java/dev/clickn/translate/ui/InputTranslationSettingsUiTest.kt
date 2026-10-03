@@ -19,7 +19,7 @@ class InputTranslationSettingsUiTest {
 
         listOf(
             "SectionCard(title = stringResource(R.string.settings_section_input_translation))",
-            "SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth())",
+            "FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp))",
             "InputTranslationDoubleAction.FULL_SCREEN",
             "InputTranslationDoubleAction.WORD_SELECT",
             "viewModel.saveInputTranslationDoubleAction(action)",

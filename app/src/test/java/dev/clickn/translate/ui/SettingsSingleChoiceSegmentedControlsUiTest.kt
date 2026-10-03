@@ -8,7 +8,7 @@ import org.junit.Test
 
 class SettingsSingleChoiceSegmentedControlsUiTest {
     @Test
-    fun singleChoiceSettings_useConnectedSegmentedButtons_tableDrivenContract() {
+    fun singleChoiceSettings_keepSelectionHandlersAcrossCardsAndWrappingChips() {
         val source = moduleFile(
             "src/main/java/dev/clickn/translate/ui/SettingsScreen.kt"
         ).readText()
@@ -29,7 +29,7 @@ class SettingsSingleChoiceSegmentedControlsUiTest {
                 requiredMarkers = listOf(
                     "RenderMode.BLOCKS",
                     "RenderMode.FLOATING_WINDOW",
-                    "selected = renderMode == mode",
+                    "SettingChoiceCards(renderMode, renderModeOptions)",
                     "if (renderMode != mode)",
                 ),
                 forbiddenMarkers = listOf(
@@ -79,15 +79,14 @@ class SettingsSingleChoiceSegmentedControlsUiTest {
                 source.indexOf(case.startMarker),
                 source.indexOf(case.endMarker, source.indexOf(case.startMarker)),
             )
-            listOf(
-                "SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth())",
-                "SegmentedButton(",
-                "SegmentedButtonDefaults.itemShape(",
-                "icon = {}",
-                "label = { Text(stringResource(labelRes)) }",
-            ).plus(case.requiredMarkers).forEach { marker ->
+            val sharedMarkers = if (case.name == "display mode") listOf("SettingChoiceCards(") else listOf(
+                "FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp))",
+                "SettingChoiceChip(", "icon = {}", "label = { Text(stringResource(labelRes)) }",
+            )
+            (sharedMarkers + case.requiredMarkers).forEach { marker ->
                 assertTrue("${case.name}: missing $marker", block.contains(marker))
             }
+            assertFalse("${case.name}: connected outlines are removed", block.contains("SegmentedButtonDefaults"))
             case.forbiddenMarkers.forEach { marker ->
                 assertFalse("${case.name}: forbidden $marker", block.contains(marker))
             }

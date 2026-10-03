@@ -253,13 +253,13 @@ class SettingsScreenModelStatusTest {
         val preview = renderingPage.indexOf("OverlayPreviewCard(")
         val colors = renderingPage.indexOf("R.string.settings_overlay_theme_label")
         val displayMode = mainPage.indexOf("R.string.settings_render_mode_label")
-        val displaySegments = mainPage.indexOf("SingleChoiceSegmentedButtonRow(", startIndex = displayMode)
+        val displaySegments = mainPage.indexOf("SettingChoiceCards(", startIndex = displayMode)
         val blocks = mainPage.indexOf("R.string.settings_render_blocks_chip", startIndex = displayMode)
         val floating = mainPage.indexOf("R.string.settings_render_floating_window_chip", startIndex = displayMode)
         val floatingContent = mainPage.indexOf("R.string.settings_floating_window_content_label", startIndex = displayMode)
         val renderModeClick = mainPage.substring(
-            mainPage.indexOf("onClick = {", startIndex = displaySegments),
-            mainPage.indexOf("shape = SegmentedButtonDefaults.itemShape", startIndex = displaySegments),
+            displaySegments,
+            mainPage.indexOf("if (renderMode == RenderMode.FLOATING_WINDOW)", startIndex = displaySegments),
         )
         val cases = listOf(
             Case("rendering secondary page exists", pageStart >= 0 && pageEnd > pageStart),
@@ -268,7 +268,7 @@ class SettingsScreenModelStatusTest {
             Case("display mode is absent from secondary page", !renderingPage.contains("R.string.settings_render_mode_label")),
             Case("display mode exists on primary page", displayMode >= 0),
             Case("block display is the first option", blocks in (displayMode + 1)..<floating),
-            Case("display mode options use the approved segmented control", displaySegments > floating),
+            Case("display modes use independent selectable cards", displaySegments > floating),
             Case("floating content follows display mode", floatingContent > floating),
             Case("floating content is absent from secondary page", !renderingPage.contains("R.string.settings_floating_window_content_label")),
             Case("adaptive switch uses the compact labelled control", source.contains("InlineSwitchLabel(")),

@@ -32,7 +32,7 @@ class TranslationSettingsUiAuditTest {
     @Test
     fun persistedRequestOptions_areHydratedBeforeSettingsBecomeLoaded() {
         val loadStart = source.indexOf("LaunchedEffect(Unit) {")
-        val loadEnd = source.indexOf("initialSettings = s", startIndex = loadStart)
+        val loadEnd = source.indexOf("initialSettings = persisted", startIndex = loadStart)
         assertTrue("settings load block", loadStart >= 0 && loadEnd > loadStart)
 
         val loadBlock = source.substring(loadStart, loadEnd)
@@ -366,10 +366,10 @@ class TranslationSettingsUiAuditTest {
                 "R.string.settings_openai_top_p",
             ),
             OrderCase(
-                "shared setting switch appears before its description",
+                "shared switch row presents its label before the trailing switch",
                 switchRowSection,
-                "Switch(",
-                "Text(",
+                "headlineContent =",
+                "trailingContent =",
             ),
         ).forEach { case ->
             val earlierIndex = case.section.indexOf(case.earlier)

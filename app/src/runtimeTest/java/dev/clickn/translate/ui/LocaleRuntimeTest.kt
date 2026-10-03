@@ -59,4 +59,38 @@ class LocaleRuntimeTest {
         val controller = androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
         assertFalse(controller.isAppearanceLightStatusBars)
     }
+    private fun resource(id: Int) = compose.activity.getString(id)
+    private fun openAdvanced() {
+        compose.onNodeWithText(resource(R.string.refine_quick_setup)).performClick()
+        compose.onNodeWithText(resource(R.string.mobile_nav_settings)).performClick()
+        compose.onAllNodesWithText(resource(R.string.mobile_advanced)).onLast().performScrollTo().performClick()
+    }
+    @Test fun displayModeChoiceSavesTheActualSetting() {
+        val repo = (compose.activity.application as ClickTranslateApp).settingsRepository
+        kotlinx.coroutines.runBlocking { repo.update { it.copy(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS) } }
+        openAdvanced()
+        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().performClick()
+        compose.onNodeWithText(resource(R.string.settings_save_btn), useUnmergedTree = true).performClick()
+        compose.waitUntil(10_000) { kotlinx.coroutines.runBlocking { repo.get().renderMode == dev.clickn.translate.data.RenderMode.FLOATING_WINDOW } }
+    }
+    @Test fun languageRecreationPreservesUnsavedSettingsDraft() {
+        val repo = (compose.activity.application as ClickTranslateApp).settingsRepository
+        kotlinx.coroutines.runBlocking { repo.update { it.copy(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS) } }
+        openAdvanced()
+        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().performClick()
+        compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
+        compose.onNodeWithText(resource(R.string.refine_general)).performClick()
+        compose.onNodeWithText(resource(R.string.settings_app_lang_en)).performClick()
+        compose.onNodeWithText(resource(R.string.settings_app_lang_ru)).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
+        compose.onNodeWithText(resource(R.string.refine_overlay)).performClick()
+        compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().assertIsSelected()
+        assertEquals(dev.clickn.translate.data.RenderMode.BLOCKS, kotlinx.coroutines.runBlocking { repo.get().renderMode })
+        compose.onNodeWithText(resource(R.string.settings_save_btn), useUnmergedTree = true).performClick()
+        compose.waitUntil(10_000) { kotlinx.coroutines.runBlocking { repo.get().renderMode == dev.clickn.translate.data.RenderMode.FLOATING_WINDOW } }
+    }
+
 }

@@ -263,18 +263,18 @@ class GlossaryScreenUiAuditTest {
             Case(
                 "correction illustration follows its help text",
                 helpDialog,
-                "imageRes = R.drawable.translation_correction_help",
+                "illustration = { TranslationReviewHelpIllustration() }",
             ),
             Case(
                 "correction illustration has an accessible description",
-                helpDialog,
+                source,
                 "R.string.translation_library_help_add_image_description",
             ),
             Case("help illustration fills the available width", helpDialog, ".fillMaxWidth()"),
-            Case("help illustration preserves its aspect ratio", helpDialog, ".aspectRatio(1117f / 633f)"),
+            Case("help illustration uses the current theme shape", source, "shape = MaterialTheme.shapes.small"),
             Case(
                 "help illustration uses a one-dp theme border",
-                helpDialog,
+                source,
                 "MaterialTheme.colorScheme.outlineVariant",
             ),
             Case("management help section", helpDialog, "R.string.translation_library_help_manage_body"),
@@ -294,16 +294,16 @@ class GlossaryScreenUiAuditTest {
         assertTrue(
             "correction illustration must appear after the correction copy",
             helpDialog.indexOf("R.string.translation_library_help_add_body") <
-                helpDialog.indexOf("R.drawable.translation_correction_help"),
+                helpDialog.indexOf("TranslationReviewHelpIllustration()"),
         )
         assertTrue(
             "management help must stay below the correction illustration",
-            helpDialog.indexOf("R.drawable.translation_correction_help") <
+            helpDialog.indexOf("TranslationReviewHelpIllustration()") <
                 helpDialog.indexOf("R.string.translation_library_help_manage_title"),
         )
-        assertTrue(
-            "compressed correction illustration must be packaged",
-            sourceFile("src/main/res/drawable-nodpi/translation_correction_help.jpg").isFile,
+        assertFalse(
+            "fixed screenshot must not override the selected UI language or theme",
+            listOf(File("src/main/res/drawable-nodpi/translation_correction_help.jpg"), File("app/src/main/res/drawable-nodpi/translation_correction_help.jpg")).any(File::exists),
         )
     }
 
