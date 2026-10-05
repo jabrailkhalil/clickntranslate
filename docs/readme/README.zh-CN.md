@@ -1,6 +1,8 @@
-# Click'n'Translate
+# clickntranslate
 
 适用于 **Windows、Linux 和 macOS** 的免费开源屏幕 OCR 与翻译工具。从应用、图片和游戏中提取文字，翻译选中文本，或持续翻译一个或多个屏幕区域。
+
+[网站与功能](https://translate.clickn.dev/zh-CN/) · [所有项目](https://clickn.dev/zh-CN/)
 
 [English](../../README.md) · [Русский](README.ru.md) · **简体中文** · [Español](README.es.md) · [Français](README.fr.md)
 
