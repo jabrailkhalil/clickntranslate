@@ -1,6 +1,8 @@
-# Click'n'Translate
+# clickntranslate
 
 OCR et traduction d’écran gratuits et open source pour **Windows, Linux et macOS**. Extrayez le texte des applications, images et jeux, traduisez une sélection ou suivez le texte qui change dans plusieurs zones de l’écran.
+
+[Site web et fonctionnalités](https://translate.clickn.dev/fr/) · [Tous les projets](https://clickn.dev/fr/)
 
 [English](../../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [Español](README.es.md) · **Français**
 
