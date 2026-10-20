@@ -14,9 +14,10 @@ if '--export' in sys.argv:
 from PyQt5 import QtCore, QtGui, QtWidgets
 from assistant_art import MASCOTS
 from assistant_motion import PetMotion, paint_pet, WALK_FRAME_NAMES, WALK_FRAME_DURATIONS
+from assistant_text import assistant_text
 
-NAMES = ('Блинчик', 'Моти', 'Бубу', 'Момо', 'Орбит')
-REVISION = 'v8'
+NAMES = tuple(assistant_text('ru', mascot) for mascot in MASCOTS)
+REVISION = 'v16'
 STATES = (
     ('Прогулка / ползание', 'walk', 'neutral'),
     ('Спокойный', 'idle', 'neutral'), ('Радостный', 'idle', 'happy'),
@@ -106,7 +107,7 @@ class Scene(QtWidgets.QWidget):
 class Preview(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('ClicknTranslate — маскоты · Python · кадры исходного GIF')
+        self.setWindowTitle('ClicknTranslate — маскоты v16 · Python · перерисованные кадры')
         self.resize(980, 740)
         layout = QtWidgets.QVBoxLayout(self)
         title = QtWidgets.QLabel('Маскоты • визуальная доработка')

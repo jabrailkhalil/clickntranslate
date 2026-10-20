@@ -1,7 +1,7 @@
 """Shared mascot poses, reference-timed walking and application reactions.
 
-Four walkers use ten complete poses with the original GIF's frame timing.
-Jelly creeps by extending, then drawing its back forward. Artwork is cached.
+Four walkers use ten redrawn complete poses with the original GIF's timing.
+Jelly uses ten grounded crawl cels, extending then drawing its back forward.
 """
 from functools import lru_cache
 from bisect import bisect_right
@@ -157,10 +157,17 @@ def skin(mascot):
     return {name: QtGui.QPixmap(art_path(f'{mascot}/rig/{name}.png')) for name in names}
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=5)
 def walking_frames(mascot):
+    if mascot == 'orbit':
+        # Every contour belongs to one original cel. Materials are rendered
+        # once; the usual shared 110 ms clock selects a complete frame.
+        from assistant_traced_walk import orbit_frame
+        return tuple(orbit_frame(index) for index in range(10))
     # Use a whole sequence; never mix old and new poses on missing resources.
-    for folder in ('walk-reference-frames', 'walk-frames'):
+    folders = ('walk-redrawn-frames',) if mascot == 'bubu' else (
+        'walk-redrawn-frames', 'walk-reference-frames', 'walk-frames')
+    for folder in folders:
         frames = tuple(QtGui.QPixmap(art_path(f'{mascot}/{folder}/{name}.png'))
                        for name in WALK_FRAME_NAMES)
         if all(not frame.isNull() for frame in frames):
@@ -212,10 +219,24 @@ def paint_pet(painter, rect, mascot, *, phase=0., time=0., action='idle', facing
     painter.scale(scale * facing, scale)
     painter.translate(-64, -64)
     width = WIDTHS[mascot]
-    if action == 'walk' and mascot != 'bubu':
+    if action == 'walk':
         frames = walking_frames(mascot)
         if frames:
-            frame = frames[walk_frame_index(phase)]
+            frame = frames[walk_frame_index(crawl_phase if mascot == 'bubu' else phase)]
+            # The shadow is separate from the complete cels, so their original
+            # hand/foot overlap stays baked into the drawing.
+            painter.save()
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            painter.translate(64, 121.5)
+            painter.scale(43, 5)
+            shadow = QtGui.QRadialGradient(0, 0, 1)
+            shadow.setColorAt(0, QtGui.QColor(3, 2, 5, 155))
+            shadow.setColorAt(.5, QtGui.QColor(3, 2, 5, 85))
+            shadow.setColorAt(1, QtGui.QColor(3, 2, 5, 0))
+            painter.setBrush(shadow)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.drawEllipse(QtCore.QRectF(-1, -1, 2, 2))
+            painter.restore()
             painter.drawPixmap(QtCore.QRectF(0, 0, 128, 128), frame, QtCore.QRectF(frame.rect()))
             painter.restore()
             return

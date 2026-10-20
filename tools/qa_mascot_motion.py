@@ -11,6 +11,7 @@ from PIL import Image
 from PyQt5 import QtCore, QtGui, QtWidgets
 from assistant_art import MASCOTS, APPEARANCES, companion_art
 from assistant_motion import PetMotion, paint_pet
+from assistant_text import assistant_text
 
 
 def pil(canvas):
@@ -56,7 +57,7 @@ def run():
             positions[row] += delta
             motion.moved(delta, 104)
             y = 46 + row * 116
-            caption(painter, 24, y+60, ('Блинчик', 'Моти', 'Бубу', 'Момо', 'Орбит')[row])
+            caption(painter, 24, y+60, assistant_text('ru', mascot))
             painter.setPen(QtGui.QColor('#3c3e51'))
             painter.drawLine(142, y+98, 724, y+98)
             paint_pet(painter, QtCore.QRectF(positions[row], y, 104, 104), mascot,

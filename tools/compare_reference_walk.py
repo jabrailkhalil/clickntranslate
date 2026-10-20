@@ -1,24 +1,30 @@
-"""Visual, synchronized comparison against the original local GIF."""
+"""Compare ten redrawn cels against the original, with frame stepping."""
 from pathlib import Path
 import os
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
 if '--export' in sys.argv:
     os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 from PyQt5 import QtCore, QtGui, QtWidgets
+from assistant_text import assistant_text
 
-NAMES = ('Оригинал', 'Блинчик', 'Моти', 'Момо', 'Орбит')
 IDS = ('pancake', 'mochi', 'momo', 'orbit')
+NAMES = ('Оригинал',) + tuple(assistant_text('ru', mascot) for mascot in IDS)
 
 
 class Comparison(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         from PIL import Image
-        self.setWindowTitle('ClicknTranslate — исходный GIF и наши герои · кадр в кадр')
-        self.resize(1060, 380)
+        self.setWindowTitle('ClicknTranslate — v16 · покадровое сравнение')
+        self.resize(1060, 425)
         self.frames = [[] for _ in NAMES]
+        self.previous = [[] for _ in IDS]
+        self.version = 'v16'
+        self.onion = False
+        self.light = False
         original = Image.open(ROOT / 'docs/mascots/reference/original.gif')
         self.durations = []
         for index in range(original.n_frames):
@@ -30,6 +36,8 @@ class Comparison(QtWidgets.QWidget):
             self.frames[0].append(QtGui.QPixmap.fromImage(qimage))
             for column, name in enumerate(IDS, 1):
                 self.frames[column].append(QtGui.QPixmap(str(ROOT / 'src/icons/desktop-assistant'
+                    / name / 'walk-redrawn-frames' / f'{index:02}.png')))
+                self.previous[column-1].append(QtGui.QPixmap(str(ROOT / 'src/icons/desktop-assistant'
                     / name / 'walk-reference-frames' / f'{index:02}.png')))
         self.index = 0
         self.elapsed = 0.
@@ -64,15 +72,37 @@ class Comparison(QtWidgets.QWidget):
         self.caption = QtWidgets.QLabel()
         controls.addWidget(self.caption)
         layout.addLayout(controls)
+        options = QtWidgets.QHBoxLayout()
+        version = QtWidgets.QComboBox()
+        version.addItem('Новая перерисовка v16', 'v16')
+        version.addItem('Предыдущие рисунки v8', 'v8')
+        version.currentIndexChanged.connect(lambda: self.setting('version', version.currentData()))
+        options.addWidget(version)
+        onion = QtWidgets.QCheckBox('Предыдущий кадр полупрозрачно')
+        onion.toggled.connect(lambda value: self.setting('onion', value))
+        options.addWidget(onion)
+        light = QtWidgets.QCheckBox('Светлый фон')
+        light.toggled.connect(lambda value: self.setting('light', value))
+        options.addWidget(light)
+        options.addStretch(1)
+        layout.addLayout(options)
+        for key, delta in ((QtCore.Qt.Key_Left, -1), (QtCore.Qt.Key_Right, 1)):
+            shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(key), self)
+            shortcut.activated.connect(lambda d=delta: self.step(d, pause))
         self.setStyleSheet('QWidget {background:#22232e;color:#eee8fa;font-family:"Segoe UI";font-size:13px;}'
             'QPushButton,QComboBox {background:#393445;border:1px solid #6e5b83;border-radius:5px;padding:7px;}')
         self.clock = QtCore.QElapsedTimer()
         self.clock.start()
+        self.last_tick_ns = self.clock.nsecsElapsed()
         self.timer = QtCore.QTimer(self)
         self.timer.setTimerType(QtCore.Qt.PreciseTimer)
         self.timer.setInterval(16)
         self.timer.timeout.connect(self.tick)
         self.timer.start()
+        self.draw()
+
+    def setting(self, name, value):
+        setattr(self, name, value)
         self.draw()
 
     def seek(self, value):
@@ -85,7 +115,9 @@ class Comparison(QtWidgets.QWidget):
         self.slider.setValue((self.index+delta) % len(self.durations))
 
     def tick(self):
-        dt = self.clock.restart()
+        now = self.clock.nsecsElapsed()
+        dt = (now-self.last_tick_ns)/1_000_000
+        self.last_tick_ns = now
         if self.paused or self.isMinimized():
             return
         self.elapsed += dt*self.rate
@@ -98,15 +130,21 @@ class Comparison(QtWidgets.QWidget):
 
     def draw(self):
         canvas = QtGui.QPixmap(1010, 240)
-        canvas.fill(QtGui.QColor('#22232e'))
+        canvas.fill(QtGui.QColor('#f4f1f8' if self.light else '#22232e'))
         painter = QtGui.QPainter(canvas)
         painter.setFont(QtGui.QFont('Segoe UI', 11))
         for column, frames in enumerate(self.frames):
             x = column*202
-            painter.setPen(QtGui.QColor('#d6c3f0'))
+            painter.setPen(QtGui.QColor('#362f40' if self.light else '#d6c3f0'))
             painter.drawText(QtCore.QRectF(x, 4, 202, 24), QtCore.Qt.AlignCenter, NAMES[column])
-            frame = frames[self.index]
+            sequence = self.previous[column-1] if column and self.version == 'v8' else frames
+            frame = sequence[self.index]
             painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, column != 0)
+            if self.onion:
+                before = sequence[(self.index-1) % len(sequence)]
+                painter.setOpacity(.22)
+                painter.drawPixmap(QtCore.QRectF(x+5, 32, 192, 192), before, QtCore.QRectF(before.rect()))
+                painter.setOpacity(1)
             painter.drawPixmap(QtCore.QRectF(x+5, 32, 192, 192), frame, QtCore.QRectF(frame.rect()))
         painter.end()
         self.scene.setPixmap(canvas)
@@ -115,7 +153,8 @@ class Comparison(QtWidgets.QWidget):
 
 def export(window):
     from PIL import Image
-    output = ROOT / 'docs/mascots'
+    output = ROOT / 'docs/mascots/redrawn-v16'
+    output.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(ROOT / 'tests'))
     from qt_layout_test_support import ensure_layout_fonts
     ensure_layout_fonts(QtWidgets.QApplication.instance())
@@ -131,7 +170,7 @@ def export(window):
         images.append(Image.frombytes('RGBA', (canvas.width(), canvas.height()), bytes(pointer)).convert('RGB'))
     palette = images[0].quantize(colors=256)
     frames = [im.quantize(palette=palette, dither=Image.Dither.NONE) for im in images]
-    frames[0].save(output / 'reference-comparison-v8.gif', save_all=True, append_images=frames[1:],
+    frames[0].save(output / 'comparison.gif', save_all=True, append_images=frames[1:],
                    duration=window.durations, loop=0)
     sheet = QtGui.QPixmap(2040, 1020)
     sheet.fill(QtGui.QColor('#22232e'))
@@ -147,8 +186,8 @@ def export(window):
             if row == 4:
                 painter.drawText(180+index*192, 1010, f'{index:02} · 110 ms')
     painter.end()
-    sheet.save(str(output / 'reference-poses-v8.png'))
-    print(output / 'reference-comparison-v8.gif')
+    sheet.save(str(output / 'poses.png'))
+    print(output / 'comparison.gif')
 
 
 if __name__ == '__main__':
@@ -158,4 +197,10 @@ if __name__ == '__main__':
     if '--export' in sys.argv:
         export(window)
     else:
+        def ready():
+            target = ROOT / '.tmp/redrawn-comparison-window.png'
+            target.parent.mkdir(parents=True, exist_ok=True)
+            window.grab().save(str(target))
+            print('Opened v16 frame comparison', flush=True)
+        QtCore.QTimer.singleShot(700, ready)
         sys.exit(app.exec_())

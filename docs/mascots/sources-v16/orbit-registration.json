@@ -1,0 +1,175 @@
+{
+  "source": "orbit-sheet.png",
+  "frames": [
+    {
+      "frame": 0,
+      "solid_bounds": [
+        59,
+        59,
+        343,
+        373
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -10.516923076923064
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 1,
+      "solid_bounds": [
+        66,
+        48,
+        339,
+        373
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -10.516923076923064
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 2,
+      "solid_bounds": [
+        66,
+        50,
+        351,
+        373
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -10.516923076923064
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 3,
+      "solid_bounds": [
+        59,
+        48,
+        369,
+        373
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -10.516923076923064
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 4,
+      "solid_bounds": [
+        70,
+        50,
+        370,
+        374
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -11.027692307692291
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 5,
+      "solid_bounds": [
+        57,
+        40,
+        344,
+        353
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -2.9682051282051134
+      ],
+      "floor": 177.33333333333334,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 6,
+      "solid_bounds": [
+        48,
+        29,
+        354,
+        353
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -2.9682051282051134
+      ],
+      "floor": 177.33333333333334,
+      "duration_ms": 110,
+      "correction": "orbit-cel-06-fixed.png"
+    },
+    {
+      "frame": 7,
+      "solid_bounds": [
+        44,
+        30,
+        356,
+        353
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -0.3015384615384562
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 8,
+      "solid_bounds": [
+        35,
+        28,
+        364,
+        353
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -0.3015384615384562
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 9,
+      "solid_bounds": [
+        70,
+        36,
+        353,
+        357
+      ],
+      "scale": 0.5107692307692308,
+      "offset": [
+        -5.285538461538465,
+        -2.3446153846153663
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    }
+  ]
+}

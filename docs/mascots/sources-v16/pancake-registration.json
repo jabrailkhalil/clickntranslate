@@ -1,0 +1,175 @@
+{
+  "source": "pancake-sheet-yaw.png",
+  "frames": [
+    {
+      "frame": 0,
+      "solid_bounds": [
+        46,
+        110,
+        335,
+        380
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        -0.0753904146473019
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 1,
+      "solid_bounds": [
+        45,
+        97,
+        343,
+        380
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        -0.0753904146473019
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 2,
+      "solid_bounds": [
+        54,
+        95,
+        346,
+        380
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        -0.0753904146473019
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 3,
+      "solid_bounds": [
+        54,
+        95,
+        382,
+        380
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        -0.0753904146473019
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 4,
+      "solid_bounds": [
+        57,
+        104,
+        377,
+        379
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        0.3984921917070494
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 5,
+      "solid_bounds": [
+        55,
+        58,
+        354,
+        338
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        17.161012385568114
+      ],
+      "floor": 177.33333333333334,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 6,
+      "solid_bounds": [
+        40,
+        52,
+        362,
+        338
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        17.161012385568114
+      ],
+      "floor": 177.33333333333334,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 7,
+      "solid_bounds": [
+        32,
+        52,
+        372,
+        336
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        20.775444264943445
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": "pancake-cel-07-fixed.png"
+    },
+    {
+      "frame": 8,
+      "solid_bounds": [
+        30,
+        52,
+        384,
+        333
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        22.197092084006442
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 9,
+      "solid_bounds": [
+        61,
+        57,
+        357,
+        339
+      ],
+      "scale": 0.473882606354335,
+      "offset": [
+        2.029079159935364,
+        19.353796445880448
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": "pancake-cel-09-fixed.png"
+    }
+  ]
+}

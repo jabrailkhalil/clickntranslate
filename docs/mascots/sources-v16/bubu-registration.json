@@ -1,0 +1,175 @@
+{
+  "source": "bubu-sheet-spaced.png",
+  "frames": [
+    {
+      "frame": 0,
+      "solid_bounds": [
+        41,
+        130,
+        332,
+        362
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        -4.458598726114644
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 1,
+      "solid_bounds": [
+        43,
+        133,
+        348,
+        362
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        -4.458598726114644
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 2,
+      "solid_bounds": [
+        47,
+        147,
+        359,
+        362
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        -4.458598726114644
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 3,
+      "solid_bounds": [
+        49,
+        153,
+        371,
+        364
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        -5.477707006369428
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 4,
+      "solid_bounds": [
+        55,
+        167,
+        365,
+        363
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        -4.968152866242036
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 5,
+      "solid_bounds": [
+        38,
+        114,
+        359,
+        333
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        10.31847133757961
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 6,
+      "solid_bounds": [
+        47,
+        99,
+        364,
+        333
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        10.31847133757961
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 7,
+      "solid_bounds": [
+        56,
+        103,
+        359,
+        333
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        10.31847133757961
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 8,
+      "solid_bounds": [
+        54,
+        96,
+        359,
+        333
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        10.31847133757961
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    },
+    {
+      "frame": 9,
+      "solid_bounds": [
+        56,
+        99,
+        357,
+        333
+      ],
+      "scale": 0.5095541401273885,
+      "offset": [
+        -5.044585987261158,
+        10.31847133757961
+      ],
+      "floor": 180.0,
+      "duration_ms": 110,
+      "correction": null
+    }
+  ]
+}

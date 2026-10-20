@@ -24,6 +24,7 @@ def run():
     import portable_paths
     portable_paths.portable_base_dir = lambda: str(PROFILE)
     import main
+    from assistant_text import assistant_text
     from PyQt5 import QtCore
 
     main.LAYOUT_EDITOR_MODE = True
@@ -56,7 +57,7 @@ def run():
     app.setQuitOnLastWindowClosed(True)
     window = MascotApp()
     main._main_window_ref = window
-    window.setWindowTitle("Click'n'Translate 1.8.2 — Python · маскоты")
+    window.setWindowTitle(f"Click'n'Translate 1.8.2 — Python · {assistant_text('ru', 'orbit')} v17")
     window._sync_desktop_assistant()
     window.show()
     window.show_assistant_settings()

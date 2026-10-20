@@ -1,0 +1,37 @@
+Orbit v16: visual review by three agents, 12 October 2026.
+
+Source coordinates use fixed 66x66 crop (30,43,96,109).
+Near-arm visible lobe bbox and distal tip are visual estimates (+/-1-2px):
+00 (9,33,28,50), tip (18,48)
+01 (16,33,34,50), tip (25,49)
+02 (24,30,42,49), tip (35,48)
+03 (24,26,42,43), tip (35,42)
+04 (19,31,37,46), tip (29,45)
+05 (9,34,28,50), tip (19,48)
+06 (6,34,25,50), tip (14,48)
+07 (4,32,23,48), tip (11,46)
+08 (2,28,21,44), tip (8,41)
+09 (6,32,24,48), tip (15,46)
+
+v16 faults: 01->02 detached glove becomes integrated arm; 03->04 hand
+returns right instead of left; 05->06 visible arm area nearly doubles;
+08->09 arm collapses into round glove; 09->00 reverses horizontal movement.
+Source arm is a continuous extension of body, not a detached round glove.
+Source eye yaw: 02 matches04, 01 matches05, peak03 has one visible eye.
+Far hand: hidden00-04, small edge05, remains visible06-09.
+
+Runtime: complete PNG, no separate limb transforms; exact110ms frame
+durations; comparison shares a frame index. Minor integer clock rounding
+in desktop timer cannot explain a hand-specific jump. v16 registration
+aligns soles, not torso; corrected frame06 was independently regenerated.
+
+Other characters still need source-matched contour work:
+Pancake00->01 turns hand into circle too early, far hand missing05.
+Mochi05->06->07 changes arm length; foot06 tilts early, far hand09 missing.
+Momo01 turns arm early; foot06 tilts early, far hand09 too prominent.
+Bubu has no legs and floor contact; crawl looks more like squashing in
+place, so it remains a separate animation, not a Kirby walking copy.
+
+v17 plan: redraw each original cel separately, retain a fixed coordinate
+system, inspect adjacent frames and09->00. First atlas attempt rejected:
+rejected-atlas.png still reproduces v16 poses despite contour instructions.

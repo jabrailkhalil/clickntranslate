@@ -74,7 +74,15 @@ def pack(mascot):
 
 
 def sample_walk(mascot):
-    # The current sequence was drawn one source GIF frame at a time.
+    if mascot == 'orbit' and (ROOT / 'src/icons/desktop-assistant/orbit/walk-geometry.json').exists():
+        # The native contour renderer already has a checked-in GIF export.
+        # Refresh it explicitly with tools/export_orbit_traced.py.
+        return
+    if (ROOT / 'docs/mascots/sources-v16' / f'{mascot}-registration.json').exists():
+        from prepare_redrawn_walk import pack as pack_redraw
+        pack_redraw(mascot)
+        return
+    # The previous sequence was drawn one source GIF frame at a time.
     if mascot != 'bubu' and (ROOT / 'docs/mascots/sources-v8/frame-09.png').exists():
         from prepare_reference_walk import pack as pack_walk
         pack_walk(mascot)
