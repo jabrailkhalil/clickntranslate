@@ -83,7 +83,8 @@ def test_switching_character_keeps_position_pause_and_capture_ownership(window, 
     window.show_main_screen()
     app.processEvents()
     assert window.assistant_preview.mascot == 'bubu'
-    assert window.assistant_preview.art is skin('bubu')
+    from assistant_preview import preview_art
+    assert window.assistant_preview.art is preview_art('bubu')
 
 
 def test_character_choice_before_enable_and_after_custom_image(window, tmp_path):
@@ -190,14 +191,15 @@ def test_preview_stage_is_themed_reacts_to_clicks_and_stops_when_hidden(window, 
     assert not stage.timer.isActive()
 
 
-def test_each_main_window_character_opens_settings_without_a_desktop_menu(window, app):
+def test_selected_main_character_opens_settings_without_a_desktop_menu(window, app):
     window.set_desktop_assistant_enabled(True)
     helper = window._desktop_assistant
     for mascot in MASCOTS:
+        window.config['desktop_assistant_mascot'] = mascot
         window.show_main_screen()
         app.processEvents()
         rail = window.assistant_preview
-        assert tuple(rail.buttons) == MASCOTS
+        assert tuple(rail.buttons) == (mascot,)
         rail.buttons[mascot].click()
         app.processEvents()
         assert window.settings_window.settings_assistant_page.isVisible()

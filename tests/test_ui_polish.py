@@ -244,11 +244,11 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     second.show()
     app.processEvents()
     assert rail.art is second.art
-    # Only the original v2 atlas is loaded, shared by both views.
-    from assistant_motion import skin
-    pixmaps = [skin(mascot).thumbnail for mascot in rail.buttons]
+    # Static shortcuts share one tiny image; no animation atlas is decoded.
+    from assistant_preview import preview_art
+    pixmaps = [preview_art(mascot) for mascot in rail.buttons]
     memory = sum(p.width() * p.height() * 4 for p in pixmaps)
-    assert memory <= 6 * 1024 * 1024
+    assert memory <= 48 * 52 * 4
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
     origin = rail.button.pos()
@@ -260,7 +260,7 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     second.hide()
 
 
-def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimized(app, owner):
+def test_static_preview_never_runs_a_repaint_timer(app, owner):
     owner.resize(300, 100)
     rail = AssistantPreview(owner, parent=owner)
     rail.resize(260, 18)
@@ -269,7 +269,7 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     rail.button.clearFocus()
     rail._hovered = False
     rail._sync_animation()
-    assert rail.timer.isActive()
+    assert not rail.timer.isActive()
     spy = QSignalSpy(rail.timer.timeout)
     rail.hide()
     QTest.qWait(200)
@@ -277,13 +277,13 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     rail.show()
     app.sendEvent(owner, QtCore.QEvent(QtCore.QEvent.WindowDeactivate))
     QTest.qWait(200)
-    assert rail.timer.isActive() and len(spy) > 0
+    assert not rail.timer.isActive() and len(spy) == 0
     rail._hovered = True
     rail._sync_animation()
-    assert rail.timer.isActive()
+    assert not rail.timer.isActive()
     rail._hovered = False
     rail._sync_animation()
-    assert rail.timer.isActive()
+    assert not rail.timer.isActive()
     owner.showMinimized()
     app.processEvents()
     assert not rail.timer.isActive()
@@ -293,7 +293,7 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     assert not rail.timer.isActive()
 
 
-def test_all_six_preview_buttons_open_settings_directly_without_desktop_overlay(app, owner):
+def test_single_static_preview_opens_settings_directly_without_desktop_overlay(app, owner):
     rail = AssistantPreview(owner, parent=owner)
     owner.resize(340, 100)
     rail.resize(320, 22)
@@ -304,10 +304,10 @@ def test_all_six_preview_buttons_open_settings_directly_without_desktop_overlay(
     for button in rail.buttons.values():
         button.click()
         assert rail._choice_dialog is None
-    assert len(spy) == 6
+    assert len(rail.buttons) == len(spy) == 1
     rail.button.setFocus()
     QTest.keyClick(rail.button, QtCore.Qt.Key_Space)
-    assert len(spy) == 7
+    assert len(spy) == 2
     assert owner.config['desktop_assistant_enabled'] is False
     assert len({button.y() for button in rail.buttons.values()}) == 1
     assert all(rail.rect().contains(button.geometry()) for button in rail.buttons.values())

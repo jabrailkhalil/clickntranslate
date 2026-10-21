@@ -98,6 +98,11 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
+        # Layered Windows surfaces retain old pixels when a smaller pose is
+        # blended over the previous frame. Replace its alpha before drawing.
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+        painter.fillRect(self.rect(), QtCore.Qt.transparent)
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         # Transparent in every state: no hover disc, border or native focus box.
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)

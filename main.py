@@ -7198,6 +7198,26 @@ class HotkeyLanguageDialog(QDialog):
         super().closeEvent(event)
 
 
+def _atomic_page_change(method):
+    """Keep the previous frame visible until the next page has its final geometry."""
+    from functools import wraps
+
+    @wraps(method)
+    def change(self, *args, **kwargs):
+        roots = list(dict.fromkeys((self, getattr(self, 'ui_root', self))))
+        frozen = [(widget, widget.updatesEnabled()) for widget in roots]
+        for widget, _ in frozen:
+            widget.setUpdatesEnabled(False)
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            for widget, enabled in reversed(frozen):
+                widget.setUpdatesEnabled(enabled)
+                if enabled:
+                    widget.update()
+    return change
+
+
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str, str, str, str)
@@ -10396,15 +10416,38 @@ class DarkThemeApp(QMainWindow):
                 + pair.trailing_glyph_room
             )
 
+    def _main_page_signature(self):
+        return (self.current_theme, self.current_interface_language,
+                json.dumps(self.config, sort_keys=True, ensure_ascii=False, default=str))
+
+    @_atomic_page_change
     def show_main_screen(self):
         active_settings = getattr(self, "settings_window", None)
         if active_settings is not None:
             self._cached_settings_window = active_settings
-        self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
+        from PyQt5 import sip
+        cached = getattr(self, '_main_page_widgets', ())
+        reuse = (bool(cached) and all(not sip.isdeleted(widget) for widget in cached)
+                 and getattr(self, '_main_page_key', None) == self._main_page_signature())
+        preserved = ((active_settings,) if active_settings is not None else ()) + (cached if reuse else ())
+        self.clear_layout(preserve_widgets=preserved)
+        if cached and not reuse:
+            for widget in cached:
+                if not sip.isdeleted(widget):
+                    widget.hide()
+                    widget.deleteLater()
+            self._main_page_widgets = ()
         self.main_layout.setContentsMargins(14, 48, 14, 14)
         self.main_layout.setSpacing(8)
         self.settings_window = None
         self.set_settings_button_to_settings()
+        if reuse:
+            for widget in cached:
+                self.main_layout.addWidget(widget)
+                widget.show()
+            self._ui_scale_controller.refresh()
+            self._complete_guide_step("back_home")
+            return
 
         # Read both passive engine names once.  They belong in the quiet status
         # column used by the original compact main page, not in another card.
@@ -10932,6 +10975,8 @@ class DarkThemeApp(QMainWindow):
         self._apply_main_hotkey_theme()
         self._ui_scale_controller.refresh()
         self._complete_guide_step("back_home")
+        self._main_page_widgets = (self.main_text_section, self.main_shortcut_section, self.main_footer)
+        self._main_page_key = self._main_page_signature()
 
     def _fit_hotkey_mode_combo(self):
         """Measure full mode names before dividing the remaining language space."""
@@ -10955,9 +11000,11 @@ class DarkThemeApp(QMainWindow):
         self.show_assistant_settings()
         self.settings_window.settings_assistant_page.mascot_preview.next_button.setFocus(Qt.OtherFocusReason)
 
+    @_atomic_page_change
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)
-        self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
+        preserved = ((active_settings,) if active_settings is not None else ()) + getattr(self, '_main_page_widgets', ())
+        self.clear_layout(preserve_widgets=preserved)
         # Derive the attachment edge from the actual title bar. The settings
         # layout owns the shelf and the pages beneath it; nothing overlays them.
         self.main_layout.setContentsMargins(14, self.title_bar.geometry().bottom() + 1, 14, 14)
