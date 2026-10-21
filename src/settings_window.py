@@ -1,5 +1,6 @@
 from button_styles import button_qss, button_palette, standard_buttons
 from number_controls import StepperFrame
+from control_hints import control_hint
 from package_table import PackageTable
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
 from PyQt5 import sip
@@ -1800,7 +1801,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
-        "translation_result_font_label": "Font size:",
+        "translation_result_font_label": "Result text:",
+        "translation_result_font_sample": "Sample text",
         "translation_result_font_tooltip": "Only changes source and translated text in the separate result window. Use Scale to resize the whole interface.",
         "translation_result_font_xsmall": "Extra small",
         "translation_result_font_small": "Small",
@@ -1935,7 +1937,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
-        "translation_result_font_label": "Размер шрифта:",
+        "translation_result_font_label": "Текст результата:",
+        "translation_result_font_sample": "Пример текста",
         "translation_result_font_tooltip": "Только размер оригинала и перевода в отдельном окне результата. Общий размер интерфейса меняется пунктом «Масштаб».",
         "translation_result_font_xsmall": "Очень мелкий",
         "translation_result_font_small": "Мелкий",
@@ -2068,7 +2071,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
-        "translation_result_font_label": "Tamaño de fuente:",
+        "translation_result_font_label": "Texto del resultado:",
+        "translation_result_font_sample": "Ejemplo",
         "translation_result_font_tooltip": "Solo cambia el texto original y traducido en la ventana de resultado. Usa Escala para cambiar el tamaño de toda la interfaz.",
         "translation_result_font_xsmall": "Muy pequeña",
         "translation_result_font_small": "Pequeña",
@@ -2201,7 +2205,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
-        "translation_result_font_label": "Schriftgröße:",
+        "translation_result_font_label": "Ergebnistext:",
+        "translation_result_font_sample": "Beispieltext",
         "translation_result_font_tooltip": "Ändert nur Original und Übersetzung im separaten Ergebnisfenster. Die gesamte Oberfläche wird über Skalierung vergrößert oder verkleinert.",
         "translation_result_font_xsmall": "Sehr klein",
         "translation_result_font_small": "Klein",
@@ -2334,7 +2339,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
-        "translation_result_font_label": "Taille de police :",
+        "translation_result_font_label": "Texte du résultat :",
+        "translation_result_font_sample": "Exemple",
         "translation_result_font_tooltip": "Modifie uniquement le texte source et traduit dans la fenêtre de résultat. Utilisez Échelle pour redimensionner toute l’interface.",
         "translation_result_font_xsmall": "Très petite",
         "translation_result_font_small": "Petite",
@@ -2467,7 +2473,8 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
-        "translation_result_font_label": "字体大小：",
+        "translation_result_font_label": "结果文字：",
+        "translation_result_font_sample": "示例文字",
         "translation_result_font_tooltip": "仅更改独立结果窗口中原文和译文的字号。整个界面的大小请通过“缩放”调整。",
         "translation_result_font_xsmall": "极小",
         "translation_result_font_small": "小",
@@ -6929,9 +6936,17 @@ class SettingsWindow(QWidget):
         key = normalize_translation_result_font_size(combo.currentData())
         if key not in TRANSLATION_RESULT_FONT_SIZE_KEYS:
             return
+        self._refresh_translation_font_preview()
         if self.parent.config.get("translation_result_font_size") == key:
             return
         self.auto_save_setting("translation_result_font_size", key)
+
+    def _refresh_translation_font_preview(self):
+        from main import translation_result_font_px
+        pixels = translation_result_font_px({'translation_result_font_size': self.translation_font_combo.currentData()})
+        self.translation_font_preview.setStyleSheet(
+            f"font-size:{pixels}px; font-weight:400; margin:0; padding:0;"
+        )
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7727,8 +7742,8 @@ class SettingsWindow(QWidget):
         self.ui_scale_value.cancel_requested.connect(self._refresh_ui_scale)
         self.ui_scale_value.step_requested.connect(lambda step: self._step_ui_scale(step, self.ui_scale_value))
         self.ui_scale_label.setBuddy(self.ui_scale_value)
-        form_grid.addWidget(self.ui_scale_label, 4, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.ui_scale_control, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_label, 6, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_control, 6, 2, Qt.AlignVCenter)
         scale_tooltip = tooltip_text(settings_text(lang, 'ui_scale_hint'))
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
@@ -7742,11 +7757,13 @@ class SettingsWindow(QWidget):
         self.translation_font_combo.setObjectName("translationResultFontSize")
         from main import (
             TRANSLATION_RESULT_FONT_SIZE_KEYS,
+            TRANSLATION_RESULT_FONT_SIZE_PX,
             normalize_translation_result_font_size,
         )
         for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
             self.translation_font_combo.addItem(
-                settings_text(lang, f"translation_result_font_{size_key}"),
+                f'{TRANSLATION_RESULT_FONT_SIZE_PX[size_key]} px · '
+                + settings_text(lang, f"translation_result_font_{size_key}"),
                 size_key,
             )
         saved_font = normalize_translation_result_font_size(
@@ -7762,11 +7779,21 @@ class SettingsWindow(QWidget):
         self.translation_font_combo.setToolTip(font_tooltip)
         self.translation_font_combo.setAccessibleDescription(settings_text(lang, "translation_result_font_tooltip"))
         self.translation_font_label.setToolTip(font_tooltip)
+        self.translation_font_label.setBuddy(self.translation_font_combo)
+        self.translation_font_preview = QLabel(settings_text(lang, "translation_result_font_sample"))
+        self.translation_font_preview.setObjectName("translationResultFontPreview")
+        # Use the spare right-column rows without increasing the fixed form's
+        # height. A 24px font needs more than a 28px input row for descenders.
+        self.translation_font_preview.setFixedSize(engine_combo_width, 36)
+        self.translation_font_preview.setAlignment(Qt.AlignCenter)
+        self.translation_font_preview.setToolTip(font_tooltip)
+        self._refresh_translation_font_preview()
         self.translation_font_combo.currentIndexChanged.connect(
             self._set_translation_result_font_size
         )
         form_grid.addWidget(self.translation_font_label, 3, 1, Qt.AlignVCenter)
         form_grid.addWidget(self.translation_font_combo, 3, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_preview, 4, 2, 2, 1, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text
@@ -8362,9 +8389,35 @@ class SettingsWindow(QWidget):
         # Apply shared styling only after every page has been recreated.
         # Earlier calls could reach deleted controls from the previous visit.
         self._apply_action_panel_style()
+        self._set_control_hints()
         self._position_settings_updates_page()
         self._set_settings_page(page_to_restore)
         QtCore.QTimer.singleShot(0, self._position_settings_updates_page)
+
+    def _set_control_hints(self):
+        from guide_setup import GUIDE_SETTING_STEPS, setting_body
+        lang = self.parent.current_interface_language
+        for action, (attribute, _page, _default) in GUIDE_SETTING_STEPS.items():
+            control = getattr(self, attribute, None)
+            if control is not None and (not control.toolTip()
+                    or control.toolTip() == control.property('automaticHoverHint')):
+                control.setToolTip(tooltip_text(setting_body(lang, action)))
+        for name, key in (
+            ('button_tooltips_checkbox', 'hover_tips'), ('clear_cache_btn', 'clear_cache'),
+            ('reset_btn', 'reset'), ('update_btn', 'update'),
+            ('copy_history_btn', 'copy_history'), ('translation_history_btn', 'translation_history'),
+            ('hotkeys_button', 'hotkeys'), ('keep_visible_checkbox', 'keep_visible'),
+            ('game_scan_interval_slider', 'scan_interval'),
+            ('game_scan_interval_label', 'scan_interval'),
+            ('game_overlay_opacity_slider', 'overlay_background'),
+            ('game_overlay_opacity_label', 'overlay_background'),
+            ('game_manual_output_checkbox', 'no_overlay_on_text'),
+            ('game_source_combo', 'source_language'), ('game_target_combo', 'target_language'),
+        ):
+            control = getattr(self, name)
+            control.setToolTip(tooltip_text(control_hint(lang, key)))
+            control.setAccessibleDescription(control_hint(lang, key))
+        self.game_help_button.setToolTip(tooltip_text(settings_text(lang, 'game_workflow_note')))
 
     def _launch_dynamic_translation(self):
         launch = getattr(self.parent, "launch_game_translate", None)
@@ -8923,6 +8976,13 @@ class SettingsWindow(QWidget):
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             label.setFixedHeight(27)
+            label.setBuddy(key_input)
+            help_text = f'{label_text.rstrip(":")}\n{self._hotkey_edit_hint()}'
+            label.setToolTip(tooltip_text(help_text))
+            if not key_input.toolTip():
+                key_input.setToolTip(tooltip_text(help_text))
+            key_input.setAccessibleName(label_text.rstrip(':'))
+            key_input.setAccessibleDescription(self._hotkey_edit_hint())
             key_input.setObjectName("secondaryHotkeyInput")
             key_input.setFixedHeight(27)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -8960,6 +9020,10 @@ class SettingsWindow(QWidget):
         shell_layout.addLayout(footer)
 
         self._refresh_secondary_view_theme()
+        for radio in (self.selection_quick_translate_mode_button,
+                      self.selection_quick_translate_mode_automatic):
+            radio.setToolTip(tooltip_text(
+                f'{radio.text()}\n{settings_text(lang, "selection_quick_translate_tooltip")}'))
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")

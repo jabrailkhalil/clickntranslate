@@ -4,6 +4,7 @@ from PyQt5 import QtCore, QtWidgets, sip
 from assistant_text import assistant_text
 from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASCOT, mascot_id
 from header_icons import header_icon
+from control_hints import control_hint
 from pathlib import Path
 
 
@@ -75,6 +76,9 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.main_visible.setAccessibleName(tr('main_visible'))
         self.toggle = QtWidgets.QCheckBox(tr('enabled'))
         self.topmost = QtWidgets.QCheckBox(tr('topmost'))
+        for control, key in ((self.main_visible, 'desktop_main'), (self.toggle, 'desktop_enabled'),
+                             (self.topmost, 'desktop_topmost')):
+            control.setToolTip(control_hint(self.language, key))
         self.reactions = QtWidgets.QCheckBox(tr('reactions'))
         self.reactions.setToolTip(tr('reactions_hint'))
         self.reactions.toggled.connect(lambda checked: self.save('reactions', checked))
@@ -106,6 +110,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             label.setStyleSheet('margin:0; padding:0;')
             label.setBuddy(field)
+            label.setToolTip(field.toolTip())
             field.setAccessibleName(tr(name))
             if name in ('size', 'opacity'):
                 for button, direction in ((field.decrease, 'decrease'), (field.increase, 'increase')):
@@ -152,6 +157,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.action_buttons = {}
         home = QtWidgets.QPushButton(tr('home'))
         home.setFixedHeight(30)
+        home.setToolTip(control_hint(self.language, 'desktop_home'))
         home.clicked.connect(lambda: self.perform('home'))
         self.action_buttons['home'] = home
         footer.addWidget(home)

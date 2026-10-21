@@ -244,7 +244,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         (settings.start_minimized_checkbox, settings.translator_engine_label, settings.translator_combo),
                         (settings.copy_translated_checkbox, settings.result_window_label, settings.result_window_control),
                         (settings.copy_history_checkbox, settings.translation_font_label, settings.translation_font_combo),
-                        (settings.history_checkbox, settings.ui_scale_label, settings.ui_scale_control),
+                        (settings.replace_select_all_checkbox, settings.ui_scale_label, settings.ui_scale_control),
                     )
                     for checkbox, label, combo in rows:
                         self.assertLessEqual(checkbox.sizeHint().width(), checkbox.width(), checkbox.text())

@@ -9,7 +9,8 @@ from PyQt5.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize,
 from PyQt5.QtGui import QColor, QCursor, QFont, QIcon, QPainter, QPalette, QRegularExpressionValidator
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsScene, QGraphicsView, QLineEdit, QMainWindow, QPushButton,
-    QStyle, QStyleOptionButton, QStyleOptionToolButton, QStylePainter, QToolButton, QWidget,
+    QGraphicsProxyWidget, QStyle, QStyleOptionButton, QStyleOptionToolButton,
+    QStylePainter, QToolButton, QToolTip, QWidget,
 )
 
 
@@ -221,6 +222,22 @@ def widget_popup_geometry(widget, desired, gap=2):
     return combo_popup_geometry(anchor, desired, bounds, gap, margin=4)
 
 
+def prepare_native_popup(popup, position):
+    """Bind native popup placement to the monitor containing its anchor.
+
+    QMenu.exec_ can clamp correct desktop coordinates to the primary screen
+    when its QWindow has not been created yet. Creating that handle and
+    selecting its screen before exec_/popup avoids the wrong-screen clamp.
+    Scene-rendered combo lists retain their existing proxy placement.
+    """
+    if popup.graphicsProxyWidget() is not None:
+        return
+    screen = QApplication.screenAt(position)
+    if screen is not None:
+        popup.winId()
+        popup.windowHandle().setScreen(screen)
+
+
 def window_position_context(window, owner=None):
     """Resolve an embedded owner to its visible native window and monitor."""
     owner = native_window_parent(owner if owner is not None else window.parentWidget())
@@ -353,7 +370,86 @@ class _ScaleView(QGraphicsView):
     mouse_global_position = None
     mouse_event_type = None
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._hover_target = None
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.setInterval(600)
+        self._hover_timer.timeout.connect(self._show_control_hint)
+        self.setMouseTracking(True)
+
+    def _hint_target_at(self, position):
+        scene_point = self.mapToScene(position)
+        item = self.scene().itemAt(scene_point, self.transform()) if self.scene() is not None else None
+        if not isinstance(item, QGraphicsProxyWidget) or item.widget() is None:
+            return None
+        root = item.widget()
+        widget = root.childAt(item.mapFromScene(scene_point).toPoint()) or root
+        while widget is not None:
+            if widget.toolTip():
+                return widget
+            if widget is root:
+                break
+            widget = widget.parentWidget()
+        return None
+
+    def _cancel_control_hint(self):
+        self._hover_timer.stop()
+        if self._hover_target is not None:
+            QToolTip.hideText()
+        self._hover_target = None
+
+    def _track_control_hint(self, event):
+        if event.buttons() or QApplication.instance().property('buttonTooltipsEnabled') is False:
+            self._cancel_control_hint()
+            return
+        target = self._hint_target_at(event.pos())
+        previous = self._hover_target() if self._hover_target is not None else None
+        changed = target is not previous
+        if changed:
+            self._cancel_control_hint()
+            self._hover_target = weakref.ref(target) if target is not None else None
+        if target is not None and (changed or not QToolTip.isVisible()):
+            self._hover_timer.start()
+
+    def _show_control_hint(self):
+        from PyQt5 import sip
+        target = self._hover_target() if self._hover_target is not None else None
+        if (target is None or sip.isdeleted(target) or not self.isVisible()
+                or not self.window().isActiveWindow() or QApplication.activePopupWidget() is not None
+                or QApplication.mouseButtons()
+                or QApplication.instance().property('buttonTooltipsEnabled') is False):
+            return
+        position = QCursor.pos()
+        local = self.viewport().mapFromGlobal(position)
+        if self.viewport().rect().contains(local) and self._hint_target_at(local) is target:
+            # QApplication's native hover timer tracks the viewport as one
+            # widget. Bridge successive proxy controls so each receives help.
+            rect = widget_global_rect(target)
+            area = QRect(self.viewport().mapFromGlobal(rect.topLeft()), rect.size())
+            from styled_dialogs import _ensure_control_tooltip
+            _ensure_control_tooltip(target)
+            QToolTip.showText(position, target.toolTip(), self.viewport(), area)
+
+    def hideEvent(self, event):
+        self._cancel_control_hint()
+        super().hideEvent(event)
+
     def viewportEvent(self, event):
+        if event.type() == QEvent.ToolTip:
+            target = self._hint_target_at(event.pos())
+            if target is not None:
+                # Do not let the native wake-up event replace this tooltip's
+                # viewport owner with a proxy child's stale global rectangle.
+                self._hover_target = weakref.ref(target)
+                self._show_control_hint()
+                event.accept()
+                return True
+        if event.type() in (QEvent.Leave, QEvent.Hide, QEvent.MouseButtonPress):
+            self._cancel_control_hint()
+        elif event.type() == QEvent.MouseMove:
+            self._track_control_hint(event)
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.MouseButtonRelease):
             # Preserve desktop coordinates through proxy rounding and focus changes.
             self.mouse_global_position = event.globalPos()

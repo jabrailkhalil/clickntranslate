@@ -115,6 +115,49 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 
+def _ensure_control_tooltip(widget):
+    """Fill missing control hints without overwriting dedicated explanations.
+
+    Resolve generated tips again after label/locale changes. Editors inside
+    composite controls inherit their parent's explanation.
+    """
+    generated = widget.property('automaticHoverHint')
+    if widget.toolTip() and widget.toolTip() != generated:
+        return
+    if not isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QComboBox,
+                              QtWidgets.QLineEdit, QtWidgets.QAbstractSpinBox,
+                              QtWidgets.QAbstractSlider, QtWidgets.QKeySequenceEdit,
+                              QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
+        return
+    text = widget.accessibleDescription() or widget.accessibleName()
+    if not text and isinstance(widget, QtWidgets.QLineEdit):
+        parent = widget.parentWidget()
+        while parent is not None:
+            if parent.toolTip():
+                text = parent.toolTip()
+                break
+            parent = parent.parentWidget()
+    if not text and isinstance(widget, QtWidgets.QAbstractButton):
+        text = widget.text().replace('&&', '\0').replace('&', '').replace('\0', '&')
+    if not text:
+        root = widget.parentWidget()
+        if root is not None:
+            label = next((label for label in root.findChildren(
+                          QtWidgets.QLabel, options=QtCore.Qt.FindDirectChildrenOnly)
+                          if label.buddy() is widget), None)
+            text = label.text().rstrip(':： ') if label is not None else ''
+    if not text and isinstance(widget, QtWidgets.QComboBox):
+        text = widget.currentData(QtCore.Qt.ToolTipRole) or widget.currentText()
+    if not text and hasattr(widget, 'placeholderText'):
+        text = widget.placeholderText()
+    value = str(text or '')
+    if not value.startswith('<qt>'):
+        value = tooltip_text(value)
+    if widget.toolTip() != value:
+        widget.setToolTip(value)
+    widget.setProperty('automaticHoverHint', value)
+
+
 class _RoundedTooltipFilter(QtCore.QObject):
     """Paint compact hover tips and keep popup corners transparent.
 
@@ -129,11 +172,13 @@ class _RoundedTooltipFilter(QtCore.QObject):
         if event_type not in (
             QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
             QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange, QtCore.QEvent.Move,
-            QtCore.QEvent.Paint,
+            QtCore.QEvent.Paint, QtCore.QEvent.ToolTip,
         ):
             return False
         if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
             return False
+        if event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.ToolTip):
+            _ensure_control_tooltip(watched)
         is_tooltip = _is_tooltip(watched)
         if event_type == QtCore.QEvent.Paint:
             if is_tooltip:

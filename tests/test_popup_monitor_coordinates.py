@@ -37,9 +37,11 @@ def test_flag_menu_stays_with_its_anchor_on_the_selected_monitor(window, app, bo
     app.processEvents()
     screen = SimpleNamespace(availableGeometry=lambda: bounds)
     with (mock.patch.object(QtWidgets.QApplication, 'screenAt', return_value=screen),
+          mock.patch.object(main, 'prepare_native_popup') as prepare,
           mock.patch.object(main.QMenu, 'exec_', return_value=None) as popup):
         window.show_interface_language_menu()
     point = popup.call_args.args[0]
+    assert prepare.call_args.args[1] == point
     assert bounds.contains(point)
     flag = widget_global_rect(window.flag_button)
     assert abs(point.x()-flag.left()) <= 4
@@ -68,28 +70,52 @@ def test_native_widgets_keep_their_ordinary_global_mapping(app):
         owner.deleteLater()
 
 
-def test_native_language_menu_follows_window_on_each_connected_screen(window, app):
+@pytest.mark.parametrize('scale', [80, 100, 150])
+@pytest.mark.parametrize('route', ['flag', 'background', 'text'])
+def test_real_native_menu_follows_window_on_each_connected_screen(window, app, scale, route):
     from PyQt5.QtTest import QTest
+    from PyQt5.QtGui import QCursor
     if app.platformName() == 'offscreen':
         pytest.skip('Physical monitor placement uses the native Qt backend')
     screens = app.screens()
     visited = []
-    class Menu(QtWidgets.QMenu):
-        def exec_(self, point):
-            self.popup(point)
-            QTest.qWait(40)
-            screen = QtWidgets.QApplication.screenAt(point)
-            assert screen is not None
-            assert screen.availableGeometry().contains(self.frameGeometry())
-            visited.append(screen.name())
-            self.close()
-    for screen in screens:
-        bounds = screen.availableGeometry()
-        window._ui_scale_controller.available_geometry.return_value = bounds
-        window.set_ui_scale_percent(100)
-        window.move(bounds.topLeft()+QtCore.QPoint(150, 100))
-        QTest.qWait(60)
-        with mock.patch.object(main, 'QMenu', Menu):
-            window.show_interface_language_menu()
-        assert visited[-1] == screen.name()
-    assert len(visited) == len(screens)
+    native_exec = QtWidgets.QMenu.exec_
+    old_cursor = QCursor.pos()
+
+    def exec_menu(menu, point):
+        # Exercise the real nested exec_ loop. Replacing exec_ with popup()
+        # hid Qt's initial-screen clamp and allowed this bug to pass before.
+        def inspect():
+            visited.append((menu.frameGeometry(), menu.screen().name(), QtCore.QPoint(point)))
+            menu.close()
+        QtCore.QTimer.singleShot(80, inspect)
+        return native_exec(menu, point)
+
+    try:
+        for screen in screens + list(reversed(screens)):
+            bounds = screen.availableGeometry()
+            window._ui_scale_controller.available_geometry.return_value = bounds
+            window.move(bounds.topLeft()+QtCore.QPoint(150, 100))
+            window.set_ui_scale_percent(scale)
+            QTest.qWait(60)
+            with mock.patch.object(QtWidgets.QMenu, 'exec_', exec_menu):
+                if route == 'flag':
+                    controller = window._ui_scale_controller
+                    QCursor.setPos(widget_global_rect(window.flag_button).center())
+                    QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton,
+                                     pos=controller.map_widget_to_view(window.flag_button))
+                    anchor = widget_global_rect(window.flag_button).bottomLeft()
+                elif route == 'text':
+                    anchor = widget_global_point(window.text_input, QtCore.QPoint(20, 20))
+                    window._show_text_input_context_menu(QtCore.QPoint(20, 20))
+                else:
+                    anchor = widget_global_point(window.ui_root, QtCore.QPoint(20, 50))
+                    window.show_main_context_menu(anchor)
+            geometry, actual_screen, requested = visited[-1]
+            assert actual_screen == screen.name()
+            assert bounds.contains(geometry)
+            assert abs(geometry.left() - anchor.x()) <= 4
+            assert abs(geometry.top() - requested.y()) <= 4
+        assert len(visited) == 2 * len(screens)
+    finally:
+        QCursor.setPos(old_cursor)

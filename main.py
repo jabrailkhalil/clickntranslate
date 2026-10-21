@@ -95,8 +95,10 @@ try:
 except Exception:
     _show_dependency_error()
 from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
-                        configure_qt_platform, widget_global_point, widget_popup_geometry)
+                        configure_qt_platform, widget_global_point, widget_popup_geometry,
+                        prepare_native_popup)
 from header_icons import header_icon
+from control_hints import control_hint
 configure_qt_platform()
 
 from guide_setup import (
@@ -5510,7 +5512,9 @@ class WelcomeDialog(QDialog):
             y = widget_global_point(self.flag_button).y()-size.height()-6
         y = max(bounds.top(), min(y, bounds.bottom()-size.height()+1))
         menu.aboutToHide.connect(menu.deleteLater)
-        menu.popup(QtCore.QPoint(x, y))
+        position = QtCore.QPoint(x, y)
+        prepare_native_popup(menu, position)
+        menu.popup(position)
 
     def set_language(self, language_code):
         self.lang = normalize_interface_language(language_code)
@@ -10215,7 +10219,10 @@ class DarkThemeApp(QMainWindow):
             action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
         menu.ensurePolished()
-        menu.exec_(widget_popup_geometry(self.flag_button, menu.sizeHint()).topLeft())
+        position = widget_popup_geometry(self.flag_button, menu.sizeHint()).topLeft()
+        prepare_native_popup(menu, position)
+        menu.exec_(position)
+        menu.deleteLater()
         self._complete_guide_step("language")
 
     def set_interface_language(self, language_code):
@@ -10775,6 +10782,12 @@ class DarkThemeApp(QMainWindow):
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
         self.target_lang = DropDownCombo()
         self.target_lang.setMaxVisibleItems(9)
+        for combo, key in ((self.source_lang, 'source_language'),
+                           (self.target_lang, 'target_language'),
+                           (self.hotkey_source_combo, 'source_language'),
+                           (self.hotkey_target_combo, 'target_language')):
+            combo.setToolTip(tooltip_text(control_hint(self.current_interface_language, key)))
+            combo.setAccessibleName(control_hint(self.current_interface_language, key))
         self._apply_main_combo_theme(self.current_theme == "Темная")
         # Side by side with an arrow between them, so it reads as one direction
         # rather than two unrelated drop-downs — and it costs one row instead of
@@ -11180,6 +11193,7 @@ class DarkThemeApp(QMainWindow):
         # Secondary: it sends the window away, which is not what someone opening
         # this window came to do. It used to be the only filled button here.
         self.start_button.setObjectName("mainShadowButton")
+        self.start_button.setToolTip(tooltip_text(control_hint(self.current_interface_language, 'shadow_mode')))
         footer_layout.addWidget(self.start_button, 0, 1)
         ocr_summary.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         footer_layout.addWidget(ocr_summary, 0, 2)
@@ -11539,14 +11553,24 @@ class DarkThemeApp(QMainWindow):
         menu = QMenu(self)
         self._apply_main_context_menu_style(menu)
         self._add_document_context_actions(menu)
+        prepare_native_popup(menu, global_pos)
         menu.exec_(global_pos)
+        menu.deleteLater()
 
     def _show_text_input_context_menu(self, pos):
-        menu = self.text_input.createStandardContextMenu()
+        standard_menu = self.text_input.createStandardContextMenu()
+        # Borrow the editor's standard actions in a native menu. Reparenting
+        # its original menu leaves Qt's automatic child proxy attached.
+        menu = QMenu(self)
+        menu.addActions(standard_menu.actions())
         menu.addSeparator()
         self._add_document_context_actions(menu)
         self._apply_main_context_menu_style(menu)
-        menu.exec_(widget_global_point(self.text_input, pos))
+        position = widget_global_point(self.text_input, pos)
+        prepare_native_popup(menu, position)
+        menu.exec_(position)
+        menu.deleteLater()
+        standard_menu.deleteLater()
 
     def _choose_document_from_main(self, initial_dir=""):
         path, _ = QFileDialog.getOpenFileName(
