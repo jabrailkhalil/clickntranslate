@@ -58,6 +58,7 @@ SAFE_CONFIG_KEYS = (
     "replace_selection_source_language",
     "replace_selection_target_language",
     "result_window_hidden_modes",
+    "close_result_window_on_outside_click",
     "copy_hotkey",
     "translate_hotkey",
     "fullscreen_translate_hotkey",

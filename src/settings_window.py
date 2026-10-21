@@ -1801,6 +1801,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Show a translate button near selected text in other apps, or translate immediately. Uses the selection language pair configured for hotkeys. Requires Accessibility on macOS; on Linux uses PRIMARY selection (limited on some Wayland setups). Paused during OCR and dynamic translation.",
         "selection_quick_translate_mode_button": "Show a button after selecting",
         "selection_quick_translate_mode_automatic": "Translate immediately after selecting",
+        "close_result_window_on_outside_click": "Close translation window on outside click",
+        "close_result_window_on_outside_click_tooltip": "Closes the translation window when you click another app or anywhere outside it, so you do not need the close button.",
         "copy_hotkey_label": "Copy Selected Hotkey:",
         "translate_hotkey_label": "Translate Hotkey:",
         "remove_local_tesseract": "Remove local Tesseract",
@@ -1923,6 +1925,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
         "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
         "selection_quick_translate_mode_automatic": "Переводить сразу после выделения",
+        "close_result_window_on_outside_click": "Закрывать окно перевода кликом снаружи",
+        "close_result_window_on_outside_click_tooltip": "Окно перевода закроется, если кликнуть другое приложение или мимо него — нажимать крестик не нужно.",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
         "remove_local_tesseract": "Удалить локальный Tesseract",
@@ -2043,6 +2047,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Muestra un botón cerca del texto seleccionado en otras apps o traduce al instante. Usa el par de idiomas de la traducción por selección. En macOS requiere Accesibilidad; en Linux usa PRIMARY (limitado en Wayland). Se pausa durante OCR y traducción dinámica.",
         "selection_quick_translate_mode_button": "Mostrar un botón tras seleccionar",
         "selection_quick_translate_mode_automatic": "Traducir inmediatamente tras seleccionar",
+        "close_result_window_on_outside_click": "Cerrar la ventana de traducción al hacer clic fuera",
+        "close_result_window_on_outside_click_tooltip": "Cierra la ventana de traducción al hacer clic en otra app o fuera de ella, sin usar el botón de cierre.",
         "copy_hotkey_label": "Atajo para copiar seleccion:",
         "translate_hotkey_label": "Atajo de traduccion:",
         "remove_local_tesseract": "Eliminar Tesseract local",
@@ -2163,6 +2169,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Zeigt eine Übersetzen-Schaltfläche nahe der Auswahl in anderen Apps oder übersetzt sofort. Verwendet das Sprachpaar für Auswahlübersetzung. Unter macOS ist Bedienungshilfe nötig; unter Linux PRIMARY (eingeschränkt unter Wayland). Pausiert während OCR und dynamischer Übersetzung.",
         "selection_quick_translate_mode_button": "Schaltfläche nach der Auswahl anzeigen",
         "selection_quick_translate_mode_automatic": "Sofort nach der Auswahl übersetzen",
+        "close_result_window_on_outside_click": "Übersetzungsfenster bei Klick außerhalb schließen",
+        "close_result_window_on_outside_click_tooltip": "Schließt das Übersetzungsfenster, wenn Sie eine andere App oder außerhalb klicken. Der Schließen-Knopf ist dann nicht nötig.",
         "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
         "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
@@ -2283,6 +2291,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Affiche un bouton près du texte sélectionné dans d'autres apps ou traduit immédiatement. Utilise la paire de langues de la traduction par sélection. macOS requiert l'accessibilité ; Linux utilise PRIMARY (limité sous Wayland). En pause pendant l'OCR et la traduction dynamique.",
         "selection_quick_translate_mode_button": "Afficher un bouton après la sélection",
         "selection_quick_translate_mode_automatic": "Traduire immédiatement après la sélection",
+        "close_result_window_on_outside_click": "Fermer la fenêtre de traduction en cliquant à l’extérieur",
+        "close_result_window_on_outside_click_tooltip": "Ferme la fenêtre de traduction si vous cliquez une autre app ou à l’extérieur, sans le bouton de fermeture.",
         "copy_hotkey_label": "Raccourci de copie :",
         "translate_hotkey_label": "Raccourci de traduction :",
         "remove_local_tesseract": "Supprimer Tesseract local",
@@ -2403,6 +2413,8 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "在其他应用中选中文本后显示翻译按钮，或立即翻译。使用选中文本翻译的语言对。macOS 需要辅助功能；Linux 使用 PRIMARY 选区（部分 Wayland 环境受限）。OCR 和动态翻译期间暂停。",
         "selection_quick_translate_mode_button": "选中后显示按钮",
         "selection_quick_translate_mode_automatic": "选中后立即翻译",
+        "close_result_window_on_outside_click": "点击窗口外时关闭翻译窗口",
+        "close_result_window_on_outside_click_tooltip": "点击其他应用或翻译窗口外时自动关闭，无需点关闭按钮。",
         "copy_hotkey_label": "复制选区快捷键：",
         "translate_hotkey_label": "翻译快捷键：",
         "remove_local_tesseract": "删除本地 Tesseract",
@@ -8676,6 +8688,22 @@ class SettingsWindow(QWidget):
         self.selection_quick_translate_mode_automatic.toggled.connect(
             lambda checked: self._set_selection_quick_translate_mode("automatic") if checked else None
         )
+        self.close_result_on_outside_click_checkbox = QCheckBox(
+            settings_text(lang, "close_result_window_on_outside_click")
+        )
+        self.close_result_on_outside_click_checkbox.setObjectName("settingsPageCheckbox")
+        self.close_result_on_outside_click_checkbox.setToolTip(
+            settings_text(lang, "close_result_window_on_outside_click_tooltip")
+        )
+        self.close_result_on_outside_click_checkbox.setChecked(
+            self.parent.config.get("close_result_window_on_outside_click") is True
+        )
+        self.close_result_on_outside_click_checkbox.toggled.connect(
+            lambda checked: self.auto_save_setting(
+                "close_result_window_on_outside_click", bool(checked)
+            )
+        )
+        quick_layout.addWidget(self.close_result_on_outside_click_checkbox)
         shell_layout.addWidget(quick_card)
 
         hotkey_card = QFrame()

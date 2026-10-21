@@ -732,6 +732,51 @@ class TranslationResultUiTest(unittest.TestCase):
         second.close()
         self.app.processEvents()
 
+    def _outside_close_dialog(self, enabled):
+        parent = _PairMemoryParent()
+        parent.config["close_result_window_on_outside_click"] = enabled
+        dialog = main.TranslationResultDialog(
+            parent,
+            "A translated sentence.",
+            auto_copy=False,
+            lang="en",
+            theme="Темная",
+            result_mode="selection",
+        )
+        dialog._test_parent = parent
+        dialog.show()
+        self.app.processEvents()
+        dialog._outside_close_ready_at = 0
+        dialog._outside_close_timer.setInterval(0)
+        return dialog
+
+    def _deactivate_result_dialog(self, dialog):
+        self.app.sendEvent(dialog, main.QtCore.QEvent(main.QtCore.QEvent.WindowDeactivate))
+        self.app.processEvents()
+        dialog._outside_close_timer.stop()
+        dialog._close_after_outside_click()
+
+    def test_outside_click_does_not_close_the_result_window_by_default(self):
+        dialog = self._outside_close_dialog(False)
+        self._deactivate_result_dialog(dialog)
+        self.assertTrue(dialog.isVisible())
+        self.assertFalse(dialog._closed)
+        dialog.close()
+
+    def test_outside_click_closes_the_result_window_when_enabled(self):
+        dialog = self._outside_close_dialog(True)
+        self._deactivate_result_dialog(dialog)
+        self.assertTrue(dialog._closed)
+        self.assertFalse(dialog.isVisible())
+
+    def test_owned_popup_keeps_the_result_window_open_on_deactivate(self):
+        dialog = self._outside_close_dialog(True)
+        with mock.patch.object(dialog, "_has_owned_popup", return_value=True):
+            self._deactivate_result_dialog(dialog)
+        self.assertTrue(dialog.isVisible())
+        self.assertFalse(dialog._closed)
+        dialog.close()
+
 
 if __name__ == "__main__":
     unittest.main()

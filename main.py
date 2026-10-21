@@ -266,6 +266,7 @@ DEFAULT_CONFIG = {
     "translate_replace_selection_hotkey": DEFAULT_REPLACE_SELECTION_HOTKEY,
     "selection_quick_translate_enabled": False,
     "selection_quick_translate_mode": "button",
+    "close_result_window_on_outside_click": False,
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -4196,6 +4197,32 @@ def _update_translation_editor(editor, text, *, reset=False):
     scroll.setValue((scroll.maximum() if following_end else position) if append else 0)
 
 
+class _ResultWindowOutsideCloseFilter(QtCore.QObject):
+    """Close the result window when the user clicks another app or window."""
+
+    def __init__(self, dialog):
+        super().__init__(dialog)
+        self._dialog = dialog
+
+    def eventFilter(self, watched, event):
+        dialog = self._dialog
+        try:
+            if dialog is None or getattr(dialog, "_closed", True):
+                return False
+        except RuntimeError:
+            return False
+        etype = event.type()
+        if etype == QtCore.QEvent.ApplicationDeactivate:
+            dialog._schedule_outside_close()
+        elif etype == QtCore.QEvent.ApplicationActivate:
+            dialog._pending_outside_close = False
+        elif etype == QtCore.QEvent.MouseButtonPress:
+            widget = watched if isinstance(watched, QWidget) else None
+            if widget is not None and not dialog._widget_belongs_to_result_window(widget):
+                dialog._schedule_outside_close()
+        return False
+
+
 class TranslationResultDialog(QDialog):
     """Editable source and result, with requests bound to an exact input revision."""
 
@@ -4418,6 +4445,17 @@ class TranslationResultDialog(QDialog):
         initial_size = self._view_sizes.get('collapsed_size' if self._source_collapsed else 'expanded_size')
         if initial_size is not None:
             self._resize_result_view(initial_size)
+
+        self._pending_outside_close = False
+        self._outside_close_ready_at = time.monotonic() + 0.25
+        self._outside_close_timer = QTimer(self)
+        self._outside_close_timer.setSingleShot(True)
+        self._outside_close_timer.setInterval(60)
+        self._outside_close_timer.timeout.connect(self._close_after_outside_click)
+        self._outside_close_filter = _ResultWindowOutsideCloseFilter(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self._outside_close_filter)
 
     def set_window_engine(self, engine):
         """Set an initial/followed provider without changing the app or sending text."""
@@ -4863,16 +4901,25 @@ class TranslationResultDialog(QDialog):
         self._set_status(self.text["copied"])
 
     def done(self, result):
+        self._closed = True
+        self._pending_outside_close = False
+        timer = getattr(self, "_outside_close_timer", None)
+        if timer is not None:
+            timer.stop()
+        app = QApplication.instance()
+        filter_obj = getattr(self, "_outside_close_filter", None)
+        if app is not None and filter_obj is not None:
+            app.removeEventFilter(filter_obj)
         try:
             self._save_mode_preferences()
         except (OSError, ValueError, RuntimeError):
             logging.getLogger('clickntranslate.result').exception('Could not save result-window preferences')
-        self._closed = True
         self._invalidate_request()
         super().done(result)
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._outside_close_ready_at = time.monotonic() + 0.25
         if not self._centered_once:
             self._centered_once = True
             self._center_on_parent()
@@ -4880,6 +4927,75 @@ class TranslationResultDialog(QDialog):
         QTimer.singleShot(0, self._reflow_editors)
         QTimer.singleShot(0, self._render_status)
         QTimer.singleShot(0, self._restore_mode_view)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+            return
+        if event.type() == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+
+    def event(self, event):
+        etype = event.type()
+        if etype == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+        elif etype == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+        return super().event(event)
+
+    def _outside_click_close_enabled(self):
+        return self._current_config().get("close_result_window_on_outside_click") is True
+
+    def _widget_belongs_to_result_window(self, widget):
+        current = widget
+        while current is not None:
+            if current is self:
+                return True
+            current = current.parentWidget()
+        try:
+            handle = widget.windowHandle() if widget is not None else None
+            ours = self.windowHandle()
+            if handle is not None and ours is not None and handle.transientParent() is ours:
+                return True
+        except RuntimeError:
+            return False
+        return False
+
+    def _has_owned_popup(self):
+        app = QApplication.instance()
+        if app is None:
+            return False
+        popup = app.activePopupWidget()
+        if popup is not None and popup is not self and self._widget_belongs_to_result_window(popup):
+            return True
+        modal = app.activeModalWidget()
+        if modal is not None and modal is not self and self._widget_belongs_to_result_window(modal):
+            return True
+        for combo in self.findChildren(QComboBox):
+            view = combo.view()
+            try:
+                if view is not None and view.isVisible() and view.window() is not self:
+                    return True
+            except RuntimeError:
+                continue
+        return False
+
+    def _schedule_outside_close(self):
+        if self._closed or not self.isVisible() or not self._outside_click_close_enabled():
+            return
+        if time.monotonic() < self._outside_close_ready_at:
+            return
+        self._pending_outside_close = True
+        self._outside_close_timer.start()
+
+    def _close_after_outside_click(self):
+        if self._closed or not self._pending_outside_close or not self.isVisible():
+            return
+        if not self._outside_click_close_enabled() or self._has_owned_popup():
+            self._pending_outside_close = False
+            return
+        self.accept()
 
     def refresh_theme(self, theme):
         self.theme = theme
