@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import logging
 import sys
-import threading
-import weakref
 
-from PyQt5 import QtCore, QtGui, QtWidgets, sip
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import mode_coordinator
 import platform_support
@@ -15,7 +13,7 @@ from selection_platform import is_foreign_foreground, read_selected_text
 
 logger = logging.getLogger("clickntranslate.selection")
 
-DEBOUNCE_MS = 280
+DEBOUNCE_MS = 420
 HIDE_TIMEOUT_MS = 9000
 MIN_SELECTION_CHARS = 2
 LINUX_POLL_MS = 350
@@ -65,7 +63,9 @@ class SelectionQuickButton(QtWidgets.QToolButton):
         self.raise_()
 
 
-class _LinuxSelectionPoller(QtCore.QObject):
+class _SelectionChangePoller(QtCore.QObject):
+    """Detect new non-empty selection text while another app is in the foreground."""
+
     activity = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
@@ -76,7 +76,7 @@ class _LinuxSelectionPoller(QtCore.QObject):
         self._last = ""
 
     def start(self):
-        self._last = read_selected_text()
+        self._last = ""
         self._timer.start()
 
     def stop(self):
@@ -84,6 +84,9 @@ class _LinuxSelectionPoller(QtCore.QObject):
         self._last = ""
 
     def _poll(self):
+        if not is_foreign_foreground():
+            self._last = ""
+            return
         current = read_selected_text()
         if current != self._last:
             self._last = current
@@ -91,120 +94,31 @@ class _LinuxSelectionPoller(QtCore.QObject):
                 self.activity.emit()
 
 
-class _MacMouseMonitor(QtCore.QObject):
+class _WindowsMouseReleasePoller(QtCore.QObject):
     activity = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._monitor = None
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(120)
+        self._timer.timeout.connect(self._poll)
+        self._left_down = False
 
     def start(self):
-        if self._monitor is not None:
-            return
-        import AppKit
-
-        mask = AppKit.NSEventMaskLeftMouseUp
-        reference = weakref.ref(self)
-
-        def handler(event):
-            helper = reference()
-            if helper is not None and not sip.isdeleted(helper):
-                helper.activity.emit()
-            return event
-
-        self._monitor = AppKit.NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(mask, handler)
+        self._left_down = False
+        self._timer.start()
 
     def stop(self):
-        if self._monitor is None:
-            return
-        import AppKit
+        self._timer.stop()
+        self._left_down = False
 
-        AppKit.NSEvent.removeMonitor_(self._monitor)
-        self._monitor = None
-
-
-class _WindowsMouseMonitor(QtCore.QObject):
-    activity = QtCore.pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._thread = None
-
-    def start(self):
-        if self._thread is not None:
-            return
-        reference = weakref.ref(self)
-        self._thread = _WindowsMouseHookThread(reference)
-        self._thread.activity.connect(self.activity.emit)
-        self._thread.start()
-
-    def stop(self):
-        if self._thread is None:
-            return
-        self._thread.stop()
-        self._thread.join(timeout=1.0)
-        self._thread = None
-
-
-class _WindowsMouseHookThread(QtCore.QThread):
-    activity = QtCore.pyqtSignal()
-
-    def __init__(self, owner_ref):
-        super().__init__()
-        self._owner_ref = owner_ref
-        self._cancelled = threading.Event()
-        self._thread_id = None
-
-    def stop(self):
-        self._cancelled.set()
-        if self._thread_id:
-            import ctypes
-
-            ctypes.windll.user32.PostThreadMessageW(self._thread_id, 0x0012, 0, 0)
-
-    def run(self):
+    def _poll(self):
         import ctypes
-        from ctypes import wintypes
 
-        if sys.platform != "win32":
-            return
-        user = ctypes.WinDLL("user32", use_last_error=True)
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        callback_type = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, ctypes.c_int, ctypes.c_size_t, ctypes.c_ssize_t)
-
-        class MouseHookStruct(ctypes.Structure):
-            _fields_ = [
-                ("pt", wintypes.POINT),
-                ("hwnd", wintypes.HWND),
-                ("wHitTestCode", wintypes.DWORD),
-                ("dwExtraInfo", ctypes.c_size_t),
-            ]
-
-        WM_LBUTTONUP = 0x0202
-
-        @callback_type
-        def callback(code, message, address):
-            if code == 0 and message == WM_LBUTTONUP and not self._cancelled.is_set():
-                owner = self._owner_ref()
-                if owner is not None and not sip.isdeleted(owner):
-                    self.activity.emit()
-            return user.CallNextHookEx(None, code, message, address)
-
-        self._thread_id = kernel.GetCurrentThreadId()
-        hook = user.SetWindowsHookExW(14, callback, kernel.GetModuleHandleW(None), 0)
-        if not hook:
-            logger.warning("Could not install selection mouse hook")
-            return
-        msg = wintypes.MSG()
-        try:
-            while not self._cancelled.is_set():
-                result = user.GetMessageW(ctypes.byref(msg), None, 0, 0)
-                if result <= 0:
-                    break
-                user.TranslateMessage(ctypes.byref(msg))
-                user.DispatchMessageW(ctypes.byref(msg))
-        finally:
-            user.UnhookWindowsHookEx(hook)
+        down = bool(ctypes.windll.user32.GetAsyncKeyState(0x01) & 0x8000)
+        if self._left_down and not down and is_foreign_foreground():
+            self.activity.emit()
+        self._left_down = down
 
 
 class SelectionQuickTranslateController(QtCore.QObject):
@@ -228,7 +142,7 @@ class SelectionQuickTranslateController(QtCore.QObject):
         self._hide_timer.setSingleShot(True)
         self._hide_timer.setInterval(HIDE_TIMEOUT_MS)
         self._hide_timer.timeout.connect(self._button.hide)
-        self._activity_monitor = None
+        self._activity_monitors = []
         self._mode_unsubscribe = mode_coordinator.subscribe(self._on_mode_changed)
         owner.destroyed.connect(self.dispose)
         app = QtWidgets.QApplication.instance()
@@ -264,25 +178,46 @@ class SelectionQuickTranslateController(QtCore.QObject):
                 checker = getattr(self.owner, "ensure_mac_accessibility_for_selection", None)
                 if callable(checker) and not checker():
                     self._enabled = False
+                    self._notify_owner("selection_quick_translate_accessibility")
                     return
         self._start_monitor()
 
+    def _notify_owner(self, message_key):
+        show = getattr(self.owner, "_show_status_signal", None)
+        if show is None:
+            return
+        lang = getattr(self.owner, "current_interface_language", "en")
+        messages = {
+            "selection_quick_translate_accessibility": {
+                "en": "Enable Accessibility for quick selection translate",
+                "ru": "Включите универсальный доступ для быстрого перевода выделения",
+            }
+        }
+        localized = messages.get(message_key, {})
+        body = localized.get(lang) or localized.get("en", "")
+        if body:
+            show.emit(body)
+
     def _start_monitor(self):
+        monitors = []
         if platform_support.IS_LINUX:
-            self._activity_monitor = _LinuxSelectionPoller(self)
+            monitors.append(_SelectionChangePoller(self))
         elif platform_support.IS_MAC:
-            self._activity_monitor = _MacMouseMonitor(self)
+            monitors.append(_SelectionChangePoller(self))
         elif platform_support.IS_WINDOWS:
-            self._activity_monitor = _WindowsMouseMonitor(self)
+            monitors.append(_WindowsMouseReleasePoller(self))
+            monitors.append(_SelectionChangePoller(self))
         else:
             return
-        self._activity_monitor.activity.connect(self._schedule_probe)
-        self._activity_monitor.start()
+        self._activity_monitors = monitors
+        for monitor in monitors:
+            monitor.activity.connect(self._schedule_probe)
+            monitor.start()
 
     def _stop_monitor(self):
-        monitor = self._activity_monitor
-        self._activity_monitor = None
-        if monitor is not None:
+        monitors = list(getattr(self, "_activity_monitors", []) or [])
+        self._activity_monitors = []
+        for monitor in monitors:
             monitor.stop()
             monitor.deleteLater()
 
@@ -321,26 +256,26 @@ class SelectionQuickTranslateController(QtCore.QObject):
     def _complete_probe(self):
         if not self._should_accept_activity():
             return
-        allow_copy = platform_support.IS_WINDOWS and self._mode == "automatic"
+        allow_copy = self._mode == "automatic" and not platform_support.IS_LINUX
         text = read_selected_text(allow_copy_fallback=allow_copy)
-        if len(text.strip()) < MIN_SELECTION_CHARS:
-            self._button.hide()
-            return
         if self._mode == "automatic":
+            if len(text.strip()) < MIN_SELECTION_CHARS:
+                return
             if text == self._last_auto_text:
                 return
             self._last_auto_text = text
             self.translate_requested.emit(text)
             return
-        self._pending_text = text
+        self._pending_text = text.strip()
         self._button.show_near(self._anchor)
         self._hide_timer.start()
 
     def _on_button_clicked(self):
         text = self._pending_text.strip()
         if len(text) < MIN_SELECTION_CHARS:
-            allow_copy = platform_support.IS_WINDOWS
-            text = read_selected_text(allow_copy_fallback=allow_copy).strip()
+            text = read_selected_text(
+                allow_copy_fallback=not platform_support.IS_LINUX
+            ).strip()
         self._button.hide()
         if len(text) >= MIN_SELECTION_CHARS:
             self.translate_requested.emit(text)

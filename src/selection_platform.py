@@ -63,7 +63,7 @@ def read_selected_text(*, allow_copy_fallback=False):
 
 
 def _read_selection_via_copy():
-    """Windows fallback: simulate copy and read clipboard (restores prior contents)."""
+    """Simulate copy and read clipboard (restores prior contents)."""
     try:
         import ctypes
         import time
@@ -72,7 +72,11 @@ def _read_selection_via_copy():
 
         previous = str(pyperclip.paste() or "")
         platform_support.copy_text("")
-        if platform_support.IS_WINDOWS:
+        if platform_support.IS_MAC:
+            from macos_desktop import send_edit_shortcut
+
+            send_edit_shortcut("c")
+        elif platform_support.IS_WINDOWS:
             VK_CONTROL = 0x11
             VK_C = 0x43
             KEYEVENTF_KEYUP = 0x0002
