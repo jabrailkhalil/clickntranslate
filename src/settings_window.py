@@ -1795,6 +1795,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
+        "translation_result_font_label": "Translation font:",
+        "translation_result_font_tooltip": "Size of the source and translation text in the result window.",
+        "translation_result_font_small": "Small",
+        "translation_result_font_medium": "Medium",
+        "translation_result_font_large": "Large",
+        "translation_result_font_xlarge": "Extra large",
         "replace_selection_translate_label": "Translate and replace selection:",
         "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
         "selection_quick_translate_enabled": "Quick translate for selected text",
@@ -1919,6 +1925,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
+        "translation_result_font_label": "Шрифт перевода:",
+        "translation_result_font_tooltip": "Размер текста оригинала и перевода в окне результата.",
+        "translation_result_font_small": "Мелкий",
+        "translation_result_font_medium": "Обычный",
+        "translation_result_font_large": "Крупный",
+        "translation_result_font_xlarge": "Очень крупный",
         "replace_selection_translate_label": "Перевести и заменить выделенное:",
         "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
         "selection_quick_translate_enabled": "Быстрый перевод выделенного текста",
@@ -2041,6 +2053,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
+        "translation_result_font_label": "Fuente de traducción:",
+        "translation_result_font_tooltip": "Tamaño del texto original y traducido en la ventana de resultado.",
+        "translation_result_font_small": "Pequeña",
+        "translation_result_font_medium": "Mediana",
+        "translation_result_font_large": "Grande",
+        "translation_result_font_xlarge": "Muy grande",
         "replace_selection_translate_label": "Traducir y reemplazar selección:",
         "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
         "selection_quick_translate_enabled": "Traducción rápida del texto seleccionado",
@@ -2163,6 +2181,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
+        "translation_result_font_label": "Übersetzungsschrift:",
+        "translation_result_font_tooltip": "Schriftgröße von Original und Übersetzung im Ergebnisfenster.",
+        "translation_result_font_small": "Klein",
+        "translation_result_font_medium": "Mittel",
+        "translation_result_font_large": "Groß",
+        "translation_result_font_xlarge": "Sehr groß",
         "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
         "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
         "selection_quick_translate_enabled": "Schnellübersetzung für markierten Text",
@@ -2285,6 +2309,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
+        "translation_result_font_label": "Police de traduction :",
+        "translation_result_font_tooltip": "Taille du texte source et traduit dans la fenêtre de résultat.",
+        "translation_result_font_small": "Petite",
+        "translation_result_font_medium": "Moyenne",
+        "translation_result_font_large": "Grande",
+        "translation_result_font_xlarge": "Très grande",
         "replace_selection_translate_label": "Traduire et remplacer la sélection :",
         "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
         "selection_quick_translate_enabled": "Traduction rapide du texte sélectionné",
@@ -2407,6 +2437,12 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
+        "translation_result_font_label": "翻译字体：",
+        "translation_result_font_tooltip": "结果窗口中原文和译文的字号。",
+        "translation_result_font_small": "小",
+        "translation_result_font_medium": "中",
+        "translation_result_font_large": "大",
+        "translation_result_font_xlarge": "特大",
         "replace_selection_translate_label": "翻译并替换所选文本：",
         "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
         "selection_quick_translate_enabled": "快速翻译选中文本",
@@ -6783,6 +6819,10 @@ class SettingsWindow(QWidget):
             sync = getattr(self.parent, "_sync_selection_quick_translate", None)
             if callable(sync):
                 sync()
+        if key == "translation_result_font_size":
+            apply = getattr(self.parent, "_apply_translation_result_font_size", None)
+            if callable(apply):
+                apply()
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
         complete = getattr(self.parent, "_complete_guide_setting", None)
@@ -6824,6 +6864,21 @@ class SettingsWindow(QWidget):
         sync = getattr(self.parent, "_sync_selection_quick_translate", None)
         if callable(sync):
             sync()
+
+    def _set_translation_result_font_size(self, *_args):
+        combo = getattr(self, "translation_font_combo", None)
+        if combo is None:
+            return
+        from main import (
+            TRANSLATION_RESULT_FONT_SIZE_KEYS,
+            normalize_translation_result_font_size,
+        )
+        key = normalize_translation_result_font_size(combo.currentData())
+        if key not in TRANSLATION_RESULT_FONT_SIZE_KEYS:
+            return
+        if self.parent.config.get("translation_result_font_size") == key:
+            return
+        self.auto_save_setting("translation_result_font_size", key)
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7278,6 +7333,7 @@ class SettingsWindow(QWidget):
         # Scale/screen signals can arrive while a secondary page replaces the form.
         self.ui_scale_control = None
         self.ui_scale_value = None
+        self.translation_font_combo = None
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -7613,6 +7669,39 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
         self._refresh_ui_scale()
+
+        self.translation_font_label = QLabel(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_label.setStyleSheet("margin:0; padding:0;")
+        self.translation_font_label.setFixedHeight(engine_control_height)
+        self.translation_font_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.translation_font_combo = DropDownCombo()
+        self.translation_font_combo.setObjectName("translationResultFontSize")
+        from main import (
+            TRANSLATION_RESULT_FONT_SIZE_KEYS,
+            normalize_translation_result_font_size,
+        )
+        for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
+            self.translation_font_combo.addItem(
+                settings_text(lang, f"translation_result_font_{size_key}"),
+                size_key,
+            )
+        saved_font = normalize_translation_result_font_size(
+            self.parent.config.get("translation_result_font_size")
+        )
+        font_index = self.translation_font_combo.findData(saved_font)
+        self.translation_font_combo.setCurrentIndex(max(font_index, 0))
+        self._apply_engine_combo_style(self.translation_font_combo)
+        self.translation_font_combo.setFixedWidth(engine_combo_width)
+        self.translation_font_combo.setFixedHeight(engine_control_height)
+        self.translation_font_combo.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        font_tooltip = tooltip_text(settings_text(lang, "translation_result_font_tooltip"))
+        self.translation_font_combo.setToolTip(font_tooltip)
+        self.translation_font_label.setToolTip(font_tooltip)
+        self.translation_font_combo.currentIndexChanged.connect(
+            self._set_translation_result_font_size
+        )
+        form_grid.addWidget(self.translation_font_label, 4, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_combo, 4, 2, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text
@@ -11261,6 +11350,7 @@ finally {
         for combo_name in (
             "ocr_engine_combo",
             "translator_combo",
+            "translation_font_combo",
             "game_source_combo",
             "game_target_combo",
         ):

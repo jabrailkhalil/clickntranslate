@@ -267,6 +267,7 @@ DEFAULT_CONFIG = {
     "selection_quick_translate_enabled": False,
     "selection_quick_translate_mode": "button",
     "close_result_window_on_outside_click": False,
+    "translation_result_font_size": "medium",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -306,6 +307,27 @@ def result_window_hidden_modes(config):
 def result_window_hidden_for(config, mode):
     """True when `mode` should copy the translation instead of showing a window."""
     return mode in result_window_hidden_modes(config)
+
+
+TRANSLATION_RESULT_FONT_SIZE_KEYS = ("small", "medium", "large", "xlarge")
+TRANSLATION_RESULT_FONT_SIZE_PX = {
+    "small": 13,
+    "medium": 16,
+    "large": 20,
+    "xlarge": 24,
+}
+
+
+def normalize_translation_result_font_size(value):
+    key = str(value or "medium").strip().lower()
+    return key if key in TRANSLATION_RESULT_FONT_SIZE_PX else "medium"
+
+
+def translation_result_font_px(config):
+    key = normalize_translation_result_font_size(
+        (config or {}).get("translation_result_font_size")
+    )
+    return TRANSLATION_RESULT_FONT_SIZE_PX[key]
 
 
 TRANSLATION_PAIR_KEYS = (
@@ -5002,6 +5024,7 @@ class TranslationResultDialog(QDialog):
         dark = theme != "Светлая"
         background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
         ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        font_px = translation_result_font_px(self._current_config())
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
             QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
@@ -5009,7 +5032,7 @@ class TranslationResultDialog(QDialog):
             QLabel#translationResultEngine, QLabel#translationResultStatus {{ color:{muted}; font-size:12px; }}
             QFrame#translationEditorPanel {{ background:{surface}; border:1px solid {edge}; border-radius:8px; }}
             QLabel#translationEditorCaption {{ color:{muted}; font-size:12px; font-weight:600; }}
-            QTextEdit {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:16px; selection-background-color:#7a5fa1; }}
+            QTextEdit#translationSourceText, QTextEdit#translationResultText {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:{font_px}px; selection-background-color:#7a5fa1; }}
             QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
             QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
@@ -7735,6 +7758,13 @@ class DarkThemeApp(QMainWindow):
             controller.configure(True, mode)
         elif controller is not None:
             controller.configure(False, mode)
+
+    def _apply_translation_result_font_size(self):
+        for dialog in _live_translation_result_dialogs():
+            try:
+                dialog.refresh_theme(dialog.theme)
+            except RuntimeError:
+                continue
 
     def launch_translate_selection_from_quick_action(self, text):
         self._launch_translate_selection(replace_selection=False, preloaded_text=str(text or ""))
