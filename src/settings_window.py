@@ -31,7 +31,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget
+    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget, QRadioButton
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
@@ -1797,6 +1797,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
         "replace_selection_translate_label": "Translate and replace selection:",
         "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
+        "selection_quick_translate_enabled": "Quick translate for selected text",
+        "selection_quick_translate_tooltip": "Show a translate button near selected text in other apps, or translate immediately. Uses the selection language pair configured for hotkeys. Requires Accessibility on macOS; on Linux uses PRIMARY selection (limited on some Wayland setups). Paused during OCR and dynamic translation.",
+        "selection_quick_translate_mode_button": "Show a button after selecting",
+        "selection_quick_translate_mode_automatic": "Translate immediately after selecting",
         "copy_hotkey_label": "Copy Selected Hotkey:",
         "translate_hotkey_label": "Translate Hotkey:",
         "remove_local_tesseract": "Remove local Tesseract",
@@ -1915,6 +1919,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
         "replace_selection_translate_label": "Перевести и заменить выделенное:",
         "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
+        "selection_quick_translate_enabled": "Быстрый перевод выделенного текста",
+        "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
+        "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
+        "selection_quick_translate_mode_automatic": "Переводить сразу после выделения",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
         "remove_local_tesseract": "Удалить локальный Tesseract",
@@ -2031,6 +2039,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
         "replace_selection_translate_label": "Traducir y reemplazar selección:",
         "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
+        "selection_quick_translate_enabled": "Traducción rápida del texto seleccionado",
+        "selection_quick_translate_tooltip": "Muestra un botón cerca del texto seleccionado en otras apps o traduce al instante. Usa el par de idiomas de la traducción por selección. En macOS requiere Accesibilidad; en Linux usa PRIMARY (limitado en Wayland). Se pausa durante OCR y traducción dinámica.",
+        "selection_quick_translate_mode_button": "Mostrar un botón tras seleccionar",
+        "selection_quick_translate_mode_automatic": "Traducir inmediatamente tras seleccionar",
         "copy_hotkey_label": "Atajo para copiar seleccion:",
         "translate_hotkey_label": "Atajo de traduccion:",
         "remove_local_tesseract": "Eliminar Tesseract local",
@@ -2147,6 +2159,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
         "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
         "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
+        "selection_quick_translate_enabled": "Schnellübersetzung für markierten Text",
+        "selection_quick_translate_tooltip": "Zeigt eine Übersetzen-Schaltfläche nahe der Auswahl in anderen Apps oder übersetzt sofort. Verwendet das Sprachpaar für Auswahlübersetzung. Unter macOS ist Bedienungshilfe nötig; unter Linux PRIMARY (eingeschränkt unter Wayland). Pausiert während OCR und dynamischer Übersetzung.",
+        "selection_quick_translate_mode_button": "Schaltfläche nach der Auswahl anzeigen",
+        "selection_quick_translate_mode_automatic": "Sofort nach der Auswahl übersetzen",
         "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
         "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
@@ -2263,6 +2279,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
         "replace_selection_translate_label": "Traduire et remplacer la sélection :",
         "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
+        "selection_quick_translate_enabled": "Traduction rapide du texte sélectionné",
+        "selection_quick_translate_tooltip": "Affiche un bouton près du texte sélectionné dans d'autres apps ou traduit immédiatement. Utilise la paire de langues de la traduction par sélection. macOS requiert l'accessibilité ; Linux utilise PRIMARY (limité sous Wayland). En pause pendant l'OCR et la traduction dynamique.",
+        "selection_quick_translate_mode_button": "Afficher un bouton après la sélection",
+        "selection_quick_translate_mode_automatic": "Traduire immédiatement après la sélection",
         "copy_hotkey_label": "Raccourci de copie :",
         "translate_hotkey_label": "Raccourci de traduction :",
         "remove_local_tesseract": "Supprimer Tesseract local",
@@ -2379,6 +2399,10 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
         "replace_selection_translate_label": "翻译并替换所选文本：",
         "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
+        "selection_quick_translate_enabled": "快速翻译选中文本",
+        "selection_quick_translate_tooltip": "在其他应用中选中文本后显示翻译按钮，或立即翻译。使用选中文本翻译的语言对。macOS 需要辅助功能；Linux 使用 PRIMARY 选区（部分 Wayland 环境受限）。OCR 和动态翻译期间暂停。",
+        "selection_quick_translate_mode_button": "选中后显示按钮",
+        "selection_quick_translate_mode_automatic": "选中后立即翻译",
         "copy_hotkey_label": "复制选区快捷键：",
         "translate_hotkey_label": "翻译快捷键：",
         "remove_local_tesseract": "删除本地 Tesseract",
@@ -6743,11 +6767,51 @@ class SettingsWindow(QWidget):
             self.parent.start_minimized = value
         if key == "autostart":
             self.parent.autostart = value
+        if key in ("selection_quick_translate_enabled", "selection_quick_translate_mode"):
+            sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+            if callable(sync):
+                sync()
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
         complete = getattr(self.parent, "_complete_guide_setting", None)
         if callable(complete):
             complete(key)
+
+    def _refresh_selection_quick_translate_mode_enabled(self):
+        checkbox = getattr(self, "selection_quick_translate_checkbox", None)
+        if checkbox is None:
+            return
+        enabled = checkbox.isChecked()
+        for widget in (
+            getattr(self, "selection_quick_translate_mode_button", None),
+            getattr(self, "selection_quick_translate_mode_automatic", None),
+        ):
+            if widget is not None:
+                widget.setEnabled(enabled)
+
+    def _set_selection_quick_translate_enabled(self, enabled):
+        if enabled:
+            checker = getattr(self.parent, "ensure_mac_accessibility_for_selection", None)
+            if callable(checker) and not checker():
+                checkbox = self.selection_quick_translate_checkbox
+                checkbox.blockSignals(True)
+                checkbox.setChecked(False)
+                checkbox.blockSignals(False)
+                self._refresh_selection_quick_translate_mode_enabled()
+                return
+        self.auto_save_setting("selection_quick_translate_enabled", bool(enabled))
+        self._refresh_selection_quick_translate_mode_enabled()
+        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+        if callable(sync):
+            sync()
+
+    def _set_selection_quick_translate_mode(self, mode):
+        if mode not in ("button", "automatic"):
+            return
+        self.auto_save_setting("selection_quick_translate_mode", mode)
+        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+        if callable(sync):
+            sync()
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -8548,6 +8612,51 @@ class SettingsWindow(QWidget):
 
         lang = self.parent.current_interface_language
         shell_layout = self._create_secondary_shell(settings_text(lang, "hotkeys"))
+
+        quick_card = QFrame()
+        quick_card.setObjectName("secondaryCard")
+        quick_layout = QVBoxLayout(quick_card)
+        quick_layout.setContentsMargins(12, 9, 12, 9)
+        quick_layout.setSpacing(6)
+        self.selection_quick_translate_checkbox = QCheckBox(
+            settings_text(lang, "selection_quick_translate_enabled")
+        )
+        self.selection_quick_translate_checkbox.setObjectName("settingsPageCheckbox")
+        self.selection_quick_translate_checkbox.setToolTip(
+            settings_text(lang, "selection_quick_translate_tooltip")
+        )
+        self.selection_quick_translate_checkbox.setChecked(
+            self.parent.config.get("selection_quick_translate_enabled") is True
+        )
+        quick_layout.addWidget(self.selection_quick_translate_checkbox)
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(12)
+        self.selection_quick_translate_mode_button = QRadioButton(
+            settings_text(lang, "selection_quick_translate_mode_button")
+        )
+        self.selection_quick_translate_mode_automatic = QRadioButton(
+            settings_text(lang, "selection_quick_translate_mode_automatic")
+        )
+        saved_mode = str(self.parent.config.get("selection_quick_translate_mode") or "button")
+        if saved_mode == "automatic":
+            self.selection_quick_translate_mode_automatic.setChecked(True)
+        else:
+            self.selection_quick_translate_mode_button.setChecked(True)
+        mode_row.addWidget(self.selection_quick_translate_mode_button)
+        mode_row.addWidget(self.selection_quick_translate_mode_automatic)
+        mode_row.addStretch(1)
+        quick_layout.addLayout(mode_row)
+        self._refresh_selection_quick_translate_mode_enabled()
+        self.selection_quick_translate_checkbox.toggled.connect(
+            self._set_selection_quick_translate_enabled
+        )
+        self.selection_quick_translate_mode_button.toggled.connect(
+            lambda checked: self._set_selection_quick_translate_mode("button") if checked else None
+        )
+        self.selection_quick_translate_mode_automatic.toggled.connect(
+            lambda checked: self._set_selection_quick_translate_mode("automatic") if checked else None
+        )
+        shell_layout.addWidget(quick_card)
 
         hotkey_card = QFrame()
         hotkey_card.setObjectName("secondaryCard")

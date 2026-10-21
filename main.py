@@ -264,6 +264,8 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": DEFAULT_SELECTION_HOTKEY,
     "translate_replace_selection_hotkey": DEFAULT_REPLACE_SELECTION_HOTKEY,
+    "selection_quick_translate_enabled": False,
+    "selection_quick_translate_mode": "button",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -7288,6 +7290,7 @@ class DarkThemeApp(QMainWindow):
         if not LAYOUT_EDITOR_MODE:
             self.create_tray_icon()
             self._sync_desktop_assistant()
+            self._sync_selection_quick_translate()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7592,6 +7595,33 @@ class DarkThemeApp(QMainWindow):
         page = getattr(settings, 'settings_assistant_page', None)
         if page is not None:
             page.refresh()
+
+    def ensure_mac_accessibility_for_selection(self):
+        if not platform_support.IS_MAC:
+            return True
+        from macos_desktop import ensure_permission
+
+        return ensure_permission("accessibility", self, self.current_interface_language)
+
+    def _sync_selection_quick_translate(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        enabled = self.config.get("selection_quick_translate_enabled") is True
+        mode = str(self.config.get("selection_quick_translate_mode") or "button")
+        if enabled and not LAYOUT_EDITOR_MODE:
+            if controller is None:
+                from selection_quick_translate import SelectionQuickTranslateController
+
+                self._selection_quick_translate = SelectionQuickTranslateController(self)
+                self._selection_quick_translate.translate_requested.connect(
+                    self.launch_translate_selection_from_quick_action
+                )
+                controller = self._selection_quick_translate
+            controller.configure(True, mode)
+        elif controller is not None:
+            controller.configure(False, mode)
+
+    def launch_translate_selection_from_quick_action(self, text):
+        self._launch_translate_selection(replace_selection=False, preloaded_text=str(text or ""))
 
     def set_desktop_assistant_enabled(self, enabled):
         self.config['desktop_assistant_enabled'] = bool(enabled)
@@ -9276,9 +9306,9 @@ class DarkThemeApp(QMainWindow):
         """Translate selected text and safely replace that exact selection on Windows."""
         return self._launch_translate_selection(replace_selection=True)
 
-    def _launch_translate_selection(self, replace_selection=False):
+    def _launch_translate_selection(self, replace_selection=False, preloaded_text=None):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
-        if platform_support.IS_MAC:
+        if platform_support.IS_MAC and not (preloaded_text and str(preloaded_text).strip()):
             from macos_desktop import ensure_permission
             if not ensure_permission("accessibility", self, self.current_interface_language):
                 return
@@ -9312,7 +9342,10 @@ class DarkThemeApp(QMainWindow):
                     platform_support.copy_text(clipboard_before_capture)
 
             try:
-                if platform_support.IS_LINUX:
+                preloaded = str(preloaded_text or "").strip()
+                if preloaded:
+                    text = preloaded
+                elif platform_support.IS_LINUX:
                     # X11 and Wayland keep the highlighted text in the PRIMARY
                     # selection, so it can be read directly — no key simulation,
                     # and nothing is written to the user's clipboard.
@@ -9334,11 +9367,14 @@ class DarkThemeApp(QMainWindow):
                     text = pyperclip.paste()
                 if not text or not text.strip():
                     time.sleep(0.3)
-                    text = (
-                        self._read_primary_selection()
-                        if platform_support.IS_LINUX
-                        else pyperclip.paste()
-                    )
+                    if preloaded:
+                        text = preloaded
+                    else:
+                        text = (
+                            self._read_primary_selection()
+                            if platform_support.IS_LINUX
+                            else pyperclip.paste()
+                        )
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")
