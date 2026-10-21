@@ -123,22 +123,20 @@ class ScaleArrowButton(QToolButton):
         super().__init__(parent)
         self.setProperty('pointerHover', False)
 
+    def setEnabled(self, enabled):
+        if not enabled:
+            # Disabling a focused mouse-clicked arrow makes Qt tab to the next
+            # control with TabFocusReason. Clear mouse focus first so it cannot
+            # leave a false keyboard outline on the opposite arrow.
+            if self.hasFocus() and not self.property('keyboardFocus'):
+                self.clearFocus()
+            self.setDown(False)
+            self.set_pointer_hover(False)
+        super().setEnabled(enabled)
+
     def set_pointer_hover(self, hovered):
-        app = QApplication.instance()
-        if hovered:
-            previous = getattr(app, '_hovered_scale_arrow', lambda: None)()
-            if previous is not None and previous is not self:
-                from PyQt5 import sip
-                if not sip.isdeleted(previous):
-                    previous.set_pointer_hover(False)
-            app._hovered_scale_arrow = weakref.ref(self)
-        elif getattr(app, '_hovered_scale_arrow', lambda: None)() is self:
-            app._hovered_scale_arrow = lambda: None
-        if bool(self.property('pointerHover')) != hovered:
-            self.setProperty('pointerHover', hovered)
-            self.style().unpolish(self)
-            self.style().polish(self)
-            self.update()
+        from button_styles import set_pointer_hover
+        set_pointer_hover(self, hovered)
 
     def enterEvent(self, event):
         self.set_pointer_hover(True)

@@ -138,10 +138,20 @@ home/back, cancel, undo and pause/resume actions use their actual meanings.
 Shared standard dialog buttons follow the app language rather than the OS.
 
 General settings include the optional **Select all before replacing** checkbox.
-The right column groups the OCR, translator, result visibility and result-font
-dropdowns, a live font sample and interface scale at the bottom. Result text
-choices show 11, 13, 16, 20 and 24 px; their full size descriptions remain in
-hover help. The sample fits even the largest font within the fixed window.
+The right column orders OCR, translator, result visibility, interface scale,
+result text and a live font sample. Scale and result text use matching bounded
+arrow controls. Result-text sizes display localized names, from extra small to
+extra large; the numerical size remains available in hover help. Arrow clicks
+and keyboard steps immediately update the sample and any open result windows.
+The sample sits in a subtle themed frame and fits even the largest font within
+the fixed window. Reaching an arrow limit clears mouse focus and hover before
+disabling that arrow; actual keyboard navigation keeps its visible focus.
+All five right-side fields share their painted width, height, insets and value
+font. Drop-down arrows reuse the stepper's light chevron rotated down, including
+mascot, capture and dynamic-translation controls. Shared pointer tracking clears
+stale native hover on ordinary buttons as well as arrows after leaving a moved
+or scaled canvas, hiding its owner or switching applications. Package-table
+scrollbars start below the stationary header and scroll only the package rows.
 Result font size affects only source/translation text in the separate result
 window. Dedicated explanations and complete-label fallback hints cover all
 visible home, settings and hotkey controls in six languages. The scaled view

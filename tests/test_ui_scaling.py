@@ -411,7 +411,7 @@ class UiScalingTest(unittest.TestCase):
                         settings.ocr_engine_combo,
                         settings.translator_combo,
                         settings.result_window_control,
-                        settings.translation_font_combo,
+                        settings.translation_font_control,
                     ):
                         self.assertEqual(settings.ui_scale_control.x(), control.x())
                     self.assertEqual(settings.ui_scale_control.width(), control.width())

@@ -240,16 +240,12 @@ class EngineComboTest(unittest.TestCase):
             settings.close()
             parent.close()
 
-    def test_drop_down_carries_a_chevron_image(self):
-        style = self._style_sheet()
-
-        self.assertIn("QComboBox::drop-down", style)
-        self.assertIn("chevron_down_dark.png", style)
-        # A url() with backslashes is read as escapes and silently draws nothing.
-        self.assertNotIn("\\", style.split("image: url(")[1].split(")")[0])
-
-    def test_light_theme_uses_the_darker_chevron(self):
-        self.assertIn("chevron_down_light.png", self._style_sheet("Светлая"))
+    def test_drop_down_does_not_overlay_a_native_arrow_on_its_painted_glyph(self):
+        for theme in ("Темная", "Светлая"):
+            style = self._style_sheet(theme)
+            self.assertIn("QComboBox::drop-down", style)
+            self.assertIn("QComboBox::down-arrow { image: none; }", style)
+            self.assertNotIn("chevron_down_", style)
 
     def test_the_chevron_images_exist_and_are_transparent_pngs(self):
         for name in ("chevron_down_dark.png", "chevron_down_light.png"):

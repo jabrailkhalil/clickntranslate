@@ -1,5 +1,5 @@
-from button_styles import button_qss, button_palette, standard_buttons
-from number_controls import StepperFrame
+from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
+from number_controls import ChoiceStepper, StepperFrame
 from control_hints import control_hint
 from package_table import PackageTable
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
@@ -394,28 +394,19 @@ class DropDownCombo(QComboBox):
     def paintEvent(self, event):
         option = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(option)
+        painter = QtWidgets.QStylePainter(self)
+        self._paint_combo(painter, option)
+
+    def _paint_combo(self, painter, option):
         arrow = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
                                            QtWidgets.QStyle.SC_ComboBoxArrow, self)
         option.subControls &= ~QtWidgets.QStyle.SC_ComboBoxArrow
-        painter = QtWidgets.QStylePainter(self)
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
         painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
         dark = option.palette.color(QtGui.QPalette.Text).lightness() > 128
-        color = QtGui.QColor('#c5b3e9' if dark else '#674586')
-        if not self.isEnabled():
-            color.setAlpha(100)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        color = QtGui.QColor(button_palette(dark)['text' if self.isEnabled() else 'disabled'])
         factor = float(self.window().property('ui_effective_scale') or 1)
-        pen = QtGui.QPen(color, 2 * factor)
-        pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
-        painter.setPen(pen)
-        center = QtCore.QRectF(arrow).center()
-        path = QtGui.QPainterPath()
-        path.moveTo(center.x() - 5 * factor, center.y() - 2.5 * factor)
-        path.lineTo(center.x(), center.y() + 2.5 * factor)
-        path.lineTo(center.x() + 5 * factor, center.y() - 2.5 * factor)
-        painter.drawPath(path)
+        paint_down_arrow(painter, QtCore.QRectF(arrow), self.font(), color, factor)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -634,9 +625,6 @@ def modern_combo_style(dark, font_size=15):
     accent = "#9A7FC1" if is_dark else "#8063a8"
     popup_bg = "#20212a" if is_dark else "#f1edf4"
     selection = "#5f4a88" if is_dark else "#cfc1df"
-    arrow_icon = resource_path(
-        "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
-    ).replace("\\", "/")
     return f"""
         QComboBox {{
             /* Keep the fixed 32px row, but inset the painted field vertically.
@@ -665,8 +653,8 @@ def modern_combo_style(dark, font_size=15):
             width: 24px;
             border: none;
             background: transparent;
-            image: url({arrow_icon});
         }}
+        QComboBox::down-arrow {{ image: none; }}
         QComboBox QAbstractItemView {{
             background-color: {popup_bg};
             color: {text};
@@ -862,8 +850,7 @@ class ResultWindowModeCombo(DropDownCombo):
         self.initStyleOption(option)
         option.currentText = self.summary_text()
         option.currentIcon = QtGui.QIcon()
-        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
-        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        self._paint_combo(painter, option)
         painter.end()
 
 
@@ -1803,6 +1790,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
         "translation_result_font_label": "Result text:",
         "translation_result_font_sample": "Sample text",
+        "translation_result_font_decrease": "Decrease result text size",
+        "translation_result_font_increase": "Increase result text size",
         "translation_result_font_tooltip": "Only changes source and translated text in the separate result window. Use Scale to resize the whole interface.",
         "translation_result_font_xsmall": "Extra small",
         "translation_result_font_small": "Small",
@@ -1939,6 +1928,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
         "translation_result_font_label": "Текст результата:",
         "translation_result_font_sample": "Пример текста",
+        "translation_result_font_decrease": "Уменьшить текст результата",
+        "translation_result_font_increase": "Увеличить текст результата",
         "translation_result_font_tooltip": "Только размер оригинала и перевода в отдельном окне результата. Общий размер интерфейса меняется пунктом «Масштаб».",
         "translation_result_font_xsmall": "Очень мелкий",
         "translation_result_font_small": "Мелкий",
@@ -2073,6 +2064,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
         "translation_result_font_label": "Texto del resultado:",
         "translation_result_font_sample": "Ejemplo",
+        "translation_result_font_decrease": "Reducir el texto del resultado",
+        "translation_result_font_increase": "Ampliar el texto del resultado",
         "translation_result_font_tooltip": "Solo cambia el texto original y traducido en la ventana de resultado. Usa Escala para cambiar el tamaño de toda la interfaz.",
         "translation_result_font_xsmall": "Muy pequeña",
         "translation_result_font_small": "Pequeña",
@@ -2207,6 +2200,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
         "translation_result_font_label": "Ergebnistext:",
         "translation_result_font_sample": "Beispieltext",
+        "translation_result_font_decrease": "Ergebnistext verkleinern",
+        "translation_result_font_increase": "Ergebnistext vergrößern",
         "translation_result_font_tooltip": "Ändert nur Original und Übersetzung im separaten Ergebnisfenster. Die gesamte Oberfläche wird über Skalierung vergrößert oder verkleinert.",
         "translation_result_font_xsmall": "Sehr klein",
         "translation_result_font_small": "Klein",
@@ -2341,6 +2336,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
         "translation_result_font_label": "Texte du résultat :",
         "translation_result_font_sample": "Exemple",
+        "translation_result_font_decrease": "Réduire le texte du résultat",
+        "translation_result_font_increase": "Agrandir le texte du résultat",
         "translation_result_font_tooltip": "Modifie uniquement le texte source et traduit dans la fenêtre de résultat. Utilisez Échelle pour redimensionner toute l’interface.",
         "translation_result_font_xsmall": "Très petite",
         "translation_result_font_small": "Petite",
@@ -2475,6 +2472,8 @@ SETTINGS_TEXT = {
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
         "translation_result_font_label": "结果文字：",
         "translation_result_font_sample": "示例文字",
+        "translation_result_font_decrease": "缩小结果文字",
+        "translation_result_font_increase": "放大结果文字",
         "translation_result_font_tooltip": "仅更改独立结果窗口中原文和译文的字号。整个界面的大小请通过“缩放”调整。",
         "translation_result_font_xsmall": "极小",
         "translation_result_font_small": "小",
@@ -6926,14 +6925,14 @@ class SettingsWindow(QWidget):
             sync()
 
     def _set_translation_result_font_size(self, *_args):
-        combo = getattr(self, "translation_font_combo", None)
-        if combo is None:
+        control = getattr(self, "translation_font_control", None)
+        if control is None:
             return
         from main import (
             TRANSLATION_RESULT_FONT_SIZE_KEYS,
             normalize_translation_result_font_size,
         )
-        key = normalize_translation_result_font_size(combo.currentData())
+        key = normalize_translation_result_font_size(control.value())
         if key not in TRANSLATION_RESULT_FONT_SIZE_KEYS:
             return
         self._refresh_translation_font_preview()
@@ -6943,15 +6942,16 @@ class SettingsWindow(QWidget):
 
     def _refresh_translation_font_preview(self):
         from main import translation_result_font_px
-        key = self.translation_font_combo.currentData()
+        key = self.translation_font_control.value()
         pixels = translation_result_font_px({'translation_result_font_size': key})
         self.translation_font_preview.setStyleSheet(
-            f"font-size:{pixels}px; font-weight:400; margin:0; padding:0;"
+            f"font-size:{pixels}px; font-weight:400; margin:0;"
         )
         lang = self.parent.current_interface_language
         description = settings_text(lang, f'translation_result_font_{key}')
-        self.translation_font_combo.setToolTip(tooltip_text(
-            f'{pixels} px · {description}\n{settings_text(lang, "translation_result_font_tooltip")}'))
+        hint = tooltip_text(f'{description} · {pixels} px\n{settings_text(lang, "translation_result_font_tooltip")}')
+        self.translation_font_control.setToolTip(hint)
+        self.translation_font_control.editor.setToolTip(hint)
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7406,7 +7406,7 @@ class SettingsWindow(QWidget):
         # Scale/screen signals can arrive while a secondary page replaces the form.
         self.ui_scale_control = None
         self.ui_scale_value = None
-        self.translation_font_combo = None
+        self.translation_font_control = None
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -7722,9 +7722,9 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setObjectName('uiScaleControl')
         self.ui_scale_control.setFixedSize(engine_combo_width, engine_control_height)
         scale_outer = QHBoxLayout(self.ui_scale_control)
-        scale_outer.setContentsMargins(3, 2, 3, 2)
+        scale_outer.setContentsMargins(0, 0, 0, 0)
         self.ui_scale_value = ScalePercentEdit()
-        self.ui_scale_field = StepperFrame(self.ui_scale_value, dark=self.parent.current_theme != 'Светлая')
+        self.ui_scale_field = StepperFrame(self.ui_scale_value, dark=self.parent.current_theme != 'Светлая', font_size=14)
         self.ui_scale_field.setObjectName('uiScaleField')
         scale_outer.addWidget(self.ui_scale_field)
         self.ui_scale_decrease = self.ui_scale_field.decrease
@@ -7747,8 +7747,8 @@ class SettingsWindow(QWidget):
         self.ui_scale_value.cancel_requested.connect(self._refresh_ui_scale)
         self.ui_scale_value.step_requested.connect(lambda step: self._step_ui_scale(step, self.ui_scale_value))
         self.ui_scale_label.setBuddy(self.ui_scale_value)
-        form_grid.addWidget(self.ui_scale_label, 6, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.ui_scale_control, 6, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_label, 3, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_control, 3, 2, Qt.AlignVCenter)
         scale_tooltip = tooltip_text(settings_text(lang, 'ui_scale_hint'))
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
@@ -7758,49 +7758,45 @@ class SettingsWindow(QWidget):
         self.translation_font_label.setStyleSheet("margin:0; padding:0;")
         self.translation_font_label.setFixedHeight(engine_control_height)
         self.translation_font_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.translation_font_combo = DropDownCombo()
-        self.translation_font_combo.setObjectName("translationResultFontSize")
         from main import (
             TRANSLATION_RESULT_FONT_SIZE_KEYS,
-            TRANSLATION_RESULT_FONT_SIZE_PX,
             normalize_translation_result_font_size,
         )
-        for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
-            self.translation_font_combo.addItem(
-                f'{TRANSLATION_RESULT_FONT_SIZE_PX[size_key]} px',
-                size_key,
-            )
-            self.translation_font_combo.setItemData(
-                self.translation_font_combo.count() - 1,
-                settings_text(lang, f'translation_result_font_{size_key}'), Qt.ToolTipRole)
+        self.translation_font_control = ChoiceStepper(
+            [(key, settings_text(lang, f'translation_result_font_{key}'))
+             for key in TRANSLATION_RESULT_FONT_SIZE_KEYS],
+            dark=self.parent.current_theme != 'Светлая', font_size=14)
+        self.translation_font_control.setObjectName("translationResultFontSize")
         saved_font = normalize_translation_result_font_size(
             self.parent.config.get("translation_result_font_size")
         )
-        font_index = self.translation_font_combo.findData(saved_font)
-        self.translation_font_combo.setCurrentIndex(max(font_index, 0))
-        self._apply_engine_combo_style(self.translation_font_combo)
-        self.translation_font_combo.setFixedWidth(engine_combo_width)
-        self.translation_font_combo.setFixedHeight(engine_control_height)
-        self.translation_font_combo.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_control.setValue(saved_font)
+        self.translation_font_control.setFixedSize(engine_combo_width, engine_control_height)
+        self.translation_font_control.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_control.editor.setAccessibleName(settings_text(lang, "translation_result_font_label"))
         font_tooltip = tooltip_text(settings_text(lang, "translation_result_font_tooltip"))
-        self.translation_font_combo.setToolTip(font_tooltip)
-        self.translation_font_combo.setAccessibleDescription(settings_text(lang, "translation_result_font_tooltip"))
+        self.translation_font_control.setAccessibleDescription(settings_text(lang, "translation_result_font_tooltip"))
+        for button, direction in ((self.translation_font_control.decrease, 'decrease'),
+                                  (self.translation_font_control.increase, 'increase')):
+            hint = settings_text(lang, f'translation_result_font_{direction}')
+            button.setAccessibleName(hint)
+            button.setToolTip(tooltip_text(hint))
         self.translation_font_label.setToolTip(font_tooltip)
-        self.translation_font_label.setBuddy(self.translation_font_combo)
+        self.translation_font_label.setBuddy(self.translation_font_control)
         self.translation_font_preview = QLabel(settings_text(lang, "translation_result_font_sample"))
         self.translation_font_preview.setObjectName("translationResultFontPreview")
         # Use the spare right-column rows without increasing the fixed form's
         # height. A 24px font needs more than a 28px input row for descenders.
-        self.translation_font_preview.setFixedSize(engine_combo_width, 36)
+        self.translation_font_preview.setFixedSize(engine_combo_width, 40)
         self.translation_font_preview.setAlignment(Qt.AlignCenter)
         self.translation_font_preview.setToolTip(font_tooltip)
         self._refresh_translation_font_preview()
-        self.translation_font_combo.currentIndexChanged.connect(
+        self.translation_font_control.valueChanged.connect(
             self._set_translation_result_font_size
         )
-        form_grid.addWidget(self.translation_font_label, 3, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.translation_font_combo, 3, 2, Qt.AlignVCenter)
-        form_grid.addWidget(self.translation_font_preview, 4, 2, 2, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_label, 4, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_control, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_preview, 5, 2, 2, 1, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text
@@ -11466,6 +11462,12 @@ finally {
         style += 'QToolButton#assistantAppearance { padding-left:5px; padding-right:5px; }'
         style += button_qss(dark, 'secondary', 'QPushButton#assistantCategory', compact=True)
         style += 'QWidget#uiScaleControl { background:transparent; }'
+        style += f'''QLabel#translationResultFontPreview {{
+            background:{'#17181d' if dark else '#e9e4ed'};
+            color:{'#f4f6fb' if dark else '#202124'};
+            border:1px solid {'#3d3948' if dark else '#d7cde7'};
+            border-radius:7px; padding:2px 6px;
+        }}'''
         set_widget_stylesheet(self, style)
         for control in self.findChildren(StepperFrame):
             control.set_theme(dark)
@@ -11491,7 +11493,6 @@ finally {
         for combo_name in (
             "ocr_engine_combo",
             "translator_combo",
-            "translation_font_combo",
             "game_source_combo",
             "game_target_combo",
         ):

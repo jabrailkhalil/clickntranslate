@@ -82,7 +82,7 @@ def test_native_hover_help_is_visible_inside_each_monitor_and_can_be_disabled(wi
             window.activateWindow()
             QTest.qWait(100)
             settings = window.settings_window
-            controls = [settings.autostart_checkbox, settings.translation_font_combo,
+            controls = [settings.autostart_checkbox, settings.translation_font_control,
                         settings.clear_cache_btn, settings.ui_scale_decrease]
             for control in controls:
                 QtWidgets.QToolTip.hideText()

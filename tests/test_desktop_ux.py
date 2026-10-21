@@ -304,3 +304,63 @@ def test_arrow_hover_clears_even_if_qt_keeps_native_under_mouse_state(app, deact
     finally:
         field.close()
         field.deleteLater()
+
+
+@pytest.mark.parametrize('percent', [80, 125, 180])
+def test_reset_hover_clears_outside_moved_scaled_canvas(window, app, percent):
+    from ui_scaling import widget_global_rect
+    window.set_ui_scale_percent(percent)
+    window.move(320, 90)
+    window.show_settings()
+    settings = window.settings_window
+    app.processEvents()
+    button = settings.reset_btn
+    app.sendEvent(button, QtCore.QEvent(QtCore.QEvent.Enter))
+    button.setAttribute(QtCore.Qt.WA_UnderMouse, True)
+    assert button.underMouse()
+    # The native viewport receives the move even when the embedded button
+    # misses its Leave event. Its old mapFromGlobal ignores the proxy scale.
+    outside = widget_global_rect(settings.ocr_engine_combo).center()
+    viewport = window._ui_scale_controller.view.viewport()
+    event = QtGui.QMouseEvent(QtCore.QEvent.MouseMove,
+                             QtCore.QPointF(viewport.mapFromGlobal(outside)),
+                             QtCore.QPointF(outside), QtCore.Qt.NoButton,
+                             QtCore.Qt.NoButton, QtCore.Qt.NoModifier)
+    app.sendEvent(viewport, event)
+    assert not button.underMouse()
+    assert not button.property('pointerHover')
+    assert not button.property('keyboardFocus')
+
+
+@pytest.mark.parametrize('header_height', [32, 54])
+def test_package_scrollbar_only_spans_rows_and_reaches_last_package(app, header_height):
+    from package_table import PackageTable
+    table = PackageTable()
+    table.setColumnCount(4)
+    table.setHorizontalHeaderLabels(['', 'Language', 'Package', 'Status'])
+    table.horizontalHeader().setFixedHeight(header_height)
+    table.setRowCount(60)
+    table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+    for row in range(60):
+        for column in range(4):
+            table.setItem(row, column, QtWidgets.QTableWidgetItem(str(row)))
+    table.resize(500, 260)
+    try:
+        table.show()
+        for _ in range(3):
+            app.processEvents()
+        bar = table.verticalScrollBar()
+        top = bar.mapTo(table, QtCore.QPoint()).y()
+        bottom = top + bar.height()
+        rows_top = table.viewport().mapTo(table, QtCore.QPoint()).y()
+        assert top >= rows_top
+        assert bottom <= rows_top + table.viewport().height()
+        bar.setValue(bar.maximum())
+        assert table.visualItemRect(table.item(59, 1)).intersects(table.viewport().rect())
+        table.horizontalHeader().setFixedHeight(header_height + 12)
+        for _ in range(3):
+            app.processEvents()
+        assert bar.mapTo(table, QtCore.QPoint()).y() >= table.viewport().mapTo(table, QtCore.QPoint()).y()
+    finally:
+        table.close()
+        table.deleteLater()

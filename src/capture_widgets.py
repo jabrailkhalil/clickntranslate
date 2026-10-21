@@ -2,6 +2,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from button_styles import paint_down_arrow
 from languages import language_display_name, language_short_label
 from settings_window import DropDownCombo
 from styled_dialogs import install_tooltip_style, set_widget_stylesheet
@@ -141,13 +142,8 @@ class CaptureLanguageCombo(DropDownCombo):
         label = language_short_label(self.currentData()) if self.currentData() else self.currentText()
         label_rect = QtCore.QRectF(38*s, 0, self.width()-62*s, self.height())
         painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
-        painter.setPen(QtGui.QPen(QtGui.QColor(c['muted']), 1.5*s,
-                                QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
-        x, y = self.width()-15*s, self.height()/2
-        path = QtGui.QPainterPath(QtCore.QPointF(x-3*s, y-1.5*s))
-        path.lineTo(x, y+1.5*s)
-        path.lineTo(x+3*s, y-1.5*s)
-        painter.drawPath(path)
+        paint_down_arrow(painter, QtCore.QRectF(self.width()-24*s, 0, 18*s, self.height()),
+                         self.font(), QtGui.QColor(c['text']), s)
 
     def _paint_popup_frame(self):
         if not getattr(self, 'colors', None):

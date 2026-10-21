@@ -20,6 +20,13 @@ class PackageTable(QtWidgets.QTableWidget):
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self.fit_columns)
         self.verticalScrollBar().rangeChanged.connect(self._schedule_fit)
+        # Qt normally gives the bar the full table height, including the
+        # stationary header. Reserve that header height in its own layout so
+        # the draggable track belongs only to the rows, at every UI scale.
+        self._scroll_header_gap = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        self.verticalScrollBar().parentWidget().layout().insertSpacerItem(0, self._scroll_header_gap)
+        self.horizontalHeader().geometriesChanged.connect(self._schedule_fit)
 
     def _schedule_fit(self, *_):
         self._fit_timer.start(0)
@@ -41,9 +48,16 @@ class PackageTable(QtWidgets.QTableWidget):
                 self._schedule_fit()
 
     def fit_columns(self):
-        if not self.isVisible() or self.columnCount() != 4:
+        if not self.isVisible():
             return
         header = self.horizontalHeader()
+        gap = header.height() if header.isVisible() else 0
+        if self._scroll_header_gap.sizeHint().height() != gap:
+            self._scroll_header_gap.changeSize(
+                0, gap, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+            self.verticalScrollBar().parentWidget().layout().invalidate()
+        if self.columnCount() != 4:
+            return
         metrics = self.fontMetrics()
         padding = max(12, metrics.height())
         header.setMinimumSectionSize(max(24, metrics.height()))

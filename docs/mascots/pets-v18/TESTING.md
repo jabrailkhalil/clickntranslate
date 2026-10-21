@@ -1,5 +1,43 @@
 # Validation
 
+The latest local UI follow-up reproduced the Reset hover bug at 80%, 125% and
+180%, and the package scrollbar/header overlap at two header heights before
+fixing them. Global button hover now maps through the actual proxy viewport;
+native hover flags, press state and mouse focus are cleared without losing
+intentional keyboard focus. The five general-settings fields share their box
+insets and value font, and drop-downs use the stepper glyph rotated down.
+
+The complete eight-part run plus the final replacement of part 6 produced
+**1992 passed, 77 skipped and the same 2 pre-existing version failures**. The
+initial part-6 pixel assertion was corrected to allow Qt's one-pixel fractional
+proxy rounding; its final run passed **290 checks and 11 subtests**, with 9
+native-only skips. A final cross-control run passed **110 checks and 26
+subtests**. It covers six languages, both themes, actual painted field bounds,
+matching value fonts, bounded arrows, ordinary-button hover cleanup and dynamic
+toolbar scaling. The existing dynamic toolbar retains its 15px font while the
+main settings use 14px throughout their right column. Another **60 hidden native
+Windows label measurements** passed. Hidden dialog rendering at 80%, 100% and
+150% confirmed that scrollbar tracks start at the row viewport below the
+header. All completed isolated runs kept user data unchanged. The source app
+was opened for review; no build, push or release was made. Android remains in
+the separate agent's scope. The immutable earlier source-commit records below
+and in `test-summary.json` are retained.
+
+The unpublished settings follow-up puts Scale directly below result visibility,
+followed by a named result-text arrow control and its live sample. It passed
+**136 checks, 1 native-only skip and 167 layout subtests**, covering six locales,
+both themes, bounded mouse/keyboard steps, live result updates and selection
+cleanup. Another **60 native Windows font/label measurements** passed without
+showing test windows. The prior complete-suite record below is unchanged; no
+release, push or PR update was made for this local follow-up.
+
+The next local follow-up reproduced both mouse-click endpoint highlight bugs
+before fixing them. Disabling an arrow now clears mouse focus/hover first,
+preventing Qt from assigning false Tab focus to its neighbour. Actual keyboard
+input still retains keyboard focus. The sample has a theme-aware frame with
+padding, checked against the largest text's available content area. These
+changes passed **112 checks and 167 layout subtests** with user data unchanged.
+
 All six exact encoded Pets v2 atlases retain their structural, visual-quality,
 blind direction and Pets MCP acceptance records. This UI update does not modify
 or regenerate artwork.
