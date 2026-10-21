@@ -4,7 +4,7 @@ Translate screens, text and photos in one app.
 
 [Русский](README.md) · [Website](https://clickn.dev) · [Telegram](https://t.me/jabrail_digital)
 
-## Android 0.3.3 — preview
+## Android 1.8.2 — release preparation
 
 - Four destinations: **Screen**, **Text**, **History**, **Settings**.
 - A prominent start button, visible language pair and direct service configuration.
@@ -13,7 +13,7 @@ Translate screens, text and photos in one app.
 - Google, Lingva, MyMemory and LibreTranslate, additional API services and offline models.
 - Text translation with copy, sharing and local history of up to 50 entries.
 - Gallery translation and image sharing from other apps.
-- Two setup steps: appearance, then languages and a short usage guide.
+- Three setup steps: interface language, theme, then translation languages and a short usage guide.
 - Glossary mode cards and a separate opt-in Japanese sound-effects pack.
 - Five static companions — Chester the cat, Doc, Pancake, Raf and Lola — and imported pictures for the floating button.
 - Reading cards and the button hide after inactivity; pin a result to keep it open.
@@ -21,11 +21,11 @@ Translate screens, text and photos in one app.
 
 Requires Android 8.0+ and ARM64. Local LLMs require Android 13+. Root is not needed for the standard capture flow.
 
-[Download preview APK 0.3.3](artifacts/android/README.md) · [New static mascots](docs/android-mascots-2026-10-22.md) · [Modes and limitations](docs/android-preview-v2.md).
+[Download signed APK 1.8.2](artifacts/android/README.md) · [Mascots, setup and signing](docs/android-1.8.2.md) · [Modes and limitations](docs/android-preview-v2.md).
 
 ## Setup
 
-Choose a theme thumbnail and interface language, then the translation languages. Setup preserves the existing service; new installations use Google. Overlay permission and screen-capture consent are requested when starting screen translation. Other permission, service and model checks are available on the home screen and in settings.
+Choose the interface language, then a theme thumbnail and translation languages. Setup preserves the existing service; new installations use Google. Overlay permission and screen-capture consent are requested when starting screen translation. Other permission, service and model checks are available on the home screen and in settings.
 
 Google needs no key. MyMemory requires an explicit source language. Lingva accepts a server URL; LibreTranslate accepts a server URL and an optional key. Connection testing sends a sample phrase to the selected service. API keys use the app’s protected credential storage.
 

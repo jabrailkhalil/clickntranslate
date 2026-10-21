@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_choose_language_body">请选择应用语言，之后可在设置中更改。</string>
+</resources>

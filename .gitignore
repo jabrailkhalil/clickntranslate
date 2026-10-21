@@ -17,6 +17,7 @@ local.properties
 *.keystore
 *.jks
 *.jks.b64
+signing.private.json
 /app/release/
 /app/debug/
 

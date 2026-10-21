@@ -8,9 +8,8 @@ import dev.clickn.translate.R
 
 internal enum class AppCompanion(
     val id: String, @StringRes val label: Int, @DrawableRes val image: Int,
-    val needsLightBackdrop: Boolean = false,
 ) {
-    CHESTER("chester", R.string.companion_chester, R.drawable.companion_chester, needsLightBackdrop = true),
+    CHESTER("chester", R.string.companion_chester, R.drawable.companion_chester),
     DOC("doc", R.string.companion_doc, R.drawable.companion_doc),
     PANCAKE("pancake", R.string.companion_pancake, R.drawable.companion_pancake),
     RAF("bubu", R.string.companion_raf, R.drawable.companion_raf),

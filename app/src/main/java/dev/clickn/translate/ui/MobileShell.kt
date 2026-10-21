@@ -672,7 +672,7 @@ internal fun AppearanceSheet() {
     }
 }
 
-private val interfaceLanguages = listOf("en" to "English", "ru" to "Русский", "de" to "Deutsch", "fr" to "Français", "es" to "Español", "zh-CN" to "中文")
+internal val interfaceLanguages = listOf("en" to "English", "ru" to "Русский", "de" to "Deutsch", "fr" to "Français", "es" to "Español", "zh-CN" to "中文")
 
 @Composable
 internal fun InterfaceLanguageSheet(onDismiss: () -> Unit) {

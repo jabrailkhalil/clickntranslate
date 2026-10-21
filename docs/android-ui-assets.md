@@ -2,9 +2,9 @@
 
 The default CT logo is the original desktop `src/icons/icon.png`, copied unchanged to `app/src/main/res/drawable-nodpi/ic_clickn_logo.png`. The adaptive launcher uses that same bitmap; the monochrome themed icon preserves its CT lettering.
 
-The current six static characters were redrawn together for preview 0.3.2. Full-size masters, packaged assets and exact current prompts are documented in [Android preview artwork](android-preview-v2-artwork.md). The original desktop poses served as identity references.
+The current five static characters were redrawn facing the viewer for Android 1.8.2, without added outlines or badges. Full-size masters, packaged assets and exact prompts are documented in [Android 1.8.2 artwork and signing](android-1.8.2.md). Earlier preview artwork remains in [the historical preview report](android-preview-v2-artwork.md).
 
-Chester is the new fox, generated on 2026-10-03 using the built-in image generation tool. The existing robot pose was supplied only as a style reference. The transparent PNG is saved at `app/src/main/res/drawable-nodpi/companion_chester.png`.
+Chester is now the cat from the current desktop mascot set; the earlier fox design has been replaced. Doc is the cream robot, Pancake the golden pancake, Raf the legless blue jelly and Lola the peach.
 
 ## Earlier Chester generation prompt (preview 0.3.1)
 

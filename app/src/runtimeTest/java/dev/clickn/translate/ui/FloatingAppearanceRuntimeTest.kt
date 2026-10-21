@@ -43,7 +43,7 @@ class FloatingAppearanceRuntimeTest {
             CompanionPrefs.write(app, AppCompanion.CHESTER.id)
             shadowOf(Looper.getMainLooper()).idle()
             assertNotSame(previous, icon.drawable)
-            assertNotNull("Chester needs a light backing on dark screens", icon.background)
+            assertNull("Character artwork has no added badge or outline", icon.background)
             assertEquals(FloatingSkill.WORD_SELECT, manager.skill)
             assertEquals(AppCompanion.CHESTER.id, CompanionPrefs.read(app))
             manager.hide()

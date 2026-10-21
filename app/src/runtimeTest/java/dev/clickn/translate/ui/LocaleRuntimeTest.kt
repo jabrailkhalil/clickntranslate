@@ -21,34 +21,35 @@ import org.robolectric.annotation.LooperMode
 class LocaleRuntimeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     @Test fun russianChoiceAppliesToStartupImmediately() {
-        setupClick("Interface language")
-        compose.onNodeWithText("Русский").performClick()
+        compose.onNodeWithTag("setup-language-ru").assertIsDisplayed().performClick()
         compose.waitForIdle()
-        assertSetupShown("Выбери тему")
+        assertSetupShown("Язык интерфейса")
+        compose.onNodeWithTag("setup-language-ru").assertIsSelected()
         assertEquals("ru", AppLocalePrefs.read(compose.activity))
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
-        assertSetupShown("Выбери тему")
+        assertSetupShown("Язык интерфейса")
+        compose.onNodeWithTag("setup-language-ru").assertIsSelected()
     }
     @Test fun allSixInterfaceLanguagesApplyInActualActivity() {
         val choices = listOf(
-            Triple("Русский", "Выбери тему", "Язык интерфейса"),
-            Triple("Deutsch", "Wähle ein Design", "App-Sprache"),
-            Triple("Français", "Choisis un thème", "Langue de l’interface"),
-            Triple("Español", "Elige un tema", "Idioma de la interfaz"),
-            Triple("中文", "选择主题", "界面语言"),
-            Triple("English", "Choose a theme", "Interface language"),
+            "Русский" to "Язык интерфейса",
+            "Deutsch" to "App-Sprache",
+            "Français" to "Langue de l’interface",
+            "Español" to "Idioma de la interfaz",
+            "中文" to "界面语言",
+            "English" to "Interface language",
         )
-        var label = "Interface language"
-        choices.forEach { (name, start, nextLabel) ->
-            setupClick(label)
+        choices.forEach { (name, heading) ->
+            compose.onNodeWithTag("setup-options").performScrollToNode(hasText(name))
             compose.onNodeWithText(name).performClick()
             compose.waitForIdle()
-            assertSetupShown(start)
-            label = nextLabel
+            assertSetupShown(heading)
         }
     }
     @Test fun paperThemePersistsAcrossRecreation() {
+        compose.onNodeWithText(resource(R.string.setup_next)).performClick()
+        compose.waitForIdle()
         compose.onNodeWithTag("setup-options").performScrollToNode(hasTestTag("theme-${ThemeMode.PAPER_NIGHT}"))
         compose.onNodeWithTag("theme-${ThemeMode.PAPER_NIGHT}").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithTag("theme-${ThemeMode.PAPER_NIGHT}").performClick()
@@ -77,18 +78,16 @@ class LocaleRuntimeTest {
     }
 
     private fun finishIntro() {
-        compose.onNodeWithText(resource(R.string.setup_next)).performClick()
-        compose.waitForIdle()
+        repeat(2) {
+            compose.onNodeWithText(resource(R.string.setup_next)).performClick()
+            compose.waitForIdle()
+        }
         compose.onNodeWithText(resource(R.string.setup_finish)).assertIsDisplayed().performClick()
         compose.waitForIdle()
     }
     private fun assertSetupShown(label: String) {
         compose.onNodeWithTag("setup-options").performScrollToNode(hasText(label))
         compose.onNodeWithText(label).assertIsDisplayed()
-    }
-    private fun setupClick(label: String) {
-        assertSetupShown(label)
-        compose.onNodeWithText(label).performClick()
     }
     private fun listClick(label: String) {
         val row = hasText(label) and hasClickAction()

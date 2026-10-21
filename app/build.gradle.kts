@@ -53,8 +53,8 @@ android {
         manifestPlaceholders["launcherLabel"] = "Clickn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.3.3"
+        versionCode = 7
+        versionName = "1.8.2"
         buildConfigField("String", "MOBILE_RELEASE_API_URL", "\"$mobileReleaseApiUrl\"")
 
         // Controlled local-LLM A/B switch. PP remains device-policy selected (6 on the

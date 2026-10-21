@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -22,6 +22,7 @@ import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureStartMode
 import dev.clickn.translate.capture.CaptureStartPreference
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.AppLocalePrefs
 import dev.clickn.translate.data.TranslatorEngine
 
 internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallback: Intent? = null) {
@@ -34,6 +35,8 @@ internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallbac
 @Composable
 fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, viewModel: MobileViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsState()
+    val context = LocalContext.current
+    var appLanguage by remember { mutableStateOf(AppLocalePrefs.read(context)) }
     var step by rememberSaveable { mutableIntStateOf(0) }
     var sheet by rememberSaveable { mutableStateOf("") }
     val finish = {
@@ -49,10 +52,10 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
         bottomBar = {
             Surface {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-                    Button(onClick = { if (step == 0) step++ else finish() },
-                        enabled = step == 0 || setupLanguagePairReady(settings),
+                    Button(onClick = { if (step < 2) step++ else finish() },
+                        enabled = step < 2 || setupLanguagePairReady(settings),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                        Text(stringResource(if (step == 0) R.string.setup_next else R.string.setup_finish))
+                        Text(stringResource(if (step < 2) R.string.setup_next else R.string.setup_finish))
                     }
                 }
             }
@@ -62,16 +65,28 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
             LazyColumn(Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("setup-options"),
                 contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
-                    Text(stringResource(R.string.setup_step, step + 1, 2), color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(if (step == 0) R.string.polish_choose_theme else R.string.setup_translation),
+                    Text(stringResource(R.string.setup_step, step + 1, 3), color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(when (step) {
+                        0 -> R.string.mobile_interface_language
+                        1 -> R.string.polish_choose_theme
+                        else -> R.string.setup_translation
+                    }),
                         Modifier.padding(top = 12.dp), style = MaterialTheme.typography.headlineMedium)
-                    Text(stringResource(if (step == 0) R.string.setup_simple_appearance else R.string.setup_simple_languages),
+                    Text(stringResource(when (step) {
+                        0 -> R.string.setup_choose_language_body
+                        1 -> R.string.setup_simple_appearance
+                        else -> R.string.setup_simple_languages
+                    }),
                         Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (step == 0) {
+                    item { SetupLanguageChoices(appLanguage) { tag ->
+                        appLanguage = tag
+                        AppLocalePrefs.write(context, tag)
+                    } }
+                } else if (step == 1) {
                     item { BrandLogo(Modifier.size(56.dp)) }
                     themeChoices.chunked(2).forEach { choices -> item { ThemeChoiceRow(choices) } }
-                    item { SetupButton(R.string.mobile_interface_language, Icons.Outlined.Language) { sheet = "interface" } }
                 } else {
                     settings?.let { current ->
                         item { LanguagePair(current, { sheet = "source" }, { sheet = "target" }, {
@@ -95,7 +110,6 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
     }
     if (sheet.isNotEmpty()) ModalBottomSheet(onDismissRequest = { sheet = "" }) {
         when (sheet) {
-            "interface" -> InterfaceLanguageSheet { sheet = "" }
             "source", "target" -> {
                 val source = sheet == "source"
                 val current = settings ?: Settings()
@@ -114,10 +128,3 @@ internal fun setupLanguagePairReady(settings: Settings?): Boolean = settings != 
     settings.targetLang.isNotBlank() && settings.targetLang != "auto" &&
     (settings.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT) ||
         settings.sourceLang.isNotBlank() && settings.sourceLang != "auto")
-
-@Composable
-private fun SetupButton(label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-        Icon(icon, null); Spacer(Modifier.width(12.dp)); Text(stringResource(label))
-    }
-}

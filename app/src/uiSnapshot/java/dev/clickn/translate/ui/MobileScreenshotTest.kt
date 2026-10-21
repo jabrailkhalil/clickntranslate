@@ -15,6 +15,7 @@ import dev.clickn.translate.data.RenderMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.TranslatorEngine
@@ -126,6 +127,13 @@ class MobileScreenshotTest {
     }
     @Test fun translationReviewHelp() = render {
         Column(Modifier.padding(24.dp)) { TranslationReviewHelpIllustration() }
+    }
+    @Test fun startupLanguage() = render {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(stringResource(R.string.mobile_interface_language), style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.setup_choose_language_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SetupLanguageChoices("ru", {})
+        }
     }
     private fun render(mode: Int = ThemeMode.LIGHT, content: @androidx.compose.runtime.Composable () -> Unit) {
         paparazzi.snapshot {
