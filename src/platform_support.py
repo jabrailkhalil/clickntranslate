@@ -1,9 +1,8 @@
 """Operating system specifics for Click'n'Translate.
 
 Shared platform selection for Windows, Linux and macOS lives here; native Mac
-bridges are in macos_desktop, macos_hotkeys and macos_ocr. The Windows implementations reproduce what
-1.5.5 already shipped; the Linux ones follow the conventions used by comparable
-Linux tools (NormCap, Flameshot):
+bridges are in macos_desktop, macos_hotkeys and macos_ocr. Windows retains the
+existing native integrations. Linux uses desktop-managed integration:
 
 * no in-app global hotkeys — the user binds a command in the desktop
   environment's own keyboard settings (see `shortcut_command`),

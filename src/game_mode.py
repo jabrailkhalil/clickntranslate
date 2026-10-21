@@ -1,10 +1,8 @@
 """Dynamic OCR translation for one or more user-selected screen regions.
 
-The mode intentionally reuses Click'n'Translate's OCR and translation engines.
-Its orchestration follows the useful parts shared by open-source game
-translators such as Translumo, SubLens and GameLingo: skip visually unchanged
-frames, ignore small OCR jitter, pause outside the bound app, and paint the
-translation over the source location instead of opening a separate result UI.
+The mode uses Click'n'Translate's OCR and translation engines. It skips visually
+unchanged frames, ignores small OCR jitter, pauses outside the bound app, and
+paints translations over the source location instead of a separate result UI.
 """
 
 from __future__ import annotations

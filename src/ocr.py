@@ -3751,9 +3751,9 @@ class ScreenCaptureOverlay(QWidget):
         A translucent window only looks translucent where a compositing manager
         is running. GNOME and KDE composite; openbox, i3 and a plain XFCE do not,
         and there the selection overlay comes out solid black — the user drags a
-        box across a black screen. Flameshot and NormCap both sidestep this by
-        selecting on a frozen screenshot, so Linux does the same here whatever
-        the setting says. Windows composites always and keeps the setting.
+        box across a black screen. Linux uses a frozen screenshot regardless of
+        the setting, ensuring that the screen stays visible during selection.
+        Windows composites always and keeps the setting.
         """
         if platform_support.IS_LINUX or platform_support.IS_MAC:
             return True

@@ -69,10 +69,7 @@ research has also shown that inconsistent training and evaluation choices can
 make OCR comparisons misleading [@baek2019comparison], motivating explicit
 configuration and provenance at the application boundary.
 
-NormCap combines screen capture with OCR for copying otherwise inaccessible
-text [@normcap], and Crow Translate integrates desktop translation with OCR and
-global shortcuts [@crowtranslate]. Click'n'Translate differs in the combination
-of four selectable OCR families, local and online translation routes, managed
+Click'n'Translate combines four selectable OCR families, local and online translation routes, managed
 language packages, area and full-screen overlays, selected-text replacement,
 document translation, Windows and Linux platform adapters, and release-level
 verification. Its research contribution is not a claim that each individual

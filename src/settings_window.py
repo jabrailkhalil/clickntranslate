@@ -1801,7 +1801,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
         "translation_result_font_label": "Font size:",
-        "translation_result_font_tooltip": "Size of the source and translation text in the result window.",
+        "translation_result_font_tooltip": "Only changes source and translated text in the separate result window. Use Scale to resize the whole interface.",
         "translation_result_font_xsmall": "Extra small",
         "translation_result_font_small": "Small",
         "translation_result_font_medium": "Medium",
@@ -1936,7 +1936,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
         "translation_result_font_label": "Размер шрифта:",
-        "translation_result_font_tooltip": "Размер текста оригинала и перевода в окне результата.",
+        "translation_result_font_tooltip": "Только размер оригинала и перевода в отдельном окне результата. Общий размер интерфейса меняется пунктом «Масштаб».",
         "translation_result_font_xsmall": "Очень мелкий",
         "translation_result_font_small": "Мелкий",
         "translation_result_font_medium": "Обычный",
@@ -2069,7 +2069,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
         "translation_result_font_label": "Tamaño de fuente:",
-        "translation_result_font_tooltip": "Tamaño del texto original y traducido en la ventana de resultado.",
+        "translation_result_font_tooltip": "Solo cambia el texto original y traducido en la ventana de resultado. Usa Escala para cambiar el tamaño de toda la interfaz.",
         "translation_result_font_xsmall": "Muy pequeña",
         "translation_result_font_small": "Pequeña",
         "translation_result_font_medium": "Mediana",
@@ -2202,7 +2202,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
         "translation_result_font_label": "Schriftgröße:",
-        "translation_result_font_tooltip": "Schriftgröße von Original und Übersetzung im Ergebnisfenster.",
+        "translation_result_font_tooltip": "Ändert nur Original und Übersetzung im separaten Ergebnisfenster. Die gesamte Oberfläche wird über Skalierung vergrößert oder verkleinert.",
         "translation_result_font_xsmall": "Sehr klein",
         "translation_result_font_small": "Klein",
         "translation_result_font_medium": "Mittel",
@@ -2335,7 +2335,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
         "translation_result_font_label": "Taille de police :",
-        "translation_result_font_tooltip": "Taille du texte source et traduit dans la fenêtre de résultat.",
+        "translation_result_font_tooltip": "Modifie uniquement le texte source et traduit dans la fenêtre de résultat. Utilisez Échelle pour redimensionner toute l’interface.",
         "translation_result_font_xsmall": "Très petite",
         "translation_result_font_small": "Petite",
         "translation_result_font_medium": "Moyenne",
@@ -2468,7 +2468,7 @@ SETTINGS_TEXT = {
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
         "translation_result_font_label": "字体大小：",
-        "translation_result_font_tooltip": "结果窗口中原文和译文的字号。",
+        "translation_result_font_tooltip": "仅更改独立结果窗口中原文和译文的字号。整个界面的大小请通过“缩放”调整。",
         "translation_result_font_xsmall": "极小",
         "translation_result_font_small": "小",
         "translation_result_font_medium": "中",
@@ -7727,8 +7727,8 @@ class SettingsWindow(QWidget):
         self.ui_scale_value.cancel_requested.connect(self._refresh_ui_scale)
         self.ui_scale_value.step_requested.connect(lambda step: self._step_ui_scale(step, self.ui_scale_value))
         self.ui_scale_label.setBuddy(self.ui_scale_value)
-        form_grid.addWidget(self.ui_scale_label, 3, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.ui_scale_control, 3, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_label, 4, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.ui_scale_control, 4, 2, Qt.AlignVCenter)
         scale_tooltip = tooltip_text(settings_text(lang, 'ui_scale_hint'))
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
@@ -7760,12 +7760,13 @@ class SettingsWindow(QWidget):
         self.translation_font_combo.setAccessibleName(settings_text(lang, "translation_result_font_label"))
         font_tooltip = tooltip_text(settings_text(lang, "translation_result_font_tooltip"))
         self.translation_font_combo.setToolTip(font_tooltip)
+        self.translation_font_combo.setAccessibleDescription(settings_text(lang, "translation_result_font_tooltip"))
         self.translation_font_label.setToolTip(font_tooltip)
         self.translation_font_combo.currentIndexChanged.connect(
             self._set_translation_result_font_size
         )
-        form_grid.addWidget(self.translation_font_label, 4, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.translation_font_combo, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_label, 3, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_combo, 3, 2, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text

@@ -790,9 +790,9 @@ These follow what the closest comparable Linux apps do, not invention:
 
 | Decision | Rationale |
 | --- | --- |
-| **No in-app global hotkeys.** The user binds `clickntranslate --ocr` etc. in their desktop settings | X11 grabs collide with the desktop and Wayland forbids them. NormCap has an ADR for exactly this; Flameshot asks users to bind `flameshot gui` |
-| **Capture via xdg-desktop-portal on Wayland**, Qt on X11, with `grim`/`gnome-screenshot`/`spectacle` fallbacks | Flameshot ≥12 and NormCap both use the portal; the helpers cover compositors whose portal is missing |
-| **AppImage + tarball**, Flatpak deferred | NormCap now prefers Flatpak, but it has no runtime-installed engines. Ours pip-installs EasyOCR/RapidOCR through a *system* Python and downloads Argos models — a Flatpak sandbox breaks both |
+| **No in-app global hotkeys.** The user binds `clickntranslate --ocr` etc. in their desktop settings | X11 grabs collide with the desktop and Wayland forbids them. Desktop-managed shortcut commands avoid those conflicts |
+| **Capture via xdg-desktop-portal on Wayland**, Qt on X11, with `grim`/`gnome-screenshot`/`spectacle` fallbacks | The portal provides screen-access consent; the helpers cover compositors whose portal is missing |
+| **AppImage + tarball**, Flatpak deferred | The application pip-installs EasyOCR/RapidOCR through a *system* Python and downloads Argos models — a Flatpak sandbox breaks both |
 | **No self-update**, only a version check | The updater is C#/WinForms + Inno + exe replacement. Linux packages are updated by whatever installed them |
 
 ### 13.2 New modules
@@ -1127,7 +1127,7 @@ Installing a Windows OCR language is `dism.exe /Online /Add-Capability` against 
 Demand that Windows Update has to fetch. Two properties of that mechanism drive the whole
 design:
 
-1. **Microsoft promises no ETA.** Its OCR and PowerToys documentation says installation may
+1. **Microsoft promises no ETA.** OCR capability installation may
    take several minutes; measured DISM runs on this machine sat on one component percentage
    for several minutes and took as long as 16.5 minutes for one language.
 2. **CBS.log has two different signals, neither is an ETA.**
@@ -1486,8 +1486,7 @@ asking the frozen worker to import the real installation: `{"available": true, "
 
 The overlay is translucent, and translucency only works where a compositing manager runs. GNOME
 and KDE composite; openbox, i3 and a bare XFCE do not, and there the user would drag a selection
-box across a solid black screen. Flameshot and NormCap both select on a frozen screenshot for
-this reason, so `ScreenCaptureOverlay._freeze_required()` now returns True on Linux whatever the
+box across a solid black screen. A frozen screenshot keeps the captured content visible, so `ScreenCaptureOverlay._freeze_required()` now returns True on Linux whatever the
 "freeze screen" setting says. Windows keeps the setting.
 
 ### 19.3 Capture asked the environment instead of Qt
