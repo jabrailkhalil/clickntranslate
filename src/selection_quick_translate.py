@@ -206,7 +206,6 @@ class SelectionQuickTranslateController(QtCore.QObject):
             monitors.append(_SelectionChangePoller(self))
         elif platform_support.IS_WINDOWS:
             monitors.append(_WindowsMouseReleasePoller(self))
-            monitors.append(_SelectionChangePoller(self))
         else:
             return
         self._activity_monitors = monitors
@@ -253,20 +252,24 @@ class SelectionQuickTranslateController(QtCore.QObject):
             return False
         return True
 
+    def _read_probe_text(self):
+        return read_selected_text(
+            allow_copy_fallback=not platform_support.IS_LINUX
+        ).strip()
+
     def _complete_probe(self):
         if not self._should_accept_activity():
             return
-        allow_copy = self._mode == "automatic" and not platform_support.IS_LINUX
-        text = read_selected_text(allow_copy_fallback=allow_copy)
+        text = self._read_probe_text()
+        if len(text) < MIN_SELECTION_CHARS:
+            return
         if self._mode == "automatic":
-            if len(text.strip()) < MIN_SELECTION_CHARS:
-                return
             if text == self._last_auto_text:
                 return
             self._last_auto_text = text
             self.translate_requested.emit(text)
             return
-        self._pending_text = text.strip()
+        self._pending_text = text
         self._button.show_near(self._anchor)
         self._hide_timer.start()
 

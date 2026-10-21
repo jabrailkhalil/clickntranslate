@@ -8477,6 +8477,24 @@ class SettingsWindow(QWidget):
                 border: 1px solid {colors['border']};
                 border-radius: 10px;
             }}
+            QCheckBox#settingsPageCheckbox {{
+                color: {colors['text']};
+                font-size: 14px;
+                spacing: 8px;
+                background: transparent;
+            }}
+            QCheckBox#settingsPageCheckbox:disabled {{
+                color: {colors['muted']};
+            }}
+            QRadioButton#settingsPageRadio {{
+                color: {colors['text']};
+                font-size: 13px;
+                spacing: 8px;
+                background: transparent;
+            }}
+            QRadioButton#settingsPageRadio:disabled {{
+                color: {colors['muted']};
+            }}
             QLabel#secondaryFieldLabel {{
                 color: {colors['text']};
                 font-size: 14px;
@@ -8634,9 +8652,11 @@ class SettingsWindow(QWidget):
         self.selection_quick_translate_mode_button = QRadioButton(
             settings_text(lang, "selection_quick_translate_mode_button")
         )
+        self.selection_quick_translate_mode_button.setObjectName("settingsPageRadio")
         self.selection_quick_translate_mode_automatic = QRadioButton(
             settings_text(lang, "selection_quick_translate_mode_automatic")
         )
+        self.selection_quick_translate_mode_automatic.setObjectName("settingsPageRadio")
         saved_mode = str(self.parent.config.get("selection_quick_translate_mode") or "button")
         if saved_mode == "automatic":
             self.selection_quick_translate_mode_automatic.setChecked(True)

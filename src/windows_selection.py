@@ -37,12 +37,4 @@ def _read_via_comtypes():
                     return text
     except Exception:
         logger.debug("TextPattern selection read failed", exc_info=True)
-    try:
-        value_pattern = element.GetCurrentPattern(10002)  # UIA_ValuePatternId
-        if value_pattern is not None:
-            text = str(getattr(value_pattern, "CurrentValue", "") or "").strip()
-            if text:
-                return text
-    except Exception:
-        logger.debug("ValuePattern selection read failed", exc_info=True)
     return ""
