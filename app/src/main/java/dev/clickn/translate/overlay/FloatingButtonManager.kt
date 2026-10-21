@@ -800,6 +800,9 @@ class FloatingButtonManager(
         val companion = AppCompanion.entries.firstOrNull { it.id == choice }
         val picture = if (choice == CompanionPrefs.CUSTOM) BrandIconPrefs.bitmap(context, floating = true) else null
         val hasPicture = companion != null || choice == CompanionPrefs.LOGO || picture != null
+        icon?.background = if (companion?.needsLightBackdrop == true) {
+            androidx.core.content.ContextCompat.getDrawable(context, R.drawable.bg_companion_contrast)
+        } else null
         icon?.scaleType = ImageView.ScaleType.FIT_CENTER
         when {
             picture != null -> icon?.setImageBitmap(picture)

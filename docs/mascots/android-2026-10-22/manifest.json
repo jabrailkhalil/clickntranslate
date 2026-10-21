@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-22",
+  "mode": "built-in image_gen",
+  "sourceCommit": "959175f",
+  "assets": [
+    {
+      "id": "chester",
+      "master": "output/imagegen/android-mascots-2026-10-22/companion_chester.png",
+      "packaged": "app/src/main/res/drawable-nodpi/companion_chester.png",
+      "reference": "docs/mascots/android-2026-10-22/references/chester.png",
+      "referenceDesktopPath": "src/icons/desktop-assistant/mochi/walk-redrawn-frames/00.png",
+      "prompt": "Use case: stylized-concept. Asset type: final STATIC transparent mascot illustration for the Android Clickn floating button, readable at 40–64 dp. Image 1 is the IDENTITY REFERENCE of the owner's current mascot, not a style to discard. Polish this same character into a richer, colorful, coherent premium 2.5D app sticker: plump simple forms, clean smooth contours, soft volumetric shading, bright tasteful highlights, warm friendly expression, controlled saturated accents. Keep the defining silhouette, species, body proportions, facial design and original palette. Complete character, calm standing/sitting three-quarter pose as in reference, centered square composition, character occupies about 82% of canvas, ears/antenna/leaves/feet fully visible. Strong readable contour and a restrained pale rim for contrast on dark and light screens. True transparent RGBA outside the character. No floor or cast shadow, no circular badge, no scenery, no text, no watermark, no extra props, no extra characters, no cropped anatomy, no animation sheet. Refine material and lighting; retain the approved character identity.\nSubject and identity constraints: Chester is the charcoal brown CAT in the reference (not the older fox). Keep rounded seated body, triangular ears with warm pink interiors, dark cocoa charcoal fur, curled short tail, large glossy eyes and small cute mouth, pink cheeks. Make highlights warm and clear enough for tiny sizes, with a subtle cream rim. Do not turn the fur white, orange, or add clothing.",
+      "masterSha256": "f4bf9ec92349368ba109fb0972c9d6b7f86cbc390fb6b3dfac8cead66e5c59fb",
+      "packagedSha256": "4a2fead7ea9ab0a566ab7e43f1a5d67679f36c96f06e58bc99373833530d7a6e",
+      "referenceSha256": "495d11a2757f387b1d2422a24d8eefd69e0164106075223fb7c89bcad75fb852",
+      "crop": [
+        0,
+        9,
+        1224,
+        1254
+      ],
+      "packedSize": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": "doc",
+      "master": "output/imagegen/android-mascots-2026-10-22/companion_doc.png",
+      "packaged": "app/src/main/res/drawable-nodpi/companion_doc.png",
+      "reference": "docs/mascots/android-2026-10-22/references/doc.png",
+      "referenceDesktopPath": "src/icons/desktop-assistant/orbit/walk-traced-frames/00.png",
+      "prompt": "Use case: stylized-concept. Asset type: final STATIC transparent mascot illustration for the Android Clickn floating button, readable at 40–64 dp. Image 1 is the IDENTITY REFERENCE of the owner's current mascot, not a style to discard. Polish this same character into a richer, colorful, coherent premium 2.5D app sticker: plump simple forms, clean smooth contours, soft volumetric shading, bright tasteful highlights, warm friendly expression, controlled saturated accents. Keep the defining silhouette, species, body proportions, facial design and original palette. Complete character, calm standing/sitting three-quarter pose as in reference, centered square composition, character occupies about 82% of canvas, ears/antenna/leaves/feet fully visible. Strong readable contour and a restrained pale rim for contrast on dark and light screens. True transparent RGBA outside the character. No floor or cast shadow, no circular badge, no scenery, no text, no watermark, no extra props, no extra characters, no cropped anatomy, no animation sheet. Refine material and lighting; retain the approved character identity.\nSubject and identity constraints: Doc is this small rounded ivory cream ROBOT, egg-like body, tiny ivory rounded arms, squat teal boots, short antenna with cyan round tip, compact dark navy visor with TWO SMALL ROUND CYAN EYES with white glints and a tiny cyan smile. Preserve the approved smaller rounded eyes and compact visor. Smooth away raster stair-stepping but preserve body shape and colors. No huge eyes, no tall eye outlines, no new robot parts or props.",
+      "masterSha256": "bbd4c7517ef113a9bbb9679a5f4614ffded6d3a86b58b18ccc27a75273494135",
+      "packagedSha256": "c1d70e3e5ef32169108aa8d68a9e093318c0ff3c350c1b2aa15e22a809445839",
+      "referenceSha256": "e69000284a7824660f12ecb1b8d03b17502bf7299a37e08e2b58b9193e936200",
+      "crop": [
+        0,
+        9,
+        1240,
+        1254
+      ],
+      "packedSize": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": "pancake",
+      "master": "output/imagegen/android-mascots-2026-10-22/companion_pancake.png",
+      "packaged": "app/src/main/res/drawable-nodpi/companion_pancake.png",
+      "reference": "docs/mascots/android-2026-10-22/references/pancake.png",
+      "referenceDesktopPath": "src/icons/desktop-assistant/pancake/walk-redrawn-frames/00.png",
+      "prompt": "Use case: stylized-concept. Asset type: final STATIC transparent mascot illustration for the Android Clickn floating button, readable at 40–64 dp. Image 1 is the IDENTITY REFERENCE of the owner's current mascot, not a style to discard. Polish this same character into a richer, colorful, coherent premium 2.5D app sticker: plump simple forms, clean smooth contours, soft volumetric shading, bright tasteful highlights, warm friendly expression, controlled saturated accents. Keep the defining silhouette, species, body proportions, facial design and original palette. Complete character, calm standing/sitting three-quarter pose as in reference, centered square composition, character occupies about 82% of canvas, ears/antenna/leaves/feet fully visible. Strong readable contour and a restrained pale rim for contrast on dark and light screens. True transparent RGBA outside the character. No floor or cast shadow, no circular badge, no scenery, no text, no watermark, no extra props, no extra characters, no cropped anatomy, no animation sheet. Refine material and lighting; retain the approved character identity.\nSubject and identity constraints: Blinchik/Pancake is this thick golden pancake buddy, warm toasted golden top, pale creamy side, butter square on top, small rounded side arms, plump caramel brown oval feet, dark glossy eyes, small happy mouth and pink cheeks. Rich golden maple highlights and buttery glow. It must remain a pancake, not a bread roll or a pancake stack.",
+      "masterSha256": "2c246dd86c0e46fedef27498476ba8f56c9ff7d414e3112734918cc0e05273a8",
+      "packagedSha256": "241ab7067f9f1f1333265a3d47f10aa5cb3a3ebffb4183556aeaca4ed4a1276d",
+      "referenceSha256": "02cd68d306fec38eef6783d5a7ce2a0b813205b628dfadb2b4d26fe9e7292200",
+      "crop": [
+        0,
+        19,
+        1238,
+        1232
+      ],
+      "packedSize": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": "raf",
+      "master": "output/imagegen/android-mascots-2026-10-22/companion_raf.png",
+      "packaged": "app/src/main/res/drawable-nodpi/companion_raf.png",
+      "reference": "docs/mascots/android-2026-10-22/references/raf.png",
+      "referenceDesktopPath": "src/icons/desktop-assistant/bubu/walk-redrawn-frames/00.png",
+      "prompt": "Use case: stylized-concept. Asset type: final STATIC transparent mascot illustration for the Android Clickn floating button, readable at 40–64 dp. Image 1 is the IDENTITY REFERENCE of the owner's current mascot, not a style to discard. Polish this same character into a richer, colorful, coherent premium 2.5D app sticker: plump simple forms, clean smooth contours, soft volumetric shading, bright tasteful highlights, warm friendly expression, controlled saturated accents. Keep the defining silhouette, species, body proportions, facial design and original palette. Complete character, calm standing/sitting three-quarter pose as in reference, centered square composition, character occupies about 82% of canvas, ears/antenna/leaves/feet fully visible. Strong readable contour and a restrained pale rim for contrast on dark and light screens. True transparent RGBA outside the character. No floor or cast shadow, no circular badge, no scenery, no text, no watermark, no extra props, no extra characters, no cropped anatomy, no animation sheet. Refine material and lighting; retain the approved character identity.\nSubject and identity constraints: Raf is this legless blue JELLY, a low round translucent droplet with curved little tip, sky blue body, soft darker blue rim, glossy dark round eyes, tiny smile and pink cheeks. Colorful aqua highlights and convincing soft gel volume. Absolutely NO legs, feet, shoes, hands, tail, bubble props, puddle, or external shadow. Keep compact original silhouette.",
+      "masterSha256": "b1749081b0f2a7ad7e1b353e3c523539863b7e49df366e6fef69a01775d63ce4",
+      "packagedSha256": "31037a6289143f46832ab4bcfb93c618b48ecf85a79cc1addfc07403b399ec32",
+      "referenceSha256": "2ea1c6650f20ad1e7ea5985e6dc6b7659a4673089724fd7c8ef15f01b49f0073",
+      "crop": [
+        0,
+        0,
+        1238,
+        1254
+      ],
+      "packedSize": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": "lola",
+      "master": "output/imagegen/android-mascots-2026-10-22/companion_lola.png",
+      "packaged": "app/src/main/res/drawable-nodpi/companion_lola.png",
+      "reference": "docs/mascots/android-2026-10-22/references/lola.png",
+      "referenceDesktopPath": "src/icons/desktop-assistant/momo/walk-redrawn-frames/00.png",
+      "prompt": "Use case: stylized-concept. Asset type: final STATIC transparent mascot illustration for the Android Clickn floating button, readable at 40–64 dp. Image 1 is the IDENTITY REFERENCE of the owner's current mascot, not a style to discard. Polish this same character into a richer, colorful, coherent premium 2.5D app sticker: plump simple forms, clean smooth contours, soft volumetric shading, bright tasteful highlights, warm friendly expression, controlled saturated accents. Keep the defining silhouette, species, body proportions, facial design and original palette. Complete character, calm standing/sitting three-quarter pose as in reference, centered square composition, character occupies about 82% of canvas, ears/antenna/leaves/feet fully visible. Strong readable contour and a restrained pale rim for contrast on dark and light screens. True transparent RGBA outside the character. No floor or cast shadow, no circular badge, no scenery, no text, no watermark, no extra props, no extra characters, no cropped anatomy, no animation sheet. Refine material and lighting; retain the approved character identity.\nSubject and identity constraints: Lola is this pink PEACH buddy with two green leaves and a tiny brown stem on top, plump soft peach body, small rounded arms and rose pink feet, large glossy dark eyes, little smile and warm pink cheeks. Preserve peach character silhouette and leaf arrangement. Rich coral pink to rosy blush shading and fresh green highlights. No hair, clothing, fruit basket, or props.",
+      "masterSha256": "d4531939a32aecc439ca442f33972b641606b1a92894e2b44f59b9dec49f887b",
+      "packagedSha256": "39ca76d9d65f5e46b9a4d6cbf51e707adbc1ee3af8bc5dd5281dc9d0bae186bb",
+      "referenceSha256": "79672bdc8f4edf9395c8ecfc885c1895ea44bdc7aba5c9ecb26209b2cbe27f3c",
+      "crop": [
+        0,
+        76,
+        1210,
+        1238
+      ],
+      "packedSize": [
+        512,
+        512
+      ]
+    }
+  ]
+}

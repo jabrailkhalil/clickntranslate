@@ -8,13 +8,13 @@ import dev.clickn.translate.R
 
 internal enum class AppCompanion(
     val id: String, @StringRes val label: Int, @DrawableRes val image: Int,
+    val needsLightBackdrop: Boolean = false,
 ) {
-    CHESTER("chester", R.string.companion_chester, R.drawable.companion_chester),
+    CHESTER("chester", R.string.companion_chester, R.drawable.companion_chester, needsLightBackdrop = true),
     DOC("doc", R.string.companion_doc, R.drawable.companion_doc),
     PANCAKE("pancake", R.string.companion_pancake, R.drawable.companion_pancake),
-    MOCHI("mochi", R.string.companion_mochi, R.drawable.companion_mochi),
-    BUBU("bubu", R.string.companion_bubu, R.drawable.companion_bubu),
-    MOMO("momo", R.string.companion_momo, R.drawable.companion_momo),
+    RAF("bubu", R.string.companion_raf, R.drawable.companion_raf),
+    LOLA("momo", R.string.companion_lola, R.drawable.companion_lola),
 }
 
 /** Button appearance is independent of its action and of the installed launcher icon. */
@@ -23,8 +23,11 @@ internal object CompanionPrefs {
     const val LOGO = "logo"
     const val CUSTOM = "custom"
     private fun prefs(context: Context) = context.getSharedPreferences("clickn_floating_picture", Context.MODE_PRIVATE)
-    private fun normalized(choice: String?): String =
-        choice?.takeIf { it in setOf(ACTION, LOGO, CUSTOM) || AppCompanion.entries.any { c -> c.id == it } } ?: AppCompanion.CHESTER.id
+    private fun normalized(choice: String?): String = when (choice) {
+        "mochi" -> AppCompanion.CHESTER.id
+        else -> choice?.takeIf { it in setOf(ACTION, LOGO, CUSTOM) || AppCompanion.entries.any { c -> c.id == it } }
+            ?: AppCompanion.CHESTER.id
+    }
 
     fun keepVisible(context: Context): Boolean = prefs(context).getBoolean("keep_visible", false)
     fun setKeepVisible(context: Context, enabled: Boolean) {

@@ -15,7 +15,6 @@
     <string name="companion_chester">Честер</string>
     <string name="companion_doc">Док</string>
     <string name="companion_pancake">Блинчик</string>
-    <string name="companion_mochi">Моти</string>
-    <string name="companion_bubu">Бубу</string>
-    <string name="companion_momo">Момо</string>
+    <string name="companion_raf">Раф</string>
+    <string name="companion_lola">Лола</string>
 </resources>

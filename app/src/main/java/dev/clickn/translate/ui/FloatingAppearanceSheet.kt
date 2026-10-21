@@ -5,6 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -21,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -94,7 +98,7 @@ internal fun FloatingAppearanceSheet(settings: Settings, onUpdate: ((Settings) -
                             }
                         }
                     }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -131,10 +135,14 @@ internal fun FloatingAppearanceSheet(settings: Settings, onUpdate: ((Settings) -
 @Composable
 internal fun FloatingPicture(choice: String, bitmap: Bitmap?, modifier: Modifier = Modifier, actionPadding: Dp = 12.dp) {
     val companion = AppCompanion.entries.firstOrNull { it.id == choice }
+    val pictureModifier = if (companion?.needsLightBackdrop == true) modifier
+        .background(colorResource(R.color.companion_light_backdrop), CircleShape)
+        .border(1.dp, colorResource(R.color.companion_light_backdrop_border), CircleShape)
+    else modifier
     when {
         choice == CompanionPrefs.CUSTOM && bitmap != null -> Image(bitmap.asImageBitmap(), null, modifier, contentScale = ContentScale.Fit)
         choice == CompanionPrefs.LOGO -> BrandLogo(modifier)
-        companion != null -> Image(painterResource(companion.image), null, modifier, contentScale = ContentScale.Fit)
+        companion != null -> Image(painterResource(companion.image), null, pictureModifier, contentScale = ContentScale.Fit)
         else -> Icon(Icons.Outlined.TouchApp, null, modifier.padding(actionPadding), tint = MaterialTheme.colorScheme.primary)
     }
 }

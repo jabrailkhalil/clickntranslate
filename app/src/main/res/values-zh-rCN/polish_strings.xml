@@ -15,7 +15,6 @@
     <string name="companion_chester">Chester</string>
     <string name="companion_doc">Doc</string>
     <string name="companion_pancake">松饼</string>
-    <string name="companion_mochi">麻薯猫</string>
-    <string name="companion_bubu">布布</string>
-    <string name="companion_momo">桃桃</string>
+    <string name="companion_raf">Raf</string>
+    <string name="companion_lola">Lola</string>
 </resources>

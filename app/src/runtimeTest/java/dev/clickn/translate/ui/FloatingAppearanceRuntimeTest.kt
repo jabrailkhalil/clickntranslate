@@ -36,22 +36,37 @@ class FloatingAppearanceRuntimeTest {
             manager.skill = FloatingSkill.WORD_SELECT
             manager.show()
             val field = FloatingButtonManager::class.java.getDeclaredField("mainIcon").apply { isAccessible = true }
-            val icon = field.get(manager) as ImageView
+            var icon = field.get(manager) as ImageView
             assertEquals(0, icon.paddingLeft)
+            assertNull(icon.background)
             val previous = icon.drawable
             CompanionPrefs.write(app, AppCompanion.CHESTER.id)
             shadowOf(Looper.getMainLooper()).idle()
             assertNotSame(previous, icon.drawable)
+            assertNotNull("Chester needs a light backing on dark screens", icon.background)
             assertEquals(FloatingSkill.WORD_SELECT, manager.skill)
             assertEquals(AppCompanion.CHESTER.id, CompanionPrefs.read(app))
             manager.hide()
             manager.show()
-            assertEquals(0, (field.get(manager) as ImageView).paddingLeft)
+            icon = field.get(manager) as ImageView
+            assertEquals(0, icon.paddingLeft)
             assertEquals(FloatingSkill.WORD_SELECT, manager.skill)
             CompanionPrefs.write(app, CompanionPrefs.ACTION)
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue((field.get(manager) as ImageView).paddingLeft > 0)
+            assertNull(icon.background)
         } finally { manager.hide(); scope.cancel() }
+    }
+
+    @Test fun previousCatChoiceUsesChesterAndKeepsOtherPreferences() {
+        app.getSharedPreferences("clickn_floating_picture", Context.MODE_PRIVATE).edit()
+            .putString("choice", "mochi").putBoolean("keep_visible", true).commit()
+        assertEquals(AppCompanion.CHESTER.id, CompanionPrefs.read(app))
+        assertTrue(CompanionPrefs.keepVisible(app))
+        for (choice in listOf("doc", "pancake", "bubu", "momo", CompanionPrefs.CUSTOM)) {
+            CompanionPrefs.write(app, choice)
+            assertEquals(choice, CompanionPrefs.read(app))
+        }
     }
 
     @Test fun customButtonPictureIsIndependentOfHeaderAndSurvivesBadImport() {

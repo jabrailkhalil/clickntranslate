@@ -109,14 +109,16 @@ class MobileScreenshotTest {
             }
         }
     }
-    @Test fun floatingCharacters() {
+    @Test fun floatingCharacters() = floatingCharacters(ThemeMode.LIGHT)
+    @Test fun floatingCharactersDark() = floatingCharacters(ThemeMode.AMOLED)
+    private fun floatingCharacters(mode: Int) {
         val owner = object : ActivityResultRegistryOwner {
             override val activityResultRegistry = object : ActivityResultRegistry() {
                 override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I,
                     options: ActivityOptionsCompat?) = Unit
             }
         }
-        render {
+        render(mode) {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner) {
                 FloatingAppearanceSheet(settings, {}, {})
             }

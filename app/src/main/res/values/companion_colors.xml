@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="companion_light_backdrop">#FFF7ED</color>
+    <color name="companion_light_backdrop_border">#D8CFC1</color>
+</resources>

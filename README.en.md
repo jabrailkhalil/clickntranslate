@@ -4,7 +4,7 @@ Translate screens, text and photos in one app.
 
 [Русский](README.md) · [Website](https://clickn.dev) · [Telegram](https://t.me/jabrail_digital)
 
-## Android 0.3.2 — preview
+## Android 0.3.3 — preview
 
 - Four destinations: **Screen**, **Text**, **History**, **Settings**.
 - A prominent start button, visible language pair and direct service configuration.
@@ -15,13 +15,13 @@ Translate screens, text and photos in one app.
 - Gallery translation and image sharing from other apps.
 - Two setup steps: appearance, then languages and a short usage guide.
 - Glossary mode cards and a separate opt-in Japanese sound-effects pack.
-- Six static companions and imported pictures for the floating button.
+- Five static companions — Chester the cat, Doc, Pancake, Raf and Lola — and imported pictures for the floating button.
 - Reading cards and the button hide after inactivity; pin a result to keep it open.
 - Advanced OCR, model, speech, dictionary, glossary and floating-button options.
 
 Requires Android 8.0+ and ARM64. Local LLMs require Android 13+. Root is not needed for the standard capture flow.
 
-[Download preview APK 0.3.2](artifacts/android/README.md) · [Changes and limitations](docs/android-preview-v2.md).
+[Download preview APK 0.3.3](artifacts/android/README.md) · [New static mascots](docs/android-mascots-2026-10-22.md) · [Modes and limitations](docs/android-preview-v2.md).
 
 ## Setup
 
