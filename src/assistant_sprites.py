@@ -52,6 +52,20 @@ class SpriteAtlas:
     def __init__(self, mascot):
         self.mascot = mascot_id(mascot)
         self._pixmap = None
+        self._thumbnail = None
+
+    @property
+    def thumbnail(self):
+        if self._thumbnail is None:
+            reader = QtGui.QImageReader(art_path(f'{self.mascot}/pets-v2.png'))
+            if reader.size() != ATLAS:
+                raise ValueError(f'Invalid Pets v2 atlas for {self.mascot}')
+            reader.setScaledSize(ATLAS / 4)
+            pixmap = QtGui.QPixmap.fromImage(reader.read())
+            if pixmap.size() != ATLAS / 4 or not pixmap.hasAlphaChannel():
+                raise ValueError(f'Invalid Pets thumbnail for {self.mascot}')
+            self._thumbnail = pixmap
+        return self._thumbnail
 
     @property
     def pixmap(self):
@@ -62,17 +76,20 @@ class SpriteAtlas:
             self._pixmap = pixmap
         return self._pixmap
 
-    def source(self, state='idle', seconds=0., *, facing=1, gaze=None, index=None):
+    def source(self, state='idle', seconds=0., *, facing=1, gaze=None, index=None, compact=False):
+        pixmap = self.thumbnail if compact else self.pixmap
         if gaze is not None:
             direction = look_index(gaze)
-            return self.pixmap, QtCore.QRect(direction % 8 * 192,
-                                             (9 + direction // 8) * 208, 192, 208)
-        if state not in STATIONARY_STATES:
-            state = 'idle'
-        row, durations = ROWS[state]
-        count, pixmap = len(durations), self.pixmap
-        column = frame_index(durations, seconds) if index is None else int(index) % count
-        return pixmap, QtCore.QRect(column * 192, row * 208, 192, 208)
+            rect = QtCore.QRect(direction % 8 * 192, (9 + direction // 8) * 208, 192, 208)
+        else:
+            if state not in STATIONARY_STATES:
+                state = 'idle'
+            row, durations = ROWS[state]
+            column = frame_index(durations, seconds) if index is None else int(index) % len(durations)
+            rect = QtCore.QRect(column * 192, row * 208, 192, 208)
+        if compact:
+            rect = QtCore.QRect(rect.x()//4, rect.y()//4, 48, 52)
+        return pixmap, rect
 
     def pose(self, expression='neutral', special=''):
         state, index = POSES.get(special or expression, POSES['neutral'])
@@ -98,7 +115,8 @@ def atlas(mascot):
 
 def paint_sprite(painter, rect, mascot, state='idle', seconds=0., *, facing=1, gaze=None):
     artwork = atlas(mascot)
-    pixmap, source = artwork.source(state, seconds, facing=facing, gaze=gaze)
+    pixmap, source = artwork.source(state, seconds, facing=facing, gaze=gaze,
+                                    compact=max(rect.width(), rect.height()) <= 32)
     size = QtCore.QSizeF(CELL).scaled(rect.size(), QtCore.Qt.KeepAspectRatio)
     target = QtCore.QRectF(rect.center().x() - size.width() / 2,
                          rect.bottom() - size.height(), size.width(), size.height())

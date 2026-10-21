@@ -49,32 +49,53 @@ it uses row 7, never either directional gait row. The native state mapping is:
 | failed | Translation failed; the user can retry |
 | sixteen look directions | Follow the local pointer while calm |
 
-The compact popup offers screen, region, text, OCR copy, live and document
-translation, companion settings, hide and a seven-state reaction picker. A
-selected reaction plays one cycle. Real work takes priority. Click reactions
-also play once from a static built-in pose, then restore that pose. Custom
-images remain static. Hovering and the open menu keep playback running. Manual
-dragging still places the pet; capture hides the companion before screenshots.
-The in-window companion uses the same popup and stays beside its label.
+The desktop popup offers screen, region, text, OCR copy, live and document
+translation, companion settings and hide. It has no manual emotion controls.
+Opening it triggers a greeting and then waiting; translation events choose the
+other states automatically. Returning home triggers a jump; opening tools or
+changing size/opacity acknowledges the action with review. Real work always
+takes priority. Click reactions also play once from a static built-in pose,
+then restore that pose. Custom images remain static. Hovering and the open menu
+keep playback running. Manual dragging still places the pet; capture hides the
+companion before screenshots.
 
-![Stationary companion and its action popup](interaction-preview.png)
+![Desktop companion action popup](interaction-preview.png)
+
+The main window has all six companions in one stationary row. Clicking any
+character opens the Mascot settings tab directly, focused on the character
+selector. It never opens the desktop translation popup or enables an overlay.
+The six characters share automatic activity updates and use compact atlas
+caches (under 6 MiB total) for their small on-screen frames.
+
+![Six-character row in the main window](main-row-preview.png)
+
+Settings match the other tabs: one column of checkboxes on the left, aligned
+labels and 180 px controls on the right, with the same 28 px control height.
+The right column contains character, display mode, size and opacity. Display
+modes are animated, still and custom image; there is no static emotion picker.
+A themed desk scene below the form gives the selected character a podium,
+soft background and translation cards. Clicking the scene triggers one native
+jump. It also reflects real translation status, and its timer stops while
+hidden or minimized. All decoration is drawn by Qt using the app palette.
+
+![Mascot settings and themed scene](settings-preview.png)
 
 Main text translation, document translation, area OCR, fullscreen OCR and both
 live translation modes report activity on the GUI thread. Concurrent jobs hold
 the working state; cancellation clears only its own job, and stale results are
-ignored by existing session guards. Explicit reactions work with automatic
-translation reactions disabled, without masking an active job.
+ignored by existing session guards. Click greetings and scene interactions still
+work with automatic translation reactions disabled, without masking an active job.
 
 Existing character IDs, positions, custom images and capture ownership remain
 compatible. Old walking profiles migrate to stationary animation. Old custom
 emotion/sleep choices map to their nearest native pose. Walking speed and pause
-controls have been removed. Settings offer seven native static poses, animated
-playback, character, size, opacity, visibility and event reactions. Click and
-stationary animation are the defaults for new configurations.
+controls have been removed. Settings offer character, display mode, size, opacity,
+visibility and automatic event reactions. Click and stationary animation are the
+defaults for new configurations.
 
-Picker thumbnails retain only one 192×208 cell; the original PNG is decoded
-once when animation first needs it and shared by both companion views. The
-Windows, Linux and macOS packaging specifications include the icons folder.
+Picker thumbnails retain one 192×208 cell. The main-window row uses shared
+384×572 compact atlases; desktop and scene playback share the full atlas only
+when a larger view needs it. The Windows, Linux and macOS packaging specifications include the icons folder.
 No plugin connection is required for playback.
 
 Review with `python tools/preview_mascots.py` or open the actual application using

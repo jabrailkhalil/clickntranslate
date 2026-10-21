@@ -177,24 +177,20 @@ def test_document_translation_cancel_and_completion_drive_reactions(window, app)
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
 
-def test_emotion_selector_and_reaction_preference_persist(window):
+def test_display_mode_and_event_reactions_persist_without_manual_emotion_choices(window):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    assert page.pose_combo.count() == 7
-    page.choose_appearance('walking')
-    page.show_category('static')
-    page.pose_combo.activated.emit(0)
+    assert tuple(page.mode_combo.itemData(i) for i in range(page.mode_combo.count())) == ('animated', 'portrait', 'custom')
+    assert not hasattr(page, 'pose_combo')
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('portrait'))
     assert window.config['desktop_assistant_appearance'] == 'portrait'
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('working'))
-    assert window.config['desktop_assistant_appearance'] == 'working'
-    assert window.config['desktop_assistant_behavior'] == 'idle'
-    page.choose_appearance('walking')
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('animated'))
     page.reactions.setChecked(False)
-    assert window.config['desktop_assistant_reactions'] is False
     page.toggle.click()
+    assert window.config['desktop_assistant_reactions'] is False
     assert window._desktop_assistant.anchor.motion.reactions is False
-    assert window.assistant_preview.motion.reactions is False
-
+    assert all(not motion.reactions for motion in window.assistant_preview.motions.values())
+    assert page.mascot_preview.motion.reactions is False
 
 @pytest.mark.parametrize('state', ['idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'])
 def test_explicit_native_reaction_plays_once_then_waits_for_menu_choice(state):

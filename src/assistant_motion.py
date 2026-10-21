@@ -159,11 +159,20 @@ def notify_activity(owner, activity, source='main'):
             helper.menu.set_activity(state)
     preview = getattr(owner, 'assistant_preview', None)
     if preview is not None and not sip.isdeleted(preview):
-        preview.motion.set_activity(state)
+        preview.set_activity(state)
         preview._sync_animation()
-        preview.button.update()
-        if preview._choice_dialog is not None:
-            preview._choice_dialog.set_activity(state)
+        for button in preview.buttons.values():
+            button.update()
+    stage = _settings_stage(owner)
+    if stage is not None:
+        stage.set_activity(state)
+
+
+def _settings_stage(owner):
+    settings = getattr(owner, 'settings_window', None) or getattr(owner, '_cached_settings_window', None)
+    page = getattr(settings, 'settings_assistant_page', None)
+    stage = getattr(page, 'mascot_preview', None)
+    return stage if stage is not None and not sip.isdeleted(stage) else None
 
 
 def play_reaction(owner, state, *, anchor=None, preview=None):
@@ -176,9 +185,10 @@ def play_reaction(owner, state, *, anchor=None, preview=None):
         anchor.update()
     preview = preview if preview is not None else getattr(owner, 'assistant_preview', None)
     if preview is not None and not sip.isdeleted(preview):
-        preview.motion.play(state)
-        preview._sync_animation()
-        preview.button.update()
+        preview.react(state)
+    stage = _settings_stage(owner)
+    if stage is not None:
+        stage.react(state)
 
 
 def notify_current_activity(activity, source, *, only_if_busy=False):

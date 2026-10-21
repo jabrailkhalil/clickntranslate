@@ -33,11 +33,9 @@ def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appeara
     page = window.settings_window.settings_assistant_page
     page.toggle.click()
     helper = window._desktop_assistant
-    page.category_buttons['dynamic'].click()
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData(appearance))
     page.choose_appearance(appearance)
     assert window.config['desktop_assistant_appearance'] == appearance
-    assert page.pose_combo.currentData() == appearance
+    assert page.mode_combo.currentData() == 'portrait'
     assert not helper.anchor._animation.isActive()
     frozen_time = helper.anchor.motion.time
     position, image = helper.anchor.pos(), helper.anchor.grab().toImage()
@@ -57,7 +55,7 @@ def test_custom_image_cancel_preserves_selection_and_invalid_values_are_safe(win
     original = assistant_preferences(window.config)['desktop_assistant_appearance']
     with mock.patch.object(QtWidgets.QFileDialog, 'getOpenFileName', return_value=('', '')):
         page.appearance_buttons['custom'].click()
-    assert page.pose_combo.currentData() == 'portrait'
+    assert page.mode_combo.currentData() == original
     assert window.config['desktop_assistant_appearance'] == original
     values = assistant_preferences({'desktop_assistant_image': [], 'desktop_assistant_appearance': {}})
     assert values['desktop_assistant_image'] == '' and values['desktop_assistant_appearance'] == 'portrait'
@@ -73,11 +71,11 @@ def test_custom_image_and_native_waiting_pose(window, tmp_path):
     with mock.patch.object(QtWidgets.QFileDialog, 'getOpenFileName', return_value=(str(custom), '')):
         page.appearance_buttons['custom'].click()
     assert window.config['desktop_assistant_image'] == str(custom)
-    assert page.appearance_buttons['custom'].isChecked()
+    assert page.mode_combo.currentData() == 'custom'
     page.choose_appearance('portrait')
     helper = window._desktop_assistant
     idle = helper.anchor.grab().toImage()
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('waiting'))
+    page.choose_appearance('waiting')
     sleeping = helper.anchor.grab().toImage()
     assert sleeping != idle
     assert not helper.anchor._animation.isActive()

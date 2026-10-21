@@ -284,36 +284,32 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
     owner.launch_fullscreen_translate.assert_not_called()
 
 
-def test_click_opens_native_reactions_below_pet_without_stopping_animation(companion, app):
+def test_click_greets_and_opens_actions_without_a_manual_emotion_picker(companion, app):
     companion.anchor.move(250, 80)
     QTest.mouseClick(companion.anchor, QtCore.Qt.LeftButton, pos=QtCore.QPoint(42, 42))
     assert companion.menu.isVisible()
     assert companion.anchor.motion.action() == 'wave'
     assert companion.anchor._animation.isActive()
     assert companion.menu.y() > companion.anchor.geometry().bottom()
-    states = tuple(companion.menu.reaction_combo.itemData(i) for i in range(7))
-    assert states == ('idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed')
-    companion.menu.reaction_combo.activated.emit(2)
-    assert companion.anchor.motion.action() == 'success'
+    assert not companion.menu.findChildren(QtWidgets.QComboBox)
     for _ in range(10): companion.anchor._advance(.2)
     assert companion.anchor.motion.action() == 'waiting'
     companion.menu.hide()
     assert companion.anchor.motion.action() == 'idle'
 
-
-def test_popup_activity_prevents_manual_reactions_from_masking_translation(companion):
+def test_translation_events_automatically_drive_the_pet_and_popup_status(companion):
     from assistant_motion import notify_activity
     companion.owner._desktop_assistant = companion
     companion.toggle_menu()
     notify_activity(companion.owner, 'busy')
-    assert not companion.menu.reaction_combo.isEnabled()
     assert companion.menu.activity_label.text() == assistant_text('ru', 'activity_busy')
     assert companion.anchor.motion.action() == 'work'
     notify_activity(companion.owner, 'success')
-    assert companion.menu.reaction_combo.isEnabled()
-    companion.menu.reaction_combo.activated.emit(1)
-    assert companion.anchor.motion.action() == 'wave'
-
+    assert companion.anchor.motion.action() == 'success'
+    for _ in range(5): companion.anchor._advance(.2)
+    assert companion.anchor.motion.action() == 'review'
+    notify_activity(companion.owner, 'error')
+    assert companion.anchor.motion.action() == 'error'
 
 @pytest.mark.parametrize('appearance', ['portrait', 'waiting'])
 def test_static_native_pose_reacts_once_to_click_and_then_returns_to_its_pose(companion, appearance):
@@ -327,22 +323,17 @@ def test_static_native_pose_reacts_once_to_click_and_then_returns_to_its_pose(co
     for _ in range(10): companion.anchor._advance(.2)
     assert not companion.anchor._animation.isActive()
     assert companion.anchor.grab().toImage() == before
-    companion.menu.reaction_combo.activated.emit(2)
+    companion.menu.hide()
+    companion.toggle_menu()
     assert companion.anchor._animation.isActive()
 
 
 
-def test_reaction_dropdown_remains_inside_the_pet_popup_and_accepts_keyboard(companion, app):
-    companion.toggle_menu()
-    combo = companion.menu.reaction_combo
-    combo.showPopup()
-    app.processEvents()
-    assert companion.menu.isVisible() and combo.view().isVisible()
-    QTest.keyClick(combo.view(), QtCore.Qt.Key_Down)
-    QTest.keyClick(combo.view(), QtCore.Qt.Key_Down)
-    QTest.keyClick(combo.view(), QtCore.Qt.Key_Return)
-    app.processEvents()
-    assert companion.menu.isVisible()
-    assert combo.currentData() == 'jumping'
+def test_return_home_action_triggers_a_native_jump_without_exposing_emotion_controls(companion):
+    companion.request_action('home')
     assert companion.anchor.motion.action() == 'success'
-    assert not companion._dispatch_timer.isActive()
+    assert companion.anchor._animation.isActive()
+    position = companion.anchor.pos()
+    for _ in range(10): companion.anchor._advance(.2)
+    assert companion.anchor.pos() == position
+    assert companion.anchor.motion.action() == 'idle'

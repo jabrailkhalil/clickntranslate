@@ -1,17 +1,13 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
   "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 120",
-  "latestRechecks": [
-    "mascot/interface/cache: 226 passed",
-    "settings regressions and six-language layout: 28 passed",
-    "real popup keyboard selection and stationary cache: 2 passed"
-  ],
+  "focusedChecks": "Mascot/interface/cache/layout group: 251 passed",
   "counts": {
-    "passed": 1801,
+    "passed": 1810,
     "skipped": 67,
     "failure": 2
   },
-  "totalReportedCases": 1870,
+  "totalReportedCases": 1879,
   "userDataUnchanged": true,
   "failures": [
     {
@@ -23,5 +19,5 @@
       "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
     }
   ],
-  "note": "Combined latest result per test after final focused rechecks. Walking and extra strips are disabled. Remaining failures are unchanged upstream version metadata (1.8.1 vs APP_VERSION 1.8.2)."
+  "note": "Complete eight-part suite on the final automatic-reactions, six-character main row and themed settings stage implementation. Only unchanged upstream version checks fail (1.8.1 versus APP_VERSION 1.8.2)."
 }

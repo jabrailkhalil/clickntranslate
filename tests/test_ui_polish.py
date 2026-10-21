@@ -245,9 +245,10 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     app.processEvents()
     assert rail.art is second.art
     # Only the original v2 atlas is loaded, shared by both views.
-    pixmaps = (rail.art.pixmap,)
+    from assistant_motion import skin
+    pixmaps = [skin(mascot).thumbnail for mascot in rail.buttons]
     memory = sum(p.width() * p.height() * 4 for p in pixmaps)
-    assert memory <= 14 * 1024 * 1024
+    assert memory <= 6 * 1024 * 1024
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
     origin = rail.button.pos()
@@ -292,22 +293,24 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     assert not rail.timer.isActive()
 
 
-def test_preview_click_and_keyboard_offer_settings_without_desktop_overlay(app, owner):
+def test_all_six_preview_buttons_open_settings_directly_without_desktop_overlay(app, owner):
     rail = AssistantPreview(owner, parent=owner)
+    owner.resize(340, 100)
+    rail.resize(320, 22)
     owner.show()
     rail.show()
+    app.processEvents()
     spy = QSignalSpy(rail.settings_requested)
-    rail.button.click()
-    assert len(spy) == 0
-    assert rail._choice_dialog.isVisible()
-    rail._choice_dialog.buttons['settings'].click()
+    for button in rail.buttons.values():
+        button.click()
+        assert rail._choice_dialog is None
+    assert len(spy) == 6
     rail.button.setFocus()
     QTest.keyClick(rail.button, QtCore.Qt.Key_Space)
-    assert len(spy) == 1
-    rail._choice_dialog.buttons['settings'].click()
-    assert len(spy) == 2
+    assert len(spy) == 7
     assert owner.config['desktop_assistant_enabled'] is False
-
+    assert len({button.y() for button in rail.buttons.values()}) == 1
+    assert all(rail.rect().contains(button.geometry()) for button in rail.buttons.values())
 
 @pytest.mark.parametrize('dark', [True, False])
 def test_capture_closed_label_never_changes_to_full_name_and_effect_is_restored(app, owner, dark):
@@ -552,8 +555,7 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         preview = window.assistant_preview
         preview.button.click()
         app.processEvents()
-        assert preview._choice_dialog.isVisible()
-        preview._choice_dialog.buttons['settings'].click()
+        assert preview._choice_dialog is None
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
         window.activateWindow()
         app.processEvents()
@@ -562,7 +564,7 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         assert window.settings_window.desktop_assistant_checkbox is window.settings_window.settings_assistant_page.toggle
         assert window.settings_window.desktop_assistant_checkbox.isVisible()
         assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
-        assert window.settings_window.desktop_assistant_checkbox.hasFocus()
+        assert window.settings_window.settings_assistant_page.mascot_combo.hasFocus()
         assert window.config.get('desktop_assistant_enabled') is not True
         assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
         with mock.patch.object(window, 'save_config') as save:

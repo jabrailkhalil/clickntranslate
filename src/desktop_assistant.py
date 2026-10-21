@@ -240,7 +240,6 @@ class ActionButton(QtWidgets.QPushButton):
 class AssistantMenu(QtWidgets.QFrame):
     """Compact actions and native reactions, anchored below the companion."""
     action_requested = QtCore.pyqtSignal(str)
-    reaction_requested = QtCore.pyqtSignal(str)
     visibility_changed = QtCore.pyqtSignal(bool)
 
     def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='animated', mascot=DEFAULT_MASCOT):
@@ -274,22 +273,6 @@ class AssistantMenu(QtWidgets.QFrame):
         self.activity_label.setWordWrap(True)
         self.activity_label.setStyleSheet(f'color:{"#bdb2ca" if dark else "#70647e"}; background:transparent; border:0; font-size:12px;')
         outer.addWidget(self.activity_label)
-        from settings_window import DropDownCombo, modern_combo_style
-        from styled_dialogs import set_widget_stylesheet
-        self.reaction_combo = DropDownCombo()
-        self.reaction_combo.setAccessibleName(assistant_text(language, 'emotion'))
-        self.reaction_combo.setMinimumHeight(32)
-        self.reaction_combo.setIconSize(QtCore.QSize(24, 24))
-        self.reaction_combo.setMaxVisibleItems(7)
-        for state in ('idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'):
-            art = {'idle': 'portrait', 'running': 'working'}.get(state, state)
-            self.reaction_combo.addItem(QtGui.QIcon(companion_art(art, mascot=mascot)),
-                                        assistant_text(language, 'reaction_' + state), state)
-        self.reaction_combo.activated.connect(
-            lambda index: self.reaction_requested.emit(self.reaction_combo.itemData(index)))
-        set_widget_stylesheet(self.reaction_combo, modern_combo_style(dark, 13))
-        outer.addWidget(self.reaction_combo)
-        self.reaction_combo.setVisible(appearance != 'custom')
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(6)
         grid.setColumnStretch(0, 1)
@@ -317,7 +300,6 @@ class AssistantMenu(QtWidgets.QFrame):
 
     def set_activity(self, activity):
         self.activity_label.setText(assistant_text(self.language, 'activity_' + activity))
-        self.reaction_combo.setEnabled(activity not in ('busy', 'waiting'))
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -500,7 +482,6 @@ class DesktopAssistant(QtCore.QObject):
             self.menu = AssistantMenu(*self._context)
             self.menu.action_requested.connect(self.request_action)
             self.menu.visibility_changed.connect(self._menu_visibility)
-            self.menu.reaction_requested.connect(lambda state: play_reaction(self.owner, state, anchor=self.anchor))
         screen = QtWidgets.QApplication.screenAt(self.anchor.geometry().center()) or self.anchor.screen()
         play_reaction(self.owner, 'waving', anchor=self.anchor)
         self.menu.set_activity(getattr(self.owner, '_companion_activity', 'idle'))
@@ -531,10 +512,13 @@ class DesktopAssistant(QtCore.QObject):
             return
         if action == 'home':
             self.restore_position()
+            play_reaction(self.owner, 'jumping', anchor=self.anchor)
             return
         if action == 'hide':
             self.owner.set_desktop_assistant_enabled(False)
             return
+        if action not in CAPTURE_ACTIONS:
+            play_reaction(self.owner, 'review', anchor=self.anchor)
         self._action = action
         self._dispatching = True
         self.refresh_visibility()

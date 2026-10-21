@@ -47,7 +47,7 @@ def test_removed_appearance_falls_back_to_new_character(window):
     assert prefs['desktop_assistant_appearance'] == 'portrait'
     assert prefs['desktop_assistant_mascot'] == DEFAULT_MASCOT
     assert 'orb' not in page.appearance_buttons
-    assert page.pose_combo.currentData() == 'portrait'
+    assert page.mode_combo.currentData() == 'portrait'
     page.toggle.click()
     assert window._desktop_assistant.anchor.appearance == 'portrait'
 
@@ -120,3 +120,59 @@ def test_dropdown_has_all_characters_and_supports_keyboard(window, app):
     QTest.keyClick(combo, QtCore.Qt.Key_Down)
     assert combo.currentData() == 'mochi'
     assert window.config['desktop_assistant_mascot'] == 'mochi'
+
+
+@pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh'])
+def test_settings_use_one_left_checkbox_column_and_aligned_right_fields(window, app, language):
+    window.current_interface_language = language
+    window.show_assistant_settings()
+    page = window.settings_window.settings_assistant_page
+    app.processEvents()
+    checks = (page.main_visible, page.toggle, page.topmost, page.reactions)
+    fields = (page.mascot_combo, page.mode_combo, page.values['size'], page.values['opacity'])
+    assert len({checkbox.mapTo(page, QtCore.QPoint()).x() for checkbox in checks}) == 1
+    assert len({field.mapTo(page, QtCore.QPoint()).x() for field in fields}) == 1
+    assert len({field.width() for field in fields}) == 1
+    for checkbox, field in zip(checks, fields):
+        left = QtCore.QRect(checkbox.mapTo(page, QtCore.QPoint()), checkbox.size())
+        right = QtCore.QRect(field.mapTo(page, QtCore.QPoint()), field.size())
+        assert left.right() < right.left()
+        assert abs(left.center().y()-right.center().y()) <= 1
+        assert page.rect().contains(left) and page.rect().contains(right)
+
+
+@pytest.mark.parametrize('theme', ['Светлая', 'Темная'])
+def test_preview_stage_is_themed_reacts_to_clicks_and_stops_when_hidden(window, app, theme):
+    from assistant_motion import notify_activity
+    window.current_theme = theme
+    window.show_assistant_settings()
+    stage = window.settings_window.settings_assistant_page.mascot_preview
+    app.processEvents()
+    image = stage.grab().toImage()
+    assert image.pixelColor(10, 10) != image.pixelColor(10, image.height()-10)
+    assert stage.timer.isActive()
+    QTest.mouseClick(stage, QtCore.Qt.LeftButton)
+    assert stage.motion.action() == 'success'
+    notify_activity(window, 'busy')
+    assert stage.motion.action() == 'work'
+    QTest.mouseClick(stage, QtCore.Qt.LeftButton)
+    assert stage.motion.action() == 'work'
+    assert all(motion.action() == 'work' for motion in window.assistant_preview.motions.values())
+    window.show_main_screen()
+    app.processEvents()
+    assert not stage.timer.isActive()
+
+
+def test_each_main_window_character_opens_settings_without_a_desktop_menu(window, app):
+    window.set_desktop_assistant_enabled(True)
+    helper = window._desktop_assistant
+    for mascot in MASCOTS:
+        window.show_main_screen()
+        app.processEvents()
+        rail = window.assistant_preview
+        assert tuple(rail.buttons) == MASCOTS
+        rail.buttons[mascot].click()
+        app.processEvents()
+        assert window.settings_window.settings_assistant_page.isVisible()
+        assert helper.menu is None
+        assert rail._choice_dialog is None

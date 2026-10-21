@@ -10928,15 +10928,7 @@ class DarkThemeApp(QMainWindow):
 
     def show_desktop_assistant_settings(self):
         self.show_assistant_settings()
-        checkbox = self.settings_window.desktop_assistant_checkbox
-        checkbox.setFocus(Qt.OtherFocusReason)
-        # Focus the actual setting; do not enable an overlay just by visiting.
-        page = checkbox.parentWidget()
-        while page is not None:
-            if isinstance(page, QtWidgets.QScrollArea):
-                page.ensureWidgetVisible(checkbox)
-                break
-            page = page.parentWidget()
+        self.settings_window.settings_assistant_page.mascot_combo.setFocus(Qt.OtherFocusReason)
 
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)

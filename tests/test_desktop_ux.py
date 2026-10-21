@@ -89,8 +89,7 @@ def test_companion_preferences_can_be_edited_before_enabling(window, app):
     assert not page.toggle.isChecked()
     assert page.options.isEnabled()
     assert 'speed' not in page.values and not hasattr(page, 'pause_walk')
-    page.show_category('dynamic')
-    page.category_buttons['dynamic'].click()
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('animated'))
     assert 'speed' not in page.values and not hasattr(page, 'pause_walk')
     page.values['size'].setValue(130)
     assert window.config['desktop_assistant_size'] == 130
@@ -102,9 +101,8 @@ def test_companion_preferences_can_be_edited_before_enabling(window, app):
     assert page.options.isEnabled()
     page.toggle.click()
     assert page.values['size'].value() == 130
-    page.show_category('static')
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('waiting'))
-    assert page.pose_combo.currentData() == 'waiting'
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('portrait'))
+    assert page.mode_combo.currentData() == 'portrait'
     assert window._desktop_assistant.anchor.behavior == 'idle'
 
 
