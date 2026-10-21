@@ -265,6 +265,7 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": DEFAULT_SELECTION_HOTKEY,
     "translate_replace_selection_hotkey": DEFAULT_REPLACE_SELECTION_HOTKEY,
+    "replace_selection_select_all": False,
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -1053,6 +1054,26 @@ def simulate_paste():
     time.sleep(0.02)
     ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+
+def select_all_text_in_foreground(expected_target):
+    """Select the whole input only while the requested replacement target owns focus."""
+    if platform_support.IS_MAC:
+        from macos_desktop import same_foreground_target, send_edit_shortcut
+        return send_edit_shortcut("a", validate_target=lambda: same_foreground_target(expected_target))
+    if not platform_support.IS_WINDOWS or not expected_target:
+        return False
+    if _windows_foreground_window() != expected_target:
+        return False
+    user32 = ctypes.windll.user32
+    try:
+        user32.keybd_event(0x11, 0, 0, 0)
+        user32.keybd_event(0x41, 0, 0, 0)
+        time.sleep(0.02)
+    finally:
+        user32.keybd_event(0x41, 0, 0x0002, 0)
+        user32.keybd_event(0x11, 0, 0x0002, 0)
+    return _windows_foreground_window() == expected_target
 
 
 def _windows_foreground_window():
@@ -9335,6 +9356,10 @@ class DarkThemeApp(QMainWindow):
                     for vk in ((0x11, 0x12, 0x10, 0x5B, 0x5C) if platform_support.IS_WINDOWS else ()):
                         ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
                     time.sleep(0.35)
+                    if (replace_selection and self.config.get("replace_selection_select_all") is True):
+                        if not select_all_text_in_foreground(selection_window):
+                            return
+                        time.sleep(0.08)
                     # Clear clipboard, then Ctrl+C to capture selection
                     platform_support.copy_text("")
                     simulate_copy()
@@ -10928,7 +10953,7 @@ class DarkThemeApp(QMainWindow):
 
     def show_desktop_assistant_settings(self):
         self.show_assistant_settings()
-        self.settings_window.settings_assistant_page.mascot_combo.setFocus(Qt.OtherFocusReason)
+        self.settings_window.settings_assistant_page.mascot_preview.next_button.setFocus(Qt.OtherFocusReason)
 
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)

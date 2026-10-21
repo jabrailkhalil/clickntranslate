@@ -5,6 +5,11 @@ from ui_scaling import ScaleArrowButton
 
 
 class _NumberEdit(QtWidgets.QLineEdit):
+    def focusOutEvent(self, event):
+        self._select_after_click = False
+        super().focusOutEvent(event)
+        self.deselect()
+
     def focusInEvent(self, event):
         super().focusInEvent(event)
         self._select_after_click = event.reason() == QtCore.Qt.MouseFocusReason

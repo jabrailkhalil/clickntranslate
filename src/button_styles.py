@@ -8,10 +8,59 @@ BUTTON_RADIUS = 7
 BUTTON_FONT_SIZE = 13
 
 
+def _clear_background_focus(widget):
+    """Blank surfaces dismiss editing; controls keep their normal mouse behavior."""
+    from PyQt5 import sip
+    from PyQt5.QtWidgets import (QApplication, QWidget, QAbstractButton, QAbstractSpinBox,
+        QAbstractSlider, QAbstractItemView, QComboBox, QLineEdit, QTextEdit,
+        QPlainTextEdit, QKeySequenceEdit, QGraphicsView, QMenu)
+    if not isinstance(widget, QWidget):
+        return
+    # A graphics viewport forwards the click to the real embedded widget.
+    if isinstance(widget, QGraphicsView) or isinstance(widget.parentWidget(), QGraphicsView):
+        return
+    target = widget
+    while target is not None:
+        if isinstance(target, (QAbstractButton, QAbstractSpinBox, QAbstractSlider,
+                QAbstractItemView, QComboBox, QLineEdit, QTextEdit, QPlainTextEdit,
+                QKeySequenceEdit, QMenu)):
+            return
+        target = target.parentWidget()
+    focused = widget.window().focusWidget() or QApplication.focusWidget()
+    if focused is None or focused is widget or focused.isAncestorOf(widget):
+        return
+    if isinstance(focused, QAbstractSpinBox):
+        # A graphics proxy can clear focus without sending the spin box the
+        # native FocusOut event that normally commits its pending text.
+        focused.interpretText()
+    if sip.isdeleted(focused):
+        return
+    finish_edit = getattr(focused, 'finish_background_edit', None)
+    if finish_edit is not None:
+        finish_edit()
+    if sip.isdeleted(focused):
+        return
+    if focused.property('keyboardFocus'):
+        focused.setProperty('keyboardFocus', False)
+        focused.style().unpolish(focused)
+        focused.style().polish(focused)
+    focused.clearFocus()
+    if sip.isdeleted(focused):
+        return
+    if isinstance(focused, QLineEdit):
+        focused.deselect()
+    elif isinstance(focused, QAbstractSpinBox):
+        focused.lineEdit().deselect()
+    elif isinstance(focused, (QTextEdit, QPlainTextEdit)):
+        cursor = focused.textCursor()
+        cursor.clearSelection()
+        focused.setTextCursor(cursor)
+
+
 def _install_keyboard_focus_tracking():
     """Keep keyboard focus visible without leaving a ring after a mouse click."""
     from PyQt5.QtCore import QEvent, QObject, Qt
-    from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip
+    from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip, QWidget
 
     app = QApplication.instance()
     if app is None or hasattr(app, "_button_focus_filter"):
@@ -20,6 +69,26 @@ def _install_keyboard_focus_tracking():
     class ButtonFocusFilter(QObject):
         def eventFilter(self, widget, event):
             kind = event.type()
+            arrow = getattr(app, '_hovered_scale_arrow', lambda: None)()
+            if arrow is not None:
+                from PyQt5 import sip
+                if not sip.isdeleted(arrow):
+                    if kind == QEvent.ApplicationDeactivate:
+                        arrow.set_pointer_hover(False)
+                        arrow.setDown(False)
+                    elif kind in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.Leave):
+                        from PyQt5.QtGui import QCursor
+                        point = event.globalPos() if hasattr(event, 'globalPos') else QCursor.pos()
+                        if not arrow.rect().contains(arrow.mapFromGlobal(point)):
+                            arrow.set_pointer_hover(False)
+                    elif kind in (QEvent.WindowDeactivate, QEvent.Hide) and isinstance(widget, QWidget):
+                        owner_ref = getattr(arrow.window(), '_ui_native_owner', None)
+                        owner = owner_ref() if owner_ref is not None else arrow.window()
+                        if widget in (arrow.window(), arrow, owner) or widget.isAncestorOf(arrow):
+                            arrow.set_pointer_hover(False)
+                            arrow.setDown(False)
+            if kind == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                _clear_background_focus(widget)
             if (kind == QEvent.DynamicPropertyChange and widget is app
                     and event.propertyName() == b'buttonTooltipsEnabled'
                     and app.property("buttonTooltipsEnabled") is False):
@@ -99,6 +168,8 @@ def button_qss(dark, role="secondary", selector="QPushButton", *, compact=False,
             border:1px solid {border}; border-radius:{radius}px;
             padding:{padding}; font-size:{size}px; font-weight:{weight}; }}
         {state(':hover')} {{ background:{hover}; }}
+        {state('[pointerHover="false"]:hover')} {{ background:{background}; }}
+        {state('[pointerHover="true"]')} {{ background:{hover}; }}
         {state(':pressed')} {{ background:{pressed}; }}
         {state('[keyboardFocus="true"]:focus')} {{ border-color:{colors['focus']}; }}
         {state(':checked')} {{ background:{colors['pressed']}; border-color:{colors['focus']}; }}

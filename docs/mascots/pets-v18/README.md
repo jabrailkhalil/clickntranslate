@@ -62,8 +62,8 @@ companion before screenshots.
 ![Desktop companion action popup](interaction-preview.png)
 
 The main window has all six companions in one stationary row. Clicking any
-character opens the Mascot settings tab directly, focused on the character
-selector. It never opens the desktop translation popup or enables an overlay.
+character opens the Mascot settings tab directly, focused on its carousel.
+It never opens the desktop translation popup or enables an overlay.
 The six characters share automatic activity updates and use compact atlas
 caches (under 6 MiB total) for their small on-screen frames.
 
@@ -71,11 +71,14 @@ caches (under 6 MiB total) for their small on-screen frames.
 
 Settings match the other tabs: one column of checkboxes on the left, aligned
 labels and 180 px controls on the right, with the same 28 px control height.
-The right column contains character, display mode, size and opacity. Display
+The right column contains display mode, size and opacity. Display
 modes are animated, still and custom image; there is no static emotion picker.
 A themed desk scene below the form gives the selected character a podium,
-soft background and translation cards. Clicking the scene triggers one native
-jump. It also reflects real translation status, and its timer stops while
+soft background and a platform carousel. Previous/next arrows select the six
+characters with a short sliding transition; each name appears above its head.
+Rapid clicks continue from the current visual frame. There is no duplicate
+character dropdown. Clicking the scene triggers one native jump. It also
+reflects real translation status, and its timer stops while
 hidden or minimized. All decoration is drawn by Qt using the app palette.
 
 ![Mascot settings and themed scene](settings-preview.png)
@@ -89,7 +92,7 @@ work with automatic translation reactions disabled, without masking an active jo
 Existing character IDs, positions, custom images and capture ownership remain
 compatible. Old walking profiles migrate to stationary animation. Old custom
 emotion/sleep choices map to their nearest native pose. Walking speed and pause
-controls have been removed. Settings offer character, display mode, size, opacity,
+controls have been removed. Settings offer a character carousel, display mode, size, opacity,
 visibility and automatic event reactions. Click and stationary animation are the
 defaults for new configurations.
 
@@ -97,6 +100,21 @@ Picker thumbnails retain one 192×208 cell. The main-window row uses shared
 384×572 compact atlases; desktop and scene playback share the full atlas only
 when a larger view needs it. The Windows, Linux and macOS packaging specifications include the icons folder.
 No plugin connection is required for playback.
+
+Blank clicks finish numeric edits and clear text selection and keyboard focus,
+including inside the scaled graphics canvas. Arrow hover is tracked separately
+from Qt's native proxy hover state; Tab navigation retains its focus indicator.
+Language package tables have rectangular frames, themed full-row selection and
+columns fitted to the available width, with tooltips for elided package/status
+values.
+
+General settings include the optional **Select all before replacing** checkbox.
+The translate-and-replace action first selects the entire active input, then
+uses the existing translation and verified-selection replacement pipeline. The
+option is off by default, does not affect ordinary selection translation or
+dynamic translation, and does not send chat messages. Windows uses Ctrl+A;
+macOS uses Cmd+A. Replacement remains unavailable on Linux. If the target loses
+focus before selection, the operation stops before changing the clipboard.
 
 Review with `python tools/preview_mascots.py` or open the actual application using
 `python tools/run_mascot_app.py`, which uses its own profile. Production-rendered

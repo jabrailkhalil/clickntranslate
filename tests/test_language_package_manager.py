@@ -12,7 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from PyQt5.QtCore import Qt  # noqa: E402
+from PyQt5.QtCore import Qt, QPoint  # noqa: E402
 from PyQt5.QtWidgets import QApplication, QAbstractItemView, QWidget  # noqa: E402
 
 import argos_worker  # noqa: E402
@@ -493,6 +493,51 @@ class LanguagePackageDialogTest(unittest.TestCase):
             self.assertFalse(table.verticalScrollBar().styleSheet())
             self.assertEqual(table.verticalScrollBar().sizeHint().width(), 6)
             self.assertEqual(table.horizontalScrollBar().sizeHint().height(), 6)
+
+    def test_package_selection_stays_themed_after_focus_leaves_the_table(self):
+        table = self.dialog.windows_table or self.dialog.tesseract_table
+        self.dialog._set_language_rows(table, [dict(code='test', name='Test language',
+            package='test-tag', status='Not installed', checked=False, selectable=True)])
+        self.dialog.show()
+        self.dialog.ocr_tabs.setCurrentWidget(table.parentWidget())
+        self.app.processEvents()
+        table.selectRow(0)
+        table.setFocus()
+        self.app.processEvents()
+        rect = table.visualItemRect(table.item(0, 2))
+        point = rect.topRight() + QPoint(-4, 4)
+        active = table.viewport().grab().toImage().pixelColor(point)
+        table.clearFocus()
+        self.app.processEvents()
+        inactive = table.viewport().grab().toImage().pixelColor(point)
+        self.assertEqual(active.name(), '#5f4a88')
+        self.assertEqual(inactive, active)
+        from PyQt5.QtWidgets import QStyle, QStyleOptionViewItem
+        option = QStyleOptionViewItem()
+        option.state |= QStyle.State_HasFocus
+        table.itemDelegate().initStyleOption(option, table.model().index(0, 2))
+        self.assertFalse(option.state & QStyle.State_HasFocus)
+
+    def test_package_columns_fit_after_font_changes_and_preserve_long_values_in_tooltips(self):
+        table = self.dialog.rapidocr_table
+        self.dialog._rapidocr_status_cache = (True, '')
+        self.dialog._populate_rapidocr_table(table)
+        self.dialog.show()
+        self.dialog.ocr_tabs.setCurrentWidget(table.parentWidget())
+        for pixels in (14, 20, 28, 14):
+            font = table.font()
+            font.setPixelSize(pixels)
+            table.setFont(font)
+            self.app.processEvents()
+            table.fit_columns()
+            self.app.processEvents()
+            self.assertLessEqual(table.horizontalHeader().length(), table.viewport().width())
+            self.assertFalse(table.horizontalScrollBar().isVisible())
+            for column in (2, 3):
+                for row in range(table.rowCount()):
+                    item = table.item(row, column)
+                    self.assertEqual(item.toolTip(), item.text())
+                    self.assertLessEqual(table.visualItemRect(item).right(), table.viewport().rect().right())
 
     def test_windows_capability_catalog_parses_supported_and_installed_states(self):
         completed = SimpleNamespace(

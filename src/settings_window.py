@@ -1,5 +1,6 @@
 from button_styles import button_qss, button_palette, standard_buttons
 from number_controls import StepperFrame
+from package_table import PackageTable
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
 from PyQt5 import sip
 import os
@@ -1744,6 +1745,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Copy to clipboard",
         "history": "Save translation history",
         "button_hover_tips": "Button hover tips",
+        "replace_select_all": "Select all before replacing",
+        "replace_select_all_hint": "For Translate and replace: selects all text in the active input before translating and replacing it. Useful for chat messages. When off, only your selected text is replaced. Does not send the message.",
         "test_ocr": "Test OCR Translation",
         "save": "Save",
         "back": "Back",
@@ -1862,6 +1865,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Копировать в буфер",
         "history": "Сохранять историю переводов",
         "button_hover_tips": "Подсказки при наведении",
+        "replace_select_all": "Выделять всё перед заменой",
+        "replace_select_all_hint": "Для команды «Перевести и заменить»: выделяет весь текст в активном поле ввода, переводит и заменяет его. Удобно для сообщений в чате. Без галочки заменяется только выделенный фрагмент. Сообщение не отправляется.",
         "test_ocr": "Проверить OCR",
         "save": "Сохранить",
         "back": "Назад",
@@ -1978,6 +1983,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Copiar al portapapeles",
         "history": "Guardar historial de traducciones",
         "button_hover_tips": "Ayuda al pasar sobre botones",
+        "replace_select_all": "Seleccionar todo al reemplazar",
+        "replace_select_all_hint": "En Traducir y reemplazar, selecciona todo el texto del campo activo antes de traducirlo y reemplazarlo. Útil para chats. Desactivado: solo reemplaza la selección. No envía el mensaje.",
         "test_ocr": "Probar OCR",
         "save": "Guardar",
         "back": "Volver",
@@ -2094,6 +2101,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "In Zwischenablage kopieren",
         "history": "Ubersetzungsverlauf speichern",
         "button_hover_tips": "Schaltflächenhinweise",
+        "replace_select_all": "Vor Ersetzen alles auswählen",
+        "replace_select_all_hint": "Bei Übersetzen und Ersetzen wird der gesamte Text im aktiven Eingabefeld ausgewählt, übersetzt und ersetzt. Praktisch für Chats. Sonst wird nur die Auswahl ersetzt. Sendet die Nachricht nicht ab.",
         "test_ocr": "OCR testen",
         "save": "Speichern",
         "back": "Zuruck",
@@ -2210,6 +2219,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Copier dans le presse-papiers",
         "history": "Garder l'historique des traductions",
         "button_hover_tips": "Aide au survol des boutons",
+        "replace_select_all": "Tout sélectionner avant remplacement",
+        "replace_select_all_hint": "Pour Traduire et remplacer : sélectionne tout le texte du champ actif, puis le traduit et le remplace. Utile dans les chats. Sinon, seule la sélection est remplacée. N’envoie pas le message.",
         "test_ocr": "Tester l'OCR",
         "save": "Enregistrer",
         "back": "Retour",
@@ -2326,6 +2337,8 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "复制到剪贴板",
         "history": "保存翻译历史",
         "button_hover_tips": "按钮悬停提示",
+        "replace_select_all": "替换前全选文本",
+        "replace_select_all_hint": "使用“翻译并替换”时，先全选当前输入框的文本，再翻译并替换。适合聊天消息。关闭后仅替换选中的部分。不会发送消息。",
         "test_ocr": "测试 OCR",
         "save": "保存",
         "back": "返回",
@@ -3573,10 +3586,12 @@ class OcrLanguageManagerDialog(QDialog):
                 QLabel { color: #f4f6fb; font-family: 'Segoe UI'; font-size: 13px; }
                 QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
                 QTabBar::tab:selected { background: #7A5FA1; }
-                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 7px; }
+                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 0px; }
                 QTableWidget::item { color: #f4f6fb; background-color: #17181d; }
                 QTableWidget::item:alternate { background-color: #20212a; }
                 QTableWidget::item:disabled { color: #9ca0ad; }
+                QTableWidget::item:selected { background: #5f4a88; color: #ffffff; }
+                QTableWidget::item:selected:!active { background: #5f4a88; color: #ffffff; }
                 QTableCornerButton::section { background: #24212e; border: 0; }
                 QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
 
@@ -3593,7 +3608,9 @@ class OcrLanguageManagerDialog(QDialog):
                 QDialog#languageManagerDialog { background-color: #f0edf3; color: #241f2a; border: 1px solid #bcb2c7; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #f0edf3; }
                 QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
-                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 7px; }
+                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 0px; }
+                QTableWidget::item:selected { background: #cdbbdd; color: #241f2a; }
+                QTableWidget::item:selected:!active { background: #cdbbdd; color: #241f2a; }
                 QHeaderView::section { background: #ddd7e2; color: #241f2a; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
 
             QPushButton#languagePackageAction { min-height: 18px; }
@@ -3604,6 +3621,8 @@ class OcrLanguageManagerDialog(QDialog):
                 QLineEdit { background: #f3eff5; color: #241f2a; border: 1px solid #bcb2c7; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
             """ + standard_buttons(self._is_dark_theme(), compact=False))
+
+        install_accent_controls(self, dark)
 
     def _apply_package_tab_styles(self):
         dark = self._is_dark_theme()
@@ -3950,7 +3969,7 @@ class OcrLanguageManagerDialog(QDialog):
             filter_edit.setClearButtonEnabled(True)
             layout.addWidget(filter_edit)
 
-        table = QTableWidget(page)
+        table = PackageTable(page)
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(header_labels or [
             "",
@@ -3973,8 +3992,8 @@ class OcrLanguageManagerDialog(QDialog):
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
         if self._is_dark_theme():
             header.setStyleSheet("QHeaderView::section { background-color: #24212e; color: #f4f6fb; border: 0; padding: 5px; }")
         else:
@@ -4254,6 +4273,7 @@ class OcrLanguageManagerDialog(QDialog):
             status_item.setForeground(QBrush(fg if data.get("checked") or data.get("selectable") else muted_fg))
             table.setItem(row, 3, status_item)
         table.resizeRowsToContents()
+        table._schedule_fit()
         table._pending_package_codes = pending
         del signal_blocker
 
@@ -7497,6 +7517,17 @@ class SettingsWindow(QWidget):
         self.button_tooltips_checkbox.setStyleSheet("margin:0; padding:0;")
         self.button_tooltips_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.button_tooltips_checkbox, 5, 0, alignment=Qt.AlignLeft)
+
+        self.replace_select_all_checkbox = QCheckBox(settings_text(lang, "replace_select_all"))
+        self.replace_select_all_checkbox.setChecked(self.parent.config.get("replace_selection_select_all") is True)
+        self.replace_select_all_checkbox.setToolTip(tooltip_text(settings_text(lang, "replace_select_all_hint")))
+        self.replace_select_all_checkbox.setAccessibleDescription(settings_text(lang, "replace_select_all_hint"))
+        self.replace_select_all_checkbox.setStyleSheet("margin:0; padding:0;")
+        self.replace_select_all_checkbox.setFixedHeight(fixed_height)
+        self.replace_select_all_checkbox.setEnabled(not platform_support.IS_LINUX)
+        self.replace_select_all_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("replace_selection_select_all", bool(state)))
+        form_grid.addWidget(self.replace_select_all_checkbox, 6, 0, alignment=Qt.AlignLeft)
 
         self.ui_scale_label = QLabel(settings_text(lang, 'ui_scale_caption'))
         self.ui_scale_label.setObjectName('uiScaleLabel')

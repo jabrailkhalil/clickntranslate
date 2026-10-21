@@ -7,6 +7,7 @@ from PyQt5.QtTest import QTest
 
 from assistant_art import MASCOTS, DEFAULT_MASCOT, APPEARANCES, companion_art, walking_art_path
 from assistant_motion import skin
+from assistant_text import assistant_text
 from assistant_settings import assistant_preferences
 from test_desktop_ux import app, window
 import mode_coordinator
@@ -61,7 +62,7 @@ def test_switching_character_keeps_position_pause_and_capture_ownership(window, 
     helper.anchor.move(220, 220)
     position = helper.anchor.pos()
     for mascot in MASCOTS:
-        page.mascot_combo.setCurrentIndex(page.mascot_combo.findData(mascot))
+        page.choose_mascot(mascot)
         assert window.config['desktop_assistant_mascot'] == mascot
         assert helper.anchor.mascot == mascot
         assert helper.anchor.motion.mascot == mascot
@@ -104,22 +105,48 @@ def test_character_choice_before_enable_and_after_custom_image(window, tmp_path)
     assert window._desktop_assistant.anchor.mascot == 'momo'
 
 
-def test_dropdown_has_all_characters_and_supports_keyboard(window, app):
+def test_stage_arrows_cycle_all_characters_wrap_and_accept_keyboard(window, app):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    combo = page.mascot_combo
-    assert tuple(combo.itemData(i) for i in range(combo.count())) == MASCOTS
-    assert all(not combo.itemIcon(i).isNull() for i in range(combo.count()))
-    combo.showPopup()
+    stage = page.mascot_preview
+    assert not hasattr(page, 'mascot_combo')
+    for mascot in MASCOTS:
+        stage.next_button.click()
+        assert window.config['desktop_assistant_mascot'] == stage.mascot == mascot
+        assert stage.accessibleName() == assistant_text(window.current_interface_language, mascot)
+    stage.next_button.setFocus(QtCore.Qt.TabFocusReason)
+    QTest.keyClick(stage.next_button, QtCore.Qt.Key_Right)
+    assert stage.mascot == 'pancake'
+    QTest.keyClick(stage.next_button, QtCore.Qt.Key_Left)
+    assert stage.mascot == 'click'
+    stage.previous_button.click()
+    assert stage.mascot == 'orbit'
+    QTest.qWait(stage.TRANSITION_MS + 40)
+    assert stage.transition.state() == QtCore.QAbstractAnimation.Stopped
+    assert stage._previous_layer is None
+    assert stage._progress == 1
+
+
+@pytest.mark.parametrize('theme', ['Светлая', 'Темная'])
+def test_carousel_moves_platform_and_name_then_settles_and_stops_when_hidden(window, app, theme):
+    window.current_theme = theme
+    window.show_assistant_settings()
+    stage = window.settings_window.settings_assistant_page.mascot_preview
     app.processEvents()
-    view = combo.view()
-    for index in range(combo.count()):
-        assert view.viewport().rect().contains(view.visualRect(combo.model().index(index, 0)))
-    combo.hidePopup()
-    combo.setCurrentIndex(0)
-    QTest.keyClick(combo, QtCore.Qt.Key_Down)
-    assert combo.currentData() == 'mochi'
-    assert window.config['desktop_assistant_mascot'] == 'mochi'
+    stage.next_button.click()
+    assert stage.transition.state() == QtCore.QAbstractAnimation.Running
+    start = stage.grab().toImage()
+    stage.transition.setCurrentTime(stage.TRANSITION_MS//2)
+    middle = stage.grab().toImage()
+    assert start != middle
+    stage.next_button.click()  # A rapid second click starts from the current composition.
+    assert stage.mascot == 'mochi'
+    window.show_main_screen()
+    assert stage.transition.state() == QtCore.QAbstractAnimation.Stopped
+    assert stage._previous_layer is None
+    assert not stage.timer.isActive()
+    window.show_assistant_settings()
+    assert stage.mascot == 'mochi' and stage._progress == 1
 
 
 @pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh'])
@@ -128,8 +155,8 @@ def test_settings_use_one_left_checkbox_column_and_aligned_right_fields(window, 
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
     app.processEvents()
-    checks = (page.main_visible, page.toggle, page.topmost, page.reactions)
-    fields = (page.mascot_combo, page.mode_combo, page.values['size'], page.values['opacity'])
+    checks = (page.main_visible, page.toggle, page.topmost)
+    fields = (page.mode_combo, page.values['size'], page.values['opacity'])
     assert len({checkbox.mapTo(page, QtCore.QPoint()).x() for checkbox in checks}) == 1
     assert len({field.mapTo(page, QtCore.QPoint()).x() for field in fields}) == 1
     assert len({field.width() for field in fields}) == 1

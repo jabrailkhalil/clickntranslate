@@ -154,6 +154,9 @@ _SECTIONS = {
     'animated_hint': ('Behavior applies only to Animated. Change it here or in the companion menu.', 'Поведение работает только в режиме «Живой». Меняйте его здесь или в меню маскота.', 'El comportamiento solo se aplica a Animado. Cámbialo aquí o en su menú.', 'Verhalten gilt nur für Animiert. Hier oder im Maskottchen-Menü ändern.', 'Le comportement concerne le mode Animé. Modifiez-le ici ou dans le menu.', '行为设置仅适用于动态模式，可在此处或伙伴菜单中修改。'),
 }
 _SECTIONS.update({
+    'previous_mascot': ('Previous mascot', 'Предыдущий маскот', 'Mascota anterior', 'Vorheriges Maskottchen', 'Mascotte précédente', '上一个伙伴'),
+    'next_mascot': ('Next mascot', 'Следующий маскот', 'Siguiente mascota', 'Nächstes Maskottchen', 'Mascotte suivante', '下一个伙伴'),
+
     'mascots': ('Mascots', 'Маскоты', 'Mascotas', 'Maskottchen', 'Mascottes', '伙伴'),
     'display_mode': ('Display', 'Отображение', 'Aspecto', 'Darstellung', 'Affichage', '显示'),
     'mode_animated': ('Animated', 'Анимация', 'Animado', 'Animiert', 'Animé', '动态'),

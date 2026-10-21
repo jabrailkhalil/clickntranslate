@@ -118,6 +118,50 @@ class ScaleArrowButton(QToolButton):
     """Every rapid click counts; remember the real pointer through proxy events."""
     click_global = None
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setProperty('pointerHover', False)
+
+    def set_pointer_hover(self, hovered):
+        app = QApplication.instance()
+        if hovered:
+            previous = getattr(app, '_hovered_scale_arrow', lambda: None)()
+            if previous is not None and previous is not self:
+                from PyQt5 import sip
+                if not sip.isdeleted(previous):
+                    previous.set_pointer_hover(False)
+            app._hovered_scale_arrow = weakref.ref(self)
+        elif getattr(app, '_hovered_scale_arrow', lambda: None)() is self:
+            app._hovered_scale_arrow = lambda: None
+        if bool(self.property('pointerHover')) != hovered:
+            self.setProperty('pointerHover', hovered)
+            self.style().unpolish(self)
+            self.style().polish(self)
+            self.update()
+
+    def enterEvent(self, event):
+        self.set_pointer_hover(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.set_pointer_hover(False)
+        super().leaveEvent(event)
+
+    def hideEvent(self, event):
+        self.set_pointer_hover(False)
+        self.setDown(False)
+        super().hideEvent(event)
+
+    def paintEvent(self, event):
+        option = QStyleOptionToolButton()
+        self.initStyleOption(option)
+        if not self.property('keyboardFocus'):
+            option.state &= ~QStyle.State_HasFocus
+        if not self.property('pointerHover'):
+            option.state &= ~QStyle.State_MouseOver
+        painter = QStylePainter(self)
+        painter.drawComplexControl(QStyle.CC_ToolButton, option)
+
     def mouseDoubleClickEvent(self, event):
         self.mousePressEvent(event)
 
@@ -236,6 +280,15 @@ class ScaledIconToolButton(QToolButton):
 class ScalePercentEdit(QLineEdit):
     step_requested = pyqtSignal(int)
     cancel_requested = pyqtSignal()
+
+    def finish_background_edit(self):
+        if self.isModified():
+            self.editingFinished.emit()
+
+    def focusOutEvent(self, event):
+        self._select_after_click = False
+        super().focusOutEvent(event)
+        self.deselect()
 
     def __init__(self, parent=None):
         super().__init__(parent)

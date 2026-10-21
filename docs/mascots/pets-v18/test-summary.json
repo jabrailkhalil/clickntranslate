@@ -1,13 +1,21 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
   "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 120",
-  "focusedChecks": "Mascot/interface/cache/layout group: 251 passed",
-  "counts": {
-    "passed": 1810,
+  "fullSuiteCounts": {
+    "passed": 1834,
     "skipped": 67,
     "failure": 2
   },
-  "totalReportedCases": 1879,
+  "counts": {
+    "passed": 1835,
+    "skipped": 67,
+    "failure": 2
+  },
+  "totalReportedCases": 1904,
+  "latestRechecks": [
+    "Final native Windows focus/hover/selection controls: 38 passed",
+    "Focused replacement workflow, settings layout and text controls: 111 passed"
+  ],
   "userDataUnchanged": true,
   "failures": [
     {
@@ -19,5 +27,5 @@
       "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
     }
   ],
-  "note": "Complete eight-part suite on the final automatic-reactions, six-character main row and themed settings stage implementation. Only unchanged upstream version checks fail (1.8.1 versus APP_VERSION 1.8.2)."
+  "note": "Eight complete isolated partitions, followed by native Windows focus/hover checks including an extra application-deactivation case. The only failures are unchanged upstream 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 was reviewed separately and was not merged."
 }

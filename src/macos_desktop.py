@@ -302,7 +302,7 @@ def send_edit_shortcut(key, validate_target=None):
     import Quartz
     if not permission_granted("accessibility"):
         raise RuntimeError("macOS Accessibility permission is required.")
-    codes = {"c": 8, "v": 9}
+    codes = {"a": 0, "c": 8, "v": 9}
     code = codes[key]
     mask = (Quartz.kCGEventFlagMaskControl | Quartz.kCGEventFlagMaskAlternate
             | Quartz.kCGEventFlagMaskShift | Quartz.kCGEventFlagMaskCommand)

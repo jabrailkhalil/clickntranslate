@@ -165,7 +165,7 @@ def test_companion_settings_and_menu_fit(window, app, language, selected_appeara
             app.processEvents()
         assert not page.findChildren(QtWidgets.QScrollArea)
         for button in (*page.appearance_buttons.values(), *page.values.values(),
-                       page.mascot_combo):
+                       page.mode_combo):
             if button.isVisible():
                 bounds = QtCore.QRect(button.mapTo(page, QtCore.QPoint()), button.size())
                 assert page.rect().contains(bounds), (language, percent, bounds)

@@ -229,3 +229,78 @@ def test_dynamic_help_runs_only_the_explicit_action(window, choice):
         assert launch.call_count == int(choice == 'start')
         assert hotkey.call_count == int(choice == 'shortcut')
         assert 'Ctrl' in box.setText.call_args.args[0]
+
+
+
+def test_clicking_empty_scaled_canvas_clears_number_selection_and_tab_arrow_focus(window, app):
+    window.show_assistant_settings()
+    page = window.settings_window.settings_assistant_page
+    field = page.values['opacity']
+    editor = field.lineEdit()
+    controller = window._ui_scale_controller
+    editor.setFocus(QtCore.Qt.MouseFocusReason)
+    editor.selectAll()
+    QTest.keyClicks(editor, '77')
+    blank = controller.map_widget_to_view(page.mascot_preview, QtCore.QPoint(8, 8))
+    QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=blank)
+    app.processEvents()
+    assert field.value() == 77
+    assert window.config['desktop_assistant_opacity'] == 77
+    assert not editor.hasSelectedText() and not editor.hasFocus()
+    field.decrease.setFocus(QtCore.Qt.TabFocusReason)
+    assert field.decrease.property('keyboardFocus')
+    QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=blank)
+    app.processEvents()
+    assert not field.decrease.property('keyboardFocus')
+    assert not field.decrease.hasFocus()
+
+
+def test_background_click_finishes_scale_edit_in_real_proxy(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    settings._set_settings_page(0)
+    app.processEvents()
+    editor = settings.ui_scale_value
+    editor.setFocus(QtCore.Qt.MouseFocusReason)
+    editor.selectAll()
+    QTest.keyClicks(editor, '125')
+    controller = window._ui_scale_controller
+    blank = controller.map_widget_to_view(settings.settings_general_page, QtCore.QPoint(400, 170))
+    QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=blank)
+    app.processEvents()
+    assert window.config['ui_scale_percent'] == 125
+    assert not editor.hasSelectedText() and not editor.hasFocus()
+
+
+@pytest.mark.parametrize('deactivate', [False, True])
+def test_arrow_hover_clears_even_if_qt_keeps_native_under_mouse_state(app, deactivate):
+    from number_controls import NumberStepper
+    field = NumberStepper()
+    field.setRange(0, 200)
+    field.setValue(100)
+    field.resize(180, 30)
+    field.show()
+    app.processEvents()
+    arrow = field.decrease
+    try:
+        arrow.set_pointer_hover(True)
+        # Reproduce the stale proxy :hover flag from the screenshot.
+        arrow.setAttribute(QtCore.Qt.WA_UnderMouse, True)
+        outside = field.mapToGlobal(QtCore.QPoint(170, 15))
+        event = QtGui.QMouseEvent(QtCore.QEvent.MouseMove, QtCore.QPointF(170, 15),
+                                 QtCore.QPointF(outside), QtCore.Qt.NoButton,
+                                 QtCore.Qt.NoButton, QtCore.Qt.NoModifier)
+        if deactivate:
+            arrow.setDown(True)
+            app.sendEvent(app, QtCore.QEvent(QtCore.QEvent.ApplicationDeactivate))
+            assert not arrow.isDown()
+        else:
+            app.sendEvent(field, event)
+        app.processEvents()
+        assert not arrow.property('pointerHover')
+        color = arrow.grab().toImage().pixelColor(4, 4).name()
+        from button_styles import button_palette
+        assert color != button_palette(True)['hover']
+    finally:
+        field.close()
+        field.deleteLater()

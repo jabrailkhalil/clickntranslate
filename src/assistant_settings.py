@@ -1,8 +1,8 @@
 """Desktop companion preferences; independent of its enabled runtime instance."""
-from PyQt5 import QtCore, QtGui, QtWidgets, sip
+from PyQt5 import QtCore, QtWidgets, sip
 
 from assistant_text import assistant_text
-from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASCOT, companion_art, mascot_id
+from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASCOT, mascot_id
 from header_icons import header_icon
 from pathlib import Path
 
@@ -83,14 +83,6 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             checkbox.setStyleSheet('margin:0; padding:0;')
             form.addWidget(checkbox, row, 0)
 
-        self.mascot_combo = DropDownCombo()
-        self.mascot_combo.setObjectName('assistantMascot')
-        self.mascot_combo.setIconSize(QtCore.QSize(24, 24))
-        self.mascot_combo.setMaxVisibleItems(len(MASCOTS))
-        for key in MASCOTS:
-            self.mascot_combo.addItem(QtGui.QIcon(companion_art('portrait', mascot=key)), tr(key), key)
-        self.mascot_combo.currentIndexChanged.connect(
-            lambda: self.choose_mascot(self.mascot_combo.currentData()))
         self.mode_combo = DropDownCombo()
         self.mode_combo.setObjectName('assistantDisplayMode')
         for value, label in (('animated', 'mode_animated'), ('portrait', 'mode_static'), ('custom', 'custom')):
@@ -107,7 +99,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             field.valueChanged.connect(lambda value, name=key: self.save(name, value))
             self.values[key] = field
         self.field_labels = {}
-        for row, (name, field) in enumerate((('mascot', self.mascot_combo), ('display_mode', self.mode_combo),
+        for row, (name, field) in enumerate((('display_mode', self.mode_combo),
                                               ('size', self.values['size']), ('opacity', self.values['opacity']))):
             label = QtWidgets.QLabel(tr(name))
             label.setFixedHeight(28)
@@ -121,6 +113,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             self.field_labels[name] = label
         root.addWidget(self.options)
         self.mascot_preview = MascotStage(self.owner, self)
+        self.mascot_preview.step_requested.connect(self.cycle_mascot)
         root.addWidget(self.mascot_preview, 1)
 
         self.custom_image_row = QtWidgets.QWidget()
@@ -179,6 +172,10 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.owner.config['desktop_assistant_behavior'] = 'idle'
         self.save('appearance', appearance)
         self.refresh()
+
+    def cycle_mascot(self, direction):
+        current = assistant_preferences(self.owner.config)['desktop_assistant_mascot']
+        self.choose_mascot(MASCOTS[(MASCOTS.index(current) + direction) % len(MASCOTS)])
 
     def choose_mascot(self, mascot):
         # Selecting a character also leaves a custom image, while preserving
@@ -241,7 +238,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         from settings_window import modern_combo_style
         from styled_dialogs import set_widget_stylesheet
         self.appearance_buttons['custom'].setIcon(header_icon('image_add', self.owner.current_theme))
-        for combo in (self.mascot_combo, self.mode_combo):
+        for combo in (self.mode_combo,):
             set_widget_stylesheet(combo, modern_combo_style(self.owner.current_theme != 'Светлая', 14))
 
     def refresh(self):
@@ -261,8 +258,6 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             self.reactions.setChecked(values['desktop_assistant_reactions'])
         appearance = values['desktop_assistant_appearance']
         mascot = values['desktop_assistant_mascot']
-        with QtCore.QSignalBlocker(self.mascot_combo):
-            self.mascot_combo.setCurrentIndex(self.mascot_combo.findData(mascot))
         mode = appearance if appearance in ('animated', 'custom') else 'portrait'
         with QtCore.QSignalBlocker(self.mode_combo):
             self.mode_combo.setCurrentIndex(self.mode_combo.findData(mode))
