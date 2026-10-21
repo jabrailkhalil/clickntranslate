@@ -40,6 +40,10 @@ Coverage includes:
 - Every native animation frame and all sixteen gaze directions for each of the
   six characters render identically over reused and fresh transparent surfaces.
   The alpha clear prevents old pose fragments from persisting around Doc.
+- Doc's malformed idle ankle frames are excluded consistently at compact,
+  settings and desktop sizes. The remaining clean resting/raised frames keep
+  genuine animation and the original cycle timing. Legacy idle poses also use
+  the clean frame; all other characters/reactions/gaze rectangles are unchanged.
 - Numeric draft commits and text deselection on background clicks inside the
   real scaled graphics canvas; copying an existing text selection still works.
 - Arrow mouse focus, stale native hover, Tab focus, and deactivation cleanup,

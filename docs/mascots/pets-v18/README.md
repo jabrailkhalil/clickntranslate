@@ -111,6 +111,12 @@ are checked against fresh transparent renders. The Windows, Linux and macOS
 packaging specifications include the icons folder.
 No plugin connection is required for playback.
 
+Doc's idle cells 2–5 contain a malformed white left ankle in the original
+artwork. Playback substitutes the clean resting cell 0 for these slots, keeping
+the native raised cell 1 and the original 1.1-second cadence. The same mapping
+applies to full-size, compact and legacy idle poses. Other reactions, gaze
+directions and character atlases retain their original frames.
+
 Blank clicks finish numeric edits and clear text selection and keyboard focus,
 including inside the scaled graphics canvas. Arrow hover is tracked separately
 from Qt's native proxy hover state; Tab navigation retains its focus indicator.

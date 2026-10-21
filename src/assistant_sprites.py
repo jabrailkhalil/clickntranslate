@@ -25,6 +25,11 @@ ROWS = {
     'review': (8, (150,) * 5 + (280,)),
 }
 STATIONARY_STATES = ('idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed')
+# Doc's last four idle cells contain a malformed white left ankle. Hold the
+# clean resting pose in those slots; retain the native rise in cell 1 and the
+# original timing. Whole-frame substitution keeps both views and all scales
+# consistent without drawing or warping individual body parts.
+FRAME_REPLACEMENTS = {('orbit', 'idle'): {2: 0, 3: 0, 4: 0, 5: 0}}
 POSES = {
     'neutral': ('idle', 0), 'happy': ('waving', 1),
     'curious': ('waiting', 2), 'thinking': ('running', 1),
@@ -53,6 +58,9 @@ class SpriteAtlas:
         self.mascot = mascot_id(mascot)
         self._pixmap = None
         self._thumbnail = None
+
+    def _frame_column(self, state, column):
+        return FRAME_REPLACEMENTS.get((self.mascot, state), {}).get(column, column)
 
     @property
     def thumbnail(self):
@@ -86,6 +94,7 @@ class SpriteAtlas:
                 state = 'idle'
             row, durations = ROWS[state]
             column = frame_index(durations, seconds) if index is None else int(index) % len(durations)
+            column = self._frame_column(state, column)
             rect = QtCore.QRect(column * 192, row * 208, 192, 208)
         if compact:
             rect = QtCore.QRect(rect.x()//4, rect.y()//4, 48, 52)
@@ -94,7 +103,8 @@ class SpriteAtlas:
     def pose(self, expression='neutral', special=''):
         state, index = POSES.get(special or expression, POSES['neutral'])
         row, durations = ROWS[state]
-        rect = QtCore.QRect(index % len(durations) * 192, row * 208, 192, 208)
+        column = self._frame_column(state, index % len(durations))
+        rect = QtCore.QRect(column * 192, row * 208, 192, 208)
         if self._pixmap is not None:
             return self._pixmap.copy(rect)
         # Picker thumbnails retain only one cell, not six decoded full atlases.
