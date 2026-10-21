@@ -1,20 +1,102 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
-  "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 120",
+  "testedSourceCommit": "d9e4f5d312baa2a4b7d30415dba87e22d8677cb9",
+  "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 160",
   "fullSuiteCounts": {
-    "passed": 1834,
-    "skipped": 67,
+    "passed": 1955,
+    "skipped": 68,
     "failure": 2
   },
   "counts": {
-    "passed": 1835,
-    "skipped": 67,
+    "passed": 1955,
+    "skipped": 68,
     "failure": 2
   },
-  "totalReportedCases": 1904,
+  "totalReportedCases": 2025,
+  "partitions": [
+    {
+      "part": 1,
+      "counts": {
+        "passed": 248
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 2,
+      "counts": {
+        "passed": 236
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 3,
+      "counts": {
+        "passed": 220,
+        "skipped": 12,
+        "failure": 1
+      },
+      "exitCode": 1
+    },
+    {
+      "part": 4,
+      "counts": {
+        "passed": 180,
+        "skipped": 17
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 5,
+      "counts": {
+        "passed": 264,
+        "skipped": 1
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 6,
+      "counts": {
+        "passed": 275,
+        "skipped": 1
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 7,
+      "counts": {
+        "passed": 290,
+        "skipped": 30
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 8,
+      "counts": {
+        "passed": 242,
+        "skipped": 7,
+        "failure": 1
+      },
+      "exitCode": 1
+    }
+  ],
+  "nativeWindowsCounts": {
+    "passed": 54
+  },
+  "pr7": {
+    "number": 7,
+    "merged": true,
+    "testedHead": "e704dfa257e919404a41c98fa0813b7dd25273c1",
+    "mergeCommit": "be5c5350586fd3086269d76c72592712bef20668",
+    "fullSuiteCounts": {
+      "passed": 1769,
+      "skipped": 67,
+      "failure": 0
+    }
+  },
   "latestRechecks": [
-    "Final native Windows focus/hover/selection controls: 38 passed",
-    "Focused replacement workflow, settings layout and text controls: 111 passed"
+    "Native Windows: two physical monitors, every mascot frame/gaze, navigation, focus and controls",
+    "Three-agent semantic label and tooltip audit in en/ru/es/de/fr/zh",
+    "Quick selection lifecycle, clipboard text restoration and stale-result rejection"
   ],
   "userDataUnchanged": true,
   "failures": [
@@ -27,5 +109,5 @@
       "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
     }
   ],
-  "note": "Eight complete isolated partitions, followed by native Windows focus/hover checks including an extra application-deactivation case. The only failures are unchanged upstream 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 was reviewed separately and was not merged."
+  "note": "All eight partitions completed on the final integrated source. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. Native Windows checks passed; macOS/Linux builds and installers were not produced."
 }

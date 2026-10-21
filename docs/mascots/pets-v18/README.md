@@ -61,13 +61,20 @@ companion before screenshots.
 
 ![Desktop companion action popup](interaction-preview.png)
 
-The main window has all six companions in one stationary row. Clicking any
-character opens the Mascot settings tab directly, focused on its carousel.
-It never opens the desktop translation popup or enables an overlay.
-The six characters share automatic activity updates and use compact atlas
-caches (under 6 MiB total) for their small on-screen frames.
+The main window shows one static shortcut for the selected companion. Clicking
+the character or name opens Mascot settings directly, focused on its carousel.
+The shortcut uses a cached 48×52 PNG extracted from the native idle frame; it
+does not decode a sprite atlas or run an animation timer. All six companions
+remain available in settings and on the desktop.
 
-![Six-character row in the main window](main-row-preview.png)
+![Selected companion shortcut in the main window](main-row-preview.png)
+
+Navigation retains the home widgets and translation draft while settings are
+open, invalidating the cache when the configuration, language, theme or minimum
+content size changes. Atomic page changes prevent an empty intermediate paint.
+In the same local Qt fixture, repeat returns fell from 99–100 ms to 5–6 ms;
+the initial return fell from 368 ms to 9 ms. These are local measurements with
+profiling enabled, not a device-independent latency guarantee.
 
 Settings match the other tabs: one column of checkboxes on the left, aligned
 labels and 180 px controls on the right, with the same 28 px control height.
@@ -96,9 +103,12 @@ controls have been removed. Settings offer a character carousel, display mode, s
 visibility and automatic event reactions. Click and stationary animation are the
 defaults for new configurations.
 
-Picker thumbnails retain one 192×208 cell. The main-window row uses shared
-384×572 compact atlases; desktop and scene playback share the full atlas only
-when a larger view needs it. The Windows, Linux and macOS packaging specifications include the icons folder.
+Picker thumbnails retain one 192×208 cell. The desktop and settings scene share
+the full atlas only when animation needs it. The desktop layered surface clears
+its alpha channel before every pose so earlier frames cannot leave fragments
+around Doc or the other characters. All native frames and sixteen gaze angles
+are checked against fresh transparent renders. The Windows, Linux and macOS
+packaging specifications include the icons folder.
 No plugin connection is required for playback.
 
 Blank clicks finish numeric edits and clear text selection and keyboard focus,
@@ -108,6 +118,14 @@ Language package tables have rectangular frames, themed full-row selection and
 columns fitted to the available width, with tooltips for elided package/status
 values.
 
+Popup anchors map through the visible scaled canvas into native screen
+coordinates. The flag menu, language lists and context menus follow the moved
+window, including monitors with negative coordinates, and stay within the
+available screen bounds. Button labels, tooltips and accessibility names have
+been audited in English, Russian, Spanish, German, French and Chinese: close,
+home/back, cancel, undo and pause/resume actions use their actual meanings.
+Shared standard dialog buttons follow the app language rather than the OS.
+
 General settings include the optional **Select all before replacing** checkbox.
 The translate-and-replace action first selects the entire active input, then
 uses the existing translation and verified-selection replacement pipeline. The
@@ -116,7 +134,18 @@ dynamic translation, and does not send chat messages. Windows uses Ctrl+A;
 macOS uses Cmd+A. Replacement remains unavailable on Linux. If the target loses
 focus before selection, the operation stops before changing the clipboard.
 
+PR #7 is merged and integrated: optional quick selection translation, result
+font size and closing the result on an outside click. Quick selection reads run
+in a bounded background worker, preserve clipboard text on the Ctrl+C fallback,
+and reject stale selections or changed foreground targets. Repeated probes
+coalesce, and a floating-button click rechecks the selected text before emitting
+a translation request. The new hotkey-page toggles use the same accent style.
+
+![Quick selection settings](hotkey-settings-preview.png)
+
 Review with `python tools/preview_mascots.py` or open the actual application using
-`python tools/run_mascot_app.py`, which uses its own profile. Production-rendered
+`python tools/run_mascot_app.py`, which uses its own profile with translation,
+global hotkeys and the optional quick-selection feature active. This review copy
+does not create a tray icon or alter OS autostart. Production-rendered
 stationary animation and 42 native static choices can be exported with
 `python tools/qa_mascot_motion.py OUTPUT_DIRECTORY`.

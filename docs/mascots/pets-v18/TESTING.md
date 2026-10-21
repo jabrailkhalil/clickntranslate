@@ -7,20 +7,29 @@ or regenerate artwork.
 The complete suite ran with the bounded, isolated repository runner:
 
 ```
-python tools/run_ci_tests.py --parts 8 --timeout 120
+python tools/run_ci_tests.py --parts 8 --timeout 160
 ```
 
-Full-suite results: **1834 passed, 67 skipped, 2 pre-existing
-version failures**. The focused replacement/settings/text-controls group passed
-**111 tests**. Final native Windows checks passed **38 tests**, including an
-additional application-deactivation case. Latest combined results are
-**1835 passed, 67 skipped, 2 unchanged version failures**.
-Every run reported `USER_DATA_UNCHANGED: True`.
+Final full-suite results: **1955 passed, 68 skipped, 2 pre-existing version
+failures**. Additional native Windows checks: **54 passed**. See
+`test-summary.json` for the complete eight-part run. The only remaining failures
+are the two development-version metadata checks described below. Every completed isolated run reported
+`USER_DATA_UNCHANGED: True`.
+
+PR #7 was corrected on its own head and merged at
+`be5c5350586fd3086269d76c72592712bef20668`. Its exact fixed head
+`e704dfa257e919404a41c98fa0813b7dd25273c1` passed the complete suite:
+**1769 passed, 67 skipped, no failures**. The development mascot branch includes
+that merge and was tested again with the integrated changes.
 
 Coverage includes:
 
-- All six characters in the main-window row; each opens mascot settings directly
-  without opening the desktop popup or enabling an overlay.
+- One selected static home shortcut opens mascot settings directly. Tiny cached
+  PNGs avoid atlas decoding and a repaint timer; draft/control identity survives
+  navigation and cache invalidation handles configuration and layout changes.
+- Same-fixture navigation profiling includes actual Qt event processing. Repeat
+  returns changed from 99–100 ms to 5–6 ms locally; see
+  `navigation-performance.json` for complete measurements and their limits.
 - Native automatic reactions with no walking or manual emotion picker.
 - Previous/next carousel arrows, wrapping, keyboard navigation, a name above
   each character and a sliding platform; rapid clicks finish consistently.
@@ -28,6 +37,9 @@ Coverage includes:
   in both themes and at different scales. No duplicate character dropdown.
 - Native Qt stage rendering, event reactions, and animation/timer cleanup on
   hide, minimize and resize.
+- Every native animation frame and all sixteen gaze directions for each of the
+  six characters render identically over reused and fresh transparent surfaces.
+  The alpha clear prevents old pose fragments from persisting around Doc.
 - Numeric draft commits and text deselection on background clicks inside the
   real scaled graphics canvas; copying an existing text selection still works.
 - Arrow mouse focus, stale native hover, Tab focus, and deactivation cleanup,
@@ -38,7 +50,20 @@ Coverage includes:
   six-language layout, operation order, target validation, key release and an
   unchanged ordinary-selection action. Existing verified-selection replacement,
   clipboard restoration, capture ownership and cancellation tests also pass.
-- Shared compact main-row atlases below 6 MiB; native frames and custom images.
+- Popup placement through the scaled graphics canvas at 80/100/150 UI scales,
+  positive/negative monitor origins and screen edges. Native Windows checks
+  actually moved the window and opened its flag menu on both connected screens.
+- Quick selection worker responsiveness, bounded probe coalescing, cancellation,
+  foreground changes, cleared selections and fresh validation on button clicks.
+  The Ctrl+C fallback restores previous clipboard text, including empty text,
+  even when copying fails; keyboard cleanup is checked independently.
+- Three-agent audit of six-language labels, tooltips and accessibility names in
+  main/settings, capture/dynamic/OCR, shared dialogs, startup and mascots. Close
+  differs from home/back/cancel; pause becomes resume, undo removes the last
+  selection, and standard dialog buttons follow the application language.
+  Dictionary keys and formatting placeholders match across all six languages.
+- Newly created quick-selection checkboxes and radio controls have visible
+  indicators and distinct checked/unchecked states in both themes.
 
 Remaining failures exist in unchanged base commit
 `959175faefcd4b7591d0d91fde5535785d155ae5`:
@@ -55,6 +80,8 @@ translations online. macOS Cmd+A support reuses the existing focus-validated
 native shortcut helper; it was not exercised on a physical Mac.
 
 The source app was launched with `python tools/run_mascot_app.py` without
-packaging, using its own review profile. Actual Qt screenshots of both themes,
-mascot settings, general settings, the main row, language tables and the desktop
+packaging, using its own review profile. Global hotkeys, translation and opt-in
+quick selection are active; OS autostart changes and tray creation are disabled
+for this review copy. Actual Qt screenshots of both themes, mascot settings,
+general/hotkey settings, the static home shortcut, language tables and desktop
 popup were visually reviewed. No user screenshots or personal data were committed.
