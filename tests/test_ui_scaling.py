@@ -407,7 +407,12 @@ class UiScalingTest(unittest.TestCase):
                     self.assertTrue(settings.ui_scale_control.isVisible())
                     self.assertEqual(settings.ui_scale_value.text(), '150%')
                     self.assertLess(settings.ui_scale_label.geometry().right(), settings.ui_scale_control.geometry().left())
-                    for control in (settings.ocr_engine_combo, settings.translator_combo, settings.result_window_control):
+                    for control in (
+                        settings.ocr_engine_combo,
+                        settings.translator_combo,
+                        settings.result_window_control,
+                        settings.translation_font_combo,
+                    ):
                         self.assertEqual(settings.ui_scale_control.x(), control.x())
                     self.assertEqual(settings.ui_scale_control.width(), control.width())
                     self.assertAlmostEqual(settings.ui_scale_control.height(), control.height(), delta=1)

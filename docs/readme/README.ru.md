@@ -1,6 +1,8 @@
-# Click'n'Translate
+# clickntranslate
 
 Бесплатный экранный переводчик с открытым исходным кодом для **Windows, Linux и macOS**. Распознавайте текст в приложениях, изображениях и играх, переводите выделенное или следите за меняющимся текстом в нескольких областях экрана.
+
+[Сайт и возможности](https://translate.clickn.dev/ru/) · [Инструкции](https://clickn.dev/ru/guides/) · [Все проекты](https://clickn.dev/ru/)
 
 [English](../../README.md) · **Русский** · [简体中文](README.zh-CN.md) · [Español](README.es.md) · [Français](README.fr.md)
 

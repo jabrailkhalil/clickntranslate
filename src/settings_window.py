@@ -32,7 +32,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget
+    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget, QRadioButton
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
@@ -1798,8 +1798,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
+        "translation_result_font_label": "Font size:",
+        "translation_result_font_tooltip": "Size of the source and translation text in the result window.",
+        "translation_result_font_xsmall": "Extra small",
+        "translation_result_font_small": "Small",
+        "translation_result_font_medium": "Medium",
+        "translation_result_font_large": "Large",
+        "translation_result_font_xlarge": "Extra large",
         "replace_selection_translate_label": "Translate and replace selection:",
         "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
+        "selection_quick_translate_enabled": "Quick translate for selected text",
+        "selection_quick_translate_tooltip": "Show a translate button near selected text in other apps, or translate immediately. Uses the selection language pair configured for hotkeys. Requires Accessibility on macOS; on Linux uses PRIMARY selection (limited on some Wayland setups). Paused during OCR and dynamic translation.",
+        "selection_quick_translate_mode_button": "Show a button after selecting",
+        "selection_quick_translate_mode_automatic": "Translate immediately after selecting",
+        "close_result_window_on_outside_click": "Close translation window on outside click",
+        "close_result_window_on_outside_click_tooltip": "Closes the translation window when you click another app or anywhere outside it, so you do not need the close button.",
         "copy_hotkey_label": "Copy Selected Hotkey:",
         "translate_hotkey_label": "Translate Hotkey:",
         "remove_local_tesseract": "Remove local Tesseract",
@@ -1918,8 +1931,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
+        "translation_result_font_label": "Размер шрифта:",
+        "translation_result_font_tooltip": "Размер текста оригинала и перевода в окне результата.",
+        "translation_result_font_xsmall": "Очень мелкий",
+        "translation_result_font_small": "Мелкий",
+        "translation_result_font_medium": "Обычный",
+        "translation_result_font_large": "Крупный",
+        "translation_result_font_xlarge": "Очень крупный",
         "replace_selection_translate_label": "Перевести и заменить выделенное:",
         "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
+        "selection_quick_translate_enabled": "Быстрый перевод выделенного текста",
+        "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
+        "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
+        "selection_quick_translate_mode_automatic": "Переводить сразу после выделения",
+        "close_result_window_on_outside_click": "Закрывать окно перевода кликом снаружи",
+        "close_result_window_on_outside_click_tooltip": "Окно перевода закроется, если кликнуть другое приложение или мимо него — нажимать крестик не нужно.",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
         "remove_local_tesseract": "Удалить локальный Tesseract",
@@ -2036,8 +2062,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
+        "translation_result_font_label": "Tamaño de fuente:",
+        "translation_result_font_tooltip": "Tamaño del texto original y traducido en la ventana de resultado.",
+        "translation_result_font_xsmall": "Muy pequeña",
+        "translation_result_font_small": "Pequeña",
+        "translation_result_font_medium": "Mediana",
+        "translation_result_font_large": "Grande",
+        "translation_result_font_xlarge": "Muy grande",
         "replace_selection_translate_label": "Traducir y reemplazar selección:",
         "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
+        "selection_quick_translate_enabled": "Traducción rápida del texto seleccionado",
+        "selection_quick_translate_tooltip": "Muestra un botón cerca del texto seleccionado en otras apps o traduce al instante. Usa el par de idiomas de la traducción por selección. En macOS requiere Accesibilidad; en Linux usa PRIMARY (limitado en Wayland). Se pausa durante OCR y traducción dinámica.",
+        "selection_quick_translate_mode_button": "Mostrar un botón tras seleccionar",
+        "selection_quick_translate_mode_automatic": "Traducir inmediatamente tras seleccionar",
+        "close_result_window_on_outside_click": "Cerrar la ventana de traducción al hacer clic fuera",
+        "close_result_window_on_outside_click_tooltip": "Cierra la ventana de traducción al hacer clic en otra app o fuera de ella, sin usar el botón de cierre.",
         "copy_hotkey_label": "Atajo para copiar seleccion:",
         "translate_hotkey_label": "Atajo de traduccion:",
         "remove_local_tesseract": "Eliminar Tesseract local",
@@ -2154,8 +2193,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
+        "translation_result_font_label": "Schriftgröße:",
+        "translation_result_font_tooltip": "Schriftgröße von Original und Übersetzung im Ergebnisfenster.",
+        "translation_result_font_xsmall": "Sehr klein",
+        "translation_result_font_small": "Klein",
+        "translation_result_font_medium": "Mittel",
+        "translation_result_font_large": "Groß",
+        "translation_result_font_xlarge": "Sehr groß",
         "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
         "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
+        "selection_quick_translate_enabled": "Schnellübersetzung für markierten Text",
+        "selection_quick_translate_tooltip": "Zeigt eine Übersetzen-Schaltfläche nahe der Auswahl in anderen Apps oder übersetzt sofort. Verwendet das Sprachpaar für Auswahlübersetzung. Unter macOS ist Bedienungshilfe nötig; unter Linux PRIMARY (eingeschränkt unter Wayland). Pausiert während OCR und dynamischer Übersetzung.",
+        "selection_quick_translate_mode_button": "Schaltfläche nach der Auswahl anzeigen",
+        "selection_quick_translate_mode_automatic": "Sofort nach der Auswahl übersetzen",
+        "close_result_window_on_outside_click": "Übersetzungsfenster bei Klick außerhalb schließen",
+        "close_result_window_on_outside_click_tooltip": "Schließt das Übersetzungsfenster, wenn Sie eine andere App oder außerhalb klicken. Der Schließen-Knopf ist dann nicht nötig.",
         "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
         "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
@@ -2272,8 +2324,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
+        "translation_result_font_label": "Taille de police :",
+        "translation_result_font_tooltip": "Taille du texte source et traduit dans la fenêtre de résultat.",
+        "translation_result_font_xsmall": "Très petite",
+        "translation_result_font_small": "Petite",
+        "translation_result_font_medium": "Moyenne",
+        "translation_result_font_large": "Grande",
+        "translation_result_font_xlarge": "Très grande",
         "replace_selection_translate_label": "Traduire et remplacer la sélection :",
         "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
+        "selection_quick_translate_enabled": "Traduction rapide du texte sélectionné",
+        "selection_quick_translate_tooltip": "Affiche un bouton près du texte sélectionné dans d'autres apps ou traduit immédiatement. Utilise la paire de langues de la traduction par sélection. macOS requiert l'accessibilité ; Linux utilise PRIMARY (limité sous Wayland). En pause pendant l'OCR et la traduction dynamique.",
+        "selection_quick_translate_mode_button": "Afficher un bouton après la sélection",
+        "selection_quick_translate_mode_automatic": "Traduire immédiatement après la sélection",
+        "close_result_window_on_outside_click": "Fermer la fenêtre de traduction en cliquant à l’extérieur",
+        "close_result_window_on_outside_click_tooltip": "Ferme la fenêtre de traduction si vous cliquez une autre app ou à l’extérieur, sans le bouton de fermeture.",
         "copy_hotkey_label": "Raccourci de copie :",
         "translate_hotkey_label": "Raccourci de traduction :",
         "remove_local_tesseract": "Supprimer Tesseract local",
@@ -2390,8 +2455,21 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
+        "translation_result_font_label": "字体大小：",
+        "translation_result_font_tooltip": "结果窗口中原文和译文的字号。",
+        "translation_result_font_xsmall": "极小",
+        "translation_result_font_small": "小",
+        "translation_result_font_medium": "中",
+        "translation_result_font_large": "大",
+        "translation_result_font_xlarge": "特大",
         "replace_selection_translate_label": "翻译并替换所选文本：",
         "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
+        "selection_quick_translate_enabled": "快速翻译选中文本",
+        "selection_quick_translate_tooltip": "在其他应用中选中文本后显示翻译按钮，或立即翻译。使用选中文本翻译的语言对。macOS 需要辅助功能；Linux 使用 PRIMARY 选区（部分 Wayland 环境受限）。OCR 和动态翻译期间暂停。",
+        "selection_quick_translate_mode_button": "选中后显示按钮",
+        "selection_quick_translate_mode_automatic": "选中后立即翻译",
+        "close_result_window_on_outside_click": "点击窗口外时关闭翻译窗口",
+        "close_result_window_on_outside_click_tooltip": "点击其他应用或翻译窗口外时自动关闭，无需点关闭按钮。",
         "copy_hotkey_label": "复制选区快捷键：",
         "translate_hotkey_label": "翻译快捷键：",
         "remove_local_tesseract": "删除本地 Tesseract",
@@ -6763,11 +6841,70 @@ class SettingsWindow(QWidget):
             self.parent.start_minimized = value
         if key == "autostart":
             self.parent.autostart = value
+        if key in ("selection_quick_translate_enabled", "selection_quick_translate_mode"):
+            sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+            if callable(sync):
+                sync()
+        if key == "translation_result_font_size":
+            apply = getattr(self.parent, "_apply_translation_result_font_size", None)
+            if callable(apply):
+                apply()
         self.parent.save_config()
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
         complete = getattr(self.parent, "_complete_guide_setting", None)
         if callable(complete):
             complete(key)
+
+    def _refresh_selection_quick_translate_mode_enabled(self):
+        checkbox = getattr(self, "selection_quick_translate_checkbox", None)
+        if checkbox is None:
+            return
+        enabled = checkbox.isChecked()
+        for widget in (
+            getattr(self, "selection_quick_translate_mode_button", None),
+            getattr(self, "selection_quick_translate_mode_automatic", None),
+        ):
+            if widget is not None:
+                widget.setEnabled(enabled)
+
+    def _set_selection_quick_translate_enabled(self, enabled):
+        if enabled:
+            checker = getattr(self.parent, "ensure_mac_accessibility_for_selection", None)
+            if callable(checker) and not checker():
+                checkbox = self.selection_quick_translate_checkbox
+                checkbox.blockSignals(True)
+                checkbox.setChecked(False)
+                checkbox.blockSignals(False)
+                self._refresh_selection_quick_translate_mode_enabled()
+                return
+        self.auto_save_setting("selection_quick_translate_enabled", bool(enabled))
+        self._refresh_selection_quick_translate_mode_enabled()
+        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+        if callable(sync):
+            sync()
+
+    def _set_selection_quick_translate_mode(self, mode):
+        if mode not in ("button", "automatic"):
+            return
+        self.auto_save_setting("selection_quick_translate_mode", mode)
+        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
+        if callable(sync):
+            sync()
+
+    def _set_translation_result_font_size(self, *_args):
+        combo = getattr(self, "translation_font_combo", None)
+        if combo is None:
+            return
+        from main import (
+            TRANSLATION_RESULT_FONT_SIZE_KEYS,
+            normalize_translation_result_font_size,
+        )
+        key = normalize_translation_result_font_size(combo.currentData())
+        if key not in TRANSLATION_RESULT_FONT_SIZE_KEYS:
+            return
+        if self.parent.config.get("translation_result_font_size") == key:
+            return
+        self.auto_save_setting("translation_result_font_size", key)
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7222,6 +7359,7 @@ class SettingsWindow(QWidget):
         # Scale/screen signals can arrive while a secondary page replaces the form.
         self.ui_scale_control = None
         self.ui_scale_value = None
+        self.translation_font_combo = None
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -7568,6 +7706,39 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setToolTip(scale_tooltip)
         self.ui_scale_label.setToolTip(scale_tooltip)
         self._refresh_ui_scale()
+
+        self.translation_font_label = QLabel(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_label.setStyleSheet("margin:0; padding:0;")
+        self.translation_font_label.setFixedHeight(engine_control_height)
+        self.translation_font_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.translation_font_combo = DropDownCombo()
+        self.translation_font_combo.setObjectName("translationResultFontSize")
+        from main import (
+            TRANSLATION_RESULT_FONT_SIZE_KEYS,
+            normalize_translation_result_font_size,
+        )
+        for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
+            self.translation_font_combo.addItem(
+                settings_text(lang, f"translation_result_font_{size_key}"),
+                size_key,
+            )
+        saved_font = normalize_translation_result_font_size(
+            self.parent.config.get("translation_result_font_size")
+        )
+        font_index = self.translation_font_combo.findData(saved_font)
+        self.translation_font_combo.setCurrentIndex(max(font_index, 0))
+        self._apply_engine_combo_style(self.translation_font_combo)
+        self.translation_font_combo.setFixedWidth(engine_combo_width)
+        self.translation_font_combo.setFixedHeight(engine_control_height)
+        self.translation_font_combo.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        font_tooltip = tooltip_text(settings_text(lang, "translation_result_font_tooltip"))
+        self.translation_font_combo.setToolTip(font_tooltip)
+        self.translation_font_label.setToolTip(font_tooltip)
+        self.translation_font_combo.currentIndexChanged.connect(
+            self._set_translation_result_font_size
+        )
+        form_grid.addWidget(self.translation_font_label, 4, 1, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_combo, 4, 2, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text
@@ -8444,6 +8615,24 @@ class SettingsWindow(QWidget):
                 border: 1px solid {colors['border']};
                 border-radius: 10px;
             }}
+            QCheckBox#settingsPageCheckbox {{
+                color: {colors['text']};
+                font-size: 14px;
+                spacing: 8px;
+                background: transparent;
+            }}
+            QCheckBox#settingsPageCheckbox:disabled {{
+                color: {colors['muted']};
+            }}
+            QRadioButton#settingsPageRadio {{
+                color: {colors['text']};
+                font-size: 13px;
+                spacing: 8px;
+                background: transparent;
+            }}
+            QRadioButton#settingsPageRadio:disabled {{
+                color: {colors['muted']};
+            }}
             QLabel#secondaryFieldLabel {{
                 color: {colors['text']};
                 font-size: 14px;
@@ -8579,6 +8768,69 @@ class SettingsWindow(QWidget):
 
         lang = self.parent.current_interface_language
         shell_layout = self._create_secondary_shell(settings_text(lang, "hotkeys"))
+
+        quick_card = QFrame()
+        quick_card.setObjectName("secondaryCard")
+        quick_layout = QVBoxLayout(quick_card)
+        quick_layout.setContentsMargins(12, 9, 12, 9)
+        quick_layout.setSpacing(6)
+        self.selection_quick_translate_checkbox = QCheckBox(
+            settings_text(lang, "selection_quick_translate_enabled")
+        )
+        self.selection_quick_translate_checkbox.setObjectName("settingsPageCheckbox")
+        self.selection_quick_translate_checkbox.setToolTip(
+            settings_text(lang, "selection_quick_translate_tooltip")
+        )
+        self.selection_quick_translate_checkbox.setChecked(
+            self.parent.config.get("selection_quick_translate_enabled") is True
+        )
+        quick_layout.addWidget(self.selection_quick_translate_checkbox)
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(12)
+        self.selection_quick_translate_mode_button = QRadioButton(
+            settings_text(lang, "selection_quick_translate_mode_button")
+        )
+        self.selection_quick_translate_mode_button.setObjectName("settingsPageRadio")
+        self.selection_quick_translate_mode_automatic = QRadioButton(
+            settings_text(lang, "selection_quick_translate_mode_automatic")
+        )
+        self.selection_quick_translate_mode_automatic.setObjectName("settingsPageRadio")
+        saved_mode = str(self.parent.config.get("selection_quick_translate_mode") or "button")
+        if saved_mode == "automatic":
+            self.selection_quick_translate_mode_automatic.setChecked(True)
+        else:
+            self.selection_quick_translate_mode_button.setChecked(True)
+        mode_row.addWidget(self.selection_quick_translate_mode_button)
+        mode_row.addWidget(self.selection_quick_translate_mode_automatic)
+        mode_row.addStretch(1)
+        quick_layout.addLayout(mode_row)
+        self._refresh_selection_quick_translate_mode_enabled()
+        self.selection_quick_translate_checkbox.toggled.connect(
+            self._set_selection_quick_translate_enabled
+        )
+        self.selection_quick_translate_mode_button.toggled.connect(
+            lambda checked: self._set_selection_quick_translate_mode("button") if checked else None
+        )
+        self.selection_quick_translate_mode_automatic.toggled.connect(
+            lambda checked: self._set_selection_quick_translate_mode("automatic") if checked else None
+        )
+        self.close_result_on_outside_click_checkbox = QCheckBox(
+            settings_text(lang, "close_result_window_on_outside_click")
+        )
+        self.close_result_on_outside_click_checkbox.setObjectName("settingsPageCheckbox")
+        self.close_result_on_outside_click_checkbox.setToolTip(
+            settings_text(lang, "close_result_window_on_outside_click_tooltip")
+        )
+        self.close_result_on_outside_click_checkbox.setChecked(
+            self.parent.config.get("close_result_window_on_outside_click") is True
+        )
+        self.close_result_on_outside_click_checkbox.toggled.connect(
+            lambda checked: self.auto_save_setting(
+                "close_result_window_on_outside_click", bool(checked)
+            )
+        )
+        quick_layout.addWidget(self.close_result_on_outside_click_checkbox)
+        shell_layout.addWidget(quick_card)
 
         hotkey_card = QFrame()
         hotkey_card.setObjectName("secondaryCard")
@@ -11140,6 +11392,7 @@ finally {
         for combo_name in (
             "ocr_engine_combo",
             "translator_combo",
+            "translation_font_combo",
             "game_source_combo",
             "game_target_combo",
         ):

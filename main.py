@@ -266,6 +266,10 @@ DEFAULT_CONFIG = {
     "translate_selection_hotkey": DEFAULT_SELECTION_HOTKEY,
     "translate_replace_selection_hotkey": DEFAULT_REPLACE_SELECTION_HOTKEY,
     "replace_selection_select_all": False,
+    "selection_quick_translate_enabled": False,
+    "selection_quick_translate_mode": "button",
+    "close_result_window_on_outside_click": False,
+    "translation_result_font_size": "medium",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -305,6 +309,28 @@ def result_window_hidden_modes(config):
 def result_window_hidden_for(config, mode):
     """True when `mode` should copy the translation instead of showing a window."""
     return mode in result_window_hidden_modes(config)
+
+
+TRANSLATION_RESULT_FONT_SIZE_KEYS = ("xsmall", "small", "medium", "large", "xlarge")
+TRANSLATION_RESULT_FONT_SIZE_PX = {
+    "xsmall": 11,
+    "small": 13,
+    "medium": 16,
+    "large": 20,
+    "xlarge": 24,
+}
+
+
+def normalize_translation_result_font_size(value):
+    key = str(value or "medium").strip().lower()
+    return key if key in TRANSLATION_RESULT_FONT_SIZE_PX else "medium"
+
+
+def translation_result_font_px(config):
+    key = normalize_translation_result_font_size(
+        (config or {}).get("translation_result_font_size")
+    )
+    return TRANSLATION_RESULT_FONT_SIZE_PX[key]
 
 
 TRANSLATION_PAIR_KEYS = (
@@ -4216,6 +4242,32 @@ def _update_translation_editor(editor, text, *, reset=False):
     scroll.setValue((scroll.maximum() if following_end else position) if append else 0)
 
 
+class _ResultWindowOutsideCloseFilter(QtCore.QObject):
+    """Close the result window when the user clicks another app or window."""
+
+    def __init__(self, dialog):
+        super().__init__(dialog)
+        self._dialog = dialog
+
+    def eventFilter(self, watched, event):
+        try:
+            dialog = getattr(self, "_dialog", None)
+            if dialog is None or getattr(dialog, "_closed", True):
+                return False
+        except RuntimeError:
+            return False
+        etype = event.type()
+        if etype == QtCore.QEvent.ApplicationDeactivate:
+            dialog._schedule_outside_close()
+        elif etype == QtCore.QEvent.ApplicationActivate:
+            dialog._pending_outside_close = False
+        elif etype == QtCore.QEvent.MouseButtonPress:
+            widget = watched if isinstance(watched, QWidget) else None
+            if widget is not None and not dialog._widget_belongs_to_result_window(widget):
+                dialog._schedule_outside_close()
+        return False
+
+
 class TranslationResultDialog(QDialog):
     """Editable source and result, with requests bound to an exact input revision."""
 
@@ -4438,6 +4490,17 @@ class TranslationResultDialog(QDialog):
         initial_size = self._view_sizes.get('collapsed_size' if self._source_collapsed else 'expanded_size')
         if initial_size is not None:
             self._resize_result_view(initial_size)
+
+        self._pending_outside_close = False
+        self._outside_close_ready_at = time.monotonic() + 0.25
+        self._outside_close_timer = QTimer(self)
+        self._outside_close_timer.setSingleShot(True)
+        self._outside_close_timer.setInterval(60)
+        self._outside_close_timer.timeout.connect(self._close_after_outside_click)
+        self._outside_close_filter = _ResultWindowOutsideCloseFilter(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self._outside_close_filter)
 
     def set_window_engine(self, engine):
         """Set an initial/followed provider without changing the app or sending text."""
@@ -4883,16 +4946,25 @@ class TranslationResultDialog(QDialog):
         self._set_status(self.text["copied"])
 
     def done(self, result):
+        self._closed = True
+        self._pending_outside_close = False
+        timer = getattr(self, "_outside_close_timer", None)
+        if timer is not None:
+            timer.stop()
+        app = QApplication.instance()
+        filter_obj = getattr(self, "_outside_close_filter", None)
+        if app is not None and filter_obj is not None:
+            app.removeEventFilter(filter_obj)
         try:
             self._save_mode_preferences()
         except (OSError, ValueError, RuntimeError):
             logging.getLogger('clickntranslate.result').exception('Could not save result-window preferences')
-        self._closed = True
         self._invalidate_request()
         super().done(result)
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._outside_close_ready_at = time.monotonic() + 0.25
         if not self._centered_once:
             self._centered_once = True
             self._center_on_parent()
@@ -4901,11 +4973,81 @@ class TranslationResultDialog(QDialog):
         QTimer.singleShot(0, self._render_status)
         QTimer.singleShot(0, self._restore_mode_view)
 
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+            return
+        if event.type() == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+
+    def event(self, event):
+        etype = event.type()
+        if etype == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+        elif etype == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+        return super().event(event)
+
+    def _outside_click_close_enabled(self):
+        return self._current_config().get("close_result_window_on_outside_click") is True
+
+    def _widget_belongs_to_result_window(self, widget):
+        current = widget
+        while current is not None:
+            if current is self:
+                return True
+            current = current.parentWidget()
+        try:
+            handle = widget.windowHandle() if widget is not None else None
+            ours = self.windowHandle()
+            if handle is not None and ours is not None and handle.transientParent() is ours:
+                return True
+        except RuntimeError:
+            return False
+        return False
+
+    def _has_owned_popup(self):
+        app = QApplication.instance()
+        if app is None:
+            return False
+        popup = app.activePopupWidget()
+        if popup is not None and popup is not self and self._widget_belongs_to_result_window(popup):
+            return True
+        modal = app.activeModalWidget()
+        if modal is not None and modal is not self and self._widget_belongs_to_result_window(modal):
+            return True
+        for combo in self.findChildren(QComboBox):
+            view = combo.view()
+            try:
+                if view is not None and view.isVisible() and view.window() is not self:
+                    return True
+            except RuntimeError:
+                continue
+        return False
+
+    def _schedule_outside_close(self):
+        if self._closed or not self.isVisible() or not self._outside_click_close_enabled():
+            return
+        if time.monotonic() < self._outside_close_ready_at:
+            return
+        self._pending_outside_close = True
+        self._outside_close_timer.start()
+
+    def _close_after_outside_click(self):
+        if self._closed or not self._pending_outside_close or not self.isVisible():
+            return
+        if not self._outside_click_close_enabled() or self._has_owned_popup():
+            self._pending_outside_close = False
+            return
+        self.accept()
+
     def refresh_theme(self, theme):
         self.theme = theme
         dark = theme != "Светлая"
         background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
         ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        font_px = translation_result_font_px(self._current_config())
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
             QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
@@ -4913,7 +5055,7 @@ class TranslationResultDialog(QDialog):
             QLabel#translationResultEngine, QLabel#translationResultStatus {{ color:{muted}; font-size:12px; }}
             QFrame#translationEditorPanel {{ background:{surface}; border:1px solid {edge}; border-radius:8px; }}
             QLabel#translationEditorCaption {{ color:{muted}; font-size:12px; font-weight:600; }}
-            QTextEdit {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:16px; selection-background-color:#7a5fa1; }}
+            QTextEdit#translationSourceText, QTextEdit#translationResultText {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:{font_px}px; selection-background-color:#7a5fa1; }}
             QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
             QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
@@ -7337,6 +7479,7 @@ class DarkThemeApp(QMainWindow):
         if not LAYOUT_EDITOR_MODE:
             self.create_tray_icon()
             self._sync_desktop_assistant()
+            self._sync_selection_quick_translate()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7641,6 +7784,44 @@ class DarkThemeApp(QMainWindow):
         page = getattr(settings, 'settings_assistant_page', None)
         if page is not None:
             page.refresh()
+
+    def ensure_mac_accessibility_for_selection(self):
+        if not platform_support.IS_MAC:
+            return True
+        from macos_desktop import ensure_permission
+
+        return ensure_permission("accessibility", self, self.current_interface_language)
+
+    def _sync_selection_quick_translate(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        enabled = self.config.get("selection_quick_translate_enabled") is True
+        mode = str(self.config.get("selection_quick_translate_mode") or "button")
+        if enabled and not LAYOUT_EDITOR_MODE:
+            if controller is None:
+                from selection_quick_translate import SelectionQuickTranslateController
+
+                self._selection_quick_translate = SelectionQuickTranslateController(self)
+                self._selection_quick_translate.translate_requested.connect(
+                    self.launch_translate_selection_from_quick_action
+                )
+                controller = self._selection_quick_translate
+            controller.configure(True, mode)
+        elif controller is not None:
+            controller.configure(False, mode)
+
+    def _apply_translation_result_font_size(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        clear = getattr(controller, "clear_auto_dedupe", None)
+        if callable(clear):
+            clear()
+        for dialog in _live_translation_result_dialogs():
+            try:
+                dialog.refresh_theme(dialog.theme)
+            except RuntimeError:
+                continue
+
+    def launch_translate_selection_from_quick_action(self, text):
+        self._launch_translate_selection(replace_selection=False, preloaded_text=str(text or ""))
 
     def set_desktop_assistant_enabled(self, enabled):
         self.config['desktop_assistant_enabled'] = bool(enabled)
@@ -9325,9 +9506,9 @@ class DarkThemeApp(QMainWindow):
         """Translate selected text and safely replace that exact selection on Windows."""
         return self._launch_translate_selection(replace_selection=True)
 
-    def _launch_translate_selection(self, replace_selection=False):
+    def _launch_translate_selection(self, replace_selection=False, preloaded_text=None):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
-        if platform_support.IS_MAC:
+        if platform_support.IS_MAC and not (preloaded_text and str(preloaded_text).strip()):
             from macos_desktop import ensure_permission
             if not ensure_permission("accessibility", self, self.current_interface_language):
                 return
@@ -9361,7 +9542,10 @@ class DarkThemeApp(QMainWindow):
                     platform_support.copy_text(clipboard_before_capture)
 
             try:
-                if platform_support.IS_LINUX:
+                preloaded = str(preloaded_text or "").strip()
+                if preloaded:
+                    text = preloaded
+                elif platform_support.IS_LINUX:
                     # X11 and Wayland keep the highlighted text in the PRIMARY
                     # selection, so it can be read directly — no key simulation,
                     # and nothing is written to the user's clipboard.
@@ -9387,11 +9571,14 @@ class DarkThemeApp(QMainWindow):
                     text = pyperclip.paste()
                 if not text or not text.strip():
                     time.sleep(0.3)
-                    text = (
-                        self._read_primary_selection()
-                        if platform_support.IS_LINUX
-                        else pyperclip.paste()
-                    )
+                    if preloaded:
+                        text = preloaded
+                    else:
+                        text = (
+                            self._read_primary_selection()
+                            if platform_support.IS_LINUX
+                            else pyperclip.paste()
+                        )
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")
