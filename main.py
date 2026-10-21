@@ -309,8 +309,9 @@ def result_window_hidden_for(config, mode):
     return mode in result_window_hidden_modes(config)
 
 
-TRANSLATION_RESULT_FONT_SIZE_KEYS = ("small", "medium", "large", "xlarge")
+TRANSLATION_RESULT_FONT_SIZE_KEYS = ("xsmall", "small", "medium", "large", "xlarge")
 TRANSLATION_RESULT_FONT_SIZE_PX = {
+    "xsmall": 11,
     "small": 13,
     "medium": 16,
     "large": 20,
@@ -4227,8 +4228,8 @@ class _ResultWindowOutsideCloseFilter(QtCore.QObject):
         self._dialog = dialog
 
     def eventFilter(self, watched, event):
-        dialog = self._dialog
         try:
+            dialog = getattr(self, "_dialog", None)
             if dialog is None or getattr(dialog, "_closed", True):
                 return False
         except RuntimeError:
@@ -7760,6 +7761,10 @@ class DarkThemeApp(QMainWindow):
             controller.configure(False, mode)
 
     def _apply_translation_result_font_size(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        clear = getattr(controller, "clear_auto_dedupe", None)
+        if callable(clear):
+            clear()
         for dialog in _live_translation_result_dialogs():
             try:
                 dialog.refresh_theme(dialog.theme)

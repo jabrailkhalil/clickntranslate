@@ -771,12 +771,16 @@ class TranslationResultUiTest(unittest.TestCase):
         parent.config["translation_result_font_size"] = "small"
         dialog.refresh_theme("Темная")
         self.assertIn("font-size:13px", dialog.styleSheet())
+        parent.config["translation_result_font_size"] = "xsmall"
+        dialog.refresh_theme("Темная")
+        self.assertIn("font-size:11px", dialog.styleSheet())
         dialog.close()
 
     def test_unknown_font_size_falls_back_to_medium(self):
         self.assertEqual(main.normalize_translation_result_font_size("bogus"), "medium")
         self.assertEqual(main.translation_result_font_px({"translation_result_font_size": "bogus"}), 16)
         self.assertEqual(main.translation_result_font_px(main.DEFAULT_CONFIG), 16)
+        self.assertEqual(main.translation_result_font_px({"translation_result_font_size": "xsmall"}), 11)
 
     def test_outside_click_does_not_close_the_result_window_by_default(self):
         dialog = self._outside_close_dialog(False)

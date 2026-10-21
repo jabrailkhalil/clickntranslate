@@ -88,10 +88,17 @@ class _SelectionChangePoller(QtCore.QObject):
             self._last = ""
             return
         current = read_selected_text()
-        if current != self._last:
-            self._last = current
-            if current:
-                self.activity.emit()
+        if current == self._last:
+            return
+        previous = self._last
+        self._last = current
+        if current:
+            self.activity.emit()
+            return
+        owner = self.parent()
+        clear = getattr(owner, "clear_auto_dedupe", None)
+        if callable(clear) and previous:
+            clear()
 
 
 class _WindowsMouseReleasePoller(QtCore.QObject):
@@ -160,7 +167,12 @@ class SelectionQuickTranslateController(QtCore.QObject):
 
     def configure(self, enabled, mode):
         self._mode = mode if mode in ("button", "automatic") else "button"
+        self.clear_auto_dedupe()
         self.set_active(bool(enabled))
+
+    def clear_auto_dedupe(self):
+        """Allow the same selection to fire automatic translate again."""
+        self._last_auto_text = ""
 
     def set_active(self, enabled):
         enabled = bool(enabled)
@@ -262,6 +274,7 @@ class SelectionQuickTranslateController(QtCore.QObject):
             return
         text = self._read_probe_text()
         if len(text) < MIN_SELECTION_CHARS:
+            self.clear_auto_dedupe()
             return
         if self._mode == "automatic":
             if text == self._last_auto_text:

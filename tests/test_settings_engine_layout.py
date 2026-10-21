@@ -901,6 +901,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             font = self._rect_in_settings(settings, combo)
             scale = self._rect_in_settings(settings, settings.ui_scale_control)
             self.assertEqual(combo.count(), len(main.TRANSLATION_RESULT_FONT_SIZE_KEYS))
+            self.assertEqual(combo.itemData(0), "xsmall")
+            self.assertEqual(combo.itemText(0), "Extra small")
             self.assertEqual(combo.currentData(), "medium")
             self.assertEqual(font[2], scale[2])
             self.assertAlmostEqual(font[3], scale[3], delta=1)
@@ -913,6 +915,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             combo.setCurrentIndex(combo.findData("large"))
             self.app.processEvents()
             self.assertEqual(parent.config["translation_result_font_size"], "large")
+            combo.setCurrentIndex(combo.findData("xsmall"))
+            self.app.processEvents()
+            self.assertEqual(parent.config["translation_result_font_size"], "xsmall")
         finally:
             settings.close()
             parent.close()
