@@ -42,8 +42,9 @@ class LocaleRuntimeTest {
         )
         choices.forEach { (name, heading) ->
             compose.onNodeWithTag("setup-options").performScrollToNode(hasText(name))
-            compose.onNodeWithText(name).performClick()
+            compose.onNodeWithText(name).performScrollTo().assertIsDisplayed().performClick()
             compose.waitForIdle()
+            assertEquals("Selected language must immediately update actual resources", heading, resource(R.string.mobile_interface_language))
             assertSetupShown(heading)
         }
     }
@@ -86,6 +87,8 @@ class LocaleRuntimeTest {
         compose.waitForIdle()
     }
     private fun assertSetupShown(label: String) {
+        compose.onNodeWithTag("setup-options").performScrollToIndex(0)
+        compose.waitForIdle()
         compose.onNodeWithTag("setup-options").performScrollToNode(hasText(label))
         compose.onNodeWithText(label).assertIsDisplayed()
     }
