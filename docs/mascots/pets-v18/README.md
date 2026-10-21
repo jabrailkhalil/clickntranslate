@@ -127,7 +127,10 @@ columns fitted to the available width, with tooltips for elided package/status
 values.
 
 Popup anchors map through the visible scaled canvas into native screen
-coordinates. The flag menu, language lists and context menus follow the moved
+coordinates. Native menu handles also select the anchor's monitor before
+opening, preventing Qt from clamping a negative desktop position to the primary
+screen. Real nested menu execution is tested after moves in both directions.
+The flag menu, language lists and context menus follow the moved
 window, including monitors with negative coordinates, and stay within the
 available screen bounds. Button labels, tooltips and accessibility names have
 been audited in English, Russian, Spanish, German, French and Chinese: close,
@@ -136,9 +139,14 @@ Shared standard dialog buttons follow the app language rather than the OS.
 
 General settings include the optional **Select all before replacing** checkbox.
 The right column groups the OCR, translator, result visibility and result-font
-dropdowns, followed by interface scale at the bottom. Result font size affects
-only source/translation text in the separate result window; its tooltip explains
-the distinction from interface scale in all six languages.
+dropdowns, a live font sample and interface scale at the bottom. Result text
+choices show 11, 13, 16, 20 and 24 px; their full size descriptions remain in
+hover help. The sample fits even the largest font within the fixed window.
+Result font size affects only source/translation text in the separate result
+window. Dedicated explanations and complete-label fallback hints cover all
+visible home, settings and hotkey controls in six languages. The scaled view
+routes successive hovers through native viewport coordinates and respects the
+global hover-help switch.
 The translate-and-replace action first selects the entire active input, then
 uses the existing translation and verified-selection replacement pipeline. The
 option is off by default, does not affect ordinary selection translation or

@@ -10,13 +10,28 @@ The complete suite ran with the bounded, isolated repository runner:
 python tools/run_ci_tests.py --parts 8 --timeout 160
 ```
 
-Final full-suite results: **1967 passed, 68 skipped, 2 pre-existing version
-failures**. Latest native Windows settings checks: **31 passed, 26 subtests**.
+Full-suite results at `eae52e40a3e4087b91d7eb41977ebe8bf6fc9457`:
+**1981 passed, 77 skipped, 2 pre-existing version failures**. The final compact
+numeric font choices and current-size tooltip at `688a51e928140a6d5c541bcfa2e78f3fafeddf3d`
+then passed **80 focused checks, 1 native-only skip and 26 layout subtests**.
+Latest focused native Windows checks: **35 passed** on two physical monitors.
+They exercise the real `QMenu.exec_` loop, rather than replacing it with
+`popup()`, after moves in both directions at 80%, 100% and 150%. This reproduces
+and prevents the original primary-monitor clamp for flag, editor and background
+menus. Real successive hover delivery and the global off switch are tested on
+both screens; all five font sizes and all six locales fit their live preview.
 Earlier native animation checks: **58 passed**; integrated native monitor/focus/
 control checks: **54 passed**. See
 `test-summary.json` for the complete eight-part run. The only remaining failures
 are the two development-version metadata checks described below. Every completed isolated run reported
 `USER_DATA_UNCHANGED: True`.
+
+An earlier extended native batch passed 135 checks but lost a held-arrow click
+once during its longer window/focus sequence. The isolated four-check rerun and
+the final 35-check native run both passed, including that held-arrow check.
+The complete offscreen suite also passed it. Native rapid-theme/navigation
+paint and atomic theme-transaction checks passed in the extended batch; those
+fixtures deliberately expose individual palette states while running visibly.
 
 PR #7 was corrected on its own head and merged at
 `be5c5350586fd3086269d76c72592712bef20668`. Its exact fixed head
@@ -71,8 +86,13 @@ Coverage includes:
 - Newly created quick-selection checkboxes and radio controls have visible
   indicators and distinct checked/unchecked states in both themes.
 - The four general-settings dropdowns precede the bottom scale control, with
-  aligned checkbox/field rows in both themes and all six languages. Font-size
-  help describes the separate result window and the difference from UI scale.
+  aligned checkbox/field rows in both themes and all six languages. Numeric font
+  choices identify the result-text size, with a live sample underneath and
+  full descriptions on hover. Even the 24px sample retains its descenders.
+- Dedicated six-language hints and shared complete-label fallbacks cover every
+  visible interactive control on home, four settings tabs and hotkeys. A single
+  hover timer bridges proxy controls using native viewport coordinates; moving,
+  leaving, dragging and disabling hover help do not retain the previous hint.
 - The repository audit reads tracked text even when absent from the sparse
   checkout. Unused research/comparison resources and obsolete development tools
   were removed; the six active atlas hashes are unchanged. Actual OCR/model/

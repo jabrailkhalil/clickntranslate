@@ -1,37 +1,39 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
-  "testedSourceCommit": "0838aaaa49badd73df4cd51fe43f7d5dca331adb",
+  "testedSourceCommit": "eae52e40a3e4087b91d7eb41977ebe8bf6fc9457",
+  "latestSourceCommit": "688a51e928140a6d5c541bcfa2e78f3fafeddf3d",
   "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 160",
   "fullSuiteCounts": {
-    "passed": 1967,
-    "skipped": 68,
+    "passed": 1981,
+    "skipped": 77,
     "failure": 2
   },
   "counts": {
-    "passed": 1967,
-    "skipped": 68,
+    "passed": 1981,
+    "skipped": 77,
     "failure": 2
   },
-  "totalReportedCases": 2037,
+  "totalReportedCases": 2060,
   "partitions": [
     {
       "part": 1,
       "counts": {
-        "passed": 249
+        "passed": 256,
+        "skipped": 1
       },
       "exitCode": 0
     },
     {
       "part": 2,
       "counts": {
-        "passed": 255
+        "passed": 248
       },
       "exitCode": 0
     },
     {
       "part": 3,
       "counts": {
-        "passed": 228,
+        "passed": 224,
         "skipped": 12,
         "failure": 1
       },
@@ -40,50 +42,50 @@
     {
       "part": 4,
       "counts": {
-        "skipped": 17,
-        "passed": 267
+        "passed": 273,
+        "skipped": 17
       },
       "exitCode": 0
     },
     {
       "part": 5,
       "counts": {
-        "passed": 209,
-        "skipped": 2
+        "passed": 205,
+        "skipped": 1
       },
       "exitCode": 0
     },
     {
       "part": 6,
       "counts": {
-        "passed": 287,
-        "skipped": 30
+        "passed": 284,
+        "skipped": 9
       },
       "exitCode": 0
     },
     {
       "part": 7,
       "counts": {
-        "passed": 354,
-        "skipped": 5
+        "passed": 286,
+        "skipped": 35
       },
       "exitCode": 0
     },
     {
       "part": 8,
       "counts": {
+        "passed": 205,
         "failure": 1,
-        "passed": 118,
         "skipped": 2
       },
       "exitCode": 1
     }
   ],
   "nativeWindowsCounts": {
-    "passed": 31
+    "passed": 35
   },
   "nativeWindowsRuns": [
-    "qa-settings-order-native"
+    "qa-native-popup-hover-font-final"
   ],
   "pr7": {
     "number": 7,
@@ -97,7 +99,9 @@
     }
   },
   "latestRechecks": [
-    "Native Windows settings layout: four dropdowns followed by scale, six-language/two-theme alignment (31 passed, 26 subtests)",
+    "Real QMenu.exec_ placement on both physical monitors, bidirectional moves, flag/editor/background routes and 80/100/150 percent UI scales (35 native cases passed including hover, font and held-arrow checks)",
+    "Six-language visible-control hover coverage for home, four settings tabs and hotkeys; live font previews at all five sizes; no clipping at 24px",
+    "Atomic production theme changes, rapid navigation and final-theme repaint checks passed; visible test fixtures also deliberately exercise individual palette states",
     "Previous native checks: Doc animation (58 passed) and two physical monitors/navigation/focus/controls (54 passed)",
     "Tracked text audit including sparse files; retained engine/model/font/library dependencies and license notices",
     "Isolated six-locale landing page build: 31 public files and retained font license",
@@ -114,10 +118,20 @@
       "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
     }
   ],
-  "note": "All eight partitions completed on the final integrated source. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. Native Windows checks passed; macOS/Linux builds and installers were not produced.",
+  "note": "All eight partitions completed on testedSourceCommit. The subsequent compact numeric font labels and size tooltip update passed the recorded focused follow-up suite. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. The final focused native Windows run passed; macOS/Linux builds and installers were not produced.",
+  "focusedFollowupRuns": [
+    {
+      "run": "qa-font-compact-final",
+      "counts": {
+        "passed": 80,
+        "skipped": 1
+      },
+      "userDataUnchanged": true
+    }
+  ],
   "projectAudit": {
     "date": "2026-10-22",
-    "trackedTextFiles": 623,
+    "trackedTextFiles": 626,
     "remainingAuditedApplicationReferences": 0,
     "includesSparseFiles": true,
     "runtimeAtlasHashesUnchanged": true,
