@@ -194,6 +194,33 @@ def native_window_parent(widget):
     return widget
 
 
+def widget_global_point(widget, point=None):
+    """Map through the visible viewport, including a moved/scaled proxy canvas."""
+    point = QPoint() if point is None else point
+    root = widget.window()
+    proxy = root.graphicsProxyWidget()
+    if proxy is not None and proxy.scene() is not None:
+        views = [view for view in proxy.scene().views() if view.isVisible()]
+        if views:
+            view = views[0]
+            scene_point = proxy.mapToScene(QPointF(widget.mapTo(root, point)))
+            return view.viewport().mapToGlobal(view.mapFromScene(scene_point))
+    return widget.mapToGlobal(point)
+
+
+def widget_global_rect(widget):
+    origin = widget_global_point(widget)
+    end = widget_global_point(widget, QPoint(widget.width(), widget.height()))
+    return QRect(origin, QSize(max(1, end.x()-origin.x()), max(1, end.y()-origin.y())))
+
+
+def widget_popup_geometry(widget, desired, gap=2):
+    anchor = widget_global_rect(widget)
+    screen = QApplication.screenAt(anchor.center()) or native_window_parent(widget).window().screen()
+    bounds = screen.availableGeometry()
+    return combo_popup_geometry(anchor, desired, bounds, gap, margin=4)
+
+
 def window_position_context(window, owner=None):
     """Resolve an embedded owner to its visible native window and monitor."""
     owner = native_window_parent(owner if owner is not None else window.parentWidget())

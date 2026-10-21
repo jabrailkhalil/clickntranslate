@@ -5,6 +5,7 @@ from __future__ import annotations
 from button_styles import standard_buttons
 from scrollbar_styles import scrollbar_stylesheet, install_scrollbar_theme
 from ui_scaling import native_window_parent, interface_scale_factor
+from dialog_text import LANGUAGES as DIALOG_LANGUAGES, dialog_action_text
 
 import ctypes
 import logging
@@ -626,6 +627,21 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
         if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
             self._draw_chevron(option, painter)
             return
+        if element == QtWidgets.QStyle.PE_IndicatorRadioButton:
+            fill, border, checked, _ = self._colors(option)
+            rect = QtCore.QRectF(option.rect).adjusted(1.5, 1.5, -1.5, -1.5)
+            painter.save()
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            painter.setPen(QtGui.QPen(border, 1.6))
+            painter.setBrush(fill)
+            painter.drawEllipse(rect)
+            if checked:
+                inset = rect.width() * .3
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.setBrush(QtGui.QColor('#ffffff'))
+                painter.drawEllipse(rect.adjusted(inset, inset, -inset, -inset))
+            painter.restore()
+            return
         if element not in self._CHECK_ELEMENTS:
             super().drawPrimitive(element, option, painter, widget)
             return
@@ -722,6 +738,7 @@ def install_accent_controls(widget, dark: bool = True) -> None:
         # Drop-down popups are separate top-level widgets, so the check boxes on
         # checkable rows would otherwise keep the platform's white squares.
         controls = [widget, *widget.findChildren(QtWidgets.QCheckBox),
+                    *widget.findChildren(QtWidgets.QRadioButton),
                     *widget.findChildren(QtWidgets.QAbstractItemView)]
         for control in controls:
             if control.property('_cntAccentStyle') is not style:
@@ -809,7 +826,9 @@ class _TitleBar(QtWidgets.QFrame):
         self.close_button.setText("×")
         self.close_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.close_button.setFixedSize(34, 32)
-        self.close_button.setToolTip("Close")
+        close_label = dialog_action_text(dialog, 'Close')
+        self.close_button.setToolTip(close_label)
+        self.close_button.setAccessibleName(close_label)
         self.close_button.clicked.connect(dialog.reject)
         layout.addWidget(self.close_button)
 
@@ -1304,6 +1323,26 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
         super().setWindowTitle(str(title))
         self.title_bar.title_label.setText(str(title))
 
+    def setInterfaceLanguage(self, language):
+        """Use an explicit language for dialogs opened before the main window."""
+        self._dialog_language_code = language if language in DIALOG_LANGUAGES else 'en'
+        self._refresh_action_labels()
+
+    def _refresh_action_labels(self):
+        close_label = dialog_action_text(self, 'Close')
+        self.title_bar.close_button.setToolTip(close_label)
+        self.title_bar.close_button.setAccessibleName(close_label)
+        for button in self._button_standards:
+            key = button.property('dialogStandardLabel')
+            previous = button.property('dialogAutomaticLabel')
+            if key and button.text() == previous:
+                label = dialog_action_text(self, key)
+                button.setText(label)
+                button.setAccessibleName(label)
+                button.setProperty('dialogAutomaticLabel', label)
+            elif key and button.accessibleName() == previous:
+                button.setAccessibleName(button.text())
+
     def setWindowIcon(self, icon):
         super().setWindowIcon(icon)
         if isinstance(icon, QtGui.QIcon) and not icon.isNull():
@@ -1398,8 +1437,12 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
             actual_role = self.ActionRole if role is None else role
         elif role is None and isinstance(button_or_text, int):
             standard = button_or_text
-            label, actual_role = self._standard_button_details(standard)
+            key, actual_role = self._standard_button_details(standard)
+            label = dialog_action_text(self, key)
             button = QtWidgets.QPushButton(label, self)
+            button.setAccessibleName(label)
+            button.setProperty('dialogStandardLabel', key)
+            button.setProperty('dialogAutomaticLabel', label)
             self._button_standards[button] = standard
         else:
             button = QtWidgets.QPushButton(str(button_or_text), self)
@@ -1512,6 +1555,7 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._refresh_action_labels()
         self.adjustSize()
         if self.width() < self.minimumWidth():
             self.resize(self.minimumWidth(), self.height())

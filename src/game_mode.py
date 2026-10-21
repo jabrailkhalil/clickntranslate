@@ -41,6 +41,8 @@ GAME_TEXT = {
         "start": "Start",
         "stop": "Stop",
         "undo": "Undo",
+        "undo_hint": "Remove the last selected area",
+        "cancel_selection": "Cancel area selection",
         "selected_count": "Selected: {count}",
         "waiting": "Waiting for new text…",
         "scanning": "Reading the selected area…",
@@ -62,7 +64,9 @@ GAME_TEXT = {
         "select_hint": "Перетаскивайте области · × — удалить · Enter — запустить",
         "start": "Запустить",
         "stop": "Стоп",
-        "undo": "Назад",
+        "undo": "Отменить",
+        "undo_hint": "Убрать последнюю выбранную область",
+        "cancel_selection": "Отменить выбор областей",
         "selected_count": "Выбрано: {count}",
         "waiting": "Жду новый текст…",
         "scanning": "Читаю выбранную область…",
@@ -85,6 +89,8 @@ GAME_TEXT = {
         "start": "Iniciar",
         "stop": "Detener",
         "undo": "Deshacer",
+        "undo_hint": "Eliminar la última área seleccionada",
+        "cancel_selection": "Cancelar la selección de áreas",
         "selected_count": "Seleccionadas: {count}",
         "waiting": "Esperando texto nuevo…",
         "scanning": "Leyendo el área seleccionada…",
@@ -106,7 +112,9 @@ GAME_TEXT = {
         "select_hint": "Ziehen zum Verschieben · × zum Entfernen · Enter zum Starten",
         "start": "Start",
         "stop": "Beenden",
-        "undo": "Zurück",
+        "undo": "Rückgängig",
+        "undo_hint": "Den zuletzt ausgewählten Bereich entfernen",
+        "cancel_selection": "Bereichsauswahl abbrechen",
         "selected_count": "Ausgewählt: {count}",
         "waiting": "Warte auf neuen Text…",
         "scanning": "Ausgewählter Bereich wird gelesen…",
@@ -129,6 +137,8 @@ GAME_TEXT = {
         "start": "Démarrer",
         "stop": "Arrêter",
         "undo": "Annuler",
+        "undo_hint": "Retirer la dernière zone sélectionnée",
+        "cancel_selection": "Annuler la sélection des zones",
         "selected_count": "Sélectionnées : {count}",
         "waiting": "En attente d’un nouveau texte…",
         "scanning": "Lecture de la zone sélectionnée…",
@@ -151,6 +161,8 @@ GAME_TEXT = {
         "start": "开始",
         "stop": "停止",
         "undo": "撤销",
+        "undo_hint": "移除最后选择的区域",
+        "cancel_selection": "取消区域选择",
         "selected_count": "已选择：{count}",
         "waiting": "等待新文字…",
         "scanning": "正在读取所选区域…",
@@ -406,6 +418,7 @@ class GameRegionSelector(QtWidgets.QWidget):
             _translation_targets_for_source,
             get_cached_ocr_config,
             installed_ocr_language_codes,
+            ocr_ui_text,
         )
         from languages import LANGUAGES, default_target_for_source, language_icon_path
 
@@ -444,6 +457,16 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.swap_button = LanguageSwapButton(self)
         self.undo_button = QtWidgets.QPushButton(game_text(self._language, "undo"), self)
         self.start_button = QtWidgets.QPushButton(self)
+        for control, key in ((self.source_combo, "source_language"),
+                             (self.target_combo, "target_language"),
+                             (self.swap_button, "swap_languages")):
+            hint = ocr_ui_text(self._language, key)
+            control.setToolTip(hint)
+            control.setAccessibleName(hint)
+        self.undo_button.setToolTip(game_text(self._language, "undo_hint"))
+        self.undo_button.setAccessibleName(game_text(self._language, "undo_hint"))
+        self.start_button.setToolTip(game_text(self._language, "start"))
+        self.start_button.setAccessibleName(game_text(self._language, "start"))
         available = set(installed_ocr_language_codes(config=self._config))
         if str(self._config.get("translator_engine", "Google")).lower() == "argos":
             available = {
@@ -499,7 +522,8 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.start_button.setStyleSheet(
             button_qss(True, "primary", compact=True)
         )
-        self.undo_button.setFixedSize(92, 44)
+        self.undo_button.ensurePolished()
+        self.undo_button.setFixedSize(max(92, self.undo_button.sizeHint().width()), 44)
         self.start_button.setFixedSize(142, 44)
         from window_appearance import style_capture_controls
         style_capture_controls(self, self._config,
@@ -519,6 +543,8 @@ class GameRegionSelector(QtWidgets.QWidget):
     def _layout_controls(self):
         if not hasattr(self, 'start_button'):
             return
+        self.undo_button.ensurePolished()
+        self.undo_button.setFixedWidth(max(self.undo_button.width(), self.undo_button.sizeHint().width()))
         languages = [self.source_combo, self.swap_button, self.target_combo]
         actions = [self.undo_button, self.start_button]
         controls = languages + actions
@@ -911,6 +937,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.close_button.setText("×")
         self.close_button.setToolTip(game_text(self.language, "close"))
         for button in (self.reselect_button, self.pause_button, self.close_button):
+            button.setAccessibleName(button.toolTip())
             button.setFixedSize(26, 26)
             header.addWidget(button)
         card_layout.addLayout(header)
@@ -1360,6 +1387,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.pause_button.setToolTip(
             game_text(self.language, "resume" if self.paused else "pause")
         )
+        self.pause_button.setAccessibleName(self.pause_button.toolTip())
         self._set_status("paused" if self.paused else "waiting", active=not self.paused)
 
     def _reselect(self):
@@ -1564,6 +1592,8 @@ class GameSessionControls(QtWidgets.QFrame):
         layout.addWidget(self.label)
         self.pause_button = QtWidgets.QPushButton(game_text(overlay.language, 'pause'))
         self.stop_button = QtWidgets.QPushButton(game_text(overlay.language, 'stop'))
+        self.pause_button.setToolTip(game_text(overlay.language, 'pause'))
+        self.pause_button.setAccessibleName(game_text(overlay.language, 'pause'))
         for button in (self.pause_button, self.stop_button):
             button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.setStyleSheet(button_qss(dark, compact=True))
@@ -1581,6 +1611,7 @@ class GameSessionControls(QtWidgets.QFrame):
         self.pause_button.clicked.connect(overlay._toggle_pause)
         self.stop_button.clicked.connect(overlay.close)
         self.stop_button.setToolTip(game_text(overlay.language, 'close'))
+        self.stop_button.setAccessibleName(game_text(overlay.language, 'close'))
         self.adjustSize()
         from windows_overlay import rounded_region, set_surface_region
         set_surface_region(self, rounded_region(self.rect(), 9), windows=platform_support.IS_WINDOWS)
@@ -2025,6 +2056,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _toggle_pause(self):
         self.paused = not self.paused
         self.controls.pause_button.setText(game_text(self.language, 'resume' if self.paused else 'pause'))
+        self.controls.pause_button.setToolTip(self.controls.pause_button.text())
+        self.controls.pause_button.setAccessibleName(self.controls.pause_button.text())
         if self.paused:
             notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._settle_timer.stop()

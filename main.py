@@ -94,7 +94,8 @@ try:
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics
 except Exception:
     _show_dependency_error()
-from ui_scaling import BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton, configure_qt_platform
+from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
+                        configure_qt_platform, widget_global_point, widget_popup_geometry)
 from header_icons import header_icon
 configure_qt_platform()
 
@@ -1633,7 +1634,7 @@ INTERFACE_TEXT = {
         "start": "Старт",
         "translation_selected": "Выбран перевод: {src} → {tgt}",
         "settings": "Настройки",
-        "back": "Назад",
+        "back": "На главный экран",
         "ocr": "OCR",
         "help": "Помощь",
         "choose_interface_language": "Выбрать язык интерфейса",
@@ -1686,7 +1687,7 @@ INTERFACE_TEXT = {
         "start": "Iniciar",
         "translation_selected": "Traducción: {src} → {tgt}",
         "settings": "Ajustes",
-        "back": "Volver",
+        "back": "Volver al inicio",
         "ocr": "OCR",
         "help": "Ayuda",
         "choose_interface_language": "Elegir idioma de la interfaz",
@@ -1739,7 +1740,7 @@ INTERFACE_TEXT = {
         "start": "Start",
         "translation_selected": "Übersetzung: {src} → {tgt}",
         "settings": "Einstellungen",
-        "back": "Zurück",
+        "back": "Zur Startseite",
         "ocr": "OCR",
         "help": "Hilfe",
         "choose_interface_language": "Sprache der Oberfläche wählen",
@@ -1792,7 +1793,7 @@ INTERFACE_TEXT = {
         "start": "Démarrer",
         "translation_selected": "Traduction : {src} → {tgt}",
         "settings": "Réglages",
-        "back": "Retour",
+        "back": "Retour à l’accueil",
         "ocr": "OCR",
         "help": "Aide",
         "choose_interface_language": "Choisir la langue de l'interface",
@@ -1845,7 +1846,7 @@ INTERFACE_TEXT = {
         "start": "开始",
         "translation_selected": "已选翻译：{src} → {tgt}",
         "settings": "设置",
-        "back": "返回",
+        "back": "返回主页",
         "ocr": "OCR",
         "help": "帮助",
         "choose_interface_language": "选择界面语言",
@@ -3086,7 +3087,7 @@ HELP_CONTENT = {
         ]),
         ("Настройки: галочки", [
             "<span class='item-title'>Запускать вместе с ОС</span> — программа стартует вместе с Windows.",
-            "<span class='item-title'>Запускать в режиме тень</span> — старт скрытым в трее. Горячие клавиши работают, окно открывается из трея.",
+            "<span class='item-title'>Запускать в режиме тени</span> — старт скрытым в трее. Горячие клавиши работают, окно открывается из трея.",
             "<span class='item-title'>Копировать переведённый текст</span> — каждый перевод попадает в буфер обмена сразу после готовности.",
             "<span class='item-title'>Сохранять историю копирований</span> и <span class='item-title'>Сохранять историю переводов</span> — хранят скопированное и переведённое. Выключите их, и на диск ничего не пишется.",
             "<span class='item-title'>Не сворачивать при OCR</span> — главное окно остаётся на экране, пока вы выделяете область.",
@@ -4390,6 +4391,7 @@ class TranslationResultDialog(QDialog):
         self.title_close_button.setText("×")
         self.title_close_button.setFixedSize(32, 32)
         self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.title_close_button.setAccessibleName(ui_text(self.lang, "close"))
         self.title_close_button.clicked.connect(self.accept)
         header.addWidget(self.title_close_button, 0, 3)
         layout.addLayout(header)
@@ -5298,11 +5300,15 @@ class WelcomeDialog(QDialog):
         self.flag_button.setIcon(QIcon(resource_path(get_interface_language_option(self.lang)["icon"])))
         self.flag_button.setIconSize(QSize(24, 24))
         self.flag_button.setFixedSize(46, 38)
+        self.flag_button.setAccessibleName(ui_text(self.lang, "choose_interface_language"))
+        self.flag_button.setToolTip(tooltip_text(ui_text(self.lang, "choose_interface_language")))
         self.flag_button.clicked.connect(self.show_language_menu)
         top_row.addWidget(self.flag_button)
 
         close_x = QPushButton("×")
         close_x.setObjectName("welcomeClose")
+        close_x.setAccessibleName(ui_text(self.lang, "close"))
+        close_x.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         close_x.setFixedSize(38, 38)
         close_x.setStyleSheet("font-size: 22px; font-weight: 700;")
         close_x.clicked.connect(self.skip_guide)
@@ -5495,13 +5501,13 @@ class WelcomeDialog(QDialog):
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
         menu.ensurePolished()
         size = menu.sizeHint()
-        anchor = self.flag_button.mapToGlobal(self.flag_button.rect().bottomRight())
+        anchor = widget_global_point(self.flag_button, self.flag_button.rect().bottomRight())
         screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
         bounds = screen.availableGeometry()
         x = max(bounds.left(), min(anchor.x()-size.width()+1, bounds.right()-size.width()+1))
         y = anchor.y()+6
         if y+size.height() > bounds.bottom()+1:
-            y = self.flag_button.mapToGlobal(QtCore.QPoint()).y()-size.height()-6
+            y = widget_global_point(self.flag_button).y()-size.height()-6
         y = max(bounds.top(), min(y, bounds.bottom()-size.height()+1))
         menu.aboutToHide.connect(menu.deleteLater)
         menu.popup(QtCore.QPoint(x, y))
@@ -5650,6 +5656,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_minimize_button.setObjectName("docWindowButton")
         self.doc_minimize_button.setText("−")
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
+        self.doc_minimize_button.setAccessibleName(ui_text(self.lang, "minimize"))
         self.doc_minimize_button.setFixedSize(34, 32)
         self.doc_minimize_button.clicked.connect(self.showMinimized)
         header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignVCenter)
@@ -5658,6 +5665,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_close_button.setObjectName("docWindowClose")
         self.doc_close_button.setText("×")
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.doc_close_button.setAccessibleName(ui_text(self.lang, "close"))
         self.doc_close_button.setFixedSize(34, 32)
         self.doc_close_button.clicked.connect(self.close)
         header_top.addWidget(self.doc_close_button, alignment=Qt.AlignVCenter)
@@ -5679,6 +5687,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.language_arrow = LanguageSwapButton()
         self.language_arrow.setObjectName("docLanguageSwap")
         self.language_arrow.setFixedSize(34, 34)
+        self.language_arrow.setAccessibleName(hotkey_language_text(self.lang, "swap"))
         self.language_arrow.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
         )
@@ -6025,7 +6034,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.header_title.setText(doc_text(self.lang, "title"))
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
+        self.doc_minimize_button.setAccessibleName(ui_text(self.lang, "minimize"))
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.doc_close_button.setAccessibleName(ui_text(self.lang, "close"))
+        self.language_arrow.setAccessibleName(hotkey_language_text(self.lang, "swap"))
+        self.language_arrow.setToolTip(tooltip_text(hotkey_language_text(self.lang, "swap")))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
         self.remove_button.setText(doc_text(self.lang, "remove_file"))
         self.translate_file_button.setText(doc_text(self.lang, "cancel_translation" if self.translation_running else "translate_file"))
@@ -7159,6 +7172,8 @@ class HotkeyLanguageDialog(QDialog):
         title_row.addWidget(title, 1)
         close_button = QToolButton()
         close_button.setObjectName("hotkeyLanguageClose")
+        close_button.setAccessibleName(ui_text(self.lang, "close"))
+        close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         close_button.setText("×")
         close_button.setFixedSize(30, 30)
         close_button.clicked.connect(self.close)
@@ -7189,6 +7204,7 @@ class HotkeyLanguageDialog(QDialog):
         self.source_combo.setAccessibleName(hotkey_language_text(self.lang, "from"))
         self.swap_button = LanguageSwapButton()
         self.swap_button.setObjectName("hotkeyLanguageSwap")
+        self.swap_button.setAccessibleName(hotkey_language_text(self.lang, "swap"))
         self.swap_button.setFixedSize(38, 38)
         self.swap_button.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
@@ -7345,13 +7361,13 @@ def _atomic_page_change(method):
     from functools import wraps
 
     @wraps(method)
-    def change(self, *args, **kwargs):
+    def change(self):
         roots = list(dict.fromkeys((self, getattr(self, 'ui_root', self))))
         frozen = [(widget, widget.updatesEnabled()) for widget in roots]
         for widget, _ in frozen:
             widget.setUpdatesEnabled(False)
         try:
-            return method(self, *args, **kwargs)
+            return method(self)
         finally:
             for widget, enabled in reversed(frozen):
                 widget.setUpdatesEnabled(enabled)
@@ -7437,7 +7453,7 @@ class DarkThemeApp(QMainWindow):
         self.ui_root.setCentralWidget(self.central_widget)
         self.central_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.central_widget.customContextMenuRequested.connect(
-            lambda pos: self.show_main_context_menu(self.central_widget.mapToGlobal(pos))
+            lambda pos: self.show_main_context_menu(widget_global_point(self.central_widget, pos))
         )
         self.main_layout = QVBoxLayout()
         # 5px on every side put the content against the frame, and 45 left the
@@ -8267,7 +8283,7 @@ class DarkThemeApp(QMainWindow):
         self._hotkey_language_dialog = dialog
         anchor = getattr(self, "label", None)
         if anchor is not None:
-            point = anchor.mapToGlobal(
+            point = widget_global_point(anchor,
                 QtCore.QPoint((anchor.width() - dialog.width()) // 2, anchor.height() + 3)
             )
         else:
@@ -8586,7 +8602,8 @@ class DarkThemeApp(QMainWindow):
 
         self.close_button = QPushButton(self.ui_root)
         self.close_button.setText("×")
-        self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
+        self.close_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "close")))
+        self.close_button.setAccessibleName(ui_text(self.current_interface_language, "close"))
         self.close_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.close_button.clicked.connect(self.close)
 
@@ -10127,6 +10144,7 @@ class DarkThemeApp(QMainWindow):
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
         self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
+        self.flag_button.setAccessibleName(ui_text(self.current_interface_language, "choose_interface_language"))
 
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
@@ -10136,10 +10154,13 @@ class DarkThemeApp(QMainWindow):
             self.update_interface_language_button()
         if hasattr(self, "theme_button"):
             self.theme_button.setToolTip(tooltip_text(ui_text(lang, "theme")))
+            self.theme_button.setAccessibleName(ui_text(lang, "theme"))
         if hasattr(self, "minimize_button"):
             self.minimize_button.setToolTip(tooltip_text(ui_text(lang, "minimize")))
+            self.minimize_button.setAccessibleName(ui_text(lang, "minimize"))
         if hasattr(self, "help_button"):
             self.help_button.setToolTip(tooltip_text(ui_text(lang, "help")))
+            self.help_button.setAccessibleName(ui_text(lang, "help"))
         document_button = getattr(self, "document_button", None)
         if isinstance(document_button, QPushButton):
             try:
@@ -10150,8 +10171,10 @@ class DarkThemeApp(QMainWindow):
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
             self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang][key]))
+            self.settings_button.setAccessibleName(INTERFACE_TEXT[lang][key])
         if hasattr(self, "close_button"):
-            self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang]["back"]))
+            self.close_button.setToolTip(tooltip_text(ui_text(lang, "close")))
+            self.close_button.setAccessibleName(ui_text(lang, "close"))
         if hasattr(self, "tray_icon"):
             self.update_tray_menu()
         if (
@@ -10191,7 +10214,8 @@ class DarkThemeApp(QMainWindow):
             selected = option["code"] == self.current_interface_language
             action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
-        menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+        menu.ensurePolished()
+        menu.exec_(widget_popup_geometry(self.flag_button, menu.sizeHint()).topLeft())
         self._complete_guide_step("language")
 
     def set_interface_language(self, language_code):
@@ -10253,7 +10277,8 @@ class DarkThemeApp(QMainWindow):
         close.setObjectName('helpTitleClose')
         close.setText('×')
         close.setFixedSize(28, 28)
-        close.setAccessibleName(help_action_text(lang, 'close'))
+        close.setAccessibleName(ui_text(lang, 'close'))
+        close.setToolTip(tooltip_text(ui_text(lang, 'close')))
         close.setStyleSheet(button_qss(dark, 'close', 'QToolButton', icon=True))
         close.clicked.connect(dialog.accept)
         header.addWidget(close)
@@ -10363,6 +10388,7 @@ class DarkThemeApp(QMainWindow):
     def set_settings_button_to_home(self):
         self.settings_button.setIcon(header_icon('home', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
+        self.settings_button.setAccessibleName(INTERFACE_TEXT[self.current_interface_language]['back'])
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -10372,6 +10398,7 @@ class DarkThemeApp(QMainWindow):
     def set_settings_button_to_settings(self):
         self.settings_button.setIcon(header_icon('settings', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
+        self.settings_button.setAccessibleName(INTERFACE_TEXT[self.current_interface_language]['settings'])
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -10604,8 +10631,11 @@ class DarkThemeApp(QMainWindow):
             )
 
     def _main_page_signature(self):
+        from PyQt5 import sip
+        composer = getattr(self, 'main_composer', None)
+        minimum = composer.minimumSize() if composer is not None and not sip.isdeleted(composer) else None
         return (self.current_theme, self.current_interface_language,
-                json.dumps(self.config, sort_keys=True, ensure_ascii=False, default=str))
+                json.dumps(self.config, sort_keys=True, ensure_ascii=False, default=str), minimum)
 
     @_atomic_page_change
     def show_main_screen(self):
@@ -10729,6 +10759,7 @@ class DarkThemeApp(QMainWindow):
             combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.hotkey_language_swap = LanguageSwapButton()
         self.hotkey_language_swap.setObjectName("hotkeyLanguageBarSwap")
+        self.hotkey_language_swap.setAccessibleName(hotkey_language_text(self.current_interface_language, "swap"))
         self.hotkey_language_swap.setFixedSize(30, 30)
         self.hotkey_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
@@ -10753,6 +10784,7 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.setSpacing(6)
         self.main_language_swap = LanguageSwapButton()
         self.main_language_swap.setObjectName("mainLanguageSwap")
+        self.main_language_swap.setAccessibleName(hotkey_language_text(self.current_interface_language, "swap"))
         self.main_language_swap.setFixedSize(30, 30)
         self.main_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
@@ -11514,7 +11546,7 @@ class DarkThemeApp(QMainWindow):
         menu.addSeparator()
         self._add_document_context_actions(menu)
         self._apply_main_context_menu_style(menu)
-        menu.exec_(self.text_input.mapToGlobal(pos))
+        menu.exec_(widget_global_point(self.text_input, pos))
 
     def _choose_document_from_main(self, initial_dir=""):
         path, _ = QFileDialog.getOpenFileName(

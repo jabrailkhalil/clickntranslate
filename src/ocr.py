@@ -67,7 +67,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No OCR languages installed",
         "no_installed_translation_pairs": "No installed translation pairs",
         "install_languages_first": "Install a language first in Settings → Language packages.",
+        "language_packages": "Language packages",
         "swap_languages": "Swap languages",
+        "source_language": "Recognition language",
+        "target_language": "Translation language",
     },
     "ru": {
         "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
@@ -90,7 +93,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Нет установленных языков OCR",
         "no_installed_translation_pairs": "Нет установленных направлений перевода",
         "install_languages_first": "Сначала установите язык: Настройки → Языковые пакеты.",
+        "language_packages": "Языковые пакеты",
         "swap_languages": "Поменять языки местами",
+        "source_language": "Язык распознавания",
+        "target_language": "Язык перевода",
     },
     "es": {
         "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
@@ -110,7 +116,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No hay idiomas OCR instalados",
         "no_installed_translation_pairs": "No hay direcciones de traducción instaladas",
         "install_languages_first": "Instala primero un idioma en Ajustes → Paquetes de idioma.",
+        "language_packages": "Paquetes de idioma",
         "swap_languages": "Intercambiar idiomas",
+        "source_language": "Idioma de reconocimiento",
+        "target_language": "Idioma de traducción",
     },
     "de": {
         "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
@@ -130,7 +139,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Keine OCR-Sprachen installiert",
         "no_installed_translation_pairs": "Keine Übersetzungsrichtungen installiert",
         "install_languages_first": "Installiere zuerst eine Sprache unter Einstellungen → Sprachpakete.",
+        "language_packages": "Sprachpakete",
         "swap_languages": "Sprachen tauschen",
+        "source_language": "Erkennungssprache",
+        "target_language": "Übersetzungssprache",
     },
     "fr": {
         "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
@@ -150,7 +162,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Aucune langue OCR installée",
         "no_installed_translation_pairs": "Aucune direction de traduction installée",
         "install_languages_first": "Installez d’abord une langue dans Réglages → Modules de langue.",
+        "language_packages": "Modules de langue",
         "swap_languages": "Inverser les langues",
+        "source_language": "Langue de reconnaissance",
+        "target_language": "Langue de traduction",
     },
     "zh": {
         "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
@@ -170,7 +185,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "未安装 OCR 语言",
         "no_installed_translation_pairs": "未安装翻译方向",
         "install_languages_first": "请先在设置 → 语言包中安装语言。",
+        "language_packages": "语言包",
         "swap_languages": "交换语言",
+        "source_language": "识别语言",
+        "target_language": "翻译语言",
     },
 }
 
@@ -3484,6 +3502,8 @@ class ScreenCaptureOverlay(QWidget):
         
         # Используем текущий язык (уже загружен из конфига в __init__)
         self.lang_combo = DropDownCombo(self)
+        self.lang_combo.setToolTip(ocr_ui_text(config.get("interface_language", "en"), "source_language"))
+        self.lang_combo.setAccessibleName(self.lang_combo.toolTip())
         self.target_lang_combo = None
         self.translate_arrow_label = None
         available_source_codes = installed_ocr_language_codes(config=config)
@@ -3517,9 +3537,12 @@ class ScreenCaptureOverlay(QWidget):
             self.translate_arrow_label.setToolTip(
                 ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
             )
+            self.translate_arrow_label.setAccessibleName(self.translate_arrow_label.toolTip())
             self.translate_arrow_label.setStyleSheet(button_qss(True, selector="QToolButton", icon=True))
             self.translate_arrow_label.clicked.connect(self._swap_translate_languages)
             self.target_lang_combo = DropDownCombo(self)
+            self.target_lang_combo.setToolTip(ocr_ui_text(config.get("interface_language", "en"), "target_language"))
+            self.target_lang_combo.setAccessibleName(self.target_lang_combo.toolTip())
         else:
             for language in APP_LANGUAGES:
                 if language.code not in available_source_codes:
@@ -4158,7 +4181,7 @@ class ScreenCaptureOverlay(QWidget):
                 interface_language = get_cached_ocr_config().get("interface_language", "en")
                 QMessageBox.information(
                     self,
-                    "Language packages",
+                    ocr_ui_text(interface_language, "language_packages"),
                     ocr_ui_text(interface_language, "install_languages_first"),
                 )
                 self.close()
@@ -4944,7 +4967,8 @@ class ScreenCaptureOverlay(QWidget):
                 except Exception as e:
                     logging.exception(f"[OCR:{session_id}] Translation error: {e}")
                     self.hide()
-                    QMessageBox.warning(None, "Ошибка перевода", str(e))
+                    interface_language = get_cached_ocr_config().get("interface_language", "en")
+                    QMessageBox.warning(None, ocr_ui_text(interface_language, "translation_failed"), str(e))
                     translated_text = ""
                 if translated_text:
                     # Определяем тему и язык из кэша
@@ -5565,6 +5589,10 @@ class FullScreenTranslateOverlay(QWidget):
         self.translate_arrow_label.setToolTip(
             ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
         )
+        self.translate_arrow_label.setAccessibleName(self.translate_arrow_label.toolTip())
+        for control, key in ((self.lang_combo, "source_language"), (self.target_lang_combo, "target_language")):
+            control.setToolTip(ocr_ui_text(config.get("interface_language", "en"), key))
+            control.setAccessibleName(control.toolTip())
         fullscreen_config = dict(config)
         available_sources = installed_ocr_language_codes(config=fullscreen_config)
         if str(config.get("translator_engine", "Google")).strip().lower() == "argos":

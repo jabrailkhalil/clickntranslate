@@ -87,7 +87,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.mode_combo.setObjectName('assistantDisplayMode')
         for value, label in (('animated', 'mode_animated'), ('portrait', 'mode_static'), ('custom', 'custom')):
             self.mode_combo.addItem(tr(label), value)
-        self.mode_combo.setToolTip(tr('animated_hint'))
+        self.mode_combo.setToolTip(tr('display_mode_hint'))
         self.mode_combo.currentIndexChanged.connect(lambda: self.choose_appearance(self.mode_combo.currentData()))
         self.values = {}
         for key, low, high in (('size', 60, 180), ('opacity', 40, 100)):
@@ -107,6 +107,11 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             label.setStyleSheet('margin:0; padding:0;')
             label.setBuddy(field)
             field.setAccessibleName(tr(name))
+            if name in ('size', 'opacity'):
+                for button, direction in ((field.decrease, 'decrease'), (field.increase, 'increase')):
+                    hint = tr(name + '_' + direction)
+                    button.setToolTip(hint)
+                    button.setAccessibleName(hint)
             field.setFixedSize(180, 28)
             form.addWidget(label, row, 1, QtCore.Qt.AlignVCenter)
             form.addWidget(field, row, 2, QtCore.Qt.AlignVCenter)
@@ -123,6 +128,8 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         custom_button = QtWidgets.QToolButton()
         custom_button.setObjectName('assistantAppearance')
         custom_button.setText(tr('custom'))
+        custom_button.setToolTip(tr('choose_image'))
+        custom_button.setAccessibleName(tr('choose_image'))
         custom_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         custom_button.setIconSize(QtCore.QSize(20, 20))
         custom_button.setFixedHeight(28)
@@ -134,6 +141,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.custom_image_name.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
         image_row.addWidget(self.custom_image_name, 1)
         self.replace_image = QtWidgets.QPushButton(tr('change_image'))
+        self.replace_image.setToolTip(tr('choose_image'))
         self.replace_image.setFixedHeight(28)
         self.replace_image.clicked.connect(self._choose_custom_image)
         image_row.addWidget(self.replace_image)
@@ -206,7 +214,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             native_window_parent(self), assistant_text(self.language, 'choose_image'),
             self.owner.config.get('desktop_assistant_image', ''),
-            'Images (*.png *.jpg *.jpeg *.webp *.bmp)')
+            f"{assistant_text(self.language, 'image_files')} (*.png *.jpg *.jpeg *.webp *.bmp)")
         if not filename or not self._validate_custom_image(filename):
             self.refresh()
             return

@@ -43,7 +43,7 @@ ASSISTANT_TEXT = {
     'es': {
         'tray': 'Asistente de escritorio', 'preview_hint': 'Configurar el asistente de escritorio',
         'setting': 'Asistente:', 'enabled': 'En el escritorio', 'title': '¿Cómo puedo ayudar?',
-        'hint': 'Haz clic para traducir. Arrastra el asistente para moverlo.',
+        'hint': 'Haz clic para elegir una acción de traducción. Arrastra el asistente para moverlo.',
         'screen': ('Traducir toda la pantalla', 'Sustituye el texto visible por su traducción.'),
         'area': ('Traducir un área', 'Selecciona la parte de la pantalla a traducir.'),
         'dynamic': ('Traducción dinámica', 'Elige el origen y un área de salida separada.'),
@@ -56,7 +56,7 @@ ASSISTANT_TEXT = {
     'fr': {
         'tray': 'Assistant de bureau', 'preview_hint': 'Configurer l’assistant de bureau',
         'setting': 'Assistant :', 'enabled': 'Sur le bureau', 'title': 'Comment vous aider ?',
-        'hint': 'Cliquez pour traduire. Faites glisser l’assistant pour le déplacer.',
+        'hint': 'Cliquez pour choisir une action de traduction. Faites glisser l’assistant pour le déplacer.',
         'screen': ('Traduire tout l’écran', 'Remplacer le texte visible par sa traduction.'),
         'area': ('Traduire une zone', 'Sélectionnez la partie de l’écran à traduire.'),
         'dynamic': ('Traduction dynamique', 'Choisissez la source et une zone de sortie.'),
@@ -145,6 +145,7 @@ _SECTIONS = {
     'click': ('Click', 'Клик', 'Click', 'Click', 'Click', 'Click'),
     'custom': ('My image…', 'Своя…', 'Mi imagen…', 'Eigenes…', 'Mon image…', '自选图片…'),
     'choose_image': ('Choose an image', 'Выбрать картинку', 'Elegir imagen', 'Bild auswählen', 'Choisir une image', '选择图片'),
+    'image_files': ('Images', 'Изображения', 'Imágenes', 'Bilder', 'Images', '图片'),
     'image_error': ('Use a PNG, JPEG or WebP up to 10 MB and 8192 px.', 'Нужен PNG, JPEG или WebP до 10 МБ и 8192 px.', 'Usa PNG, JPEG o WebP de hasta 10 MB y 8192 px.', 'PNG, JPEG oder WebP bis 10 MB und 8192 px verwenden.', 'PNG, JPEG ou WebP jusqu’à 10 Mo et 8192 px.', '请使用不超过 10 MB 和 8192 px 的 PNG、JPEG 或 WebP。'),
     'placement': ('Size and visibility', 'Размер и видимость', 'Tamaño y visibilidad', 'Größe und Sichtbarkeit', 'Taille et visibilité', '大小和可见性'),
     'translation_section': ('Translation', 'Перевод', 'Traducción', 'Übersetzen', 'Traduction', '翻译'),
@@ -154,6 +155,11 @@ _SECTIONS = {
     'animated_hint': ('Behavior applies only to Animated. Change it here or in the companion menu.', 'Поведение работает только в режиме «Живой». Меняйте его здесь или в меню маскота.', 'El comportamiento solo se aplica a Animado. Cámbialo aquí o en su menú.', 'Verhalten gilt nur für Animiert. Hier oder im Maskottchen-Menü ändern.', 'Le comportement concerne le mode Animé. Modifiez-le ici ou dans le menu.', '行为设置仅适用于动态模式，可在此处或伙伴菜单中修改。'),
 }
 _SECTIONS.update({
+    'display_mode_hint': ('Choose animated, still or your own image. Only animated mascots play automatic reactions.', 'Выберите анимацию, статичный вид или свою картинку. Автоматические реакции работают в режиме анимации.', 'Elige animación, imagen estática o una imagen propia. Las reacciones automáticas se muestran en el modo animado.', 'Animation, Standbild oder eigenes Bild wählen. Automatische Reaktionen werden im Animationsmodus abgespielt.', 'Choisissez une animation, une image fixe ou votre propre image. Les réactions automatiques sont jouées en mode animé.', '选择动画、静态或自选图片。自动反应仅在动画模式下播放。'),
+    'size_decrease': ('Make the mascot smaller (−1%)', 'Уменьшить маскота (−1%)', 'Reducir la mascota (−1 %)', 'Maskottchen verkleinern (−1 %)', 'Réduire la mascotte (−1 %)', '缩小伙伴（−1%）'),
+    'size_increase': ('Make the mascot larger (+1%)', 'Увеличить маскота (+1%)', 'Ampliar la mascota (+1 %)', 'Maskottchen vergrößern (+1 %)', 'Agrandir la mascotte (+1 %)', '放大伙伴（+1%）'),
+    'opacity_decrease': ('Decrease opacity (−1%)', 'Уменьшить непрозрачность (−1%)', 'Reducir la opacidad (−1 %)', 'Deckkraft verringern (−1 %)', 'Réduire l’opacité (−1 %)', '降低不透明度（−1%）'),
+    'opacity_increase': ('Increase opacity (+1%)', 'Увеличить непрозрачность (+1%)', 'Aumentar la opacidad (+1 %)', 'Deckkraft erhöhen (+1 %)', 'Augmenter l’opacité (+1 %)', '提高不透明度（+1%）'),
     'previous_mascot': ('Previous mascot', 'Предыдущий маскот', 'Mascota anterior', 'Vorheriges Maskottchen', 'Mascotte précédente', '上一个伙伴'),
     'next_mascot': ('Next mascot', 'Следующий маскот', 'Siguiente mascota', 'Nächstes Maskottchen', 'Mascotte suivante', '下一个伙伴'),
 

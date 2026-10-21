@@ -36,6 +36,7 @@ TEXT = {
 def replacement_dialog(language, version):
     labels = TEXT.get(language, TEXT['en'])
     box = StyledMessageBox()
+    box.setInterfaceLanguage(language)
     box.setWindowTitle(labels[0])
     box.setText(labels[1])
     box.setInformativeText(labels[2].format(version=version))
@@ -79,6 +80,7 @@ class _ClosingDialog(StyledMessageBox):
 def close_with_progress(language, close):
     labels = TEXT.get(language, TEXT['en'])
     box = _ClosingDialog()
+    box.setInterfaceLanguage(language)
     box.setWindowTitle(labels[0])
     box.setText(labels[5])
     box.setIcon(StyledMessageBox.Information)
@@ -97,4 +99,10 @@ def close_with_progress(language, close):
 
 def show_replacement_error(language):
     labels = TEXT.get(language, TEXT['en'])
-    StyledMessageBox.warning(None, labels[0], labels[7])
+    box = StyledMessageBox()
+    box.setInterfaceLanguage(language)
+    box.setWindowTitle(labels[0])
+    box.setText(labels[7])
+    box.setIcon(StyledMessageBox.Warning)
+    box.setStandardButtons(StyledMessageBox.Ok)
+    box.exec_()

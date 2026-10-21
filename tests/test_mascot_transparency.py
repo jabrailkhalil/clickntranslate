@@ -3,7 +3,7 @@ import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from assistant_art import MASCOTS
-from assistant_sprites import STATIONARY_STATES
+from assistant_sprites import ROWS, STATIONARY_STATES
 from desktop_assistant import AssistantAnchor
 from test_desktop_ux import app
 
@@ -26,7 +26,10 @@ def test_each_animation_frame_clears_previous_pose_alpha(app, mascot):
     surface.fill(QtGui.QColor('#c02a53'))
     try:
         for state in STATIONARY_STATES:
-            for seconds in (0., .16, .32, .48, .64, .80):
+            elapsed = 0
+            for duration in ROWS[state][1]:
+                seconds = (elapsed+duration/2)/1000
+                elapsed += duration
                 anchor.motion.play(state)
                 anchor.motion.gesture_age = seconds
                 render(anchor, surface)
@@ -35,6 +38,15 @@ def test_each_animation_frame_clears_previous_pose_alpha(app, mascot):
                 render(anchor, fresh)
                 assert surface == fresh, (mascot, state, seconds)
                 assert surface.pixelColor(0, 0).alpha() == 0
+        anchor.motion.gesture = None
+        anchor.motion.set_activity('idle')
+        anchor._hover = True
+        for direction in range(16):
+            anchor._gaze_angle = direction*22.5
+            render(anchor, surface)
+            fresh.fill(QtCore.Qt.transparent)
+            render(anchor, fresh)
+            assert surface == fresh, (mascot, 'gaze', direction)
     finally:
         anchor.close()
         anchor.deleteLater()

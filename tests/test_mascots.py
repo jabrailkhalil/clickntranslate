@@ -122,7 +122,12 @@ def test_stage_arrows_cycle_all_characters_wrap_and_accept_keyboard(window, app)
     assert stage.mascot == 'click'
     stage.previous_button.click()
     assert stage.mascot == 'orbit'
-    QTest.qWait(stage.TRANSITION_MS + 40)
+    # The first global Qt animation tick can be delayed by font/atlas work in
+    # a complete suite. Wait for completion with a bound, not one exact frame.
+    elapsed = QtCore.QElapsedTimer()
+    elapsed.start()
+    while stage.transition.state() != QtCore.QAbstractAnimation.Stopped and elapsed.elapsed() < 2000:
+        QTest.qWait(20)
     assert stage.transition.state() == QtCore.QAbstractAnimation.Stopped
     assert stage._previous_layer is None
     assert stage._progress == 1

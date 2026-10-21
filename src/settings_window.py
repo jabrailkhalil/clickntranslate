@@ -1,7 +1,7 @@
 from button_styles import button_qss, button_palette, standard_buttons
 from number_controls import StepperFrame
 from package_table import PackageTable
-from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
+from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
 from PyQt5 import sip
 import os
 import json
@@ -602,7 +602,7 @@ class DropDownCombo(QComboBox):
             desired = self._popup_content_size()
             popup.setMinimumSize(0, 0)
             if not position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired):
-                anchor = QtCore.QRect(self.mapToGlobal(QtCore.QPoint()), self.size())
+                anchor = widget_global_rect(self)
                 popup.setGeometry(combo_popup_geometry(anchor, desired,
                                                        self._available_screen_rect(), self.POPUP_GAP))
             if popup.layout() is not None:
@@ -612,10 +612,11 @@ class DropDownCombo(QComboBox):
             self._laying_out_popup = False
 
     def _available_screen_rect(self):
-        screen = QtWidgets.QApplication.screenAt(self.mapToGlobal(self.rect().center()))
+        screen = QtWidgets.QApplication.screenAt(widget_global_point(self, self.rect().center()))
         if screen is None:
-            handle = self.window().windowHandle()
-            screen = handle.screen() if handle is not None else None
+            owner = native_window_parent(self).window()
+            handle = owner.windowHandle()
+            screen = handle.screen() if handle is not None else owner.screen()
         if screen is None:
             screen = QtWidgets.QApplication.primaryScreen()
         return screen.availableGeometry()
@@ -1542,7 +1543,7 @@ class TesseractInstallProgressDialog(QDialog):
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)
         action_row.addStretch()
-        self.background_button = QPushButton("Continue in background")
+        self.background_button = QPushButton(language_manager_text(self._lang, "continue_background"))
         self.background_button.clicked.connect(self._continue_in_background)
         action_row.addWidget(self.background_button)
         self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
@@ -1751,6 +1752,7 @@ SETTINGS_TEXT = {
         "save": "Save",
         "back": "Back",
         "remove_hotkey": "Press ESC to remove hotkey",
+        "invalid_hotkey_format": "Use a single key combination. Double-tap shortcuts are available on Windows.",
         "history_view": "View translation history",
         "start_minimized": "Start in shadow mode",
         "copy_history_view": "Show copy history",
@@ -1806,7 +1808,7 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "Large",
         "translation_result_font_xlarge": "Extra large",
         "replace_selection_translate_label": "Translate and replace selection:",
-        "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
+        "replace_selection_unavailable": "Automatic replacement is available on Windows and macOS.",
         "selection_quick_translate_enabled": "Quick translate for selected text",
         "selection_quick_translate_tooltip": "Show a translate button near selected text in other apps, or translate immediately. Uses the selection language pair configured for hotkeys. Requires Accessibility on macOS; on Linux uses PRIMARY selection (limited on some Wayland setups). Paused during OCR and dynamic translation.",
         "selection_quick_translate_mode_button": "Show a button after selecting",
@@ -1827,6 +1829,7 @@ SETTINGS_TEXT = {
         "no": "No",
         "cancel": "Cancel",
         "minimize": "Minimize",
+        "close": "Close",
         "open": "Open",
         "install": "Install",
         "later": "Later",
@@ -1884,8 +1887,9 @@ SETTINGS_TEXT = {
         "save": "Сохранить",
         "back": "Назад",
         "remove_hotkey": "Нажмите ESC для удаления горячей клавиши",
+        "invalid_hotkey_format": "Используйте одно сочетание клавиш. Двойное нажатие одной клавиши доступно в Windows.",
         "history_view": "Посмотреть историю переводов",
-        "start_minimized": "Запускать в режиме тень",
+        "start_minimized": "Запускать в режиме тени",
         "copy_history_view": "Показать историю копирований",
         "copy_history": "Сохранять историю копирований",
         "clear_copy_history": "Очистить историю копирований",
@@ -1939,7 +1943,7 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "Крупный",
         "translation_result_font_xlarge": "Очень крупный",
         "replace_selection_translate_label": "Перевести и заменить выделенное:",
-        "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
+        "replace_selection_unavailable": "Автоматическая замена доступна в Windows и macOS.",
         "selection_quick_translate_enabled": "Быстрый перевод выделенного текста",
         "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
         "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
@@ -1960,6 +1964,7 @@ SETTINGS_TEXT = {
         "no": "Нет",
         "cancel": "Отмена",
         "minimize": "Свернуть",
+        "close": "Закрыть",
         "open": "Открыть",
         "install": "Установить",
         "later": "Позже",
@@ -2003,7 +2008,7 @@ SETTINGS_TEXT = {
         "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
         "game_show_original": "Mostrar el texto reconocido junto con la traducción",
         "game_workflow_note": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
-        "translation_mode": "Modo de traduccion: {mode}",
+        "translation_mode": "Modo de traducción: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
         "copy_to_clipboard": "Copiar al portapapeles",
@@ -2015,6 +2020,7 @@ SETTINGS_TEXT = {
         "save": "Guardar",
         "back": "Volver",
         "remove_hotkey": "Pulsa ESC para quitar el atajo",
+        "invalid_hotkey_format": "Usa una sola combinación de teclas. Los atajos de doble pulsación están disponibles en Windows.",
         "history_view": "Ver historial de traducciones",
         "start_minimized": "Iniciar en modo sombra",
         "copy_history_view": "Mostrar historial de copias",
@@ -2023,28 +2029,28 @@ SETTINGS_TEXT = {
         "clear_translation_history": "Borrar historial de traducciones",
         "history_title": "Historial de traducciones",
         "copy_history_title": "Historial de copias",
-        "history_empty": "El historial esta vacio.",
+        "history_empty": "El historial está vacío.",
         "history_error": "Error al leer el historial.",
         "error_title": "Error",
         "clear_translation_history_error": "No se pudo borrar el historial de traducciones.",
         "clear_copy_history_error": "No se pudo borrar el historial de copias.",
         "copy_translated_text": "Copiar el texto traducido",
         "freeze_screen_on_ocr": "Congelar pantalla durante OCR",
-        "fullscreen_translate_hotkey": "Atajo de traduccion de pantalla:",
+        "fullscreen_translate_hotkey": "Atajo de traducción de pantalla:",
         "fullscreen_from": "De:",
         "fullscreen_to": "A:",
-        "translate_selection_hotkey": "Atajo para traducir seleccion:",
+        "translate_selection_hotkey": "Atajo para traducir selección:",
         "translator_label": "Traducir:",
         "keep_visible_on_ocr": "Mantener ventana visible durante OCR",
-        "clear_cache": "Borrar cache",
+        "clear_cache": "Borrar caché",
         "reset": "Restablecer",
         "update": "Actualizar",
         "translation_history_button": "Historial de traducciones",
         "copy_history_button": "Historial de copias",
-        "fullscreen_translate_label": "Traduccion de pantalla:",
+        "fullscreen_translate_label": "Traducción de pantalla:",
         "game_translate_label": "Dinámico:",
-        "selection_translate_label": "Traduccion de seleccion:",
-        "toggle_window_hotkey_label": "Mostrar / ocultar aplicacion:",
+        "selection_translate_label": "Traducción de selección:",
+        "toggle_window_hotkey_label": "Mostrar / ocultar aplicación:",
         "result_window_label": "Mostrar ventana:",
         "result_window_mode_selection": "Texto",
         "result_window_mode_area": "Área",
@@ -2070,15 +2076,15 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "Grande",
         "translation_result_font_xlarge": "Muy grande",
         "replace_selection_translate_label": "Traducir y reemplazar selección:",
-        "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
+        "replace_selection_unavailable": "El reemplazo automático está disponible en Windows y macOS.",
         "selection_quick_translate_enabled": "Traducción rápida del texto seleccionado",
         "selection_quick_translate_tooltip": "Muestra un botón cerca del texto seleccionado en otras apps o traduce al instante. Usa el par de idiomas de la traducción por selección. En macOS requiere Accesibilidad; en Linux usa PRIMARY (limitado en Wayland). Se pausa durante OCR y traducción dinámica.",
         "selection_quick_translate_mode_button": "Mostrar un botón tras seleccionar",
         "selection_quick_translate_mode_automatic": "Traducir inmediatamente tras seleccionar",
         "close_result_window_on_outside_click": "Cerrar la ventana de traducción al hacer clic fuera",
         "close_result_window_on_outside_click_tooltip": "Cierra la ventana de traducción al hacer clic en otra app o fuera de ella, sin usar el botón de cierre.",
-        "copy_hotkey_label": "Atajo para copiar seleccion:",
-        "translate_hotkey_label": "Atajo de traduccion:",
+        "copy_hotkey_label": "Atajo para copiar selección:",
+        "translate_hotkey_label": "Atajo de traducción:",
         "remove_local_tesseract": "Eliminar Tesseract local",
         "remove_local_rapidocr": "Eliminar RapidOCR local",
         "remove_local_easyocr": "Eliminar EasyOCR local",
@@ -2087,17 +2093,18 @@ SETTINGS_TEXT = {
         "manage_ocr_languages": "Gestionar paquetes de OCR y Argos",
         "clearing": "Borrando...",
         "cleared": "Borrado {size}",
-        "yes": "Si",
+        "yes": "Sí",
         "no": "No",
         "cancel": "Cancelar",
         "minimize": "Minimizar",
+        "close": "Cerrar",
         "open": "Abrir",
         "install": "Instalar",
-        "later": "Mas tarde",
+        "later": "Más tarde",
         "remove": "Eliminar",
-        "reset_question": "Seguro que quieres restablecer todos los ajustes?",
-        "clear_histories_title": "Borrar historiales?",
-        "clear_histories_question": "Borrar el historial de traducciones y de copias?",
+        "reset_question": "¿Seguro que quieres restablecer todos los ajustes?",
+        "clear_histories_title": "¿Borrar historiales?",
+        "clear_histories_question": "¿Borrar el historial de traducciones y de copias?",
         "settings_reset_done": "Ajustes restablecidos"
     },
     "de": {
@@ -2134,47 +2141,48 @@ SETTINGS_TEXT = {
         "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
         "game_show_original": "Erkannten Text zusammen mit der Übersetzung zeigen",
         "game_workflow_note": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
-        "translation_mode": "Ubersetzungsmodus: {mode}",
-        "hotkeys": "Tastenkurzel konfigurieren",
-        "save_and_back": "Speichern und zuruck",
+        "translation_mode": "Übersetzungsmodus: {mode}",
+        "hotkeys": "Tastenkürzel konfigurieren",
+        "save_and_back": "Speichern und zurück",
         "copy_to_clipboard": "In Zwischenablage kopieren",
-        "history": "Ubersetzungsverlauf speichern",
+        "history": "Übersetzungsverlauf speichern",
         "button_hover_tips": "Schaltflächenhinweise",
         "replace_select_all": "Vor Ersetzen alles auswählen",
         "replace_select_all_hint": "Bei Übersetzen und Ersetzen wird der gesamte Text im aktiven Eingabefeld ausgewählt, übersetzt und ersetzt. Praktisch für Chats. Sonst wird nur die Auswahl ersetzt. Sendet die Nachricht nicht ab.",
         "test_ocr": "OCR testen",
         "save": "Speichern",
-        "back": "Zuruck",
-        "remove_hotkey": "ESC drucken, um das Tastenkurzel zu entfernen",
-        "history_view": "Ubersetzungsverlauf anzeigen",
+        "back": "Zurück",
+        "remove_hotkey": "ESC drücken, um das Tastenkürzel zu entfernen",
+        "invalid_hotkey_format": "Verwenden Sie eine einzelne Tastenkombination. Doppeltipp-Tastenkürzel sind unter Windows verfügbar.",
+        "history_view": "Übersetzungsverlauf anzeigen",
         "start_minimized": "Im Schattenmodus starten",
         "copy_history_view": "Kopierverlauf anzeigen",
         "copy_history": "Kopierverlauf speichern",
         "clear_copy_history": "Kopierverlauf leeren",
-        "clear_translation_history": "Ubersetzungsverlauf leeren",
-        "history_title": "Ubersetzungsverlauf",
+        "clear_translation_history": "Übersetzungsverlauf leeren",
+        "history_title": "Übersetzungsverlauf",
         "copy_history_title": "Kopierverlauf",
         "history_empty": "Der Verlauf ist leer.",
         "history_error": "Fehler beim Lesen des Verlaufs.",
         "error_title": "Fehler",
         "clear_translation_history_error": "Der Übersetzungsverlauf konnte nicht gelöscht werden.",
         "clear_copy_history_error": "Der Kopierverlauf konnte nicht gelöscht werden.",
-        "copy_translated_text": "Ubersetzten Text kopieren",
-        "freeze_screen_on_ocr": "Bildschirm wahrend OCR einfrieren",
-        "fullscreen_translate_hotkey": "Tastenkurzel fur Bildschirmubersetzung:",
+        "copy_translated_text": "Übersetzten Text kopieren",
+        "freeze_screen_on_ocr": "Bildschirm während OCR einfrieren",
+        "fullscreen_translate_hotkey": "Tastenkürzel für Bildschirmübersetzung:",
         "fullscreen_from": "Von:",
         "fullscreen_to": "Nach:",
-        "translate_selection_hotkey": "Tastenkurzel fur Auswahlubersetzung:",
-        "translator_label": "Ubersetzen:",
-        "keep_visible_on_ocr": "Fenster wahrend OCR sichtbar halten",
+        "translate_selection_hotkey": "Tastenkürzel für Auswahlübersetzung:",
+        "translator_label": "Übersetzen:",
+        "keep_visible_on_ocr": "Fenster während OCR sichtbar halten",
         "clear_cache": "Cache leeren",
-        "reset": "Zurucksetzen",
+        "reset": "Zurücksetzen",
         "update": "Aktualisieren",
-        "translation_history_button": "Ubersetzungsverlauf",
+        "translation_history_button": "Übersetzungsverlauf",
         "copy_history_button": "Kopierverlauf",
-        "fullscreen_translate_label": "Bildschirmubersetzung:",
+        "fullscreen_translate_label": "Bildschirmübersetzung:",
         "game_translate_label": "Dynamisch:",
-        "selection_translate_label": "Auswahlubersetzung:",
+        "selection_translate_label": "Auswahlübersetzung:",
         "toggle_window_hotkey_label": "App anzeigen / ausblenden:",
         "result_window_label": "Fenster zeigen:",
         "result_window_mode_selection": "Text",
@@ -2201,15 +2209,15 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "Groß",
         "translation_result_font_xlarge": "Sehr groß",
         "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
-        "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
+        "replace_selection_unavailable": "Automatisches Ersetzen ist unter Windows und macOS verfügbar.",
         "selection_quick_translate_enabled": "Schnellübersetzung für markierten Text",
         "selection_quick_translate_tooltip": "Zeigt eine Übersetzen-Schaltfläche nahe der Auswahl in anderen Apps oder übersetzt sofort. Verwendet das Sprachpaar für Auswahlübersetzung. Unter macOS ist Bedienungshilfe nötig; unter Linux PRIMARY (eingeschränkt unter Wayland). Pausiert während OCR und dynamischer Übersetzung.",
         "selection_quick_translate_mode_button": "Schaltfläche nach der Auswahl anzeigen",
         "selection_quick_translate_mode_automatic": "Sofort nach der Auswahl übersetzen",
         "close_result_window_on_outside_click": "Übersetzungsfenster bei Klick außerhalb schließen",
         "close_result_window_on_outside_click_tooltip": "Schließt das Übersetzungsfenster, wenn Sie eine andere App oder außerhalb klicken. Der Schließen-Knopf ist dann nicht nötig.",
-        "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
-        "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
+        "copy_hotkey_label": "Tastenkürzel zum Kopieren:",
+        "translate_hotkey_label": "Tastenkürzel zum Übersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
         "remove_local_rapidocr": "Lokales RapidOCR entfernen",
         "remove_local_easyocr": "Lokales EasyOCR entfernen",
@@ -2222,17 +2230,18 @@ SETTINGS_TEXT = {
         "no": "Nein",
         "cancel": "Abbrechen",
         "minimize": "Minimieren",
-        "open": "Offnen",
+        "close": "Schließen",
+        "open": "Öffnen",
         "install": "Installieren",
-        "later": "Spater",
+        "later": "Später",
         "remove": "Entfernen",
-        "reset_question": "Mochtest du wirklich alle Einstellungen zurucksetzen?",
-        "clear_histories_title": "Verlaufe leeren?",
-        "clear_histories_question": "Ubersetzungs- und Kopierverlauf leeren?",
-        "settings_reset_done": "Einstellungen wurden zuruckgesetzt"
+        "reset_question": "Möchtest du wirklich alle Einstellungen zurücksetzen?",
+        "clear_histories_title": "Verläufe leeren?",
+        "clear_histories_question": "Übersetzungs- und Kopierverlauf leeren?",
+        "settings_reset_done": "Einstellungen wurden zurückgesetzt"
     },
     "fr": {
-        "autostart": "Demarrer avec le systeme",
+        "autostart": "Démarrer avec le système",
         "update_check_on_launch": "Rechercher les mises à jour au démarrage",
         "dim_screen_during_ocr": "Assombrir l’écran pendant la sélection OCR",
         "ocr_dim_strength_tooltip": "Choisissez l’intensité de l’assombrissement hors de la sélection OCR.",
@@ -2277,8 +2286,9 @@ SETTINGS_TEXT = {
         "save": "Enregistrer",
         "back": "Retour",
         "remove_hotkey": "Appuyez sur ESC pour supprimer le raccourci",
+        "invalid_hotkey_format": "Utilisez une seule combinaison de touches. Les raccourcis par double appui sont disponibles sous Windows.",
         "history_view": "Voir l'historique des traductions",
-        "start_minimized": "Demarrer en mode ombre",
+        "start_minimized": "Démarrer en mode ombre",
         "copy_history_view": "Afficher l'historique des copies",
         "copy_history": "Enregistrer l'historique des copies",
         "clear_copy_history": "Effacer l'historique des copies",
@@ -2291,21 +2301,21 @@ SETTINGS_TEXT = {
         "clear_translation_history_error": "Impossible d’effacer l’historique des traductions.",
         "clear_copy_history_error": "Impossible d’effacer l’historique des copies.",
         "copy_translated_text": "Copier le texte traduit",
-        "freeze_screen_on_ocr": "Figer l'ecran pendant l'OCR",
-        "fullscreen_translate_hotkey": "Raccourci traduction plein ecran :",
+        "freeze_screen_on_ocr": "Figer l’écran pendant l’OCR",
+        "fullscreen_translate_hotkey": "Raccourci de traduction plein écran :",
         "fullscreen_from": "De :",
         "fullscreen_to": "Vers :",
-        "translate_selection_hotkey": "Raccourci traduction de selection :",
+        "translate_selection_hotkey": "Raccourci de traduction de sélection :",
         "translator_label": "Traduire :",
-        "keep_visible_on_ocr": "Garder la fenetre visible pendant l'OCR",
+        "keep_visible_on_ocr": "Garder la fenêtre visible pendant l’OCR",
         "clear_cache": "Vider le cache",
-        "reset": "Reinitialiser",
-        "update": "Mettre a jour",
+        "reset": "Réinitialiser",
+        "update": "Mettre à jour",
         "translation_history_button": "Historique des traductions",
         "copy_history_button": "Historique des copies",
-        "fullscreen_translate_label": "Traduction plein ecran :",
+        "fullscreen_translate_label": "Traduction plein écran :",
         "game_translate_label": "Dynamique :",
-        "selection_translate_label": "Traduction de selection :",
+        "selection_translate_label": "Traduction de sélection :",
         "toggle_window_hotkey_label": "Afficher / masquer l'application :",
         "result_window_label": "Afficher fenêtre :",
         "result_window_mode_selection": "Texte",
@@ -2332,7 +2342,7 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "Grande",
         "translation_result_font_xlarge": "Très grande",
         "replace_selection_translate_label": "Traduire et remplacer la sélection :",
-        "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
+        "replace_selection_unavailable": "Le remplacement automatique est disponible sous Windows et macOS.",
         "selection_quick_translate_enabled": "Traduction rapide du texte sélectionné",
         "selection_quick_translate_tooltip": "Affiche un bouton près du texte sélectionné dans d'autres apps ou traduit immédiatement. Utilise la paire de langues de la traduction par sélection. macOS requiert l'accessibilité ; Linux utilise PRIMARY (limité sous Wayland). En pause pendant l'OCR et la traduction dynamique.",
         "selection_quick_translate_mode_button": "Afficher un bouton après la sélection",
@@ -2348,19 +2358,20 @@ SETTINGS_TEXT = {
         "ocr_language_packs": "Modules linguistiques",
         "manage_ocr_languages": "Gérer les modules OCR et Argos",
         "clearing": "Nettoyage...",
-        "cleared": "{size} nettoye",
+        "cleared": "{size} nettoyé",
         "yes": "Oui",
         "no": "Non",
         "cancel": "Annuler",
         "minimize": "Réduire",
+        "close": "Fermer",
         "open": "Ouvrir",
         "install": "Installer",
         "later": "Plus tard",
         "remove": "Supprimer",
-        "reset_question": "Voulez-vous vraiment reinitialiser tous les reglages ?",
+        "reset_question": "Voulez-vous vraiment réinitialiser tous les réglages ?",
         "clear_histories_title": "Effacer les historiques ?",
         "clear_histories_question": "Effacer l'historique des traductions et des copies ?",
-        "settings_reset_done": "Reglages reinitialises"
+        "settings_reset_done": "Réglages réinitialisés"
     },
     "zh": {
         "autostart": "随系统启动",
@@ -2370,7 +2381,7 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "处理所选文本后恢复剪贴板",
         "restore_clipboard_tooltip": "显示翻译或成功替换后恢复原剪贴板内容；明确的复制操作仍会保留结果。",
         "copy_notification": "复制文本后通知我",
-        "copy_notification_tooltip": "复制结果后在屏幕上显示简短提示，在隐身模式下也会显示。",
+        "copy_notification_tooltip": "复制结果后在屏幕上显示简短提示，在阴影模式下也会显示。",
         "create_bug_report": "创建安全错误报告",
         "bug_report_tooltip": "创建不包含剪贴板、历史记录或文档文本的诊断 ZIP。",
         "export_settings": "导出设置", "import_settings": "导入设置",
@@ -2408,6 +2419,7 @@ SETTINGS_TEXT = {
         "save": "保存",
         "back": "返回",
         "remove_hotkey": "按 ESC 删除快捷键",
+        "invalid_hotkey_format": "请使用单个组合键。Windows 支持连续按两次同一按键的快捷方式。",
         "history_view": "查看翻译历史",
         "start_minimized": "以阴影模式启动",
         "copy_history_view": "显示复制历史",
@@ -2463,7 +2475,7 @@ SETTINGS_TEXT = {
         "translation_result_font_large": "大",
         "translation_result_font_xlarge": "特大",
         "replace_selection_translate_label": "翻译并替换所选文本：",
-        "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
+        "replace_selection_unavailable": "自动替换支持 Windows 和 macOS。",
         "selection_quick_translate_enabled": "快速翻译选中文本",
         "selection_quick_translate_tooltip": "在其他应用中选中文本后显示翻译按钮，或立即翻译。使用选中文本翻译的语言对。macOS 需要辅助功能；Linux 使用 PRIMARY 选区（部分 Wayland 环境受限）。OCR 和动态翻译期间暂停。",
         "selection_quick_translate_mode_button": "选中后显示按钮",
@@ -2484,6 +2496,7 @@ SETTINGS_TEXT = {
         "no": "否",
         "cancel": "取消",
         "minimize": "最小化",
+        "close": "关闭",
         "open": "打开",
         "install": "安装",
         "later": "稍后",
@@ -2768,6 +2781,8 @@ ENGINE_TEXT = {
     "en": {
         "not_found": "{engine} not found", "install": "Install", "cancel": "Cancel", "remove": "Remove",
         "tesseract_prompt": "Tesseract-OCR was not found. Download and install it locally?",
+        "linux_tesseract_hint": "Tesseract is not installed. Install it with your package manager:\n\n{command}",
+        "manual_hymt_hint": "Automatic Hy-MT installation is available on Windows and macOS.\n\nPut the {model} model and a llama.cpp runner ({runners}) in:\n{directory}",
         "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and about 1 GB of free disk space. The app downloads its own private installer runtime; you do not need to install Python. Language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet. The app downloads its own private installer runtime; you do not need to install Python. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
         "hymt_prompt": "The local Hy-MT model is not installed. Download and install the offline translation package?\n\nAbout 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime.",
@@ -2786,6 +2801,8 @@ ENGINE_TEXT = {
     "ru": {
         "not_found": "{engine} не найден", "install": "Установить", "cancel": "Отмена", "remove": "Удалить",
         "tesseract_prompt": "Tesseract-OCR не найден. Скачать и установить локально?",
+        "linux_tesseract_hint": "Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}",
+        "manual_hymt_hint": "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\nПоложите модель {model} и исполняемый файл llama.cpp ({runners}) в папку:\n{directory}",
         "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет и около 1 ГБ свободного места. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Языковые модели загрузятся при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
         "hymt_prompt": "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\nБудет скачано около 1,2 ГБ: модель Hy-MT и локальный runtime llama.cpp.",
@@ -2804,6 +2821,8 @@ ENGINE_TEXT = {
     "es": {
         "not_found": "No se encontró {engine}", "install": "Instalar", "cancel": "Cancelar", "remove": "Eliminar",
         "tesseract_prompt": "No se encontró Tesseract-OCR. ¿Descargarlo e instalarlo localmente?",
+        "linux_tesseract_hint": "Tesseract no está instalado. Instálalo con el gestor de paquetes:\n\n{command}",
+        "manual_hymt_hint": "La instalación automática de Hy-MT está disponible en Windows y macOS.\n\nColoca el modelo {model} y un ejecutable de llama.cpp ({runners}) en:\n{directory}",
         "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y aproximadamente 1 GB de espacio libre. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
         "hymt_prompt": "El modelo local Hy-MT no está instalado. ¿Descargar e instalar el paquete de traducción sin conexión?\n\nSe descargarán aproximadamente 1,2 GB: el modelo Hy-MT y el runtime local de llama.cpp.",
@@ -2822,6 +2841,8 @@ ENGINE_TEXT = {
     "de": {
         "not_found": "{engine} nicht gefunden", "install": "Installieren", "cancel": "Abbrechen", "remove": "Entfernen",
         "tesseract_prompt": "Tesseract-OCR wurde nicht gefunden. Lokal herunterladen und installieren?",
+        "linux_tesseract_hint": "Tesseract ist nicht installiert. Installieren Sie es mit Ihrer Paketverwaltung:\n\n{command}",
+        "manual_hymt_hint": "Die automatische Installation von Hy-MT ist unter Windows und macOS verfügbar.\n\nLegen Sie das Modell {model} und eine ausführbare llama.cpp-Datei ({runners}) in diesem Ordner ab:\n{directory}",
         "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und etwa 1 GB freier Speicherplatz benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
         "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür wird Internet benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
         "hymt_prompt": "Das lokale Hy-MT-Modell ist nicht installiert. Das Offline-Übersetzungspaket herunterladen und installieren?\n\nEtwa 1,2 GB werden geladen: das Hy-MT-Modell und die lokale llama.cpp-Laufzeit.",
@@ -2840,6 +2861,8 @@ ENGINE_TEXT = {
     "fr": {
         "not_found": "{engine} introuvable", "install": "Installer", "cancel": "Annuler", "remove": "Supprimer",
         "tesseract_prompt": "Tesseract-OCR est introuvable. Le télécharger et l’installer localement ?",
+        "linux_tesseract_hint": "Tesseract n’est pas installé. Installez-le avec votre gestionnaire de paquets :\n\n{command}",
+        "manual_hymt_hint": "L’installation automatique de Hy-MT est disponible sous Windows et macOS.\n\nPlacez le modèle {model} et un exécutable llama.cpp ({runners}) dans ce dossier :\n{directory}",
         "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et environ 1 Go d’espace libre sont nécessaires. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet est nécessaire. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
         "hymt_prompt": "Le modèle Hy-MT local n’est pas installé. Télécharger et installer le paquet de traduction hors ligne ?\n\nEnviron 1,2 Go seront téléchargés : le modèle Hy-MT et le runtime local llama.cpp.",
@@ -2858,6 +2881,8 @@ ENGINE_TEXT = {
     "zh": {
         "not_found": "未找到 {engine}", "install": "安装", "cancel": "取消", "remove": "删除",
         "tesseract_prompt": "未找到 Tesseract-OCR。是否下载并在本地安装？",
+        "linux_tesseract_hint": "尚未安装 Tesseract。请通过软件包管理器安装：\n\n{command}",
+        "manual_hymt_hint": "Windows 和 macOS 支持自动安装 Hy-MT。\n\n请将 {model} 模型和 llama.cpp 可执行文件（{runners}）放入以下文件夹：\n{directory}",
         "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并预留约 1 GB 可用空间。应用会自行下载独立的安装环境，无需另外安装 Python。语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
         "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网。应用会自行下载独立的安装环境，无需另外安装 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
         "hymt_prompt": "本地 Hy-MT 模型尚未安装。是否下载并安装离线翻译包？\n\n将下载约 1.2 GB：Hy-MT 模型和本地 llama.cpp 运行时。",
@@ -3509,6 +3534,8 @@ class OcrLanguageManagerDialog(QDialog):
         self.title_close_btn = QToolButton()
         self.title_close_btn.setObjectName("languageManagerTitleClose")
         self.title_close_btn.setText("×")
+        self.title_close_btn.setAccessibleName(settings_text(self.lang, "close"))
+        self.title_close_btn.setToolTip(tooltip_text(settings_text(self.lang, "close")))
         self.title_close_btn.setCursor(Qt.PointingHandCursor)
         self.title_close_btn.setFixedSize(30, 28)
         self.title_close_btn.clicked.connect(self.reject)
@@ -8104,6 +8131,7 @@ class SettingsWindow(QWidget):
         self.game_swap_button.setObjectName("gameLanguageSwap")
         self.game_swap_button.setFixedSize(34, 32)
         self.game_swap_button.setToolTip(tooltip_text(settings_text(lang, "game_swap_languages")))
+        self.game_swap_button.setAccessibleName(settings_text(lang, "game_swap_languages"))
         language_row.addWidget(self.game_source_combo)
         language_row.addWidget(self.game_swap_button)
         language_row.addWidget(self.game_target_combo)
@@ -8931,6 +8959,7 @@ class SettingsWindow(QWidget):
         shell_layout.addLayout(footer)
 
         self._refresh_secondary_view_theme()
+        install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
 
@@ -8986,10 +9015,8 @@ class SettingsWindow(QWidget):
                 or (not double and QKeySequence(hotkey).count() > 1)):
             with QtCore.QSignalBlocker(field):
                 field.setHotkeyText(self.parent.config.get(key, ''))
-            message = ('Используйте одно сочетание или два нажатия одной клавиши.'
-                       if self.parent.current_interface_language == 'ru' else
-                       'Use one shortcut or two taps of the same key (Windows).')
-            self.hotkey_hint_label.setText(message)
+            self.hotkey_hint_label.setText(settings_text(
+                self.parent.current_interface_language, 'invalid_hotkey_format'))
             return None
         hotkey = double or hotkey
         labels = {
@@ -11798,12 +11825,7 @@ finally {
     def _show_linux_tesseract_hint(self, lang):
         """Tell a Linux user which package provides Tesseract."""
         command = platform_support.tesseract_install_hint()
-        is_ru = lang == "ru"
-        message = (
-            f"Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}"
-            if is_ru
-            else f"Tesseract is not installed. Install it with your package manager:\n\n{command}"
-        )
+        message = engine_text(lang, "linux_tesseract_hint", command=command)
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
         msg.setText(message)
@@ -11990,17 +12012,8 @@ finally {
 
         target_dir = os.path.join(_portable_base_dir(), "translators", "hymt")
         runner_names = ", ".join(translater.hymt_runner_names())
-        is_ru = lang == "ru"
-        message = (
-            "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\n"
-            f"Положите модель {HYMT_MODEL_FILE} и исполняемый файл llama.cpp "
-            f"({runner_names}) в папку:\n{target_dir}"
-            if is_ru
-            else
-            "Automatic Hy-MT installation is available on Windows and macOS.\n\n"
-            f"Put the {HYMT_MODEL_FILE} model and a llama.cpp runner "
-            f"({runner_names}) in:\n{target_dir}"
-        )
+        message = engine_text(lang, "manual_hymt_hint", model=HYMT_MODEL_FILE,
+                              runners=runner_names, directory=target_dir)
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
         msg.setText(message)
