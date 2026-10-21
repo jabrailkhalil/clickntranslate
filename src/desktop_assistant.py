@@ -66,10 +66,12 @@ class AssistantAnchor(QtWidgets.QWidget):
             self.setAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setMouseTracking(True)
         self.setFixedSize(84, 84)
         self._press = None
         self._dragging = False
         self._hover = False
+        self._gaze_angle = None
         self.dark = True
         self.behavior = 'idle'
         self.appearance = 'portrait'
@@ -93,6 +95,7 @@ class AssistantAnchor(QtWidgets.QWidget):
         self.mascot = mascot
         self.motion.mascot = mascot
         self.motion.crawl_phase = 0
+        self.motion.greet()
         self._sync_motion()
         self.update()
 
@@ -108,12 +111,14 @@ class AssistantAnchor(QtWidgets.QWidget):
             rect = QtCore.QRectF(self.rect())
             if self._walk_x is not None and abs(self._walk_x-self.x()) < 1:
                 rect.translate(self._walk_x-self.x(), 0)
-            action = self.motion.action()
+            action = self.motion.action(self.behavior == 'walk')
             # Hover, click and drag freeze the current animation frame. The
             # old wave/drag substitution used a smaller, separate body rig.
             paint_pet(painter, rect, self.mascot,
                       phase=self.motion.phase, time=self.motion.time, action=action,
-                      facing=self.facing, crawl_phase=self.motion.crawl_phase)
+                      facing=self.facing, crawl_phase=self.motion.crawl_phase,
+                      state_time=self.motion.seconds(action),
+                      gaze=self._gaze_angle if self._hover and self.motion.status == 'idle' else None)
             return
         pixmap = companion_art(self.appearance, self.custom_image, self.mascot)
         if not pixmap.isNull():
@@ -136,7 +141,8 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def _sync_motion(self):
         active = self.appearance == 'walking' and self.isVisible() and not self._hover and self._press is None and not self.menu_open
-        animate = active and self.behavior == 'walk'
+        # Pausing travel retains idle breathing and translation reactions.
+        animate = active
         if animate and not self._animation.isActive():
             self._clock.start()
             self._animation.start()
@@ -149,16 +155,18 @@ class AssistantAnchor(QtWidgets.QWidget):
         self.update()
 
     def _advance(self, seconds=None):
-        if (self.appearance != 'walking' or self.behavior != 'walk'
+        if (self.appearance != 'walking'
                 or not self.isVisible() or self._hover or self._press is not None or self.menu_open):
             return
         dt = min(.1, self._clock.restart() / 1000) if seconds is None else seconds
-        if self.appearance == 'walking' and self.behavior == 'walk':
+        distance = self.motion.advance(dt, self.speed, self.width(),
+                                       locomotion=self.behavior == 'walk')
+        if distance:
             screen = QtWidgets.QApplication.screenAt(self.geometry().center()) or self.screen()
             bounds = screen.availableGeometry()
             if self._walk_x is None or round(self._walk_x) != self.x():
                 self._walk_x = float(self.x())
-            distance = self.motion.advance(dt, self.speed * desktop_control_scale(screen), self.width())
+            distance *= desktop_control_scale(screen)
             target_x = self._walk_x + distance*self.facing
             clamped_x = max(float(bounds.left()), min(target_x, float(bounds.right()-self.width()+1)))
             self.motion.moved(clamped_x-self._walk_x, self.width())
@@ -183,6 +191,7 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def leaveEvent(self, event):
         self._hover = False
+        self._gaze_angle = None
         self._sync_motion()
         self.update()
 
@@ -197,6 +206,10 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def mouseMoveEvent(self, event):
         if self._press is None or not event.buttons() & QtCore.Qt.LeftButton:
+            offset = event.localPos() - QtCore.QPointF(self.width()/2, self.height()*.44)
+            self._gaze_angle = (math.degrees(math.atan2(offset.x(), -offset.y())) % 360
+                                if abs(offset.x()) + abs(offset.y()) > self.width()*.08 else None)
+            self.update()
             return
         offset = event.globalPos() - self._press
         if offset.manhattanLength() >= QtWidgets.QApplication.startDragDistance():

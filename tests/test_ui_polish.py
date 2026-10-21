@@ -244,10 +244,12 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     second.show()
     app.processEvents()
     assert rail.art is second.art
-    assert len(rail.art) == 16
-    memory = sum(p.width() * p.height() * 4 for p in rail.art.values())
-    assert memory <= 4 * 1024 * 1024
+    # One shared 73-cell atlas plus sleep4 and expressions8, decoded once.
+    pixmaps = (rail.art.pixmap, rail.art.sleep, rail.art.expressions)
+    memory = sum(p.width() * p.height() * 4 for p in pixmaps)
+    assert memory <= 16 * 1024 * 1024
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
+    monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
     for _ in range(200):
         rail._advance(80)
         assert 0 <= rail.button.x() <= rail.width() - rail.button.width()

@@ -119,7 +119,11 @@ def test_walking_sprite_greets_on_hover_and_freezes_when_paused(window, app):
     assert anchor.grab().toImage() == paused
     assert (anchor.motion.phase, anchor.motion.time) == (phase, time)
     anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
+    anchor._advance(.2)
+    assert anchor.pos() == position
+    assert anchor.motion.phase == phase
+    assert anchor.motion.time > time
     window._desktop_assistant.request_action('walk')
     anchor._advance(.5)
     assert anchor.pos() != position

@@ -39,13 +39,14 @@ def run():
     sys.path.insert(0, str(ROOT / 'tests'))
     from qt_layout_test_support import ensure_layout_fonts
     ensure_layout_fonts(app)
-    output = ROOT / 'docs/mascots'
+    output = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / '.tmp/pets-v18'
+    output.mkdir(parents=True, exist_ok=True)
     motions = [PetMotion(m) for m in MASCOTS]
-    positions = [150.] * 5
+    positions = [150.] * len(MASCOTS)
     frames = []
     # Movement, personal activities, celebration and a stationary pause.
     for index in range(200):
-        image = canvas(760, 640)
+        image = canvas(760, 760)
         painter = QtGui.QPainter(image)
         caption(painter, 24, 28, '1.8.2 • прогулка и ползание → занятие → готово')
         for row, (mascot, motion) in enumerate(zip(MASCOTS, motions)):
@@ -62,13 +63,13 @@ def run():
             painter.drawLine(142, y+98, 724, y+98)
             paint_pet(painter, QtCore.QRectF(positions[row], y, 104, 104), mascot,
                       phase=motion.phase, time=motion.time, action=motion.action(),
-                      crawl_phase=motion.crawl_phase)
+                      crawl_phase=motion.crawl_phase, state_time=motion.seconds(motion.action()))
         painter.end()
         frames.append(pil(image).convert('RGB'))
         if index in (0, 4, 8, 12, 16, 120, 174):
             image.save(str(output / f'motion-frame-{index:03}.png'))
     # Fixed palette across all frames prevents background and outline flicker.
-    palette_sheet = Image.new('RGB', (760*4, 640))
+    palette_sheet = Image.new('RGB', (760*4, 760))
     for slot, index in enumerate((0, 80, 130, 180)):
         palette_sheet.paste(frames[index], (slot*760, 0))
     palette = palette_sheet.quantize(colors=256)
@@ -76,7 +77,7 @@ def run():
     encoded[0].save(output / 'motion-v2.gif', save_all=True, append_images=encoded[1:],
                     duration=40, loop=0, optimize=False)
     poses = [p for p in APPEARANCES if p not in ('walking', 'custom')]
-    sheet = canvas(1100, 590)
+    sheet = canvas(1100, 700)
     painter = QtGui.QPainter(sheet)
     labels = ('Спокойный', 'Радость', 'Интерес', 'Думает', 'Удивление', 'Грусть',
               'Сонный', 'Спит', 'Гордится', 'Празднует', 'Занят')
@@ -87,7 +88,7 @@ def run():
             painter.drawPixmap(QtCore.QRect(col*100+2, 30+row*110, 96, 96), companion_art(pose, mascot=mascot))
     painter.end()
     sheet.save(str(output / 'emotions-v2.png'))
-    print(f'Motion and 55 static choices rendered in {output}')
+    print(f'Motion and 66 static choices rendered in {output}')
 
 
 if __name__ == '__main__':

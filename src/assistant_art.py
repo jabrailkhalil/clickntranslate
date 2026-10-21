@@ -6,8 +6,8 @@ import sys
 from PyQt5 import QtCore, QtGui
 
 
-MASCOTS = ('pancake', 'mochi', 'bubu', 'momo', 'orbit')
-DEFAULT_MASCOT = MASCOTS[0]
+MASCOTS = ('pancake', 'mochi', 'bubu', 'momo', 'orbit', 'click')
+DEFAULT_MASCOT = 'click'
 APPEARANCES = ('portrait', 'happy', 'curious', 'thinking', 'surprised', 'sad',
                'sleep_alt', 'sleep_icon', 'star', 'hero', 'working', 'walking', 'custom')
 EXPRESSIONS = {'portrait': 'neutral', 'happy': 'happy', 'curious': 'curious',
@@ -34,11 +34,7 @@ def mascot_id(value):
 
 
 def walking_art_path(mascot=DEFAULT_MASCOT):
-    traced = art_path(f'{mascot_id(mascot)}/walk-traced.gif')
-    if Path(traced).is_file():
-        return traced
-    redraw = art_path(f'{mascot_id(mascot)}/walk-redrawn.gif')
-    return redraw if Path(redraw).is_file() else art_path(f'{mascot_id(mascot)}/walk.gif')
+    return art_path(f'{mascot_id(mascot)}/walk.gif')
 
 
 def _decode_pixmap(path):

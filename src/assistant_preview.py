@@ -2,8 +2,9 @@
 
 Only a 20px sprite is animated, at most 60 times/s while its page is visible.
 The animation continues in inactive windows. Hidden/minimized pages have no
-running timer. Artwork is decoded once; motion shares the desktop rig.
+running timer. Artwork is decoded once; both views play the same whole frames.
 """
+import math
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from assistant_text import assistant_text
@@ -17,6 +18,7 @@ class _PreviewButton(QtWidgets.QAbstractButton):
         self.rail = rail
         self.setFixedSize(28, 22)
         self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def event(self, event):
@@ -33,7 +35,9 @@ class _PreviewButton(QtWidgets.QAbstractButton):
             fraction = self.rail._x-round(self.rail._x)
             paint_pet(painter, QtCore.QRectF((self.width()-22)/2+fraction, 0, 22, 22),
                       self.rail.mascot, phase=motion.phase, time=motion.time,
-                      action=action, facing=self.rail.direction, crawl_phase=motion.crawl_phase)
+                      action=action, facing=self.rail.direction, crawl_phase=motion.crawl_phase,
+                      state_time=motion.seconds(action),
+                      gaze=self.rail.gaze if self.rail._hovered and motion.status == 'idle' else None)
         else:
             painter.setPen(self.palette().text().color())
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, '✦')
@@ -47,9 +51,17 @@ class _PreviewButton(QtWidgets.QAbstractButton):
 
     def leaveEvent(self, event):
         self.rail._hovered = False
+        self.rail.gaze = None
         self.rail._sync_animation()
         self.update()
         super().leaveEvent(event)
+
+    def mouseMoveEvent(self, event):
+        offset = event.localPos() - QtCore.QPointF(self.width()/2, self.height()*.44)
+        self.rail.gaze = (math.degrees(math.atan2(offset.x(), -offset.y())) % 360
+                          if abs(offset.x()) + abs(offset.y()) > 3 else None)
+        self.update()
+        super().mouseMoveEvent(event)
 
     def focusInEvent(self, event):
         self.rail._sync_animation()
@@ -77,6 +89,7 @@ class AssistantPreview(QtWidgets.QWidget):
         font.setPixelSize(13)
         self.setFont(font)
         self._hovered = False
+        self.gaze = None
         self.art = None
         self.mascot = mascot_id(getattr(activity_owner, 'config', {}).get('desktop_assistant_mascot'))
         self.motion = PetMotion(self.mascot)
@@ -193,6 +206,7 @@ class AssistantPreview(QtWidgets.QWidget):
         self.art = skin(mascot) if self.isVisible() else None
         self.motion.mascot = mascot
         self.motion.crawl_phase = 0
+        self.motion.greet()
         self._sync_animation()
         self.button.update()
 

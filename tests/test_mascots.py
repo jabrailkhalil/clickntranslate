@@ -1,4 +1,4 @@
-"""Asset, selection and capture lifecycle checks for the five companions."""
+"""Asset, selection and capture lifecycle checks for the six companions."""
 from pathlib import Path
 
 import pytest
@@ -13,27 +13,26 @@ import mode_coordinator
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)
-def test_each_character_has_transparent_rig_and_distinct_emotions(app, mascot):
+def test_each_character_has_transparent_atlas_and_distinct_emotions(app, mascot):
     movie = QtGui.QMovie(walking_art_path(mascot))
-    assert movie.isValid() and movie.frameCount() == 20
-    images = []
-    for index in range(20):
+    assert movie.isValid() and movie.frameCount() == 8
+    for index in range(8):
         assert movie.jumpToFrame(index)
         image = movie.currentImage()
-        assert image.size() == QtCore.QSize(192, 192)
+        assert image.size() == QtCore.QSize(192, 208)
         assert image.pixelColor(0, 0).alpha() == 0
-        assert movie.nextFrameDelay() == 50
-        images.append(image)
-    assert all(images[0] != image for image in images[1:])
+        assert movie.nextFrameDelay() == (220 if index == 7 else 120)
     for pose in APPEARANCES[:-2]:
         image = companion_art(pose, mascot=mascot).toImage()
         assert not image.isNull() and image.hasAlphaChannel()
         assert image.pixelColor(0, 0).alpha() == 0
         assert image.pixelColor(image.width()-1, image.height()-1).alpha() == 0
-    layers = skin(mascot)
-    assert len(layers) == 16
-    assert all(not p.isNull() and p.hasAlphaChannel() for p in layers.values())
-    assert sum(p.width()*p.height()*4 for p in layers.values()) <= 4*1024*1024
+    artwork = skin(mascot)
+    assert artwork.pixmap.size() == QtCore.QSize(1536, 2288)
+    assert artwork.sleep.size() == QtCore.QSize(768, 208)
+    assert artwork.expressions.size() == QtCore.QSize(1536, 208)
+    directions = [artwork.source(gaze=angle)[1] for angle in range(0, 360, 90)]
+    assert len({(r.x(), r.y()) for r in directions}) == 4
     emotions = [companion_art(pose, mascot=mascot).toImage() for pose in APPEARANCES[:7]]
     assert all(emotions[a] != emotions[b] for a in range(7) for b in range(a+1, 7))
 
@@ -78,7 +77,10 @@ def test_switching_character_keeps_position_pause_and_capture_ownership(window, 
         assert helper.anchor.mascot == mascot
         assert helper.anchor.motion.mascot == mascot
         assert helper.anchor.pos() == position
-        assert not helper.anchor._animation.isActive()
+        assert helper.anchor._animation.isActive()
+        position = helper.anchor.pos()
+        helper.anchor._advance(.1)
+        assert helper.anchor.pos() == position
     mode_coordinator.request_mode('mascot-test', lambda: None)
     try:
         page.choose_mascot('bubu')
@@ -126,6 +128,7 @@ def test_dropdown_has_all_characters_and_supports_keyboard(window, app):
     for index in range(combo.count()):
         assert view.viewport().rect().contains(view.visualRect(combo.model().index(index, 0)))
     combo.hidePopup()
+    combo.setCurrentIndex(0)
     QTest.keyClick(combo, QtCore.Qt.Key_Down)
     assert combo.currentData() == 'mochi'
     assert window.config['desktop_assistant_mascot'] == 'mochi'

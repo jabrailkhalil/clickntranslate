@@ -88,9 +88,10 @@ def test_companion_preferences_can_be_edited_before_enabling(window, app):
     page = window.settings_window.settings_assistant_page
     assert not page.toggle.isChecked()
     assert page.options.isEnabled()
-    assert page.motion_options.isHidden()
+    assert page.motion_options.isVisible()
     page.show_category('dynamic')
-    page.appearance_buttons['walking'].click()
+    page.category_buttons['dynamic'].click()
+    page.pause_walk.setChecked(False)
     assert page.motion_options.isVisible()
     page.values['size'].setValue(130)
     assert window.config['desktop_assistant_size'] == 130
@@ -133,10 +134,12 @@ def test_idle_hover_has_no_outline_and_walking_pauses_for_menu_capture_and_drag(
     mode_coordinator.release_mode('ux-qa')
     assert anchor.isVisible() and anchor._animation.isActive()
     helper.request_action('idle')
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
+    position = anchor.pos()
     helper.request_action('hop')  # Removed pseudo-animation cannot reactivate it.
     anchor._advance(1.)
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
+    assert anchor.pos() == position
 
 
 def test_companion_does_not_write_config_every_walk_frame_and_returns_home(window):

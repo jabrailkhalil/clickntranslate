@@ -33,10 +33,10 @@ def run():
         config = dict(main.DEFAULT_CONFIG,
                       interface_language='ru',
                       desktop_assistant_enabled=True,
-                      desktop_assistant_mascot='pancake',
+                      desktop_assistant_mascot='click',
                       desktop_assistant_appearance='walking',
                       desktop_assistant_behavior='walk',
-                      desktop_assistant_reactions=False,
+                      desktop_assistant_reactions=True,
                       desktop_assistant_position={'screen': '', 'x': .55, 'y': .85},
                       show_update_info=False, update_check_on_launch=False,
                       first_run_guide_completed=True, first_run_guide_pending=False,
@@ -57,7 +57,7 @@ def run():
     app.setQuitOnLastWindowClosed(True)
     window = MascotApp()
     main._main_window_ref = window
-    window.setWindowTitle(f"Click'n'Translate 1.8.2 — Python · {assistant_text('ru', 'orbit')} v17")
+    window.setWindowTitle(f"Click'n'Translate 1.8.2 — Python · Pets v18")
     window._sync_desktop_assistant()
     window.show()
     window.show_assistant_settings()

@@ -18,7 +18,7 @@ ASSISTANT_DEFAULTS = {
     'desktop_assistant_speed': 40,
     'desktop_assistant_opacity': 100,
     'desktop_assistant_topmost': True,
-    'desktop_assistant_appearance': 'portrait',
+    'desktop_assistant_appearance': 'walking',
     'desktop_assistant_mascot': DEFAULT_MASCOT,
     'desktop_assistant_reactions': True,
     'desktop_assistant_image': '',
@@ -45,7 +45,7 @@ def assistant_preferences(config):
     values['desktop_assistant_mascot'] = mascot_id(values['desktop_assistant_mascot'])
     values['desktop_assistant_reactions'] = values['desktop_assistant_reactions'] is True
     if values['desktop_assistant_appearance'] not in APPEARANCES:
-        values['desktop_assistant_appearance'] = ASSISTANT_DEFAULTS['desktop_assistant_appearance']
+        values['desktop_assistant_appearance'] = 'portrait'
     if not isinstance(values['desktop_assistant_image'], str):
         values['desktop_assistant_image'] = ''
     return values
@@ -102,7 +102,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.mascot_combo.setAccessibleName(tr('mascot'))
         self.mascot_combo.setIconSize(QtCore.QSize(24, 24))
         self.mascot_combo.setFixedHeight(32)
-        self.mascot_combo.setMaxVisibleItems(5)
+        self.mascot_combo.setMaxVisibleItems(len(MASCOTS))
         mascot_label.setBuddy(self.mascot_combo)
         for key in MASCOTS:
             self.mascot_combo.addItem(QtGui.QIcon(companion_art('portrait', mascot=key)), tr(key), key)

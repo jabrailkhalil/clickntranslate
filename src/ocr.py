@@ -18,6 +18,7 @@ import math
 from button_styles import button_qss
 from settings_window import LanguageSwapButton
 from capture_widgets import CaptureLanguageCombo as DropDownCombo
+from assistant_motion import notify_current_activity
 from window_appearance import style_capture_controls
 from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
@@ -3963,6 +3964,7 @@ class ScreenCaptureOverlay(QWidget):
 
     def closeEvent(self, event):
         # Сначала убираем себя из активных оверлеев
+        notify_current_activity('idle', f'ocr:{id(self)}', only_if_busy=True)
         try:
             for active_mode, overlay in list(_ACTIVE_OVERLAYS.items()):
                 if overlay is self:
@@ -4599,6 +4601,7 @@ class ScreenCaptureOverlay(QWidget):
             return
 
         self._last_ocr_raw_capture = screenshot.copy()
+        notify_current_activity('busy', f'ocr:{id(self)}')
         self._last_ocr_capture_meta = {
             "local_rect": _rect_to_text(rect),
             "global_rect": _rect_to_text(global_rect),
@@ -4903,8 +4906,10 @@ class ScreenCaptureOverlay(QWidget):
                 f"[OCR:{getattr(self, '_session_id', 'unknown')}] handle_ocr_result; "
                 f"text_len={len(text or '')}, preview={_text_preview(text)}"
             )
-            self._handle_ocr_result_inner(text)
+            success = self._handle_ocr_result_inner(text)
+            notify_current_activity('success' if success else 'error', f'ocr:{id(self)}')
         except Exception as e:
+            notify_current_activity('error', f'ocr:{id(self)}')
             logging.exception(f"[OCR:{getattr(self, '_session_id', 'unknown')}] Critical error in handle_ocr_result: {e}")
             # Гарантированно закрываем оверлей при любом краше
             try:
@@ -4959,7 +4964,7 @@ class ScreenCaptureOverlay(QWidget):
                         save_copy_history(translated_text)
                         save_translation_history(text, translated_text, target_code)
                         self.close()
-                        return
+                        return True
 
                     # Скрываем оверлей ПЕРЕД показом диалога, чтобы:
                     # 1) Пользователь видел исходный контент за диалогом
@@ -4989,6 +4994,7 @@ class ScreenCaptureOverlay(QWidget):
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
                 self.close()
+                return bool(translated_text)
             else:
                 try:
                     # Ленивый импорт для избежания циклического импорта
@@ -5001,6 +5007,7 @@ class ScreenCaptureOverlay(QWidget):
                     )
                     # НЕ сохраняем обычный текст в историю переводов!
                     self.close()
+                    return True
                 except Exception as e:
                     logging.exception(f"[OCR:{session_id}] OCR result handling error: {e}")
         else:
@@ -5763,12 +5770,14 @@ class FullScreenTranslateOverlay(QWidget):
         """Leave the overlay in a readable failed state instead of loading forever."""
         if run_id != self._translation_run_id:
             return
+        notify_current_activity('error', f'fullscreen:{id(self)}')
         self.loading = False
         lang = get_cached_ocr_config().get("interface_language", "en")
         self.error_message = ocr_ui_text(lang, message_key)
         self.update()
 
     def _start_ocr(self, run_id, source_code, target_code):
+        notify_current_activity('busy', f'fullscreen:{id(self)}')
         qimage = self.screenshot.toImage()
         worker = create_position_ocr_worker(qimage, source_code, get_cached_ocr_config().get("ocr_engine"))
         if worker is None:
@@ -5877,6 +5886,8 @@ class FullScreenTranslateOverlay(QWidget):
         self.translated_blocks = list(blocks or [])
         self.error_message = str(error_message or "") or None
         self.loading = False
+        notify_current_activity('error' if self.error_message or not self.translated_blocks else 'success',
+                                f'fullscreen:{id(self)}')
         if self.translated_blocks and not self.error_message:
             original_text = "\n".join(str(block[1] or "") for block in self.translated_blocks)
             translated_text = "\n".join(str(block[2] or "") for block in self.translated_blocks)
@@ -6205,6 +6216,7 @@ class FullScreenTranslateOverlay(QWidget):
 
     def closeEvent(self, event):
         global _fullscreen_overlay_ref
+        notify_current_activity('idle', f'fullscreen:{id(self)}', only_if_busy=True)
         self._translation_run_id += 1
         self._rerun_timer.stop()
         self._pending_translation_pair = None

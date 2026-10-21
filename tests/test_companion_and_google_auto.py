@@ -33,15 +33,16 @@ def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appeara
     page = window.settings_window.settings_assistant_page
     page.toggle.click()
     helper = window._desktop_assistant
-    page.appearance_buttons['walking'].click()
+    page.category_buttons['dynamic'].click()
     page.pose_combo.setCurrentIndex(page.pose_combo.findData(appearance))
     page.choose_appearance(appearance)
     assert window.config['desktop_assistant_appearance'] == appearance
     assert page.motion_options.isHidden()
     assert not helper.anchor._animation.isActive()
-    assert helper.anchor.motion.time == 0
+    frozen_time = helper.anchor.motion.time
     position, image = helper.anchor.pos(), helper.anchor.grab().toImage()
     helper.anchor._advance(2.)
+    assert helper.anchor.motion.time == frozen_time
     assert helper.anchor.pos() == position
     assert helper.anchor.grab().toImage() == image
     helper.toggle_menu()
@@ -53,10 +54,11 @@ def test_custom_image_cancel_preserves_selection_and_invalid_values_are_safe(win
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
     page.toggle.click()
+    original = assistant_preferences(window.config)['desktop_assistant_appearance']
     with mock.patch.object(QtWidgets.QFileDialog, 'getOpenFileName', return_value=('', '')):
         page.appearance_buttons['custom'].click()
     assert page.pose_combo.currentData() == 'portrait'
-    assert window.config['desktop_assistant_appearance'] == 'portrait'
+    assert window.config['desktop_assistant_appearance'] == original
     values = assistant_preferences({'desktop_assistant_image': [], 'desktop_assistant_appearance': {}})
     assert values['desktop_assistant_image'] == '' and values['desktop_assistant_appearance'] == 'portrait'
     assert not companion_art('custom', 'missing-file.png').isNull()
@@ -79,9 +81,11 @@ def test_custom_image_and_sleep_pose(window, tmp_path):
     sleeping = helper.anchor.grab().toImage()
     assert sleeping != idle
     assert not helper.anchor._animation.isActive()
-    assert helper.anchor.motion.time == 0
+    frozen_time = helper.anchor.motion.time
     helper.request_action('walk')  # Static icons cannot start walking.
     assert not helper.anchor._animation.isActive()
+    helper.anchor._advance(2.)
+    assert helper.anchor.motion.time == frozen_time
 
 
 @pytest.mark.parametrize('language', tuple(AUTO_LANGUAGE_NAMES))

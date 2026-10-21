@@ -17,7 +17,7 @@ from assistant_motion import PetMotion, paint_pet, WALK_FRAME_NAMES, WALK_FRAME_
 from assistant_text import assistant_text
 
 NAMES = tuple(assistant_text('ru', mascot) for mascot in MASCOTS)
-REVISION = 'v16'
+REVISION = 'v18'
 STATES = (
     ('Прогулка / ползание', 'walk', 'neutral'),
     ('Спокойный', 'idle', 'neutral'), ('Радостный', 'idle', 'happy'),
@@ -35,8 +35,8 @@ class Scene(QtWidgets.QWidget):
         super().__init__()
         self.setMinimumSize(690, 605)
         self.pets = [PetMotion(m) for m in MASCOTS]
-        self.positions = [150.] * 5
-        self.directions = [1] * 5
+        self.positions = [150.] * len(MASCOTS)
+        self.directions = [1] * len(MASCOTS)
         self.state = 0
         self.speed = 40
         self.extent = 128
@@ -53,8 +53,8 @@ class Scene(QtWidgets.QWidget):
 
     def reset(self):
         self.pets = [PetMotion(m) for m in MASCOTS]
-        self.positions = [150.] * 5
-        self.directions = [1] * 5
+        self.positions = [150.] * len(MASCOTS)
+        self.directions = [1] * len(MASCOTS)
         self.update()
 
     def tick(self):
@@ -85,7 +85,7 @@ class Scene(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.fillRect(self.rect(), QtGui.QColor('#22232e' if self.dark else '#f4f1f8'))
-        row_height = self.height()/5
+        row_height = self.height()/len(MASCOTS)
         font = QtGui.QFont('Segoe UI', 11)
         painter.setFont(font)
         for index, (mascot, pet) in enumerate(zip(MASCOTS, self.pets)):
@@ -107,7 +107,7 @@ class Scene(QtWidgets.QWidget):
 class Preview(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('ClicknTranslate — маскоты v16 · Python · перерисованные кадры')
+        self.setWindowTitle('ClicknTranslate — маскоты v18 · Python · перерисованные кадры')
         self.resize(980, 740)
         layout = QtWidgets.QVBoxLayout(self)
         title = QtWidgets.QLabel('Маскоты • визуальная доработка')
@@ -168,9 +168,10 @@ def export(preview):
     preview.scene.timer.stop()
     preview.show()
     QtWidgets.QApplication.processEvents()
-    output = ROOT / 'docs/mascots'
+    output = ROOT / '.tmp/pets-v18'
+    output.mkdir(parents=True, exist_ok=True)
     preview.grab().save(str(output / f'python-preview-{REVISION}.png'))
-    poses = QtGui.QImage(100+150*len(WALK_FRAME_NAMES), 820, QtGui.QImage.Format_RGBA8888)
+    poses = QtGui.QImage(100+150*len(WALK_FRAME_NAMES), 20+160*len(MASCOTS), QtGui.QImage.Format_RGBA8888)
     poses.fill(QtGui.QColor('#22232e'))
     painter = QtGui.QPainter(poses)
     painter.setFont(QtGui.QFont('Segoe UI', 11))
@@ -191,7 +192,7 @@ def export(preview):
     frames = []
     for index in range(400):
         if index == 200:
-            preview.scene.directions = [-1] * 5
+            preview.scene.directions = [-1] * len(MASCOTS)
         preview.scene.advance(.02)
         canvas = preview.scene.grab().toImage().convertToFormat(QtGui.QImage.Format_RGBA8888)
         pointer = canvas.bits()

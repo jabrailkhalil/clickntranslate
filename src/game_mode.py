@@ -20,6 +20,7 @@ import time
 
 from button_styles import button_qss
 from live_translation import LiveTextState, live_frame_changed
+from assistant_motion import notify_current_activity
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -1276,6 +1277,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 self._translation_cancel.set()
             return
         self._translation_busy = True
+        notify_current_activity('busy', f'live:{id(self)}')
         cancelled = self._translation_cancel = threading.Event()
         engine = self.config.get('translator_engine', 'Google')
         self._revision += 1
@@ -1321,16 +1323,20 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if self.paused or not self._target_is_active():
             self._last_source_text = ''
             self._last_frame = ()
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         if pending:
             self._start_translation(pending)
             return
         if was_cancelled or (self._has_ocr_source and source_text != self._last_source_text):
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         if error or not translated:
+            notify_current_activity('error', f'live:{id(self)}')
             self._last_source_text = ''
             self._set_status("translation_error", active=False)
         else:
+            notify_current_activity('success', f'live:{id(self)}')
             from ocr import save_translation_history
             self.original_label.setText(source_text)
             self.original_label.setVisible(
@@ -1348,6 +1354,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def _toggle_pause(self):
         self.paused = not self.paused
+        if self.paused:
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self.pause_button.setText("▶" if self.paused else "Ⅱ")
         self.pause_button.setToolTip(
             game_text(self.language, "resume" if self.paused else "pause")
@@ -1381,6 +1389,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     def closeEvent(self, event):
         self._timer.stop()
         self._closed = True
+        notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         if self._translation_cancel is not None:
             self._translation_cancel.set()
         self._revision += 1
@@ -1915,6 +1924,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._pending_lines = None
         self._requested_texts = {normalize_game_ocr_text(item[4]) for item in lines}
         self._translation_busy = True
+        notify_current_activity('busy', f'live:{id(self)}')
         cancelled = self._translation_cancel = threading.Event()
         engine = self.engine
         self._revision += 1
@@ -1984,9 +1994,11 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._last_layout_signature = ()
             self._pending_lines = None
             self._live.reset_visible()
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         self._pending_lines = None
         if error and not was_cancelled:
+            notify_current_activity('error', f'live:{id(self)}')
             self._last_layout_signature = ()
             self._set_status("translation_error", error=True)
             return
@@ -2004,6 +2016,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             translated = "\n".join(block[5] for block in self._blocks)
             save_translation_history(source, translated, self.target_language)
         if final:
+            notify_current_activity('idle' if was_cancelled else ('success' if blocks else 'error'),
+                                    f'live:{id(self)}')
             pending = set(self._live.pending(time.monotonic()))
             if pending:
                 self._start_block_translation([item for item in self._live.lines if item[4] in pending])
@@ -2011,6 +2025,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _toggle_pause(self):
         self.paused = not self.paused
         self.controls.pause_button.setText(game_text(self.language, 'resume' if self.paused else 'pause'))
+        if self.paused:
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._settle_timer.stop()
         self._live.reset_visible()
         self._blocks = []
@@ -2155,6 +2171,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         global _game_fullscreen_ref
+        notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._timer.stop()
         self._settle_timer.stop()
         self._closed = True

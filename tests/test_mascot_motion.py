@@ -1,4 +1,4 @@
-"""Check contact in screen coordinates, jelly hops, and real application events."""
+"""Check whole-frame playback, state transitions and real application events."""
 from unittest import mock
 
 import pytest
@@ -6,51 +6,29 @@ from PyQt5 import QtCore, QtGui
 
 import main
 from assistant_art import MASCOTS
-from assistant_motion import PetMotion, STRIDE, foot_pose, paint_pet, skin, notify_activity
+from assistant_motion import PetMotion, paint_pet, skin, notify_activity, notify_current_activity
+from assistant_sprites import frame_index, look_index
 from test_desktop_ux import app, window
+
+
+def test_frame_cadence_and_clockwise_cardinal_selection():
+    assert frame_index((100, 200, 300), 0) == 0
+    assert frame_index((100, 200, 300), .1) == 1
+    assert frame_index((100, 200, 300), .3) == 2
+    assert frame_index((100, 200, 300), .6) == 0
+    assert [look_index(a) for a in (0, 90, 180, 270, 360, -90)] == [0, 4, 8, 12, 0, 12]
 
 
 @pytest.mark.parametrize('extent', [60, 84, 150])
 @pytest.mark.parametrize('speed', [20, 40, 100])
-@pytest.mark.parametrize('facing', [-1, 1])
-def test_contact_foot_stays_fixed_in_world_at_all_speeds_and_sizes(extent, speed, facing):
+def test_travel_uses_elapsed_time_independent_of_render_size(extent, speed):
     pet = PetMotion('pancake')
     pet.reactions = False
-    x, remainder = 200, 0.
-    contacts = {}
-    samples = 0
-    for _ in range(300):
-        remainder += pet.advance(.02, speed, extent)
-        step = int(remainder)
-        remainder -= step
-        x += step * facing
-        pet.moved(step, extent)
-        for leg in (0, 1):
-            offset, lift, planted = foot_pose(pet.phase, leg)
-            cycle = int(pet.distance / STRIDE + leg * .5)
-            if planted:
-                world = x + facing * offset * extent / 128
-                key = leg, cycle
-                if key in contacts:
-                    assert world == pytest.approx(contacts[key], abs=1e-8)
-                    samples += 1
-                contacts[key] = world
-                assert lift == 0
-            else:
-                assert lift < 0
-    assert samples > 150
-
-
-def test_jelly_compresses_without_sliding_then_travels_in_flight():
-    pet = PetMotion('bubu')
-    pet.reactions = False
-    distances = []
-    for _ in range(100):
-        distances.append(pet.advance(.01, 26, 128))
-    assert sum(distances[:19]) == pytest.approx(0)
-    assert sum(distances[83:]) == pytest.approx(0)
-    assert sum(distances[20:80]) > 24
-    assert sum(distances) == pytest.approx(26)
+    distances = [pet.advance(.02, speed, extent) for _ in range(50)]
+    assert sum(distances) == pytest.approx(speed)
+    assert pet.walk_time == pytest.approx(1.)
+    assert pet.advance(.1, speed, extent, locomotion=False) == 0
+    assert pet.walk_time == pytest.approx(1.)
 
 
 def render(mascot, **kwargs):
@@ -62,14 +40,65 @@ def render(mascot, **kwargs):
     return canvas
 
 
-def test_jelly_never_renders_limbs_and_hop_is_visible(app):
-    poses = [render('bubu', action='walk', hop_phase=p) for p in (.0, .1, .5, .9)]
+@pytest.mark.parametrize('mascot', MASCOTS)
+def test_whole_frames_have_distinct_motion_and_both_gait_directions(app, mascot):
+    poses = [render(mascot, action='walk', phase=p) for p in (0., .2, .4, .6)]
     assert all(poses[a] != poses[b] for a in range(4) for b in range(a+1, 4))
-    wrong_limb = QtGui.QPixmap(200, 200)
-    wrong_limb.fill(QtCore.Qt.red)
-    replacement = {key: wrong_limb for key in ('foot-left', 'foot-right', 'arm-left', 'arm-right')}
-    with mock.patch.dict(skin('bubu'), replacement):
-        assert [render('bubu', action='walk', hop_phase=p) for p in (.0, .1, .5, .9)] == poses
+    assert render(mascot, action='walk', facing=-1) != poses[0]
+    # The renderer uses the cached original atlas; painting never creates limbs.
+    assert skin(mascot) is skin(mascot)
+
+
+def test_activity_clock_starts_at_first_frame_and_success_transitions_to_review():
+    pet = PetMotion('click')
+    pet.time = 103.3
+    pet.set_activity('success')
+    assert pet.seconds(pet.action()) == 0
+    for _ in range(4):
+        pet.advance(.21, 40, 84)
+    assert pet.action() == 'review'
+    assert pet.seconds('review') == pytest.approx(0)
+
+
+def test_gui_activity_bridge_keeps_concurrent_sources_and_ignores_late_cancel(window):
+    with mock.patch.object(main, '_main_window_ref', window):
+        notify_current_activity('busy', 'ocr:one')
+        notify_current_activity('busy', 'live:two')
+        notify_current_activity('success', 'ocr:one')
+        assert window._companion_activity == 'busy'
+        notify_current_activity('error', 'live:two')
+        assert window._companion_activity == 'error'
+        notify_current_activity('idle', 'ocr:one', only_if_busy=True)
+        assert window._companion_activity == 'error'
+
+
+@pytest.mark.parametrize('result', ['success', 'error', 'cancel'])
+def test_live_translation_drives_reactions_and_stale_results_cannot_replace_them(window, result):
+    import game_mode
+    import ocr
+    with (mock.patch.object(main, '_main_window_ref', window),
+          mock.patch.object(ocr, 'get_cached_ocr_config', return_value=dict(window.config)),
+          mock.patch.object(game_mode, '_exclude_from_windows_capture', return_value=True),
+          mock.patch.object(game_mode.threading, 'Thread')):
+        overlay = game_mode.GameTranslationOverlay(QtCore.QRect(100, 100, 300, 100), 'en', 'ru')
+        overlay._timer.stop()
+        try:
+            with mock.patch.object(overlay, '_target_is_active', return_value=True):
+                overlay._start_translation('Hello')
+                revision = overlay._revision
+                assert window._companion_activity == 'busy'
+                overlay._has_ocr_source = False
+                if result == 'cancel':
+                    overlay.close()
+                else:
+                    overlay._apply_translation(revision, 'Hello', 'Привет' if result == 'success' else '',
+                                               'Unavailable' if result == 'error' else '')
+                assert window._companion_activity == ('idle' if result == 'cancel' else result)
+                overlay._apply_translation(revision - 1, 'Old text', '', 'Old failure')
+                assert window._companion_activity == ('idle' if result == 'cancel' else result)
+                assert not window._companion_jobs
+        finally:
+            overlay.close()
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)

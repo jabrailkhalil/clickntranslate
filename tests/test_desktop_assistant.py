@@ -46,7 +46,10 @@ def test_animation_and_capture_lifecycle_do_not_leave_the_companion_in_ocr(compa
     companion.refresh()
     assert not companion.anchor.grab().isNull()
     assert companion.anchor.isVisible()
-    assert not companion.anchor._animation.isActive()
+    assert companion.anchor._animation.isActive()
+    position = companion.anchor.pos()
+    companion.anchor._advance(.1)
+    assert companion.anchor.pos() == position
     companion.request_action('walk')
     assert companion.anchor._animation.isActive()
     companion.toggle_menu()

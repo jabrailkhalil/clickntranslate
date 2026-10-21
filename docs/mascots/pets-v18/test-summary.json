@@ -1,0 +1,26 @@
+{
+  "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
+  "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 120",
+  "latestRechecks": [
+    "mascot/interface/cache files: 171 passed",
+    "UX/packaging/version files: 53 passed, 2 pre-existing version failures"
+  ],
+  "counts": {
+    "passed": 1789,
+    "skipped": 67,
+    "failure": 2
+  },
+  "totalReportedCases": 1858,
+  "userDataUnchanged": true,
+  "failures": [
+    {
+      "test": "tests.test_version_consistency::test_release_version_is_synchronized_everywhere",
+      "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
+    },
+    {
+      "test": "tests.test_linux_packaging.AppStreamMetadataTest::test_latest_metadata_release_matches_the_application_version",
+      "message": "AssertionError: '1.8.1' != '1.8.2'\n- 1.8.1\n?     ^\n+ 1.8.2\n?     ^"
+    }
+  ],
+  "note": "Combined latest results after rechecking modified test files and hydrating existing store/readme fixtures. The two remaining version failures are present in the unchanged base: APP_VERSION=1.8.2, hardcoded version assertion and AppStream metadata=1.8.1."
+}
