@@ -892,6 +892,37 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             parent.close()
             self.app.processEvents()
 
+    def test_translation_font_size_sits_beside_scale_and_persists(self):
+        parent, settings = self._result_window_settings()
+        try:
+            combo = settings.translation_font_combo
+            history = self._rect_in_settings(settings, settings.history_checkbox)
+            label = self._rect_in_settings(settings, settings.translation_font_label)
+            font = self._rect_in_settings(settings, combo)
+            scale = self._rect_in_settings(settings, settings.ui_scale_control)
+            self.assertEqual(combo.count(), len(main.TRANSLATION_RESULT_FONT_SIZE_KEYS))
+            self.assertEqual(combo.itemData(0), "xsmall")
+            self.assertEqual(combo.itemText(0), "Extra small")
+            self.assertEqual(combo.currentData(), "medium")
+            self.assertEqual(font[2], scale[2])
+            self.assertAlmostEqual(font[3], scale[3], delta=1)
+            self.assertEqual(font[0], scale[0])
+            self.assertGreater(font[1], scale[1])
+            self.assertAlmostEqual(
+                history[1] + history[3] / 2, font[1] + font[3] / 2, delta=3
+            )
+            self.assertLess(label[0] + label[2], font[0])
+            combo.setCurrentIndex(combo.findData("large"))
+            self.app.processEvents()
+            self.assertEqual(parent.config["translation_result_font_size"], "large")
+            combo.setCurrentIndex(combo.findData("xsmall"))
+            self.app.processEvents()
+            self.assertEqual(parent.config["translation_result_font_size"], "xsmall")
+        finally:
+            settings.close()
+            parent.close()
+            self.app.processEvents()
+
     def test_translator_combo_has_no_stale_delete_button_slot(self):
         parent, settings = self._result_window_settings()
         try:
