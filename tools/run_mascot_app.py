@@ -1,6 +1,7 @@
 """Open the full source application for hands-on mascot review.
 
 Run: .venv/Scripts/python.exe tools/run_mascot_app.py
+Add --general-settings to open the general settings page for UI review.
 Uses its own persistent profile in .tmp/mascot-app. Translation, optional quick
 selection and global hotkeys are active. Startup announcements, tray creation
 and OS autostart changes are disabled for this review copy.
@@ -72,7 +73,10 @@ def run():
     window.setWindowTitle(f"Click'n'Translate {main.APP_VERSION} — Python · Pets v18")
     window._sync_desktop_assistant()
     window.show()
-    window.show_assistant_settings()
+    if '--general-settings' in sys.argv:
+        window.show_settings()
+    else:
+        window.show_assistant_settings()
     window.raise_()
     window.activateWindow()
 

@@ -135,6 +135,10 @@ home/back, cancel, undo and pause/resume actions use their actual meanings.
 Shared standard dialog buttons follow the app language rather than the OS.
 
 General settings include the optional **Select all before replacing** checkbox.
+The right column groups the OCR, translator, result visibility and result-font
+dropdowns, followed by interface scale at the bottom. Result font size affects
+only source/translation text in the separate result window; its tooltip explains
+the distinction from interface scale in all six languages.
 The translate-and-replace action first selects the entire active input, then
 uses the existing translation and verified-selection replacement pipeline. The
 option is off by default, does not affect ordinary selection translation or

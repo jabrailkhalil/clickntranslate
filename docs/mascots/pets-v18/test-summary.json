@@ -1,6 +1,6 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
-  "testedSourceCommit": "4292c651f59079ea145476ccdbf6ffda03aba13b",
+  "testedSourceCommit": "0838aaaa49badd73df4cd51fe43f7d5dca331adb",
   "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 160",
   "fullSuiteCounts": {
     "passed": 1967,
@@ -80,10 +80,10 @@
     }
   ],
   "nativeWindowsCounts": {
-    "passed": 58
+    "passed": 31
   },
   "nativeWindowsRuns": [
-    "qa-doc-idle-native"
+    "qa-settings-order-native"
   ],
   "pr7": {
     "number": 7,
@@ -97,9 +97,10 @@
     }
   },
   "latestRechecks": [
-    "Native Windows: Doc idle frame rejection, all mascot frame/gaze alpha and application reaction transitions",
-    "Previous integrated native checks: two physical monitors, navigation, focus and controls (54 passed)",
-    "Three-agent semantic label and tooltip audit in en/ru/es/de/fr/zh",
+    "Native Windows settings layout: four dropdowns followed by scale, six-language/two-theme alignment (31 passed, 26 subtests)",
+    "Previous native checks: Doc animation (58 passed) and two physical monitors/navigation/focus/controls (54 passed)",
+    "Tracked text audit including sparse files; retained engine/model/font/library dependencies and license notices",
+    "Isolated six-locale landing page build: 31 public files and retained font license",
     "Quick selection lifecycle, clipboard text restoration and stale-result rejection"
   ],
   "userDataUnchanged": true,
@@ -113,5 +114,24 @@
       "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
     }
   ],
-  "note": "All eight partitions completed on the final integrated source. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. Native Windows checks passed; macOS/Linux builds and installers were not produced."
+  "note": "All eight partitions completed on the final integrated source. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. Native Windows checks passed; macOS/Linux builds and installers were not produced.",
+  "projectAudit": {
+    "date": "2026-10-22",
+    "trackedTextFiles": 623,
+    "remainingAuditedApplicationReferences": 0,
+    "includesSparseFiles": true,
+    "runtimeAtlasHashesUnchanged": true,
+    "retiredResourcesRemoved": true,
+    "dependencyLicenseNoticesRetained": true,
+    "landingLocalesBuilt": 6,
+    "landingPublicFiles": 31,
+    "deployed": false,
+    "newlyBrokenTrackedMarkdownLinks": 0
+  },
+  "manualReview": {
+    "sourceAppRestarted": true,
+    "generalSettingsOpened": true,
+    "isolatedProfile": true,
+    "stderrEmpty": true
+  }
 }

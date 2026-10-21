@@ -11,8 +11,9 @@ python tools/run_ci_tests.py --parts 8 --timeout 160
 ```
 
 Final full-suite results: **1967 passed, 68 skipped, 2 pre-existing version
-failures**. Latest native Windows animation checks: **58 passed**. Earlier
-integrated native monitor/focus/control checks: **54 passed**. See
+failures**. Latest native Windows settings checks: **31 passed, 26 subtests**.
+Earlier native animation checks: **58 passed**; integrated native monitor/focus/
+control checks: **54 passed**. See
 `test-summary.json` for the complete eight-part run. The only remaining failures
 are the two development-version metadata checks described below. Every completed isolated run reported
 `USER_DATA_UNCHANGED: True`.
@@ -69,6 +70,15 @@ Coverage includes:
   Dictionary keys and formatting placeholders match across all six languages.
 - Newly created quick-selection checkboxes and radio controls have visible
   indicators and distinct checked/unchecked states in both themes.
+- The four general-settings dropdowns precede the bottom scale control, with
+  aligned checkbox/field rows in both themes and all six languages. Font-size
+  help describes the separate result window and the difference from UI scale.
+- The repository audit reads tracked text even when absent from the sparse
+  checkout. Unused research/comparison resources and obsolete development tools
+  were removed; the six active atlas hashes are unchanged. Actual OCR/model/
+  build dependencies and font/library license notices are retained.
+- The tracked landing page builds in a new isolated directory: six localized
+  pages, 31 public files and the retained font license. No site was deployed.
 
 Remaining failures exist in unchanged base commit
 `959175faefcd4b7591d0d91fde5535785d155ae5`:
