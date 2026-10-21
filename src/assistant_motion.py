@@ -3,7 +3,7 @@ from functools import lru_cache
 import sys
 from PyQt5 import QtCore, QtGui, sip
 from assistant_art import mascot_id
-from assistant_sprites import atlas, frame_index, paint_sprite, ROWS
+from assistant_sprites import atlas, frame_index, paint_sprite, ROWS, STATIONARY_STATES
 
 WALK_FRAME_DURATIONS = ROWS['running-right'][1]
 WALK_FRAME_NAMES = tuple(f'{index:02}' for index in range(len(WALK_FRAME_DURATIONS)))
@@ -41,43 +41,50 @@ class PetMotion:
         self.interact()
 
     def greet(self):
-        if self.status not in ('busy', 'waiting'):
-            self.gesture, self.gesture_age = 'wave', 0.
+        self.play('waving')
 
-    def action(self, locomotion=True):
+    def play(self, state):
+        if state not in STATIONARY_STATES or self.status in ('busy', 'waiting'):
+            return False
+        if self.status in ('success', 'error'):
+            self.status, self.status_age = 'idle', 0.
+        self.gesture = {'waving': 'wave', 'jumping': 'success', 'running': 'work',
+                        'failed': 'error'}.get(state, state)
+        self.gesture_age = 0.
+        self.interact()
+        return True
+
+    @property
+    def gesture_duration(self):
+        state = {'wave': 'waving', 'success': 'jumping', 'work': 'running',
+                 'error': 'failed'}.get(self.gesture, self.gesture)
+        return sum(ROWS.get(state, ROWS['idle'])[1]) / 1000
+
+    def action(self, locomotion=False):
         if self.reactions:
             if self.status == 'busy':
                 return 'work'
             if self.status == 'waiting':
                 return 'waiting'
+        if self.gesture and self.gesture_age < self.gesture_duration:
+            return self.gesture
+        if self.reactions:
             if self.status == 'error' and self.status_age < 3:
                 return 'error'
             if self.status == 'success' and self.status_age < 3:
                 return 'success' if self.status_age < .84 else 'review'
-            if self.gesture == 'wave' and self.gesture_age < .7:
-                return 'wave'
-            if self.quiet >= 45:
-                return 'sleep'
-            if 6 <= self.quiet < 6.7:
-                return 'wave'
-            if 8 <= self.quiet < 8.8:
-                return 'curious'
-        return 'walk' if locomotion else 'idle'
+        return 'waiting' if getattr(self, 'menu_open', False) else 'idle'
 
     def seconds(self, action):
+        if self.gesture == action and self.gesture_age < self.gesture_duration:
+            return self.gesture_age
         if action in ('work', 'waiting', 'error', 'success'):
             return self.status_age
         if action == 'review' and self.status == 'success':
             return max(0., self.status_age - .84)
-        if action == 'wave':
-            return self.gesture_age if self.gesture == 'wave' and self.gesture_age < .7 else self.quiet - 6
-        if action == 'sleep':
-            return max(0., self.quiet - 45)
-        if action == 'curious':
-            return max(0., self.quiet - 8)
-        return self.walk_time if action == 'walk' else self.time
+        return self.time
 
-    def advance(self, dt, speed, extent, locomotion=True):
+    def advance(self, dt, speed=0., extent=0., locomotion=False):
         dt = max(0., min(float(dt), .25))
         self.time += dt
         self.status_age += dt
@@ -86,13 +93,10 @@ class PetMotion:
             self.status = 'idle'
         if self.status != 'busy':
             self.quiet += dt
-        if self.action(locomotion) != 'walk':
-            return 0.
-        self.walk_time += dt
-        return max(0., speed) * dt
+        return 0.
 
     def moved(self, pixels, extent):
-        self.distance += abs(pixels) * 128 / max(1., extent)
+        pass  # Compatibility for saved preview tools; companions never travel.
 
 
 def skin(mascot):
@@ -114,7 +118,7 @@ def paint_pet(painter, rect, mascot, *, phase=0., time=0., action='idle', facing
              'proud': 'review'}.get(action, action)
     seconds = time if state_time is None else state_time
     if action == 'walk':
-        seconds = phase * sum(WALK_FRAME_DURATIONS) / 1000
+        state = 'idle'
     if expression != 'neutral' and action == 'idle' and gaze is None:
         pixmap = atlas(mascot).pose(expression)
         size = QtCore.QSizeF(pixmap.size()).scaled(rect.size(), QtCore.Qt.KeepAspectRatio)
@@ -151,9 +155,28 @@ def notify_activity(owner, activity, source='main'):
         helper.anchor.motion.set_activity(state)
         helper.anchor._sync_motion()
         helper.anchor.update()
+        if helper.menu is not None:
+            helper.menu.set_activity(state)
     preview = getattr(owner, 'assistant_preview', None)
     if preview is not None and not sip.isdeleted(preview):
         preview.motion.set_activity(state)
+        preview._sync_animation()
+        preview.button.update()
+        if preview._choice_dialog is not None:
+            preview._choice_dialog.set_activity(state)
+
+
+def play_reaction(owner, state, *, anchor=None, preview=None):
+    """Explicit one-cycle reaction shared by the two stationary companions."""
+    helper = getattr(owner, '_desktop_assistant', None)
+    anchor = anchor if anchor is not None else getattr(helper, 'anchor', None)
+    if anchor is not None:
+        anchor.motion.play(state)
+        anchor._sync_motion()
+        anchor.update()
+    preview = preview if preview is not None else getattr(owner, 'assistant_preview', None)
+    if preview is not None and not sip.isdeleted(preview):
+        preview.motion.play(state)
         preview._sync_animation()
         preview.button.update()
 

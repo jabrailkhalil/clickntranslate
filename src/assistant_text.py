@@ -153,6 +153,25 @@ _SECTIONS = {
     'static_hint': ('Static shortcut: no movement or animation. Click for translation; drag to move.', 'Статичный значок без движения и анимации. Нажмите для перевода, перетащите для перемещения.', 'Icono estático sin animación. Haz clic para traducir; arrastra para mover.', 'Statisches Symbol ohne Animation. Klicken zum Übersetzen, ziehen zum Verschieben.', 'Icône fixe sans animation. Cliquez pour traduire, glissez pour déplacer.', '静态图标，无移动或动画。点击翻译，拖动移动。'),
     'animated_hint': ('Behavior applies only to Animated. Change it here or in the companion menu.', 'Поведение работает только в режиме «Живой». Меняйте его здесь или в меню маскота.', 'El comportamiento solo se aplica a Animado. Cámbialo aquí o en su menú.', 'Verhalten gilt nur für Animiert. Hier oder im Maskottchen-Menü ändern.', 'Le comportement concerne le mode Animé. Modifiez-le ici ou dans le menu.', '行为设置仅适用于动态模式，可在此处或伙伴菜单中修改。'),
 }
+_SECTIONS.update({
+    'waving': ('Greeting', 'Приветствие', 'Saludo', 'Begrüßung', 'Salut', '打招呼'),
+    'jumping': ('Celebrating', 'Прыжок от радости', 'Celebrando', 'Freudensprung', 'Célébration', '庆祝'),
+    'waiting': ('Waiting for input', 'Ждёт выбора', 'Espera tu elección', 'Wartet auf Eingabe', 'Attend votre choix', '等待选择'),
+    'review': ('Reviewing result', 'Проверяет результат', 'Revisa el resultado', 'Prüft das Ergebnis', 'Vérifie le résultat', '检查结果'),
+    'failed': ('Error', 'Ошибка', 'Error', 'Fehler', 'Erreur', '出错'),
+    'activity_idle': ('Choose a translation or try a reaction', 'Выберите перевод или эмоцию', 'Elige una traducción o una reacción', 'Übersetzung oder Reaktion wählen', 'Choisissez une traduction ou une réaction', '选择翻译或试试表情'),
+    'activity_busy': ('Translating…', 'Перевожу…', 'Traduciendo…', 'Übersetze…', 'Traduction…', '正在翻译…'),
+    'activity_waiting': ('Waiting for your input', 'Жду вашего ввода', 'Esperando tu elección', 'Warte auf deine Eingabe', 'En attente de votre choix', '等待你的输入'),
+    'activity_success': ('Translation is ready', 'Перевод готов', 'Traducción lista', 'Übersetzung fertig', 'Traduction prête', '翻译已完成'),
+    'activity_error': ('Translation failed — you can try again', 'Не удалось перевести — можно повторить', 'No se pudo traducir; prueba de nuevo', 'Übersetzung fehlgeschlagen; erneut versuchen', 'Échec de traduction ; réessayez', '翻译失败，可以重试'),
+    'preview_hint': ('Click for translation and reactions', 'Нажмите для перевода и эмоций', 'Pulsa para traducir y ver reacciones', 'Klicken für Übersetzung und Reaktionen', 'Cliquez pour traduire et voir les réactions', '点击翻译和查看表情'),
+    'animated_hint': ('Stays in place, reacts to clicks and translation events. Drag to place it.', 'Стоит на месте, реагирует на нажатия и перевод. Перетащите, чтобы выбрать место.', 'Permanece en su sitio y reacciona a clics y traducciones. Arrastra para colocarla.', 'Bleibt am Platz und reagiert auf Klicks und Übersetzungen. Zum Platzieren ziehen.', 'Reste en place et réagit aux clics et traductions. Glissez pour la placer.', '原地响应点击和翻译事件。拖动可放置。'),
+    'page_hint': ('Click for actions; drag to place. Hidden during screen capture.', 'Нажмите для действий, перетащите для размещения. Во время захвата экрана маскот скрыт.', 'Pulsa para acciones; arrastra para colocar. Se oculta durante la captura.', 'Klicken für Aktionen, ziehen zum Platzieren. Bei Bildschirmaufnahmen ausgeblendet.', 'Cliquez pour les actions, glissez pour placer. Masquée pendant la capture.', '点击执行操作，拖动放置。截屏时隐藏。'),
+    'main_walking_note': ('Your chosen companion also appears in the main window.', 'Выбранный герой также появится в главном окне.', 'Tu mascota también aparece en la ventana principal.', 'Dein Begleiter erscheint auch im Hauptfenster.', 'Votre compagnon apparaît aussi dans la fenêtre principale.', '所选伙伴也会显示在主窗口。'),
+})
+for _state, _label in {'idle': 'portrait', 'waving': 'waving', 'jumping': 'jumping',
+                        'running': 'working', 'waiting': 'waiting', 'review': 'review', 'failed': 'failed'}.items():
+    _SECTIONS['reaction_' + _state] = _SECTIONS[_label]
 for _key, _values in _SECTIONS.items():
     for _language, _value in zip(('en', 'ru', 'es', 'de', 'fr', 'zh'), _values):
         ASSISTANT_TEXT[_language][_key] = _value

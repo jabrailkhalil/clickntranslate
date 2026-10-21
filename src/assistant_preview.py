@@ -37,7 +37,7 @@ class _PreviewButton(QtWidgets.QAbstractButton):
                       self.rail.mascot, phase=motion.phase, time=motion.time,
                       action=action, facing=self.rail.direction, crawl_phase=motion.crawl_phase,
                       state_time=motion.seconds(action),
-                      gaze=self.rail.gaze if self.rail._hovered and motion.status == 'idle' else None)
+                      gaze=self.rail.gaze if self.rail._hovered and action == 'idle' else None)
         else:
             painter.setPen(self.palette().text().color())
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, '✦')
@@ -85,6 +85,7 @@ class AssistantPreview(QtWidgets.QWidget):
         self._owner = activity_owner
         self.language = language
         self._menu_open = False
+        self._choice_dialog = None
         font = QtGui.QFont(self.font())
         font.setPixelSize(13)
         self.setFont(font)
@@ -115,76 +116,56 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def _show_menu(self):
         if self._menu_open:
+            self._choice_dialog.hide()
             return
-        self._menu_open = True
+        from desktop_assistant import AssistantMenu
+        from assistant_motion import play_reaction
+        from ui_scaling import desktop_control_scale
+        from game_mode import _foreground_window
+        helper = getattr(self._owner, '_desktop_assistant', None)
+        if helper is not None:
+            helper._foreground = _foreground_window()
+        if self._choice_dialog is None:
+            screen = self.screen()
+            available = screen.availableGeometry()
+            factor = min(desktop_control_scale(screen), available.width()/360, available.height()/360)
+            dialog = AssistantMenu(self.language, self._owner.current_theme != 'Светлая',
+                                   factor, mascot=self.mascot)
+            self._choice_dialog = dialog
+            dialog.reaction_requested.connect(lambda state: play_reaction(self._owner, state, preview=self))
+            dialog.action_requested.connect(self._request_action)
+            dialog.visibility_changed.connect(self._menu_visibility)
+            self.destroyed.connect(dialog.deleteLater)
+        play_reaction(self._owner, 'waving', preview=self)
+        self._choice_dialog.set_activity(getattr(self._owner, '_companion_activity', 'idle'))
+        origin = self.button.mapToGlobal(QtCore.QPoint())
+        self._choice_dialog.open_beside(QtCore.QRect(origin, self.button.size()), self.screen().availableGeometry())
+
+    def _menu_visibility(self, visible):
+        self._menu_open = visible
+        self.motion.menu_open = visible
         self._sync_animation()
-        # An embedded QMenu inherits the graphics proxy's clipping and native
-        # menu palette. A real owned dialog has its own complete native surface.
-        from styled_dialogs import CenteredFramelessDialog
-        from ui_scaling import native_window_parent
-        from button_styles import button_qss
-        from rounded_windows import clip_rounded_window
-        dark = self._owner.current_theme != 'Светлая'
-        dialog = CenteredFramelessDialog(native_window_parent(self), drag_height=42)
-        self._choice_dialog = dialog
-        dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        dialog.setObjectName('companionChoice')
-        dialog.setWindowTitle(assistant_text(self.language, 'page'))
-        dialog.setFixedWidth(350)
-        outer = QtWidgets.QVBoxLayout(dialog)
-        outer.setContentsMargins(0, 0, 0, 0)
-        frame = QtWidgets.QFrame(dialog)
-        frame.setObjectName('companionChoiceFrame')
-        outer.addWidget(frame)
-        dialog.setStyleSheet(f'''
-            QDialog#companionChoice {{ background:transparent; }}
-            QFrame#companionChoiceFrame {{ background:{'#121212' if dark else '#f0edf3'};
-                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:8px; }}
-            QLabel {{ color:{'#eee7f5' if dark else '#302639'}; background:transparent; border:0; }}
-        ''')
-        clip_rounded_window(dialog, frame, 8)
-        layout = QtWidgets.QVBoxLayout(frame)
-        layout.setContentsMargins(16, 12, 16, 16)
-        layout.setSpacing(12)
-        header = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel(assistant_text(self.language, 'page'))
-        title.setStyleSheet('font-size:16px; font-weight:600;')
-        header.addWidget(title, 1)
-        close = QtWidgets.QPushButton('×')
-        close.setFixedSize(28, 28)
-        close.setAccessibleName(assistant_text(self.language, 'close_menu'))
-        close.setStyleSheet(button_qss(dark, 'close', icon=True))
-        close.clicked.connect(dialog.reject)
-        header.addWidget(close)
-        layout.addLayout(header)
-        note = QtWidgets.QLabel(assistant_text(self.language, 'preview_choices'))
-        note.setWordWrap(True)
-        note.setStyleSheet('font-size:13px;')
-        layout.addWidget(note)
-        actions = QtWidgets.QHBoxLayout()
-        for key, result in (('companion_settings', 1), ('dismiss', 2)):
-            button = QtWidgets.QPushButton(assistant_text(self.language, key))
-            button.setStyleSheet(button_qss(dark, 'primary' if result == 1 else 'secondary', compact=True))
-            button.setMinimumHeight(32)
-            button.clicked.connect(lambda checked=False, value=result: dialog.done(value))
-            actions.addWidget(button)
-        layout.addLayout(actions)
-        def finished(result):
-            self._menu_open = False
-            self.button.clearFocus()
-            self._sync_animation()
-            self._choice_dialog = None
-            if result == 1:
-                self.settings_requested.emit()
-            elif result == 2:
-                self.dismiss_requested.emit()
-        dialog.finished.connect(finished)
-        dialog.open()
+
+    def _request_action(self, action):
+        self._choice_dialog.hide()
+        if action == 'settings':
+            self.settings_requested.emit()
+        elif action == 'hide':
+            self.dismiss_requested.emit()
+        else:
+            helper = getattr(self._owner, '_desktop_assistant', None)
+            if helper is not None:
+                helper.request_action(action)
+            else:
+                from desktop_assistant import ACTION_METHODS
+                method = 'open_text_translation' if action == 'text' else ACTION_METHODS.get(action)
+                callback = getattr(self._owner, method, None) if method else None
+                if callback is not None:
+                    QtCore.QTimer.singleShot(180, callback)
 
     def _sync_animation(self):
         active = (self.isVisible() and self.button.parentWidget() is self
                   and not self._owner.isMinimized()
-                  and not self._hovered and not self._menu_open
                   and self.width() > self.button.width() and bool(self.art))
         if active and not self.timer.isActive():
             self._clock.start()
@@ -203,6 +184,10 @@ class AssistantPreview(QtWidgets.QWidget):
         if mascot == self.mascot:
             return
         self.mascot = mascot
+        if self._choice_dialog is not None:
+            self._choice_dialog.hide()
+            self._choice_dialog.deleteLater()
+            self._choice_dialog = None
         self.art = skin(mascot) if self.isVisible() else None
         self.motion.mascot = mascot
         self.motion.crawl_phase = 0
@@ -213,6 +198,8 @@ class AssistantPreview(QtWidgets.QWidget):
     def hideEvent(self, event):
         self.timer.stop()
         self._hovered = False
+        if self._choice_dialog is not None:
+            self._choice_dialog.hide()
         super().hideEvent(event)
 
     def eventFilter(self, watched, event):
@@ -225,8 +212,7 @@ class AssistantPreview(QtWidgets.QWidget):
         return super().eventFilter(watched, event)
 
     def resizeEvent(self, event):
-        self._x = min(self._x, max(0, self.width() - self.button.width()))
-        self._x = max(self._track_start(), self._x)
+        self._x = float(self._track_start())
         self.button.move(round(self._x), 0)
         self._sync_animation()
         super().resizeEvent(event)
@@ -247,13 +233,5 @@ class AssistantPreview(QtWidgets.QWidget):
         self._advance(elapsed)
 
     def _advance(self, elapsed):
-        maximum = max(0, self.width() - self.button.width())
-        before = self._x
-        self._x += self.direction * self.motion.advance(elapsed / 1000, 10, 22)
-        if self._x >= maximum:
-            self._x, self.direction = float(maximum), -1
-        elif self._x <= self._track_start():
-            self._x, self.direction = float(self._track_start()), 1
-        self.motion.moved(self._x-before, 22)
-        self.button.move(round(self._x), 0)
-        self.button.update()  # Invalidate only the 22x18 child, not the whole page.
+        self.motion.advance(elapsed / 1000)
+        self.button.update()

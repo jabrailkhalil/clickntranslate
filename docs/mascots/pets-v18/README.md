@@ -2,16 +2,16 @@
 
 The six companions use complete image-generated poses in the Pets v2 format.
 Doc, Chester, Blinchik, Raf and Lola were regenerated from their identity cues;
-Click uses the previously accepted original robot atlas, with new matching sleep
-and emotion strips. Generation used OpenAI's built-in imagegen through Pets
+Click uses the previously accepted original robot atlas. Extra sleep and emotion
+strips are retained as generation provenance; the app does not load them. Generation used OpenAI's built-in imagegen through Pets
 create-pet v0.1.6. Actual generation prompts are preserved in `PROMPTS.md`.
 
 ![Six companion designs](preview.png)
 
 All six atlases are transparent 1536×2288 PNGs with 192×208 cells. The nine
 animation rows contain 6, 8, 8, 4, 5, 8, 6, 6 and 6 frames; the last two rows
-contain sixteen clockwise gaze directions. Sleep has four additional poses and
-the emotion strip has eight. One shared registration transform per source row
+contain sixteen clockwise gaze directions. Playback uses only the seven stationary
+native states and gaze; the two gait rows are never selected. One shared registration transform per source row
 preserves the generated motion, and a common cell viewport keeps the body
 anchored. A final chroma-edge pass is applied once to each encoded artifact.
 
@@ -33,22 +33,51 @@ every final atlas. Full decoded source strips, canonical references, rejected
 revisions, assembly scripts and detailed QA are preserved in the separate local
 source archive.
 
-Both companion views cache whole PNGs and select cells. Screen-right and
-screen-left walks are separate generated sequences. Processing stays planted;
-success plays a jump followed by a review pose, and errors play the failure
-sequence. Main text translation, document translation, area OCR, fullscreen OCR
-and both live translation modes report activity on the GUI thread. Concurrent
-jobs hold the working state; cancellation clears only its own job, and stale
-results are ignored by the existing session guards. Pausing travel retains idle
-animation and reactions. Hovering selects gaze using local cursor coordinates.
+Both companion views stay at a fixed position and render complete v2 frames.
+There is no automatic walking, crawling, synthetic limb motion, sleep or extra
+emotion strip in the app. `running` means active work in the Pets contract;
+it uses row 7, never either directional gait row. The native state mapping is:
 
-Existing character IDs, saved poses, position, custom images and capture
-ownership remain compatible. Click and the animated appearance are the defaults
-for new configurations; travel starts paused. Static choices stay still. The
-existing Windows, Linux and macOS packaging specifications include the complete
-icons folder. No plugin connection is required for playback.
+| Native animation | ClicknTranslate scenario |
+| --- | --- |
+| idle | Quiet, stationary breathing between interactions |
+| waving | Greeting on click; opens actions beneath the pet |
+| jumping | Translation completed successfully |
+| running | Text/document/OCR/live translation is processing |
+| waiting | Waiting for input or choosing an action in the open menu |
+| review | Checking the finished result after the success jump |
+| failed | Translation failed; the user can retry |
+| sixteen look directions | Follow the local pointer while calm |
+
+The compact popup offers screen, region, text, OCR copy, live and document
+translation, companion settings, hide and a seven-state reaction picker. A
+selected reaction plays one cycle. Real work takes priority. Click reactions
+also play once from a static built-in pose, then restore that pose. Custom
+images remain static. Hovering and the open menu keep playback running. Manual
+dragging still places the pet; capture hides the companion before screenshots.
+The in-window companion uses the same popup and stays beside its label.
+
+![Stationary companion and its action popup](interaction-preview.png)
+
+Main text translation, document translation, area OCR, fullscreen OCR and both
+live translation modes report activity on the GUI thread. Concurrent jobs hold
+the working state; cancellation clears only its own job, and stale results are
+ignored by existing session guards. Explicit reactions work with automatic
+translation reactions disabled, without masking an active job.
+
+Existing character IDs, positions, custom images and capture ownership remain
+compatible. Old walking profiles migrate to stationary animation. Old custom
+emotion/sleep choices map to their nearest native pose. Walking speed and pause
+controls have been removed. Settings offer seven native static poses, animated
+playback, character, size, opacity, visibility and event reactions. Click and
+stationary animation are the defaults for new configurations.
+
+Picker thumbnails retain only one 192×208 cell; the original PNG is decoded
+once when animation first needs it and shared by both companion views. The
+Windows, Linux and macOS packaging specifications include the icons folder.
+No plugin connection is required for playback.
 
 Review with `python tools/preview_mascots.py` or open the actual application using
 `python tools/run_mascot_app.py`, which uses its own profile. Production-rendered
-motion and 66 static choices can be exported with
+stationary animation and 42 native static choices can be exported with
 `python tools/qa_mascot_motion.py OUTPUT_DIRECTORY`.

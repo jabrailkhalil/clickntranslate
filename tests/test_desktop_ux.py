@@ -88,28 +88,27 @@ def test_companion_preferences_can_be_edited_before_enabling(window, app):
     page = window.settings_window.settings_assistant_page
     assert not page.toggle.isChecked()
     assert page.options.isEnabled()
-    assert page.motion_options.isVisible()
+    assert 'speed' not in page.values and not hasattr(page, 'pause_walk')
     page.show_category('dynamic')
     page.category_buttons['dynamic'].click()
-    page.pause_walk.setChecked(False)
-    assert page.motion_options.isVisible()
+    assert 'speed' not in page.values and not hasattr(page, 'pause_walk')
     page.values['size'].setValue(130)
     assert window.config['desktop_assistant_size'] == 130
     assert getattr(window, '_desktop_assistant', None) is None
     page.toggle.click()
-    assert window._desktop_assistant.anchor.behavior == 'walk'
+    assert window._desktop_assistant.anchor.behavior == 'idle'
     page.toggle.click()
     assert window._desktop_assistant is None
     assert page.options.isEnabled()
     page.toggle.click()
     assert page.values['size'].value() == 130
     page.show_category('static')
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('sleep_icon'))
-    assert page.motion_options.isHidden()
+    page.pose_combo.setCurrentIndex(page.pose_combo.findData('waiting'))
+    assert page.pose_combo.currentData() == 'waiting'
     assert window._desktop_assistant.anchor.behavior == 'idle'
 
 
-def test_idle_hover_has_no_outline_and_walking_pauses_for_menu_capture_and_drag(window, app):
+def test_hover_and_menu_keep_reactions_running_and_capture_hides_pet(window, app):
     window.config['desktop_assistant_appearance'] = 'walking'
     window.set_desktop_assistant_enabled(True)
     helper = window._desktop_assistant
@@ -117,16 +116,16 @@ def test_idle_hover_has_no_outline_and_walking_pauses_for_menu_capture_and_drag(
     before = anchor.grab().toImage()
     anchor.enterEvent(QtCore.QEvent(QtCore.QEvent.Enter))
     assert anchor.grab().toImage() == before
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
     helper.request_action('walk')
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
     anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
     assert anchor._animation.isActive()
     start = anchor.pos()
     anchor._advance(.25)
-    assert anchor.pos() != start
+    assert anchor.pos() == start
     helper.toggle_menu()
-    assert not anchor._animation.isActive()
+    assert anchor._animation.isActive()
     helper.menu.hide()
     assert anchor._animation.isActive()
     mode_coordinator.request_mode('ux-qa', lambda: None)
@@ -154,7 +153,7 @@ def test_companion_does_not_write_config_every_walk_frame_and_returns_home(windo
         for _ in range(20):
             helper.anchor._advance(.05)
         save.assert_not_called()
-    assert helper.anchor.pos() != origin
+    assert helper.anchor.pos() == origin
     helper.request_action('home')
     assert helper.anchor.pos() == origin
 

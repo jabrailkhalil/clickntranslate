@@ -21,14 +21,14 @@ def test_frame_cadence_and_clockwise_cardinal_selection():
 
 @pytest.mark.parametrize('extent', [60, 84, 150])
 @pytest.mark.parametrize('speed', [20, 40, 100])
-def test_travel_uses_elapsed_time_independent_of_render_size(extent, speed):
+def test_legacy_speed_and_size_never_move_the_pet(extent, speed):
     pet = PetMotion('pancake')
     pet.reactions = False
     distances = [pet.advance(.02, speed, extent) for _ in range(50)]
-    assert sum(distances) == pytest.approx(speed)
-    assert pet.walk_time == pytest.approx(1.)
+    assert sum(distances) == 0
+    assert pet.walk_time == 0
     assert pet.advance(.1, speed, extent, locomotion=False) == 0
-    assert pet.walk_time == pytest.approx(1.)
+    assert pet.walk_time == 0
 
 
 def render(mascot, **kwargs):
@@ -41,13 +41,13 @@ def render(mascot, **kwargs):
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)
-def test_whole_frames_have_distinct_motion_and_both_gait_directions(app, mascot):
-    poses = [render(mascot, action='walk', phase=p) for p in (0., .2, .4, .6)]
-    assert all(poses[a] != poses[b] for a in range(4) for b in range(a+1, 4))
-    assert render(mascot, action='walk', facing=-1) != poses[0]
-    # The renderer uses the cached original atlas; painting never creates limbs.
+def test_whole_frames_animate_without_using_directional_gaits(app, mascot):
+    poses = [render(mascot, action='wave', time=t) for t in (0., .15, .3, .45)]
+    assert len({image.cacheKey() for image in poses}) == 4
+    assert poses[0] != poses[1]
+    assert render(mascot, action='walk') == render(mascot, action='idle')
+    assert render(mascot, action='idle', facing=-1) == render(mascot, action='idle')
     assert skin(mascot) is skin(mascot)
-
 
 def test_activity_clock_starts_at_first_frame_and_success_transitions_to_review():
     pet = PetMotion('click')
@@ -102,33 +102,31 @@ def test_live_translation_drives_reactions_and_stale_results_cannot_replace_them
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)
-def test_busy_reactions_rest_and_sleep_have_intentional_transitions(mascot):
+def test_native_reactions_have_intentional_stationary_transitions(mascot):
     pet = PetMotion(mascot)
     pet.set_activity('busy')
     for _ in range(250):
-        assert pet.advance(.2, 40, 84) == 0
+        assert pet.advance(.2, 40, 84, locomotion=True) == 0
         assert pet.action() == 'work'
-    assert pet.time > 49 and pet.quiet == 0
+    assert not pet.play('jumping')  # Do not obscure an active translation.
     pet.set_activity('success')
     assert pet.action() == 'success'
-    for _ in range(16):
-        pet.advance(.2, 40, 84)
-    assert pet.action() == 'walk'
+    for _ in range(5): pet.advance(.2)
+    assert pet.action() == 'review'
+    for _ in range(11): pet.advance(.2)
+    assert pet.action() == 'idle'
     pet.set_activity('error')
     assert pet.action() == 'error'
-    for _ in range(230):
-        pet.advance(.2, 40, 84)
-    assert pet.action() == 'sleep'
-    pet.interact()
-    assert pet.action() == 'walk'
-    pet.quiet = 6.5
-    assert pet.action() == 'wave'
-    pet.quiet = 8.5
-    assert pet.action() == 'curious'
+    for _ in range(230): pet.advance(.2)
+    assert pet.action() == 'idle'  # No spontaneous walking, sleep or extra poses.
     pet.reactions = False
     pet.set_activity('busy')
-    assert pet.action() == 'walk'
-
+    assert pet.action() == 'idle'
+    pet.set_activity('idle')
+    pet.greet()
+    assert pet.action() == 'wave'  # Explicit clicks also work with auto reactions off.
+    for _ in range(4): pet.advance(.2)
+    assert pet.action() == 'idle'
 
 def test_notifications_reach_both_pets_and_concurrent_jobs_hold_busy(window):
     window.config.update(desktop_assistant_appearance='walking', desktop_assistant_behavior='walk')
@@ -182,13 +180,13 @@ def test_document_translation_cancel_and_completion_drive_reactions(window, app)
 def test_emotion_selector_and_reaction_preference_persist(window):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    assert page.pose_combo.count() == 11
+    assert page.pose_combo.count() == 7
     page.choose_appearance('walking')
     page.show_category('static')
     page.pose_combo.activated.emit(0)
     assert window.config['desktop_assistant_appearance'] == 'portrait'
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('thinking'))
-    assert window.config['desktop_assistant_appearance'] == 'thinking'
+    page.pose_combo.setCurrentIndex(page.pose_combo.findData('working'))
+    assert window.config['desktop_assistant_appearance'] == 'working'
     assert window.config['desktop_assistant_behavior'] == 'idle'
     page.choose_appearance('walking')
     page.reactions.setChecked(False)
@@ -196,3 +194,16 @@ def test_emotion_selector_and_reaction_preference_persist(window):
     page.toggle.click()
     assert window._desktop_assistant.anchor.motion.reactions is False
     assert window.assistant_preview.motion.reactions is False
+
+
+@pytest.mark.parametrize('state', ['idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'])
+def test_explicit_native_reaction_plays_once_then_waits_for_menu_choice(state):
+    pet = PetMotion('click')
+    pet.menu_open = True
+    assert pet.play(state)
+    assert pet.seconds(pet.action()) == 0
+    for _ in range(10): pet.advance(.2)
+    assert pet.action() == 'waiting'
+    pet.menu_open = False
+    assert pet.action() == 'idle'
+    assert not pet.play('sleep') and not pet.play('running-right')

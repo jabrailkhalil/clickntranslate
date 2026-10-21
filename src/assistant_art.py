@@ -8,12 +8,12 @@ from PyQt5 import QtCore, QtGui
 
 MASCOTS = ('pancake', 'mochi', 'bubu', 'momo', 'orbit', 'click')
 DEFAULT_MASCOT = 'click'
-APPEARANCES = ('portrait', 'happy', 'curious', 'thinking', 'surprised', 'sad',
-               'sleep_alt', 'sleep_icon', 'star', 'hero', 'working', 'walking', 'custom')
-EXPRESSIONS = {'portrait': 'neutral', 'happy': 'happy', 'curious': 'curious',
-               'thinking': 'thinking', 'surprised': 'surprised', 'sad': 'sad',
-               'sleep_alt': 'sleepy'}
-SPECIAL_POSES = {'sleep_icon': 'sleep', 'star': 'proud', 'hero': 'success', 'working': 'work'}
+APPEARANCES = ('portrait', 'waving', 'jumping', 'waiting', 'working', 'review', 'failed',
+               'animated', 'custom')
+LEGACY_APPEARANCES = {'walking': 'animated', 'happy': 'waving', 'curious': 'waiting',
+                      'thinking': 'working', 'surprised': 'jumping', 'sad': 'failed',
+                      'sleep_alt': 'portrait', 'sleep_icon': 'portrait',
+                      'star': 'review', 'hero': 'jumping'}
 MAX_IMAGE_BYTES = 10_000_000
 MAX_IMAGE_SIDE = 8192
 
@@ -96,7 +96,6 @@ def companion_art(appearance, custom_image='', mascot=DEFAULT_MASCOT):
         except (OSError, ValueError):
             pass
     from assistant_motion import pose_pixmap
-    if appearance == 'walking':
-        return pose_pixmap(mascot_id(mascot), special='walk')
-    return pose_pixmap(mascot_id(mascot), EXPRESSIONS.get(appearance, 'neutral'),
-                       SPECIAL_POSES.get(appearance, ''))
+    appearance = LEGACY_APPEARANCES.get(appearance, appearance)
+    state = {'portrait': 'idle', 'animated': 'idle', 'working': 'running'}.get(appearance, appearance)
+    return pose_pixmap(mascot_id(mascot), special=state)

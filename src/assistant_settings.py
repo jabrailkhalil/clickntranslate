@@ -2,7 +2,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 from assistant_text import assistant_text
-from assistant_art import APPEARANCES, MASCOTS, DEFAULT_MASCOT, companion_art, mascot_id
+from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASCOT, companion_art, mascot_id
 from header_icons import header_icon
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from number_controls import NumberStepper as AssistantNumberBox
 
 
-BEHAVIORS = ('idle', 'walk')
+BEHAVIORS = ('idle',)
 ASSISTANT_DEFAULTS = {
     'main_assistant_visible': True,
     'desktop_assistant_behavior': 'idle',
@@ -18,7 +18,7 @@ ASSISTANT_DEFAULTS = {
     'desktop_assistant_speed': 40,
     'desktop_assistant_opacity': 100,
     'desktop_assistant_topmost': True,
-    'desktop_assistant_appearance': 'walking',
+    'desktop_assistant_appearance': 'animated',
     'desktop_assistant_mascot': DEFAULT_MASCOT,
     'desktop_assistant_reactions': True,
     'desktop_assistant_image': '',
@@ -27,13 +27,12 @@ ASSISTANT_DEFAULTS = {
 
 def assistant_preferences(config):
     values = {key: config.get(key, default) for key, default in ASSISTANT_DEFAULTS.items()}
-    # Preserve older choices without mixing static art with a walking sprite.
-    if values['desktop_assistant_appearance'] == 'animated':
-        values['desktop_assistant_appearance'] = {
-            'walk': 'walking', 'sleep': 'sleep_icon', 'look': 'portrait', 'idle': 'portrait',
-        }.get(str(values['desktop_assistant_behavior']), 'portrait')
-    if values['desktop_assistant_behavior'] not in BEHAVIORS:
-        values['desktop_assistant_behavior'] = 'idle'
+    # Old walking profiles become stationary animation; static choices retain
+    # the closest built-in v2 pose. Never resume travel after an upgrade.
+    old = values['desktop_assistant_appearance']
+    old = old if isinstance(old, str) else 'portrait'
+    values['desktop_assistant_appearance'] = LEGACY_APPEARANCES.get(old, old)
+    values['desktop_assistant_behavior'] = 'idle'
     for key, lower, upper in (('size', 60, 180), ('speed', 20, 100), ('opacity', 40, 100)):
         name = 'desktop_assistant_' + key
         try:
@@ -132,6 +131,8 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             button.setObjectName('assistantCategory')
             button.setCheckable(True)
             button.setFixedHeight(28)
+            if key == 'dynamic':
+                button.setToolTip(tr('animated_hint'))
             button.clicked.connect(lambda checked=False, value=key: self.choose_category(value))
             self.category_group.addButton(button)
             self.category_buttons[key] = button
@@ -152,7 +153,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.pose_combo.setIconSize(QtCore.QSize(26, 26))
         self.pose_combo.setMaxVisibleItems(7)
         for key in APPEARANCES:
-            if key not in ('walking', 'custom'):
+            if key not in ('animated', 'custom'):
                 self.pose_combo.addItem(QtGui.QIcon(companion_art(key)), tr(key), key)
         self.pose_combo.currentIndexChanged.connect(lambda: self.choose_appearance(self.pose_combo.currentData()))
         # Activating the already-selected first item must also leave walking/custom.
@@ -188,7 +189,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         contents.addWidget(self.custom_image_row)
 
         self.values = {}
-        for key, low, high, suffix in (('size', 60, 180, '%'), ('opacity', 40, 100, '%'), ('speed', 20, 100, '')):
+        for key, low, high, suffix in (('size', 60, 180, '%'), ('opacity', 40, 100, '%')):
             field = AssistantNumberBox(dark=self.owner.current_theme != 'Светлая')
             field.setRange(low, high)
             field.setSuffix(suffix)
@@ -209,23 +210,6 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             form.addWidget(self.values[key], 1, column)
             form.setColumnStretch(column, 1)
         contents.addLayout(form)
-        self.motion_options = QtWidgets.QWidget()
-        motion = QtWidgets.QGridLayout(self.motion_options)
-        motion.setContentsMargins(0, 0, 0, 0)
-        motion.setHorizontalSpacing(8)
-        motion.setVerticalSpacing(2)
-        motion.setColumnStretch(0, 1)
-        motion.setColumnStretch(1, 1)
-        speed_label = QtWidgets.QLabel(tr('speed_short'))
-        speed_label.setObjectName('assistantFieldLabel')
-        speed_label.setBuddy(self.values['speed'])
-        motion.addWidget(speed_label, 0, 0)
-        motion.addWidget(self.values['speed'], 1, 0)
-        self.pause_walk = QtWidgets.QCheckBox(tr('pause_walk'))
-        self.pause_walk.setToolTip(tr('walking_hint'))
-        self.pause_walk.toggled.connect(lambda paused: self.save('behavior', 'idle' if paused else 'walk'))
-        motion.addWidget(self.pause_walk, 1, 1)
-        contents.addWidget(self.motion_options)
         contents.addStretch(1)
         columns.addWidget(self.options, 1)
         root.addLayout(columns, 1)
@@ -253,9 +237,9 @@ class AssistantSettingsPage(QtWidgets.QWidget):
 
     def choose_category(self, category):
         appearance = assistant_preferences(self.owner.config)['desktop_assistant_appearance']
-        if category == 'dynamic' and appearance != 'walking':
-            self.choose_appearance('walking')
-        elif category == 'static' and appearance == 'walking':
+        if category == 'dynamic' and appearance != 'animated':
+            self.choose_appearance('animated')
+        elif category == 'static' and appearance == 'animated':
             self.choose_appearance(self._static_appearance)
         else:
             self.show_category(category)
@@ -265,12 +249,11 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.category_buttons[category].setChecked(True)
         for key, gallery in self.galleries.items():
             gallery.setVisible(key == category)
-        walking = assistant_preferences(self.owner.config)['desktop_assistant_appearance'] == 'walking'
-        self.motion_options.setVisible(category == 'dynamic' and walking)
         self.custom_image_row.setVisible(category == 'static')
         self.replace_image.setVisible(bool(self.owner.config.get('desktop_assistant_image')))
 
     def choose_appearance(self, appearance):
+        appearance = LEGACY_APPEARANCES.get(appearance, appearance)
         if appearance == 'custom':
             filename = self.owner.config.get('desktop_assistant_image', '')
             if not filename:
@@ -278,14 +261,14 @@ class AssistantSettingsPage(QtWidgets.QWidget):
                 return
             if not self._validate_custom_image(filename):
                 return
-        self.owner.config['desktop_assistant_behavior'] = 'walk' if appearance == 'walking' else 'idle'
-        self._category = 'dynamic' if appearance == 'walking' else 'static'
+        self.owner.config['desktop_assistant_behavior'] = 'idle'
+        self._category = 'dynamic' if appearance == 'animated' else 'static'
         self.save('appearance', appearance)
         self.refresh()
 
     def choose_mascot(self, mascot):
         # Selecting a character also leaves a custom image, while preserving
-        # any pose and walking pause chosen for a built-in character.
+        # the selected built-in pose.
         if self.owner.config.get('desktop_assistant_appearance') == 'custom':
             self.owner.config['desktop_assistant_appearance'] = 'portrait'
         self.save('mascot', mascot_id(mascot))
@@ -353,17 +336,15 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         for key, field in self.values.items():
             with QtCore.QSignalBlocker(field):
                 field.setValue(values['desktop_assistant_' + key])
-        with QtCore.QSignalBlocker(self.pause_walk):
-            self.pause_walk.setChecked(values['desktop_assistant_behavior'] != 'walk')
         with QtCore.QSignalBlocker(self.reactions):
             self.reactions.setChecked(values['desktop_assistant_reactions'])
         appearance = values['desktop_assistant_appearance']
-        if appearance != 'walking':
+        if appearance != 'animated':
             self._static_appearance = appearance
         mascot = values['desktop_assistant_mascot']
         with QtCore.QSignalBlocker(self.mascot_combo):
             self.mascot_combo.setCurrentIndex(self.mascot_combo.findData(mascot))
-        if appearance not in ('walking', 'custom'):
+        if appearance not in ('animated', 'custom'):
             with QtCore.QSignalBlocker(self.pose_combo):
                 self.pose_combo.setCurrentIndex(max(0, self.pose_combo.findData(appearance)))
         for index in range(self.pose_combo.count()):
@@ -380,6 +361,6 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             Path(filename).name if filename else '', QtCore.Qt.ElideMiddle, 190))
         self.custom_image_name.setToolTip(filename)
         if self._category is None or appearance != self._last_appearance:
-            self._category = 'dynamic' if appearance == 'walking' else 'static'
+            self._category = 'dynamic' if appearance == 'animated' else 'static'
         self._last_appearance = appearance
         self.show_category(self._category)

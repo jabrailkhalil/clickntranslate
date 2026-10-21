@@ -244,14 +244,16 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     second.show()
     app.processEvents()
     assert rail.art is second.art
-    # One shared 73-cell atlas plus sleep4 and expressions8, decoded once.
-    pixmaps = (rail.art.pixmap, rail.art.sleep, rail.art.expressions)
+    # Only the original v2 atlas is loaded, shared by both views.
+    pixmaps = (rail.art.pixmap,)
     memory = sum(p.width() * p.height() * 4 for p in pixmaps)
-    assert memory <= 16 * 1024 * 1024
+    assert memory <= 14 * 1024 * 1024
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
+    origin = rail.button.pos()
     for _ in range(200):
         rail._advance(80)
+        assert rail.button.pos() == origin
         assert 0 <= rail.button.x() <= rail.width() - rail.button.width()
     rail.hide()
     second.hide()
@@ -277,7 +279,7 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     assert rail.timer.isActive() and len(spy) > 0
     rail._hovered = True
     rail._sync_animation()
-    assert not rail.timer.isActive()
+    assert rail.timer.isActive()
     rail._hovered = False
     rail._sync_animation()
     assert rail.timer.isActive()
@@ -298,11 +300,11 @@ def test_preview_click_and_keyboard_offer_settings_without_desktop_overlay(app, 
     rail.button.click()
     assert len(spy) == 0
     assert rail._choice_dialog.isVisible()
-    rail._choice_dialog.done(1)
+    rail._choice_dialog.buttons['settings'].click()
     rail.button.setFocus()
     QTest.keyClick(rail.button, QtCore.Qt.Key_Space)
     assert len(spy) == 1
-    rail._choice_dialog.done(1)
+    rail._choice_dialog.buttons['settings'].click()
     assert len(spy) == 2
     assert owner.config['desktop_assistant_enabled'] is False
 
@@ -551,7 +553,7 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         preview.button.click()
         app.processEvents()
         assert preview._choice_dialog.isVisible()
-        preview._choice_dialog.done(1)
+        preview._choice_dialog.buttons['settings'].click()
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
         window.activateWindow()
         app.processEvents()

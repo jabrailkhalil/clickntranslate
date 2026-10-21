@@ -14,14 +14,6 @@ import mode_coordinator
 
 @pytest.mark.parametrize('mascot', MASCOTS)
 def test_each_character_has_transparent_atlas_and_distinct_emotions(app, mascot):
-    movie = QtGui.QMovie(walking_art_path(mascot))
-    assert movie.isValid() and movie.frameCount() == 8
-    for index in range(8):
-        assert movie.jumpToFrame(index)
-        image = movie.currentImage()
-        assert image.size() == QtCore.QSize(192, 208)
-        assert image.pixelColor(0, 0).alpha() == 0
-        assert movie.nextFrameDelay() == (220 if index == 7 else 120)
     for pose in APPEARANCES[:-2]:
         image = companion_art(pose, mascot=mascot).toImage()
         assert not image.isNull() and image.hasAlphaChannel()
@@ -29,8 +21,6 @@ def test_each_character_has_transparent_atlas_and_distinct_emotions(app, mascot)
         assert image.pixelColor(image.width()-1, image.height()-1).alpha() == 0
     artwork = skin(mascot)
     assert artwork.pixmap.size() == QtCore.QSize(1536, 2288)
-    assert artwork.sleep.size() == QtCore.QSize(768, 208)
-    assert artwork.expressions.size() == QtCore.QSize(1536, 208)
     directions = [artwork.source(gaze=angle)[1] for angle in range(0, 360, 90)]
     assert len({(r.x(), r.y()) for r in directions}) == 4
     emotions = [companion_art(pose, mascot=mascot).toImage() for pose in APPEARANCES[:7]]
@@ -43,7 +33,7 @@ def test_unknown_character_keeps_legacy_pose_and_other_preferences(invalid):
               'desktop_assistant_behavior': 'idle', 'desktop_assistant_size': 137}
     prefs = assistant_preferences(config)
     assert prefs['desktop_assistant_mascot'] == DEFAULT_MASCOT
-    assert prefs['desktop_assistant_appearance'] == 'walking'
+    assert prefs['desktop_assistant_appearance'] == 'animated'
     assert prefs['desktop_assistant_behavior'] == 'idle'
     assert prefs['desktop_assistant_size'] == 137
     assert config['desktop_assistant_mascot'] == invalid
@@ -65,12 +55,11 @@ def test_removed_appearance_falls_back_to_new_character(window):
 def test_switching_character_keeps_position_pause_and_capture_ownership(window, app):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    page.choose_appearance('walking')
+    page.choose_appearance('animated')
     page.toggle.click()
     helper = window._desktop_assistant
     helper.anchor.move(220, 220)
     position = helper.anchor.pos()
-    page.pause_walk.setChecked(True)
     for mascot in MASCOTS:
         page.mascot_combo.setCurrentIndex(page.mascot_combo.findData(mascot))
         assert window.config['desktop_assistant_mascot'] == mascot
@@ -84,7 +73,6 @@ def test_switching_character_keeps_position_pause_and_capture_ownership(window, 
     mode_coordinator.request_mode('mascot-test', lambda: None)
     try:
         page.choose_mascot('bubu')
-        page.pause_walk.setChecked(False)
         assert not helper.anchor.isVisible()
         assert not helper.anchor._animation.isActive()
     finally:
@@ -102,9 +90,9 @@ def test_character_choice_before_enable_and_after_custom_image(window, tmp_path)
     page = window.settings_window.settings_assistant_page
     page.choose_mascot('mochi')
     assert getattr(window, '_desktop_assistant', None) is None
-    page.choose_appearance('sleep_alt')
+    page.choose_appearance('waiting')
     page.choose_mascot('orbit')
-    assert window.config['desktop_assistant_appearance'] == 'sleep_alt'
+    assert window.config['desktop_assistant_appearance'] == 'waiting'
     custom = tmp_path / 'image.png'
     companion_art('portrait').save(str(custom))
     window.config['desktop_assistant_image'] = str(custom)
