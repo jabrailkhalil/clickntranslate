@@ -34,7 +34,8 @@ class SelectionQuickButton(QtWidgets.QToolButton):
         flags |= QtCore.Qt.WindowDoesNotAcceptFocus
         if sys.platform == "darwin":
             flags |= QtCore.Qt.NoDropShadowWindowHint
-        super().__init__(None, flags)
+        super().__init__(None)
+        self.setWindowFlags(flags)
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         if sys.platform == "darwin":
