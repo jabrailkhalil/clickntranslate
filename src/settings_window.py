@@ -6943,10 +6943,15 @@ class SettingsWindow(QWidget):
 
     def _refresh_translation_font_preview(self):
         from main import translation_result_font_px
-        pixels = translation_result_font_px({'translation_result_font_size': self.translation_font_combo.currentData()})
+        key = self.translation_font_combo.currentData()
+        pixels = translation_result_font_px({'translation_result_font_size': key})
         self.translation_font_preview.setStyleSheet(
             f"font-size:{pixels}px; font-weight:400; margin:0; padding:0;"
         )
+        lang = self.parent.current_interface_language
+        description = settings_text(lang, f'translation_result_font_{key}')
+        self.translation_font_combo.setToolTip(tooltip_text(
+            f'{pixels} px · {description}\n{settings_text(lang, "translation_result_font_tooltip")}'))
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7762,10 +7767,12 @@ class SettingsWindow(QWidget):
         )
         for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
             self.translation_font_combo.addItem(
-                f'{TRANSLATION_RESULT_FONT_SIZE_PX[size_key]} px · '
-                + settings_text(lang, f"translation_result_font_{size_key}"),
+                f'{TRANSLATION_RESULT_FONT_SIZE_PX[size_key]} px',
                 size_key,
             )
+            self.translation_font_combo.setItemData(
+                self.translation_font_combo.count() - 1,
+                settings_text(lang, f'translation_result_font_{size_key}'), Qt.ToolTipRole)
         saved_font = normalize_translation_result_font_size(
             self.parent.config.get("translation_result_font_size")
         )
