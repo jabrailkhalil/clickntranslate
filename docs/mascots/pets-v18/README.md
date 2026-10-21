@@ -117,6 +117,8 @@ the native raised cell 1 and the original 1.1-second cadence. The same mapping
 applies to full-size, compact and legacy idle poses. Other reactions, gaze
 directions and character atlases retain their original frames.
 
+![Doc's original idle ankle cells and accepted playback](doc-idle-ankle-preview.png)
+
 Blank clicks finish numeric edits and clear text selection and keyboard focus,
 including inside the scaled graphics canvas. Arrow hover is tracked separately
 from Qt's native proxy hover state; Tab navigation retains its focus indicator.

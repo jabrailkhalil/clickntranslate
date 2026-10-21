@@ -10,8 +10,9 @@ The complete suite ran with the bounded, isolated repository runner:
 python tools/run_ci_tests.py --parts 8 --timeout 160
 ```
 
-Final full-suite results: **1955 passed, 68 skipped, 2 pre-existing version
-failures**. Additional native Windows checks: **54 passed**. See
+Final full-suite results: **1967 passed, 68 skipped, 2 pre-existing version
+failures**. Latest native Windows animation checks: **58 passed**. Earlier
+integrated native monitor/focus/control checks: **54 passed**. See
 `test-summary.json` for the complete eight-part run. The only remaining failures
 are the two development-version metadata checks described below. Every completed isolated run reported
 `USER_DATA_UNCHANGED: True`.

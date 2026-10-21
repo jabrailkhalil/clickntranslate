@@ -1,37 +1,37 @@
 {
   "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
-  "testedSourceCommit": "d9e4f5d312baa2a4b7d30415dba87e22d8677cb9",
+  "testedSourceCommit": "4292c651f59079ea145476ccdbf6ffda03aba13b",
   "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 160",
   "fullSuiteCounts": {
-    "passed": 1955,
+    "passed": 1967,
     "skipped": 68,
     "failure": 2
   },
   "counts": {
-    "passed": 1955,
+    "passed": 1967,
     "skipped": 68,
     "failure": 2
   },
-  "totalReportedCases": 2025,
+  "totalReportedCases": 2037,
   "partitions": [
     {
       "part": 1,
       "counts": {
-        "passed": 248
+        "passed": 249
       },
       "exitCode": 0
     },
     {
       "part": 2,
       "counts": {
-        "passed": 236
+        "passed": 255
       },
       "exitCode": 0
     },
     {
       "part": 3,
       "counts": {
-        "passed": 220,
+        "passed": 228,
         "skipped": 12,
         "failure": 1
       },
@@ -40,48 +40,51 @@
     {
       "part": 4,
       "counts": {
-        "passed": 180,
-        "skipped": 17
+        "skipped": 17,
+        "passed": 267
       },
       "exitCode": 0
     },
     {
       "part": 5,
       "counts": {
-        "passed": 264,
-        "skipped": 1
+        "passed": 209,
+        "skipped": 2
       },
       "exitCode": 0
     },
     {
       "part": 6,
       "counts": {
-        "passed": 275,
-        "skipped": 1
+        "passed": 287,
+        "skipped": 30
       },
       "exitCode": 0
     },
     {
       "part": 7,
       "counts": {
-        "passed": 290,
-        "skipped": 30
+        "passed": 354,
+        "skipped": 5
       },
       "exitCode": 0
     },
     {
       "part": 8,
       "counts": {
-        "passed": 242,
-        "skipped": 7,
-        "failure": 1
+        "failure": 1,
+        "passed": 118,
+        "skipped": 2
       },
       "exitCode": 1
     }
   ],
   "nativeWindowsCounts": {
-    "passed": 54
+    "passed": 58
   },
+  "nativeWindowsRuns": [
+    "qa-doc-idle-native"
+  ],
   "pr7": {
     "number": 7,
     "merged": true,
@@ -94,7 +97,8 @@
     }
   },
   "latestRechecks": [
-    "Native Windows: two physical monitors, every mascot frame/gaze, navigation, focus and controls",
+    "Native Windows: Doc idle frame rejection, all mascot frame/gaze alpha and application reaction transitions",
+    "Previous integrated native checks: two physical monitors, navigation, focus and controls (54 passed)",
     "Three-agent semantic label and tooltip audit in en/ru/es/de/fr/zh",
     "Quick selection lifecycle, clipboard text restoration and stale-result rejection"
   ],
