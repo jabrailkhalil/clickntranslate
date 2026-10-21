@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -20,6 +21,7 @@ from selection_quick_translate import (  # noqa: E402
     DEBOUNCE_MS,
 )
 from PyQt5.QtCore import QObject  # noqa: E402
+from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication  # noqa: E402
 
 
@@ -27,6 +29,15 @@ def _controller_owner(config=None):
     owner = QObject()
     owner.config = config or {}
     return owner
+
+
+def _wait_for_probe(controller):
+    deadline = time.monotonic() + 3
+    while controller._inflight is not None:
+        QApplication.processEvents()
+        if time.monotonic() >= deadline:
+            raise AssertionError('Selection probe did not finish')
+        QTest.qWait(1)
 
 
 class SelectionQuickTranslateLogicTest(unittest.TestCase):
@@ -46,7 +57,9 @@ class SelectionQuickTranslateLogicTest(unittest.TestCase):
             controller.translate_requested.connect(emitted.append)
             controller.configure(True, "automatic")
             controller._complete_probe()
+            _wait_for_probe(controller)
             controller._complete_probe()
+            _wait_for_probe(controller)
             controller.dispose()
         self.assertEqual(emitted, ["Hello there"])
 
@@ -67,12 +80,15 @@ class SelectionQuickTranslateLogicTest(unittest.TestCase):
             controller.translate_requested.connect(emitted.append)
             controller.configure(True, "automatic")
             controller._complete_probe()
+            _wait_for_probe(controller)
             controller._complete_probe()
+            _wait_for_probe(controller)
             self.assertEqual(emitted, ["Hello there"])
             main.DarkThemeApp._apply_translation_result_font_size(
                 SimpleNamespace(_selection_quick_translate=controller)
             )
             controller._complete_probe()
+            _wait_for_probe(controller)
             controller.dispose()
         self.assertEqual(emitted, ["Hello there", "Hello there"])
 
@@ -97,10 +113,13 @@ class SelectionQuickTranslateLogicTest(unittest.TestCase):
             controller.translate_requested.connect(emitted.append)
             controller.configure(True, "automatic")
             controller._complete_probe()
+            _wait_for_probe(controller)
             selected[0] = ""
             controller._complete_probe()
+            _wait_for_probe(controller)
             selected[0] = "Hello there"
             controller._complete_probe()
+            _wait_for_probe(controller)
             controller.dispose()
         self.assertEqual(emitted, ["Hello there", "Hello there"])
 

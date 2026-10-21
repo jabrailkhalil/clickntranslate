@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import mode_coordinator
 import platform_support
-from selection_platform import is_foreign_foreground, read_selected_text
+from selection_platform import foreground_token, is_foreign_foreground, read_selected_text
 
 logger = logging.getLogger("clickntranslate.selection")
 
@@ -84,21 +85,35 @@ class _SelectionChangePoller(QtCore.QObject):
         self._last = ""
 
     def _poll(self):
-        if not is_foreign_foreground():
-            self._last = ""
-            return
-        current = read_selected_text()
-        if current == self._last:
-            return
-        previous = self._last
-        self._last = current
-        if current:
-            self.activity.emit()
-            return
-        owner = self.parent()
-        clear = getattr(owner, "clear_auto_dedupe", None)
-        if callable(clear) and previous:
-            clear()
+        # OS/CLI selection reads can block. The controller coalesces these
+        # ticks into one worker instead of doing that work on the GUI thread.
+        self.activity.emit()
+
+
+class _ProbeSignals(QtCore.QObject):
+    completed = QtCore.pyqtSignal(object)
+
+
+class _SelectionProbe(QtCore.QRunnable):
+    def __init__(self, request, primary_text):
+        super().__init__()
+        self.request = request
+        self.primary_text = primary_text
+        self.cancelled = threading.Event()
+        self.signals = _ProbeSignals()
+
+    def run(self):
+        result = dict(self.request, text="")
+        target = self.request['target']
+        validate = lambda: not self.cancelled.is_set() and (target is None or foreground_token() == target)
+        try:
+            if validate():
+                result['text'] = read_selected_text(
+                    allow_copy_fallback=not platform_support.IS_LINUX,
+                    primary_text=self.primary_text, validate_target=validate).strip()
+        except Exception:
+            logger.debug('Selection probe failed', exc_info=True)
+        self.signals.completed.emit(result)
 
 
 class _WindowsMouseReleasePoller(QtCore.QObject):
@@ -135,10 +150,17 @@ class SelectionQuickTranslateController(QtCore.QObject):
         super().__init__(owner)
         self.owner = owner
         self._enabled = False
+        self._disposed = False
+        self._revision = 0
+        self._inflight = None
+        self._probe_again = False
+        self._queued_click = ""
+        self._last_button_selection = None
         self._mode = "button"
         self._button = SelectionQuickButton()
         self._button.clicked.connect(self._on_button_clicked)
         self._pending_text = ""
+        self._pending_target = None
         self._last_auto_text = ""
         self._anchor = QtCore.QPoint()
         self._debounce = QtCore.QTimer(self)
@@ -148,7 +170,7 @@ class SelectionQuickTranslateController(QtCore.QObject):
         self._hide_timer = QtCore.QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.setInterval(HIDE_TIMEOUT_MS)
-        self._hide_timer.timeout.connect(self._button.hide)
+        self._hide_timer.timeout.connect(self._dismiss_selection)
         self._activity_monitors = []
         self._mode_unsubscribe = mode_coordinator.subscribe(self._on_mode_changed)
         owner.destroyed.connect(self.dispose)
@@ -157,6 +179,10 @@ class SelectionQuickTranslateController(QtCore.QObject):
             app.installEventFilter(self)
 
     def dispose(self):
+        if self._disposed:
+            return
+        self._disposed = True
+        self._cancel_probe()
         app = QtWidgets.QApplication.instance()
         if app is not None:
             app.removeEventFilter(self)
@@ -166,6 +192,10 @@ class SelectionQuickTranslateController(QtCore.QObject):
         self._button.deleteLater()
 
     def configure(self, enabled, mode):
+        self._cancel_probe()
+        self._revision += 1
+        self._dismiss_selection()
+        self._last_button_selection = None
         self._mode = mode if mode in ("button", "automatic") else "button"
         self.clear_auto_dedupe()
         self.set_active(bool(enabled))
@@ -179,7 +209,11 @@ class SelectionQuickTranslateController(QtCore.QObject):
         if enabled == self._enabled:
             return
         self._enabled = enabled
-        self._button.hide()
+        self._revision += 1
+        self._debounce.stop()
+        self._probe_again = False
+        self._queued_click = ""
+        self._dismiss_selection()
         self._stop_monitor()
         if not enabled:
             return
@@ -222,7 +256,7 @@ class SelectionQuickTranslateController(QtCore.QObject):
             return
         self._activity_monitors = monitors
         for monitor in monitors:
-            monitor.activity.connect(self._schedule_probe)
+            monitor.activity.connect(self._schedule_probe if platform_support.IS_WINDOWS else self._complete_probe)
             monitor.start()
 
     def _stop_monitor(self):
@@ -233,8 +267,12 @@ class SelectionQuickTranslateController(QtCore.QObject):
             monitor.deleteLater()
 
     def _on_mode_changed(self):
-        if mode_coordinator.active_mode() is not None:
-            self._button.hide()
+        self._cancel_probe()
+        self._revision += 1
+        self._debounce.stop()
+        self._probe_again = False
+        self._queued_click = ""
+        self._dismiss_selection()
 
     def eventFilter(self, watched, event):
         if not self._enabled:
@@ -242,19 +280,23 @@ class SelectionQuickTranslateController(QtCore.QObject):
         if event.type() == QtCore.QEvent.MouseButtonPress and self._button.isVisible():
             global_pos = event.globalPos()
             if not self._button.geometry().contains(global_pos):
-                self._button.hide()
+                self._dismiss_selection()
         if event.type() == QtCore.QEvent.KeyPress and event.key() == QtCore.Qt.Key_Escape:
-            self._button.hide()
+            self._dismiss_selection()
         return False
 
     def _schedule_probe(self):
+        self._cancel_probe()
+        self._revision += 1
+        self._dismiss_selection()
+        self._last_button_selection = None
         if not self._should_accept_activity():
             return
         self._anchor = QtGui.QCursor.pos()
         self._debounce.start()
 
     def _should_accept_activity(self):
-        if not self._enabled:
+        if not self._enabled or self._disposed:
             return False
         if mode_coordinator.active_mode() is not None:
             return False
@@ -264,34 +306,88 @@ class SelectionQuickTranslateController(QtCore.QObject):
             return False
         return True
 
-    def _read_probe_text(self):
-        return read_selected_text(
-            allow_copy_fallback=not platform_support.IS_LINUX
-        ).strip()
+    def _dismiss_selection(self):
+        self._button.hide()
+        self._hide_timer.stop()
+        self._pending_text = ""
+        self._pending_target = None
 
-    def _complete_probe(self):
+    def _cancel_probe(self):
+        if self._inflight is not None:
+            self._inflight.cancelled.set()
+
+    def _complete_probe(self, clicked_text=""):
         if not self._should_accept_activity():
+            self._dismiss_selection()
             return
-        text = self._read_probe_text()
+        if self._inflight is not None:
+            self._probe_again = True
+            self._queued_click = clicked_text or self._queued_click
+            return
+        target = foreground_token()
+        if self._pending_text and self._pending_target != target:
+            self._dismiss_selection()
+        # Qt clipboard access stays on its owning thread. CLI fallbacks and
+        # Accessibility/UIA/Ctrl+C reads run in the bounded worker below.
+        primary_text = None
+        if platform_support.IS_LINUX:
+            clipboard = QtWidgets.QApplication.clipboard()
+            primary_text = clipboard.text(clipboard.Selection) if clipboard.supportsSelection() else ""
+        request = dict(revision=self._revision, target=target, clicked=clicked_text)
+        task = _SelectionProbe(request, primary_text)
+        task.signals.completed.connect(self._probe_finished)
+        self._inflight = task
+        QtCore.QThreadPool.globalInstance().start(task)
+
+    @QtCore.pyqtSlot(object)
+    def _probe_finished(self, result):
+        self._inflight = None
+        if self._disposed:
+            return
+        valid = (result['revision'] == self._revision and self._should_accept_activity()
+                 and result['target'] == foreground_token())
+        if valid:
+            self._accept_probe(result)
+        else:
+            self._dismiss_selection()
+        if self._probe_again:
+            clicked = self._queued_click
+            self._probe_again, self._queued_click = False, ""
+            if clicked or not self._debounce.isActive():
+                self._complete_probe(clicked)
+
+    def _accept_probe(self, result):
+        text, target = result['text'], result['target']
         if len(text) < MIN_SELECTION_CHARS:
+            self._dismiss_selection()
+            self._last_button_selection = None
             self.clear_auto_dedupe()
             return
+        if result['clicked']:
+            self._dismiss_selection()
+            if text == result['clicked']:
+                self.translate_requested.emit(text)
+            return
         if self._mode == "automatic":
-            if text == self._last_auto_text:
+            if (target, text) == self._last_auto_text:
                 return
-            self._last_auto_text = text
+            self._last_auto_text = (target, text)
             self.translate_requested.emit(text)
             return
+        if self._last_button_selection == (target, text):
+            return
+        self._last_button_selection = (target, text)
         self._pending_text = text
+        self._pending_target = target
+        self._anchor = QtGui.QCursor.pos()
         self._button.show_near(self._anchor)
         self._hide_timer.start()
 
     def _on_button_clicked(self):
         text = self._pending_text.strip()
-        if len(text) < MIN_SELECTION_CHARS:
-            text = read_selected_text(
-                allow_copy_fallback=not platform_support.IS_LINUX
-            ).strip()
-        self._button.hide()
-        if len(text) >= MIN_SELECTION_CHARS:
-            self.translate_requested.emit(text)
+        valid = self._should_accept_activity() and self._pending_target == foreground_token()
+        self._revision += 1
+        self._cancel_probe()
+        self._dismiss_selection()
+        if valid and len(text) >= MIN_SELECTION_CHARS:
+            self._complete_probe(clicked_text=text)
