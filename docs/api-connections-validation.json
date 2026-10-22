@@ -1,0 +1,75 @@
+{
+  "core_source_commit": "c56a55bb1a002358090a1834654e53ade58bcbd0",
+  "native_qa_commit": "7671c7e1c356b5736f5bbcd787fb87442e83af73",
+  "windows": {
+    "passed": 2119,
+    "skipped": 77,
+    "subtests_passed": 915,
+    "partitions": 8,
+    "native_checks_passed": 61,
+    "user_data_unchanged": true
+  },
+  "macos": {
+    "passed": 2052,
+    "skipped": 144,
+    "subtests_passed": 912,
+    "partitions": 8,
+    "native_cocoa_checks_passed": 100,
+    "user_data_unchanged": true,
+    "platform": {
+      "system": "Darwin",
+      "version": "14.3",
+      "architecture": "arm64"
+    }
+  },
+  "native_vaults": {
+    "windows": {
+      "persisted": true,
+      "read_back": true,
+      "removed": true
+    },
+    "macos": {
+      "storage": "keychain",
+      "persisted": true,
+      "read_back": true,
+      "removed": true
+    }
+  },
+  "macos_bundle": {
+    "version": "1.8.2",
+    "minimum_macos": "13.4",
+    "notarized": false,
+    "signing": "ad-hoc"
+  },
+  "macos_bundle_checks": {
+    "gui": "ok",
+    "vision": "ok",
+    "api_connections": "ok",
+    "launchservices": "ok",
+    "OcrWorker": "ok",
+    "ArgosWorker": "ok"
+  },
+  "macos_real_update_zip": {
+    "prepared": true,
+    "version": "1.8.2",
+    "kind": "macos",
+    "target_unchanged": true,
+    "signature_and_identity_validated": true
+  },
+  "original_mac_repository": {
+    "head": "97d3e74b4ef53ba238ba2c6d3418d23dbc1da6ff",
+    "branch": "codex/macos-1.7.1",
+    "clean": true
+  },
+  "not_run": {
+    "live_paid_api_calls": "No user API keys were supplied; transport/payload contracts use mocked responses.",
+    "macos_screen_and_accessibility": "Both permissions are disabled for the new QA bundle. Real screen capture and external text selection await the user.",
+    "linux_native": "No Linux device was available. Platform and POSIX transaction regression tests were run."
+  },
+  "publication": {
+    "pushed": false,
+    "released": false,
+    "original_app_replaced": false
+  },
+  "artifact_checksums": "1fa1b78c53b3d440d657fc252abc68804f4b4fb7876cda274f5e2941d8a38cd0  Click-n-Translate-1.8.2-macos-arm64.dmg\n7ea8cd53c3edf1874637b66bb0e711903daaa5101df8160f9d6e124c09632feb  Click-n-Translate-1.8.2-macos-arm64.zip\n"
+}
