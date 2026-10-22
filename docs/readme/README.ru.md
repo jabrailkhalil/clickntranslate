@@ -1,85 +1,134 @@
-# Click’n’Translate
+<p align="center">
+  <img src="../../src/icons/icon.png" alt="" width="72" height="72">
+</p>
 
-**Читайте текст с экрана на своём языке.**
+<h1 align="center">Click’n’Translate</h1>
+
+<p align="center"><strong>Читайте текст с экрана на своём языке.</strong></p>
+<p align="center">Windows · macOS · Linux · Android</p>
+
+<p align="center">
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
+</p>
+
+<p align="center">
+  <strong><a href="#download">Скачать</a></strong>
+  &nbsp; · &nbsp;
+  <a href="https://translate.clickn.dev/ru/">Сайт</a>
+  &nbsp; · &nbsp;
+  <a href="https://t.me/jabrail_digital">Telegram</a>
+  &nbsp; · &nbsp;
+  <a href="#readme-languages">Языки</a>
+</p>
 
 Переводите игры, копируйте текст с картинок, читайте документы и заменяйте сообщения переводом. Бесплатное приложение с открытым кодом для **Windows, macOS и Linux**. Для **Android** есть отдельная мобильная версия.
 
-[![Downloads](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=for-the-badge&color=8b6bb1)](https://github.com/jabrailkhalil/clickntranslate/releases)
+<p align="center">
+  <img src="../../docs/images/translation-demo-v2.gif" alt="Читайте текст с экрана на своём языке." width="640">
+</p>
 
-[English](../../README.md) · [Русский](README.ru.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [简体中文](README.zh-CN.md) · [Português](README.pt.md) · [Italiano](README.it.md)
-
-![Click’n’Translate 1.8.2](../images/desktop-1.8.2.png)
+<a name="download"></a>
 
 ## Скачать 1.8.2
 
-| OS | Download |
-| --- | --- |
-| Windows 10/11 x64 | [Installer](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-portable-x64.zip) |
-| macOS 13.4+, Apple Silicon | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-arm64.dmg) |
-| macOS 13.4+, Intel | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-x86_64.dmg) |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) · [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
-| Android 8.0+, ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) |
+| Система | Установка | Без установки |
+| --- | --- | --- |
+| **Windows** 10/11 · x64 | [EXE](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-x64-installer.exe) | [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-portable-x64.zip) |
+| **macOS** 13.4+ · Apple Silicon (M1+) | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-arm64.dmg) | — |
+| **macOS** 13.4+ · Intel | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-x86_64.dmg) | — |
+| **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
+| **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[Checksums / signatures](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2) · [Signing identities](../SIGNING_IDENTITIES.md)
+[Все загрузки](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
 
-## Под задачу, а не под одно окно
+## Перевод там, где вы работаете
 
-| Что нужно сделать | Как это работает |
-| --- | --- |
-| Прочитать текст, который нельзя выделить | Выделите область экрана: приложение распознает и переведёт текст |
-| Скопировать текст с изображения | OCR перенесёт распознанный текст в буфер обмена |
-| Перевести выделение в другом приложении | Нажмите своё сочетание клавиш; для режима хранится отдельная пара языков |
-| Написать сообщение на другом языке | Замените выделение переводом; при желании включите выделение всего поля перед заменой |
-| Следить за меняющимся текстом | Динамический перевод наблюдает за одной или несколькими областями |
-| Прочитать документ | Откройте исходник и перевод рядом, редактируйте результат и скрывайте исходник |
+- **Игры, изображения и приложения:** выделите область экрана, чтобы распознать и перевести текст.
+- **Сообщения и документы:** переводите выделение, заменяйте черновик переводом или редактируйте исходник и результат рядом.
+- **Меняющийся текст:** динамический перевод следит за одной или несколькими областями. Результат можно показывать поверх исходника или отдельно.
+- **Нужен только текст?** Скопируйте распознанный текст с экрана прямо в буфер обмена.
 
-![Настоящий перевод в версии 1.8.2](../images/translate-text-1.8.2.gif)
+Документный режим открывает TXT, Markdown, DOCX, PDF с текстовым слоем, HTML и RTF. На Android — отдельный [интерфейс перевода экрана, текста и фото](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme).
 
-Поддерживаются TXT, Markdown, DOCX, PDF с текстовым слоем, HTML и RTF. Для сканов нужен OCR. Можно печатать прямо в главном окне, раскрыть результат в отдельное рабочее окно или скопировать его.
+## Больше примеров
+
+### Скопировать текст с изображения
+
+![Скопировать текст с изображения](../images/area-ocr-demo-v2.gif)
+
+### Перевести выделенный текст
+
+![Перевести выделенный текст](../images/selected-text-demo-v2.gif)
+
+### Перевести весь экран
+
+![Перевести весь экран](../images/fullscreen-translation-demo-v2.gif)
+
+<sub>Записи рабочих сценариев настольной версии; оформление окон могло измениться.</sub>
+
 
 ## Онлайн, офлайн или свой API
 
-- **Онлайн:** Google, MyMemory, Lingva, LibreTranslate.
-- **Офлайн:** Argos Translate и Hy-MT после установки нужных моделей.
-- **Локальный OCR:** Windows OCR, Apple Vision, Tesseract, RapidOCR, EasyOCR. Нативные движки зависят от ОС.
-- **Свои ключи:** OpenAI, Gemini, Claude, DeepL, LibreTranslate и совместимые Custom API. Для vision-модели можно явно включить изображения и получить распознавание с переводом у одного провайдера.
+**Онлайн:** Google, MyMemory, Lingva и LibreTranslate. **Офлайн:** Argos Translate и Hy-MT после установки моделей. Для локального распознавания есть Windows OCR, Apple Vision, Tesseract, RapidOCR и EasyOCR — доступность зависит от системы.
 
-Откройте **Настройки → Перевод и OCR → Языковые пакеты**. Во вкладках OCR и переводчиков устанавливаются локальные компоненты, во вкладке **API** — подключения. Если движка или направления нет, приложение предложит перейти к установке либо выбрать доступный сервис.
+**Свои ключи:** OpenAI, Gemini, Claude, DeepL, LibreTranslate и совместимые API. Для поддерживаемых vision-моделей можно включить передачу изображения и получить распознавание с переводом одним запросом.
 
-![Настройки и API в 1.8.2](../images/settings-api-1.8.2.gif)
+Движки, модели и подключения находятся в **Настройки → Перевод и OCR → Языковые пакеты**. Выберите вкладку **OCR**, **Переводчики** или **API**. Если локального компонента не хватает, приложение предложит перейти к установке.
 
-Локальный OCR обрабатывает изображения на устройстве. Онлайн-перевод отправляет текст выбранному сервису; включённый vision API получает и выбранное изображение. После загрузки моделей офлайн-перевод работает локально. У API-провайдера могут быть свои тарифы и лимиты. [Приватность](../../PRIVACY.md).
+Локальный OCR обрабатывает изображения на устройстве. Онлайн-сервис получает текст; включённый vision API — ещё и выбранное изображение. После загрузки моделей офлайн-перевод работает локально. Тарифы и лимиты зависят от провайдера. [Приватность](../../PRIVACY.md).
 
-## Удобно каждый день
+## Настройте под себя
 
-Восемь языков интерфейса: русский, английский, испанский, немецкий, французский, китайский, португальский и итальянский — с подсказками и встроенным гайдом. Есть светлая и тёмная темы, масштаб интерфейса, отдельный размер текста результата с примером, импорт/экспорт настроек и необязательные локальные истории.
+Восемь языков интерфейса, светлая и тёмная темы, масштаб интерфейса и отдельный размер текста результата. Настройте сочетания клавиш и языковые пары для каждого режима, включите локальную историю или экспортируйте настройки. Маскот открывает меню перевода по нажатию; его можно настроить или скрыть.
 
-![Новые маскоты и их настройки](../images/companion-1.8.2.gif)
+<details>
+<summary>Горячие клавиши по умолчанию</summary>
 
-Маскот открывает меню действий по нажатию и реагирует на события. Персонажа, размер и прозрачность можно настроить; самого маскота — скрыть.
-
-| Горячая клавиша Windows | Действие |
+| Windows | Действие |
 | --- | --- |
-| Ctrl + Alt + T | Перевести область |
-| Ctrl + Alt + C | Скопировать текст из области |
-| Ctrl + Alt + F | Перевести экран |
-| Ctrl + Alt + Q | Перевести выделение |
-| Ctrl + Shift + Q | Заменить переводом |
-| Ctrl + Alt + G | Динамический перевод |
-| Ctrl + Shift + Space | Показать или скрыть приложение |
+| `Ctrl + Alt + T` | Перевести область |
+| `Ctrl + Alt + C` | Скопировать текст из области |
+| `Ctrl + Alt + F` | Перевести весь экран |
+| `Ctrl + Alt + Q` | Перевести выделение |
+| `Ctrl + Shift + Q` | Заменить переводом |
+| `Ctrl + Alt + G` | Включить или остановить динамический перевод |
+| `Ctrl + Shift + Space` | Показать или скрыть приложение |
 
-Сочетания меняются в настройках горячих клавиш. На Mac используйте Command вместо Ctrl, Option вместо Alt. На Linux назначьте команды в своей среде рабочего стола: [инструкция](../LINUX.md).
+Измените их в **Настройки → Настроить горячие клавиши**. На Mac вместо Ctrl используется Command, вместо Alt — Option. На Linux сочетания настраиваются в окружении рабочего стола; поддержка зависит от X11/Wayland и композитора. [Инструкция для Linux](../LINUX.md).
 
-## Первый запуск и обновления
+</details>
 
-Python уже включён в настольные сборки. Распакуйте ZIP целиком или используйте установщик. На Mac для соответствующих функций нужны «Запись экрана» и «Универсальный доступ». На Android разрешения на захват и показ поверх других приложений запрашиваются при включении перевода экрана.
+## Начните с трёх шагов
 
-В Windows и Mac используется прежний самоподписанный сертификат **jabrailkhalil**: возможен SmartScreen; у Mac нет Apple-нотаризации. [Первый запуск по шагам](../guides/setup.ru.md).
+1. **Установите свою сборку.** Python уже включён. Если выбрали Windows portable, распакуйте архив целиком.
+2. **Выберите сервис и языки.** Для офлайн-режима сначала установите движок и нужное направление в языковых пакетах.
+3. **Выделите область, текст или напечатайте сообщение.** Используйте горячую клавишу, меню маскота или главное окно.
 
-Настольная версия 1.8.2 скачивает обновления из GitHub Releases внутри приложения, показывает прогресс и перезапускается после замены файлов. Mac/Linux 1.8.1 и старше сначала нужно обновить вручную до этой версии. Защищённое расположение установки может требовать ручной замены; Store-сборки обновляются через Microsoft Store. [Как устроено обновление](../UPDATES_1.8.2_DEVELOPMENT.md).
+Сборки Windows и Mac подписаны самоподписанным сертификатом `jabrailkhalil`. При первом запуске возможен запрос SmartScreen или Gatekeeper; у Mac нет Apple-нотаризации. В [инструкции](../guides/setup.ru.md) описаны первый запуск и разрешения «Запись экрана» и «Универсальный доступ» на Mac.
 
-Android — отдельный интерфейс с переводом экрана, текста и фото, а также историей: [мобильная версия](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme). Счётчик GitHub показывает скачивания файлов релизов, а не число уникальных пользователей.
+Настольная версия 1.8.2 скачивает обновления из GitHub Releases внутри приложения. Mac/Linux 1.8.1 и старше сначала нужно обновить вручную до этой версии. Защищённое расположение установки может требовать ручной замены; Store-сборки обновляются через Microsoft Store.
 
-Нашли ошибку? Создайте **Баг-репорт** в настройках и приложите ZIP к [issue](https://github.com/jabrailkhalil/clickntranslate/issues). Содержимое буфера, документов, историй и ключи в отчёт не включаются.
+## Помощь и участие
 
-[Сайт](https://translate.clickn.dev/) · [Telegram](https://t.me/jabrail_digital) · [Исходный код](../REPOSITORY_LAYOUT.md) · [GPL-3.0](../../LICENSE)
+[Сообщить об ошибке](https://github.com/jabrailkhalil/clickntranslate/issues) · [Telegram](https://t.me/jabrail_digital) · [Первый запуск](../guides/setup.ru.md) · [Исходный код и сборки](../REPOSITORY_LAYOUT.md)
+
+Для диагностики приложите ZIP из **Настройки → Баг-репорт**. Содержимое буфера, документов, историй и ключи в отчёт не включаются. Код открыт под [GPL-3.0](../../LICENSE); Android разрабатывается в [отдельной ветке](https://github.com/jabrailkhalil/clickntranslate/tree/android).
+
+<details>
+<summary>Контрольные суммы, подписи и счётчик загрузок</summary>
+
+Маленькие файлы `.sha256` используются автообновлением для проверки скачанных сборок. Вручную загружать их не нужно. Необязательный [архив проверки](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-verification.zip) содержит контрольные суммы, подписи и публичные сертификаты. [Данные подписей](../SIGNING_IDENTITIES.md).
+
+Счётчик показывает скачивания файлов релизов, включая файлы обновлений, а не число уникальных пользователей.
+
+</details>
+
+---
+
+<a name="readme-languages"></a>
+
+README на других языках:
+
+[English](../../README.md) · **Русский** · [Español](README.es.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [简体中文](README.zh-CN.md) · [Português](README.pt.md) · [Italiano](README.it.md)

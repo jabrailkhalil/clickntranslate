@@ -95,7 +95,7 @@ display tests do not establish compatibility with every Wayland compositor.
 Windows/Mac certificates are self-signed; the Mac app is not Apple-notarized.
 Online providers have their own availability, accounts, prices and limits.
 
-README media consists of new step sequences captured from the running Windows
-1.8.2 GUI with synthetic demonstration text. The translation is a real online
-result. Screenshots are not generated mockups, and no personal documents or
-keys appear in the recordings.
+README media reuses the four existing desktop workflow recordings: game text,
+area OCR, selected-text translation and full-screen translation. They illustrate
+the workflows; their window design can differ from 1.8.2. The short 1.8.2 step
+sequences are retained as files but are no longer displayed in the READMEs.
