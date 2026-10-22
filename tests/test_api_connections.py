@@ -150,3 +150,18 @@ def test_malformed_api_envelopes_are_reported_without_raw_payload(config, body):
     with mock.patch.object(api,'_post',return_value=body):
         with pytest.raises(api.ProviderError):
             api.translate('openai-compatible','Hello','en','ru',config)
+
+
+def test_native_smoke_round_trip_removes_only_its_disposable_vault_item():
+    import macos_smoke
+    values={}
+    class Vault:
+        def set_password(self,service,name,value): values[service,name]=value
+        def get_password(self,service,name): return values.get((service,name),'')
+        def delete_password(self,service,name): values.pop((service,name),None)
+    previous=secrets._SERVICE
+    with mock.patch.object(secrets,'_vault',return_value=Vault()):
+        result=macos_smoke.api_keychain_check()
+    assert result == dict(storage='keychain',persisted=True,read_back=True,removed=True)
+    assert not values
+    assert secrets._SERVICE == previous

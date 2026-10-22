@@ -5,7 +5,34 @@ import os
 import platform
 from pathlib import Path
 import tempfile
+import sys
 from unittest import mock
+
+
+def api_keychain_check():
+    """Test only a unique disposable QA item, never the user's API credentials."""
+    import uuid
+    import provider_secrets as vault
+    if sys.platform == 'darwin':
+        # A missing frozen backend is a packaging failure, not a locked vault.
+        from keyring.backends.macOS import Keyring
+    previous = vault._SERVICE
+    vault._SERVICE = 'ClicknTranslate.QA'
+    provider, endpoint = 'qa-' + uuid.uuid4().hex, 'https://qa.invalid'
+    account = vault.account(provider, endpoint)
+    persisted = False
+    try:
+        persisted = vault.set_key(provider, endpoint, 'temporary-qa-value')
+        vault._SESSION.pop(account, None)
+        reread = vault.get_key(provider, endpoint) == 'temporary-qa-value'
+        assert not persisted or reread, 'Keychain did not return the written QA item'
+    finally:
+        removed = vault.set_key(provider, endpoint, '')
+        vault._SESSION.pop(account, None)
+        vault._SERVICE = previous
+    assert not persisted or removed, 'Could not remove the disposable QA item'
+    return {'storage': 'keychain' if persisted else 'session', 'persisted': persisted,
+            'read_back': reread, 'removed': removed}
 
 
 def hotkey_dispatch_check():
@@ -319,7 +346,9 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
             window.show_settings()
             settings = window.settings_window
             settings._set_settings_page(0)
-            for key in ('ocr_engine_combo', 'translator_combo', 'result_window_control'):
+            inspect(settings.result_window_control, prefix + '-settings-result_window_control', percent, actual)
+            settings._set_settings_page(1)
+            for key in ('ocr_engine_combo', 'translator_combo'):
                 inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
             settings._set_settings_page(2)
             for key in ('game_source_combo', 'game_target_combo'):
@@ -727,6 +756,18 @@ def run(main, report_path):
             direction_theme_results = main_direction_and_theme_check(main, app, window)
             capture_notice_results = capture_picker_and_notice_check(main, app, window, report_path, screenshots)
             compact_translation_results = compact_translation_views_check(main, app, window, report_path, screenshots)
+            window.show_settings()
+            from provider_settings import show_provider_settings
+            show_provider_settings(window.settings_window)
+            for _ in range(5):
+                app.processEvents()
+            api_page = window.settings_window.api_connections_page
+            assert api_page.key.isVisible() and api_page.model.isVisible()
+            api_picture = report_path.with_name(report_path.stem + '-api-connections.png')
+            assert window.grab().save(str(api_picture))
+            screenshots.append({'file': api_picture.name, 'requested_percent': window.config.get('ui_scale_percent'),
+                                'width': window.width(), 'height': window.height()})
+            keychain_results = api_keychain_check()
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -763,6 +804,7 @@ def run(main, report_path):
                 "main_direction_and_theme": direction_theme_results,
                 "capture_picker_and_notice": capture_notice_results,
                 "compact_translation_views": compact_translation_results,
+                "api_connections": "ok", "api_keychain": keychain_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()
