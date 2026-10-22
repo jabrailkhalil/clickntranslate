@@ -15,11 +15,11 @@
 
 <p align="center">
   <strong><a href="#download">Herunterladen</a></strong>
-  &nbsp; · &nbsp;
+  &nbsp;&nbsp;&nbsp;
   <a href="https://translate.clickn.dev/en/">Website</a>
-  &nbsp; · &nbsp;
+  &nbsp;&nbsp;&nbsp;
   <a href="https://t.me/jabrail_digital">Telegram</a>
-  &nbsp; · &nbsp;
+  &nbsp;&nbsp;&nbsp;
   <a href="#readme-languages">Sprachen</a>
 </p>
 
