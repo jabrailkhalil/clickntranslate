@@ -300,13 +300,13 @@ def test_real_updater_replaces_all_files_or_restores_all_old_files(tmp_path, win
         # The application inherits stdout. A pipe would stay open while that
         # healthy app runs, making communicate() wait after the updater exits.
         with log.open('w') as output:
-            result = subprocess.run([str(windows_binaries / 'apply.exe'), str(windows_binaries / 'updater.exe'),
-                '--mode', mode, '--app-dir', encoded(install), '--package', encoded(archive),
+            result = subprocess.run([str(windows_binaries / 'updater.exe'), '--quiet', 'true',
+                '--result', encoded(tmp_path / 'update-failure.txt'), '--mode', mode, '--app-dir', encoded(install), '--package', encoded(archive),
                 '--exe', encoded('ClicknTranslate.exe'), '--version', '1.7.2', '--pid', '2147483000'],
                 stdout=output, stderr=subprocess.STDOUT, timeout=75, creationflags=subprocess.CREATE_NO_WINDOW)
         details = log.read_text(encoding='utf-8', errors='replace')
         if damage:
-            assert result.returncode == 7, details
+            assert result.returncode == 1, details
             for relative, content in old.items():
                 assert (install / relative).read_bytes() == content
         else:

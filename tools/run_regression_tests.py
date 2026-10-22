@@ -47,8 +47,12 @@ def run():
     main.LAYOUT_EDITOR_MODE = True
     from PyQt5.QtWidgets import QApplication
     from qt_layout_test_support import ensure_layout_fonts
+    from ui_scaling import configure_interface_style
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
+    # Match normal startup: replacing Aqua after tests have already created
+    # styled widgets can invalidate their native style objects on macOS.
+    configure_interface_style()
     ensure_layout_fonts(app)
     import pytest
     code = pytest.main(['-q', '-ra', '--tb=short', '--disable-warnings',

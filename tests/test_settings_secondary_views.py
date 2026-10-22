@@ -180,6 +180,44 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.secondary_view_shell.height(),
         )
 
+    def test_translation_toggles_have_visible_indicators_in_both_themes(self):
+        from PyQt5.QtCore import QSignalBlocker
+        from PyQt5.QtWidgets import QStyle, QStyleOptionButton
+
+        self.parent.resize(800, 600)
+        self.settings.setGeometry(0, 0, 790, 590)
+        for theme in ("Темная", "Светлая"):
+            self.parent.current_theme = theme
+            self.settings.apply_theme()
+            self.settings._set_settings_page(1)
+            self.app.processEvents()
+            controls = (
+                self.settings.close_result_on_outside_click_checkbox,
+                self.settings.close_result_on_outside_click_checkbox,
+            )
+            for control in controls:
+                with self.subTest(theme=theme, text=control.text()):
+                    control.setEnabled(True)
+                    option = QStyleOptionButton()
+                    control.initStyleOption(option)
+                    element = (QStyle.SE_CheckBoxIndicator if isinstance(control, sw.QCheckBox)
+                               else QStyle.SE_RadioButtonIndicator)
+                    indicator = control.style().subElementRect(element, option, control)
+                    self.assertTrue(control.rect().contains(indicator))
+                    pictures = []
+                    blocker = QSignalBlocker(control)
+                    control.setAutoExclusive(False)
+                    for checked in (False, True):
+                        control.setChecked(checked)
+                        self.app.processEvents()
+                        picture = control.grab().toImage().copy(indicator)
+                        colors = {picture.pixel(x, y) for x in range(picture.width())
+                                  for y in range(picture.height())}
+                        self.assertGreater(len(colors), 8, "indicator must be visible against the card")
+                        pictures.append(picture)
+                    del blocker
+                    self.assertNotEqual(pictures[0], pictures[1], "checked and unchecked must look distinct")
+
     def test_main_badge_navigation_focuses_the_requested_hotkey_field(self):
         self.assertTrue(self.settings.focus_hotkey_setting("game_translate_hotkey"))
         self.app.processEvents()
@@ -260,8 +298,8 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Alt+G")
         self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
 
-    def test_outside_click_close_setting_persists_from_the_hotkeys_page(self):
-        self.settings.show_hotkeys_screen()
+    def test_outside_click_close_setting_persists_from_the_general_page(self):
+        self.settings._set_settings_page(0)
         self.app.processEvents()
         checkbox = self.settings.close_result_on_outside_click_checkbox
         self.assertFalse(checkbox.isChecked())

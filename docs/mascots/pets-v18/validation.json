@@ -1,0 +1,212 @@
+[
+  {
+    "name": "Click",
+    "id": "click",
+    "sha256": "4003554f70c1956e32e6365dc0952f0c984be0d3865a44704cb7ea57a03e28e7",
+    "encodedBytes": 2145588,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        179,
+        151,
+        184,
+        198
+      ],
+      "airborne_lift_pixels": 47,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 045 accepted with a reviewed warning",
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "157.5->180 diff is a local outlier (1695 pixels vs neighbor average 936)",
+      "270->292.5 diff is a local outlier (1329 pixels vs neighbor average 720)",
+      "337.5->000 diff is a local outlier (1798 pixels vs neighbor average 906)"
+    ]
+  },
+  {
+    "name": "Doc",
+    "id": "orbit",
+    "sha256": "dc53e5aa3fdd2f816d5a23364d6acffb5bec8aedc0def2971230a6649aa8b6c6",
+    "encodedBytes": 2105763,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        188,
+        172,
+        187,
+        198
+      ],
+      "airborne_lift_pixels": 26,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "000 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "022.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "045 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "067.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "090 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "112.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "135 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "157.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "180 has transparent interior hole rows (y=167, y=168, y=169, y=170, +5 more)",
+      "202.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "225 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "247.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "270 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "292.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "315 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "337.5 has transparent interior hole rows (y=168, y=169, y=170, y=171, +4 more)",
+      "135->157.5 diff is a local outlier (978 pixels vs neighbor average 650)",
+      "202.5->225 diff is a local outlier (879 pixels vs neighbor average 506)",
+      "337.5->000 diff is a local outlier (1033 pixels vs neighbor average 706)"
+    ]
+  },
+  {
+    "name": "Chester",
+    "id": "mochi",
+    "sha256": "892d085420eadab8910947a507df6a01b8f04c005c49366638facab10099ac08",
+    "encodedBytes": 2598832,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        181,
+        148,
+        179,
+        198
+      ],
+      "airborne_lift_pixels": 50,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 157.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "000 has transparent interior hole rows (y=63, y=64, y=65, y=66, +2 more)",
+      "022.5 has transparent interior hole rows (y=64, y=65, y=66, y=67)",
+      "045 has transparent interior hole rows (y=63, y=64)",
+      "067.5 has transparent interior hole rows (y=61, y=62, y=63, y=64)",
+      "090 has transparent interior hole rows (y=60, y=61, y=62, y=63)",
+      "112.5 has transparent interior hole rows (y=60, y=61, y=62, y=63, +2 more)",
+      "135 has transparent interior hole rows (y=62, y=63, y=64, y=65, +1 more)",
+      "157.5 has transparent interior hole rows (y=64, y=65, y=66)",
+      "180 has transparent interior hole rows (y=65, y=66, y=67)",
+      "202.5 has transparent interior hole rows (y=62, y=63, y=64, y=65)",
+      "225 has transparent interior hole rows (y=62, y=63, y=64)",
+      "247.5 has transparent interior hole rows (y=61, y=62, y=63)",
+      "270 has transparent interior hole rows (y=62, y=63, y=64, y=65)",
+      "292.5 has transparent interior hole rows (y=61, y=62, y=63, y=64, +1 more)",
+      "315 has transparent interior hole rows (y=61, y=62, y=63, y=64, +1 more)",
+      "337.5 has transparent interior hole rows (y=63, y=64, y=65, y=66, +1 more)",
+      "157.5->180 diff is a local outlier (1611 pixels vs neighbor average 900)"
+    ]
+  },
+  {
+    "name": "Blinchik",
+    "id": "pancake",
+    "sha256": "52ed7ad5667e3487f150c44f1c9b5bb09450af62c5adffde41787265c9e579e7",
+    "encodedBytes": 2166999,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        171,
+        135,
+        171,
+        198
+      ],
+      "airborne_lift_pixels": 63,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 022.5 accepted with a reviewed warning",
+      "look direction 045 accepted with a reviewed warning",
+      "look direction 067.5 accepted with a reviewed warning",
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 157.5 accepted with a reviewed warning",
+      "look direction 202.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "look direction 337.5 accepted with a reviewed warning",
+      "022.5 has transparent interior hole rows (y=176)",
+      "045 has transparent interior hole rows (y=176)",
+      "067.5 has transparent interior hole rows (y=176)",
+      "112.5 has transparent interior hole rows (y=177)",
+      "135 has transparent interior hole rows (y=177)"
+    ]
+  },
+  {
+    "name": "Raf",
+    "id": "bubu",
+    "sha256": "99129426d8fe6069dbb2356e6e5ccc6a07218f1102fdf65d275e2b8323c74a6e",
+    "encodedBytes": 1958617,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        171,
+        122,
+        171,
+        198
+      ],
+      "airborne_lift_pixels": 76,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 022.5 accepted with a reviewed warning",
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "look direction 337.5 accepted with a reviewed warning",
+      "067.5->090 diff is a local outlier (400 pixels vs neighbor average 232)",
+      "337.5->000 diff is a local outlier (893 pixels vs neighbor average 514)"
+    ]
+  },
+  {
+    "name": "Lola",
+    "id": "momo",
+    "sha256": "6db968c1e8977364f3afed4d2ffa1e628f5b30d516cc2f3384998ef18e1ea57a",
+    "encodedBytes": 2486243,
+    "structurePass": true,
+    "qualityPass": true,
+    "blindPass": true,
+    "jump": {
+      "idle_baseline": 198,
+      "jump_baselines": [
+        198,
+        184,
+        164,
+        185,
+        198
+      ],
+      "airborne_lift_pixels": 34,
+      "landing_delta_pixels": 0
+    },
+    "warnings": [
+      "look direction 112.5 accepted with a reviewed warning",
+      "look direction 247.5 accepted with a reviewed warning",
+      "000 has transparent interior hole rows (y=169)",
+      "337.5 has transparent interior hole rows (y=171)",
+      "157.5->180 diff is a local outlier (2806 pixels vs neighbor average 849)",
+      "337.5->000 diff is a local outlier (2522 pixels vs neighbor average 796)"
+    ]
+  }
+]

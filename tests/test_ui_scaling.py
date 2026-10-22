@@ -266,6 +266,7 @@ class UiScalingTest(unittest.TestCase):
     def test_scaled_popup_stays_inside_viewport_and_selection_works(self):
         self.window.set_ui_scale_percent(200)
         self.window.show_settings()
+        self.window.settings_window._set_settings_page(1)
         self.settle()
         combo = self.window.settings_window.translator_combo
         self.click(combo)
@@ -288,6 +289,10 @@ class UiScalingTest(unittest.TestCase):
         # timer and the queued popup layout settle before calculating a click
         # position; coordinates taken before this wait may already be stale.
         QTest.qWait(QApplication.doubleClickInterval() + 20)
+        if getattr(combo, '_language_search', None) is not None:
+            # The searchable picker starts in the search field. Down enters
+            # its result list; End then navigates to the final language.
+            QTest.keyClick(self.controller.view.viewport(), Qt.Key_Down)
         QTest.keyClick(self.controller.view.viewport(), Qt.Key_End)
         self.settle()
         last = combo.count() - 1
@@ -407,16 +412,16 @@ class UiScalingTest(unittest.TestCase):
                     self.assertTrue(settings.ui_scale_control.isVisible())
                     self.assertEqual(settings.ui_scale_value.text(), '150%')
                     self.assertLess(settings.ui_scale_label.geometry().right(), settings.ui_scale_control.geometry().left())
-                    for control in (
-                        settings.ocr_engine_combo,
-                        settings.translator_combo,
-                        settings.result_window_control,
-                        settings.translation_font_combo,
-                    ):
+                    for control in (settings.result_window_control, settings.translation_font_control):
                         self.assertEqual(settings.ui_scale_control.x(), control.x())
                     self.assertEqual(settings.ui_scale_control.width(), control.width())
                     self.assertAlmostEqual(settings.ui_scale_control.height(), control.height(), delta=1)
-                    self.assertEqual(settings.ui_scale_label.geometry().right(), settings.ocr_engine_label.geometry().right())
+                    self.assertTrue(settings.settings_general_page.isAncestorOf(settings.ui_scale_control))
+                    settings._set_settings_page(1)
+                    self.settle()
+                    self.assertEqual(settings.ocr_engine_combo.x(), settings.translator_combo.x())
+                    self.assertEqual(settings.ocr_engine_combo.size(), settings.translator_combo.size())
+                    settings._set_settings_page(0)
 
     def test_screen_changes_clamp_size_without_losing_the_preference(self):
         self.window.set_ui_scale_percent(200)
@@ -634,9 +639,10 @@ class UiScalingTest(unittest.TestCase):
         self.assertEqual(self.window.config['ui_scale_percent'], 131)
         self.click(settings.ui_scale_value)
         QTest.keyClicks(viewport, '150')
-        self.click(settings.translator_combo)
+        before = settings.update_check_on_launch_checkbox.isChecked()
+        self.click(settings.update_check_on_launch_checkbox)
         self.assertEqual(self.window.config['ui_scale_percent'], 150)
-        self.assertTrue(settings.translator_combo.view().window().isVisible())
+        self.assertEqual(settings.update_check_on_launch_checkbox.isChecked(), not before)
         QTest.keyClick(viewport, Qt.Key_Escape)
 
     def test_window_edges_and_exposed_backing_follow_the_theme_during_scaling(self):

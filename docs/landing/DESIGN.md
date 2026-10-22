@@ -2,23 +2,14 @@
 
 Updated September 2026 for the Windows, macOS and Linux releases.
 
-## References and attribution
+## Implementation and font license
 
-- **Astroship, Web3Templates / Surjith S M**:
-  <https://github.com/surjithctly/astroship>
-  and <https://astroship.web3templates.com/>.
-  The two-column hero, compact navigation, primary/secondary action grouping
-  and contrasting final call to action are adapted from the public
-  `hero.astro`, `navbar/navbar.astro` and `cta.astro` components. This adaptation
-  uses static HTML and CSS, with project-specific layout, content and media.
-  The upstream GPL-3.0 license is retained in
-  `licenses/ASTROSHIP-GPL-3.0.txt`; source is in this public GPL-3.0 repository.
-- **Screen Studio**: <https://screen.studio/>. Visual reference for emphasizing
-  the actual desktop product and keeping the download action clear. No code or
-  media copied from this site.
-- **Onest**: <https://github.com/google/fonts/tree/main/ofl/onest>.
-  Fonts are hosted locally; the SIL Open Font License is in
-  `licenses/ONEST-OFL.txt`.
+The landing page uses the project's static HTML, CSS and JavaScript. Its locale
+generator imports Node.js standard modules and the project's own content and
+asset helpers. The build requires no external site template or UI framework.
+
+Onest fonts are hosted locally; their SIL Open Font License is retained in
+`licenses/ONEST-OFL.txt`.
 
 ## Decisions
 

@@ -1,10 +1,15 @@
-"""Compact numeric controls: one-unit arrows and a centered editable value."""
+"""Compact value controls with bounded arrows and a centered value."""
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from ui_scaling import ScaleArrowButton
 
 
 class _NumberEdit(QtWidgets.QLineEdit):
+    def focusOutEvent(self, event):
+        self._select_after_click = False
+        super().focusOutEvent(event)
+        self.deselect()
+
     def focusInEvent(self, event):
         super().focusInEvent(event)
         self._select_after_click = event.reason() == QtCore.Qt.MouseFocusReason
@@ -56,9 +61,10 @@ class _NumberBox(QtWidgets.QSpinBox):
 
 class StepperFrame(QtWidgets.QFrame):
     """Shared chrome; the owner retains its existing commit/scale behavior."""
-    def __init__(self, editor, parent=None, *, dark=True):
+    def __init__(self, editor, parent=None, *, dark=True, font_size=15):
         super().__init__(parent)
         self.setProperty('numberStepper', True)
+        self._editor_font_size = int(font_size)
         self.editor = editor
         self.decrease = ScaleArrowButton(self)
         self.increase = ScaleArrowButton(self)
@@ -85,14 +91,69 @@ class StepperFrame(QtWidgets.QFrame):
         background, border, ink = (('#17181d', '#3d3948', '#f4f6fb') if dark
                                    else ('#e9e4ed', '#d7cde7', '#202124'))
         self.setStyleSheet(f'''
-            QFrame[numberStepper="true"] {{ background:{background}; border:1px solid {border}; border-radius:7px; }}
+            QFrame[numberStepper="true"] {{ background:{background}; border:1px solid {border};
+                border-radius:7px; margin:1px 3px; }}
             QLineEdit, QSpinBox {{ color:{ink}; background:transparent; border:0;
-                padding:0; margin:0; min-height:0; font-size:15px; font-weight:400; }}
+                padding:0; margin:0; min-height:0; font-size:{self._editor_font_size}px; font-weight:400; }}
             QLineEdit:disabled, QSpinBox:disabled {{ color:{'#7d7487' if dark else '#958b9f'}; }}
         ''' + button_qss(dark, 'quiet', 'QToolButton', icon=True, radius=4) + '''
             QToolButton { padding:0; margin:0; min-width:0; min-height:0; font-size:15px; }
             QToolButton:disabled { background:transparent; border-color:transparent; }
         ''')
+
+
+class ChoiceStepper(StepperFrame):
+    """Named choices with the same bounded arrows as the numeric controls."""
+    valueChanged = QtCore.pyqtSignal(str)
+
+    def __init__(self, choices, parent=None, *, dark=True, font_size=15):
+        self._choices = tuple(choices)
+        if not self._choices:
+            raise ValueError('ChoiceStepper needs at least one choice')
+        self._index = 0
+        editor = QtWidgets.QLineEdit()
+        editor.setReadOnly(True)
+        editor.setAlignment(QtCore.Qt.AlignCenter)
+        editor.setFocusPolicy(QtCore.Qt.NoFocus)
+        editor.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        super().__init__(editor, parent, dark=dark, font_size=font_size)
+        self.decrease.clicked.connect(lambda: self.stepBy(-1))
+        self.increase.clicked.connect(lambda: self.stepBy(1))
+        for control in (self, self.decrease, self.increase):
+            control.installEventFilter(self)
+        self._sync_choice()
+
+    def value(self):
+        return self._choices[self._index][0]
+
+    def setValue(self, value):
+        index = tuple(key for key, _label in self._choices).index(value)
+        if index != self._index:
+            self._index = index
+            self._sync_choice()
+            self.valueChanged.emit(self.value())
+
+    def stepBy(self, direction):
+        index = max(0, min(len(self._choices) - 1, self._index + direction))
+        self.setValue(self._choices[index][0])
+
+    def _sync_choice(self):
+        self.editor.setText(self._choices[self._index][1])
+        self.decrease.setEnabled(self._index > 0)
+        self.increase.setEnabled(self._index < len(self._choices) - 1)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QtCore.QEvent.KeyPress and event.modifiers() == QtCore.Qt.NoModifier:
+            key = event.key()
+            if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Down, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up):
+                self.stepBy(-1 if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Down) else 1)
+            elif key in (QtCore.Qt.Key_Home, QtCore.Qt.Key_End):
+                self.setValue(self._choices[0 if key == QtCore.Qt.Key_Home else -1][0])
+            else:
+                return super().eventFilter(watched, event)
+            event.accept()
+            return True
+        return super().eventFilter(watched, event)
 
 
 class NumberStepper(StepperFrame):

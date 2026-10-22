@@ -8,18 +8,142 @@ BUTTON_RADIUS = 7
 BUTTON_FONT_SIZE = 13
 
 
+def paint_down_arrow(painter, rect, font, color, factor=1.0):
+    """The stepper's light › glyph, turned down and optically centered."""
+    from PyQt5.QtCore import QPointF
+    from PyQt5.QtGui import QFont, QFontMetricsF
+    font = QFont(font)
+    font.setPixelSize(max(1, round(15 * factor)))
+    font.setWeight(QFont.Normal)
+    bounds = QFontMetricsF(font).tightBoundingRect('›')
+    painter.save()
+    painter.setFont(font)
+    painter.setPen(color)
+    painter.translate(rect.center())
+    painter.rotate(90)
+    painter.drawText(QPointF(-bounds.center().x(), -bounds.center().y()), '›')
+    painter.restore()
+
+
+def set_pointer_hover(button, hovered):
+    """Keep the native and styled hover state in sync through a graphics proxy."""
+    import weakref
+    from PyQt5 import sip
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication.instance()
+    previous = getattr(app, '_hovered_app_button', lambda: None)()
+    if hovered:
+        if previous is not None and previous is not button and not sip.isdeleted(previous):
+            set_pointer_hover(previous, False)
+        app._hovered_app_button = weakref.ref(button)
+    elif previous is button:
+        app._hovered_app_button = lambda: None
+    button.setAttribute(Qt.WA_UnderMouse, hovered)
+    if button.property('pointerHover') != hovered:
+        button.setProperty('pointerHover', hovered)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
+
+
+def _clear_background_focus(widget):
+    """Blank surfaces dismiss editing; controls keep their normal mouse behavior."""
+    from PyQt5 import sip
+    from PyQt5.QtWidgets import (QApplication, QWidget, QAbstractButton, QAbstractSpinBox,
+        QAbstractSlider, QAbstractItemView, QComboBox, QLineEdit, QTextEdit,
+        QPlainTextEdit, QKeySequenceEdit, QGraphicsView, QMenu)
+    if not isinstance(widget, QWidget):
+        return
+    # A graphics viewport forwards the click to the real embedded widget.
+    if isinstance(widget, QGraphicsView) or isinstance(widget.parentWidget(), QGraphicsView):
+        return
+    target = widget
+    while target is not None:
+        if isinstance(target, (QAbstractButton, QAbstractSpinBox, QAbstractSlider,
+                QAbstractItemView, QComboBox, QLineEdit, QTextEdit, QPlainTextEdit,
+                QKeySequenceEdit, QMenu)):
+            return
+        target = target.parentWidget()
+    focused = widget.window().focusWidget() or QApplication.focusWidget()
+    if focused is None or focused is widget or focused.isAncestorOf(widget):
+        return
+    if isinstance(focused, QAbstractSpinBox):
+        # A graphics proxy can clear focus without sending the spin box the
+        # native FocusOut event that normally commits its pending text.
+        focused.interpretText()
+    if sip.isdeleted(focused):
+        return
+    finish_edit = getattr(focused, 'finish_background_edit', None)
+    if finish_edit is not None:
+        finish_edit()
+    if sip.isdeleted(focused):
+        return
+    if focused.property('keyboardFocus'):
+        focused.setProperty('keyboardFocus', False)
+        focused.style().unpolish(focused)
+        focused.style().polish(focused)
+    focused.clearFocus()
+    if sip.isdeleted(focused):
+        return
+    if isinstance(focused, QLineEdit):
+        focused.deselect()
+    elif isinstance(focused, QAbstractSpinBox):
+        focused.lineEdit().deselect()
+    elif isinstance(focused, (QTextEdit, QPlainTextEdit)):
+        cursor = focused.textCursor()
+        cursor.clearSelection()
+        focused.setTextCursor(cursor)
+
+
 def _install_keyboard_focus_tracking():
     """Keep keyboard focus visible without leaving a ring after a mouse click."""
     from PyQt5.QtCore import QEvent, QObject, Qt
-    from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip
+    from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip, QWidget
 
     app = QApplication.instance()
     if app is None or hasattr(app, "_button_focus_filter"):
         return
 
     class ButtonFocusFilter(QObject):
+        _events = frozenset((
+            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress,
+            QEvent.Leave, QEvent.WindowDeactivate, QEvent.Hide, QEvent.EnabledChange,
+            QEvent.Enter, QEvent.DynamicPropertyChange, QEvent.ToolTip,
+            QEvent.GraphicsSceneHelp, QEvent.FocusIn, QEvent.FocusOut, QEvent.KeyPress,
+        ))
+
         def eventFilter(self, widget, event):
             kind = event.type()
+            if kind not in self._events:
+                return False
+            hovered = getattr(app, '_hovered_app_button', lambda: None)()
+            if hovered is not None:
+                from PyQt5 import sip
+                if not sip.isdeleted(hovered):
+                    if kind == QEvent.ApplicationDeactivate:
+                        set_pointer_hover(hovered, False)
+                        hovered.setDown(False)
+                    elif kind in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.Leave):
+                        from PyQt5.QtGui import QCursor
+                        from ui_scaling import widget_global_rect
+                        point = event.globalPos() if hasattr(event, 'globalPos') else QCursor.pos()
+                        if not widget_global_rect(hovered).contains(point):
+                            set_pointer_hover(hovered, False)
+                    elif kind in (QEvent.WindowDeactivate, QEvent.Hide, QEvent.EnabledChange) and isinstance(widget, QWidget):
+                        owner_ref = getattr(hovered.window(), '_ui_native_owner', None)
+                        owner = owner_ref() if owner_ref is not None else hovered.window()
+                        if (kind != QEvent.EnabledChange or not hovered.isEnabled()) and (
+                                widget in (hovered.window(), hovered, owner) or widget.isAncestorOf(hovered)):
+                            set_pointer_hover(hovered, False)
+                            hovered.setDown(False)
+            if isinstance(widget, QAbstractButton):
+                if kind == QEvent.Enter and widget.isEnabled():
+                    set_pointer_hover(widget, True)
+                elif kind == QEvent.Leave:
+                    set_pointer_hover(widget, False)
+            if kind == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                _clear_background_focus(widget)
             if (kind == QEvent.DynamicPropertyChange and widget is app
                     and event.propertyName() == b'buttonTooltipsEnabled'
                     and app.property("buttonTooltipsEnabled") is False):
@@ -30,13 +154,13 @@ def _install_keyboard_focus_tracking():
                     event.accept()
                     return True
                 return False
-            if kind not in (QEvent.FocusIn, QEvent.FocusOut, QEvent.MouseButtonPress):
+            if kind not in (QEvent.FocusIn, QEvent.FocusOut, QEvent.MouseButtonPress, QEvent.KeyPress):
                 return False
             if not isinstance(widget, (QPushButton, QToolButton, QComboBox)):
                 return False
-            keyboard = kind == QEvent.FocusIn and event.reason() in (
+            keyboard = kind == QEvent.KeyPress or (kind == QEvent.FocusIn and event.reason() in (
                 Qt.TabFocusReason, Qt.BacktabFocusReason, Qt.ShortcutFocusReason,
-            )
+            ))
             if bool(widget.property("keyboardFocus")) != keyboard:
                 widget.setProperty("keyboardFocus", keyboard)
                 widget.style().unpolish(widget)
@@ -99,6 +223,8 @@ def button_qss(dark, role="secondary", selector="QPushButton", *, compact=False,
             border:1px solid {border}; border-radius:{radius}px;
             padding:{padding}; font-size:{size}px; font-weight:{weight}; }}
         {state(':hover')} {{ background:{hover}; }}
+        {state('[pointerHover="false"]:hover')} {{ background:{background}; }}
+        {state('[pointerHover="true"]')} {{ background:{hover}; }}
         {state(':pressed')} {{ background:{pressed}; }}
         {state('[keyboardFocus="true"]:focus')} {{ border-color:{colors['focus']}; }}
         {state(':checked')} {{ background:{colors['pressed']}; border-color:{colors['focus']}; }}

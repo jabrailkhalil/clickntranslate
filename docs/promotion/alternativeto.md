@@ -118,22 +118,10 @@ selecting “Privacy focused” and “Works Offline”.
 - game-translation
 - document-translation
 
-## Suggested alternatives
+## Product capabilities
 
-Explain the relationship rather than claiming identical functionality:
-
-1. **Capture2Text** — both extract text from a selected screen area; Click'n'Translate
-   adds translation workflows, multiple OCR engines, documents, and overlays.
-2. **Crow Translate** — both are open-source desktop translators for Windows and
-   Linux; Click'n'Translate focuses more heavily on screen OCR and multi-area
-   overlays.
-3. **CopyFish** — both can OCR and translate text from images/video; one is a
-   browser extension and the other is a system-wide desktop app.
-4. **QTranslate** — both provide hotkey translation on Windows; Click'n'Translate
-   also captures arbitrary screen pixels and offers local OCR/translation routes.
-5. **Screen Translator** — both place translations over screen content;
-   Click'n'Translate is an open-source Windows/Linux desktop application with
-   user-selected areas and document tools.
+Describe Click’n’Translate through its screen OCR, selected-text translation,
+document tools, configurable overlays and local/online engine choices.
 
 ## Assets
 

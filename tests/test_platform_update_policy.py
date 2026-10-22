@@ -13,23 +13,18 @@ import platform_support  # noqa: E402
 
 
 class UpdatePolicyTest(unittest.TestCase):
-    """Self-replacement is Windows-only; other systems only announce a version."""
+    """Only an owned packaged installation may replace itself."""
 
-    def test_only_windows_replaces_itself(self):
-        self.assertEqual(platform_support.supports_in_app_update(), platform_support.IS_WINDOWS)
+    def test_windows_keeps_its_verified_update_helper(self):
+        with mock.patch.object(platform_support, "IS_WINDOWS", True):
+            self.assertTrue(platform_support.supports_in_app_update())
 
-    def test_download_path_is_guarded_by_the_policy(self):
-        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
-        guard = "if status == \"ready\" and not platform_support.supports_in_app_update():"
-        self.assertIn(guard, source)
-        # The guard has to come before the branch that starts a download.
-        self.assertLess(source.index(guard), source.index("self._start_update_download(asset_url"))
-
-    def test_linux_offers_the_release_page_instead(self):
-        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
-        guard_at = source.index("if status == \"ready\" and not platform_support.supports_in_app_update():")
-        block = source[guard_at:guard_at + 1200]
-        self.assertIn("webbrowser.open(GITHUB_RELEASES_PAGE)", block)
+    def test_portable_posix_install_can_update_but_managed_install_cannot(self):
+        with mock.patch.object(platform_support, "IS_WINDOWS", False):
+            for target, expected in ((None, False), (("macos", Path("/Applications/App.app")), True),
+                                     (("appimage", Path("/home/me/app.AppImage")), True)):
+                with mock.patch("posix_update.update_target", return_value=target):
+                    self.assertEqual(platform_support.supports_in_app_update(), expected)
 
     def test_linux_build_does_not_ship_the_windows_update_helpers(self):
         spec = (ROOT / "tools/packaging/ClicknTranslate-linux.spec").read_text(encoding="utf-8")

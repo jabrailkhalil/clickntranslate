@@ -165,9 +165,16 @@ class LaunchPromptTest(unittest.TestCase):
 
     def test_a_newer_version_is_still_offered_after_a_skip(self):
         app = _App({"skipped_update_version": "9.9.9"})
-        with mock.patch.object(main, "QMessageBox") as box:
+        app.show_settings = mock.Mock(side_effect=lambda: setattr(app, "settings_window", mock.Mock()))
+        with mock.patch.object(main, "QMessageBox") as box, \
+             mock.patch("inline_update.result") as inline, mock.patch("inline_update.page") as page:
             main.DarkThemeApp._on_launch_update_found(app, "10.0.0")
-        self.assertTrue(box.called)
+        box.assert_not_called()
+        inline.assert_called_once()
+        self.assertIn("10.0.0", inline.call_args.args[1])
+        skip = page.return_value.extra.clicked.connect.call_args.args[0]
+        skip()
+        self.assertEqual(app.config["skipped_update_version"], "10.0.0")
 
     def test_manual_settings_update_owns_the_ui_without_a_second_prompt(self):
         for marker in ("settings", "manual-flow"):

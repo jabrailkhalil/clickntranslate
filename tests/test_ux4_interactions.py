@@ -96,26 +96,24 @@ def test_light_hover_tip_has_no_opaque_native_corners(app):
         styled_dialogs.install_tooltip_style(app)
 
 
-@pytest.mark.parametrize('old_mode,new_appearance', [('idle', 'orb'), ('walk', 'walking'), ('sleep', 'sleep_icon'), ('look', 'orb'), ({}, 'orb')])
+@pytest.mark.parametrize('old_mode,new_appearance', [('idle', 'animated'), ('walk', 'animated'), ('sleep', 'animated'), ('look', 'animated'), ({}, 'animated')])
 def test_legacy_companion_modes_migrate_without_fake_animation(old_mode, new_appearance):
     prefs = assistant_preferences({'desktop_assistant_appearance': 'animated', 'desktop_assistant_behavior': old_mode})
     assert prefs['desktop_assistant_appearance'] == new_appearance
     assert prefs['desktop_assistant_behavior'] in ('idle', 'walk')
 
 
-def test_walking_sprite_stays_consistent_when_paused_and_ignores_hover_ticks(window, app):
+def test_legacy_walking_profile_is_stationary_with_continuous_native_animation(window, app):
     window.config.update(desktop_assistant_appearance='walking', desktop_assistant_behavior='walk')
     window.set_desktop_assistant_enabled(True)
     anchor = window._desktop_assistant.anchor
     anchor.move(200, 200)
+    assert anchor.appearance == 'animated' and anchor.behavior == 'idle'
     anchor.enterEvent(QtCore.QEvent(QtCore.QEvent.Enter))
-    image, position = anchor.grab().toImage(), anchor.pos()
-    anchor._advance(1.)
-    assert anchor.pos() == position and anchor.grab().toImage() == image
-    window._desktop_assistant.request_action('idle')
-    assert anchor.grab().toImage() == image
-    anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
-    assert not anchor._animation.isActive()
+    position, time = anchor.pos(), anchor.motion.time
+    anchor._advance(.2)
+    assert anchor.pos() == position and anchor.motion.time > time
     window._desktop_assistant.request_action('walk')
-    anchor._advance(.5)
-    assert anchor.pos() != position
+    anchor._advance(.2)
+    assert anchor.pos() == position
+    assert window.config['desktop_assistant_behavior'] == 'walk'  # Merely read, never executed.

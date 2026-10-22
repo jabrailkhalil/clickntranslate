@@ -25,7 +25,7 @@ browser locale until the visitor makes a manual choice.
 - Text and translations: `tools/content.mjs`.
 - Shared HTML: `tools/generate-locales.mjs` (the six HTML files are generated).
 - Styling: `styles.css`; interactions and current GitHub downloads: `app.js`.
-- Design references, attribution and licenses: [DESIGN.md](DESIGN.md).
+- Design decisions and font license: [DESIGN.md](DESIGN.md).
 - Real app recordings and owner-supplied screenshots: `assets/`.
 
 Run `npm run build` after editing. `dist/` includes only public files; it omits
@@ -50,21 +50,6 @@ fingerprinted CSS/JS is immutable, and other site resources are revalidated.
 The file also includes the host's existing global security headers so adding
 cache headers does not discard them. Keep previous fingerprinted bundles during
 deployment for visitors who still have an older page open.
-
-`hosting/xynapse-home.html` is the parent site's standalone home page. It is
-maintained separately from the Click'n'Translate bundle and deployed only to
-`/var/www/xynapse.online/index.html`. Its product navigation points to the
-product pages on this domain.
-
-The home page links Click'n'Translate to `/clickntranslate/`, goallog to
-`/goallog/`, and Xynapse IDE to its `#xynapse-ide` description. The IDE's
-Windows button downloads its published v1.108.0 installer directly; update that
-explicit version and link when maintaining the IDE release. It is independent
-of this landing page's automatic Click'n'Translate download resolver.
-
-The parent homepage's Downloads panel uses the separate server collector in
-`hosting/downloads/`, with totals by project and platform. See its README for
-counting rules, the 30-minute refresh timer and deployment paths.
 
 First-launch instructions live in `tools/setup-content.mjs`. The locale
 generator renders the website's Windows/Mac setup sections and the six

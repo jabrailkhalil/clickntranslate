@@ -30,12 +30,31 @@ TEXT = {
            '将打开 {version} 版本。之前副本的窗口将关闭。',
            '关闭并启动', '打开运行中的程序', '正在关闭之前的副本…', '请稍候…',
            '无法关闭之前的副本。请从托盘菜单退出后重试。'),
+
+    'pt': ('O aplicativo já está em execução',
+     'Fechar a cópia em execução e abrir esta?',
+     'A versão {version} será aberta. As janelas da cópia anterior serão fechadas.',
+     'Fechar e iniciar',
+     'Abra o aplicativo em execução',
+     'Fechando a cópia anterior…',
+     'Por favor, espere…',
+     'Não foi possível fechar a cópia anterior. Feche-o no menu da bandeja e tente novamente.'),
+    'it': ("L'app è già in esecuzione",
+     'Chiudere la copia in esecuzione e aprire questa?',
+     'Si aprirà la versione {version}. Le finestre della copia precedente verranno chiuse.',
+     'Chiudi e avvia',
+     "Apri l'app in esecuzione",
+     'Chiusura della copia precedente...',
+     'Per favore aspetta...',
+     'Impossibile chiudere la copia precedente. Chiudilo dal menu della barra delle applicazioni e '
+     'riprova.'),
 }
 
 
 def replacement_dialog(language, version):
     labels = TEXT.get(language, TEXT['en'])
     box = StyledMessageBox()
+    box.setInterfaceLanguage(language)
     box.setWindowTitle(labels[0])
     box.setText(labels[1])
     box.setInformativeText(labels[2].format(version=version))
@@ -79,6 +98,7 @@ class _ClosingDialog(StyledMessageBox):
 def close_with_progress(language, close):
     labels = TEXT.get(language, TEXT['en'])
     box = _ClosingDialog()
+    box.setInterfaceLanguage(language)
     box.setWindowTitle(labels[0])
     box.setText(labels[5])
     box.setIcon(StyledMessageBox.Information)
@@ -97,4 +117,10 @@ def close_with_progress(language, close):
 
 def show_replacement_error(language):
     labels = TEXT.get(language, TEXT['en'])
-    StyledMessageBox.warning(None, labels[0], labels[7])
+    box = StyledMessageBox()
+    box.setInterfaceLanguage(language)
+    box.setWindowTitle(labels[0])
+    box.setText(labels[7])
+    box.setIcon(StyledMessageBox.Warning)
+    box.setStandardButtons(StyledMessageBox.Ok)
+    box.exec_()

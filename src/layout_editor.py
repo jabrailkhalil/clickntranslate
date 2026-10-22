@@ -826,7 +826,7 @@ class LayoutEditorOverlay(QtWidgets.QWidget):
                 panel = (
                     getattr(settings, "settings_action_panel", None)
                     if self.editor.screen == "settings0"
-                    else getattr(settings, "settings_transfer_panel", None)
+                    else getattr(settings, "translation_action_panel", None)
                     if self.editor.screen == "settings1"
                     else None
                 )

@@ -27,6 +27,8 @@ def test_window_selection_reaches_exact_backend(workspaces, owner, monkeypatch, 
         calls[name] = mock.Mock(return_value='Result from ' + provider_key)
         monkeypatch.setattr(translater, name, calls[name])
     monkeypatch.setattr(translater, 'argos_runtime_available', lambda: True)
+    monkeypatch.setattr(translater, 'argos_installed_translation_pairs_fast', lambda: {('en', 'ru'), ('ru', 'en')})
+    monkeypatch.setattr(translater, 'hymt_installed', lambda: True)
     dialog, _, jobs = workspaces
     dialog.engine_combo.setCurrentIndex(dialog.engine_combo.findData(key))
     if not jobs:  # The initial provider is already selected.
@@ -39,3 +41,30 @@ def test_window_selection_reaches_exact_backend(workspaces, owner, monkeypatch, 
     assert cache.save.call_args.args[-1] == key
     if key == 'argos':
         assert calls[function_name].call_args.kwargs['allow_install'] is False
+
+
+@pytest.mark.parametrize('key',['openai','openai-compatible','gemini','anthropic','deepl'])
+def test_result_and_document_api_choices_reach_the_selected_backend(workspaces, owner, monkeypatch, key):
+    import main
+    import translater
+    import api_providers
+    cache=SimpleNamespace(get=mock.Mock(return_value=None),save=mock.Mock())
+    monkeypatch.setattr(translater,'_TranslationCache',lambda *args:cache)
+    translate=mock.Mock(return_value='API result')
+    monkeypatch.setattr(api_providers,'translate',translate)
+    dialog,_,jobs=workspaces
+    assert dialog.engine_combo.findData(key) >= 0
+    dialog.engine_combo.setCurrentIndex(dialog.engine_combo.findData(key))
+    if not jobs: dialog.translate_button.click()
+    jobs.pop()()
+    assert translate.call_args.args[0] == key
+    assert dialog.text_edit.toPlainText() == 'API result'
+    assert owner.config['translator_engine'] == 'Lingva'
+    document=main.DocumentTranslationDialog(owner)
+    try:
+        document._populate_provider_combo(key)
+        assert document.provider_combo.currentData() == key
+    finally:
+        document.close()
+        document.deleteLater()
+    assert main.provider_display_name(key,'ru') == api_providers.BY_KEY[key].name

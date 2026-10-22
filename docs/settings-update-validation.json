@@ -1,0 +1,118 @@
+{
+  "source_commit": "efdabcd4eda24286e3709a188c4b990c42711a5c",
+  "tests_commit": "4f408fe0bde85a7a97c32631b13128a0b4dd0fab",
+  "totals": {
+    "passed": 2073,
+    "skipped": 77,
+    "subtests_passed": 915,
+    "failures": 0,
+    "errors": 0
+  },
+  "parts": [
+    {
+      "part": 1,
+      "folder": "part-1",
+      "passed": 261,
+      "subtests_passed": 0,
+      "skipped": 1,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 2,
+      "folder": "part-2",
+      "passed": 248,
+      "subtests_passed": 710,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 3,
+      "folder": "part-3-final",
+      "passed": 225,
+      "subtests_passed": 4,
+      "skipped": 12,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 4,
+      "folder": "part-4",
+      "passed": 246,
+      "subtests_passed": 24,
+      "skipped": 17,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 5,
+      "folder": "part-5",
+      "passed": 241,
+      "subtests_passed": 14,
+      "skipped": 1,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 6,
+      "folder": "part-6",
+      "passed": 283,
+      "subtests_passed": 3,
+      "skipped": 9,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 7,
+      "folder": "part-7",
+      "passed": 324,
+      "subtests_passed": 157,
+      "skipped": 30,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "part": 8,
+      "folder": "part-8",
+      "passed": 245,
+      "subtests_passed": 3,
+      "skipped": 7,
+      "failures": 0,
+      "errors": 0,
+      "user_data_unchanged": true,
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "main.py": "f8bc08a418ede6431e50f313ee3a6d3c4f9867069b34dd709aa2e4a8714b1df9",
+    "src/settings_window.py": "f7577df22cf434759629948093b4628b260dd14eb1435bc0bfb81483124e0f82",
+    "src/settings_categories.py": "9404e7b12479c6d0e7e6ddcbf731b6a79d61467f2491a0c831fe0a7cb3d3321b",
+    "src/inline_update.py": "436dc089fefac44f0b87ed512c425f1445d1b5947ace7a465a0fa400630ba878",
+    "src/posix_update.py": "6c275c68aebf4dc8133f468eca4159dbf1860dfdce54e5d220d2c1dd210481f7",
+    "src/platform_support.py": "90363b5672fe8d0741852499d2ebe2c08b2623791db29ff16c72c425d8b16046",
+    "tools/launcher/ClicknTranslateApplyUpdate.cs": "dcbb1270bf15ead23c44ed87f690f1fee9e5222612f77f7ebab958b38da6366a"
+  },
+  "scope": "Windows offscreen Qt full suite; compiled quiet Windows updater CLI; MSYS shell transaction tests with disposable programs.",
+  "native_macos": "Pending connection",
+  "native_linux_gui": "Not run on this Windows host",
+  "inno_setup": "Five native setup cases skipped: compiler unavailable; automatic approval review blocked installing it.",
+  "notes": [
+    "Part 3 was replaced after removing a brittle source-prefix assertion. Its final 17-file run passed.",
+    "No release, upload, push or shutdown."
+  ]
+}

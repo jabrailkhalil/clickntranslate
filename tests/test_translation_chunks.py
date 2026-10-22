@@ -185,7 +185,8 @@ def test_batch_documents_use_fewer_requests_and_preserve_order(isolated_translat
 def test_unsupported_batch_retries_singly_on_the_same_server(isolated_translation, monkeypatch):
     calls = []
 
-    def post(url, json, timeout):
+    def post(url, json, timeout, allow_redirects=True):
+        assert allow_redirects is False
         calls.append((url, json))
         q = json['q']
         if isinstance(q, list):

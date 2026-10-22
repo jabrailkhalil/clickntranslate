@@ -7,7 +7,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest, QSignalSpy
 
 import main
-from assistant_preview import AssistantPreview, preview_frames
+from assistant_preview import AssistantPreview
 from capture_widgets import CaptureLanguageCombo
 from languages import LANGUAGES, language_icon_path
 from qt_layout_test_support import ensure_layout_fonts
@@ -29,6 +29,7 @@ def owner(app):
     widget.config = dict(main.DEFAULT_CONFIG, show_update_info=True, translator_engine='Lingva')
     widget.current_interface_language = 'ru'
     widget.current_theme = 'Темная'
+    widget._create_main_hotkey_pair = main.DarkThemeApp._create_main_hotkey_pair
     widget.save_config = mock.Mock()
     yield widget
     widget.close()
@@ -182,8 +183,9 @@ def test_followed_or_unknown_provider_never_falls_back_to_online(workspaces):
     assert not jobs
 
 
-def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
+def test_preview_reference_hover_does_not_leave_mouse_focus_highlight(app, owner):
     rail = AssistantPreview(owner, parent=owner)
+    rail.motion.reactions = False  # Isolate the focus outline from the optional greeting.
     owner.resize(300, 100)
     owner.show()
     rail.show()
@@ -196,6 +198,10 @@ def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
     rail.button.setFocus(QtCore.Qt.MouseFocusReason)
     rail.button.setAttribute(QtCore.Qt.WA_UnderMouse, True)
     app.sendEvent(rail.button, QtCore.QEvent(QtCore.QEvent.Enter))
+    assert isinstance(rail.button, main.HotkeyReferenceRow)
+    assert not rail.button.property('keyboardFocus')
+    app.sendEvent(rail.button, QtCore.QEvent(QtCore.QEvent.Leave))
+    rail.button.clearFocus()
     assert rail.button.grab().toImage() == before
     rail.hide()
 
@@ -236,25 +242,30 @@ def test_welcome_language_menu_is_complete_rounded_and_anchored(app, owner, them
 def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monkeypatch):
     rail = AssistantPreview(owner, parent=owner)
     second = AssistantPreview(owner, parent=owner)
-    assert not rail.frames[0]  # No eagerly loaded animation for a hidden page.
+    assert rail.art is None  # No eagerly loaded animation for a hidden page.
     owner.resize(250, 100)
     owner.show()
     rail.show()
     second.show()
     app.processEvents()
-    assert rail.frames is second.frames
-    assert len(rail.frames[0]) == 10
-    memory = sum(p.width() * p.height() * 4 for row in rail.frames for p in row)
-    assert memory <= 80 * 1024
+    assert rail.art is second.art
+    # Static shortcuts share one tiny image; no animation atlas is decoded.
+    from assistant_preview import preview_art
+    pixmaps = [preview_art(mascot) for mascot in rail.buttons]
+    memory = sum(p.width() * p.height() * 4 for p in pixmaps)
+    assert memory <= 48 * 52 * 4
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
+    monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
+    origin = rail.button.pos()
     for _ in range(200):
         rail._advance(80)
+        assert rail.button.pos() == origin
         assert 0 <= rail.button.x() <= rail.width() - rail.button.width()
     rail.hide()
     second.hide()
 
 
-def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimized(app, owner):
+def test_static_preview_never_runs_a_repaint_timer(app, owner):
     owner.resize(300, 100)
     rail = AssistantPreview(owner, parent=owner)
     rail.resize(260, 18)
@@ -263,7 +274,7 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     rail.button.clearFocus()
     rail._hovered = False
     rail._sync_animation()
-    assert rail.timer.isActive()
+    assert not rail.timer.isActive()
     spy = QSignalSpy(rail.timer.timeout)
     rail.hide()
     QTest.qWait(200)
@@ -271,13 +282,13 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     rail.show()
     app.sendEvent(owner, QtCore.QEvent(QtCore.QEvent.WindowDeactivate))
     QTest.qWait(200)
-    assert rail.timer.isActive() and len(spy) > 0
+    assert not rail.timer.isActive() and len(spy) == 0
     rail._hovered = True
     rail._sync_animation()
     assert not rail.timer.isActive()
     rail._hovered = False
     rail._sync_animation()
-    assert rail.timer.isActive()
+    assert not rail.timer.isActive()
     owner.showMinimized()
     app.processEvents()
     assert not rail.timer.isActive()
@@ -287,22 +298,24 @@ def test_preview_walks_while_inactive_but_pauses_when_hidden_hovered_or_minimize
     assert not rail.timer.isActive()
 
 
-def test_preview_click_and_keyboard_offer_settings_without_desktop_overlay(app, owner):
+def test_single_static_preview_requests_settings_without_desktop_overlay(app, owner):
     rail = AssistantPreview(owner, parent=owner)
+    owner.resize(340, 100)
+    rail.resize(320, 22)
     owner.show()
     rail.show()
+    app.processEvents()
     spy = QSignalSpy(rail.settings_requested)
-    rail.button.click()
-    assert len(spy) == 0
-    assert rail._choice_dialog.isVisible()
-    rail._choice_dialog.done(1)
+    for button in rail.buttons.values():
+        button.click()
+        assert rail._choice_dialog is None
+    assert len(rail.buttons) == len(spy) == 1
     rail.button.setFocus()
     QTest.keyClick(rail.button, QtCore.Qt.Key_Space)
-    assert len(spy) == 1
-    rail._choice_dialog.done(1)
     assert len(spy) == 2
     assert owner.config['desktop_assistant_enabled'] is False
-
+    assert len({button.y() for button in rail.buttons.values()}) == 1
+    assert all(rail.rect().contains(button.geometry()) for button in rail.buttons.values())
 
 @pytest.mark.parametrize('dark', [True, False])
 def test_capture_closed_label_never_changes_to_full_name_and_effect_is_restored(app, owner, dark):
@@ -545,10 +558,13 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
     app.processEvents()
     try:
         preview = window.assistant_preview
-        preview.button.click()
+        def choose_settings(box):
+            next(button for button in box.findChildren(QtWidgets.QPushButton)
+                 if box.buttonRole(button) == main.QMessageBox.AcceptRole).click()
+        with mock.patch.object(main.QMessageBox, 'exec_', choose_settings):
+            preview.button.click()
         app.processEvents()
-        assert preview._choice_dialog.isVisible()
-        preview._choice_dialog.done(1)
+        assert preview._choice_dialog is None
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
         window.activateWindow()
         app.processEvents()
@@ -557,7 +573,7 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         assert window.settings_window.desktop_assistant_checkbox is window.settings_window.settings_assistant_page.toggle
         assert window.settings_window.desktop_assistant_checkbox.isVisible()
         assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
-        assert window.settings_window.desktop_assistant_checkbox.hasFocus()
+        assert window.settings_window.settings_assistant_page.mascot_preview.next_button.hasFocus()
         assert window.config.get('desktop_assistant_enabled') is not True
         assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
         with mock.patch.object(window, 'save_config') as save:

@@ -80,6 +80,9 @@ print(f"icon -> {target}")
 PYTHON
 
 # --- 3. Portable tarball -----------------------------------------------------
+# Only a dedicated, explicitly marked portable install may replace its folder.
+# Distro installs and accidentally unpacking the binary into $HOME stay manual.
+printf '%s\n' 'io.github.jabrailkhalil.clickntranslate' > "$DIST_DIR/.cnt-portable-install"
 echo "[3/4] Packing the portable tarball..."
 TARBALL="$RELEASE_DIR/Click-n-Translate-$VERSION-linux-$ARCH.tar.gz"
 rm -f "$TARBALL"

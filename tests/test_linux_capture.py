@@ -290,7 +290,7 @@ class OverlayFreezeTest(unittest.TestCase):
     runs. GNOME and KDE composite; openbox, i3 and a bare XFCE do not, and there
     the overlay came out solid black — verified on a nested X11 desktop with no
     compositor, where a capture taken while the overlay was up returned a single
-    colour. Flameshot and NormCap both select on a frozen screenshot instead.
+    colour. Selecting on a frozen screenshot keeps the captured screen visible.
     """
 
     @staticmethod

@@ -29,6 +29,11 @@ def stage():
     signature = json.loads((ROOT / 'build/macos/release-signature.json').read_text())
     if signature['sha1'] != EXPECTED_SIGNER or signature['architecture'] != architecture:
         raise RuntimeError('The verification report does not match the permanent signer and architecture.')
+    smoke = json.loads((ROOT / 'build/macos/smoke.json').read_text())
+    if (smoke.get('architecture') != architecture or smoke.get('gui') != 'ok'
+            or smoke.get('vision') != 'ok' or smoke.get('launchservices') != 'ok'
+            or smoke.get('OcrWorker') != 'ok' or smoke.get('ArgosWorker') != 'ok'):
+        raise RuntimeError('Native GUI/OCR/helper checks must pass before staging release files.')
     subprocess.run([
         '/usr/bin/codesign', '--verify', '--deep', '--strict', '-R',
         '=identifier "io.github.jabrailkhalil.clickntranslate" and certificate root = '
@@ -67,8 +72,8 @@ def stage():
         'signer_sha1': EXPECTED_SIGNER,
         'signature': 'permanent self-signed',
         'notarized': bool(signature.get('notarized', False)),
-        'runtime_tested': False,
-        'tests_skipped': 'Explicit prepare_release workflow mode',
+        'runtime_tested': True,
+        'runtime_checks': ['Cocoa GUI', 'LaunchServices', 'Vision', 'RapidOCR', 'Argos'],
         'published_release': False,
         'files': files,
     }
@@ -78,7 +83,7 @@ def stage():
         f"Source commit: {commit}\n\n"
         'Prepared for a later coordinated release. No release has been published.\n'
         'Permanent self-signed certificate; no Apple Developer ID or notarization.\n'
-        'Runtime tests were skipped. See BUILD.json and docs/MACOS_QA.md.\n\n'
+        'Native runtime checks passed. See BUILD.json and docs/MACOS_QA.md.\n\n'
         'Upload the .dmg, .zip and .sha256 files unchanged to the future release.\n'
         'On Windows, keep the inner .zip intact to preserve Mac permissions and symlinks.\n'
         'The .app is inside the .dmg and .zip; it is not a separate Windows executable.\n'

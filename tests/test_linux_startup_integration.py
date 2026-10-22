@@ -168,9 +168,8 @@ class TrayFallbackTest(unittest.TestCase):
         window.hide.assert_not_called()
 
     def test_closing_without_a_tray_quits_instead_of_vanishing(self):
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
-        close_at = source.index("    def closeEvent(self, event):\n        if not self.force_quit")
-        body = source[close_at:close_at + 800]
+        import inspect
+        body = inspect.getsource(main.DarkThemeApp.closeEvent)
 
         self.assertIn("self.has_tray()", body)
         self.assertIn("self.force_quit = True", body)

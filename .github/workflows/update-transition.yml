@@ -12,9 +12,13 @@ on:
         type: choice
         default: all
         options: [all, windows, linux]
+      candidate_release_id:
+        description: Optional private draft release ID for Windows QA before publication
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   transition:
@@ -31,6 +35,8 @@ jobs:
           - {old: '1.7.0', mode: setup}
           - {old: '1.8.0', mode: zip}
           - {old: '1.8.0', mode: setup}
+          - {old: '1.8.1', mode: zip}
+          - {old: '1.8.1', mode: setup}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -44,8 +50,12 @@ jobs:
           CANDIDATE: ${{ inputs.candidate }}
           BASELINE: ${{ matrix.old }}
           PACKAGE_MODE: ${{ matrix.mode }}
+          CANDIDATE_RELEASE_ID: ${{ inputs.candidate_release_id }}
           PYTHONUTF8: '1'
-        run: python tools/qa_published_update.py --old-version $env:BASELINE --new-version $env:CANDIDATE --mode $env:PACKAGE_MODE
+        run: |
+          $candidateArgs = @()
+          if ($env:CANDIDATE_RELEASE_ID) { $candidateArgs = @('--candidate-release-id', $env:CANDIDATE_RELEASE_ID) }
+          python tools/qa_published_update.py --old-version $env:BASELINE --new-version $env:CANDIDATE --mode $env:PACKAGE_MODE @candidateArgs
       - name: Preserve migration receipts and diagnostics
         if: always()
         uses: actions/upload-artifact@v4

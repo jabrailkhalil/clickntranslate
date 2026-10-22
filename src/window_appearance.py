@@ -155,16 +155,20 @@ class DialogAppearance(QtCore.QObject):
         QtCore.QTimer.singleShot(0, update)
 
     def refresh(self, percent=None, theme=None):
+        changed = False
         if percent is not None:
-            self.percent = normalize_ui_scale(percent)
+            value = normalize_ui_scale(percent)
+            changed |= value != self.percent
+            self.percent = value
             self.app.setProperty('ui_scale_percent', self.percent)
-            from styled_dialogs import install_tooltip_style
-            install_tooltip_style(self.app, (theme or self.theme) != 'Светлая')
         if theme is not None:
+            changed |= theme != self.theme
             self.theme = theme
             self.app.setProperty('ui_theme', theme)
-            from styled_dialogs import install_tooltip_style
-            install_tooltip_style(self.app, theme != 'Светлая')
+        if not changed:
+            return
+        from styled_dialogs import install_tooltip_style
+        install_tooltip_style(self.app, self.theme != 'Светлая')
         for window in list(self.app.topLevelWidgets()):
             if self._eligible(window) and (window.isVisible() or window in self._windows):
                 self.apply(window)

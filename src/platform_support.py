@@ -1,9 +1,8 @@
 """Operating system specifics for Click'n'Translate.
 
 Shared platform selection for Windows, Linux and macOS lives here; native Mac
-bridges are in macos_desktop, macos_hotkeys and macos_ocr. The Windows implementations reproduce what
-1.5.5 already shipped; the Linux ones follow the conventions used by comparable
-Linux tools (NormCap, Flameshot):
+bridges are in macos_desktop, macos_hotkeys and macos_ocr. Windows retains the
+existing native integrations. Linux uses desktop-managed integration:
 
 * no in-app global hotkeys — the user binds a command in the desktop
   environment's own keyboard settings (see `shortcut_command`),
@@ -418,9 +417,8 @@ def python_install_hint(version):
 
 
 def supports_in_app_update():
-    """Whether the app may replace itself.
-
-    Only the Windows build ships the updater helpers. Linux packages are updated
-    by whatever installed them, so the app only reports that a version exists.
-    """
-    return IS_WINDOWS
+    """Self-update owned portable installs; stores and distro packages manage theirs."""
+    if IS_WINDOWS:
+        return True
+    from posix_update import update_target
+    return update_target() is not None

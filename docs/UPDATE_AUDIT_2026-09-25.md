@@ -144,16 +144,13 @@ long-path changes. Download/checksum/selection tests also passed. These include
 fixtures and source-level checks; they do not replace migration of the rebuilt
 candidate. Preserve each JSON receipt and its artifact/helper hashes.
 
-## Practices from established projects
+## Update design constraints
 
-| Project | Verified practice | Application here |
-| --- | --- | --- |
-| [OBS Windows updater](https://github.com/obsproject/obs-studio/blob/master/frontend/utility/AutoUpdateThread.cpp) | Separate stable manifest/channel metadata; retrieves and verifies the updater module before launch | Future protocol should support updating the helper independently, with authenticated metadata |
-| [Telegram Desktop updater](https://github.com/telegramdesktop/tdesktop/blob/dev/Telegram/SourceFiles/core/update_checker.cpp) | Authenticates update packages and stages an updater from the downloaded update | Authenticate packages before executing any replacement helper; keep a trusted public key in the client |
-| [VS Code Windows](https://code.visualstudio.com/docs/setup/windows) | User installer avoids routine elevation; ZIP distribution uses manual updates | Treat installation types as distinct contracts, and test each contract |
-| [VS Code Linux](https://code.visualstudio.com/docs/setup/linux) | Repository/package-manager updates for managed packages | Keep managed installations under their package manager |
-| [Sparkle](https://sparkle-project.org/documentation/) | macOS update framework with signed update archives and stable signing keys | Evaluate native Sparkle integration for future Mac automatic updates |
-| [AppImage](https://docs.appimage.org/packaging-guide/optional/updates.html) | Embedded update information and AppImageUpdate; zsync for efficient transfer | Evaluate AppImageUpdate for the AppImage distribution, preserving the previous working image |
+- Authenticate metadata and payloads before launching replacement helpers.
+- Keep helper updates independently versioned and preserve rollback receipts.
+- Test installer and portable updates as separate distribution contracts.
+- Leave managed installations under their package manager.
+- Preserve the previous working image when staging a replacement.
 
 The .NET correction follows Microsoft's [long-path migration guidance](https://learn.microsoft.com/en-us/dotnet/framework/migration-guide/retargeting/4.6.x).
 

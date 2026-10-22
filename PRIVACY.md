@@ -1,19 +1,21 @@
 # Click'n'Translate Privacy Policy
 
-Effective date: August 2, 2026
+Effective date: October 22, 2026
 
-Click'n'Translate is a Windows screen OCR and translation application published by Jabrail Digital. The application does not require an account and does not include advertising, analytics, or developer-operated telemetry.
+Click'n'Translate is a screen OCR and translation application published by Jabrail Digital. This policy describes the Windows, macOS and Linux desktop edition. The application does not require a Click'n'Translate account and does not include advertising, analytics, or developer-operated telemetry.
 
 ## Data processed by the application
 
-- Screen images are captured only after a user invokes an OCR or translation action. OCR is performed locally by the selected OCR engine.
+- Screen images are captured only after a user invokes an OCR or translation action. Local OCR engines process those images on the device. If the user selects a vision API and enables image input, the selected image is sent to that configured provider for recognition or translation.
 - Clipboard text is read or written only for features explicitly invoked or enabled by the user.
 - Copy and translation histories are optional. When enabled, they are stored locally on the user's device.
 - Settings, caches, downloaded OCR files, and offline translation models are stored locally on the user's device.
 
 ## Online translation providers
 
-When an online translation engine is selected, the text the user asks to translate is sent to that provider so it can return a translation. Available online engines include Google Translate, MyMemory, Lingva, and LibreTranslate instances. Their handling of submitted text is governed by their own terms and privacy policies.
+When an online translation engine is selected, the text the user asks to translate is sent to that provider so it can return a translation. Available engines include Google Translate, MyMemory, Lingva and LibreTranslate instances. User-configured API connections include OpenAI, Gemini, Anthropic, DeepL, LibreTranslate and compatible custom endpoints. Vision-capable API connections can also receive selected images when image input is enabled. Their handling of submitted text and images is governed by their own terms and privacy policies.
+
+API keys use the operating system credential store when available, with an in-memory session fallback if persistent secure storage is unavailable. Keys are excluded from settings exports and diagnostic reports. Custom API addresses determine which server receives the configured request; keys are not forwarded automatically to redirects or a fallback provider.
 
 Argos Translate and Hy-MT are offline options. After their selected packages are downloaded, translation is performed on the user's device.
 

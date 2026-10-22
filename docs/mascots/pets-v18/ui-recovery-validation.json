@@ -1,0 +1,102 @@
+{
+  "sourceCommit": "84e166a195802380ab03776bc90dfcdf1e88ba2e",
+  "command": "python tools/run_ci_tests.py --parts 8 --timeout 160",
+  "totals": {
+    "passed": 2039,
+    "skipped": 77,
+    "failed": 2,
+    "subtests": 919
+  },
+  "knownVersionMetadataFailures": [
+    "test_latest_metadata_release_matches_the_application_version",
+    "test_release_version_is_synchronized_everywhere"
+  ],
+  "partitions": [
+    {
+      "part": 1,
+      "finalRerun": false,
+      "passed": 261,
+      "skipped": 1,
+      "failed": 0,
+      "subtests": 0,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 2,
+      "finalRerun": false,
+      "passed": 248,
+      "skipped": 0,
+      "failed": 0,
+      "subtests": 710,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 3,
+      "finalRerun": true,
+      "passed": 224,
+      "skipped": 12,
+      "failed": 1,
+      "subtests": 4,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 4,
+      "finalRerun": true,
+      "passed": 246,
+      "skipped": 17,
+      "failed": 0,
+      "subtests": 24,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 5,
+      "finalRerun": true,
+      "passed": 241,
+      "skipped": 1,
+      "failed": 0,
+      "subtests": 14,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 6,
+      "finalRerun": false,
+      "passed": 276,
+      "skipped": 9,
+      "failed": 0,
+      "subtests": 11,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 7,
+      "finalRerun": false,
+      "passed": 322,
+      "skipped": 30,
+      "failed": 0,
+      "subtests": 153,
+      "userDataUnchanged": true
+    },
+    {
+      "part": 8,
+      "finalRerun": true,
+      "passed": 221,
+      "skipped": 7,
+      "failed": 1,
+      "subtests": 3,
+      "userDataUnchanged": true
+    }
+  ],
+  "focusedFinal": {
+    "passed": 160,
+    "subtests": 24,
+    "userDataUnchanged": true,
+    "files": [
+      "test_main_mascot_shortcut.py",
+      "test_main_window_layout.py",
+      "test_translation_availability.py",
+      "test_ui_polish.py",
+      "test_desktop_ux.py"
+    ]
+  },
+  "nativeMacExecution": false,
+  "releasePublished": false
+}

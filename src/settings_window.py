@@ -1,6 +1,8 @@
-from button_styles import button_qss, button_palette, standard_buttons
-from number_controls import StepperFrame
-from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry
+from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
+from number_controls import ChoiceStepper, StepperFrame
+from control_hints import control_hint
+from package_table import PackageTable
+from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
 from PyQt5 import sip
 import os
 import json
@@ -205,14 +207,7 @@ EASYOCR_PIP_PACKAGES_ANY_PYTHON = (
 # Do not apply this lock to an untested future Python version either.
 EASYOCR_PINNED_PYTHONS = {(3, 12), (3, 13)}
 
-TRANSLATOR_ENGINE_OPTIONS = (
-    ("google", "Google", "online"),
-    ("argos", "Argos", "offline"),
-    (HYMT_ENGINE_KEY, HYMT_ENGINE_DISPLAY, "offline"),
-    ("mymemory", "MyMemory", "online"),
-    ("lingva", "Lingva", "online"),
-    ("libretranslate", "LibreTranslate", "online"),
-)
+from provider_catalog import TRANSLATION_PROVIDERS as TRANSLATOR_ENGINE_OPTIONS
 
 
 def _update_feed_api_url():
@@ -275,6 +270,9 @@ def _provider_kind_text(kind, lang):
             "de": "offline",
             "fr": "offline",
             "zh": "离线",
+
+            'pt': 'offline',
+            'it': 'offline',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -282,6 +280,9 @@ def _provider_kind_text(kind, lang):
         "de": "online",
         "fr": "online",
         "zh": "在线",
+
+        'pt': 'online',
+        'it': 'online',
     }.get(lang, "online")
 
 
@@ -299,6 +300,9 @@ TRANSLATOR_GROUP_TEXT = {
     "de": {"online": "Online", "offline": "Offline"},
     "fr": {"online": "En ligne", "offline": "Hors ligne"},
     "zh": {"online": "在线", "offline": "离线"},
+
+    'pt': {'online': 'Online', 'offline': 'Offline'},
+    'it': {'online': 'Online', 'offline': 'Offline'},
 }
 
 
@@ -328,8 +332,8 @@ def _populate_grouped_translator_combo(
     groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     engines_by_index = []
-    for kind in ("online", "offline"):
-        combo.addItem(f"  {groups[kind]}", None)
+    for kind in ("online", "offline", "api"):
+        combo.addItem(f"  {groups.get(kind, 'API')}", None)
         header_index = combo.count() - 1
         engines_by_index.append(None)
         _configure_engine_group_header(combo, header_index, foreground)
@@ -392,28 +396,19 @@ class DropDownCombo(QComboBox):
     def paintEvent(self, event):
         option = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(option)
+        painter = QtWidgets.QStylePainter(self)
+        self._paint_combo(painter, option)
+
+    def _paint_combo(self, painter, option):
         arrow = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
                                            QtWidgets.QStyle.SC_ComboBoxArrow, self)
         option.subControls &= ~QtWidgets.QStyle.SC_ComboBoxArrow
-        painter = QtWidgets.QStylePainter(self)
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
         painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
         dark = option.palette.color(QtGui.QPalette.Text).lightness() > 128
-        color = QtGui.QColor('#c5b3e9' if dark else '#674586')
-        if not self.isEnabled():
-            color.setAlpha(100)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        color = QtGui.QColor(button_palette(dark)['text' if self.isEnabled() else 'disabled'])
         factor = float(self.window().property('ui_effective_scale') or 1)
-        pen = QtGui.QPen(color, 2 * factor)
-        pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
-        painter.setPen(pen)
-        center = QtCore.QRectF(arrow).center()
-        path = QtGui.QPainterPath()
-        path.moveTo(center.x() - 5 * factor, center.y() - 2.5 * factor)
-        path.lineTo(center.x(), center.y() + 2.5 * factor)
-        path.lineTo(center.x() + 5 * factor, center.y() - 2.5 * factor)
-        painter.drawPath(path)
+        paint_down_arrow(painter, QtCore.QRectF(arrow), self.font(), color, factor)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -539,9 +534,14 @@ class DropDownCombo(QComboBox):
 
     def showPopup(self):
         self.aboutToShowPopup.emit()
+        from language_search import prepare_language_search
+        prepare_language_search(self)
         self._prepare_popup()
         super().showPopup()
         self._layout_open_popup()
+        search = getattr(self, '_language_search', None)
+        if search is not None:
+            search.setFocus(Qt.PopupFocusReason)
         # Cocoa synchronizes a newly created QGraphicsProxyWidget after Show.
         # That can overwrite the scene position with unscaled window coordinates.
         self._queue_popup_layout()
@@ -601,7 +601,7 @@ class DropDownCombo(QComboBox):
             desired = self._popup_content_size()
             popup.setMinimumSize(0, 0)
             if not position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired):
-                anchor = QtCore.QRect(self.mapToGlobal(QtCore.QPoint()), self.size())
+                anchor = widget_global_rect(self)
                 popup.setGeometry(combo_popup_geometry(anchor, desired,
                                                        self._available_screen_rect(), self.POPUP_GAP))
             if popup.layout() is not None:
@@ -611,10 +611,11 @@ class DropDownCombo(QComboBox):
             self._laying_out_popup = False
 
     def _available_screen_rect(self):
-        screen = QtWidgets.QApplication.screenAt(self.mapToGlobal(self.rect().center()))
+        screen = QtWidgets.QApplication.screenAt(widget_global_point(self, self.rect().center()))
         if screen is None:
-            handle = self.window().windowHandle()
-            screen = handle.screen() if handle is not None else None
+            owner = native_window_parent(self).window()
+            handle = owner.windowHandle()
+            screen = handle.screen() if handle is not None else owner.screen()
         if screen is None:
             screen = QtWidgets.QApplication.primaryScreen()
         return screen.availableGeometry()
@@ -631,9 +632,6 @@ def modern_combo_style(dark, font_size=15):
     accent = "#9A7FC1" if is_dark else "#8063a8"
     popup_bg = "#20212a" if is_dark else "#f1edf4"
     selection = "#5f4a88" if is_dark else "#cfc1df"
-    arrow_icon = resource_path(
-        "icons/chevron_down_dark.png" if is_dark else "icons/chevron_down_light.png"
-    ).replace("\\", "/")
     return f"""
         QComboBox {{
             /* Keep the fixed 32px row, but inset the painted field vertically.
@@ -662,8 +660,8 @@ def modern_combo_style(dark, font_size=15):
             width: 24px;
             border: none;
             background: transparent;
-            image: url({arrow_icon});
         }}
+        QComboBox::down-arrow {{ image: none; }}
         QComboBox QAbstractItemView {{
             background-color: {popup_bg};
             color: {text};
@@ -859,8 +857,7 @@ class ResultWindowModeCombo(DropDownCombo):
         self.initStyleOption(option)
         option.currentText = self.summary_text()
         option.currentIcon = QtGui.QIcon()
-        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
-        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        self._paint_combo(painter, option)
         painter.end()
 
 
@@ -942,7 +939,8 @@ class LanguageSwapButton(ScaledIconToolButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setText("")
-        self.setAccessibleName("Swap languages")
+        from dialog_text import dialog_action_text
+        self.setAccessibleName(dialog_action_text(self,'Swap languages'))
         self.setIconSize(QtCore.QSize(20, 16))
         self._refresh_swap_icon()
 
@@ -1164,6 +1162,13 @@ def _populate_grouped_ocr_combo(
             _ocr_combo_tooltip(engine, lang),
             Qt.ToolTipRole,
         )
+    from api_providers import VISION_ENGINES
+    from provider_settings import provider_text
+    combo.addItem('  API', None)
+    _configure_engine_group_header(combo, combo.count() - 1, foreground)
+    for name in VISION_ENGINES:
+        combo.addItem(name, name)
+        combo.setItemData(combo.count() - 1, tooltip_text(provider_text(lang, 'help')), Qt.ToolTipRole)
 
 
 OCR_DETAIL_TEXT = {
@@ -1203,6 +1208,22 @@ OCR_DETAIL_TEXT = {
         "rapidocr": "用于文本块和方向检测的本地神经 OCR；内置模型支持中文和英文。",
         "easyocr": "适合复杂图像和多种文字的本地神经 OCR；需提前安装语言模型。",
     },
+
+    'pt': {'windows': 'Integrado em Windows. Rápido para texto normal da interface; idiomas são instalados '
+                'em pacotes de idiomas.',
+     'tesseract': 'OCR clássico local. Amplo suporte a idiomas e reconhecimento offline previsível.',
+     'rapidocr': 'OCR neural local otimizado para blocos de texto e orientação; o modelo incluído '
+                 'suporta chinês e inglês.',
+     'easyocr': 'OCR neural local para imagens difíceis e vários scripts; os modelos de idioma '
+                'selecionados devem ser instalados primeiro.'},
+    'it': {'windows': "Integrato in Windows. Veloce per il testo dell'interfaccia normale; le lingue sono "
+                'installate nei pacchetti lingua.',
+     'tesseract': 'OCR classico locale. Ampio supporto linguistico e riconoscimento offline '
+                  'prevedibile.',
+     'rapidocr': 'OCR neurale locale ottimizzato per blocchi di testo e orientamento; il modello in '
+                 'bundle supporta cinese e inglese.',
+     'easyocr': 'OCR neurale locale per immagini difficili e script multipli; i modelli linguistici '
+                'selezionati devono essere installati per primi.'},
 }
 
 
@@ -1221,10 +1242,16 @@ TRANSLATOR_DETAIL_TEXT = {
     "de": {"google": "schnell und genau; benötigt Internet", "argos": "lokale Übersetzung; installierte Sprachpakete erforderlich", HYMT_ENGINE_KEY: "lokales LLM-Modell; wird separat installiert", "mymemory": "Online-API mit Tageslimit", "lingva": "Online-Proxy für Google", "libretranslate": "Online-Server LibreTranslate"},
     "fr": {"google": "rapide et précis ; connexion Internet requise", "argos": "traduction locale ; modules de langue installés requis", HYMT_ENGINE_KEY: "modèle LLM local ; installé séparément", "mymemory": "API en ligne avec limite quotidienne", "lingva": "proxy Google en ligne", "libretranslate": "serveur LibreTranslate en ligne"},
     "zh": {"google": "快速、准确，需要联网", "argos": "本地翻译，需要已安装的语言包", HYMT_ENGINE_KEY: "本地 LLM 模型，需要单独安装", "mymemory": "在线 API，设有每日限额", "lingva": "Google 在线代理", "libretranslate": "LibreTranslate 在线服务器"},
+
+    'pt': {'google': 'rápido, preciso, precisa de internet', 'argos': 'tradução local, requer pacotes de idiomas instalados', HYMT_ENGINE_KEY: 'modelo LLM local, instalado separadamente', 'mymemory': 'API online com limite diário', 'lingva': 'proxy on-line do Google', 'libretranslate': 'servidor on-line LibreTranslate'},
+    'it': {'google': 'veloce, preciso, necessita di internet', 'argos': 'traduzione locale, richiede pacchetti lingua installati', HYMT_ENGINE_KEY: 'modello LLM locale, installato separatamente', 'mymemory': 'API online con limite giornaliero', 'lingva': 'proxy online di Google', 'libretranslate': 'server LibreTranslate in linea'},
 }
 
 
 def _translator_combo_tooltip(engine, name, kind, lang):
+    if kind == 'api':
+        from provider_settings import provider_text
+        return name + ' · API\n' + provider_text(lang, 'help')
     kind_text = _provider_kind_text(kind, lang)
     details = TRANSLATOR_DETAIL_TEXT.get(lang, TRANSLATOR_DETAIL_TEXT["en"])
     return f"{name}: {kind_text}. {details.get(engine, '')}".strip()
@@ -1541,7 +1568,7 @@ class TesseractInstallProgressDialog(QDialog):
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)
         action_row.addStretch()
-        self.background_button = QPushButton("Continue in background")
+        self.background_button = QPushButton(language_manager_text(self._lang, "continue_background"))
         self.background_button.clicked.connect(self._continue_in_background)
         action_row.addWidget(self.background_button)
         self.cancel_button = QPushButton(settings_text(self._lang, "cancel"))
@@ -1725,7 +1752,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR behavior",
         "updates_heading": "Updates",
         "settings_page_main": "General settings",
-        "settings_page_updates": "OCR and updates",
+        "settings_page_updates": "Translation and OCR",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
         "game_intro": 'Select text on screen. Translation overlays it and updates automatically. Enable separate output to choose another area.',
@@ -1744,10 +1771,13 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Copy to clipboard",
         "history": "Save translation history",
         "button_hover_tips": "Button hover tips",
+        "replace_select_all": "Select all before replacing",
+        "replace_select_all_hint": "For Translate and replace: selects all text in the active input before translating and replacing it. Useful for chat messages. When off, only your selected text is replaced. Does not send the message.",
         "test_ocr": "Test OCR Translation",
         "save": "Save",
         "back": "Back",
         "remove_hotkey": "Press ESC to remove hotkey",
+        "invalid_hotkey_format": "Use a single key combination. Double-tap shortcuts are available on Windows.",
         "history_view": "View translation history",
         "start_minimized": "Start in shadow mode",
         "copy_history_view": "Show copy history",
@@ -1795,15 +1825,18 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Show the result window after translating selected text.",
         "result_window_mode_area_tooltip": "Show the result window after translating a screen area.",
         "result_window_mode_main_tooltip": "Show the translation next to the input in the main window.",
-        "translation_result_font_label": "Font size:",
-        "translation_result_font_tooltip": "Size of the source and translation text in the result window.",
+        "translation_result_font_label": "Result text:",
+        "translation_result_font_sample": "Sample text",
+        "translation_result_font_decrease": "Decrease result text size",
+        "translation_result_font_increase": "Increase result text size",
+        "translation_result_font_tooltip": "Only changes source and translated text in the separate result window. Use Scale to resize the whole interface.",
         "translation_result_font_xsmall": "Extra small",
         "translation_result_font_small": "Small",
         "translation_result_font_medium": "Medium",
         "translation_result_font_large": "Large",
         "translation_result_font_xlarge": "Extra large",
         "replace_selection_translate_label": "Translate and replace selection:",
-        "replace_selection_unavailable": "Safe automatic replacement is currently available on Windows.",
+        "replace_selection_unavailable": "Automatic replacement is available on Windows and macOS.",
         "selection_quick_translate_enabled": "Quick translate for selected text",
         "selection_quick_translate_tooltip": "Show a translate button near selected text in other apps, or translate immediately. Uses the selection language pair configured for hotkeys. Requires Accessibility on macOS; on Linux uses PRIMARY selection (limited on some Wayland setups). Paused during OCR and dynamic translation.",
         "selection_quick_translate_mode_button": "Show a button after selecting",
@@ -1824,6 +1857,7 @@ SETTINGS_TEXT = {
         "no": "No",
         "cancel": "Cancel",
         "minimize": "Minimize",
+        "close": "Close",
         "open": "Open",
         "install": "Install",
         "later": "Later",
@@ -1855,7 +1889,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Поведение OCR",
         "updates_heading": "Обновления",
         "settings_page_main": "Основные настройки",
-        "settings_page_updates": "OCR и обновления",
+        "settings_page_updates": "Перевод и OCR",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
         "game_intro": 'Выделите текст на экране. Перевод появится поверх него и будет обновляться сам. Для отдельного вывода включите «Не накладывать на текст».',
@@ -1875,12 +1909,15 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Копировать в буфер",
         "history": "Сохранять историю переводов",
         "button_hover_tips": "Подсказки при наведении",
+        "replace_select_all": "Выделять всё перед заменой",
+        "replace_select_all_hint": "Для команды «Перевести и заменить»: выделяет весь текст в активном поле ввода, переводит и заменяет его. Удобно для сообщений в чате. Без галочки заменяется только выделенный фрагмент. Сообщение не отправляется.",
         "test_ocr": "Проверить OCR",
         "save": "Сохранить",
         "back": "Назад",
         "remove_hotkey": "Нажмите ESC для удаления горячей клавиши",
+        "invalid_hotkey_format": "Используйте одно сочетание клавиш. Двойное нажатие одной клавиши доступно в Windows.",
         "history_view": "Посмотреть историю переводов",
-        "start_minimized": "Запускать в режиме тень",
+        "start_minimized": "Запускать в режиме тени",
         "copy_history_view": "Показать историю копирований",
         "copy_history": "Сохранять историю копирований",
         "clear_copy_history": "Очистить историю копирований",
@@ -1926,20 +1963,23 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Показывать окно после перевода выделенного текста.",
         "result_window_mode_area_tooltip": "Показывать окно после перевода области экрана.",
         "result_window_mode_main_tooltip": "Показывать перевод рядом с вводом в главном окне.",
-        "translation_result_font_label": "Размер шрифта:",
-        "translation_result_font_tooltip": "Размер текста оригинала и перевода в окне результата.",
+        "translation_result_font_label": "Текст результата:",
+        "translation_result_font_sample": "Пример текста",
+        "translation_result_font_decrease": "Уменьшить текст результата",
+        "translation_result_font_increase": "Увеличить текст результата",
+        "translation_result_font_tooltip": "Только размер оригинала и перевода в отдельном окне результата. Общий размер интерфейса меняется пунктом «Масштаб».",
         "translation_result_font_xsmall": "Очень мелкий",
         "translation_result_font_small": "Мелкий",
         "translation_result_font_medium": "Обычный",
         "translation_result_font_large": "Крупный",
         "translation_result_font_xlarge": "Очень крупный",
         "replace_selection_translate_label": "Перевести и заменить выделенное:",
-        "replace_selection_unavailable": "Безопасная автоматическая замена пока доступна только в Windows.",
+        "replace_selection_unavailable": "Автоматическая замена доступна в Windows и macOS.",
         "selection_quick_translate_enabled": "Быстрый перевод выделенного текста",
         "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
         "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
         "selection_quick_translate_mode_automatic": "Переводить сразу после выделения",
-        "close_result_window_on_outside_click": "Закрывать окно перевода кликом снаружи",
+        "close_result_window_on_outside_click": "Закрывать результат кликом снаружи",
         "close_result_window_on_outside_click_tooltip": "Окно перевода закроется, если кликнуть другое приложение или мимо него — нажимать крестик не нужно.",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
@@ -1955,6 +1995,7 @@ SETTINGS_TEXT = {
         "no": "Нет",
         "cancel": "Отмена",
         "minimize": "Свернуть",
+        "close": "Закрыть",
         "open": "Открыть",
         "install": "Установить",
         "later": "Позже",
@@ -1985,7 +2026,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Comportamiento de OCR",
         "updates_heading": "Actualizaciones",
         "settings_page_main": "Ajustes generales",
-        "settings_page_updates": "OCR y actualizaciones",
+        "settings_page_updates": "Traducción y OCR",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
         "game_intro": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
@@ -1998,16 +2039,19 @@ SETTINGS_TEXT = {
         "game_pause_inactive_tooltip": "Pausa el OCR si la ventana activa al iniciar el modo se minimiza o deja de estar en primer plano. La traducción se reanuda al volver.",
         "game_show_original": "Mostrar el texto reconocido junto con la traducción",
         "game_workflow_note": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
-        "translation_mode": "Modo de traduccion: {mode}",
+        "translation_mode": "Modo de traducción: {mode}",
         "hotkeys": "Configurar atajos",
         "save_and_back": "Guardar y volver",
         "copy_to_clipboard": "Copiar al portapapeles",
         "history": "Guardar historial de traducciones",
         "button_hover_tips": "Ayuda al pasar sobre botones",
+        "replace_select_all": "Seleccionar todo al reemplazar",
+        "replace_select_all_hint": "En Traducir y reemplazar, selecciona todo el texto del campo activo antes de traducirlo y reemplazarlo. Útil para chats. Desactivado: solo reemplaza la selección. No envía el mensaje.",
         "test_ocr": "Probar OCR",
         "save": "Guardar",
         "back": "Volver",
         "remove_hotkey": "Pulsa ESC para quitar el atajo",
+        "invalid_hotkey_format": "Usa una sola combinación de teclas. Los atajos de doble pulsación están disponibles en Windows.",
         "history_view": "Ver historial de traducciones",
         "start_minimized": "Iniciar en modo sombra",
         "copy_history_view": "Mostrar historial de copias",
@@ -2016,28 +2060,28 @@ SETTINGS_TEXT = {
         "clear_translation_history": "Borrar historial de traducciones",
         "history_title": "Historial de traducciones",
         "copy_history_title": "Historial de copias",
-        "history_empty": "El historial esta vacio.",
+        "history_empty": "El historial está vacío.",
         "history_error": "Error al leer el historial.",
         "error_title": "Error",
         "clear_translation_history_error": "No se pudo borrar el historial de traducciones.",
         "clear_copy_history_error": "No se pudo borrar el historial de copias.",
         "copy_translated_text": "Copiar el texto traducido",
         "freeze_screen_on_ocr": "Congelar pantalla durante OCR",
-        "fullscreen_translate_hotkey": "Atajo de traduccion de pantalla:",
+        "fullscreen_translate_hotkey": "Atajo de traducción de pantalla:",
         "fullscreen_from": "De:",
         "fullscreen_to": "A:",
-        "translate_selection_hotkey": "Atajo para traducir seleccion:",
+        "translate_selection_hotkey": "Atajo para traducir selección:",
         "translator_label": "Traducir:",
         "keep_visible_on_ocr": "Mantener ventana visible durante OCR",
-        "clear_cache": "Borrar cache",
+        "clear_cache": "Borrar caché",
         "reset": "Restablecer",
         "update": "Actualizar",
         "translation_history_button": "Historial de traducciones",
         "copy_history_button": "Historial de copias",
-        "fullscreen_translate_label": "Traduccion de pantalla:",
+        "fullscreen_translate_label": "Traducción de pantalla:",
         "game_translate_label": "Dinámico:",
-        "selection_translate_label": "Traduccion de seleccion:",
-        "toggle_window_hotkey_label": "Mostrar / ocultar aplicacion:",
+        "selection_translate_label": "Traducción de selección:",
+        "toggle_window_hotkey_label": "Mostrar / ocultar aplicación:",
         "result_window_label": "Mostrar ventana:",
         "result_window_mode_selection": "Texto",
         "result_window_mode_area": "Área",
@@ -2055,23 +2099,26 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Mostrar la ventana al traducir texto seleccionado.",
         "result_window_mode_area_tooltip": "Mostrar la ventana al traducir un área de la pantalla.",
         "result_window_mode_main_tooltip": "Mostrar la traducción junto a la entrada en la ventana principal.",
-        "translation_result_font_label": "Tamaño de fuente:",
-        "translation_result_font_tooltip": "Tamaño del texto original y traducido en la ventana de resultado.",
+        "translation_result_font_label": "Texto del resultado:",
+        "translation_result_font_sample": "Ejemplo",
+        "translation_result_font_decrease": "Reducir el texto del resultado",
+        "translation_result_font_increase": "Ampliar el texto del resultado",
+        "translation_result_font_tooltip": "Solo cambia el texto original y traducido en la ventana de resultado. Usa Escala para cambiar el tamaño de toda la interfaz.",
         "translation_result_font_xsmall": "Muy pequeña",
         "translation_result_font_small": "Pequeña",
         "translation_result_font_medium": "Mediana",
         "translation_result_font_large": "Grande",
         "translation_result_font_xlarge": "Muy grande",
         "replace_selection_translate_label": "Traducir y reemplazar selección:",
-        "replace_selection_unavailable": "El reemplazo automático seguro está disponible actualmente en Windows.",
+        "replace_selection_unavailable": "El reemplazo automático está disponible en Windows y macOS.",
         "selection_quick_translate_enabled": "Traducción rápida del texto seleccionado",
         "selection_quick_translate_tooltip": "Muestra un botón cerca del texto seleccionado en otras apps o traduce al instante. Usa el par de idiomas de la traducción por selección. En macOS requiere Accesibilidad; en Linux usa PRIMARY (limitado en Wayland). Se pausa durante OCR y traducción dinámica.",
         "selection_quick_translate_mode_button": "Mostrar un botón tras seleccionar",
         "selection_quick_translate_mode_automatic": "Traducir inmediatamente tras seleccionar",
         "close_result_window_on_outside_click": "Cerrar la ventana de traducción al hacer clic fuera",
         "close_result_window_on_outside_click_tooltip": "Cierra la ventana de traducción al hacer clic en otra app o fuera de ella, sin usar el botón de cierre.",
-        "copy_hotkey_label": "Atajo para copiar seleccion:",
-        "translate_hotkey_label": "Atajo de traduccion:",
+        "copy_hotkey_label": "Atajo para copiar selección:",
+        "translate_hotkey_label": "Atajo de traducción:",
         "remove_local_tesseract": "Eliminar Tesseract local",
         "remove_local_rapidocr": "Eliminar RapidOCR local",
         "remove_local_easyocr": "Eliminar EasyOCR local",
@@ -2080,17 +2127,18 @@ SETTINGS_TEXT = {
         "manage_ocr_languages": "Gestionar paquetes de OCR y Argos",
         "clearing": "Borrando...",
         "cleared": "Borrado {size}",
-        "yes": "Si",
+        "yes": "Sí",
         "no": "No",
         "cancel": "Cancelar",
         "minimize": "Minimizar",
+        "close": "Cerrar",
         "open": "Abrir",
         "install": "Instalar",
-        "later": "Mas tarde",
+        "later": "Más tarde",
         "remove": "Eliminar",
-        "reset_question": "Seguro que quieres restablecer todos los ajustes?",
-        "clear_histories_title": "Borrar historiales?",
-        "clear_histories_question": "Borrar el historial de traducciones y de copias?",
+        "reset_question": "¿Seguro que quieres restablecer todos los ajustes?",
+        "clear_histories_title": "¿Borrar historiales?",
+        "clear_histories_question": "¿Borrar el historial de traducciones y de copias?",
         "settings_reset_done": "Ajustes restablecidos"
     },
     "de": {
@@ -2114,7 +2162,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR-Verhalten",
         "updates_heading": "Updates",
         "settings_page_main": "Allgemeine Einstellungen",
-        "settings_page_updates": "OCR und Updates",
+        "settings_page_updates": "Übersetzung und OCR",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
         "game_intro": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
@@ -2127,45 +2175,48 @@ SETTINGS_TEXT = {
         "game_pause_inactive_tooltip": "OCR pausiert, wenn das beim Modusstart aktive Fenster minimiert wird oder nicht mehr im Vordergrund ist. Beim Zurückkehren läuft die Übersetzung automatisch weiter.",
         "game_show_original": "Erkannten Text zusammen mit der Übersetzung zeigen",
         "game_workflow_note": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
-        "translation_mode": "Ubersetzungsmodus: {mode}",
-        "hotkeys": "Tastenkurzel konfigurieren",
-        "save_and_back": "Speichern und zuruck",
+        "translation_mode": "Übersetzungsmodus: {mode}",
+        "hotkeys": "Tastenkürzel konfigurieren",
+        "save_and_back": "Speichern und zurück",
         "copy_to_clipboard": "In Zwischenablage kopieren",
-        "history": "Ubersetzungsverlauf speichern",
+        "history": "Übersetzungsverlauf speichern",
         "button_hover_tips": "Schaltflächenhinweise",
+        "replace_select_all": "Vor Ersetzen alles auswählen",
+        "replace_select_all_hint": "Bei Übersetzen und Ersetzen wird der gesamte Text im aktiven Eingabefeld ausgewählt, übersetzt und ersetzt. Praktisch für Chats. Sonst wird nur die Auswahl ersetzt. Sendet die Nachricht nicht ab.",
         "test_ocr": "OCR testen",
         "save": "Speichern",
-        "back": "Zuruck",
-        "remove_hotkey": "ESC drucken, um das Tastenkurzel zu entfernen",
-        "history_view": "Ubersetzungsverlauf anzeigen",
+        "back": "Zurück",
+        "remove_hotkey": "ESC drücken, um das Tastenkürzel zu entfernen",
+        "invalid_hotkey_format": "Verwenden Sie eine einzelne Tastenkombination. Doppeltipp-Tastenkürzel sind unter Windows verfügbar.",
+        "history_view": "Übersetzungsverlauf anzeigen",
         "start_minimized": "Im Schattenmodus starten",
         "copy_history_view": "Kopierverlauf anzeigen",
         "copy_history": "Kopierverlauf speichern",
         "clear_copy_history": "Kopierverlauf leeren",
-        "clear_translation_history": "Ubersetzungsverlauf leeren",
-        "history_title": "Ubersetzungsverlauf",
+        "clear_translation_history": "Übersetzungsverlauf leeren",
+        "history_title": "Übersetzungsverlauf",
         "copy_history_title": "Kopierverlauf",
         "history_empty": "Der Verlauf ist leer.",
         "history_error": "Fehler beim Lesen des Verlaufs.",
         "error_title": "Fehler",
         "clear_translation_history_error": "Der Übersetzungsverlauf konnte nicht gelöscht werden.",
         "clear_copy_history_error": "Der Kopierverlauf konnte nicht gelöscht werden.",
-        "copy_translated_text": "Ubersetzten Text kopieren",
-        "freeze_screen_on_ocr": "Bildschirm wahrend OCR einfrieren",
-        "fullscreen_translate_hotkey": "Tastenkurzel fur Bildschirmubersetzung:",
+        "copy_translated_text": "Übersetzten Text kopieren",
+        "freeze_screen_on_ocr": "Bildschirm während OCR einfrieren",
+        "fullscreen_translate_hotkey": "Tastenkürzel für Bildschirmübersetzung:",
         "fullscreen_from": "Von:",
         "fullscreen_to": "Nach:",
-        "translate_selection_hotkey": "Tastenkurzel fur Auswahlubersetzung:",
-        "translator_label": "Ubersetzen:",
-        "keep_visible_on_ocr": "Fenster wahrend OCR sichtbar halten",
+        "translate_selection_hotkey": "Tastenkürzel für Auswahlübersetzung:",
+        "translator_label": "Übersetzen:",
+        "keep_visible_on_ocr": "Fenster während OCR sichtbar halten",
         "clear_cache": "Cache leeren",
-        "reset": "Zurucksetzen",
+        "reset": "Zurücksetzen",
         "update": "Aktualisieren",
-        "translation_history_button": "Ubersetzungsverlauf",
+        "translation_history_button": "Übersetzungsverlauf",
         "copy_history_button": "Kopierverlauf",
-        "fullscreen_translate_label": "Bildschirmubersetzung:",
+        "fullscreen_translate_label": "Bildschirmübersetzung:",
         "game_translate_label": "Dynamisch:",
-        "selection_translate_label": "Auswahlubersetzung:",
+        "selection_translate_label": "Auswahlübersetzung:",
         "toggle_window_hotkey_label": "App anzeigen / ausblenden:",
         "result_window_label": "Fenster zeigen:",
         "result_window_mode_selection": "Text",
@@ -2184,23 +2235,26 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Fenster nach der Übersetzung markierten Textes zeigen.",
         "result_window_mode_area_tooltip": "Fenster nach der Übersetzung eines Bildschirmbereichs zeigen.",
         "result_window_mode_main_tooltip": "Übersetzung neben der Eingabe im Hauptfenster anzeigen.",
-        "translation_result_font_label": "Schriftgröße:",
-        "translation_result_font_tooltip": "Schriftgröße von Original und Übersetzung im Ergebnisfenster.",
+        "translation_result_font_label": "Ergebnistext:",
+        "translation_result_font_sample": "Beispieltext",
+        "translation_result_font_decrease": "Ergebnistext verkleinern",
+        "translation_result_font_increase": "Ergebnistext vergrößern",
+        "translation_result_font_tooltip": "Ändert nur Original und Übersetzung im separaten Ergebnisfenster. Die gesamte Oberfläche wird über Skalierung vergrößert oder verkleinert.",
         "translation_result_font_xsmall": "Sehr klein",
         "translation_result_font_small": "Klein",
         "translation_result_font_medium": "Mittel",
         "translation_result_font_large": "Groß",
         "translation_result_font_xlarge": "Sehr groß",
         "replace_selection_translate_label": "Auswahl übersetzen und ersetzen:",
-        "replace_selection_unavailable": "Sicheres automatisches Ersetzen ist derzeit unter Windows verfügbar.",
+        "replace_selection_unavailable": "Automatisches Ersetzen ist unter Windows und macOS verfügbar.",
         "selection_quick_translate_enabled": "Schnellübersetzung für markierten Text",
         "selection_quick_translate_tooltip": "Zeigt eine Übersetzen-Schaltfläche nahe der Auswahl in anderen Apps oder übersetzt sofort. Verwendet das Sprachpaar für Auswahlübersetzung. Unter macOS ist Bedienungshilfe nötig; unter Linux PRIMARY (eingeschränkt unter Wayland). Pausiert während OCR und dynamischer Übersetzung.",
         "selection_quick_translate_mode_button": "Schaltfläche nach der Auswahl anzeigen",
         "selection_quick_translate_mode_automatic": "Sofort nach der Auswahl übersetzen",
         "close_result_window_on_outside_click": "Übersetzungsfenster bei Klick außerhalb schließen",
         "close_result_window_on_outside_click_tooltip": "Schließt das Übersetzungsfenster, wenn Sie eine andere App oder außerhalb klicken. Der Schließen-Knopf ist dann nicht nötig.",
-        "copy_hotkey_label": "Tastenkurzel zum Kopieren:",
-        "translate_hotkey_label": "Tastenkurzel zum Ubersetzen:",
+        "copy_hotkey_label": "Tastenkürzel zum Kopieren:",
+        "translate_hotkey_label": "Tastenkürzel zum Übersetzen:",
         "remove_local_tesseract": "Lokales Tesseract entfernen",
         "remove_local_rapidocr": "Lokales RapidOCR entfernen",
         "remove_local_easyocr": "Lokales EasyOCR entfernen",
@@ -2213,17 +2267,18 @@ SETTINGS_TEXT = {
         "no": "Nein",
         "cancel": "Abbrechen",
         "minimize": "Minimieren",
-        "open": "Offnen",
+        "close": "Schließen",
+        "open": "Öffnen",
         "install": "Installieren",
-        "later": "Spater",
+        "later": "Später",
         "remove": "Entfernen",
-        "reset_question": "Mochtest du wirklich alle Einstellungen zurucksetzen?",
-        "clear_histories_title": "Verlaufe leeren?",
-        "clear_histories_question": "Ubersetzungs- und Kopierverlauf leeren?",
-        "settings_reset_done": "Einstellungen wurden zuruckgesetzt"
+        "reset_question": "Möchtest du wirklich alle Einstellungen zurücksetzen?",
+        "clear_histories_title": "Verläufe leeren?",
+        "clear_histories_question": "Übersetzungs- und Kopierverlauf leeren?",
+        "settings_reset_done": "Einstellungen wurden zurückgesetzt"
     },
     "fr": {
-        "autostart": "Demarrer avec le systeme",
+        "autostart": "Démarrer avec le système",
         "update_check_on_launch": "Rechercher les mises à jour au démarrage",
         "dim_screen_during_ocr": "Assombrir l’écran pendant la sélection OCR",
         "ocr_dim_strength_tooltip": "Choisissez l’intensité de l’assombrissement hors de la sélection OCR.",
@@ -2243,7 +2298,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Comportement OCR",
         "updates_heading": "Mises à jour",
         "settings_page_main": "Réglages généraux",
-        "settings_page_updates": "OCR et mises à jour",
+        "settings_page_updates": "Traduction et OCR",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
         "game_intro": 'Sélectionnez du texte. La traduction le recouvre et se met à jour automatiquement. Activez la sortie séparée pour choisir une autre zone.',
@@ -2262,12 +2317,15 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "Copier dans le presse-papiers",
         "history": "Garder l'historique des traductions",
         "button_hover_tips": "Aide au survol des boutons",
+        "replace_select_all": "Tout sélectionner avant remplacement",
+        "replace_select_all_hint": "Pour Traduire et remplacer : sélectionne tout le texte du champ actif, puis le traduit et le remplace. Utile dans les chats. Sinon, seule la sélection est remplacée. N’envoie pas le message.",
         "test_ocr": "Tester l'OCR",
         "save": "Enregistrer",
         "back": "Retour",
         "remove_hotkey": "Appuyez sur ESC pour supprimer le raccourci",
+        "invalid_hotkey_format": "Utilisez une seule combinaison de touches. Les raccourcis par double appui sont disponibles sous Windows.",
         "history_view": "Voir l'historique des traductions",
-        "start_minimized": "Demarrer en mode ombre",
+        "start_minimized": "Démarrer en mode ombre",
         "copy_history_view": "Afficher l'historique des copies",
         "copy_history": "Enregistrer l'historique des copies",
         "clear_copy_history": "Effacer l'historique des copies",
@@ -2280,21 +2338,21 @@ SETTINGS_TEXT = {
         "clear_translation_history_error": "Impossible d’effacer l’historique des traductions.",
         "clear_copy_history_error": "Impossible d’effacer l’historique des copies.",
         "copy_translated_text": "Copier le texte traduit",
-        "freeze_screen_on_ocr": "Figer l'ecran pendant l'OCR",
-        "fullscreen_translate_hotkey": "Raccourci traduction plein ecran :",
+        "freeze_screen_on_ocr": "Figer l’écran pendant l’OCR",
+        "fullscreen_translate_hotkey": "Raccourci de traduction plein écran :",
         "fullscreen_from": "De :",
         "fullscreen_to": "Vers :",
-        "translate_selection_hotkey": "Raccourci traduction de selection :",
+        "translate_selection_hotkey": "Raccourci de traduction de sélection :",
         "translator_label": "Traduire :",
-        "keep_visible_on_ocr": "Garder la fenetre visible pendant l'OCR",
+        "keep_visible_on_ocr": "Garder la fenêtre visible pendant l’OCR",
         "clear_cache": "Vider le cache",
-        "reset": "Reinitialiser",
-        "update": "Mettre a jour",
+        "reset": "Réinitialiser",
+        "update": "Mettre à jour",
         "translation_history_button": "Historique des traductions",
         "copy_history_button": "Historique des copies",
-        "fullscreen_translate_label": "Traduction plein ecran :",
+        "fullscreen_translate_label": "Traduction plein écran :",
         "game_translate_label": "Dynamique :",
-        "selection_translate_label": "Traduction de selection :",
+        "selection_translate_label": "Traduction de sélection :",
         "toggle_window_hotkey_label": "Afficher / masquer l'application :",
         "result_window_label": "Afficher fenêtre :",
         "result_window_mode_selection": "Texte",
@@ -2313,15 +2371,18 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "Afficher la fenêtre après la traduction du texte sélectionné.",
         "result_window_mode_area_tooltip": "Afficher la fenêtre après la traduction d’une zone de l’écran.",
         "result_window_mode_main_tooltip": "Afficher la traduction à côté de la saisie dans la fenêtre principale.",
-        "translation_result_font_label": "Taille de police :",
-        "translation_result_font_tooltip": "Taille du texte source et traduit dans la fenêtre de résultat.",
+        "translation_result_font_label": "Texte du résultat :",
+        "translation_result_font_sample": "Exemple",
+        "translation_result_font_decrease": "Réduire le texte du résultat",
+        "translation_result_font_increase": "Agrandir le texte du résultat",
+        "translation_result_font_tooltip": "Modifie uniquement le texte source et traduit dans la fenêtre de résultat. Utilisez Échelle pour redimensionner toute l’interface.",
         "translation_result_font_xsmall": "Très petite",
         "translation_result_font_small": "Petite",
         "translation_result_font_medium": "Moyenne",
         "translation_result_font_large": "Grande",
         "translation_result_font_xlarge": "Très grande",
         "replace_selection_translate_label": "Traduire et remplacer la sélection :",
-        "replace_selection_unavailable": "Le remplacement automatique sécurisé est actuellement disponible sous Windows.",
+        "replace_selection_unavailable": "Le remplacement automatique est disponible sous Windows et macOS.",
         "selection_quick_translate_enabled": "Traduction rapide du texte sélectionné",
         "selection_quick_translate_tooltip": "Affiche un bouton près du texte sélectionné dans d'autres apps ou traduit immédiatement. Utilise la paire de langues de la traduction par sélection. macOS requiert l'accessibilité ; Linux utilise PRIMARY (limité sous Wayland). En pause pendant l'OCR et la traduction dynamique.",
         "selection_quick_translate_mode_button": "Afficher un bouton après la sélection",
@@ -2337,19 +2398,20 @@ SETTINGS_TEXT = {
         "ocr_language_packs": "Modules linguistiques",
         "manage_ocr_languages": "Gérer les modules OCR et Argos",
         "clearing": "Nettoyage...",
-        "cleared": "{size} nettoye",
+        "cleared": "{size} nettoyé",
         "yes": "Oui",
         "no": "Non",
         "cancel": "Annuler",
         "minimize": "Réduire",
+        "close": "Fermer",
         "open": "Ouvrir",
         "install": "Installer",
         "later": "Plus tard",
         "remove": "Supprimer",
-        "reset_question": "Voulez-vous vraiment reinitialiser tous les reglages ?",
+        "reset_question": "Voulez-vous vraiment réinitialiser tous les réglages ?",
         "clear_histories_title": "Effacer les historiques ?",
         "clear_histories_question": "Effacer l'historique des traductions et des copies ?",
-        "settings_reset_done": "Reglages reinitialises"
+        "settings_reset_done": "Réglages réinitialisés"
     },
     "zh": {
         "autostart": "随系统启动",
@@ -2359,7 +2421,7 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "处理所选文本后恢复剪贴板",
         "restore_clipboard_tooltip": "显示翻译或成功替换后恢复原剪贴板内容；明确的复制操作仍会保留结果。",
         "copy_notification": "复制文本后通知我",
-        "copy_notification_tooltip": "复制结果后在屏幕上显示简短提示，在隐身模式下也会显示。",
+        "copy_notification_tooltip": "复制结果后在屏幕上显示简短提示，在阴影模式下也会显示。",
         "create_bug_report": "创建安全错误报告",
         "bug_report_tooltip": "创建不包含剪贴板、历史记录或文档文本的诊断 ZIP。",
         "export_settings": "导出设置", "import_settings": "导入设置",
@@ -2372,7 +2434,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR 行为",
         "updates_heading": "更新",
         "settings_page_main": "常规设置",
-        "settings_page_updates": "OCR 与更新",
+        "settings_page_updates": "翻译与 OCR",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
         "game_intro": '框选屏幕文字，译文会覆盖原文并自动更新。启用独立输出可选择另一处显示译文。',
@@ -2391,10 +2453,13 @@ SETTINGS_TEXT = {
         "copy_to_clipboard": "复制到剪贴板",
         "history": "保存翻译历史",
         "button_hover_tips": "按钮悬停提示",
+        "replace_select_all": "替换前全选文本",
+        "replace_select_all_hint": "使用“翻译并替换”时，先全选当前输入框的文本，再翻译并替换。适合聊天消息。关闭后仅替换选中的部分。不会发送消息。",
         "test_ocr": "测试 OCR",
         "save": "保存",
         "back": "返回",
         "remove_hotkey": "按 ESC 删除快捷键",
+        "invalid_hotkey_format": "请使用单个组合键。Windows 支持连续按两次同一按键的快捷方式。",
         "history_view": "查看翻译历史",
         "start_minimized": "以阴影模式启动",
         "copy_history_view": "显示复制历史",
@@ -2442,15 +2507,18 @@ SETTINGS_TEXT = {
         "result_window_mode_selection_tooltip": "翻译选中文本后显示窗口。",
         "result_window_mode_area_tooltip": "翻译屏幕区域后显示窗口。",
         "result_window_mode_main_tooltip": "在主窗口的输入旁边显示译文。",
-        "translation_result_font_label": "字体大小：",
-        "translation_result_font_tooltip": "结果窗口中原文和译文的字号。",
+        "translation_result_font_label": "结果文字：",
+        "translation_result_font_sample": "示例文字",
+        "translation_result_font_decrease": "缩小结果文字",
+        "translation_result_font_increase": "放大结果文字",
+        "translation_result_font_tooltip": "仅更改独立结果窗口中原文和译文的字号。整个界面的大小请通过“缩放”调整。",
         "translation_result_font_xsmall": "极小",
         "translation_result_font_small": "小",
         "translation_result_font_medium": "中",
         "translation_result_font_large": "大",
         "translation_result_font_xlarge": "特大",
         "replace_selection_translate_label": "翻译并替换所选文本：",
-        "replace_selection_unavailable": "安全自动替换目前仅可在 Windows 上使用。",
+        "replace_selection_unavailable": "自动替换支持 Windows 和 macOS。",
         "selection_quick_translate_enabled": "快速翻译选中文本",
         "selection_quick_translate_tooltip": "在其他应用中选中文本后显示翻译按钮，或立即翻译。使用选中文本翻译的语言对。macOS 需要辅助功能；Linux 使用 PRIMARY 选区（部分 Wayland 环境受限）。OCR 和动态翻译期间暂停。",
         "selection_quick_translate_mode_button": "选中后显示按钮",
@@ -2471,6 +2539,7 @@ SETTINGS_TEXT = {
         "no": "否",
         "cancel": "取消",
         "minimize": "最小化",
+        "close": "关闭",
         "open": "打开",
         "install": "安装",
         "later": "稍后",
@@ -2479,7 +2548,331 @@ SETTINGS_TEXT = {
         "clear_histories_title": "清除历史？",
         "clear_histories_question": "清除翻译历史和复制历史吗？",
         "settings_reset_done": "设置已重置"
-    }
+    },
+    'pt': {'autostart': 'Iniciar com o sistema',
+     'update_check_on_launch': 'Buscar atualizações ao iniciar',
+     'dim_screen_during_ocr': 'Escureça a tela ao selecionar uma área de OCR',
+     'ocr_dim_strength_tooltip': 'Escolha o quão escura ficará a área fora da seleção de OCR.',
+     'restore_clipboard_after_selection': 'Restaurar a área de transferência após ações de texto '
+                                          'selecionado',
+     'restore_clipboard_tooltip': 'Restaure o que estava na área de transferência após uma tradução de '
+                                  'seleção visível ou uma substituição bem-sucedida. As ações de cópia '
+                                  'explícitas ainda mantêm o resultado.',
+     'copy_notification': 'Avise-me depois que o texto for copiado',
+     'copy_notification_tooltip': 'Mostra uma confirmação silenciosa na tela quando um resultado é '
+                                  'copiado, inclusive no modo sombra.',
+     'create_bug_report': 'Relatar problema',
+     'bug_report_tooltip': 'Crie um ZIP de diagnóstico sem conteúdo da área de transferência, '
+                           'históricos ou texto de documento.',
+     'export_settings': 'Exportar',
+     'import_settings': 'Importar',
+     'export_settings_tooltip': 'Salve todas as configurações do aplicativo em um arquivo JSON '
+                                'portátil.',
+     'import_settings_tooltip': "Carregue um JSON de configurações Click'n'Translate e aplique-o "
+                                'agora.',
+     'settings_exported': 'As configurações foram exportadas.\n\n{path}',
+     'settings_imported': 'As configurações foram importadas e aplicadas.',
+     'settings_transfer_failed': 'Não foi possível transferir as configurações.\n\n{error}',
+     'settings_file_filter': "Configurações Click'n'Translate (*.json)",
+     'ocr_behavior_heading': 'Comportamento de OCR',
+     'updates_heading': 'Atualizações',
+     'settings_page_main': 'Configurações gerais',
+     'settings_page_updates': 'Tradução e OCR',
+     'settings_page_game': 'Tradução dinâmica',
+     'game_settings_heading': 'Tradução dinâmica',
+     'game_intro': 'Selecione o texto na tela. A tradução se sobrepõe e é atualizada automaticamente. '
+                   'Ative a saída separada para escolher outra área.',
+     'game_launch': 'Selecione o texto na tela',
+     'game_languages': 'Idiomas:',
+     'game_swap_languages': 'Trocar idiomas de tradução dinâmica',
+     'game_scan_interval': 'Intervalo de verificação:',
+     'game_overlay_opacity': 'Fundo da tradução:',
+     'game_pause_inactive': 'Pausar quando o aplicativo de destino estiver inativo',
+     'game_pause_inactive_tooltip': 'Pausa o OCR quando a janela ativa no início do modo é minimizada '
+                                    'ou não está mais em primeiro plano. A tradução é retomada '
+                                    'automaticamente quando você retorna.',
+     'game_show_original': 'Mostrar texto reconhecido com a tradução',
+     'game_workflow_note': 'Selecione o texto na tela. A tradução se sobrepõe e é atualizada '
+                           'automaticamente. Ative a saída separada para escolher outra área.',
+     'translation_mode': 'Modo de tradução de texto: {mode}',
+     'hotkeys': 'Configurar atalhos',
+     'save_and_back': 'Salvar e voltar',
+     'copy_to_clipboard': 'Copiar para a área de transferência',
+     'history': 'Salvar histórico de tradução',
+     'button_hover_tips': 'Dicas ao passar o mouse',
+     'replace_select_all': 'Selecione tudo antes de substituir',
+     'replace_select_all_hint': 'Para Traduzir e substituir: seleciona todo o texto na entrada ativa '
+                                'antes de traduzi-lo e substituí-lo. Útil para mensagens de bate-papo. '
+                                'Quando desativado, apenas o texto selecionado é substituído. Não '
+                                'envia a mensagem.',
+     'test_ocr': 'Teste de tradução de OCR',
+     'save': 'Salvar',
+     'back': 'Voltar',
+     'remove_hotkey': 'Pressione ESC para remover o atalho',
+     'invalid_hotkey_format': 'Use uma única combinação de teclas. Atalhos de toque duplo estão '
+                              'disponíveis em Windows.',
+     'history_view': 'Ver histórico de tradução',
+     'start_minimized': 'Iniciar no modo sombra',
+     'copy_history_view': 'Mostrar histórico de cópias',
+     'copy_history': 'Salvar histórico de cópias',
+     'clear_copy_history': 'Limpar histórico de cópias',
+     'clear_translation_history': 'Limpar histórico de tradução',
+     'history_title': 'Histórico de traduções',
+     'copy_history_title': 'Histórico de cópias',
+     'history_empty': 'O histórico está vazio.',
+     'history_error': 'Erro ao ler o histórico.',
+     'error_title': 'Erro',
+     'clear_translation_history_error': 'Não foi possível limpar o histórico de tradução.',
+     'clear_copy_history_error': 'Não foi possível limpar o histórico de cópias.',
+     'copy_translated_text': 'Copiar texto traduzido',
+     'freeze_screen_on_ocr': 'Congelar tela durante OCR',
+     'fullscreen_translate_hotkey': 'Atalho para traduzir tela:',
+     'fullscreen_from': 'De:',
+     'fullscreen_to': 'Para:',
+     'translate_selection_hotkey': 'Atalho para traduzir seleção:',
+     'translator_label': 'Traduzir:',
+     'keep_visible_on_ocr': 'Mantenha a janela visível durante o OCR',
+     'clear_cache': 'Limpar cache',
+     'reset': 'Redefinir',
+     'update': 'Atualizar',
+     'translation_history_button': 'Histórico de traduções',
+     'copy_history_button': 'Histórico de cópias',
+     'fullscreen_translate_label': 'Tradução em tela cheia:',
+     'game_translate_label': 'Dinâmico:',
+     'selection_translate_label': 'Traduzir seleção:',
+     'toggle_window_hotkey_label': 'Mostrar/ocultar aplicativo:',
+     'result_window_label': 'Mostrar janela:',
+     'result_window_mode_selection': 'Texto',
+     'result_window_mode_area': 'Área',
+     'result_window_mode_main': 'Principal',
+     'result_window_modes_header': 'Mostrar a janela depois:',
+     'result_window_row_selection': 'Traduzindo o texto selecionado',
+     'result_window_row_area': 'Traduzindo uma área da tela',
+     'result_window_row_main': 'Pressionando Traduzir',
+     'result_window_summary_all': 'Todos',
+     'result_window_summary_none': 'Nunca',
+     'result_window_summary_on': 'mostrado',
+     'result_window_summary_off': 'escondido',
+     'result_window_summary_count': '{count} de {total}',
+     'result_window_tooltip': 'Marque as ações que devem abrir a janela de tradução. As ações '
+                              'desmarcadas copiam a tradução diretamente para a área de transferência.',
+     'result_window_mode_selection_tooltip': 'Mostrar a janela de resultados após traduzir o texto '
+                                             'selecionado.',
+     'result_window_mode_area_tooltip': 'Mostrar a janela de resultados após traduzir uma área da '
+                                        'tela.',
+     'result_window_mode_main_tooltip': 'Mostre a tradução ao lado da entrada na janela principal.',
+     'translation_result_font_label': 'Texto do resultado:',
+     'translation_result_font_sample': 'Exemplo',
+     'translation_result_font_decrease': 'Diminuir o tamanho do texto do resultado',
+     'translation_result_font_increase': 'Aumentar o tamanho do texto do resultado',
+     'translation_result_font_tooltip': 'Altera apenas o texto original e traduzido na janela de '
+                                        'resultado. Use Escala para ajustar toda a interface.',
+     'translation_result_font_xsmall': 'Muito pequeno',
+     'translation_result_font_small': 'Pequeno',
+     'translation_result_font_medium': 'Médio',
+     'translation_result_font_large': 'Grande',
+     'translation_result_font_xlarge': 'Muito grande',
+     'replace_selection_translate_label': 'Traduzir e substituir seleção:',
+     'replace_selection_unavailable': 'A substituição automática está disponível no Windows e no '
+                                      'macOS.',
+     'selection_quick_translate_enabled': 'Tradução rápida para texto selecionado',
+     'selection_quick_translate_tooltip': 'Mostrar um botão junto ao texto selecionado em outros '
+                                          'aplicativos ou traduzir imediatamente. Usa o par de idiomas '
+                                          'do modo Seleção. Exige Acessibilidade no macOS; no Linux '
+                                          'usa a seleção PRIMARY, limitada em algumas sessões Wayland. '
+                                          'Pausado durante OCR e tradução dinâmica.',
+     'selection_quick_translate_mode_button': 'Mostrar um botão após selecionar',
+     'selection_quick_translate_mode_automatic': 'Traduzir imediatamente após selecionar',
+     'close_result_window_on_outside_click': 'Fechar janela de tradução com clique externo',
+     'close_result_window_on_outside_click_tooltip': 'Fecha a janela de tradução quando você clica em '
+                                                     'outro aplicativo ou em qualquer lugar fora dele, '
+                                                     'portanto você não precisa do botão Fechar.',
+     'copy_hotkey_label': 'Atalho para copiar texto:',
+     'translate_hotkey_label': 'Atalho para traduzir área:',
+     'remove_local_tesseract': 'Remover Tesseractlocal',
+     'remove_local_rapidocr': 'Remover RapidOCRlocal',
+     'remove_local_easyocr': 'Remover EasyOCRlocal',
+     'remove_local_hymt': 'Remover Hy-MTlocal',
+     'ocr_language_packs': 'Pacotes de idiomas',
+     'manage_ocr_languages': 'Gerenciar pacotes de idiomas OCR e Argos',
+     'clearing': 'Limpando...',
+     'cleared': '{size} liberados',
+     'yes': 'Sim',
+     'no': 'Não',
+     'cancel': 'Cancelar',
+     'minimize': 'Minimizar',
+     'close': 'Fechar',
+     'open': 'Abrir',
+     'install': 'Instalar',
+     'later': 'Mais tarde',
+     'remove': 'Remover',
+     'reset_question': 'Tem certeza de que deseja redefinir todas as configurações?',
+     'clear_histories_title': 'Limpar históricos?',
+     'clear_histories_question': 'Limpar histórico de tradução e histórico de cópias?',
+     'settings_reset_done': 'As configurações foram redefinidas'},
+    'it': {'autostart': 'Avvia con il sistema',
+     'update_check_on_launch': "Controlla aggiornamenti all'avvio",
+     'dim_screen_during_ocr': "Oscura lo schermo mentre selezioni un'area OCR",
+     'ocr_dim_strength_tooltip': "Scegli quanto scura diventa l'area al di fuori della selezione OCR.",
+     'restore_clipboard_after_selection': 'Ripristina gli appunti dopo le azioni del testo selezionato',
+     'restore_clipboard_tooltip': 'Ripristina ciò che era negli appunti dopo una traduzione di '
+                                  'selezione visibile o una sostituzione riuscita. Le azioni di copia '
+                                  'esplicite mantengono comunque il risultato.',
+     'copy_notification': 'Avvisami dopo che il testo è stato copiato',
+     'copy_notification_tooltip': 'Mostra una silenziosa conferma sullo schermo quando un risultato '
+                                  'viene copiato, anche in modalità ombra.',
+     'create_bug_report': 'Segnala un problema',
+     'bug_report_tooltip': 'Crea uno ZIP diagnostico senza contenuto degli appunti, cronologie o testo '
+                           'del documento.',
+     'export_settings': 'Esporta',
+     'import_settings': 'Importa',
+     'export_settings_tooltip': "Salva tutte le impostazioni dell'applicazione in un file JSON "
+                                'portatile.',
+     'import_settings_tooltip': "Carica un JSON delle impostazioni Click'n'Translate e applicalo ora.",
+     'settings_exported': 'Le impostazioni sono state esportate.\n\n{path}',
+     'settings_imported': 'Le impostazioni sono state importate e applicate.',
+     'settings_transfer_failed': 'Impossibile trasferire le impostazioni.\n\n{error}',
+     'settings_file_filter': "Impostazioni Click'n'Translate (*.json)",
+     'ocr_behavior_heading': "Comportamento dell'OCR",
+     'updates_heading': 'Aggiornamenti',
+     'settings_page_main': 'Impostazioni generali',
+     'settings_page_updates': 'Traduzione e OCR',
+     'settings_page_game': 'Traduzione dinamica',
+     'game_settings_heading': 'Traduzione dinamica',
+     'game_intro': 'Seleziona il testo sullo schermo. La traduzione si sovrappone e si aggiorna '
+                   "automaticamente. Abilita l'output separato per scegliere un'altra area.",
+     'game_launch': 'Seleziona il testo sullo schermo',
+     'game_languages': 'Lingue:',
+     'game_swap_languages': 'Scambia le lingue di traduzione dinamica',
+     'game_scan_interval': 'Intervallo di scansione:',
+     'game_overlay_opacity': 'Sfondo traduzione:',
+     'game_pause_inactive': "Pausa quando l'app di destinazione è inattiva",
+     'game_pause_inactive_tooltip': "Mette in pausa l'OCR quando la finestra attiva all'avvio della "
+                                    'modalità è ridotta a icona o non è più in primo piano. La '
+                                    'traduzione riprende automaticamente al tuo ritorno.',
+     'game_show_original': 'Mostra il testo riconosciuto con la traduzione',
+     'game_workflow_note': 'Seleziona il testo sullo schermo. La traduzione si sovrappone e si '
+                           "aggiorna automaticamente. Abilita l'output separato per scegliere un'altra "
+                           'area.',
+     'translation_mode': 'Modalità di traduzione del testo: {mode}',
+     'hotkeys': 'Configura scorciatoie',
+     'save_and_back': 'Salva e torna indietro',
+     'copy_to_clipboard': 'Copia negli appunti',
+     'history': 'Salva la cronologia delle traduzioni',
+     'button_hover_tips': 'Suggerimenti al passaggio del mouse',
+     'replace_select_all': 'Seleziona tutto prima di sostituire',
+     'replace_select_all_hint': "Per Traduci e sostituisci: seleziona tutto il testo nell'input attivo "
+                                'prima di tradurlo e sostituirlo. Utile per i messaggi di chat. Quando '
+                                'è disattivato, viene sostituito solo il testo selezionato. Non invia '
+                                'il messaggio.',
+     'test_ocr': 'Prova la traduzione OCR',
+     'save': 'Salva',
+     'back': 'Indietro',
+     'remove_hotkey': 'Premere ESC per rimuovere la scorciatoia',
+     'invalid_hotkey_format': "Utilizza un'unica combinazione di tasti. Le scorciatoie con doppio "
+                              'tocco sono disponibili su Windows.',
+     'history_view': 'Visualizza la cronologia delle traduzioni',
+     'start_minimized': 'Avvia in modalità ombra',
+     'copy_history_view': 'Mostra la cronologia delle copie',
+     'copy_history': 'Salva la cronologia delle copie',
+     'clear_copy_history': 'Cancella la cronologia delle copie',
+     'clear_translation_history': 'Cancella la cronologia delle traduzioni',
+     'history_title': 'Cronologia traduzioni',
+     'copy_history_title': 'Cronologia copie',
+     'history_empty': 'La cronologia è vuota.',
+     'history_error': 'Errore durante la lettura della cronologia.',
+     'error_title': 'Errore',
+     'clear_translation_history_error': 'Impossibile cancellare la cronologia delle traduzioni.',
+     'clear_copy_history_error': 'Impossibile cancellare la cronologia delle copie.',
+     'copy_translated_text': 'Copia il testo tradotto',
+     'freeze_screen_on_ocr': "Blocca lo schermo durante l'OCR",
+     'fullscreen_translate_hotkey': 'Scorciatoia traduci schermo:',
+     'fullscreen_from': 'Da:',
+     'fullscreen_to': 'A:',
+     'translate_selection_hotkey': 'Scorciatoia traduci selezione:',
+     'translator_label': 'Traduci:',
+     'keep_visible_on_ocr': "Mantieni la finestra visibile durante l'OCR",
+     'clear_cache': 'Svuota cache',
+     'reset': 'Ripristina',
+     'update': 'Aggiorna',
+     'translation_history_button': 'Cronologia traduzioni',
+     'copy_history_button': 'Cronologia copie',
+     'fullscreen_translate_label': 'Traduzione a schermo intero:',
+     'game_translate_label': 'Dinamico:',
+     'selection_translate_label': 'Traduci selezione:',
+     'toggle_window_hotkey_label': 'Mostra/nascondi app:',
+     'result_window_label': 'Mostra finestra:',
+     'result_window_mode_selection': 'Testo',
+     'result_window_mode_area': 'Zona',
+     'result_window_mode_main': 'Principale',
+     'result_window_modes_header': 'Mostra la finestra dopo:',
+     'result_window_row_selection': 'Traduzione del testo selezionato',
+     'result_window_row_area': "Traduzione di un'area dello schermo",
+     'result_window_row_main': 'Premendo Traduci',
+     'result_window_summary_all': 'Tutto',
+     'result_window_summary_none': 'Mai',
+     'result_window_summary_on': 'mostrato',
+     'result_window_summary_off': 'nascosto',
+     'result_window_summary_count': '{count} di {total}',
+     'result_window_tooltip': 'Spunta le azioni che dovrebbero aprire la finestra di traduzione. Le '
+                              'azioni deselezionate copiano la traduzione direttamente negli appunti.',
+     'result_window_mode_selection_tooltip': 'Mostra la finestra dei risultati dopo aver tradotto il '
+                                             'testo selezionato.',
+     'result_window_mode_area_tooltip': "Mostra la finestra dei risultati dopo aver tradotto un'area "
+                                        'dello schermo.',
+     'result_window_mode_main_tooltip': "Mostra la traduzione accanto all'input nella finestra "
+                                        'principale.',
+     'translation_result_font_label': 'Testo risultato:',
+     'translation_result_font_sample': 'Esempio',
+     'translation_result_font_decrease': 'Diminuisci la dimensione del testo del risultato',
+     'translation_result_font_increase': 'Aumenta la dimensione del testo del risultato',
+     'translation_result_font_tooltip': 'Modifica solo il testo originale e tradotto nella finestra '
+                                        'del risultato. Usa Scala per ridimensionare l’intera '
+                                        'interfaccia.',
+     'translation_result_font_xsmall': 'Molto piccolo',
+     'translation_result_font_small': 'Piccolo',
+     'translation_result_font_medium': 'Medio',
+     'translation_result_font_large': 'Grande',
+     'translation_result_font_xlarge': 'Molto grande',
+     'replace_selection_translate_label': 'Traduci e sostituisci la selezione:',
+     'replace_selection_unavailable': 'La sostituzione automatica è disponibile su Windows e macOS.',
+     'selection_quick_translate_enabled': 'Traduzione rapida per il testo selezionato',
+     'selection_quick_translate_tooltip': 'Mostra un pulsante vicino al testo selezionato in altre app '
+                                          'o traduci subito. Usa la coppia di lingue della modalità '
+                                          'Selezione. Richiede Accessibilità su macOS; su Linux usa la '
+                                          'selezione PRIMARY, limitata in alcune sessioni Wayland. In '
+                                          'pausa durante OCR e traduzione dinamica.',
+     'selection_quick_translate_mode_button': 'Mostra un pulsante dopo la selezione',
+     'selection_quick_translate_mode_automatic': 'Traduci immediatamente dopo la selezione',
+     'close_result_window_on_outside_click': 'Chiudi la finestra di traduzione con un clic esterno',
+     'close_result_window_on_outside_click_tooltip': 'Chiude la finestra di traduzione quando fai clic '
+                                                     "su un'altra app o in qualsiasi punto al di fuori "
+                                                     'di essa, quindi non è necessario il pulsante di '
+                                                     'chiusura.',
+     'copy_hotkey_label': 'Scorciatoia copia testo:',
+     'translate_hotkey_label': 'Scorciatoia traduci area:',
+     'remove_local_tesseract': 'Rimuovere Tesseractlocale',
+     'remove_local_rapidocr': 'Rimuovere RapidOCRlocale',
+     'remove_local_easyocr': 'Rimuovere EasyOCRlocale',
+     'remove_local_hymt': 'Rimuovere Hy-MTlocale',
+     'ocr_language_packs': 'Pacchetti lingua',
+     'manage_ocr_languages': 'Gestisci i pacchetti lingua OCR e Argos',
+     'clearing': 'Cancellazione...',
+     'cleared': 'Liberati {size}',
+     'yes': 'Sì',
+     'no': 'No',
+     'cancel': 'Annulla',
+     'minimize': 'Riduci a icona',
+     'close': 'Chiudi',
+     'open': 'Apri',
+     'install': 'Installa',
+     'later': 'Più tardi',
+     'remove': 'Rimuovi',
+     'reset_question': 'Sei sicuro di voler ripristinare tutte le impostazioni?',
+     'clear_histories_title': 'Cancellare le cronologie?',
+     'clear_histories_question': 'Cancellare la cronologia delle traduzioni e la cronologia delle '
+                                 'copie?',
+     'settings_reset_done': 'Le impostazioni sono state ripristinate'},
 }
 
 def settings_text(lang, key):
@@ -2494,6 +2887,17 @@ for _scale_lang, _scale_labels in {
     'fr': ('Échelle de l’interface', 'Agrandit le texte, les icônes et les commandes dans toutes les fenêtres. Chaque fenêtre reste adaptée à l’écran.', 'Réduire le zoom', 'Augmenter le zoom'),
     'es': ('Escala de la interfaz', 'Amplía el texto, los iconos y los controles de todas las ventanas. Cada ventana se ajusta a la pantalla.', 'Reducir escala', 'Aumentar escala'),
     'zh': ('界面缩放', '放大所有应用窗口中的文字、图标和控件。每个窗口的大小都会适应屏幕。', '缩小界面', '放大界面'),
+
+    'pt': ('Escala de interface',
+     'Amplie texto, ícones e controles em todas as janelas do aplicativo. Cada janela se ajusta à tela '
+     'disponível.',
+     'Diminuir escala',
+     'Aumentar escala'),
+    'it': ("Scala dell'interfaccia",
+     "Ingrandisci testo, icone e controlli in tutte le finestre dell'app. Ogni finestra si adatta allo "
+     'schermo disponibile.',
+     'Riduci scala',
+     'Aumenta scala'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale=_scale_labels[0], ui_scale_hint=_scale_labels[1],
                                     ui_scale_decrease=_scale_labels[2], ui_scale_increase=_scale_labels[3])
@@ -2506,6 +2910,13 @@ for _scale_lang, (_caption, _hint) in {
     'fr': ('Échelle :', 'Saisissez un pourcentage, puis Entrée ou quittez le champ. Échap annule. Les flèches changent de 1%.'),
     'es': ('Escala:', 'Introduzca un porcentaje y pulse Intro o salga del campo. Escape cancela. Las flechas cambian un 1%.'),
     'zh': ('缩放：', '输入百分比后按 Enter 或离开输入框生效。Escape 取消。箭头每次调整 1%。'),
+
+    'pt': ('Escala:',
+     'Digite uma porcentagem e pressione Enter ou saia do campo. Esc cancela. As setas ajustam a '
+     'escala em 1%.'),
+    'it': ('Scala:',
+     'Inserisci una percentuale e premi Invio o esci dal campo. Esc annulla. Le frecce regolano la '
+     'scala dell’1%.'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
 
@@ -2517,12 +2928,42 @@ SETTINGS_EXPORT_SCHEMA = 1
 def settings_export_payload(config):
     """Return a portable, JSON-only settings document."""
     safe = json.loads(json.dumps(dict(config or {}), ensure_ascii=False))
+    def without_secrets(value):
+        if isinstance(value, dict):
+            return {key: without_secrets(item) for key, item in value.items()
+                    if not re.search(r'(?i)(api[_-]?key|auth[_-]?key|password|secret|credential|access[_-]?token|refresh[_-]?token|authorization|(?:^|[_-])token(?:$|[_-]))', key)}
+        if isinstance(value, list):
+            return [without_secrets(item) for item in value]
+        return value
+    safe = without_secrets(safe)
+    if 'api_providers' in safe:
+        from api_providers import clean_profiles
+        safe['api_providers'] = clean_profiles(safe['api_providers'])
     return {
         "format": SETTINGS_EXPORT_FORMAT,
         "schema": SETTINGS_EXPORT_SCHEMA,
         "app_version": APP_VERSION,
         "settings": safe,
     }
+
+
+def _settings_import_error(error, lang):
+    """Localize app validation; OS errors remain available as technical details."""
+    if isinstance(error,(json.JSONDecodeError,UnicodeError)) or str(error).startswith((
+            'The settings file must', 'This is not a Click', 'The settings schema',
+            'Unsupported settings schema', 'The export does not', 'The export contains')):
+        labels = {
+            'en': 'Invalid settings file. Choose a compatible ClicknTranslate JSON export.',
+            'ru': 'Неверный файл настроек. Выберите совместимый JSON-экспорт ClicknTranslate.',
+            'es': 'Archivo de ajustes no válido. Elige una exportación JSON compatible de ClicknTranslate.',
+            'de': 'Ungültige Einstellungsdatei. Einen kompatiblen ClicknTranslate-JSON-Export wählen.',
+            'fr': 'Fichier de réglages invalide. Choisissez un export JSON ClicknTranslate compatible.',
+            'zh': '设置文件无效。请选择兼容的 ClicknTranslate JSON 导出文件。',
+            'pt': 'Arquivo de configurações inválido. Escolha um JSON compatível exportado pelo ClicknTranslate.',
+            'it': 'File delle impostazioni non valido. Scegli un’esportazione JSON compatibile di ClicknTranslate.',
+        }
+        return labels.get(lang,labels['en'])
+    return str(error)
 
 
 def validated_import_settings(payload, defaults):
@@ -2546,6 +2987,20 @@ def validated_import_settings(payload, defaults):
         if key not in defaults:
             continue
         default = defaults[key]
+        if key == 'api_providers':
+            from api_providers import clean_profiles
+            accepted[key] = clean_profiles(value)
+            continue
+        if key == 'desktop_assistant_position':
+            import math
+            if value is None:
+                accepted[key] = None
+            elif (isinstance(value, dict) and isinstance(value.get('screen', ''), str)
+                  and all(isinstance(value.get(axis), (int, float)) and not isinstance(value.get(axis), bool)
+                          and math.isfinite(value[axis]) for axis in ('x', 'y'))):
+                accepted[key] = dict(screen=value.get('screen', '')[:256],
+                                     x=max(0., min(1., value['x'])), y=max(0., min(1., value['y'])))
+            continue
         valid = False
         if isinstance(default, bool):
             valid = isinstance(value, bool)
@@ -2555,6 +3010,8 @@ def validated_import_settings(payload, defaults):
             valid = isinstance(value, (int, float)) and not isinstance(value, bool)
             if valid:
                 value = float(value)
+                import math
+                valid = math.isfinite(value)
         elif isinstance(default, str):
             valid = isinstance(value, str)
         elif isinstance(default, (tuple, list)):
@@ -2590,6 +3047,9 @@ HISTORY_RECORD_TEXT = {
     "de": {"original": "Original", "translated": "Übersetzung", "copy": "Kopieren", "delete": "Löschen"},
     "fr": {"original": "Original", "translated": "Traduction", "copy": "Copier", "delete": "Supprimer"},
     "zh": {"original": "原文", "translated": "译文", "copy": "复制", "delete": "删除"},
+
+    'pt': {'original': 'Original', 'translated': 'Tradução', 'copy': 'Copiar', 'delete': 'Excluir'},
+    'it': {'original': 'Originale', 'translated': 'Traduzione', 'copy': 'Copia', 'delete': 'Elimina'},
 }
 
 
@@ -2601,7 +3061,7 @@ def history_record_text(lang, key):
 UPDATE_TEXT = {
     "en": {
         "store_updates": "Updates for this version are delivered by Microsoft Store. Open the Microsoft Store Library and choose Get updates.",
-        "dev_build": "Auto-update is available only in the packaged app.\nOpen releases page?",
+        "dev_build": 'Auto-update is available in the packaged application. Python source is updated separately.',
         "checking_button": "Checking...", "checking": "Checking updates...", "downloading_word": "Downloading",
         "downloading_button": "Downloading...", "apply_wait": "The update is being applied.\nPlease wait...",
         "apply_close": "The update is already being applied. Closing is disabled right now.\nPlease wait.",
@@ -2610,7 +3070,7 @@ UPDATE_TEXT = {
         "parse_failed": "Failed to parse update response.", "check_cancelled": "Update check was canceled.",
         "error_title": "Update error", "unknown_error": "Unknown update error.",
         "up_to_date": "You already have the latest version: V{version}",
-        "no_asset": "No compatible auto-update asset found in the release. Open releases page?",
+        "no_asset": 'This release has no compatible update package for your installation yet. Try checking again later.',
         "invalid_url": "Invalid update asset URL.", "available_title": "Update available",
         "available_prompt": "New version found: V{latest}\nCurrent version: V{current}\n\nInstall now?",
         "preparing_download": "Preparing download...", "stage_download": "Downloading update package...",
@@ -2626,7 +3086,7 @@ UPDATE_TEXT = {
     },
     "ru": {
         "store_updates": "Обновления этой версии устанавливает Microsoft Store. Откройте Библиотеку Microsoft Store и нажмите «Получить обновления».",
-        "dev_build": "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?",
+        "dev_build": 'Автообновление доступно в собранном приложении. Исходники Python обновляются отдельно.',
         "checking_button": "Проверка...", "checking": "Проверка обновлений...", "downloading_word": "Скачивание",
         "downloading_button": "Скачивание...", "apply_wait": "Обновление уже применяется.\nПожалуйста, подождите...",
         "apply_close": "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите.",
@@ -2635,7 +3095,7 @@ UPDATE_TEXT = {
         "parse_failed": "Не удалось обработать ответ от сервера обновлений.", "check_cancelled": "Проверка обновлений отменена.",
         "error_title": "Ошибка обновления", "unknown_error": "Неизвестная ошибка обновления.",
         "up_to_date": "У вас уже актуальная версия: V{version}",
-        "no_asset": "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?",
+        "no_asset": 'В этой версии пока нет подходящего пакета обновления для вашей установки. Повторите проверку позже.',
         "invalid_url": "Некорректный URL файла обновления.", "available_title": "Доступно обновление",
         "available_prompt": "Найдена новая версия: V{latest}\nТекущая версия: V{current}\n\nУстановить сейчас?",
         "preparing_download": "Подготовка загрузки...", "stage_download": "Загрузка файла обновления...",
@@ -2651,7 +3111,7 @@ UPDATE_TEXT = {
     },
     "es": {
         "store_updates": "Las actualizaciones de esta versión se instalan desde Microsoft Store. Abre la Biblioteca de Microsoft Store y selecciona Obtener actualizaciones.",
-        "dev_build": "La actualización automática solo está disponible en la aplicación compilada.\n¿Abrir la página de versiones?",
+        "dev_build": 'La actualización automática está disponible en la aplicación empaquetada. El código Python se actualiza por separado.',
         "checking_button": "Comprobando...", "checking": "Buscando actualizaciones...", "downloading_word": "Descargando",
         "downloading_button": "Descargando...", "apply_wait": "La actualización se está aplicando.\nEspera...",
         "apply_close": "La actualización ya se está aplicando. No se puede cerrar ahora.\nEspera.",
@@ -2660,7 +3120,7 @@ UPDATE_TEXT = {
         "parse_failed": "No se pudo procesar la respuesta del servidor de actualizaciones.", "check_cancelled": "Se canceló la búsqueda de actualizaciones.",
         "error_title": "Error de actualización", "unknown_error": "Error de actualización desconocido.",
         "up_to_date": "Ya tienes la versión más reciente: V{version}",
-        "no_asset": "La versión no contiene un archivo compatible para la actualización automática. ¿Abrir la página de versiones?",
+        "no_asset": 'Esta versión aún no tiene un paquete de actualización compatible con tu instalación. Vuelve a comprobarlo más tarde.',
         "invalid_url": "La URL del archivo de actualización no es válida.", "available_title": "Actualización disponible",
         "available_prompt": "Nueva versión: V{latest}\nVersión actual: V{current}\n\n¿Instalar ahora?",
         "preparing_download": "Preparando la descarga...", "stage_download": "Descargando el paquete de actualización...",
@@ -2676,7 +3136,7 @@ UPDATE_TEXT = {
     },
     "de": {
         "store_updates": "Updates für diese Version werden über den Microsoft Store installiert. Öffne die Bibliothek im Microsoft Store und wähle Updates abrufen.",
-        "dev_build": "Die automatische Aktualisierung ist nur in der kompilierten App verfügbar.\nRelease-Seite öffnen?",
+        "dev_build": 'Automatische Updates sind in der gepackten Anwendung verfügbar. Python-Quellcode wird separat aktualisiert.',
         "checking_button": "Prüfen...", "checking": "Nach Updates suchen...", "downloading_word": "Herunterladen",
         "downloading_button": "Herunterladen...", "apply_wait": "Das Update wird angewendet.\nBitte warten...",
         "apply_close": "Das Update wird bereits angewendet. Schließen ist momentan nicht möglich.\nBitte warten.",
@@ -2685,7 +3145,7 @@ UPDATE_TEXT = {
         "parse_failed": "Die Antwort des Update-Servers konnte nicht verarbeitet werden.", "check_cancelled": "Die Update-Prüfung wurde abgebrochen.",
         "error_title": "Update-Fehler", "unknown_error": "Unbekannter Update-Fehler.",
         "up_to_date": "Du verwendest bereits die neueste Version: V{version}",
-        "no_asset": "Das Release enthält keine kompatible Datei für die automatische Aktualisierung. Release-Seite öffnen?",
+        "no_asset": 'Für diese Version gibt es noch kein passendes Update-Paket für deine Installation. Versuche es später erneut.',
         "invalid_url": "Die URL der Update-Datei ist ungültig.", "available_title": "Update verfügbar",
         "available_prompt": "Neue Version: V{latest}\nAktuelle Version: V{current}\n\nJetzt installieren?",
         "preparing_download": "Download wird vorbereitet...", "stage_download": "Update-Paket wird heruntergeladen...",
@@ -2701,7 +3161,7 @@ UPDATE_TEXT = {
     },
     "fr": {
         "store_updates": "Les mises à jour de cette version sont installées par le Microsoft Store. Ouvrez la Bibliothèque du Microsoft Store et choisissez Obtenir les mises à jour.",
-        "dev_build": "La mise à jour automatique est disponible uniquement dans l’application compilée.\nOuvrir la page des versions ?",
+        "dev_build": 'La mise à jour automatique est disponible dans l’application compilée. Les sources Python se mettent à jour séparément.',
         "checking_button": "Vérification...", "checking": "Recherche de mises à jour...", "downloading_word": "Téléchargement",
         "downloading_button": "Téléchargement...", "apply_wait": "La mise à jour est en cours d’application.\nVeuillez patienter...",
         "apply_close": "La mise à jour est déjà en cours d’application. La fermeture est momentanément impossible.\nVeuillez patienter.",
@@ -2710,7 +3170,7 @@ UPDATE_TEXT = {
         "parse_failed": "Impossible de traiter la réponse du serveur de mises à jour.", "check_cancelled": "La recherche de mises à jour a été annulée.",
         "error_title": "Erreur de mise à jour", "unknown_error": "Erreur de mise à jour inconnue.",
         "up_to_date": "Vous utilisez déjà la dernière version : V{version}",
-        "no_asset": "La version ne contient aucun fichier compatible avec la mise à jour automatique. Ouvrir la page des versions ?",
+        "no_asset": 'Cette version ne propose pas encore de mise à jour compatible avec votre installation. Réessayez plus tard.',
         "invalid_url": "L’URL du fichier de mise à jour n’est pas valide.", "available_title": "Mise à jour disponible",
         "available_prompt": "Nouvelle version : V{latest}\nVersion actuelle : V{current}\n\nInstaller maintenant ?",
         "preparing_download": "Préparation du téléchargement...", "stage_download": "Téléchargement du paquet de mise à jour...",
@@ -2726,7 +3186,7 @@ UPDATE_TEXT = {
     },
     "zh": {
         "store_updates": "此版本由 Microsoft Store 提供更新。请打开 Microsoft Store 的“库”，然后选择“获取更新”。",
-        "dev_build": "自动更新仅适用于已打包的应用。\n是否打开发布页面？",
+        "dev_build": '自动更新适用于打包后的应用。Python 源代码需要单独更新。',
         "checking_button": "正在检查...", "checking": "正在检查更新...", "downloading_word": "正在下载",
         "downloading_button": "正在下载...", "apply_wait": "正在应用更新。\n请稍候...",
         "apply_close": "更新已在应用中，现在无法关闭。\n请稍候。",
@@ -2735,7 +3195,7 @@ UPDATE_TEXT = {
         "parse_failed": "无法处理更新服务器的响应。", "check_cancelled": "已取消更新检查。",
         "error_title": "更新错误", "unknown_error": "未知更新错误。",
         "up_to_date": "当前已是最新版本：V{version}",
-        "no_asset": "此版本中没有兼容的自动更新文件。是否打开发布页面？",
+        "no_asset": '此版本暂时没有适用于当前安装的更新包。请稍后重新检查。',
         "invalid_url": "更新文件 URL 无效。", "available_title": "有可用更新",
         "available_prompt": "发现新版本：V{latest}\n当前版本：V{current}\n\n现在安装吗？",
         "preparing_download": "正在准备下载...", "stage_download": "正在下载更新包...",
@@ -2748,6 +3208,89 @@ UPDATE_TEXT = {
         "launch_skip": "跳过此版本",
         "launch_later": "稍后",
     },
+
+    'pt': {'store_updates': 'As atualizações para esta versão são fornecidas pela Microsoft Store. Abra a '
+                      'biblioteca da Microsoft Store e escolha Obter atualizações.',
+     'dev_build': 'A atualização automática está disponível no aplicativo empacotado. O código Python é atualizado separadamente.',
+     'checking_button': 'Verificando...',
+     'checking': 'Verificando atualizações...',
+     'downloading_word': 'Baixando',
+     'downloading_button': 'Baixando...',
+     'apply_wait': 'A atualização está sendo aplicada.\nAguarde...',
+     'apply_close': 'A atualização já está sendo aplicada. O fechamento está desativado no momento.\n'
+                    'Aguarde.',
+     'canceling_button': 'Cancelando...',
+     'canceling_clean': 'Cancelando a atualização...\nLimpando arquivos temporários, aguarde.',
+     'canceling_wait': 'Cancelando a atualização...\nAguarde.',
+     'check_failed': 'Falha ao verificar atualizações:\n{error}',
+     'parse_failed': 'Falha ao analisar a resposta de atualização.',
+     'check_cancelled': 'A verificação de atualização foi cancelada.',
+     'error_title': 'Erro de atualização',
+     'unknown_error': 'Erro de atualização desconhecido.',
+     'up_to_date': 'Você já tem a versão mais recente: V{version}',
+     'no_asset': 'Esta versão ainda não tem um pacote de atualização compatível com sua instalação. Tente verificar novamente mais tarde.',
+     'invalid_url': 'URL de recurso de atualização inválido.',
+     'available_title': 'Atualização disponível',
+     'available_prompt': 'Nova versão encontrada: V{latest}\n'
+                         'Versão atual: V{current}\n'
+                         '\n'
+                         'Instalar agora?',
+     'preparing_download': 'Preparando download...',
+     'stage_download': 'Baixando pacote de atualização...',
+     'stage_checksum': 'Baixando soma de verificação...',
+     'stage_verify': 'Verificando soma de verificação...',
+     'stage_prepare': 'Preparando atualização...',
+     'cancelled': 'Atualização cancelada. Arquivos temporários foram removidos.',
+     'install_failed': 'Falha ao instalar a atualização:\n{error}',
+     'restart_ready': 'A atualização V{version} está pronta.\nReiniciando o aplicativo...',
+     'restarting': 'Reiniciando...',
+     'launch_title': 'Atualização disponível',
+     'launch_prompt': 'A versão V{latest} foi lançada. Você tem V{current}.',
+     'launch_update': 'Atualizar agora',
+     'launch_skip': 'Pular esta versão',
+     'launch_later': 'Mais tarde'},
+    'it': {'store_updates': 'Gli aggiornamenti per questa versione vengono forniti da Microsoft Store. Apri '
+                      'la Libreria di Microsoft Store e scegli Ottieni aggiornamenti.',
+     'dev_build': 'L’aggiornamento automatico è disponibile nell’applicazione compilata. Il codice Python viene aggiornato separatamente.',
+     'checking_button': 'Controllo...',
+     'checking': 'Controllo aggiornamenti...',
+     'downloading_word': 'Download in corso',
+     'downloading_button': 'Download in corso...',
+     'apply_wait': "L'aggiornamento è in fase di applicazione.\nAttendere prego...",
+     'apply_close': "L'aggiornamento è già in fase di applicazione. La chiusura è disabilitata in "
+                    'questo momento.\n'
+                    'Attendere prego.',
+     'canceling_button': 'Annullamento...',
+     'canceling_clean': "Annullamento dell'aggiornamento in corso...\n"
+                        'Pulizia dei file temporanei, attendere.',
+     'canceling_wait': 'Annullamento aggiornamento in corso...\nAttendere prego.',
+     'check_failed': 'Impossibile verificare la disponibilità di aggiornamenti:\n{error}',
+     'parse_failed': "Impossibile analizzare la risposta all'aggiornamento.",
+     'check_cancelled': "Il controllo dell'aggiornamento è stato annullato.",
+     'error_title': 'Errore di aggiornamento',
+     'unknown_error': 'Errore di aggiornamento sconosciuto.',
+     'up_to_date': "Hai già l'ultima versione: V{version}",
+     'no_asset': 'Questa versione non dispone ancora di un pacchetto di aggiornamento compatibile con la tua installazione. Riprova più tardi.',
+     'invalid_url': 'URL della risorsa di aggiornamento non valido.',
+     'available_title': 'Aggiornamento disponibile',
+     'available_prompt': 'Nuova versione trovata: V{latest}\n'
+                         'Versione corrente: V{current}\n'
+                         '\n'
+                         'Installare ora?',
+     'preparing_download': 'Preparazione download...',
+     'stage_download': 'Download del pacchetto di aggiornamento in corso...',
+     'stage_checksum': 'Download del checksum in corso...',
+     'stage_verify': 'Verifica del checksum...',
+     'stage_prepare': 'Preparazione aggiornamento...',
+     'cancelled': 'Aggiornamento annullato. I file temporanei sono stati rimossi.',
+     'install_failed': "Impossibile installare l'aggiornamento:\n{error}",
+     'restart_ready': "L'aggiornamento V{version} è pronto.\nRiavvio dell'app...",
+     'restarting': 'Riavvio...',
+     'launch_title': 'Aggiornamento disponibile',
+     'launch_prompt': 'È uscita la versione V{latest}. Hai V{current}.',
+     'launch_update': 'Aggiorna ora',
+     'launch_skip': 'Salta questa versione',
+     'launch_later': 'Più tardi'},
 }
 
 
@@ -2755,6 +3298,8 @@ ENGINE_TEXT = {
     "en": {
         "not_found": "{engine} not found", "install": "Install", "cancel": "Cancel", "remove": "Remove",
         "tesseract_prompt": "Tesseract-OCR was not found. Download and install it locally?",
+        "linux_tesseract_hint": "Tesseract is not installed. Install it with your package manager:\n\n{command}",
+        "manual_hymt_hint": "Automatic Hy-MT installation is available on Windows and macOS.\n\nPut the {model} model and a llama.cpp runner ({runners}) in:\n{directory}",
         "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and about 1 GB of free disk space. The app downloads its own private installer runtime; you do not need to install Python. Language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet. The app downloads its own private installer runtime; you do not need to install Python. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
         "hymt_prompt": "The local Hy-MT model is not installed. Download and install the offline translation package?\n\nAbout 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime.",
@@ -2773,6 +3318,8 @@ ENGINE_TEXT = {
     "ru": {
         "not_found": "{engine} не найден", "install": "Установить", "cancel": "Отмена", "remove": "Удалить",
         "tesseract_prompt": "Tesseract-OCR не найден. Скачать и установить локально?",
+        "linux_tesseract_hint": "Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}",
+        "manual_hymt_hint": "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\nПоложите модель {model} и исполняемый файл llama.cpp ({runners}) в папку:\n{directory}",
         "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет и около 1 ГБ свободного места. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Языковые модели загрузятся при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
         "hymt_prompt": "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\nБудет скачано около 1,2 ГБ: модель Hy-MT и локальный runtime llama.cpp.",
@@ -2791,6 +3338,8 @@ ENGINE_TEXT = {
     "es": {
         "not_found": "No se encontró {engine}", "install": "Instalar", "cancel": "Cancelar", "remove": "Eliminar",
         "tesseract_prompt": "No se encontró Tesseract-OCR. ¿Descargarlo e instalarlo localmente?",
+        "linux_tesseract_hint": "Tesseract no está instalado. Instálalo con el gestor de paquetes:\n\n{command}",
+        "manual_hymt_hint": "La instalación automática de Hy-MT está disponible en Windows y macOS.\n\nColoca el modelo {model} y un ejecutable de llama.cpp ({runners}) en:\n{directory}",
         "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y aproximadamente 1 GB de espacio libre. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
         "hymt_prompt": "El modelo local Hy-MT no está instalado. ¿Descargar e instalar el paquete de traducción sin conexión?\n\nSe descargarán aproximadamente 1,2 GB: el modelo Hy-MT y el runtime local de llama.cpp.",
@@ -2809,6 +3358,8 @@ ENGINE_TEXT = {
     "de": {
         "not_found": "{engine} nicht gefunden", "install": "Installieren", "cancel": "Abbrechen", "remove": "Entfernen",
         "tesseract_prompt": "Tesseract-OCR wurde nicht gefunden. Lokal herunterladen und installieren?",
+        "linux_tesseract_hint": "Tesseract ist nicht installiert. Installieren Sie es mit Ihrer Paketverwaltung:\n\n{command}",
+        "manual_hymt_hint": "Die automatische Installation von Hy-MT ist unter Windows und macOS verfügbar.\n\nLegen Sie das Modell {model} und eine ausführbare llama.cpp-Datei ({runners}) in diesem Ordner ab:\n{directory}",
         "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und etwa 1 GB freier Speicherplatz benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
         "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür wird Internet benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
         "hymt_prompt": "Das lokale Hy-MT-Modell ist nicht installiert. Das Offline-Übersetzungspaket herunterladen und installieren?\n\nEtwa 1,2 GB werden geladen: das Hy-MT-Modell und die lokale llama.cpp-Laufzeit.",
@@ -2827,6 +3378,8 @@ ENGINE_TEXT = {
     "fr": {
         "not_found": "{engine} introuvable", "install": "Installer", "cancel": "Annuler", "remove": "Supprimer",
         "tesseract_prompt": "Tesseract-OCR est introuvable. Le télécharger et l’installer localement ?",
+        "linux_tesseract_hint": "Tesseract n’est pas installé. Installez-le avec votre gestionnaire de paquets :\n\n{command}",
+        "manual_hymt_hint": "L’installation automatique de Hy-MT est disponible sous Windows et macOS.\n\nPlacez le modèle {model} et un exécutable llama.cpp ({runners}) dans ce dossier :\n{directory}",
         "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et environ 1 Go d’espace libre sont nécessaires. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
         "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet est nécessaire. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
         "hymt_prompt": "Le modèle Hy-MT local n’est pas installé. Télécharger et installer le paquet de traduction hors ligne ?\n\nEnviron 1,2 Go seront téléchargés : le modèle Hy-MT et le runtime local llama.cpp.",
@@ -2845,6 +3398,8 @@ ENGINE_TEXT = {
     "zh": {
         "not_found": "未找到 {engine}", "install": "安装", "cancel": "取消", "remove": "删除",
         "tesseract_prompt": "未找到 Tesseract-OCR。是否下载并在本地安装？",
+        "linux_tesseract_hint": "尚未安装 Tesseract。请通过软件包管理器安装：\n\n{command}",
+        "manual_hymt_hint": "Windows 和 macOS 支持自动安装 Hy-MT。\n\n请将 {model} 模型和 llama.cpp 可执行文件（{runners}）放入以下文件夹：\n{directory}",
         "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并预留约 1 GB 可用空间。应用会自行下载独立的安装环境，无需另外安装 Python。语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
         "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网。应用会自行下载独立的安装环境，无需另外安装 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
         "hymt_prompt": "本地 Hy-MT 模型尚未安装。是否下载并安装离线翻译包？\n\n将下载约 1.2 GB：Hy-MT 模型和本地 llama.cpp 运行时。",
@@ -2860,6 +3415,114 @@ ENGINE_TEXT = {
         "remove_failed": "无法删除 {engine}：\n{error}", "hymt_runtime": "正在下载 Hy-MT 运行时...",
         "hymt_extract": "正在解压 Hy-MT 运行时...", "hymt_model": "正在下载 Hy-MT 模型...", "hymt_license": "正在保存 Hy-MT 许可证...",
     },
+
+    'pt': {'not_found': '{engine} não encontrado',
+     'install': 'Instalar',
+     'cancel': 'Cancelar',
+     'remove': 'Remover',
+     'tesseract_prompt': 'Tesseract-OCR não foi encontrado. Baixar e instalar localmente?',
+     'linux_tesseract_hint': 'Tesseract não está instalado. Instale-o com seu gerenciador de pacotes:\n'
+                             '\n'
+                             '{command}',
+     'manual_hymt_hint': 'A instalação automática do Hy-MT está disponível no Windows e macOS.\n'
+                         '\n'
+                         'Coloque o modelo {model} e um executável llama.cpp ({runners}) em:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR não está instalado localmente. Instalar o mecanismo de OCR neural na '
+                       'pasta do aplicativo?\n'
+                       '\n'
+                       'Isso precisa de internet e cerca de 1 GB de espaço livre em disco. O '
+                       'aplicativo baixa seu próprio tempo de execução do instalador privado; você não '
+                       'precisa instalar o Python. Os modelos de linguagem são baixados no primeiro '
+                       'reconhecimento. Os pacotes serão salvos em ocr\\easyocr.',
+     'rapidocr_prompt': 'RapidOCR não está instalado localmente. Instalar o mecanismo de OCR neural na '
+                        'pasta do aplicativo?\n'
+                        '\n'
+                        'Isso precisa de internet. O aplicativo baixa seu próprio tempo de execução do '
+                        'instalador privado; você não precisa instalar o Python. Os pacotes serão '
+                        'salvos em ocr\\rapidocr e os modelos serão armazenados em cache lá no '
+                        'primeiro reconhecimento.',
+     'hymt_prompt': 'O modelo Hy-MT local não está instalado. Baixar e instalar o pacote de tradução '
+                    'offline?\n'
+                    '\n'
+                    'Serão baixados cerca de 1,2 GB: o modelo Hy-MT e o tempo de execução local '
+                    'llama.cpp.',
+     'preparing': 'Preparando a instalação do {engine}...',
+     'downloading_packages': 'Baixando e instalando pacotes {engine}...',
+     'downloading_engine': 'Baixando {engine}...',
+     'extracting_engine': 'Extraindo {engine}...',
+     'downloading_language': 'Baixando dados de idioma {name}...',
+     'applying': 'Aplicando instalação...',
+     'done': 'Concluído',
+     'canceling': 'Cancelando instalação...',
+     'ready': '{engine} está instalado e pronto.',
+     'hymt_ready': 'Hy-MT está instalado e pronto para tradução offline.',
+     'error_title': 'Erro{engine}',
+     'install_failed': 'Falha ao instalar {engine}:\n{error}',
+     'cancelled_title': 'Cancelado',
+     'install_cancelled': 'Instalação do{engine} cancelada. Arquivos temporários foram removidos.',
+     'remove_title': 'Remover {engine}',
+     'remove_ocr_prompt': 'Remover o mecanismo {engine} local da pasta do aplicativo?',
+     'remove_hymt_prompt': 'Remover o modelo Hy-MT local e o tempo de execução da pasta do aplicativo?',
+     'removed': 'O {engine} local foi removido.',
+     'remove_failed': 'Falha ao remover {engine}:\n{error}',
+     'hymt_runtime': 'Baixando o tempo de execução do Hy-MT...',
+     'hymt_extract': 'Extraindo o tempo de execução Hy-MT...',
+     'hymt_model': 'Baixando o modelo Hy-MT...',
+     'hymt_license': 'Salvando licença Hy-MT...'},
+    'it': {'not_found': '{engine} non trovato',
+     'install': 'Installa',
+     'cancel': 'Annulla',
+     'remove': 'Rimuovi',
+     'tesseract_prompt': 'Tesseract-OCR non trovato. Scaricarlo e installarlo localmente?',
+     'linux_tesseract_hint': 'Tesseract non è installato. Installalo con il tuo gestore pacchetti:\n'
+                             '\n'
+                             '{command}',
+     'manual_hymt_hint': 'L’installazione automatica di Hy-MT è disponibile su Windows e macOS.\n'
+                         '\n'
+                         'Inserisci il modello {model} e un eseguibile llama.cpp ({runners}) in:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR non è installato localmente. Installare il motore OCR neurale nella '
+                       "cartella dell'app?\n"
+                       '\n'
+                       "Richiede Internet e circa 1 GB di spazio libero su disco. L'app scarica il "
+                       'proprio runtime di installazione privato; non è necessario installare Python. '
+                       'I modelli linguistici vengono scaricati al primo riconoscimento. I pacchetti '
+                       'verranno salvati in ocr\\easyocr.',
+     'rapidocr_prompt': 'RapidOCR non è installato localmente. Installare il motore OCR neurale nella '
+                        "cartella dell'app?\n"
+                        '\n'
+                        "Questo ha bisogno di Internet. L'app scarica il proprio runtime di "
+                        'installazione privato; non è necessario installare Python. I pacchetti '
+                        'verranno salvati in ocr\\rapidocr e i modelli verranno memorizzati nella '
+                        'cache al primo riconoscimento.',
+     'hymt_prompt': 'Il modello Hy-MT locale non è installato. Scaricare e installare il pacchetto di '
+                    'traduzione offline?\n'
+                    '\n'
+                    'Verranno scaricati circa 1,2 GB: il modello Hy-MT e il runtime locale llama.cpp.',
+     'preparing': "Preparazione dell'installazione di {engine}...",
+     'downloading_packages': 'Download e installazione dei pacchetti {engine} in corso...',
+     'downloading_engine': 'Download di {engine}in corso...',
+     'extracting_engine': 'Estrazione {engine}...',
+     'downloading_language': 'Download dei dati della lingua {name}...',
+     'applying': "Applicazione dell'installazione in corso...",
+     'done': 'Fatto',
+     'canceling': 'Annullamento installazione...',
+     'ready': '{engine} è installato e pronto.',
+     'hymt_ready': 'Hy-MT è installato e pronto per la traduzione offline.',
+     'error_title': 'Errore{engine}',
+     'install_failed': 'Impossibile installare {engine}:\n{error}',
+     'cancelled_title': 'Annullato',
+     'install_cancelled': 'Installazione{engine} annullata. I file temporanei sono stati rimossi.',
+     'remove_title': 'Rimuovere {engine}',
+     'remove_ocr_prompt': "Rimuovere il motore {engine} locale dalla cartella dell'app?",
+     'remove_hymt_prompt': "Rimuovere il modello Hy-MT locale e il runtime dalla cartella dell'app?",
+     'removed': '{engine} locale è stato rimosso.',
+     'remove_failed': 'Impossibile rimuovere {engine}:\n{error}',
+     'hymt_runtime': 'Download del runtime Hy-MT in corso...',
+     'hymt_extract': 'Estrazione del runtime Hy-MT in corso...',
+     'hymt_model': 'Download del modello Hy-MT...',
+     'hymt_license': 'Salvataggio della licenza Hy-MT...'},
 }
 
 
@@ -3261,6 +3924,175 @@ LANGUAGE_MANAGER_TEXT = {
         "win_removing": "Windows OCR：正在删除 {language}（{current}/{total}）…",
         "win_rolling_back": "Windows OCR：正在取消并删除未完成的语言包…",
     },
+
+    'pt': {'intro': 'Instale aqui os idiomas de OCR e os pares de tradução offline do Argos. Os pacotes são '
+              'baixados antecipadamente, não durante o reconhecimento ou a tradução.',
+     'refresh': 'Atualizar',
+     'windows_note': 'Mostra os idiomas de OCR disponíveis em Windows. Instale apenas OCR sem '
+                     'adicionar um teclado.',
+     'install_selected': 'Instalar selecionados',
+     'windows_settings': 'Configurações do Windows',
+     'tesseract_note': 'Marque os idiomas para baixar na pasta tessdata local.',
+     'install_engine': 'Instalar motor',
+     'easyocr_note': 'Marque os idiomas para pré-baixar os modelos EasyOCR. O inglês é adicionado como '
+                     'alternativa.',
+     'remove_engine': 'Remover motor',
+     'remove_engine_tooltip': 'Exclua o mecanismo {engine} instalado deste computador.',
+     'hymt_note': 'Hy-MT é um modelo de tradução local, não pacotes por idioma. Instale-o aqui e ele '
+                  'aparecerá na lista de tradutores.',
+     'translation_engine': 'Mecanismo de tradução',
+     'local_model': 'Modelo local',
+     'rapidocr_note': 'O RapidOCR não possui pacotes de idiomas separados. O motor local inclui um '
+                      'modelo de chinês e inglês. Para russo, use Windows OCR, Tesseract ou EasyOCR.',
+     'component': 'Componente',
+     'package': 'Pacote',
+     'status': 'Status',
+     'argos_note': 'Todos os pacotes Argos disponíveis são exibidos. Pares sem inglês usam dois '
+                   'pacotes com inglês como idioma intermediário.',
+     'remove_highlighted': 'Remover destacado',
+     'direction': 'Par de idiomas',
+     'search': 'Pesquisa: Russo, ru, en→ru…',
+     'language': 'Idioma',
+     'installed': 'Instalado',
+     'missing': 'Não instalado',
+     'can_download': 'Disponível para baixar',
+     'engine_missing': '{engine} ausente',
+     'checking': 'Verificando…',
+     'unavailable': 'Não disponível nesta versão Windows',
+     'first_use': 'Preparado no primeiro OCR',
+     'engine_first': 'Instale o motor primeiro',
+     'ocr_engine': 'Mecanismo de OCR',
+     'runtime': 'Tempo de execução neural',
+     'detector': 'Detecção de texto + orientação',
+     'recognition': 'Reconhecimento',
+     'loading': 'Carregando lista de pacotes…',
+     'load_error': 'Não foi possível carregar a lista de pacotes: ',
+     'no_match': 'Nenhum pacote corresponde à sua pesquisa',
+     'no_packages': 'Nenhum pacote encontrado',
+     'no_selection': 'Marque pelo menos um idioma para instalar.',
+     'already': '{engine} já está instalado.',
+     'still': '{engine} ainda está sendo verificado. Por favor, espere um momento.',
+     'win_confirm': 'Instalar componentes Windows OCR selecionados?\n'
+                    '\n'
+                    'A permissão do administrador será solicitada. Apenas o OCR está instalado; nenhum '
+                    'teclado ou layout de entrada é adicionado.',
+     'easy_prompt': 'EasyOCR deve ser instalado primeiro. Iniciar a instalação do motor?',
+     'argos_installed': 'Os pares de idiomas Argos selecionados foram instalados.',
+     'highlight': 'Destaque uma ou mais linhas instaladas.',
+     'remove_confirm': 'Remover os pacotes Argos: {packages}?\n'
+                       '\n'
+                       'Esses pares de idiomas não funcionarão mais offline.',
+     'removed': 'Pacotes Argos selecionados foram removidos.',
+     'preparing': 'Preparando…',
+     'canceling': 'Cancelando…',
+     'install_failed': 'Falha ao instalar pacotes de idiomas:\n',
+     'ready': 'Os pacotes de idiomas selecionados estão prontos.',
+     'canceled': 'Cancelado',
+     'tess_down': 'Tesseract: baixando idiomas…',
+     'win_wait': 'Windows OCR: aguardando permissão do administrador…',
+     'win_done': 'Windows OCR: concluído',
+     'win_installing': 'Windows OCR: instalando {language} ({current}/{total})…',
+     'win_checking': 'Windows OCR: verificando {language}…',
+     'win_verifying': 'Windows OCR: verificando {language}…',
+     'easy_down': 'EasyOCR: baixando modelos {language} …',
+     'easy_done': 'EasyOCR: concluído',
+     'ocr_section': 'OCR',
+     'translation_section': 'Tradução',
+     'engine_not_installed_title': '{engine} não está instalado',
+     'engine_not_installed_body': 'Instale o motor primeiro. Os pacotes de idiomas aparecerão aqui '
+                                  'após a instalação.',
+     'repair_needed': 'Precisa de reparo',
+     'remove_packages_confirm': 'Remover pacotes {engine} selecionados: {packages}?',
+     'easy_shared_removal': 'EasyOCR compartilha modelos entre idiomas. A remoção deste pacote afeta: '
+                            '{packages}.',
+     'packages_removed': 'Os pacotes de idiomas {engine} selecionados foram removidos.',
+     'remove_failed': 'Falha ao remover pacotes de idiomas:\n',
+     'win_removing': 'Windows OCR: removendo {language} ({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: cancelando e removendo pacotes incompletos…'},
+    'it': {'intro': 'Installa qui le lingue OCR e le coppie di traduzione offline Argos. I pacchetti vengono '
+              'scaricati prima dell’uso, non durante il riconoscimento o la traduzione.',
+     'refresh': 'Aggiorna',
+     'windows_note': 'Mostra le lingue OCR disponibili in Windows. Installa solo OCR senza aggiungere '
+                     'una tastiera.',
+     'install_selected': 'Installa selezionati',
+     'windows_settings': 'Impostazioni di Windows',
+     'tesseract_note': 'Seleziona le lingue da scaricare nella cartella tessdata locale.',
+     'install_engine': 'Installa motore',
+     'easyocr_note': "Seleziona le lingue per prescaricare i modelli EasyOCR. L'inglese viene aggiunto "
+                     'come fallback.',
+     'remove_engine': 'Rimuovi motore',
+     'remove_engine_tooltip': 'Elimina il motore {engine} installato da questo computer.',
+     'hymt_note': 'Hy-MT è un modello di traduzione locale, non pacchetti per lingua. Installalo qui e '
+                  "apparirà nell'elenco dei traduttori.",
+     'translation_engine': 'Motore di traduzione',
+     'local_model': 'Modello locale',
+     'rapidocr_note': 'RapidOCR non ha pacchetti lingua separati. Il motore locale include un modello '
+                      'per cinese e inglese. Per il russo, usa Windows OCR, Tesseract o EasyOCR.',
+     'component': 'Componente',
+     'package': 'Pacchetto',
+     'status': 'Stato',
+     'argos_note': 'Sono mostrati tutti i pacchetti Argos disponibili. Le coppie senza inglese usano '
+                   'due pacchetti con l’inglese come lingua intermedia.',
+     'remove_highlighted': 'Rimuovi evidenziato',
+     'direction': 'Coppia di lingue',
+     'search': 'Cerca: russo, ru, en→ru…',
+     'language': 'Lingua',
+     'installed': 'Installato',
+     'missing': 'Non installato',
+     'can_download': 'Scaricabile',
+     'engine_missing': '{engine} mancante',
+     'checking': 'Controllo…',
+     'unavailable': 'Non disponibile su questa build Windows',
+     'first_use': 'Preparato sul primo OCR',
+     'engine_first': 'Installare prima il motore',
+     'ocr_engine': "Motore dell'OCR",
+     'runtime': 'Tempo di esecuzione neurale',
+     'detector': 'Rilevamento testo + orientamento',
+     'recognition': 'Riconoscimento',
+     'loading': 'Caricamento elenco pacchetti...',
+     'load_error': "Impossibile caricare l'elenco dei pacchetti: ",
+     'no_match': 'Nessun pacchetto corrisponde alla tua ricerca',
+     'no_packages': 'Nessun pacchetto trovato',
+     'no_selection': 'Seleziona almeno una lingua da installare.',
+     'already': '{engine} è già installato.',
+     'still': '{engine} è ancora in fase di controllo. Per favore aspetta un momento.',
+     'win_confirm': 'Installare i componenti Windows OCR selezionati?\n'
+                    '\n'
+                    "Verrà richiesta l'autorizzazione dell'amministratore. È installato solo l'OCR; "
+                    'non viene aggiunta alcuna tastiera o layout di input.',
+     'easy_prompt': "EasyOCR deve essere installato per primo. Avviare l'installazione del motore?",
+     'argos_installed': 'Le coppie di lingue Argos selezionate sono state installate.',
+     'highlight': 'Evidenzia una o più righe installate.',
+     'remove_confirm': 'Rimuovere i pacchetti Argos: {packages}?\n'
+                       '\n'
+                       'Queste coppie di lingue non funzioneranno più offline.',
+     'removed': 'I pacchetti Argos selezionati sono stati rimossi.',
+     'preparing': 'Preparazione…',
+     'canceling': 'Annullamento…',
+     'install_failed': 'Impossibile installare i pacchetti di lingue:\n',
+     'ready': 'I pacchetti lingua selezionati sono pronti.',
+     'canceled': 'Annullato',
+     'tess_down': 'Tesseract: download delle lingue…',
+     'win_wait': "Windows OCR: in attesa dell'autorizzazione dell'amministratore…",
+     'win_done': 'Windows OCR: fatto',
+     'win_installing': 'Windows OCR: installazione di {language} ({current}/{total})...',
+     'win_checking': 'Windows OCR: controllo {language}…',
+     'win_verifying': 'Windows OCR: verifica {language}...',
+     'easy_down': 'EasyOCR: download dei modelli {language} …',
+     'easy_done': 'EasyOCR: fatto',
+     'ocr_section': 'OCR',
+     'translation_section': 'Traduzione',
+     'engine_not_installed_title': '{engine} non è installato',
+     'engine_not_installed_body': 'Installare prima il motore. I pacchetti lingua verranno '
+                                  "visualizzati qui dopo l'installazione.",
+     'repair_needed': 'Necessita di riparazione',
+     'remove_packages_confirm': 'Rimuovi i pacchetti {engine} selezionati: {packages}?',
+     'easy_shared_removal': 'EasyOCR condivide i modelli tra le lingue. La rimozione di questo '
+                            'pacchetto influisce su: {packages}.',
+     'packages_removed': 'I pacchetti lingua {engine} selezionati sono stati rimossi.',
+     'remove_failed': 'Impossibile rimuovere i pacchetti di lingue:\n',
+     'win_removing': 'Windows OCR: rimozione di {language} ({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: annullamento e rimozione pacchetti incompleti…'},
 }
 
 
@@ -3415,6 +4247,92 @@ WINDOWS_OCR_RUNTIME_TEXT = {
         "win_error_busy": "Windows 组件服务正忙，通常是 Windows 更新或其他安装正在进行。请等待一分钟后重试，不需要重启。",
         "win_error_generic": "Windows 无法完成 OCR 包操作。请安装待处理的 Windows 更新，重启电脑后重试。",
     },
+
+    'pt': {'continue_background': 'Continuar em segundo plano',
+     'show_progress': 'Mostrar',
+     'task_installing_short': 'Instalando',
+     'task_packages_short': 'Pacotes',
+     'task_busy_help': 'Outra operação de pacote está em execução. Suas seleções são preservadas; abra '
+                       'seu progresso ou espere que termine.',
+     'win_component_short': 'DISM {percent}%',
+     'win_stage': 'Etapa {stage}/4 · Idioma {current}/{total}',
+     'win_time_unknown': 'Windows Update controla o tempo restante; um horário exato de término não '
+                         'está disponível.',
+     'win_activity_recent': 'Windows está respondendo',
+     'win_background_info': 'Windows baixa o idioma d Windows Update. Espere de 5 a 20 minutos por '
+                            'idioma e espere que a porcentagem fique parada por alguns minutos de cada '
+                            'vez - isso é normal, não um congelamento. O trabalho é executado como um '
+                            'serviço Windows, portanto continua se você enviá-lo para segundo plano, e '
+                            'esta janela informa o resultado.',
+     'win_download_stage': 'AtualizaçãoWindows : {percent}% baixado',
+     'win_quiet': 'Nenhum progresso para {minutes} min. Windows ainda está respondendo, mas seu '
+                  'download pode estar paralisado. Você pode continuar esperando em segundo plano ou '
+                  'cancelar com segurança.',
+     'win_installing_basic': 'Windows está preparando {language} ({current}/{total}). Este componente '
+                             'de idioma obrigatório pode levar vários minutos.',
+     'win_installing': 'Windows Update está baixando e instalando OCR para {language} '
+                       '({current}/{total}). Isso pode levar vários minutos.',
+     'win_cancel_pending': 'Cancelar solicitado. Windows está finalizando com segurança o componente '
+                           'atual; isso pode levar vários minutos.',
+     'win_still_working': 'Windows Update ainda está funcionando. Não desligue o PC.',
+     'win_registering': 'Windows está registrando o novo idioma OCR. Isso pode demorar um pouco…',
+     'win_installed_pending_restart': 'Windows concluiu a instalação do pacote OCR. {languages} ainda '
+                                      'não está disponível para o aplicativo – reinicie '
+                                      "Click'n'Translateou Windows se ainda não aparecer.",
+     'win_error_policy': 'Uma política do Windows Update bloqueou este pacote de OCR. Abra as '
+                         'configurações do Windows ou contate o administrador do sistema (0x800f0954).',
+     'win_error_source': 'Windows não pôde baixar o pacote OCR. Verifique Windows Update, a conexão '
+                         'com a Internet e o espaço livre em disco e tente novamente.',
+     'win_error_restart': 'Windows precisa ser reiniciado antes de poder instalar componentes. '
+                          'Reinicie o PC e tente novamente.',
+     'win_error_busy': 'A manutenção do componente Windows está ocupada - geralmente Windows Update ou '
+                       'outra instalação está em execução. Espere um minuto e tente novamente; nenhuma '
+                       'reinicialização é necessária.',
+     'win_error_generic': 'Windows não pôde concluir a operação do pacote OCR. Instale as atualizações '
+                          'pendentes do Windows, reinicie o PC e tente novamente.'},
+    'it': {'continue_background': 'Continua in sottofondo',
+     'show_progress': 'Mostra',
+     'task_installing_short': 'Installazione',
+     'task_packages_short': 'Pacchetti',
+     'task_busy_help': "È in esecuzione un'altra operazione sul pacchetto. Le tue selezioni vengono "
+                       "conservate; aprirne l'avanzamento o attendere che finisca.",
+     'win_component_short': 'DISM {percent}%',
+     'win_stage': 'Passo {stage}/4 · Lingua {current}/{total}',
+     'win_time_unknown': "Windows L'aggiornamento controlla il tempo rimanente; non è disponibile "
+                         "un'ora di fine esatta.",
+     'win_activity_recent': 'Windows sta rispondendo',
+     'win_background_info': 'Windows scarica la lingua dal Windows Update. Aspettatevi 5-20 minuti per '
+                            'lingua e aspettatevi che la percentuale rimanga ferma per minuti alla '
+                            'volta: è normale, non un blocco. Il lavoro viene eseguito come servizio '
+                            'Windows, quindi continua se lo mandi in background e questa finestra '
+                            'riporta il risultato.',
+     'win_download_stage': 'AggiornamentoWindows : {percent}% scaricato',
+     'win_quiet': 'Nessun progresso per {minutes} min. Windows risponde ancora, ma il download '
+                  'potrebbe essere bloccato. Puoi continuare ad attendere in background o annullare in '
+                  'tutta sicurezza.',
+     'win_installing_basic': 'Windows sta preparando {language} ({current}/{total}). Questo componente '
+                             'linguistico richiesto potrebbe richiedere diversi minuti.',
+     'win_installing': "Windows Update sta scaricando e installando l'OCR per {language} "
+                       "({current}/{total}). L'operazione potrebbe richiedere diversi minuti.",
+     'win_cancel_pending': 'Annulla richiesta. Windows sta terminando in sicurezza il componente '
+                           "corrente; l'operazione può richiedere diversi minuti.",
+     'win_still_working': 'Windows Update funziona ancora. Non spegnere il PC.',
+     'win_registering': "Windows sta registrando la nuova lingua OCR. L'operazione può richiedere un "
+                        'momento...',
+     'win_installed_pending_restart': "Windows ha terminato l'installazione del pacchetto OCR. "
+                                      "{languages} non è ancora disponibile per l'app: riavvia "
+                                      "Click'n'Translateo Windows se ancora non viene visualizzato.",
+     'win_error_policy': 'Un criterio di Windows Update ha bloccato questo pacchetto OCR. Apri le '
+                         'impostazioni di Windows o contatta l’amministratore di sistema (0x800f0954).',
+     'win_error_source': 'Windows non è riuscito a scaricare il pacchetto OCR. Controlla Windows '
+                         'Update, la connessione Internet e lo spazio libero su disco, quindi riprova.',
+     'win_error_restart': 'Windows necessita di un riavvio prima di poter installare i componenti. '
+                          'Riavviare il PC e riprovare.',
+     'win_error_busy': 'La manutenzione del componente Windows è occupata: in genere è in esecuzione '
+                       "Windows Update o un'altra installazione. Aspetta un minuto e riprova; non è "
+                       'necessario riavviare.',
+     'win_error_generic': "Windows non è riuscito a completare l'operazione del pacchetto OCR. "
+                          'Installa gli aggiornamenti Windows in sospeso, riavvia il PC e riprova.'},
 }
 for _runtime_lang, _runtime_values in WINDOWS_OCR_RUNTIME_TEXT.items():
     LANGUAGE_MANAGER_TEXT.setdefault(_runtime_lang, {}).update(_runtime_values)
@@ -3496,6 +4414,8 @@ class OcrLanguageManagerDialog(QDialog):
         self.title_close_btn = QToolButton()
         self.title_close_btn.setObjectName("languageManagerTitleClose")
         self.title_close_btn.setText("×")
+        self.title_close_btn.setAccessibleName(settings_text(self.lang, "close"))
+        self.title_close_btn.setToolTip(tooltip_text(settings_text(self.lang, "close")))
         self.title_close_btn.setCursor(Qt.PointingHandCursor)
         self.title_close_btn.setFixedSize(30, 28)
         self.title_close_btn.clicked.connect(self.reject)
@@ -3515,6 +4435,7 @@ class OcrLanguageManagerDialog(QDialog):
             drag_widget.installEventFilter(self)
 
         intro = QLabel(language_manager_text(self.lang, "intro"))
+        self.intro_label = intro
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
@@ -3542,6 +4463,11 @@ class OcrLanguageManagerDialog(QDialog):
             self.translation_section_page,
             language_manager_text(self.lang, "translation_section"),
         )
+        self.api_section_page = QWidget(self.tabs)
+        self.api_section_layout = QVBoxLayout(self.api_section_page)
+        self.api_section_layout.setContentsMargins(0, 0, 0, 0)
+        self.api_page = None
+        self.tabs.addTab(self.api_section_page, "API")
         layout.addWidget(self.tabs)
 
         self.windows_table = None
@@ -3594,8 +4520,16 @@ class OcrLanguageManagerDialog(QDialog):
         self.ocr_tabs.tabBar().setElideMode(Qt.ElideRight)
         self.translation_tabs.tabBar().setUsesScrollButtons(False)
         self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
-        QtCore.QTimer.singleShot(0, self._start_runtime_probe)
-        QtCore.QTimer.singleShot(0, lambda: self._start_argos_catalog_refresh(True))
+        # These callbacks belong to this dialog. A bare singleShot lambda can
+        # outlive it when the app closes before the first event-loop turn.
+        self._initial_probe_timer = QtCore.QTimer(self)
+        self._initial_probe_timer.setSingleShot(True)
+        self._initial_probe_timer.timeout.connect(lambda: self._start_runtime_probe())
+        self._initial_probe_timer.start(0)
+        self._initial_catalog_timer = QtCore.QTimer(self)
+        self._initial_catalog_timer.setSingleShot(True)
+        self._initial_catalog_timer.timeout.connect(lambda: self._start_argos_catalog_refresh(True))
+        self._initial_catalog_timer.start(0)
 
     def _owner_app(self):
         owner_parent = getattr(self.owner, "parent", None)
@@ -3651,10 +4585,12 @@ class OcrLanguageManagerDialog(QDialog):
                 QLabel { color: #f4f6fb; font-family: 'Segoe UI'; font-size: 13px; }
                 QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
                 QTabBar::tab:selected { background: #7A5FA1; }
-                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 7px; }
+                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 0px; }
                 QTableWidget::item { color: #f4f6fb; background-color: #17181d; }
                 QTableWidget::item:alternate { background-color: #20212a; }
                 QTableWidget::item:disabled { color: #9ca0ad; }
+                QTableWidget::item:selected { background: #5f4a88; color: #ffffff; }
+                QTableWidget::item:selected:!active { background: #5f4a88; color: #ffffff; }
                 QTableCornerButton::section { background: #24212e; border: 0; }
                 QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
 
@@ -3671,7 +4607,9 @@ class OcrLanguageManagerDialog(QDialog):
                 QDialog#languageManagerDialog { background-color: #f0edf3; color: #241f2a; border: 1px solid #bcb2c7; font-family: 'Segoe UI'; font-size: 13px; }
                 QWidget#languageManagerContent { background-color: #f0edf3; }
                 QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
-                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 7px; }
+                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 0px; }
+                QTableWidget::item:selected { background: #cdbbdd; color: #241f2a; }
+                QTableWidget::item:selected:!active { background: #cdbbdd; color: #241f2a; }
                 QHeaderView::section { background: #ddd7e2; color: #241f2a; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
 
             QPushButton#languagePackageAction { min-height: 18px; }
@@ -3682,6 +4620,25 @@ class OcrLanguageManagerDialog(QDialog):
                 QLineEdit { background: #f3eff5; color: #241f2a; border: 1px solid #bcb2c7; border-radius: 6px; padding: 6px 9px; }
                 QLineEdit:focus { border-color: #7A5FA1; }
             """ + standard_buttons(self._is_dark_theme(), compact=False))
+
+        install_accent_controls(self, dark)
+        if self.api_page is not None:
+            self.api_page.apply_theme()
+
+    def show_api(self, provider=None):
+        if self.api_page is None:
+            from provider_settings import ProviderSettingsPage
+            self.api_page = ProviderSettingsPage(self.owner, self.api_section_page)
+            self.api_section_layout.addWidget(self.api_page)
+        self.tabs.setCurrentWidget(self.api_section_page)
+        self.intro_label.hide()
+        self.refresh_btn.hide()
+        if provider is not None:
+            index = self.api_page.service.findData(provider)
+            if index >= 0:
+                self.api_page.service.setCurrentIndex(index)
+        self.api_page.apply_theme()
+        return self.api_page
 
     def _apply_package_tab_styles(self):
         dark = self._is_dark_theme()
@@ -3836,6 +4793,11 @@ class OcrLanguageManagerDialog(QDialog):
             tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def _on_tab_changed(self, _index):
+        api = self.tabs.currentWidget() is self.api_section_page
+        self.intro_label.setVisible(not api)
+        self.refresh_btn.setVisible(not api)
+        if api and self.api_page is None:
+            self.show_api()
         # A page is laid out when it is first shown, so its table can only be
         # measured after switching to it.
         QtCore.QTimer.singleShot(0, self._snap_visible_table)
@@ -3844,6 +4806,9 @@ class OcrLanguageManagerDialog(QDialog):
         for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
                       self.rapidocr_table, self.argos_table):
             if table is not None and table.isVisible():
+                # Fitting columns may remove a temporary horizontal scrollbar
+                # and change row heights. Measure the cap after that settles.
+                table.fit_columns()
                 self._snap_table_to_whole_rows(table)
 
     def _build_tabs(self):
@@ -4028,7 +4993,7 @@ class OcrLanguageManagerDialog(QDialog):
             filter_edit.setClearButtonEnabled(True)
             layout.addWidget(filter_edit)
 
-        table = QTableWidget(page)
+        table = PackageTable(page)
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(header_labels or [
             "",
@@ -4051,8 +5016,8 @@ class OcrLanguageManagerDialog(QDialog):
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
         if self._is_dark_theme():
             header.setStyleSheet("QHeaderView::section { background-color: #24212e; color: #f4f6fb; border: 0; padding: 5px; }")
         else:
@@ -4129,6 +5094,31 @@ class OcrLanguageManagerDialog(QDialog):
                     engine=engine_name,
                 )
             )
+
+    def focus_translation_engine(self, engine, source='', target=''):
+        engine = str(engine).lower().replace('hy-mt', 'hymt')
+        table = self.hymt_table if engine == 'hymt' else self.argos_table
+        self.tabs.setCurrentWidget(self.translation_section_page)
+        self.translation_tabs.setCurrentWidget(table.parentWidget())
+        if engine == 'argos':
+            search = getattr(table, '_package_filter_edit', None)
+            if search is not None:
+                search.clear()
+            self._requested_argos_pair = (str(source), str(target))
+            self._focus_requested_argos_pair()
+
+    def _focus_requested_argos_pair(self):
+        pair = getattr(self, '_requested_argos_pair', None)
+        if not pair or not all(pair):
+            return
+        table = self.argos_table
+        direct = f'{pair[0]}->{pair[1]}'
+        for row in range(table.rowCount()):
+            item = table.item(row, 0)
+            if item is not None and item.data(Qt.UserRole) == direct:
+                table.selectRow(row)
+                table.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+                return
 
     def refresh_all(self):
         if self.windows_table is not None:
@@ -4332,6 +5322,7 @@ class OcrLanguageManagerDialog(QDialog):
             status_item.setForeground(QBrush(fg if data.get("checked") or data.get("selectable") else muted_fg))
             table.setItem(row, 3, status_item)
         table.resizeRowsToContents()
+        table._schedule_fit()
         table._pending_package_codes = pending
         del signal_blocker
 
@@ -4563,6 +5554,13 @@ class OcrLanguageManagerDialog(QDialog):
                 "status": (
                     self._status_checking()
                     if checking else
+                    {'ru': 'Язык не поддерживается этим движком', 'en': 'Language not supported by this engine',
+                     'es': 'Idioma no compatible con este motor', 'de': 'Sprache von dieser Engine nicht unterstützt',
+                     'fr': 'Langue non prise en charge par ce moteur', 'zh': '此引擎不支持该语言',
+                        'pt': 'Idioma não suportado por este mecanismo',
+                        'it': 'Lingua non supportata da questo motore',
+                    }.get(self.lang, 'Language not supported by this engine')
+                    if not groups else
                     self._status_engine_missing(EASYOCR_ENGINE_DISPLAY)
                     if not engine_ready else
                     self._status_installed()
@@ -4570,7 +5568,7 @@ class OcrLanguageManagerDialog(QDialog):
                     self._status_can_download()
                 ),
                 "checked": installed,
-                "selectable": bool(engine_ready and not installed),
+                "selectable": bool(groups and engine_ready and not installed),
             })
         self._set_language_rows(table, rows)
 
@@ -4822,6 +5820,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_error = str(error or "")
         if self.argos_table is not None:
             self._populate_argos_table(self.argos_table)
+            self._focus_requested_argos_pair()
 
     def _selected_codes(self, table):
         codes = []
@@ -6840,6 +7839,9 @@ class SettingsWindow(QWidget):
         if checkbox is None:
             return
         enabled = checkbox.isChecked()
+        mode_combo = getattr(self, "selection_quick_translate_mode_combo", None)
+        if mode_combo is not None:
+            mode_combo.setEnabled(enabled)
         for widget in (
             getattr(self, "selection_quick_translate_mode_button", None),
             getattr(self, "selection_quick_translate_mode_automatic", None),
@@ -6859,32 +7861,40 @@ class SettingsWindow(QWidget):
                 return
         self.auto_save_setting("selection_quick_translate_enabled", bool(enabled))
         self._refresh_selection_quick_translate_mode_enabled()
-        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
-        if callable(sync):
-            sync()
 
     def _set_selection_quick_translate_mode(self, mode):
         if mode not in ("button", "automatic"):
             return
         self.auto_save_setting("selection_quick_translate_mode", mode)
-        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
-        if callable(sync):
-            sync()
 
     def _set_translation_result_font_size(self, *_args):
-        combo = getattr(self, "translation_font_combo", None)
-        if combo is None:
+        control = getattr(self, "translation_font_control", None)
+        if control is None:
             return
         from main import (
             TRANSLATION_RESULT_FONT_SIZE_KEYS,
             normalize_translation_result_font_size,
         )
-        key = normalize_translation_result_font_size(combo.currentData())
+        key = normalize_translation_result_font_size(control.value())
         if key not in TRANSLATION_RESULT_FONT_SIZE_KEYS:
             return
+        self._refresh_translation_font_preview()
         if self.parent.config.get("translation_result_font_size") == key:
             return
         self.auto_save_setting("translation_result_font_size", key)
+
+    def _refresh_translation_font_preview(self):
+        from main import translation_result_font_px
+        key = self.translation_font_control.value()
+        pixels = translation_result_font_px({'translation_result_font_size': key})
+        self.translation_font_preview.setStyleSheet(
+            f"font-size:{pixels}px; font-weight:400; margin:0;"
+        )
+        lang = self.parent.current_interface_language
+        description = settings_text(lang, f'translation_result_font_{key}')
+        hint = tooltip_text(f'{description} · {pixels} px\n{settings_text(lang, "translation_result_font_tooltip")}')
+        self.translation_font_control.setToolTip(hint)
+        self.translation_font_control.editor.setToolTip(hint)
 
     def _set_desktop_assistant_enabled(self, enabled):
         setter = getattr(self.parent, 'set_desktop_assistant_enabled', None)
@@ -7127,22 +8137,20 @@ class SettingsWindow(QWidget):
         target = Path(path)
         if target.suffix.lower() != ".json":
             target = target.with_suffix(".json")
-        temporary = target.with_name(target.name + ".tmp")
+        temporary = None
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            temporary.write_text(
-                json.dumps(
-                    settings_export_payload(self.parent.config),
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                ) + "\n",
-                encoding="utf-8",
-            )
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                    prefix=target.name+'.', suffix='.tmp', dir=target.parent, delete=False) as output:
+                temporary = Path(output.name)
+                json.dump(settings_export_payload(self.parent.config), output,
+                          ensure_ascii=False, indent=2, sort_keys=True)
+                output.write('\n')
             os.replace(str(temporary), str(target))
         except Exception as error:
             try:
-                temporary.unlink(missing_ok=True)
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
             except OSError:
                 pass
             QMessageBox.warning(
@@ -7169,7 +8177,22 @@ class SettingsWindow(QWidget):
         if not path:
             return None
         try:
-            payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+            with Path(path).open('rb') as source:
+                content = source.read(1024 * 1024 + 1)
+            if len(content) > 1024 * 1024:
+                messages = {
+                    'en': 'This settings file is too large. Choose a ClicknTranslate export.',
+                    'ru': 'Файл настроек слишком большой. Выберите экспорт ClicknTranslate.',
+                    'es': 'El archivo es demasiado grande. Elige una exportación de ClicknTranslate.',
+                    'de': 'Die Einstellungsdatei ist zu groß. Wählen Sie einen ClicknTranslate-Export.',
+                    'fr': 'Ce fichier est trop volumineux. Choisissez un export ClicknTranslate.',
+                    'zh': '设置文件过大，请选择 ClicknTranslate 导出的文件。',
+
+                    'pt': 'Este arquivo de configurações é muito grande. Escolha uma exportação ClicknTranslate.',
+                    'it': "Questo file delle impostazioni è troppo grande. Scegli un'esportazione ClicknTranslate.",
+                }
+                raise ValueError(messages.get(lang, messages['en']))
+            payload = json.loads(content.decode('utf-8-sig'))
             from main import (
                 DEFAULT_CONFIG,
                 merge_config_defaults,
@@ -7202,12 +8225,15 @@ class SettingsWindow(QWidget):
             actual_autostart = self.parent.set_autostart(self.parent.autostart)
             self.parent.autostart = bool(actual_autostart)
             self.parent.config["autostart"] = self.parent.autostart
-            self.parent.save_config()
+            self.parent.save_config(capture_languages=False)
 
             restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
             if callable(restart_hotkeys):
                 restart_hotkeys()
             self.parent.apply_theme()
+            sync_selection = getattr(self.parent, '_sync_selection_quick_translate', None)
+            if callable(sync_selection):
+                sync_selection()
             self.parent.refresh_interface_language_ui()
             self.init_ui()
             self.apply_theme()
@@ -7217,7 +8243,7 @@ class SettingsWindow(QWidget):
             QMessageBox.warning(
                 self,
                 settings_text(lang, "import_settings"),
-                settings_text(lang, "settings_transfer_failed").format(error=error),
+                settings_text(lang, "settings_transfer_failed").format(error=_settings_import_error(error,lang)),
             )
             return None
 
@@ -7339,7 +8365,9 @@ class SettingsWindow(QWidget):
         # Scale/screen signals can arrive while a secondary page replaces the form.
         self.ui_scale_control = None
         self.ui_scale_value = None
-        self.translation_font_combo = None
+        self.translation_font_control = None
+        self._update_progress = None
+        self.selection_quick_translate_mode_combo = None
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -7364,6 +8392,8 @@ class SettingsWindow(QWidget):
         self.clear_main_layout()
 
     def init_ui(self):
+        if self._update_in_progress and getattr(self, 'settings_pages', None) is not None:
+            return
         # Every visit starts from the compact general page.  Remembering page
         # 2/3 made Settings appear empty or unfamiliar on the next opening.
         page_to_restore = 0
@@ -7394,7 +8424,7 @@ class SettingsWindow(QWidget):
         # 672x334 settings viewport. At 36px Qt overlaps the rows and paints
         # over their lower borders; 31px keeps every frame intact.
         action_button_height = 29
-        
+
         # --- СТРОКА 1: Запускать вместе с ОС + Движок OCR ---
         # One grid owns the three selector rows. Separate horizontal layouts
         # with 300px checkbox minima and 90px labels overflowed with Linux
@@ -7411,14 +8441,14 @@ class SettingsWindow(QWidget):
         self.autostart_checkbox.setStyleSheet("margin:0; padding:0;")
         self.autostart_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.autostart_checkbox, 0, 0)
-        
+
         # Правые блоки обеих строк имеют одинаковую высоту и разметку.
         # Кнопка удаления живёт в расширенной правой секции самого списка.
         self.ocr_engine_label = QLabel("OCR:")
         self.ocr_engine_label.setStyleSheet("margin:0; padding:0;")
         self.ocr_engine_label.setFixedHeight(engine_control_height)
         self.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        
+
         # Same drop-down behaviour as the other two pickers: the list opens
         # below the field instead of covering it.
         self.ocr_engine_combo = DropDownCombo()
@@ -7455,7 +8485,7 @@ class SettingsWindow(QWidget):
         self.ocr_engine_combo.setFixedHeight(engine_control_height)
         form_grid.addWidget(self.ocr_engine_label, 0, 1, Qt.AlignVCenter)
         form_grid.addWidget(self.ocr_engine_combo, 0, 2, Qt.AlignVCenter)
-        
+
         # Each popup item has its own concise explanation.  Avoid one giant
         # native tooltip covering most of the fixed settings window.
         ocr_picker_help = {
@@ -7465,10 +8495,13 @@ class SettingsWindow(QWidget):
             "de": "OCR-Engine wählen. Fehlende Engines können danach installiert werden.",
             "fr": "Choisissez un OCR. Un moteur manquant peut ensuite être installé.",
             "zh": "选择 OCR；缺少的引擎可在选择后安装。",
+
+            'pt': 'Escolha um mecanismo de OCR. Motores ausentes podem ser instalados quando selecionados.',
+            'it': 'Scegli un motore OCR. I motori mancanti possono essere installati quando selezionati.',
         }
         self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
         self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
-        
+
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
         self.start_minimized_checkbox = QCheckBox(settings_text(lang, "start_minimized"))
         self.start_minimized_checkbox.setChecked(self.parent.config.get("start_minimized", False))
@@ -7476,7 +8509,7 @@ class SettingsWindow(QWidget):
         self.start_minimized_checkbox.setStyleSheet("margin:0; padding:0;")
         self.start_minimized_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.start_minimized_checkbox, 1, 0)
-        
+
         # Блок переводчика повторяет ту же сетку, чтобы колонки не сдвигались.
         self.translator_engine_label = QLabel(settings_text(lang, "translator_label"))
         self.translator_engine_label.setStyleSheet("margin:0; padding:0;")
@@ -7503,7 +8536,7 @@ class SettingsWindow(QWidget):
             engine_group_color,
             installed_engines=installed_translator_engines,
         )
-        
+
         current_tr = self.parent.config.get("translator_engine", "Google").lower()
         try:
             idx = self._translator_engines.index(current_tr)
@@ -7516,7 +8549,7 @@ class SettingsWindow(QWidget):
         self.translator_combo.setFixedHeight(engine_control_height)
         form_grid.addWidget(self.translator_engine_label, 1, 1, Qt.AlignVCenter)
         form_grid.addWidget(self.translator_combo, 1, 2, Qt.AlignVCenter)
-        
+
         translator_picker_help = {
             "en": "Online providers need internet. Installed offline providers are listed separately.",
             "ru": "Онлайн-переводчикам нужен интернет. Установленные офлайн-пакеты показаны отдельно.",
@@ -7524,6 +8557,11 @@ class SettingsWindow(QWidget):
             "de": "Online-Anbieter benötigen Internet; installierte Offline-Anbieter stehen separat.",
             "fr": "Les services en ligne nécessitent Internet ; les moteurs hors ligne installés sont séparés.",
             "zh": "在线服务需要网络；已安装的离线翻译器会单独显示。",
+
+            'pt': ('Provedores online precisam de internet. Os provedores off-line instalados são listados '
+             'separadamente.'),
+            'it': ('I fornitori online hanno bisogno di Internet. I provider offline installati sono elencati '
+             'separatamente.'),
         }
         picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
         self.translator_combo.setToolTip(tooltip_text(picker_help))
@@ -7636,6 +8674,17 @@ class SettingsWindow(QWidget):
         self.button_tooltips_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.button_tooltips_checkbox, 5, 0, alignment=Qt.AlignLeft)
 
+        self.replace_select_all_checkbox = QCheckBox(settings_text(lang, "replace_select_all"))
+        self.replace_select_all_checkbox.setChecked(self.parent.config.get("replace_selection_select_all") is True)
+        self.replace_select_all_checkbox.setToolTip(tooltip_text(settings_text(lang, "replace_select_all_hint")))
+        self.replace_select_all_checkbox.setAccessibleDescription(settings_text(lang, "replace_select_all_hint"))
+        self.replace_select_all_checkbox.setStyleSheet("margin:0; padding:0;")
+        self.replace_select_all_checkbox.setFixedHeight(fixed_height)
+        self.replace_select_all_checkbox.setEnabled(not platform_support.IS_LINUX)
+        self.replace_select_all_checkbox.toggled.connect(
+            lambda state: self.auto_save_setting("replace_selection_select_all", bool(state)))
+        form_grid.addWidget(self.replace_select_all_checkbox, 6, 0, alignment=Qt.AlignLeft)
+
         self.ui_scale_label = QLabel(settings_text(lang, 'ui_scale_caption'))
         self.ui_scale_label.setObjectName('uiScaleLabel')
         self.ui_scale_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -7644,9 +8693,9 @@ class SettingsWindow(QWidget):
         self.ui_scale_control.setObjectName('uiScaleControl')
         self.ui_scale_control.setFixedSize(engine_combo_width, engine_control_height)
         scale_outer = QHBoxLayout(self.ui_scale_control)
-        scale_outer.setContentsMargins(3, 2, 3, 2)
+        scale_outer.setContentsMargins(0, 0, 0, 0)
         self.ui_scale_value = ScalePercentEdit()
-        self.ui_scale_field = StepperFrame(self.ui_scale_value, dark=self.parent.current_theme != 'Светлая')
+        self.ui_scale_field = StepperFrame(self.ui_scale_value, dark=self.parent.current_theme != 'Светлая', font_size=14)
         self.ui_scale_field.setObjectName('uiScaleField')
         scale_outer.addWidget(self.ui_scale_field)
         self.ui_scale_decrease = self.ui_scale_field.decrease
@@ -7680,34 +8729,45 @@ class SettingsWindow(QWidget):
         self.translation_font_label.setStyleSheet("margin:0; padding:0;")
         self.translation_font_label.setFixedHeight(engine_control_height)
         self.translation_font_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.translation_font_combo = DropDownCombo()
-        self.translation_font_combo.setObjectName("translationResultFontSize")
         from main import (
             TRANSLATION_RESULT_FONT_SIZE_KEYS,
             normalize_translation_result_font_size,
         )
-        for size_key in TRANSLATION_RESULT_FONT_SIZE_KEYS:
-            self.translation_font_combo.addItem(
-                settings_text(lang, f"translation_result_font_{size_key}"),
-                size_key,
-            )
+        self.translation_font_control = ChoiceStepper(
+            [(key, settings_text(lang, f'translation_result_font_{key}'))
+             for key in TRANSLATION_RESULT_FONT_SIZE_KEYS],
+            dark=self.parent.current_theme != 'Светлая', font_size=14)
+        self.translation_font_control.setObjectName("translationResultFontSize")
         saved_font = normalize_translation_result_font_size(
             self.parent.config.get("translation_result_font_size")
         )
-        font_index = self.translation_font_combo.findData(saved_font)
-        self.translation_font_combo.setCurrentIndex(max(font_index, 0))
-        self._apply_engine_combo_style(self.translation_font_combo)
-        self.translation_font_combo.setFixedWidth(engine_combo_width)
-        self.translation_font_combo.setFixedHeight(engine_control_height)
-        self.translation_font_combo.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_control.setValue(saved_font)
+        self.translation_font_control.setFixedSize(engine_combo_width, engine_control_height)
+        self.translation_font_control.setAccessibleName(settings_text(lang, "translation_result_font_label"))
+        self.translation_font_control.editor.setAccessibleName(settings_text(lang, "translation_result_font_label"))
         font_tooltip = tooltip_text(settings_text(lang, "translation_result_font_tooltip"))
-        self.translation_font_combo.setToolTip(font_tooltip)
+        self.translation_font_control.setAccessibleDescription(settings_text(lang, "translation_result_font_tooltip"))
+        for button, direction in ((self.translation_font_control.decrease, 'decrease'),
+                                  (self.translation_font_control.increase, 'increase')):
+            hint = settings_text(lang, f'translation_result_font_{direction}')
+            button.setAccessibleName(hint)
+            button.setToolTip(tooltip_text(hint))
         self.translation_font_label.setToolTip(font_tooltip)
-        self.translation_font_combo.currentIndexChanged.connect(
+        self.translation_font_label.setBuddy(self.translation_font_control)
+        self.translation_font_preview = QLabel(settings_text(lang, "translation_result_font_sample"))
+        self.translation_font_preview.setObjectName("translationResultFontPreview")
+        # Use the spare right-column rows without increasing the fixed form's
+        # height. A 24px font needs more than a 28px input row for descenders.
+        self.translation_font_preview.setFixedSize(engine_combo_width, 40)
+        self.translation_font_preview.setAlignment(Qt.AlignCenter)
+        self.translation_font_preview.setToolTip(font_tooltip)
+        self._refresh_translation_font_preview()
+        self.translation_font_control.valueChanged.connect(
             self._set_translation_result_font_size
         )
         form_grid.addWidget(self.translation_font_label, 4, 1, Qt.AlignVCenter)
-        form_grid.addWidget(self.translation_font_combo, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_control, 4, 2, Qt.AlignVCenter)
+        form_grid.addWidget(self.translation_font_preview, 5, 2, 2, 1, Qt.AlignVCenter)
 
         # Companion preferences have their own page, not a hidden general row.
         from assistant_text import assistant_text
@@ -7750,7 +8810,7 @@ class SettingsWindow(QWidget):
         action_grid.setVerticalSpacing(1)
         for column in range(3):
             action_grid.setColumnStretch(column, 1)
-        
+
         # Левая кнопка - закругление слева (фиолетовая)
         self.clear_cache_btn = OpticallyCenteredPushButton(settings_text(lang, "clear_cache"))
         self.clear_cache_btn.setObjectName("settingsClearCacheButton")
@@ -7759,7 +8819,7 @@ class SettingsWindow(QWidget):
         self.clear_cache_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.clear_cache_btn.clicked.connect(self.clear_all_cache)
         action_grid.addWidget(self.clear_cache_btn, 0, 0)
-        
+
         # Средняя кнопка - без закругления (красная - сброс)
         self.reset_btn = OpticallyCenteredPushButton(settings_text(lang, "reset"))
         self.reset_btn.setObjectName("settingsResetButton")
@@ -7768,7 +8828,7 @@ class SettingsWindow(QWidget):
         self.reset_btn.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.reset_btn.clicked.connect(self.reset_settings)
         action_grid.addWidget(self.reset_btn, 0, 1)
-        
+
         # Правая кнопка - закругление справа (фиолетовая - обновление)
         self.update_btn = OpticallyCenteredPushButton(settings_text(lang, "update"))
         self.update_btn.setObjectName("settingsUpdateButton")
@@ -7823,7 +8883,7 @@ class SettingsWindow(QWidget):
         self.hotkeys_button.setStyleSheet("")
         self.hotkeys_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         action_grid.addWidget(self.hotkeys_button, 2, 0, 1, 3)
-        
+
         # --- Page 2: OCR behaviour and updates ---
         # Keep this as one clean page.  The fixed 700x400 window does not have
         # enough horizontal room for a second settings form beside it without
@@ -8073,6 +9133,7 @@ class SettingsWindow(QWidget):
         self.game_swap_button.setObjectName("gameLanguageSwap")
         self.game_swap_button.setFixedSize(34, 32)
         self.game_swap_button.setToolTip(tooltip_text(settings_text(lang, "game_swap_languages")))
+        self.game_swap_button.setAccessibleName(settings_text(lang, "game_swap_languages"))
         language_row.addWidget(self.game_source_combo)
         language_row.addWidget(self.game_swap_button)
         language_row.addWidget(self.game_target_combo)
@@ -8301,10 +9362,38 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.settings_pages, 1)
         # Apply shared styling only after every page has been recreated.
         # Earlier calls could reach deleted controls from the previous visit.
+        from settings_categories import organize
+        organize(self, general_layout, form_grid, updates_layout, dim_row)
         self._apply_action_panel_style()
+        self._set_control_hints()
         self._position_settings_updates_page()
         self._set_settings_page(page_to_restore)
         QtCore.QTimer.singleShot(0, self._position_settings_updates_page)
+
+    def _set_control_hints(self):
+        from guide_setup import GUIDE_SETTING_STEPS, setting_body
+        lang = self.parent.current_interface_language
+        for action, (attribute, _page, _default) in GUIDE_SETTING_STEPS.items():
+            control = getattr(self, attribute, None)
+            if control is not None and (not control.toolTip()
+                    or control.toolTip() == control.property('automaticHoverHint')):
+                control.setToolTip(tooltip_text(setting_body(lang, action)))
+        for name, key in (
+            ('button_tooltips_checkbox', 'hover_tips'), ('clear_cache_btn', 'clear_cache'),
+            ('reset_btn', 'reset'), ('update_btn', 'update'),
+            ('copy_history_btn', 'copy_history'), ('translation_history_btn', 'translation_history'),
+            ('hotkeys_button', 'hotkeys'), ('keep_visible_checkbox', 'keep_visible'),
+            ('game_scan_interval_slider', 'scan_interval'),
+            ('game_scan_interval_label', 'scan_interval'),
+            ('game_overlay_opacity_slider', 'overlay_background'),
+            ('game_overlay_opacity_label', 'overlay_background'),
+            ('game_manual_output_checkbox', 'no_overlay_on_text'),
+            ('game_source_combo', 'source_language'), ('game_target_combo', 'target_language'),
+        ):
+            control = getattr(self, name)
+            control.setToolTip(tooltip_text(control_hint(lang, key)))
+            control.setAccessibleDescription(control_hint(lang, key))
+        self.game_help_button.setToolTip(tooltip_text(settings_text(lang, 'game_workflow_note')))
 
     def _launch_dynamic_translation(self):
         launch = getattr(self.parent, "launch_game_translate", None)
@@ -8312,6 +9401,9 @@ class SettingsWindow(QWidget):
             launch()
 
     def _set_settings_page(self, index):
+        progress = getattr(self, '_update_progress', None)
+        if self._update_in_progress and progress is not None:
+            index = self.settings_pages.indexOf(progress)
         updates_page = getattr(self, "settings_updates_page", None)
         game_page = getattr(self, "settings_game_page", None)
         if updates_page is None or game_page is None:
@@ -8434,7 +9526,7 @@ class SettingsWindow(QWidget):
         button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
         button.setAccessibleDescription(detail or help_text)
 
-    def show_ocr_language_manager(self):
+    def show_ocr_language_manager(self, engine=None, source='', target=''):
         # Completion is an unread badge until the user follows it. Opening the
         # package manager acknowledges it; ongoing and failed work remains
         # visible until it is actually resolved.
@@ -8469,7 +9561,11 @@ class SettingsWindow(QWidget):
             dialog._start_runtime_probe()
             if dialog.argos_table.isVisible():
                 dialog._start_argos_catalog_refresh(False)
+        dialog._apply_style()
+        dialog._apply_package_tab_styles()
         dialog.show()
+        if isinstance(engine, str):
+            dialog.focus_translation_engine(engine, source, target)
         dialog.raise_()
         dialog.activateWindow()
 
@@ -8738,69 +9834,6 @@ class SettingsWindow(QWidget):
         lang = self.parent.current_interface_language
         shell_layout = self._create_secondary_shell(settings_text(lang, "hotkeys"))
 
-        quick_card = QFrame()
-        quick_card.setObjectName("secondaryCard")
-        quick_layout = QVBoxLayout(quick_card)
-        quick_layout.setContentsMargins(12, 9, 12, 9)
-        quick_layout.setSpacing(6)
-        self.selection_quick_translate_checkbox = QCheckBox(
-            settings_text(lang, "selection_quick_translate_enabled")
-        )
-        self.selection_quick_translate_checkbox.setObjectName("settingsPageCheckbox")
-        self.selection_quick_translate_checkbox.setToolTip(
-            settings_text(lang, "selection_quick_translate_tooltip")
-        )
-        self.selection_quick_translate_checkbox.setChecked(
-            self.parent.config.get("selection_quick_translate_enabled") is True
-        )
-        quick_layout.addWidget(self.selection_quick_translate_checkbox)
-        mode_row = QHBoxLayout()
-        mode_row.setSpacing(12)
-        self.selection_quick_translate_mode_button = QRadioButton(
-            settings_text(lang, "selection_quick_translate_mode_button")
-        )
-        self.selection_quick_translate_mode_button.setObjectName("settingsPageRadio")
-        self.selection_quick_translate_mode_automatic = QRadioButton(
-            settings_text(lang, "selection_quick_translate_mode_automatic")
-        )
-        self.selection_quick_translate_mode_automatic.setObjectName("settingsPageRadio")
-        saved_mode = str(self.parent.config.get("selection_quick_translate_mode") or "button")
-        if saved_mode == "automatic":
-            self.selection_quick_translate_mode_automatic.setChecked(True)
-        else:
-            self.selection_quick_translate_mode_button.setChecked(True)
-        mode_row.addWidget(self.selection_quick_translate_mode_button)
-        mode_row.addWidget(self.selection_quick_translate_mode_automatic)
-        mode_row.addStretch(1)
-        quick_layout.addLayout(mode_row)
-        self._refresh_selection_quick_translate_mode_enabled()
-        self.selection_quick_translate_checkbox.toggled.connect(
-            self._set_selection_quick_translate_enabled
-        )
-        self.selection_quick_translate_mode_button.toggled.connect(
-            lambda checked: self._set_selection_quick_translate_mode("button") if checked else None
-        )
-        self.selection_quick_translate_mode_automatic.toggled.connect(
-            lambda checked: self._set_selection_quick_translate_mode("automatic") if checked else None
-        )
-        self.close_result_on_outside_click_checkbox = QCheckBox(
-            settings_text(lang, "close_result_window_on_outside_click")
-        )
-        self.close_result_on_outside_click_checkbox.setObjectName("settingsPageCheckbox")
-        self.close_result_on_outside_click_checkbox.setToolTip(
-            settings_text(lang, "close_result_window_on_outside_click_tooltip")
-        )
-        self.close_result_on_outside_click_checkbox.setChecked(
-            self.parent.config.get("close_result_window_on_outside_click") is True
-        )
-        self.close_result_on_outside_click_checkbox.toggled.connect(
-            lambda checked: self.auto_save_setting(
-                "close_result_window_on_outside_click", bool(checked)
-            )
-        )
-        quick_layout.addWidget(self.close_result_on_outside_click_checkbox)
-        shell_layout.addWidget(quick_card)
-
         hotkey_card = QFrame()
         hotkey_card.setObjectName("secondaryCard")
         hotkey_grid = QGridLayout(hotkey_card)
@@ -8863,6 +9896,13 @@ class SettingsWindow(QWidget):
             label.setObjectName("secondaryFieldLabel")
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             label.setFixedHeight(27)
+            label.setBuddy(key_input)
+            help_text = f'{label_text.rstrip(":")}\n{self._hotkey_edit_hint()}'
+            label.setToolTip(tooltip_text(help_text))
+            if not key_input.toolTip():
+                key_input.setToolTip(tooltip_text(help_text))
+            key_input.setAccessibleName(label_text.rstrip(':'))
+            key_input.setAccessibleDescription(self._hotkey_edit_hint())
             key_input.setObjectName("secondaryHotkeyInput")
             key_input.setFixedHeight(27)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -8896,12 +9936,22 @@ class SettingsWindow(QWidget):
         footer = QHBoxLayout()
         footer.setContentsMargins(2, 0, 2, 0)
         footer.addWidget(remove_label, 1)
+        from selection_options import TEXT as SELECTION_TEXT
+        self.selection_mode_button = QPushButton(SELECTION_TEXT.get(lang, SELECTION_TEXT['en'])[4])
+        self._configure_secondary_button(self.selection_mode_button, 'secondaryBackButton')
+        self.selection_mode_button.clicked.connect(self._show_selection_mode_options)
+        footer.addWidget(self.selection_mode_button)
         footer.addWidget(back_button, 0)
         shell_layout.addLayout(footer)
 
         self._refresh_secondary_view_theme()
+        install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
+
+    def _show_selection_mode_options(self):
+        self.parent.config['hotkey_language_editor_mode'] = 'selection'
+        self.parent.show_hotkey_language_dialog()
 
     def focus_hotkey_setting(self, config_key):
         """Open the hotkey page and focus the field named by its config key."""
@@ -8943,6 +9993,9 @@ class SettingsWindow(QWidget):
             'es': 'Atajo o doble pulsación (Shift → Shift). Esc: borrar.',
             'fr': 'Raccourci ou double appui (Shift → Shift). Échap : effacer.',
             'zh': '组合键或双击（Shift → Shift）。Esc 清除。',
+
+            'pt': 'Atalho ou toque duplo (Shift → Shift). Esc para limpar.',
+            'it': 'Scorciatoia o doppio tocco (Maiusc → Maiusc). Esc per cancellare.',
         }
         return hints.get(lang, hints['en'])
 
@@ -8955,10 +10008,8 @@ class SettingsWindow(QWidget):
                 or (not double and QKeySequence(hotkey).count() > 1)):
             with QtCore.QSignalBlocker(field):
                 field.setHotkeyText(self.parent.config.get(key, ''))
-            message = ('Используйте одно сочетание или два нажатия одной клавиши.'
-                       if self.parent.current_interface_language == 'ru' else
-                       'Use one shortcut or two taps of the same key (Windows).')
-            self.hotkey_hint_label.setText(message)
+            self.hotkey_hint_label.setText(settings_text(
+                self.parent.current_interface_language, 'invalid_hotkey_format'))
             return None
         hotkey = double or hotkey
         labels = {
@@ -8986,6 +10037,9 @@ class SettingsWindow(QWidget):
                     "fr": "{hotkey} déjà utilisé : {action}",
                     "es": "{hotkey} ya está en uso: {action}",
                     "zh": "{hotkey} 已被占用：{action}",
+
+                    'pt': '{hotkey} já está em uso: {action}',
+                    'it': '{hotkey} è già utilizzato: {action}',
                 }
                 message = messages.get(lang, messages["en"]).format(
                     hotkey=hotkey, action=settings_text(lang, label).rstrip(":"))
@@ -9566,16 +10620,9 @@ class SettingsWindow(QWidget):
             return
 
         if not getattr(sys, "frozen", False):
-            msg = QMessageBox(self)
-            msg.setWindowTitle(settings_text(lang, "update"))
-            msg.setText(update_text(lang, "dev_build"))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == yes_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
+            from inline_update import result
+            result(self, update_text(lang, "dev_build"),
+                   settings_text(lang, "back"), self._leave_update_page)
             return
 
         if self._update_in_progress:
@@ -9584,6 +10631,8 @@ class SettingsWindow(QWidget):
         self._start_update_check()
 
     def _start_update_check(self):
+        if self._update_in_progress:
+            return
         lang = self.parent.current_interface_language
         self._set_parent_update_flow_active(True)
         self._update_cancel_requested.clear()
@@ -9608,48 +10657,26 @@ class SettingsWindow(QWidget):
             text = settings_text(self.parent.current_interface_language, "update")
         self.update_btn.setEnabled(enabled)
         self.update_btn.setText(text)
+        for tab in getattr(self, 'settings_page_tabs', ()):
+            tab.setEnabled(enabled)
+
+    def _leave_update_page(self):
+        if self._update_in_progress:
+            self._handle_update_progress_close_attempt()
+            return
+        self._set_parent_update_flow_active(False)
+        self._set_settings_page(0)
 
     def _show_update_progress(self, text, determinate=False, value=0):
-        title = settings_text(self.parent.current_interface_language, "update")
-        if not hasattr(self, "_update_progress") or self._update_progress is None:
-            self._update_progress = UpdateProgressDialog(self)
-            self._update_progress.setWindowTitle(title)
-            self._update_progress.setCancelButtonText(settings_text(self.parent.current_interface_language, "cancel"))
-            self._update_progress.setWindowModality(Qt.NonModal)
-            self._update_progress.setAutoClose(False)
-            self._update_progress.setAutoReset(False)
-            self._update_progress.setMinimumDuration(0)
-            self._update_progress.setMinimumWidth(430)
-            self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            try:
-                owner_window = self.window()
-                owner_center = owner_window.frameGeometry().center()
-                progress_frame = self._update_progress.frameGeometry()
-                progress_frame.moveCenter(owner_center)
-                self._update_progress.move(progress_frame.topLeft())
-            except Exception:
-                pass
-        else:
-            try:
-                self._update_progress.setWindowTitle(title)
-            except Exception:
-                pass
-        try:
-            self._update_progress.setWindowModality(Qt.NonModal)
-        except Exception:
-            pass
-        try:
-            self._update_progress.setLabelText(text)
-        except Exception:
-            pass
+        from inline_update import page
+        current = page(self)
+        current.setLabelText(text)
+        current.setRange(0, 100 if determinate else 0)
         if determinate:
-            self._update_progress.setRange(0, 100)
-            self._update_progress.setValue(max(0, min(100, int(value))))
-        else:
-            self._update_progress.setRange(0, 0)
-        if not self._update_progress.isVisible() and not getattr(self._update_progress, "_user_minimized", False):
-            self._update_progress.show()
-        self._update_progress.bring_to_front()
+            current.setValue(max(0, min(100, int(value))))
+        cancelable = self._is_update_cancelable()
+        current.actions(secondary=settings_text(self.parent.current_interface_language, "cancel") if cancelable else "",
+                        secondary_callback=self._handle_update_progress_close_attempt)
 
     @QtCore.pyqtSlot(str)
     def _on_update_progress_text(self, text):
@@ -9676,20 +10703,10 @@ class SettingsWindow(QWidget):
         self._set_update_controls_enabled(False, update_text(lang, "downloading_button"))
 
     def _hide_update_progress(self):
-        if hasattr(self, "_update_progress") and self._update_progress is not None:
-            progress = self._update_progress
-            try:
-                progress.blockSignals(True)
-                progress.hide()
-                progress.deleteLater()
-            except Exception:
-                pass
-            finally:
-                try:
-                    progress.blockSignals(False)
-                except Exception:
-                    pass
-            self._update_progress = None
+        # Terminal states stay on the same embedded page until Back is pressed.
+        current = getattr(self, "_update_progress", None)
+        if current is not None:
+            current.progress.hide()
 
     def _cleanup_update_temp_dir(self):
         temp_dir = getattr(self, "_update_temp_dir", "") or ""
@@ -9717,11 +10734,6 @@ class SettingsWindow(QWidget):
             self._show_update_progress(
                 update_text(lang, "apply_wait"),
                 determinate=False
-            )
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "apply_close"),
             )
             return
 
@@ -9820,113 +10832,42 @@ class SettingsWindow(QWidget):
 
     @QtCore.pyqtSlot(str)
     def _on_update_check_result(self, payload_text):
+        from inline_update import result
         lang = self.parent.current_interface_language
         self._update_in_progress = False
         self._update_phase = "idle"
         self._set_update_controls_enabled(True)
-        self._hide_update_progress()
-
+        self._set_parent_update_flow_active(False)
         try:
             payload = json.loads(payload_text)
         except Exception:
             payload = {"status": "error", "error": update_text(lang, "parse_failed")}
-
         status = payload.get("status")
-        latest_version = payload.get("latest_version") or APP_VERSION
-
+        latest = payload.get("latest_version") or APP_VERSION
+        back = settings_text(lang, "back")
         if status == "cancelled" or self._update_cancel_requested.is_set():
-            self._set_parent_update_flow_active(False)
             self._update_cancel_requested.clear()
-            self._cleanup_update_temp_dir()
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "check_cancelled"),
-            )
-            return
-
-        if status == "error":
-            self._set_parent_update_flow_active(False)
-            QMessageBox.warning(
-                self,
-                update_text(lang, "error_title"),
-                payload.get("error", update_text(lang, "unknown_error")),
-            )
-            return
-
-        if status == "up_to_date":
-            self._set_parent_update_flow_active(False)
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "up_to_date", version=APP_VERSION),
-            )
-            return
-
-        if status in ("no_asset", "invalid_asset"):
-            self._set_parent_update_flow_active(False)
-            msg = QMessageBox(self)
-            msg.setWindowTitle(settings_text(lang, "update"))
-            msg.setText(update_text(lang, "no_asset"))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == yes_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
-            return
-
-        if status == "ready" and not platform_support.supports_in_app_update():
-            self._set_parent_update_flow_active(False)
-            # Only the Windows build ships the helpers that replace the running
-            # app. Elsewhere the new version is announced and the user updates
-            # through whatever installed it (a new AppImage, their package
-            # manager), which is what Linux desktop apps do.
-            msg = QMessageBox(self)
-            msg.setWindowTitle(update_text(lang, "available_title"))
-            msg.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            open_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == open_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
-            return
-
-        if status == "ready":
-            asset_name = payload.get("asset_name") or f"ClicknTranslate-v{latest_version}.zip"
-            asset_url = payload.get("asset_url")
-            checksum_url = payload.get("checksum_url")
-            if not asset_url:
-                self._set_parent_update_flow_active(False)
-                QMessageBox.warning(
-                    self,
-                    update_text(lang, "error_title"),
-                    update_text(lang, "invalid_url"),
-                )
-                return
-
-            confirm = QMessageBox(self)
-            confirm.setWindowTitle(update_text(lang, "available_title"))
-            confirm.setIcon(QMessageBox.Question)
-            confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            confirm.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
-            yes_btn = confirm.addButton(settings_text(lang, "install"), QMessageBox.YesRole)
-            confirm.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
-            confirm.exec_()
-            if confirm.clickedButton() != yes_btn:
-                self._set_parent_update_flow_active(False)
-                return
-
-            self._start_update_download(asset_url, asset_name, latest_version, checksum_url)
-            return
-
-        self._set_parent_update_flow_active(False)
+            result(self, update_text(lang, "check_cancelled"), back, self._leave_update_page)
+        elif status == "error":
+            result(self, payload.get("error", update_text(lang, "unknown_error")),
+                   settings_text(lang, "update"), self._start_update_check, back, self._leave_update_page)
+        elif status == "up_to_date":
+            result(self, update_text(lang, "up_to_date", version=APP_VERSION), back, self._leave_update_page)
+        elif status == "ready" and payload.get("asset_url") and platform_support.supports_in_app_update():
+            def install():
+                self._set_parent_update_flow_active(True)
+                self._start_update_download(payload['asset_url'], payload['asset_name'], latest, payload.get('checksum_url', ''))
+            result(self, update_text(lang, "available_prompt", latest=latest, current=APP_VERSION),
+                   settings_text(lang, "install"), install, settings_text(lang, "later"), self._leave_update_page)
+        else:
+            result(self, update_text(lang, "no_asset"), settings_text(lang, "update"),
+                   self._start_update_check, back, self._leave_update_page)
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
+        if self._update_in_progress:
+            return
         lang = self.parent.current_interface_language
+        self._set_parent_update_flow_active(True)
         self._update_in_progress = True
         self._update_phase = "preparing_download"
         self._update_temp_dir = ""
@@ -9941,6 +10882,16 @@ class SettingsWindow(QWidget):
         worker.start()
 
     def _pick_update_asset(self, assets):
+        if not platform_support.IS_WINDOWS:
+            from posix_update import update_target, pick_asset
+            target = update_target()
+            if target is None:
+                # Still recognize the correct platform when announcing releases
+                # for an install managed outside the app.
+                kind = "macos" if platform_support.IS_MAC else "appimage"
+            else:
+                kind = target[0]
+            return pick_asset(assets, kind)
         installed_copy = _is_inno_installed_copy()
         if installed_copy:
             setup_assets = []
@@ -10008,7 +10959,7 @@ class SettingsWindow(QWidget):
     def _pick_checksum_url(self, assets, asset_name):
         if not asset_name:
             return ""
-        base_name = re.sub(r"\.(zip|exe)$", "", asset_name.lower())
+        base_name = re.sub(r"\.(tar\.gz|appimage|zip|exe)$", "", asset_name.lower())
         direct_name = f"{asset_name.lower()}"
         direct_txt_name = f"{direct_name}.txt"
         candidates = set()
@@ -10049,13 +11000,15 @@ class SettingsWindow(QWidget):
         # the exact filename; a substring or another platform's hash is invalid.
         if len(lines) == 1 and re.fullmatch(r"[0-9a-fA-F]{64}", lines[0]):
             return lines[0].lower()
+        def matches_name(name):
+            return name.lower() in (archive_name, "./" + archive_name, "releases/" + archive_name)
         matches = []
         for line in lines:
             gnu = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(.+)", line)
             bsd = re.fullmatch(r"SHA256\s*\((.+)\)\s*=\s*([0-9a-fA-F]{64})", line, re.IGNORECASE)
-            if gnu and gnu[2].lower() == archive_name:
+            if gnu and matches_name(gnu[2]):
                 matches.append(gnu[1].lower())
-            elif bsd and bsd[1].lower() == archive_name:
+            elif bsd and matches_name(bsd[1]):
                 matches.append(bsd[2].lower())
         return matches[0] if len(matches) == 1 else ""
 
@@ -10250,7 +11203,9 @@ class SettingsWindow(QWidget):
             safe_name = os.path.basename(asset_name or f"ClicknTranslate-v{latest_version}.zip")
             package_path = os.path.join(temp_dir, safe_name)
             package_kind = os.path.splitext(safe_name)[1].lower()
-            if package_kind not in (".zip", ".exe"):
+            if safe_name.lower().endswith(".tar.gz"):
+                package_kind = ".tar.gz"
+            if package_kind not in (".zip", ".exe", ".appimage", ".AppImage", ".tar.gz"):
                 raise RuntimeError("Unsupported update package type.")
             if package_kind == ".exe" and not _is_inno_installed_copy():
                 raise RuntimeError("Installer updates are available only for an installed copy.")
@@ -10304,7 +11259,6 @@ class SettingsWindow(QWidget):
             self._check_update_cancel_requested()
             self._update_phase = "preparing"
             _emit_stage_text(stage_prepare)
-            self._update_phase = "applying"
             ok, err = self._launch_apply_updater(
                 package_path,
                 package_kind,
@@ -10348,6 +11302,24 @@ class SettingsWindow(QWidget):
             )
 
     def _launch_apply_updater(self, package_path, package_kind, latest_version):
+        if not platform_support.IS_WINDOWS:
+            try:
+                from posix_update import prepare, launch
+                plan = prepare(package_path, latest_version)
+                self._check_update_cancel_requested()
+                self._update_phase = "applying"
+                launch(plan, get_data_file("update-failure.txt"))
+                # The POSIX runner owns a fully extracted same-volume stage;
+                # it never reads the original download again after handoff.
+                self._cleanup_update_temp_dir()
+                return True, None
+            except Exception as error:
+                if 'plan' in locals():
+                    shutil.rmtree(plan['stage'], ignore_errors=True)
+                if self._update_cancel_requested.is_set():
+                    raise UpdateCancelledError("Update cancelled") from error
+                return False, str(error)
+        self._update_phase = "applying"
         if portable_paths.is_windows_packaged():
             return False, "Microsoft Store manages updates for this package"
         if not getattr(sys, "frozen", False):
@@ -10385,6 +11357,8 @@ class SettingsWindow(QWidget):
             "--exe", _encoded(exe_name),
             "--version", str(latest_version),
             "--pid", str(os.getpid()),
+            "--quiet", "true",
+            "--result", _encoded(get_data_file("update-failure.txt")),
         ]
         try:
             requires_elevation = self._install_dir_requires_elevation(app_dir)
@@ -10402,6 +11376,7 @@ class SettingsWindow(QWidget):
                     [helper_path, *arguments],
                     cwd=tempfile.gettempdir(),
                     close_fds=True,
+                    **platform_support.no_window_kwargs(),
                 )
             return True, None
         except Exception as error:
@@ -11023,11 +11998,8 @@ finally {
         self._hide_update_progress()
 
         lang = self.parent.current_interface_language
-        QMessageBox.information(
-            self,
-            settings_text(lang, "update"),
-            update_text(lang, "cancelled"),
-        )
+        from inline_update import result
+        result(self, update_text(lang, "cancelled"), settings_text(lang, "back"), self._leave_update_page)
 
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
@@ -11037,20 +12009,10 @@ finally {
         self._cleanup_update_temp_dir()
         self._update_cancel_requested.clear()
         self._set_update_controls_enabled(True)
-        if hasattr(self, "_update_progress") and self._update_progress is not None:
-            try:
-                self._update_progress.close()
-            except Exception:
-                pass
-            self._update_progress = None
-
         lang = self.parent.current_interface_language
-        friendly_error = self._friendly_update_error(error_text, lang)
-        QMessageBox.warning(
-            self,
-            update_text(lang, "error_title"),
-            friendly_error,
-        )
+        from inline_update import result
+        result(self, self._friendly_update_error(error_text, lang), settings_text(lang, "update"),
+               self._start_update_check, settings_text(lang, "back"), self._leave_update_page)
 
     def _friendly_update_error(self, error_text, lang=None):
         raw = str(error_text or "").strip()
@@ -11097,8 +12059,42 @@ finally {
                 "permission": "Windows 阻止访问程序文件夹。请关闭其他 Click'n'Translate 实例，确认管理员提示后重试。",
                 "generic": "无法安装更新，当前版本已保留。请关闭其他程序实例后再次点击“更新”。",
             },
+
+            'pt': {'network': 'O download foi interrompido. Verifique a conexão e clique em Atualizar novamente – o '
+                        'aplicativo será retomado com segurança.',
+             'checksum': 'A atualização baixada estava incompleta ou danificada. Não foi instalado; clique em '
+                         'Atualizar para baixá-lo novamente.',
+             'permission': 'Windows bloqueou o acesso à pasta do aplicativo. Feche outras cópias de '
+                           "Click'n'Translate, aprove o prompt do administrador e tente novamente.",
+             'generic': 'A atualização não pôde ser instalada. Sua versão atual foi mantida. Feche outras '
+                        'cópias do aplicativo e tente atualizar novamente.'},
+            'it': {'network': 'Il download è stato interrotto. Controlla la connessione e fai di nuovo clic su '
+                        "Aggiorna: l'app riprenderà in sicurezza.",
+             'checksum': "L'aggiornamento scaricato era incompleto o danneggiato. Non è stato installato; fare "
+                         'clic su Aggiorna per scaricarlo di nuovo.',
+             'permission': "Windows ha bloccato l'accesso alla cartella dell'applicazione. Chiudi le altre "
+                           "copie di Click'n'Translate e approva la richiesta dell'amministratore, quindi "
+                           'riprova.',
+             'generic': "Impossibile installare l'aggiornamento. La tua versione attuale è stata mantenuta. "
+                        "Chiudi le altre copie dell'app e riprova ad aggiornare."},
         }
         lowered = raw.lower()
+        if not platform_support.IS_WINDOWS and any(token in lowered for token in (
+                'permission', 'not writable', 'writable application folder', 'access is denied')):
+            locations = {
+                'ru': 'Папка приложения недоступна для записи. Переместите приложение в свою папку Applications или домашнюю папку и повторите обновление. Текущая версия сохранена.',
+                'en': 'The application folder is not writable. Move the app to your own Applications or home folder and retry. The current version was kept.',
+                'es': 'No se puede escribir en la carpeta. Mueve la aplicación a tu carpeta Applications o personal y reintenta. Se conservó la versión actual.',
+                'de': 'Der App-Ordner ist nicht beschreibbar. Verschieben Sie die App in Ihren Applications- oder persönlichen Ordner und versuchen Sie es erneut. Die aktuelle Version blieb erhalten.',
+                'fr': 'Le dossier est protégé en écriture. Déplacez l’application dans votre dossier Applications ou personnel et réessayez. La version actuelle est conservée.',
+                'zh': '应用文件夹不可写。请将应用移到个人 Applications 或主目录后重试，当前版本已保留。',
+
+                'pt': ('A pasta do aplicativo não é gravável. Mova o aplicativo para seus próprios Aplicativos ou pasta '
+                 'inicial e tente novamente. A versão atual foi mantida.'),
+                'it': ("La cartella dell'applicazione non è scrivibile. Sposta l'app nelle tue Applicazioni o nella "
+                 'cartella Home e riprova. È stata mantenuta la versione attuale.'),
+            }
+            return locations.get(language, locations['en'])
         if any(token in lowered for token in ("incompleteread", "connection", "timeout", "interrupted repeatedly", "download")):
             key = "network"
         elif any(token in lowered for token in ("checksum", "sha256", "not a valid", "not a zip", "damaged")):
@@ -11156,6 +12152,7 @@ finally {
         dark = self.parent.current_theme != "Светлая"
         colors = button_palette(dark)
         for name, object_name in (("settings_action_panel", "settingsActionPanel"),
+                                  ("translation_action_panel", "settingsActionPanel"),
                                   ("settings_transfer_panel", "settingsTransferPanel")):
             panel = getattr(self, name, None)
             if panel is not None and not sip.isdeleted(panel):
@@ -11168,13 +12165,13 @@ finally {
             ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
             ("reset_btn", "danger", 1, (0, 0, 0, 0)),
             ("update_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("ocr_languages_btn", "secondary", 0, (0, 0, 0, 0)),
-            ("copy_history_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("translation_history_btn", "secondary", 2, (0, 0, 0, 0)),
+            ("ocr_languages_btn", "secondary", 0, (6, 6, 0, 0)),
+            ("copy_history_btn", "secondary", 0, (0, 0, 6, 0)),
+            ("translation_history_btn", "secondary", 1, (0, 0, 0, 6)),
             ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
-            ("export_settings_btn", "secondary", 0, (6, 0, 6, 0)),
+            ("export_settings_btn", "secondary", 0, (0, 0, 0, 0)),
             ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("create_bug_report_btn", "secondary", 2, (0, 6, 0, 6)),
+            ("create_bug_report_btn", "secondary", 2, (0, 0, 0, 0)),
         )
         for name, role, column, corners in specs:
             button = getattr(self, name, None)
@@ -11232,6 +12229,7 @@ finally {
             QCheckBox:disabled {{
                 color: {disabled_text};
             }}
+            QLabel:disabled {{ color: {disabled_text}; }}
 
             QWidget#assistantOptions QLabel:disabled {{
                 color: {disabled_text};
@@ -11239,6 +12237,11 @@ finally {
             QLabel#assistantSection {{ color: #a88bcc; font-size: 13px; font-weight: 700; }}
             QLabel#assistantNote {{ color: {'#aaa0b8' if dark else '#71667d'}; font-size: 12px; }}
             QLabel#assistantFieldLabel {{ font-size:13px; }}
+            QLabel#assistantMascotPreview {{
+                background:{'#19171d' if dark else '#f8f6fb'};
+                border:1px solid {'#403749' if dark else '#ded5e8'};
+                border-radius:8px;
+            }}
             QWidget#assistantVisibility QCheckBox {{ font-size:14px; spacing:8px; }}
             QWidget#assistantOptions QSpinBox {{
                 color:{theme['text_color']}; background:{'#211d28' if dark else '#f2edf6'};
@@ -11331,6 +12334,12 @@ finally {
         style += 'QToolButton#assistantAppearance { padding-left:5px; padding-right:5px; }'
         style += button_qss(dark, 'secondary', 'QPushButton#assistantCategory', compact=True)
         style += 'QWidget#uiScaleControl { background:transparent; }'
+        style += f'''QLabel#translationResultFontPreview {{
+            background:{'#17181d' if dark else '#e9e4ed'};
+            color:{'#f4f6fb' if dark else '#202124'};
+            border:1px solid {'#3d3948' if dark else '#d7cde7'};
+            border-radius:7px; padding:2px 6px;
+        }}'''
         set_widget_stylesheet(self, style)
         for control in self.findChildren(StepperFrame):
             control.set_theme(dark)
@@ -11356,7 +12365,7 @@ finally {
         for combo_name in (
             "ocr_engine_combo",
             "translator_combo",
-            "translation_font_combo",
+            "selection_quick_translate_mode_combo",
             "game_source_combo",
             "game_target_combo",
         ):
@@ -11387,6 +12396,10 @@ finally {
                 pass
 
         self._refresh_secondary_view_theme()
+        dialog = getattr(self, '_language_manager_dialog', None)
+        if dialog is not None and not sip.isdeleted(dialog):
+            dialog._apply_style()
+            dialog._apply_package_tab_styles()
         secondary_kind = getattr(self, "_secondary_view_kind", None)
         if secondary_kind == "history":
             try:
@@ -11716,6 +12729,18 @@ finally {
         self.ocr_engine_combo.blockSignals(False)
 
     def handle_ocr_engine_change(self, text):
+        from api_providers import VISION_ENGINES, validate, ProviderError
+        if text in VISION_ENGINES:
+            self.save_ocr_engine(text)
+            provider = VISION_ENGINES[text]
+            try:
+                item = validate(provider, self.parent.config)
+                if not item['vision']:
+                    raise ProviderError('Image input is disabled')
+            except ProviderError:
+                from provider_settings import show_provider_settings
+                QtCore.QTimer.singleShot(0, lambda: show_provider_settings(self, provider))
+            return
         if text == RAPIDOCR_ENGINE_DISPLAY:
             self._handle_rapidocr_engine_change()
             return
@@ -11762,12 +12787,7 @@ finally {
     def _show_linux_tesseract_hint(self, lang):
         """Tell a Linux user which package provides Tesseract."""
         command = platform_support.tesseract_install_hint()
-        is_ru = lang == "ru"
-        message = (
-            f"Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}"
-            if is_ru
-            else f"Tesseract is not installed. Install it with your package manager:\n\n{command}"
-        )
+        message = engine_text(lang, "linux_tesseract_hint", command=command)
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
         msg.setText(message)
@@ -11861,6 +12881,8 @@ finally {
 
     def save_ocr_engine(self, text):
         self.auto_save_setting("ocr_engine", text)
+        from provider_settings import refresh_provider_routing
+        refresh_provider_routing(self)
 
     def _local_hymt_dir(self):
         return os.path.join(self._portable_app_dir(), "translators", "hymt")
@@ -11954,17 +12976,8 @@ finally {
 
         target_dir = os.path.join(_portable_base_dir(), "translators", "hymt")
         runner_names = ", ".join(translater.hymt_runner_names())
-        is_ru = lang == "ru"
-        message = (
-            "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\n"
-            f"Положите модель {HYMT_MODEL_FILE} и исполняемый файл llama.cpp "
-            f"({runner_names}) в папку:\n{target_dir}"
-            if is_ru
-            else
-            "Automatic Hy-MT installation is available on Windows and macOS.\n\n"
-            f"Put the {HYMT_MODEL_FILE} model and a llama.cpp runner "
-            f"({runner_names}) in:\n{target_dir}"
-        )
+        message = engine_text(lang, "manual_hymt_hint", model=HYMT_MODEL_FILE,
+                              runners=runner_names, directory=target_dir)
         msg = QMessageBox(self)
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
         msg.setText(message)
@@ -11981,44 +12994,32 @@ finally {
             value = "google"
         if not value:
             return
-        if value != HYMT_ENGINE_KEY:
-            self.auto_save_setting("translator_engine", value)
-            return
-
-        self.previous_translator_engine = self.parent.config.get("translator_engine", "Google").lower()
-        if self._hymt_installed():
-            self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
-            return
-
         lang = self.parent.current_interface_language
-        if platform_support.IS_LINUX:
-            # The pinned llama.cpp archive is the Windows build, so instead of
-            # downloading something that cannot run, explain how to supply a
-            # local runner. Hy-MT still works once one is in place.
-            self._show_manual_hymt_hint(lang)
-            fallback = self.previous_translator_engine or "google"
-            self._set_translator_combo_silently(fallback)
-            self.auto_save_setting("translator_engine", fallback)
-            return
-
-        msg = QMessageBox(self)
-        msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
-        msg.setText(engine_text(lang, "hymt_prompt"))
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
-        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
-        msg.exec_()
-        if msg.clickedButton() == yes_btn:
-            if platform_support.IS_MAC:
-                self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
-            self.start_hymt_install()
-            return
-
-        fallback = self.previous_translator_engine or "google"
-        self._set_translator_combo_silently(fallback)
-        self.auto_save_setting("translator_engine", fallback)
+        if value in {'argos', HYMT_ENGINE_KEY}:
+            from translation_availability import missing_provider, offer_provider_recovery
+            previous = str(self.parent.config.get('translator_engine', 'google')).lower()
+            source = str(self.parent.config.get('main_translation_source_language', 'en'))
+            target = str(self.parent.config.get('main_translation_target_language', 'ru'))
+            issue = missing_provider(value, source, target)
+            if issue is not None:
+                choice = offer_provider_recovery(self, issue, TRANSLATOR_ENGINE_OPTIONS, lang)
+                if choice in (None, 'install'):
+                    self._set_translator_combo_silently(previous)
+                    if choice == 'install':
+                        self.show_ocr_language_manager(value, source, target)
+                    return
+                value = choice
+                self._set_translator_combo_silently(value)
+        self.auto_save_setting('translator_engine', value)
+        from provider_settings import refresh_provider_routing
+        refresh_provider_routing(self)
+        if value in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+            from api_providers import validate, ProviderError
+            try:
+                validate(value, self.parent.config)
+            except ProviderError:
+                from provider_settings import show_provider_settings
+                QtCore.QTimer.singleShot(0, lambda: show_provider_settings(self, value))
 
     def start_download_thread(self):
         self.start_tesseract_install()
@@ -13122,6 +14123,9 @@ finally {
         )
 
     def start_hymt_install(self, progress_owner=None):
+        if platform_support.IS_LINUX:
+            self._show_manual_hymt_hint(self.parent.current_interface_language)
+            return
         if (
             self._hymt_install_in_progress
             or self._tesseract_install_in_progress
@@ -13739,13 +14743,13 @@ finally {
 
         size_str = format_size(total_cleared)
         done_text = settings_text(lang, "cleared").format(size=size_str)
-        
+
         # Показываем результат и возвращаем текст через 2 сек
         if hasattr(self, 'clear_cache_btn'):
             self.clear_cache_btn.setText(done_text)
             # Зеленый фон, но форма сохраняется (закругление только слева)
             self._apply_action_panel_style()
-            
+
             def restore_button():
                 try:
                     self.clear_cache_btn.setText(original_text)
@@ -13753,7 +14757,7 @@ finally {
                     self.clear_cache_btn.setEnabled(True)
                 except Exception:
                     pass
-            
+
             QTimer.singleShot(2000, restore_button)
 
 

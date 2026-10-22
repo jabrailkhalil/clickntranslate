@@ -105,7 +105,7 @@ class GuideSetupTest(unittest.TestCase):
         self.assertEqual(self.window._guide_current_action(), "copy_translated_text")
         target.click()
         self.assertTrue(self.window.config["copy_translated_text"])
-        self.assertEqual(self.window._guide_current_action(), "history")
+        self.assertEqual(self.window._guide_current_action(), "language_packages")
 
     def test_result_window_applies_every_mode(self):
         self.window.config["result_window_hidden_modes"] = main.RESULT_WINDOW_MODES
@@ -113,7 +113,7 @@ class GuideSetupTest(unittest.TestCase):
         self.window._guide_primary_btn.click()
         self.assertEqual(set(target.checked_modes()), set(main.RESULT_WINDOW_MODES))
         self.assertFalse(main.result_window_hidden_modes(self.window.config))
-        self.assertEqual(self.window._guide_current_action(), "language_packages")
+        self.assertEqual(self.window._guide_current_action(), "result_text")
 
     def test_full_primary_flow_configures_all_recommendations(self):
         self.show_step("settings")
@@ -127,9 +127,9 @@ class GuideSetupTest(unittest.TestCase):
         self.assertFalse(self.window._guide_active)
         for action, (_widget, _page, desired) in GUIDE_SETTING_STEPS.items():
             self.assertEqual(self.window.config[action], desired, action)
-        self.assertEqual(self.window._guide_progress.text(), "28 / 28")
-        self.assertEqual(self.window._guide_bubble.progress_bar.maximum(), 28)
-        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 28)
+        self.assertEqual(self.window._guide_progress.text(), "32 / 32")
+        self.assertEqual(self.window._guide_bubble.progress_bar.maximum(), 32)
+        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 32)
         self.assertEqual(self.window._guide_body.text(), setup_labels(
             self.window.current_interface_language
         )["done_body"].format(ready=13, total=13))
@@ -145,8 +145,8 @@ class GuideSetupTest(unittest.TestCase):
         self.window._guide_active = True
         self.window._guide_step_index = len(GUIDE_SETUP_ORDER)
         self.window._show_guide_step()
-        self.assertEqual(self.window._guide_progress.text(), "28 / 28")
-        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 28)
+        self.assertEqual(self.window._guide_progress.text(), "32 / 32")
+        self.assertEqual(self.window._guide_bubble.progress_bar.value(), 32)
         self.assertEqual(self.window._guide_body.text(), setup_labels(
             self.window.current_interface_language
         )["done_body"].format(ready=0, total=13))
@@ -175,7 +175,7 @@ class GuideSetupTest(unittest.TestCase):
 
     def _check_card_layout(self, configured):
         for theme in ("Темная", "Светлая"):
-            for language in ("ru", "en", "de", "fr", "es", "zh"):
+            for language in ("ru", "en", "de", "fr", "es", "zh", "pt", "it"):
                 self.window._guide_active = False
                 self.window.config.update({
                     key: desired if configured else not desired

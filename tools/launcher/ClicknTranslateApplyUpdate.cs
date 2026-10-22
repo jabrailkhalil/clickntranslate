@@ -24,6 +24,10 @@ internal static class ClicknTranslateApplyUpdate
             UpdateRequest request = UpdateRequest.Parse(args);
             using (UpdateWindow window = new UpdateWindow(request))
             {
+                if (request.Quiet)
+                {
+                    return window.RunQuiet();
+                }
                 Application.Run(window);
                 return window.Succeeded ? 0 : 1;
             }
@@ -31,6 +35,7 @@ internal static class ClicknTranslateApplyUpdate
         catch (Exception error)
         {
             WriteLog("Updater startup failed: " + error);
+            if (args.Contains("--quiet")) return 1;
             SilentWinFormsDialog.Show(
                 "The update could not be started. Your current version was not changed.\n\nPlease run Update again.",
                 "Click'n'Translate update",
@@ -48,6 +53,8 @@ internal static class ClicknTranslateApplyUpdate
         internal string ExecutableName;
         internal string ExpectedVersion;
         internal int TargetProcessId;
+        internal bool Quiet;
+        internal string ResultPath;
 
         internal static UpdateRequest Parse(string[] args)
         {
@@ -64,6 +71,8 @@ internal static class ClicknTranslateApplyUpdate
                 ExecutableName = Decode(Required(values, "--exe")),
                 ExpectedVersion = Required(values, "--version"),
                 TargetProcessId = int.Parse(Required(values, "--pid")),
+                Quiet = values.ContainsKey("--quiet") && values["--quiet"] == "true",
+                ResultPath = values.ContainsKey("--result") ? Decode(values["--result"]) : "",
             };
             request.AppDirectory = Path.GetFullPath(request.AppDirectory);
             request.PackagePath = Path.GetFullPath(request.PackagePath);
@@ -704,6 +713,33 @@ internal static class ClicknTranslateApplyUpdate
             }
         }
 
+        internal int RunQuiet()
+        {
+            // Settings owns the only visible progress page. The detached
+            // process only replaces files after that app has exited.
+            try
+            {
+                ApplyUpdate();
+                return 0;
+            }
+            catch (Exception error)
+            {
+                WriteLog("Quiet update failed: " + error);
+                return 1;
+            }
+        }
+
+        private void WriteFailure(string text)
+        {
+            if (string.IsNullOrWhiteSpace(request.ResultPath)) return;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(request.ResultPath));
+                File.WriteAllText(request.ResultPath, text, new UTF8Encoding(false));
+            }
+            catch (Exception error) { WriteLog("Could not save update result: " + error); }
+        }
+
         private void ApplyUpdate()
         {
             string marker = Path.Combine(request.AppDirectory, "data", ".update-in-progress");
@@ -754,6 +790,7 @@ internal static class ClicknTranslateApplyUpdate
                 TryDeleteDirectory(backup);
                 backup = null;
                 TryDelete(request.PackagePath);
+                if (!string.IsNullOrWhiteSpace(request.ResultPath)) TryDelete(request.ResultPath);
             }
             catch
             {
@@ -770,12 +807,14 @@ internal static class ClicknTranslateApplyUpdate
                         backup = null;
                     }
                     TryDelete(marker);
+                    WriteFailure("The update failed. The previous version was restored.");
                     StartApplication(request.AppDirectory, request.ExecutableName, "--show-after-update");
                     rollbackCompleted = true;
                 }
                 catch (Exception rollbackError)
                 {
                     WriteLog("Rollback failed: " + rollbackError);
+                    WriteFailure("The update failed. Recovery files: " + backup);
                 }
                 throw;
             }
@@ -815,7 +854,7 @@ internal static class ClicknTranslateApplyUpdate
             string setupLog = Path.Combine(Path.GetTempPath(), "clickntranslate_setup_update.log");
             string arguments = string.Join(" ", new[]
             {
-                "/SILENT", "/SUPPRESSMSGBOXES", "/NOCANCEL", "/NORESTART",
+                "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NOCANCEL", "/NORESTART",
                 "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS",
                 "/DIR=" + Quote(appDirectory), "/LOG=" + Quote(setupLog),
             });
