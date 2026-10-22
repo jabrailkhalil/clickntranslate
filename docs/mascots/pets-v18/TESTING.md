@@ -1,5 +1,13 @@
 # Validation
 
+The subsequent home-shortcut follow-up restores the localized Mascot caption
+and offers the same styled settings prompt as hotkey rows. Its primary action
+opens the mascot carousel; rejecting or closing preserves the main-window
+draft. It passed **73 checks and 26 subtests**, including real modal interaction
+and primary-button text fitting in all six languages. The static preview still
+uses its cached thumbnail and no animation timer. This was a focused UI run;
+the earlier full-suite results below are retained separately.
+
 The latest local UI follow-up reproduced the Reset hover bug at 80%, 125% and
 180%, and the package scrollbar/header overlap at two header heights before
 fixing them. Global button hover now maps through the actual proxy viewport;

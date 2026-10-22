@@ -36,7 +36,7 @@ class _PreviewButton(QtWidgets.QAbstractButton):
         painter.setFont(font)
         painter.setPen(QtGui.QColor('#99919f' if self.rail._owner.current_theme != 'Светлая' else '#71647b'))
         painter.drawText(QtCore.QRect(33, 0, max(0, self.width()-33), 22), QtCore.Qt.AlignVCenter,
-                         assistant_text(self.rail.language, self.rail.mascot))
+                         self.text())
 
 
 class AssistantPreview(QtWidgets.QWidget):
@@ -70,6 +70,7 @@ class AssistantPreview(QtWidgets.QWidget):
         self.set_reactions(getattr(self._owner, 'config', {}).get('desktop_assistant_reactions', True) is True)
         self.set_activity(getattr(self._owner, '_companion_activity', 'idle'))
         hint = assistant_text(self.language, self.mascot) + ' — ' + assistant_text(self.language, 'companion_settings')
+        self.button.setText(assistant_text(self.language, 'companion_section'))
         self.button.setAccessibleName(hint)
         self.button.setToolTip(hint)
         self.art = preview_art(self.mascot) if self.isVisible() else None

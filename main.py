@@ -10611,6 +10611,25 @@ class DarkThemeApp(QMainWindow):
         self._open_hotkey_setting(config_key)
         return True
 
+    def _offer_mascot_settings(self):
+        from assistant_text import assistant_text
+        lang = self.current_interface_language
+        box = QMessageBox(self)
+        box.setWindowTitle(assistant_text(lang, 'companion_section'))
+        box.setWindowIcon(QIcon(resource_path('icons/icon.ico')))
+        box.setIcon(QMessageBox.Question)
+        box.setText(assistant_text(lang, 'preview_settings_question'))
+        open_button = box.addButton(assistant_text(lang, 'preview_open_settings'), QMessageBox.AcceptRole)
+        box.addButton(hotkey_settings_prompt_text(lang, 'cancel'), QMessageBox.RejectRole)
+        box.setDefaultButton(open_button)
+        box.exec_()
+        accepted = box.clickedButton() is open_button
+        box.deleteLater()
+        if accepted:
+            self.activateWindow()
+            self.show_desktop_assistant_settings()
+        return accepted
+
     def _open_hotkey_setting(self, config_key):
         self.show_settings()
         settings = getattr(self, "settings_window", None)
@@ -11157,7 +11176,7 @@ class DarkThemeApp(QMainWindow):
         self.main_hotkey_slot_order = list(slot_order)
         from assistant_preview import AssistantPreview
         self.assistant_preview = AssistantPreview(self, lang, self.main_hotkey_area)
-        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
+        self.assistant_preview.settings_requested.connect(self._offer_mascot_settings)
         self.assistant_preview.dismiss_requested.connect(lambda: self.set_main_assistant_visible(False))
         preview_slot = slot_order.index(None)
         hotkey_grid.addWidget(self.assistant_preview, preview_slot // 2, preview_slot % 2)

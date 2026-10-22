@@ -61,8 +61,9 @@ companion before screenshots.
 
 ![Desktop companion action popup](interaction-preview.png)
 
-The main window shows one static shortcut for the selected companion. Clicking
-the character or name opens Mascot settings directly, focused on its carousel.
+The main window shows one static shortcut for the selected companion, captioned
+Mascot. Clicking the character or caption opens the same styled prompt as the
+hotkey rows; its primary action opens Mascot settings focused on the carousel.
 The shortcut uses a cached 48×52 PNG extracted from the native idle frame; it
 does not decode a sprite atlas or run an animation timer. All six companions
 remain available in settings and on the desktop.

@@ -293,7 +293,7 @@ def test_static_preview_never_runs_a_repaint_timer(app, owner):
     assert not rail.timer.isActive()
 
 
-def test_single_static_preview_opens_settings_directly_without_desktop_overlay(app, owner):
+def test_single_static_preview_requests_settings_without_desktop_overlay(app, owner):
     rail = AssistantPreview(owner, parent=owner)
     owner.resize(340, 100)
     rail.resize(320, 22)
@@ -553,7 +553,11 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
     app.processEvents()
     try:
         preview = window.assistant_preview
-        preview.button.click()
+        def choose_settings(box):
+            next(button for button in box.findChildren(QtWidgets.QPushButton)
+                 if box.buttonRole(button) == main.QMessageBox.AcceptRole).click()
+        with mock.patch.object(main.QMessageBox, 'exec_', choose_settings):
+            preview.button.click()
         app.processEvents()
         assert preview._choice_dialog is None
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
