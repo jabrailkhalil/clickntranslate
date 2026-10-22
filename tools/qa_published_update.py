@@ -12,22 +12,55 @@ import re
 import subprocess
 import sys
 import urllib.request
+import urllib.error
+from urllib.parse import urlparse
 
 REPO = 'jabrailkhalil/clickntranslate'
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def release(version):
-    url = f'https://api.github.com/repos/{REPO}/releases/tags/v{version}'
+def release(version, candidate_release_id=None):
+    if candidate_release_id is not None and not str(candidate_release_id).isdigit():
+        raise ValueError('Invalid candidate release ID')
+    suffix = str(candidate_release_id) if candidate_release_id else 'tags/v' + version
+    url = f'https://api.github.com/repos/{REPO}/releases/{suffix}'
     headers = {'Accept': 'application/vnd.github+json', 'User-Agent': 'ClicknTranslate-transition-QA'}
     token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
     if token:
         headers['Authorization'] = 'Bearer ' + token
     with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
         value = json.load(response)
-    if value['tag_name'] != 'v' + version or value['draft']:
+    if value['tag_name'] != 'v' + version or (value['draft'] and not candidate_release_id):
         raise RuntimeError('Unexpected release or unpublished draft')
     return value
+
+
+def asset_response(info, asset):
+    """Read a private candidate without forwarding its token to the CDN."""
+    if not info.get('draft'):
+        return urllib.request.urlopen(asset['browser_download_url'], timeout=120)
+    token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
+    if not token or not asset['url'].startswith(f'https://api.github.com/repos/{REPO}/releases/assets/'):
+        raise RuntimeError('Private candidate requires repository credentials and an asset API URL')
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, message, headers, newurl):
+            return None
+
+    request = urllib.request.Request(asset['url'], headers={
+        'Authorization': 'Bearer ' + token, 'Accept': 'application/octet-stream',
+        'User-Agent': 'ClicknTranslate-transition-QA'})
+    try:
+        return urllib.request.build_opener(NoRedirect).open(request, timeout=120)
+    except urllib.error.HTTPError as error:
+        if error.code not in (302, 303, 307, 308):
+            raise
+        location = error.headers.get('Location', '')
+        parsed = urlparse(location)
+        if parsed.scheme != 'https' or not (parsed.hostname or '').endswith('.githubusercontent.com'):
+            raise RuntimeError('Unexpected private asset redirect') from None
+        # A fresh public request carries no repository credential.
+        return urllib.request.urlopen(location, timeout=120)
 
 
 def download(info, name, destination):
@@ -44,7 +77,7 @@ def download(info, name, destination):
     partial = target.with_name(target.name + '.part')
     checksum = hashlib.sha256()
     # Public asset request carries no token, including across CDN redirects.
-    with urllib.request.urlopen(url, timeout=120) as source, partial.open('wb') as output:
+    with asset_response(info, asset) as source, partial.open('wb') as output:
         while block := source.read(1024 * 1024):
             output.write(block)
             checksum.update(block)
@@ -59,6 +92,7 @@ def main():
     parser.add_argument('--old-version', required=True)
     parser.add_argument('--new-version', required=True)
     parser.add_argument('--mode', choices=('zip', 'setup'), default='zip')
+    parser.add_argument('--candidate-release-id', help='Explicit private draft ID for pre-publication QA')
     args = parser.parse_args()
     for version in (args.old_version, args.new_version):
         if not re.fullmatch(r'\d+\.\d+\.\d+', version):
@@ -71,7 +105,7 @@ def main():
     command = [sys.executable, str(ROOT / 'tools/qa_update_transition.py'), '--case', case]
     metadata = {}
     for label, version in (('old', args.old_version), ('new', args.new_version)):
-        info = release(version)
+        info = release(version, args.candidate_release_id if label == 'new' else None)
         metadata[label] = {'id': info['id'], 'tag': info['tag_name'], 'prerelease': info['prerelease']}
         name = f'Click-n-Translate-{version}-windows-portable-x64.zip'
         path, checksum = download(info, name, downloads)
