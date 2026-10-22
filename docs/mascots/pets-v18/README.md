@@ -62,7 +62,9 @@ companion before screenshots.
 ![Desktop companion action popup](interaction-preview.png)
 
 The main window shows one static shortcut for the selected companion, captioned
-Mascot. Clicking the character or caption opens the same styled prompt as the
+Mascot. Its caption is on the left and its cached thumbnail is on the right,
+using the same row component, spacing, typography and hover as the hotkeys.
+Clicking the character or caption opens the same styled prompt as the
 hotkey rows; its primary action opens Mascot settings focused on the carousel.
 The shortcut uses a cached 48×52 PNG extracted from the native idle frame; it
 does not decode a sprite atlas or run an animation timer. All six companions
@@ -164,6 +166,28 @@ option is off by default, does not affect ordinary selection translation or
 dynamic translation, and does not send chat messages. Windows uses Ctrl+A;
 macOS uses Cmd+A. Replacement remains unavailable on Linux. If the target loses
 focus before selection, the operation stops before changing the clipboard.
+
+Selecting or using an unavailable offline translator now offers the matching
+installation page or an explicitly chosen available translator. Argos readiness
+is checked for the current direction, including installed English-pivot routes;
+Hy-MT needs both its model and runner. These checks use local metadata and file
+presence without loading native translation models in the UI thread. The
+recovery dialog lists online choices with their internet requirement and only
+lists ready offline alternatives. The main Argos flow also retains its explicit
+download-now action and byte-progress installation.
+
+After cancellation the result window retains both drafts and a short, themed
+installation link instead of a clipped technical instruction. Following that
+link opens Language packages on Argos or Hy-MT directly. A requested Argos
+direction is highlighted when the asynchronous catalog arrives. Opening setup
+does not download anything until the user starts installation. Standalone OCR
+results can create a settings host without another tray, startup tasks or global
+hotkeys. Worker-discovered missing components carry structured setup information
+to the owning window, with request checks rejecting stale warnings. Local
+result/document choices do not change the global translator, and an owned
+installer does not trigger the result window's optional outside-click close.
+
+![Offline translator setup and explicit alternatives](provider-recovery-preview.png)
 
 PR #7 is merged and integrated: optional quick selection translation, result
 font size and closing the result on an outside click. Quick selection reads run

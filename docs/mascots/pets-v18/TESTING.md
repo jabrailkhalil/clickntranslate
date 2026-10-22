@@ -1,5 +1,25 @@
 # Validation
 
+The latest source at `84e166a195802380ab03776bc90dfcdf1e88ba2e` uses the actual
+hotkey row for the home mascot: caption left, cached thumbnail right, with the
+same typography, padding and pointer states. The offline-translator follow-up
+adds pair/model checks, actionable localized prompts, direct installer tabs,
+explicit ready-provider selection and structured worker setup failures. Cancel,
+close and installation navigation preserve drafts and keep local choices scoped
+to their window. A standalone result can open a settings host with background
+services disabled; its close path leaves other windows and active modes alone.
+
+Final eight-part results, including replacement runs for parts 3, 4, 5 and 8:
+**2039 passed, 77 skipped, 919 subtests passed and the same 2 pre-existing version
+metadata failures**. Final focused navigation/provider/hover checks passed
+**160 tests and 24 subtests**. Every selected isolated run kept user data
+unchanged. Older tests were updated to accept the newly requested mascot prompt
+and to declare local providers installed when testing backend dispatch. The
+initial runs stopped at those previously implicit interactions; the final
+replacement runs completed. See `ui-recovery-validation.json` for exact partition
+results. The full suite was run offscreen on Windows; native macOS execution and
+release packaging were not performed for this follow-up.
+
 The subsequent home-shortcut follow-up restores the localized Mascot caption
 and offers the same styled settings prompt as hotkey rows. Its primary action
 opens the mascot carousel; rejecting or closing preserves the main-window
