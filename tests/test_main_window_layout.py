@@ -547,8 +547,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 }
                 self.assertTrue({
                     "ocr_engine_combo", "translator_combo",
-                    "selection_quick_translate_mode_automatic",
-                    "selection_quick_translate_checkbox",
+                    "copy_notification_checkbox",
+                    "close_result_on_outside_click_checkbox",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
                 self.assertNotIn("export_settings_btn", detached_keys)

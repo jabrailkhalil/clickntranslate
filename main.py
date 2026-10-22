@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 # Keep the public source entry point stable while implementation modules live in src/.
 # Frozen builds discover these modules through the explicit PyInstaller search path.
@@ -26,6 +27,7 @@ import time
 import logging
 import translater
 import diagnostics
+from runtime_metrics import measure
 from translation_chunks import completion_percent
 
 # CTranslate2 can crash when its native runtime is first loaded after Qt on
@@ -2773,6 +2775,12 @@ for _guide_lang, _bodies in {
         _title = GUIDE_TOUR_EXTRAS[_guide_lang][_key][0]
         GUIDE_TOUR_EXTRAS[_guide_lang][_key] = (_title, _body)
 
+from settings_guide_content import guide_updates, COPY as SETTINGS_GUIDE_COPY
+for _guide_language in GUIDE_TOUR_EXTRAS:
+    GUIDE_TOUR_EXTRAS[_guide_language].update(guide_updates(_guide_language))
+    for _action, _body_index in (('settings_page_main', 1), ('settings_page_updates', 2)):
+        _title = GUIDE_TOUR_EXTRAS[_guide_language][_action][0]
+        GUIDE_TOUR_EXTRAS[_guide_language][_action] = (_title, SETTINGS_GUIDE_COPY[_guide_language][_body_index])
 GUIDE_TOUR_ORDER = GUIDE_SETUP_ORDER
 
 
@@ -3553,6 +3561,9 @@ HELP_EXTRA_CONTENT = {
         ]),
     ],
 }
+
+from settings_guide_content import update_help as _update_settings_help
+_update_settings_help(HELP_CONTENT)
 
 BUG_REPORT_HELP_CONTENT = {
     "en": [("Bug reports", [
@@ -7361,6 +7372,10 @@ class HotkeyLanguageDialog(QDialog):
         pair_row.addWidget(self.target_combo, 1)
         layout.addLayout(pair_row)
 
+        from selection_options import SelectionTriggerControl
+        self.selection_trigger = SelectionTriggerControl(owner, root)
+        layout.addWidget(self.selection_trigger)
+
         self.status_label = QLabel("")
         self.status_label.setObjectName("hotkeyLanguageStatus")
         self.status_label.setWordWrap(True)
@@ -7393,7 +7408,7 @@ class HotkeyLanguageDialog(QDialog):
 
         """ + standard_buttons(dark, compact=False))
         combo_style = modern_combo_style(dark, font_size=14)
-        for combo in (self.mode_combo, self.source_combo, self.target_combo):
+        for combo in (self.mode_combo, self.source_combo, self.target_combo, self.selection_trigger.combo):
             combo.setStyleSheet(combo_style)
             combo.setMinimumHeight(38)
 
@@ -7402,6 +7417,9 @@ class HotkeyLanguageDialog(QDialog):
 
     def _load_mode(self):
         mode = self.current_mode()
+        self.selection_trigger.setVisible(mode == 'selection')
+        self.setFixedHeight(302 if mode == 'selection' else 258)
+        self.findChild(QFrame, 'hotkeyLanguageCard').setGeometry(self.rect())
         pairs = self.owner._available_hotkey_translation_pairs(mode)
         source, target = self.owner._configured_hotkey_translation_pair(mode)
         source_codes = [
@@ -7912,8 +7930,9 @@ class DarkThemeApp(QMainWindow):
             daemon=True,
         ).start()
 
-    def save_config(self):
-        self._capture_main_translation_languages()
+    def save_config(self, *, capture_languages=True):
+        if capture_languages:
+            self._capture_main_translation_languages()
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
@@ -9130,6 +9149,14 @@ class DarkThemeApp(QMainWindow):
             return getattr(settings_window, "translator_combo", None)
         if action == "result_window":
             return getattr(settings_window, "result_window_control", None)
+        if action == "result_text":
+            return getattr(settings_window, "translation_font_control", None)
+        if action == "result_behavior":
+            return getattr(settings_window, "close_result_on_outside_click_checkbox", None)
+        if action == "api_connections":
+            return getattr(settings_window, "ocr_languages_btn", None)
+        if action == "selection_behavior":
+            return getattr(settings_window, "hotkeys_button", None)
         if action == "language_packages":
             return getattr(settings_window, "ocr_languages_btn", None)
         if action == "hotkeys":
@@ -9175,9 +9202,9 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"ocr_engine", "translator", "language_packages"}:
+                if action in {"ocr_engine", "translator", "language_packages", "api_connections", "result_behavior"}:
                     page = 1
-                elif action in {"hotkeys", "result_window"}:
+                elif action in {"hotkeys", "result_window", "result_text", "selection_behavior"}:
                     page = 0
                 elif action == "game_controls":
                     page = 2
@@ -10040,11 +10067,13 @@ class DarkThemeApp(QMainWindow):
             requested = normalize_ui_scale(self.config.get('ui_scale_percent', DEFAULT_SCALE))
             if controller.requested_percent != requested:
                 controller.set_percent(requested)
-        self._apply_main_combo_theme(is_dark)
-        self._apply_main_hotkey_theme()
-        # The theme decides the font, and the font decides how wide the mode
-        # picker has to be to show its longest entry.
-        self._fit_hotkey_mode_combo()
+        if self.settings_window is None:
+            self._apply_main_combo_theme(is_dark)
+            self._apply_main_hotkey_theme()
+            self._fit_hotkey_mode_combo()
+            self._main_controls_theme = self.current_theme
+        # Hidden home controls retain the theme they actually have. Refresh
+        # only if it differs when returning home (two toggles need no work).
         if hasattr(self, "title_bar"):
             header_bg = window_header_color(self.current_theme != "Светлая")
             self.title_bar.setStyleSheet(
@@ -10249,6 +10278,7 @@ class DarkThemeApp(QMainWindow):
             except RuntimeError:
                 self.document_button = None
 
+    @measure('ui.theme')
     def toggle_theme(self):
         # Apply the parent and every open child as one paint transaction.  Qt
         # otherwise exposes the parent with the new palette while cached child
@@ -10492,17 +10522,43 @@ class DarkThemeApp(QMainWindow):
         self._complete_guide_step('help')
 
     def _create_bug_report(self, parent=None):
+        active = getattr(self, '_diagnostic_job', None)
+        if active is not None:
+            return active
+        from diagnostic_job import DiagnosticJob
+        job = DiagnosticJob(self, app_version=APP_VERSION,
+            data_dir=Path(get_data_file('config.json')).parent,
+            runtime=diagnostics.application_snapshot(self))
+        self._diagnostic_job = job
+        self._diagnostic_parent = parent
+        button = getattr(parent, 'create_bug_report_btn', None)
+        if button is not None:
+            button.setEnabled(False)
+        job.finished.connect(self._finish_bug_report)
+        job.start()
+        return job
+
+    def _finish_bug_report(self, report_path, error):
+        from PyQt5 import sip
+        job = getattr(self, '_diagnostic_job', None)
+        self._diagnostic_job = None
+        if job is not None:
+            job.deleteLater()
+        parent = getattr(self, '_diagnostic_parent', None)
+        self._diagnostic_parent = None
+        if parent is not None and sip.isdeleted(parent):
+            parent = None
+        button = getattr(parent, 'create_bug_report_btn', None)
+        if button is not None and not sip.isdeleted(button):
+            button.setEnabled(True)
         lang = self.current_interface_language
-        try:
-            report_path = diagnostics.create_bug_report(app_version=APP_VERSION)
-        except Exception as error:
-            logging.exception("Could not create the user diagnostic report")
+        if error:
             QMessageBox.warning(
                 parent or self,
                 help_action_text(lang, "report"),
                 help_action_text(lang, "report_failed").format(error=error),
             )
-            return None
+            return
 
         try:
             if platform_support.IS_WINDOWS:
@@ -10826,10 +10882,28 @@ class DarkThemeApp(QMainWindow):
         from PyQt5 import sip
         composer = getattr(self, 'main_composer', None)
         minimum = composer.minimumSize() if composer is not None and not sip.isdeleted(composer) else None
-        return (self.current_theme, self.current_interface_language,
-                json.dumps(self.config, sort_keys=True, ensure_ascii=False, default=str), minimum)
+        # History, startup flags and scale do not change the home widget tree.
+        # Serializing every preference used to rebuild the page after editing
+        # any setting, including a theme that can be applied to existing items.
+        keys = (
+            'ocr_engine', 'translator_engine', 'api_providers',
+            'copy_hotkey', 'translate_hotkey', 'fullscreen_translate_hotkey',
+            'game_translate_hotkey', 'translate_selection_hotkey',
+            'translate_replace_selection_hotkey', 'toggle_window_hotkey',
+            'main_assistant_visible', 'desktop_assistant_mascot', 'desktop_assistant_reactions',
+            'hotkey_language_editor_mode', 'main_translation_source_language',
+            'main_translation_target_language', 'ocr_translate_source_language',
+            'ocr_translate_target_language', 'fullscreen_translate_from', 'fullscreen_translate_to',
+            'selection_translate_source_language', 'selection_translate_target_language',
+            'replace_selection_source_language', 'replace_selection_target_language',
+            'game_translate_source_language', 'game_translate_target_language',
+        )
+        state = {key: self.config.get(key) for key in keys}
+        return (self.current_interface_language,
+                json.dumps(state, sort_keys=True, ensure_ascii=False, default=str), minimum)
 
     @_atomic_page_change
+    @measure('ui.home')
     def show_main_screen(self):
         active_settings = getattr(self, "settings_window", None)
         if active_settings is not None:
@@ -10854,6 +10928,11 @@ class DarkThemeApp(QMainWindow):
             for widget in cached:
                 self.main_layout.addWidget(widget)
                 widget.show()
+            if getattr(self, '_main_controls_theme', None) != self.current_theme:
+                self._apply_main_combo_theme(self.current_theme != 'Светлая')
+                self._apply_main_hotkey_theme()
+                self._fit_hotkey_mode_combo()
+                self._main_controls_theme = self.current_theme
             self._ui_scale_controller.refresh()
             self._complete_guide_step("back_home")
             return
@@ -11394,6 +11473,7 @@ class DarkThemeApp(QMainWindow):
         self._apply_main_hotkey_theme()
         self._ui_scale_controller.refresh()
         self._complete_guide_step("back_home")
+        self._main_controls_theme = self.current_theme
         self._main_page_widgets = (self.main_text_section, self.main_shortcut_section, self.main_footer)
         self._main_page_key = self._main_page_signature()
 
@@ -11420,6 +11500,7 @@ class DarkThemeApp(QMainWindow):
         self.settings_window.settings_assistant_page.mascot_preview.next_button.setFocus(Qt.OtherFocusReason)
 
     @_atomic_page_change
+    @measure('ui.settings')
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)
         preserved = ((active_settings,) if active_settings is not None else ()) + getattr(self, '_main_page_widgets', ())

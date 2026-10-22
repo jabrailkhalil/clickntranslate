@@ -534,12 +534,18 @@ def _theme_value(widget) -> str:
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         try:
+            attributes = vars(current)
             for attr in ("current_theme", "theme", "theme_name"):
-                value = getattr(current, attr, None)
+                # A missing PyQt attribute falls through to meta-object lookup.
+                # Most children have none of these attributes; a theme change
+                # used to repeat that slow path for every scrollbar/style event.
+                value = attributes.get(attr)
+                if value is None and hasattr(type(current), attr):
+                    value = getattr(current, attr, None)
                 if isinstance(value, str) and value:
                     return value.lower()
 
-            owner = getattr(current, "owner", None)
+            owner = attributes.get("owner")
             if owner is not None:
                 current = owner
                 continue
@@ -547,7 +553,7 @@ def _theme_value(widget) -> str:
             # SettingsWindow intentionally stores its QWidget parent in a
             # ``parent`` instance attribute, shadowing QObject.parent().  Both
             # forms are valid in this project, so never assume it is callable.
-            parent_ref = getattr(current, "parent", None)
+            parent_ref = attributes.get("parent") if 'parent' in attributes else getattr(current, "parent", None)
             current = parent_ref() if callable(parent_ref) else parent_ref
         except (RuntimeError, TypeError):
             # Theme detection must never escape into a Qt signal handler: an

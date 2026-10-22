@@ -256,7 +256,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertLess(label_rect.right(), combo_rect.left())
                         self.assertEqual(box_rect.center().y(), combo_rect.center().y())
                     self.assertLess(
-                        self.rect_in(settings, settings.selection_quick_translate_mode_automatic).bottom(),
+                        self.rect_in(settings, settings.copy_notification_checkbox).bottom(),
                         self.rect_in(settings, settings.ocr_languages_btn).top(),
                     )
                     for page in range(3):

@@ -196,7 +196,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
             self.dialog.translation_tabs.tabText(index)
             for index in range(self.dialog.translation_tabs.count())
         ]
-        self.assertEqual(section_titles, ["OCR", "Translation"])
+        self.assertEqual(section_titles, ["OCR", "Translation", "API"])
         expected_ocr_titles = ["Tesseract", "EasyOCR", "RapidOCR"]
         if platform_support.supports_windows_ocr():
             expected_ocr_titles.insert(0, "Windows")

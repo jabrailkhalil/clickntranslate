@@ -237,6 +237,10 @@ class SelectionQuickTranslateController(QtCore.QObject):
             "selection_quick_translate_accessibility": {
                 "en": "Enable Accessibility for quick selection translate",
                 "ru": "Включите универсальный доступ для быстрого перевода выделения",
+                "es": "Activa Accesibilidad para traducir el texto seleccionado",
+                "de": "Bedienungshilfen für die Auswahlübersetzung aktivieren",
+                "fr": "Activez l’accessibilité pour traduire le texte sélectionné",
+                "zh": "请启用辅助功能以翻译选中的文字",
             }
         }
         localized = messages.get(message_key, {})

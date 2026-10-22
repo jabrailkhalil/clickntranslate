@@ -552,7 +552,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertTrue(settings.settings_page_dots[1].isChecked())
             self.assertTrue(settings.settings_updates_page.isVisible())
             self.assertFalse(settings.update_check_on_launch_checkbox.isVisible())
-            self.assertFalse(settings.close_result_on_outside_click_checkbox.isVisible())
+            self.assertTrue(settings.close_result_on_outside_click_checkbox.isVisible())
             self.assertTrue(settings.settings_action_panel.isHidden())
 
             footer = self._rect_in_settings(settings, settings.settings_page_footer)
@@ -809,13 +809,12 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     self.assertTrue(settings.settings_action_panel.isHidden())
                     self.assertGreaterEqual(overlay[1] - (footer[1] + footer[3]), 6)
                     for widget in (settings.ocr_engine_combo, settings.translator_combo,
-                                   settings.selection_quick_translate_checkbox):
+                                   settings.close_result_on_outside_click_checkbox):
                         rect = self._rect_in_settings(settings, widget)
                         self.assertGreaterEqual(rect[0], overlay[0], (theme, language))
                         self.assertGreaterEqual(rect[1], overlay[1], (theme, language))
                         self.assertLessEqual(rect[0] + rect[2], overlay[0] + overlay[2], (theme, language))
                         self.assertLessEqual(rect[1] + rect[3], overlay[1] + overlay[3], (theme, language))
-                    settings.ocr_options_button.setChecked(True)
                     self.app.processEvents()
                     for widget in (settings.keep_visible_checkbox, settings.freeze_screen_checkbox,
                                    settings.dim_screen_during_ocr_checkbox, settings.copy_notification_checkbox):

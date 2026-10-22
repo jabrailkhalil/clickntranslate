@@ -448,8 +448,12 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 for action, _title, _body in main.guide_text(language_code)["steps"]
             ]
             self.assertIn("result_window", actions)
-            self.assertLess(actions.index("translator"), actions.index("result_window"))
-            self.assertLess(actions.index("result_window"), actions.index("language_packages"))
+            # Result appearance is in General; engine installation and API
+            # precede it in the Translation chapter of the revised guide.
+            self.assertLess(actions.index("translator"), actions.index("language_packages"))
+            self.assertLess(actions.index("settings_page_main"), actions.index("result_window"))
+            self.assertLess(actions.index("result_window"), actions.index("result_text"))
+            self.assertLess(actions.index("result_text"), actions.index("hotkeys"))
 
     def test_setup_guide_finishes_with_shortcuts_and_a_real_translation(self):
         shortcut_steps = [

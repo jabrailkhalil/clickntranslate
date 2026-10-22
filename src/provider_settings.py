@@ -1,7 +1,7 @@
-"""A compact, scrollable connection editor inside the existing settings window."""
+"""API connection editor embedded in the language package manager."""
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
-                            QLineEdit, QCheckBox, QPushButton, QScrollArea, QFrame)
+                            QLineEdit, QPushButton, QScrollArea, QFrame)
 from api_providers import PROVIDERS, BY_KEY, profile, validate_url, ProviderError
 
 _KEYS = ('connections', 'service', 'address', 'key', 'model', 'vision', 'direct',
@@ -56,6 +56,10 @@ def refresh_provider_routing(settings):
     provider = VISION_ENGINES.get(config.get('ocr_engine'))
     item = profile(provider, config) if provider else {}
     direct = bool(item.get('direct') and item.get('vision'))
+    from provider_catalog import provider_id
+    shared = direct and provider_id(config.get('translator_engine')) == provider
+    settings.translator_combo.setEnabled(not shared)
+    settings.translator_engine_label.setEnabled(not shared)
     text = {
         'ru': 'Изображения: {provider} · {model}. Один запрос; отдельный переводчик используется только для обычного текста.',
         'en': 'Images: {provider} · {model}. One request; the separate translator is used only for plain text.',
@@ -64,7 +68,16 @@ def refresh_provider_routing(settings):
         'fr': 'Images : {provider} · {model}. Une requête ; le traducteur séparé sert uniquement au texte.',
         'zh': '图像：{provider} · {model}。一次请求；单独的翻译服务仅用于普通文本。',
     }
-    note.setText(text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else '')
+    description = text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else ''
+    captions = {
+        'ru': ('Один API: ', 'API изображений: '), 'en': ('One API: ', 'Image API: '),
+        'es': ('Una API: ', 'API de imagen: '), 'de': ('Eine API: ', 'Bild-API: '),
+        'fr': ('Une API : ', 'API d’image : '), 'zh': ('统一 API：', '图像 API：'),
+    }
+    import html
+    note.setText(captions.get(lang,captions['en'])[0 if shared else 1] +
+                 '<a href="api">' + html.escape(BY_KEY[provider].name) + '</a>' if direct else '')
+    note.setToolTip(tooltip_text(description + '\n' + provider_text(lang,'help')) if direct else '')
     note.setVisible(direct)
     for attribute, provider_key in (('translator_combo', config.get('translator_engine', '').lower()),
                                     ('ocr_engine_combo', provider)):
@@ -74,45 +87,59 @@ def refresh_provider_routing(settings):
             combo.setToolTip(tooltip_text(f"{BY_KEY[provider_key].name} · {connection['model']}\n{provider_text(lang,'help')}"))
 
 
+EXTRA = {
+ 'ru': ('Режим:', 'Только перевод текста', 'Распознавание текста (OCR)', 'Распознавание и перевод', 'Сохранить и выбрать', 'Настройте сервис, затем выберите его для перевода и OCR.', 'Выбран для перевода.', 'Выбран для перевода и OCR.', 'Укажите ID модели в поле «Модель».', 'API'),
+ 'en': ('Use for:', 'Text translation only', 'Text recognition (OCR)', 'Recognition and translation', 'Save and select', 'Configure a service, then select it for translation and OCR.', 'Selected for translation.', 'Selected for translation and OCR.', 'Enter a model ID in the Model field.', 'API'),
+ 'es': ('Modo:', 'Solo traducción de texto', 'Reconocimiento de texto (OCR)', 'Reconocimiento y traducción', 'Guardar y elegir', 'Configura un servicio y selecciónalo para traducción y OCR.', 'Elegido para traducir.', 'Elegido para traducción y OCR.', 'Introduce el ID del modelo.', 'API'),
+ 'de': ('Modus:', 'Nur Textübersetzung', 'Texterkennung (OCR)', 'Erkennen und übersetzen', 'Speichern und wählen', 'Dienst einrichten und für Übersetzung und OCR auswählen.', 'Für Übersetzung ausgewählt.', 'Für Übersetzung und OCR ausgewählt.', 'Geben Sie eine Modell-ID ein.', 'API'),
+ 'fr': ('Mode :', 'Traduction de texte seule', 'Reconnaissance de texte (OCR)', 'Reconnaissance et traduction', 'Enregistrer et choisir', 'Configurez un service, puis sélectionnez-le pour la traduction et l’OCR.', 'Choisi pour la traduction.', 'Choisi pour la traduction et l’OCR.', 'Saisissez un identifiant de modèle.', 'API'),
+ 'zh': ('模式：', '仅翻译文字', '文字识别 (OCR)', '识别并翻译', '保存并选用', '配置服务，然后将其用于翻译和 OCR。', '已选择用于翻译。', '已选择用于翻译和 OCR。', '请输入模型 ID。', 'API'),
+}
+
+
+def connection_text(lang, index):
+    return EXTRA.get(lang, EXTRA['en'])[index]
+
+
 def show_provider_settings(settings, provider=None):
-    page = getattr(settings, 'api_connections_page', None)
-    from PyQt5 import sip
-    if page is None or sip.isdeleted(page) or settings.settings_pages.indexOf(page) < 0:
-        page = ProviderSettingsPage(settings)
-        settings.api_connections_page = page
-        settings.settings_pages.addWidget(page)
-    if provider in BY_KEY:
-        page.service.setCurrentIndex(page.service.findData(provider))
-    settings.settings_pages.setCurrentWidget(page)
+    """API connections live beside installed OCR and translation packages."""
+    settings.show_ocr_language_manager()
+    dialog = settings._language_manager_dialog
+    page = dialog.show_api(provider)
+    settings.api_connections_page = page
+    return page
 
 
 class ProviderSettingsPage(QWidget):
-    def __init__(self, settings):
-        super().__init__(settings.settings_pages)
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
         from settings_window import DropDownCombo
-        from styled_dialogs import install_accent_controls, tooltip_text
-        from button_styles import button_qss
-        self.settings, self.lang = settings, settings.parent.current_interface_language
-        self.drafts = {}
-        self.active = None
+        from styled_dialogs import tooltip_text
+        from PyQt5.QtWidgets import QSizePolicy
+        self.settings = settings
+        self.app = settings.parent if not callable(settings.parent) else settings.parent()
+        self.lang = self.app.current_interface_language
+        self.drafts, self.active = {}, None
+        self.setObjectName('apiConnectionsPage')
         tr = lambda key: provider_text(self.lang, key)
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(4)
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        outer.setContentsMargins(0, 10, 0, 0)
+        outer.setSpacing(8)
+        self.scroll = QScrollArea(self)
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         content = QWidget()
+        content.setObjectName('apiConnectionsContent')
         body = QVBoxLayout(content)
-        body.setContentsMargins(4, 4, 8, 4)
-        body.setSpacing(4)
+        body.setContentsMargins(2, 0, 8, 0)
+        body.setSpacing(8)
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(4)
+        form.setSpacing(8)
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.service = DropDownCombo(content)
-        settings._apply_engine_combo_style(self.service)
         for spec in PROVIDERS:
             self.service.addItem(spec.name, spec.key)
         self.address, self.key, self.model = (QLineEdit(content) for _ in range(3))
@@ -123,50 +150,87 @@ class ProviderSettingsPage(QWidget):
         self.key.setClearButtonEnabled(True)
         self.address.setPlaceholderText('https://…/v1')
         self.model.setPlaceholderText('Model ID')
+        self.labels = []
         for name, widget in (('service', self.service), ('address', self.address), ('key', self.key), ('model', self.model)):
-            widget.setFixedHeight(28)
+            widget.setMinimumHeight(32)
+            widget.setMinimumWidth(0)
+            widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             widget.setAccessibleName(tr(name).rstrip(':： '))
             widget.setToolTip(tooltip_text(tr('help') if name == 'service' else tr(name)))
-            form.addRow(tr(name), widget)
+            label = QLabel(tr(name), content)
+            label.setBuddy(widget)
+            label.setMinimumWidth(label.sizeHint().width())
+            self.labels.append(label)
+            form.addRow(label, widget)
+        self.usage = DropDownCombo(content)
+        self.usage.setMinimumHeight(32)
+        self.usage.setAccessibleName(connection_text(self.lang, 0))
+        self.usage.setToolTip(tooltip_text(tr('help')))
+        label = QLabel(connection_text(self.lang, 0), content)
+        label.setBuddy(self.usage)
+        self.labels.append(label)
+        form.addRow(label, self.usage)
         body.addLayout(form)
-        self.vision = QCheckBox(tr('vision'), content)
-        self.direct = QCheckBox(tr('direct'), content)
-        self.vision.toggled.connect(lambda checked: self.direct.setEnabled(checked))
-        for flag in (self.vision, self.direct):
-            flag.setFixedHeight(28)
-            flag.setToolTip(tooltip_text(tr('help')))
-            body.addWidget(flag)
-        self.note = QLabel(tr('help'), content)
-        self.note.setObjectName('assistantNote')
+        self.note = QLabel(connection_text(self.lang, 5), content)
+        self.note.setObjectName('apiConnectionHint')
         self.note.setWordWrap(True)
+        self.note.setToolTip(tooltip_text(tr('help')))
         body.addWidget(self.note)
         self.status = QLabel('', content)
-        self.status.setObjectName('assistantNote')
+        self.status.setObjectName('apiConnectionStatus')
         self.status.setWordWrap(True)
         body.addWidget(self.status)
         body.addStretch(1)
-        scroll.setWidget(content)
-        outer.addWidget(scroll, 1)
+        self.scroll.setWidget(content)
+        outer.addWidget(self.scroll, 1)
         footer = QHBoxLayout()
+        footer.setSpacing(6)
         self.delete = QPushButton(tr('delete'), self)
         self.save = QPushButton(tr('save'), self)
-        self.back = QPushButton(tr('back'), self)
-        dark = settings.parent.current_theme != 'Светлая'
-        for button, role in ((self.delete, 'danger'), (self.save, 'primary'), (self.back, 'secondary')):
-            button.setFixedHeight(29)
-            button.setStyleSheet(button_qss(dark, role, compact=True))
-            footer.addWidget(button)
+        self.use = QPushButton(connection_text(self.lang, 4), self)
+        for button in (self.delete, self.save, self.use):
+            button.setMinimumHeight(32)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            footer.addWidget(button, 1)
         outer.addLayout(footer)
         self.save.clicked.connect(self.save_profile)
+        self.use.clicked.connect(self.select_profile)
         self.delete.clicked.connect(self.delete_key)
-        self.back.clicked.connect(lambda: settings._set_settings_page(1))
         self.service.currentIndexChanged.connect(self.load_profile)
-        install_accent_controls(self, dark=dark)
+        self.address.textChanged.connect(lambda text: self.address.setToolTip(tooltip_text(text)))
+        self.apply_theme()
         self.load_profile()
 
+    def apply_theme(self):
+        from settings_window import modern_combo_style
+        from styled_dialogs import install_accent_controls, set_widget_stylesheet
+        from button_styles import button_qss
+        dark = self.app.current_theme != 'Светлая'
+        field, text, border = ('#17181d', '#f4f6fb', '#34313f') if dark else ('#f3eff5', '#241f2a', '#bcb2c7')
+        muted = '#aaa0b8' if dark else '#71667d'
+        set_widget_stylesheet(self, f"""
+            QWidget#apiConnectionsPage, QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
+            QLabel {{ color:{text}; font-size:13px; background:transparent; }}
+            QLabel#apiConnectionHint, QLabel#apiConnectionStatus {{ color:{muted}; font-size:12px; }}
+            QLineEdit {{ color:{text}; background:{field}; border:1px solid {border}; border-radius:6px; padding:3px 8px; font-size:14px; }}
+            QLineEdit:focus {{ border-color:#9B78C8; }}
+        """)
+        for combo in (self.service, self.usage):
+            set_widget_stylesheet(combo, modern_combo_style(dark, font_size=14))
+            combo.set_popup_background(field)
+        for button, role in ((self.delete, 'danger'), (self.save, 'secondary'), (self.use, 'primary')):
+            set_widget_stylesheet(button, button_qss(dark, role, compact=True))
+        install_accent_controls(self, dark=dark)
+        # Stylesheet fonts must also inform the form's label measurements.
+        self.ensurePolished()
+        for label in self.labels:
+            label.ensurePolished()
+            label.setMinimumWidth(label.sizeHint().width())
+
     def _capture(self):
+        usage = self.usage.currentData()
         return dict(url=self.address.text().strip(), model=self.model.text().strip(),
-                    vision=self.vision.isChecked(), direct=self.direct.isChecked(), key=self.key.text())
+                    vision=usage in ('ocr', 'direct'), direct=usage == 'direct', key=self.key.text())
 
     def load_profile(self, *_args):
         from provider_secrets import get_key
@@ -174,50 +238,72 @@ class ProviderSettingsPage(QWidget):
             self.drafts[self.active] = self._capture()
         self.active = self.service.currentData()
         spec = BY_KEY[self.active]
-        item = self.drafts.get(self.active, profile(self.active, self.settings.parent.config))
+        item = self.drafts.get(self.active, profile(self.active, self.app.config))
         self.address.setText(item['url'])
-        # Official-service credentials can never be sent to a custom host.
         self.address.setReadOnly(self.active not in {'openai-compatible', 'libretranslate', 'deepl'})
         self.model.setText(item['model'])
         self.model.setEnabled(spec.protocol not in {'deepl', 'libre'})
         self.key.setText(item.get('key', ''))
         self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
-        self.vision.setEnabled(spec.vision)
-        self.vision.setChecked(item['vision'] and spec.vision)
-        self.direct.setChecked(item['direct'] and spec.vision)
-        self.direct.setEnabled(self.vision.isChecked())
+        self.usage.clear()
+        for index, code in ((1, 'text'), (2, 'ocr'), (3, 'direct')):
+            if index == 1 or spec.vision:
+                self.usage.addItem(connection_text(self.lang, index), code)
+        usage = ('direct' if item['direct'] else 'ocr') if item['vision'] and spec.vision else 'text'
+        self.usage.setCurrentIndex(max(0, self.usage.findData(usage)))
+        self.usage.setEnabled(spec.vision)
         self.status.clear()
 
     def save_profile(self):
-        from provider_secrets import set_key
+        from provider_secrets import set_key, get_key
         spec, item = BY_KEY[self.active], self._capture()
         try:
             validate_url(item['url'])
             if self.active == 'deepl' and item['url'] not in {'https://api-free.deepl.com/v2', 'https://api.deepl.com/v2'}:
                 raise ProviderError('DeepL API accepts only the official Free or Pro address.')
             if spec.protocol not in {'deepl', 'libre'} and not item['model']:
-                raise ProviderError(provider_text(self.lang, 'model'))
+                raise ProviderError(connection_text(self.lang, 8))
         except ProviderError as error:
             self.status.setText(str(error))
-            return
+            return False
         persisted = True
         if item['key']:
             persisted = set_key(self.active, item['url'], item.pop('key'))
         else:
             item.pop('key')
-        profiles = dict(self.settings.parent.config.get('api_providers', {}))
+        profiles = dict(self.app.config.get('api_providers', {}))
         profiles[self.active] = item
         self.settings.auto_save_setting('api_providers', profiles)
         refresh_provider_routing(self.settings)
         self.key.clear()
-        from provider_secrets import get_key
         self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
         self.drafts[self.active] = item
         self.status.setText(provider_text(self.lang, 'saved' if persisted else 'session'))
+        return True
+
+    def select_profile(self):
+        if not self.save_profile():
+            return
+        from api_providers import VISION_ENGINES, validate
+        try:
+            validate(self.active, self.app.config)
+        except ProviderError as error:
+            from api_providers import display_error
+            self.status.setText(display_error(error, self.lang))
+            return
+        status = self.status.text()
+        self.settings._set_translator_combo_silently(self.active)
+        self.settings.auto_save_setting('translator_engine', self.active)
+        item = profile(self.active, self.app.config)
+        if item['vision']:
+            engine = next(name for name, key in VISION_ENGINES.items() if key == self.active)
+            self.settings.ocr_engine_combo.setCurrentIndex(self.settings.ocr_engine_combo.findData(engine))
+        refresh_provider_routing(self.settings)
+        self.status.setText(connection_text(self.lang, 7 if item['vision'] else 6) + ' ' + status)
 
     def delete_key(self):
         from provider_secrets import set_key
-        persisted = set_key(self.active, profile(self.active, self.settings.parent.config)['url'], '')
+        persisted = set_key(self.active, profile(self.active, self.app.config)['url'], '')
         self.key.clear()
         self.drafts.pop(self.active, None)
         self.key.setPlaceholderText(provider_text(self.lang, 'empty'))

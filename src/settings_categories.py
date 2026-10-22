@@ -86,11 +86,11 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     content.setObjectName('translationSettingsContent')
     body = QVBoxLayout(content)
     body.setContentsMargins(0, 0, 0, 0)
-    body.setSpacing(4)
+    body.setSpacing(0)
     grid = QGridLayout()
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(8)
-    grid.setVerticalSpacing(2)
+    grid.setVerticalSpacing(1)
     grid.setColumnStretch(0, 1)
     body.addLayout(grid)
     settings.translation_settings_grid = grid
@@ -98,12 +98,13 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         settings.copy_translated_checkbox, settings.replace_select_all_checkbox,
         settings.restore_clipboard_checkbox,
     )
+    settings.restore_clipboard_checkbox.setText(compact[0])
     for row, flag in enumerate(flags):
         flag.setParent(content)
         flag.setObjectName('settingsPageCheckbox')
         grid.addWidget(flag, row, 0, Qt.AlignLeft)
     settings.close_result_on_outside_click_checkbox = QCheckBox(
-        settings_text(lang, 'close_result_window_on_outside_click'), general)
+        settings_text(lang, 'close_result_window_on_outside_click'), content)
     close_flag = settings.close_result_on_outside_click_checkbox
     close_flag.setText(compact[1])
     close_flag.setChecked(settings.parent.config.get('close_result_window_on_outside_click') is True)
@@ -112,34 +113,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         'close_result_window_on_outside_click', bool(checked)))
     close_flag.setObjectName('settingsPageCheckbox')
     close_flag.setFixedHeight(28)
-    form.addWidget(close_flag, 6, 0, Qt.AlignLeft)
-    settings.selection_quick_translate_checkbox = QCheckBox(
-        settings_text(lang, 'selection_quick_translate_enabled'), content)
-    quick_flag = settings.selection_quick_translate_checkbox
-    quick_flag.setText(compact[2])
-    settings.restore_clipboard_checkbox.setText(compact[0])
-    quick_flag.setChecked(settings.parent.config.get('selection_quick_translate_enabled') is True)
-    quick_flag.setToolTip(tooltip_text(settings_text(lang, 'selection_quick_translate_tooltip')))
-    for row, flag in ((3, quick_flag),):
-        flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(28)
-        grid.addWidget(flag, row, 0, Qt.AlignLeft)
-    immediate = {
-        'ru': 'Переводить выделение сразу', 'en': 'Translate selection immediately',
-        'es': 'Traducir selección al instante', 'de': 'Auswahl sofort übersetzen',
-        'fr': 'Traduire la sélection aussitôt', 'zh': '立即翻译选中文本',
-    }
-    settings.selection_quick_translate_mode_automatic = QCheckBox(immediate.get(lang, immediate['en']), content)
-    mode = settings.selection_quick_translate_mode_automatic
-    mode.setChecked(settings.parent.config.get('selection_quick_translate_mode', 'button') == 'automatic')
-    mode.setFixedHeight(28)
-    mode.setObjectName('settingsPageCheckbox')
-    mode.setToolTip(tooltip_text(settings_text(lang, 'selection_quick_translate_mode_automatic') + '\n' +
-                                settings_text(lang, 'selection_quick_translate_mode_button')))
-    mode.setEnabled(quick_flag.isChecked())
-    mode.toggled.connect(lambda checked: settings._set_selection_quick_translate_mode('automatic' if checked else 'button'))
-    quick_flag.toggled.connect(settings._set_selection_quick_translate_enabled)
-    grid.addWidget(mode, 4, 0, Qt.AlignLeft)
+    grid.addWidget(close_flag, 3, 0, 1, 3, Qt.AlignLeft)
     for row, label, control in (
         (0, settings.ocr_engine_label, settings.ocr_engine_combo),
         (1, settings.translator_engine_label, settings.translator_combo),
@@ -148,64 +122,56 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             widget.setParent(content)
         grid.addWidget(label, row, 1)
         grid.addWidget(control, row, 2)
-    help_text = {
-        'ru': 'Быстрый перевод: выделите текст в другом приложении. Появится кнопка перевода.\n\nИспользуется переводчик выше и языки режима «Выделение».',
-        'en': 'Quick translation: select text in another app to show a translate button.\n\nUses the translator above and the Selection language pair.',
-        'es': 'Selecciona texto en otra app para mostrar un botón de traducción.\n\nUsa el traductor de arriba y los idiomas de Selección.',
-        'de': 'Text in einer anderen App auswählen, um eine Übersetzungsschaltfläche einzublenden.\n\nVerwendet den obigen Übersetzer und das Sprachpaar für Auswahl.',
-        'fr': 'Sélectionnez du texte dans une autre app pour afficher le bouton de traduction.\n\nUtilise le traducteur ci-dessus et les langues du mode Sélection.',
-        'zh': '在其他应用中选择文字后显示翻译按钮。\n\n使用上方翻译服务和“选中文本”模式的语言。',
-    }
-    note = QLabel(help_text.get(lang, help_text['en']), content)
-    note.setWordWrap(True)
-    note.setObjectName('assistantNote')
-    note.setMaximumWidth(255)
-    note.setToolTip(tooltip_text(note.text()))
-    grid.addWidget(note, 2, 1, 3, 2)
-    quick_flag.setToolTip(tooltip_text(note.text()))
-
     settings.provider_routing_note = QLabel(content)
     settings.provider_routing_note.setObjectName('assistantNote')
-    settings.provider_routing_note.setWordWrap(True)
-    body.addWidget(settings.provider_routing_note)
+    settings.provider_routing_note.setWordWrap(False)
+    settings.provider_routing_note.setFixedHeight(28)
+    settings.provider_routing_note.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    def open_image_api(_link):
+        from api_providers import VISION_ENGINES
+        from provider_settings import show_provider_settings
+        show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
+    settings.provider_routing_note.linkActivated.connect(open_image_api)
+    grid.addWidget(settings.provider_routing_note, 2, 1, 1, 2, Qt.AlignTop)
     from provider_settings import refresh_provider_routing
     refresh_provider_routing(settings)
 
+    for row, flag in ((4, settings.keep_visible_checkbox), (5, settings.freeze_screen_checkbox)):
+        flag.setParent(content)
+        flag.setObjectName('settingsPageCheckbox')
+        flag.setFixedHeight(28)
+        grid.addWidget(flag, row, 0, 1, 3, Qt.AlignLeft)
+    # Dimming belongs to the same visible form, not an expanding subpage.
+    while dim_row.count():
+        dim_row.takeAt(0)
+    settings.dim_screen_during_ocr_checkbox.setParent(content)
+    grid.addWidget(settings.dim_screen_during_ocr_checkbox, 6, 0, Qt.AlignLeft)
+    from PyQt5.QtWidgets import QHBoxLayout
+    dim_controls = QWidget(content)
+    slider_row = QHBoxLayout(dim_controls)
+    slider_row.setContentsMargins(0, 0, 0, 0)
+    slider_row.addStretch(1)
+    slider_row.addWidget(settings.ocr_dim_strength_value)
+    slider_row.addWidget(settings.ocr_dim_strength_slider)
+    grid.addWidget(dim_controls, 6, 1, 1, 2)
+    settings.copy_notification_checkbox.setParent(content)
+    settings.copy_notification_checkbox.setFixedHeight(28)
+    grid.addWidget(settings.copy_notification_checkbox, 7, 0, 1, 3, Qt.AlignLeft)
     body.addStretch(1)
     settings.translation_action_panel = QWidget(settings.settings_updates_page)
     settings.translation_action_panel.setObjectName('settingsActionPanel')
-    settings.translation_action_panel.setFixedHeight(91)
+    settings.translation_action_panel.setFixedHeight(61)
     tools = QGridLayout(settings.translation_action_panel)
     tools.setContentsMargins(1, 1, 1, 1)
     tools.setHorizontalSpacing(0)
     tools.setVerticalSpacing(1)
-    for column, button in enumerate((settings.ocr_languages_btn, settings.copy_history_btn,
-                   settings.translation_history_btn)):
+    tools.setColumnStretch(0, 1)
+    tools.setColumnStretch(1, 1)
+    settings.ocr_languages_btn.setParent(settings.translation_action_panel)
+    tools.addWidget(settings.ocr_languages_btn, 0, 0, 1, 2)
+    for column, button in enumerate((settings.copy_history_btn, settings.translation_history_btn)):
         button.setParent(settings.translation_action_panel)
-        tools.addWidget(button, 0, column)
-    from settings_window import OpticallyCenteredPushButton
-    from provider_settings import provider_text, show_provider_settings
-    settings.api_connections_button = OpticallyCenteredPushButton(provider_text(lang, 'connections'), settings.translation_action_panel)
-    settings.api_connections_button.clicked.connect(lambda: show_provider_settings(settings))
-    settings.api_connections_button.setFixedHeight(29)
-    tools.addWidget(settings.api_connections_button, 1, 0, 1, 3)
-    settings.ocr_options_button = OpticallyCenteredPushButton(captions[1], settings.translation_action_panel)
-    settings.ocr_options_button.setCheckable(True)
-    settings.ocr_options_button.setFixedHeight(29)
-    tools.addWidget(settings.ocr_options_button, 2, 0, 1, 3)
-    settings.ocr_options_panel = QWidget(content)
-    options = QVBoxLayout(settings.ocr_options_panel)
-    options.setContentsMargins(0, 0, 0, 0)
-    options.setSpacing(2)
-    for flag in (settings.keep_visible_checkbox, settings.freeze_screen_checkbox):
-        flag.setParent(settings.ocr_options_panel)
-        options.addWidget(flag)
-    options.addLayout(dim_row)
-    settings.copy_notification_checkbox.setParent(settings.ocr_options_panel)
-    options.addWidget(settings.copy_notification_checkbox)
-    body.addWidget(settings.ocr_options_panel)
-    settings.ocr_options_panel.hide()
-    settings.ocr_options_button.toggled.connect(settings.ocr_options_panel.setVisible)
+        tools.addWidget(button, 1, column)
     scroll.setWidget(content)
     scroll.viewport().setAutoFillBackground(False)
     updates_layout.addWidget(scroll)
@@ -221,9 +187,6 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
 
 def reveal(settings, widget):
     """Keep guide links valid after moving controls to their actual category."""
-    panel = getattr(settings, 'ocr_options_panel', None)
-    if panel is not None and panel.isAncestorOf(widget):
-        settings.ocr_options_button.setChecked(True)
     scroll = getattr(settings, 'translation_settings_scroll', None)
     if scroll is not None and scroll.widget().isAncestorOf(widget):
         settings._set_settings_page(1)

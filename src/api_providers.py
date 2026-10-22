@@ -12,6 +12,7 @@ import threading
 from functools import wraps
 from urllib.parse import urlsplit
 import requests
+from runtime_metrics import measure
 from languages import language_english_name
 
 
@@ -54,38 +55,38 @@ def _valid_response(function):
 def display_error(error, lang):
     """Localize actionable failures without reflecting arbitrary server text."""
     messages = {
-        'en': ('API request failed. Check the connection in Translation and OCR → API connections.',
-               'Add an API key in Translation and OCR → API connections.',
-               'Set the model in Translation and OCR → API connections.',
+        'en': ('API request failed. Check the connection in Language packages → API.',
+               'Add an API key in Language packages → API.',
+               'Set the model in Language packages → API.',
                'The API key was rejected. Check the saved key.',
                'API quota or rate limit reached. Check your service account.',
                'The API connection timed out or failed. Check the address and network.',
                'Enable image input for this model in API connections.',
                'The model returned an incomplete or invalid result. Try a smaller selection.'),
-        'ru': ('Ошибка API. Проверьте подключение: «Перевод и OCR» → «API-подключения».',
-               'Добавьте ключ: «Перевод и OCR» → «API-подключения».',
-               'Укажите модель: «Перевод и OCR» → «API-подключения».',
+        'ru': ('Ошибка API. Проверьте подключение: «Языковые пакеты» → «API».',
+               'Добавьте ключ: «Языковые пакеты» → «API».',
+               'Укажите модель: «Языковые пакеты» → «API».',
                'API-ключ не принят. Проверьте сохранённый ключ.',
                'Достигнут лимит запросов или квота API. Проверьте аккаунт сервиса.',
                'Не удалось подключиться к API. Проверьте адрес и сеть.',
-               'Включите приём изображений для этой модели в «API-подключениях».',
+               'Включите приём изображений для этой модели в «Языковые пакеты → API».',
                'Модель вернула неполный или неверный ответ. Попробуйте выделить меньшую область.'),
-        'es': ('Error de API. Revisa Traducción y OCR → Conexiones API.',
-               'Añade una clave en Traducción y OCR → Conexiones API.', 'Configura el modelo en Conexiones API.',
+        'es': ('Error de API. Revisa Paquetes de idioma → API.',
+               'Añade una clave en Paquetes de idioma → API.', 'Configura el modelo en Conexiones API.',
                'La clave API fue rechazada. Revisa la clave guardada.', 'Se alcanzó la cuota o el límite de API. Revisa tu cuenta.',
                'Falló la conexión API. Revisa la dirección y la red.', 'Activa la entrada de imágenes para este modelo en Conexiones API.',
                'El modelo devolvió un resultado incompleto o incorrecto. Prueba una selección menor.'),
-        'de': ('API-Anfrage fehlgeschlagen. Übersetzung und OCR → API-Verbindungen prüfen.',
+        'de': ('API-Anfrage fehlgeschlagen. Sprachpakete → API prüfen.',
                'API-Schlüssel unter API-Verbindungen hinzufügen.', 'Modell unter API-Verbindungen einstellen.',
                'API-Schlüssel abgelehnt. Gespeicherten Schlüssel prüfen.', 'API-Kontingent oder Anfragelimit erreicht. Dienstkonto prüfen.',
                'API-Verbindung fehlgeschlagen. Adresse und Netzwerk prüfen.', 'Bildeingabe für dieses Modell unter API-Verbindungen aktivieren.',
                'Das Modell lieferte eine unvollständige oder ungültige Antwort. Kleineren Bereich wählen.'),
-        'fr': ('Échec API. Vérifiez Traduction et OCR → Connexions API.',
+        'fr': ('Échec API. Vérifiez Modules de langue → API.',
                'Ajoutez une clé dans Connexions API.', 'Choisissez le modèle dans Connexions API.',
                'Clé API refusée. Vérifiez la clé enregistrée.', 'Quota ou limite API atteint. Vérifiez votre compte.',
                'Échec de connexion API. Vérifiez l’adresse et le réseau.', 'Activez les images pour ce modèle dans Connexions API.',
                'Le modèle a renvoyé un résultat incomplet ou incorrect. Sélectionnez une zone plus petite.'),
-        'zh': ('API 请求失败，请检查“翻译与 OCR”中的“API 连接”。', '请在“API 连接”中添加密钥。',
+        'zh': ('API 请求失败，请检查“语言包”中的“API”。', '请在“API 连接”中添加密钥。',
                '请在“API 连接”中设置模型。', 'API 密钥被拒绝，请检查已保存的密钥。',
                'API 配额或请求频率已达上限，请检查服务账户。', 'API 连接失败，请检查地址和网络。',
                '请在“API 连接”中为此模型启用图像输入。', '模型返回的结果不完整或无效，请选择更小的区域。'),
@@ -190,6 +191,7 @@ def _session():
     return _LOCAL.session
 
 
+@measure('api.request')
 def _post(url, headers, payload, cancel=None):
     from translater import _check_translation_cancelled
     _check_translation_cancelled(cancel)

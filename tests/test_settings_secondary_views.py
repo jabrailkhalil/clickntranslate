@@ -192,7 +192,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings._set_settings_page(1)
             self.app.processEvents()
             controls = (
-                self.settings.selection_quick_translate_checkbox,
+                self.settings.close_result_on_outside_click_checkbox,
                 self.settings.close_result_on_outside_click_checkbox,
             )
             for control in controls:

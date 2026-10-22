@@ -43,20 +43,19 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
         scroll = settings.translation_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
         for control in (settings.ocr_engine_combo, settings.translator_combo,
-                        settings.selection_quick_translate_checkbox,
-                        settings.selection_quick_translate_mode_automatic):
+                        settings.close_result_on_outside_click_checkbox,
+                        settings.copy_notification_checkbox):
             rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
             assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         for flag in (settings.copy_translated_checkbox, settings.restore_clipboard_checkbox,
-                     settings.selection_quick_translate_mode_automatic):
+                     settings.close_result_on_outside_click_checkbox):
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
         settings._set_settings_page(0)
         QApplication.processEvents()
         page = settings.settings_general_page
         for control in (settings.result_window_control, settings.translation_font_control,
                         settings.translation_font_preview, settings.ui_scale_control,
-                        settings.copy_history_checkbox, settings.history_checkbox,
-                        settings.close_result_on_outside_click_checkbox):
+                        settings.copy_history_checkbox, settings.history_checkbox):
             rect = QRect(control.mapTo(page, QPoint()), control.size())
             assert page.rect().contains(rect), (language, scale, control.objectName(), rect)
             assert control.isVisible()
@@ -68,16 +67,15 @@ def test_flags_persist_and_ocr_options_are_reachable(window):
     settings._set_settings_page(1)
     for key, flag in (
         ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
-        ('selection_quick_translate_enabled', settings.selection_quick_translate_checkbox),
+        ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
     ):
         flag.setChecked(False)
         flag.click()
         assert window.config[key] is True
-    settings.selection_quick_translate_mode_automatic.setChecked(True)
-    assert window.config['selection_quick_translate_mode'] == 'automatic'
-    settings.ocr_options_button.click()
     QApplication.processEvents()
     assert settings.keep_visible_checkbox.isVisible()
+    assert not hasattr(settings, 'ocr_options_button')
+    assert not hasattr(settings, 'selection_quick_translate_checkbox')
     settings.translation_settings_scroll.ensureWidgetVisible(settings.copy_notification_checkbox)
     QApplication.processEvents()
     assert not settings.copy_notification_checkbox.visibleRegion().isEmpty()
@@ -126,32 +124,104 @@ def test_active_update_survives_settings_rebuild_and_blocks_duplicate_navigation
 
 
 @pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh'])
-def test_api_editor_fits_and_back_returns_to_translation(window, language):
+def test_api_editor_lives_in_packages_and_fits(window, language):
     from provider_settings import show_provider_settings
     from api_providers import PROVIDERS
     window.set_interface_language(language)
     window.show_settings()
     settings=window.settings_window
-    with mock.patch('provider_secrets.get_key',return_value=''):
+    with mock.patch('provider_secrets.get_key',return_value=''), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'):
         show_provider_settings(settings)
         page=settings.api_connections_page
+        dialog=settings._language_manager_dialog
+        assert dialog.tabs.currentWidget() is dialog.api_section_page
+        assert settings.settings_pages.indexOf(page) == -1
         for spec in PROVIDERS:
             page.service.setCurrentIndex(page.service.findData(spec.key))
             QApplication.processEvents()
             assert page.isVisible()
-            for control in (page.service,page.address,page.key,page.model,page.back,page.save):
+            for control in (page.service,page.address,page.key,page.model,page.usage,page.save,page.use):
                 assert control.isVisible()
+                rect=QRect(control.mapTo(page, QPoint()), control.size())
+                assert page.rect().contains(rect), (language, spec.key, rect)
+            for label in page.labels:
+                assert label.width() >= label.sizeHint().width()
             assert page.key.echoMode() == page.key.Password
-        page.back.click(); QApplication.processEvents()
-        assert settings.settings_pages.currentWidget() is settings.settings_updates_page
+        dialog.close_btn.click(); QApplication.processEvents()
+        assert not dialog.isVisible()
+        assert settings.isVisible()
 
 
 def test_translation_footer_matches_general_button_rows(window):
     window.show_settings()
     settings=window.settings_window
-    assert settings.translation_action_panel.height() == settings.settings_action_panel.height()
-    for button in (settings.ocr_languages_btn,settings.copy_history_btn,settings.translation_history_btn,
-                   settings.api_connections_button,settings.ocr_options_button):
+    for button in (settings.ocr_languages_btn,settings.copy_history_btn,settings.translation_history_btn):
         assert button.height() == settings.clear_cache_btn.height()
         assert button.font().pixelSize() == settings.clear_cache_btn.font().pixelSize()
         assert 'padding:0 6px' in button.styleSheet()
+
+
+def test_api_theme_switch_refreshes_form_and_popups(window):
+    from provider_settings import show_provider_settings
+    window.show_settings()
+    settings=window.settings_window
+    with mock.patch('provider_secrets.get_key',return_value=''), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'):
+        page=show_provider_settings(settings)
+        for theme, field in (('Светлая','#f3eff5'), ('Темная','#17181d'), ('Светлая','#f3eff5')):
+            if window.current_theme != theme:
+                window.toggle_theme()
+            QApplication.processEvents()
+            assert field in page.styleSheet()
+            for combo in (page.service, page.usage):
+                assert ('#f1edf4' if theme == 'Светлая' else '#20212a') in combo.styleSheet()
+        settings._language_manager_dialog.close()
+
+
+def test_saving_and_selecting_uses_one_service_for_text_and_ocr(window):
+    from provider_settings import show_provider_settings
+    window.show_settings()
+    settings=window.settings_window
+    settings._set_settings_page(1)
+    with mock.patch('provider_secrets.get_key',return_value='test-key'), \
+         mock.patch('provider_secrets.set_key',return_value=True), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'), \
+         mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'):
+        page=show_provider_settings(settings, 'gemini')
+        page.model.setText('test-vision-model')
+        page.usage.setCurrentIndex(page.usage.findData('direct'))
+        page.use.click()
+        assert window.config['translator_engine'] == 'gemini'
+        assert window.config['ocr_engine'] == 'Gemini API'
+        assert window.config['api_providers']['gemini']['direct'] is True
+        assert settings.translator_combo.currentData() == 'gemini'
+        assert settings.ocr_engine_combo.currentData() == 'Gemini API'
+        assert not settings.translator_combo.isEnabled()
+        assert settings.provider_routing_note.isVisible()
+        page.usage.setCurrentIndex(page.usage.findData('ocr'))
+        page.save.click()
+        assert settings.translator_combo.isEnabled()
+        assert 'test-key' not in json.dumps(window.config)
+        settings._language_manager_dialog.close()
+
+
+def test_selection_trigger_is_one_choice_inside_existing_mode(window):
+    from main import HotkeyLanguageDialog
+    from selection_options import SelectionTriggerControl
+    with mock.patch.object(window, '_sync_selection_quick_translate') as sync:
+        dialog=HotkeyLanguageDialog(window)
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData('selection'))
+        dialog.show(); QApplication.processEvents()
+        trigger=dialog.selection_trigger
+        assert isinstance(trigger, SelectionTriggerControl) and trigger.isVisible()
+        for mode in ('automatic','button','hotkey'):
+            trigger.combo.setCurrentIndex(trigger.combo.findData(mode))
+            assert window.config['selection_quick_translate_enabled'] == (mode != 'hotkey')
+        assert sync.call_count == 3
+        dialog.mode_combo.setCurrentIndex(dialog.mode_combo.findData('ocr'))
+        QApplication.processEvents()
+        assert not trigger.isVisible()
+        dialog.close()

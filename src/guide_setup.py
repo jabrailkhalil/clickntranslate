@@ -76,11 +76,11 @@ GUIDE_SETTING_STEPS = {
 }
 
 GUIDE_SETUP_CHAPTERS = (
-    ("startup", ("settings", "autostart", "start_minimized", "copy_translated_text", "history", "copy_history")),
-    ("translation", ("ocr_engine", "translator", "result_window", "language_packages")),
-    ("capture", ("settings_page_updates", "keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "update_check_on_launch")),
+    ("startup", ("settings", "autostart", "start_minimized", "history", "copy_history", "update_check_on_launch")),
+    ("translation", ("settings_page_updates", "ocr_engine", "translator", "copy_translated_text", "language_packages", "api_connections")),
+    ("capture", ("keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "result_behavior")),
     ("dynamic", ("settings_page_game", "game_controls", "game_pause_when_inactive")),
-    ("finish", ("settings_page_main", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
+    ("finish", ("settings_page_main", "result_window", "result_text", "selection_behavior", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
 )
 GUIDE_SETUP_ORDER = tuple(action for _chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions)
 GUIDE_CHAPTER_BY_ACTION = {action: chapter for chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions}
@@ -88,42 +88,42 @@ GUIDE_CHAPTER_BY_ACTION = {action: chapter for chapter, actions in GUIDE_SETUP_C
 GUIDE_SETUP_LABELS = {
     "ru": {
         "completed": "Гайд завершён",
-        "startup": "Удобный запуск", "translation": "Перевод", "capture": "Экран и обновления", "dynamic": "Динамический перевод", "finish": "Последние штрихи",
+        "startup": "Удобный запуск", "translation": "Перевод", "capture": "Захват экрана", "dynamic": "Динамический перевод", "finish": "Последние штрихи",
         "enable": "Включить и дальше", "disable": "Выключить и дальше", "next": "Далее", "later": "Позже", "open": "Открыть", "close": "Завершить гайд",
         "ready": "Уже настроено", "recommended": "Рекомендуем включить", "recommended_off": "Рекомендуем выключить", "inspect": "Проверьте настройку и продолжайте",
         "failed": "Настройка не применилась. Попробуйте ещё раз.", "done": "Можно переводить!", "done_body": "Готово полезных настроек: {ready} из {total}. Остальные можно включить позже. Гайд доступен в справке.", "finish_button": "Начать работу",
     },
     "en": {
         "completed": "Guide complete",
-        "startup": "Everyday setup", "translation": "Translation", "capture": "Capture and updates", "dynamic": "Dynamic translation", "finish": "Finishing touches",
+        "startup": "Everyday setup", "translation": "Translation", "capture": "Screen capture", "dynamic": "Dynamic translation", "finish": "Finishing touches",
         "enable": "Enable and next", "disable": "Disable and next", "next": "Next", "later": "Later", "open": "Open", "close": "Close guide",
         "ready": "Already configured", "recommended": "Recommended: on", "recommended_off": "Recommended: off", "inspect": "Check the setting, then continue",
         "failed": "The setting did not apply. Please try again.", "done": "Ready to translate!", "done_body": "{ready} of {total} recommended settings are ready. You can change the rest later and reopen this guide from Help.", "finish_button": "Start using the app",
     },
     "es": {
         "completed": "Guía completada",
-        "startup": "Uso diario", "translation": "Traducción", "capture": "Captura y actualizaciones", "dynamic": "Traducción dinámica", "finish": "Últimos ajustes",
+        "startup": "Uso diario", "translation": "Traducción", "capture": "Captura de pantalla", "dynamic": "Traducción dinámica", "finish": "Últimos ajustes",
         "enable": "Activar y seguir", "disable": "Desactivar y seguir", "next": "Siguiente", "later": "Después", "open": "Abrir", "close": "Cerrar guía",
         "ready": "Ya configurado", "recommended": "Recomendado: activar", "recommended_off": "Recomendado: desactivar", "inspect": "Revisa el ajuste y continúa",
         "failed": "No se aplicó el ajuste. Inténtalo de nuevo.", "done": "¡Todo listo para traducir!", "done_body": "Hay {ready} de {total} ajustes recomendados listos. Puedes cambiar el resto después y abrir la guía desde Ayuda.", "finish_button": "Empezar",
     },
     "de": {
         "completed": "Anleitung abgeschlossen",
-        "startup": "Für den Alltag", "translation": "Übersetzung", "capture": "Aufnahme und Updates", "dynamic": "Dynamische Übersetzung", "finish": "Letzte Schritte",
+        "startup": "Für den Alltag", "translation": "Übersetzung", "capture": "Bildschirmaufnahme", "dynamic": "Dynamische Übersetzung", "finish": "Letzte Schritte",
         "enable": "Aktivieren & weiter", "disable": "Deaktivieren & weiter", "next": "Weiter", "later": "Später", "open": "Öffnen", "close": "Anleitung schließen",
         "ready": "Bereits eingerichtet", "recommended": "Empfehlung: aktivieren", "recommended_off": "Empfehlung: deaktivieren", "inspect": "Einstellung prüfen und fortfahren",
         "failed": "Einstellung nicht übernommen. Bitte erneut versuchen.", "done": "Bereit zum Übersetzen!", "done_body": "{ready} von {total} empfohlenen Einstellungen sind bereit. Den Rest können Sie später ändern. Die Anleitung bleibt in der Hilfe verfügbar.", "finish_button": "Loslegen",
     },
     "fr": {
         "completed": "Guide terminé",
-        "startup": "Au quotidien", "translation": "Traduction", "capture": "Capture et mises à jour", "dynamic": "Traduction dynamique", "finish": "Derniers réglages",
+        "startup": "Au quotidien", "translation": "Traduction", "capture": "Capture d’écran", "dynamic": "Traduction dynamique", "finish": "Derniers réglages",
         "enable": "Activer et continuer", "disable": "Désactiver et continuer", "next": "Suivant", "later": "Plus tard", "open": "Ouvrir", "close": "Fermer le guide",
         "ready": "Déjà configuré", "recommended": "Activation conseillée", "recommended_off": "Désactivation conseillée", "inspect": "Vérifiez le réglage, puis continuez",
         "failed": "Le réglage n’a pas été appliqué. Réessayez.", "done": "Prêt à traduire !", "done_body": "{ready} réglages recommandés sur {total} sont prêts. Les autres peuvent attendre. Le guide reste disponible dans l’aide.", "finish_button": "Commencer",
     },
     "zh": {
         "completed": "引导已完成",
-        "startup": "日常使用", "translation": "翻译设置", "capture": "屏幕与更新", "dynamic": "动态翻译", "finish": "最后几步",
+        "startup": "日常使用", "translation": "翻译设置", "capture": "屏幕捕获", "dynamic": "动态翻译", "finish": "最后几步",
         "enable": "启用并继续", "disable": "关闭并继续", "next": "下一步", "later": "稍后", "open": "打开", "close": "关闭引导",
         "ready": "已设置", "recommended": "建议启用", "recommended_off": "建议关闭", "inspect": "检查设置后继续",
         "failed": "设置未生效，请重试。", "done": "可以开始翻译了！", "done_body": "已完成 {total} 项推荐设置中的 {ready} 项。其余可稍后修改，也可从帮助中重新打开引导。", "finish_button": "开始使用",

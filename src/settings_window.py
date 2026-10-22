@@ -2557,6 +2557,14 @@ SETTINGS_EXPORT_SCHEMA = 1
 def settings_export_payload(config):
     """Return a portable, JSON-only settings document."""
     safe = json.loads(json.dumps(dict(config or {}), ensure_ascii=False))
+    def without_secrets(value):
+        if isinstance(value, dict):
+            return {key: without_secrets(item) for key, item in value.items()
+                    if not re.search(r'(?i)(api[_-]?key|auth[_-]?key|password|secret|credential|access[_-]?token|refresh[_-]?token|authorization|(?:^|[_-])token(?:$|[_-]))', key)}
+        if isinstance(value, list):
+            return [without_secrets(item) for item in value]
+        return value
+    safe = without_secrets(safe)
     if 'api_providers' in safe:
         from api_providers import clean_profiles
         safe['api_providers'] = clean_profiles(safe['api_providers'])
@@ -2593,6 +2601,16 @@ def validated_import_settings(payload, defaults):
             from api_providers import clean_profiles
             accepted[key] = clean_profiles(value)
             continue
+        if key == 'desktop_assistant_position':
+            import math
+            if value is None:
+                accepted[key] = None
+            elif (isinstance(value, dict) and isinstance(value.get('screen', ''), str)
+                  and all(isinstance(value.get(axis), (int, float)) and not isinstance(value.get(axis), bool)
+                          and math.isfinite(value[axis]) for axis in ('x', 'y'))):
+                accepted[key] = dict(screen=value.get('screen', '')[:256],
+                                     x=max(0., min(1., value['x'])), y=max(0., min(1., value['y'])))
+            continue
         valid = False
         if isinstance(default, bool):
             valid = isinstance(value, bool)
@@ -2602,6 +2620,8 @@ def validated_import_settings(payload, defaults):
             valid = isinstance(value, (int, float)) and not isinstance(value, bool)
             if valid:
                 value = float(value)
+                import math
+                valid = math.isfinite(value)
         elif isinstance(default, str):
             valid = isinstance(value, str)
         elif isinstance(default, (tuple, list)):
@@ -3576,6 +3596,7 @@ class OcrLanguageManagerDialog(QDialog):
             drag_widget.installEventFilter(self)
 
         intro = QLabel(language_manager_text(self.lang, "intro"))
+        self.intro_label = intro
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
@@ -3603,6 +3624,11 @@ class OcrLanguageManagerDialog(QDialog):
             self.translation_section_page,
             language_manager_text(self.lang, "translation_section"),
         )
+        self.api_section_page = QWidget(self.tabs)
+        self.api_section_layout = QVBoxLayout(self.api_section_page)
+        self.api_section_layout.setContentsMargins(0, 0, 0, 0)
+        self.api_page = None
+        self.tabs.addTab(self.api_section_page, "API")
         layout.addWidget(self.tabs)
 
         self.windows_table = None
@@ -3749,6 +3775,23 @@ class OcrLanguageManagerDialog(QDialog):
             """ + standard_buttons(self._is_dark_theme(), compact=False))
 
         install_accent_controls(self, dark)
+        if self.api_page is not None:
+            self.api_page.apply_theme()
+
+    def show_api(self, provider=None):
+        if self.api_page is None:
+            from provider_settings import ProviderSettingsPage
+            self.api_page = ProviderSettingsPage(self.owner, self.api_section_page)
+            self.api_section_layout.addWidget(self.api_page)
+        self.tabs.setCurrentWidget(self.api_section_page)
+        self.intro_label.hide()
+        self.refresh_btn.hide()
+        if provider is not None:
+            index = self.api_page.service.findData(provider)
+            if index >= 0:
+                self.api_page.service.setCurrentIndex(index)
+        self.api_page.apply_theme()
+        return self.api_page
 
     def _apply_package_tab_styles(self):
         dark = self._is_dark_theme()
@@ -3903,6 +3946,11 @@ class OcrLanguageManagerDialog(QDialog):
             tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def _on_tab_changed(self, _index):
+        api = self.tabs.currentWidget() is self.api_section_page
+        self.intro_label.setVisible(not api)
+        self.refresh_btn.setVisible(not api)
+        if api and self.api_page is None:
+            self.show_api()
         # A page is laid out when it is first shown, so its table can only be
         # measured after switching to it.
         QtCore.QTimer.singleShot(0, self._snap_visible_table)
@@ -7236,22 +7284,20 @@ class SettingsWindow(QWidget):
         target = Path(path)
         if target.suffix.lower() != ".json":
             target = target.with_suffix(".json")
-        temporary = target.with_name(target.name + ".tmp")
+        temporary = None
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            temporary.write_text(
-                json.dumps(
-                    settings_export_payload(self.parent.config),
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                ) + "\n",
-                encoding="utf-8",
-            )
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                    prefix=target.name+'.', suffix='.tmp', dir=target.parent, delete=False) as output:
+                temporary = Path(output.name)
+                json.dump(settings_export_payload(self.parent.config), output,
+                          ensure_ascii=False, indent=2, sort_keys=True)
+                output.write('\n')
             os.replace(str(temporary), str(target))
         except Exception as error:
             try:
-                temporary.unlink(missing_ok=True)
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
             except OSError:
                 pass
             QMessageBox.warning(
@@ -7278,7 +7324,19 @@ class SettingsWindow(QWidget):
         if not path:
             return None
         try:
-            payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+            with Path(path).open('rb') as source:
+                content = source.read(1024 * 1024 + 1)
+            if len(content) > 1024 * 1024:
+                messages = {
+                    'en': 'This settings file is too large. Choose a ClicknTranslate export.',
+                    'ru': 'Файл настроек слишком большой. Выберите экспорт ClicknTranslate.',
+                    'es': 'El archivo es demasiado grande. Elige una exportación de ClicknTranslate.',
+                    'de': 'Die Einstellungsdatei ist zu groß. Wählen Sie einen ClicknTranslate-Export.',
+                    'fr': 'Ce fichier est trop volumineux. Choisissez un export ClicknTranslate.',
+                    'zh': '设置文件过大，请选择 ClicknTranslate 导出的文件。',
+                }
+                raise ValueError(messages.get(lang, messages['en']))
+            payload = json.loads(content.decode('utf-8-sig'))
             from main import (
                 DEFAULT_CONFIG,
                 merge_config_defaults,
@@ -7311,12 +7369,15 @@ class SettingsWindow(QWidget):
             actual_autostart = self.parent.set_autostart(self.parent.autostart)
             self.parent.autostart = bool(actual_autostart)
             self.parent.config["autostart"] = self.parent.autostart
-            self.parent.save_config()
+            self.parent.save_config(capture_languages=False)
 
             restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
             if callable(restart_hotkeys):
                 restart_hotkeys()
             self.parent.apply_theme()
+            sync_selection = getattr(self.parent, '_sync_selection_quick_translate', None)
+            if callable(sync_selection):
+                sync_selection()
             self.parent.refresh_interface_language_ui()
             self.init_ui()
             self.apply_theme()
@@ -8636,6 +8697,8 @@ class SettingsWindow(QWidget):
             dialog._start_runtime_probe()
             if dialog.argos_table.isVisible():
                 dialog._start_argos_catalog_refresh(False)
+        dialog._apply_style()
+        dialog._apply_package_tab_styles()
         dialog.show()
         if isinstance(engine, str):
             dialog.focus_translation_engine(engine, source, target)
@@ -9009,6 +9072,11 @@ class SettingsWindow(QWidget):
         footer = QHBoxLayout()
         footer.setContentsMargins(2, 0, 2, 0)
         footer.addWidget(remove_label, 1)
+        from selection_options import TEXT as SELECTION_TEXT
+        self.selection_mode_button = QPushButton(SELECTION_TEXT.get(lang, SELECTION_TEXT['en'])[4])
+        self._configure_secondary_button(self.selection_mode_button, 'secondaryBackButton')
+        self.selection_mode_button.clicked.connect(self._show_selection_mode_options)
+        footer.addWidget(self.selection_mode_button)
         footer.addWidget(back_button, 0)
         shell_layout.addLayout(footer)
 
@@ -9016,6 +9084,10 @@ class SettingsWindow(QWidget):
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
+
+    def _show_selection_mode_options(self):
+        self.parent.config['hotkey_language_editor_mode'] = 'selection'
+        self.parent.show_hotkey_language_dialog()
 
     def focus_hotkey_setting(self, config_key):
         """Open the hotkey page and focus the field named by its config key."""
@@ -11198,11 +11270,9 @@ finally {
             ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
             ("reset_btn", "danger", 1, (0, 0, 0, 0)),
             ("update_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("ocr_languages_btn", "secondary", 0, (6, 0, 0, 0)),
-            ("copy_history_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("translation_history_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("api_connections_button", "secondary", 0, (0, 0, 0, 0)),
-            ("ocr_options_button", "secondary", 0, (0, 0, 6, 6)),
+            ("ocr_languages_btn", "secondary", 0, (6, 6, 0, 0)),
+            ("copy_history_btn", "secondary", 0, (0, 0, 6, 0)),
+            ("translation_history_btn", "secondary", 1, (0, 0, 0, 6)),
             ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
             ("export_settings_btn", "secondary", 0, (0, 0, 0, 0)),
             ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
@@ -11264,6 +11334,7 @@ finally {
             QCheckBox:disabled {{
                 color: {disabled_text};
             }}
+            QLabel:disabled {{ color: {disabled_text}; }}
 
             QWidget#assistantOptions QLabel:disabled {{
                 color: {disabled_text};
@@ -11430,6 +11501,10 @@ finally {
                 pass
 
         self._refresh_secondary_view_theme()
+        dialog = getattr(self, '_language_manager_dialog', None)
+        if dialog is not None and not sip.isdeleted(dialog):
+            dialog._apply_style()
+            dialog._apply_package_tab_styles()
         secondary_kind = getattr(self, "_secondary_view_kind", None)
         if secondary_kind == "history":
             try:

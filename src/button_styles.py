@@ -106,8 +106,17 @@ def _install_keyboard_focus_tracking():
         return
 
     class ButtonFocusFilter(QObject):
+        _events = frozenset((
+            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress,
+            QEvent.Leave, QEvent.WindowDeactivate, QEvent.Hide, QEvent.EnabledChange,
+            QEvent.Enter, QEvent.DynamicPropertyChange, QEvent.ToolTip,
+            QEvent.GraphicsSceneHelp, QEvent.FocusIn, QEvent.FocusOut, QEvent.KeyPress,
+        ))
+
         def eventFilter(self, widget, event):
             kind = event.type()
+            if kind not in self._events:
+                return False
             hovered = getattr(app, '_hovered_app_button', lambda: None)()
             if hovered is not None:
                 from PyQt5 import sip
