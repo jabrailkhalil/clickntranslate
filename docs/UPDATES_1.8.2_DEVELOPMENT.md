@@ -1,6 +1,7 @@
-# Settings and updates in 1.8.2 (unreleased)
+# Settings and updates in 1.8.2
 
-This is local development work. No release or upload is part of this change.
+This document describes the desktop update implementation and its validation
+boundaries. Release files are listed in the [1.8.2 download table](RELEASE_1.8.2.md).
 
 ## Settings
 
@@ -89,11 +90,11 @@ kills the actual GUI PID (rather than just its outer runtime) and checks a
 different recovered GUI PID. Mac production signature verification accepts
 the previous certificate and rejects an independently valid ad-hoc signature.
 
-Packaging was stopped when the missing end-to-end validation was identified.
-Earlier 1.8.2 archives predate the Welcome fix and are not final update-tested
-artifacts. Control builds are used only to validate the startup fix in frozen
-code; they are not a release, tag, upload or replacement of the working app.
-The source controller boundary above remains explicit even after those checks.
+Early private 1.8.2 archives predated the Welcome and theme-button fixes and
+were replaced before publication. Runtime packages are built from commit
+`4de4e107797f050cfc5e1d6725252742ab362993`; subsequent documentation commits
+do not change their runtime source. The source-controller boundary above
+remains explicit even after native package checks.
 
 The signed Mac control build and Linux portable control build passed an
 additional 1.8.1 -> 1.8.2 transaction with `--welcome-enabled`: the real new GUI acknowledged readiness and remained

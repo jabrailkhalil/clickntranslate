@@ -10,8 +10,8 @@ authors:
     orcid: "https://orcid.org/0009-0002-2391-692X"
 repository-code: "https://github.com/jabrailkhalil/clickntranslate"
 url: "https://github.com/jabrailkhalil/clickntranslate"
-version: 1.8.1
-date-released: 2026-09-25
+version: 1.8.2
+date-released: 2026-10-22
 license: GPL-3.0-only
 abstract: >-
   Click'n'Translate is a cross-platform desktop application for capturing,

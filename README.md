@@ -1,121 +1,116 @@
-# clickntranslate
+# Click’n’Translate
 
-Free, open-source screen OCR and translation for **Windows, Linux and macOS**. Capture text from apps, images and games, translate selected text, or follow changing text in one or more screen regions.
+**Read what is on your screen. In your language.**
 
-[Website and features](https://translate.clickn.dev/en/) · [Guides](https://clickn.dev/en/guides/) · [All projects](https://clickn.dev/)
+Translate a game, copy text from an image, understand a document, or replace a message with its translation. A free, open-source desktop app for **Windows, macOS and Linux**, with an **Android edition** too.
 
-**English** · [Русский](docs/readme/README.ru.md) · [简体中文](docs/readme/README.zh-CN.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md)
+[![Downloads](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=for-the-badge&label=Downloads&color=8b6bb1)](https://github.com/jabrailkhalil/clickntranslate/releases)
+[![Release](https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=for-the-badge&color=674586)](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+[![Stars](https://img.shields.io/github/stars/jabrailkhalil/clickntranslate?style=for-the-badge&color=8b6bb1)](https://github.com/jabrailkhalil/clickntranslate/stargazers)
+[![License](https://img.shields.io/github/license/jabrailkhalil/clickntranslate?style=for-the-badge&color=674586)](LICENSE)
 
-![Three ways to use Click'n'Translate](docs/images/how-it-works.png)
+**English** · [Русский](docs/readme/README.ru.md) · [Español](docs/readme/README.es.md) · [Deutsch](docs/readme/README.de.md) · [Français](docs/readme/README.fr.md) · [简体中文](docs/readme/README.zh-CN.md) · [Português](docs/readme/README.pt.md) · [Italiano](docs/readme/README.it.md)
 
-## Download 1.8.1
+[Website](https://translate.clickn.dev/en/) · [Setup guide](docs/guides/setup.en.md) · [Telegram](https://t.me/jabrail_digital) · [Report an issue](https://github.com/jabrailkhalil/clickntranslate/issues)
 
-| System | Download | Choose this for |
+![Click’n’Translate 1.8.2 — the actual Windows desktop app](docs/images/desktop-1.8.2.png)
+
+## Download 1.8.2
+
+The desktop packages include Python and the application runtime. You do not need to install Python.
+
+| Platform | Download | Requirements |
 | --- | --- | --- |
-| Windows x64 | [Installer (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-x64-installer.exe) | A regular installation on Windows 10/11, x64. |
-| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-portable-x64.zip) | Running without installation; extract the entire archive. |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-linux-x86_64.AppImage) | A single-file application for Linux x86_64; make it executable before opening. |
-| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-arm64.dmg) | Installing on Apple Silicon (M1 and newer), macOS 13.4 or later. |
-| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-x86_64.dmg) | Installing on an Intel Mac (x86_64), macOS 13.4 or later. |
+| Windows | [Installer](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-portable-x64.zip) | Windows 10/11, x64. Extract the entire portable ZIP. |
+| macOS, Apple Silicon | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-arm64.dmg) · [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-arm64.zip) | macOS 13.4+, M1 or newer |
+| macOS, Intel | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-x86_64.dmg) · [ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-x86_64.zip) | macOS 13.4+, Intel x86_64 |
+| Linux | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) · [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) | Linux x86_64; [setup and shortcuts](docs/LINUX.md) |
+| Android | [Signed APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | Android 8.0+, ARM64; [Android features and guide](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme) |
 
-[All downloads and the signature/checksum archive](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1).
+[All files, checksums and signature bundle](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2). The download badge counts release-file downloads on GitHub, not unique people.
 
-Windows and macOS builds currently use a **self-signed certificate named `jabrailkhalil`**. Windows may show a SmartScreen warning; the Mac app has no Apple Developer ID or notarization, so Gatekeeper may block its first launch. Linux downloads have separate OpenPGP signatures. Choose **Apple Silicon** for M1 and newer chips, or **Intel** for Intel Macs.
+Windows and Mac builds use the existing self-signed **jabrailkhalil** certificate. Windows may show SmartScreen; the Mac app is not Apple-notarized. See the [first-launch guide](docs/guides/setup.en.md) and [signing identities](docs/SIGNING_IDENTITIES.md).
 
-**First launch:** [Windows: SmartScreen and Defender](docs/guides/setup.en.md#windows) · [Mac: opening the app and granting permissions](docs/guides/setup.en.md#macos).
+## Pick the way you work
 
-**Updates:** Windows uses the Update button in the app. On macOS and Linux, download the new DMG/AppImage and replace the application manually; keep your existing user data. [Update checks and limitations](docs/UPDATE_AUDIT_2026-09-25.md).
-
-**Development 1.8.2:** program and translation preferences are separated; updates use an embedded page, with new Mac/Linux portable update paths. Native platform validation is pending. [Scope and checks](docs/UPDATES_1.8.2_DEVELOPMENT.md).
-
-## What is included
-
-- Screen OCR, selected-text translation, full-screen overlays and dynamic translation of multiple regions.
-- Online translation and local OCR; optional offline translation with downloaded language models.
-- Document translation, configurable shortcuts and a desktop companion.
-- Light and dark themes, six interface languages, and separate window preferences for each mode.
-- **1.8.0:** a shared welcome screen, clearer language menus, improved dynamic overlays, Mac permission guidance and thin scrollbars throughout the app.
-
-The document workspace opens `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` and `.rtf` files. You can edit the original and translation side by side, or hide the original for a smaller translation window. Settings import/export and optional local histories are available in Settings.
-
-## See it in action
-
-### Translate game text
-
-![Translate game text](docs/images/translation-demo-v2.gif)
-
-### Copy text from any screen area
-
-![Copy text from any screen area](docs/images/area-ocr-demo-v2.gif)
-
-### Translate selected text in any application
-
-![Translate selected text in any application](docs/images/selected-text-demo-v2.gif)
-
-### Translate the full screen
-
-![Translate the full screen](docs/images/fullscreen-translation-demo-v2.gif)
-
-### Update in one click (Windows)
-
-![Update in one click (Windows)](docs/images/update-demo.gif)
-
-## Desktop companion
-
-Prefer clicking to remembering hotkeys? Click the mascot to open its action menu: translate an area or the full screen, recognize and copy text, open the translator, start Dynamic translation, or translate a document. You can hide the mascot when you do not need it.
-
-| Light theme | Dark theme |
+| When you want to… | Use… |
 | --- | --- |
-| ![Light theme](docs/images/mascot-light.png) | ![Dark theme](docs/images/mascot-dark.png) |
+| Read text you cannot select | **Translate area** — draw a rectangle over an app, image or game |
+| Grab a quote from a screenshot | **Copy text** — recognize an area and copy the text |
+| Translate a passage in another app | **Translate selection** — use your own shortcut and language pair |
+| Write a message in another language | **Replace with translation** — optionally select the whole input first |
+| Follow changing text | **Dynamic translation** — watch multiple regions, with an overlay or separate output |
+| Read a whole screen | **Translate screen** — show translated text over the captured screen |
+| Work with a longer text or file | **Text and document translation** — edit original and result side by side |
 
-## Dynamic translation
+The examples show the desktop edition. Android has its own screen, text, photo and history views.
 
-Select one or more screen regions and choose your languages. Translation follows changes in the selected text, with output over the original or in a separate region.
+### Text in, translation out
 
-Setup example: the purple frame marks the area to read; the green frame marks a separate area for the translation.
+![Live translation in Click’n’Translate 1.8.2](docs/images/translate-text-1.8.2.gif)
 
-<img src="docs/images/dynamic-translation-regions.png" alt="Setup example: the purple frame marks the area to read; the green frame marks a separate area for the translation." width="760">
+Keep the result beside your draft, expand it into a workspace, or copy it. Documents open from `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` and `.rtf`; scanned PDFs require an OCR workflow.
 
-## Default hotkeys
+### Your engines, your settings
 
-| Default hotkey | Action |
+![Translation, OCR and API settings in 1.8.2](docs/images/settings-api-1.8.2.gif)
+
+| Option | Available engines | How it works |
+| --- | --- | --- |
+| Everyday online translation | Google, MyMemory, Lingva, LibreTranslate | Send text to your chosen service |
+| Offline translation | Argos Translate, Hy-MT | Install the required models, then translate locally |
+| Local text recognition | Windows OCR, Apple Vision, Tesseract, RapidOCR, EasyOCR | Native engines depend on your OS; optional engines and languages install separately |
+| Your own API connection | OpenAI, Gemini, Claude, DeepL, LibreTranslate, Custom API | Bring your own key; choose the model and endpoint where supported |
+| Image-aware API translation | OpenAI, Gemini, Claude, compatible vision models | Explicitly enable image input to recognize and translate with one provider |
+
+Open **Settings → Translation and OCR → Language packages**. Install engines and models in **OCR** or **Translators**, and configure keys in **API**. If an offline direction or engine is missing, the app offers installation or an available provider.
+
+**Local OCR keeps images on your device.** Online translation sends text to the selected service; an enabled vision API also receives the selected image. Offline engines keep translation local after model downloads. API services have their own pricing and limits. [Privacy](PRIVACY.md).
+
+### A companion when you need a click
+
+![The current desktop companion and its settings](docs/images/companion-1.8.2.gif)
+
+Choose a character, adjust size and opacity, and click it for translation actions. Reactions follow your actions. Prefer an empty desktop? Hide the companion and keep using shortcuts.
+
+## Make it yours
+
+- **Eight desktop interface languages:** English, Russian, Spanish, German, French, Chinese, Portuguese and Italian, including hints and the in-app guide.
+- **Light or dark**, adjustable interface scale, and a separate result-text size with a live preview.
+- **Separate language pairs** for screen OCR, selection, replacement, full-screen and dynamic translation.
+- **Optional local histories**, settings import/export, and a diagnostic ZIP for troubleshooting.
+- **Optional result dismissal by outside click**, in the translation settings.
+
+### Default desktop shortcuts
+
+| Windows default | Action |
 | --- | --- |
-| `Ctrl + Alt + C` | Extract text from an area and copy it |
-| `Ctrl + Alt + T` | Capture an area, recognize the text, and translate it |
-| `Ctrl + Alt + F` | Translate the entire screen |
-| `Ctrl + Alt + Q` | Translate selected text with the language pair from the main window |
-| `Ctrl + Shift + Q` | Replace selected text with its translation |
-| `Ctrl + Shift + Space` | Show or hide Click'n'Translate |
-| `Ctrl + Alt + G` | Start or stop Dynamic translation for selected screen areas |
+| `Ctrl + Alt + T` | Translate an area |
+| `Ctrl + Alt + C` | Copy text from an area |
+| `Ctrl + Alt + F` | Translate the screen |
+| `Ctrl + Alt + Q` | Translate selected text |
+| `Ctrl + Shift + Q` | Replace with translation |
+| `Ctrl + Alt + G` | Start or stop dynamic translation |
+| `Ctrl + Shift + Space` | Show or hide the app |
 
-Every shortcut can be changed or cleared in **Settings → Configure hotkeys**. Your chosen language pair is remembered separately for OCR, selected text, replacement, full-screen, and Dynamic translation.
+Change or clear bindings in **Settings → Configure hotkeys**. On **Mac**, use Command for Ctrl and Option for Alt. On **Linux**, configure the commands in your desktop environment; behavior depends on X11/Wayland and the compositor. [Linux guide](docs/LINUX.md).
 
-The table shows Windows defaults. On **macOS**, use **Command** in place of Ctrl and **Option** in place of Alt. On **Linux**, bind the corresponding commands in your desktop’s shortcut settings: [Linux guide](docs/LINUX.md).
+## Start in three steps
 
-## Translation and OCR engines
+1. Download your build and open it. On Mac, grant **Screen Recording** and **Accessibility** when the feature requires them. On Android, grant capture and overlay access when starting screen translation.
+2. Choose a translation service and language pair. For offline use, install the selected engine and language direction first.
+3. Type a text, use a shortcut, or click the companion. Reopen the built-in guide from Help whenever you need it.
 
-| Layer | Available engines | Connection | Best for |
-| --- | --- | --- | --- |
-| **Online translation** | Google, MyMemory, Lingva, LibreTranslate | Internet required | Fast everyday translation without model downloads |
-| **Offline translation** | Argos Translate, Hy-MT | Offline after installation | Private translation and unreliable connections |
-| **OCR** | Windows OCR / Apple Vision, Tesseract, RapidOCR, EasyOCR | Local after installation | Different scripts, fonts, layouts, and image quality |
+### Updates
 
-Open **Settings → Language packages** to install or remove OCR engines, recognition languages and offline translation models. Only the packages you choose are downloaded; installed offline engines work without an internet connection. Native OCR uses Windows OCR on Windows or Apple Vision on macOS. Online provider availability depends on the service.
+Desktop 1.8.2 checks GitHub Releases and downloads compatible update files **inside the app**. The update page shows progress; the native helper replaces the application and restarts it. Mac and Linux versions 1.8.1 and earlier need this first upgrade installed manually. Protected installation locations can require manual replacement; Microsoft Store builds update through the Store. [Update behavior and checks](docs/UPDATES_1.8.2_DEVELOPMENT.md).
 
-## Get started
+## Help, source and community
 
-1. Download the file for your system and open the app. The Python runtime is included.
-2. Choose your OCR engine, translation provider and languages in Settings. Download language models if you want offline translation.
-3. Choose a capture or translation action. On Mac, follow the app’s prompts to grant **Screen Recording** and **Accessibility** permissions. On Linux, configure desktop shortcuts using the [Linux guide](docs/LINUX.md).
+Use **Settings → Bug report** and attach the generated ZIP to a [GitHub issue](https://github.com/jabrailkhalil/clickntranslate/issues). The report excludes clipboard contents, documents, histories and credentials.
 
-OCR runs locally. Online translation sends the text to your selected provider; use an offline engine to keep translation local. See [Privacy](PRIVACY.md).
+[First launch](docs/guides/setup.en.md) · [Linux setup](docs/LINUX.md) · [Mac setup and builds](docs/MACOS.md) · [Source layout](docs/REPOSITORY_LAYOUT.md) · [GPL-3.0 license](LICENSE)
 
-## Help and development
+Android development lives in the [`android` branch](https://github.com/jabrailkhalil/clickntranslate/tree/android); desktop development lives in `main`.
 
-[Source layout and developer commands](docs/REPOSITORY_LAYOUT.md).
-
-[Linux setup](docs/LINUX.md) · [macOS setup and builds](docs/MACOS.md) · [Report a problem](https://github.com/jabrailkhalil/clickntranslate/issues) · [License: GPL-3.0](LICENSE)
-
-For a diagnostic report, open **Help → Bug report** in the app and attach the generated ZIP to your issue. It excludes clipboard text, document contents, histories and credentials.
-
-Click’n’Translate is free. If it helps you, please [star the project on GitHub](https://github.com/jabrailkhalil/clickntranslate) and [join us on Telegram](https://t.me/jabrail_digital).
+If Click’n’Translate makes your day easier, [star the project](https://github.com/jabrailkhalil/clickntranslate) or [join us on Telegram](https://t.me/jabrail_digital).

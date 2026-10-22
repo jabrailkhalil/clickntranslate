@@ -1,117 +1,53 @@
-# clickntranslate
+# Click’n’Translate
 
-OCR et traduction d’écran gratuits et open source pour **Windows, Linux et macOS**. Extrayez le texte des applications, images et jeux, traduisez une sélection ou suivez le texte qui change dans plusieurs zones de l’écran.
+**Lisez le texte à l’écran dans votre langue.**
 
-[Site web et fonctionnalités](https://translate.clickn.dev/fr/) · [Tous les projets](https://clickn.dev/fr/)
+Traduisez un jeu, copiez le texte d’une image, lisez un document ou remplacez un message par sa traduction. Une application gratuite et libre pour **Windows, macOS et Linux**, avec une édition **Android** distincte.
 
-[English](../../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [Español](README.es.md) · **Français**
+[![Downloads](https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=for-the-badge&color=8b6bb1)](https://github.com/jabrailkhalil/clickntranslate/releases)
 
-![Trois façons d’utiliser Click'n'Translate](../images/how-it-works.png)
+[English](../../README.md) · [Русский](README.ru.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [简体中文](README.zh-CN.md) · [Português](README.pt.md) · [Italiano](README.it.md)
 
-## Télécharger la version 1.8.1
+![Click’n’Translate 1.8.2](../images/desktop-1.8.2.png)
 
-| Système | Téléchargement | Utilisation |
-| --- | --- | --- |
-| Windows x64 | [Installateur (.exe)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-x64-installer.exe) | Installation classique sur Windows 10/11, x64. |
-| Windows x64 | [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-windows-portable-x64.zip) | Sans installation ; extrayez l’archive entière. |
-| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-linux-x86_64.AppImage) | Application en un fichier pour Linux x86_64 ; autorisez son exécution. |
-| Mac — Apple Silicon | [DMG (M1+)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-arm64.dmg) | Installation sur Apple Silicon (M1 ou plus récent), avec macOS 13.4 ou plus récent. |
-| Mac — Intel | [DMG (Intel)](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.1/Click-n-Translate-1.8.1-macos-x86_64.dmg) | Installation sur Mac Intel (x86_64), avec macOS 13.4 ou plus récent. |
+## Télécharger 1.8.2
 
-[Tous les téléchargements, sommes SHA-256 et signatures](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1).
-
-Les versions Windows et macOS utilisent actuellement un **certificat autosigné nommé `jabrailkhalil`**. Windows peut afficher un avertissement SmartScreen. L’application Mac ne dispose pas encore d’un Developer ID Apple ni de notarisation ; Gatekeeper peut donc bloquer son premier lancement. Des signatures OpenPGP séparées sont disponibles pour Linux. Choisissez **Apple Silicon** pour les puces M1 ou plus récentes, ou **Intel** pour les Mac Intel.
-
-**Premier lancement :** [Windows : SmartScreen et Defender](../guides/setup.fr.md#windows) · [Mac : ouvrir l’app et autoriser les accès](../guides/setup.fr.md#macos).
-
-**Mises à jour :** Windows se met à jour depuis l’application. Sur macOS et Linux, téléchargez le nouveau DMG/AppImage et remplacez l’application manuellement, en conservant vos données.
-
-## Fonctionnalités
-
-- OCR à l’écran, traduction de sélection, superposition plein écran et traduction dynamique de plusieurs zones.
-- Traduction en ligne et OCR local ; traduction hors ligne après téléchargement des modèles linguistiques.
-- Traduction de documents, raccourcis personnalisables et compagnon de bureau.
-- Thèmes clair et sombre, six langues d’interface et préférences de fenêtre propres à chaque mode.
-- **1.8.0 :** accueil commun, menus de langues plus clairs, superpositions dynamiques améliorées, aide aux autorisations Mac et barres de défilement fines dans toute l’application.
-
-L’espace de documents ouvre `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm` et `.rtf`. Modifiez l’original et la traduction côte à côte, ou masquez l’original pour réduire la fenêtre. Les paramètres proposent l’import/export des préférences et des historiques locaux facultatifs.
-
-## Démonstration
-
-### Traduire le texte des jeux
-
-![Traduire le texte des jeux](../images/translation-demo-v2.gif)
-
-### Copier le texte de n’importe quelle zone
-
-![Copier le texte de n’importe quelle zone](../images/area-ocr-demo-v2.gif)
-
-### Traduire une sélection dans une application
-
-![Traduire une sélection dans une application](../images/selected-text-demo-v2.gif)
-
-### Traduire tout l’écran
-
-![Traduire tout l’écran](../images/fullscreen-translation-demo-v2.gif)
-
-### Mettre à jour en un clic (Windows)
-
-![Mettre à jour en un clic (Windows)](../images/update-demo.gif)
-
-## Compagnon de bureau
-
-Vous préférez cliquer plutôt que mémoriser des raccourcis ? Cliquez sur la mascotte pour traduire une zone ou tout l’écran, reconnaître et copier du texte, ouvrir le traducteur, lancer la traduction dynamique ou traduire un document. Vous pouvez la masquer quand vous n’en avez pas besoin.
-
-| Thème clair | Thème sombre |
+| OS | Download |
 | --- | --- |
-| ![Thème clair](../images/mascot-light.png) | ![Thème sombre](../images/mascot-dark.png) |
+| Windows 10/11 x64 | [Installer](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-x64-installer.exe) · [Portable ZIP](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-portable-x64.zip) |
+| macOS 13.4+, Apple Silicon | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-arm64.dmg) |
+| macOS 13.4+, Intel | [DMG](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-macos-x86_64.dmg) |
+| Linux x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) · [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
+| Android 8.0+, ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) |
 
-## Traduction dynamique
+[Checksums / signatures](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2) · [Signing identities](../SIGNING_IDENTITIES.md)
 
-Sélectionnez une ou plusieurs zones de l’écran et les langues. La traduction suit les changements du texte et s’affiche sur l’original ou dans une zone séparée.
+## Du texte au résultat
 
-Exemple de configuration : le cadre violet délimite la zone à lire, le cadre vert une zone séparée pour la traduction.
+![Traduction réelle dans la version 1.8.2](../images/translate-text-1.8.2.gif)
 
-<img src="../images/dynamic-translation-regions.png" alt="Exemple de configuration : le cadre violet délimite la zone à lire, le cadre vert une zone séparée pour la traduction." width="760">
+Traduisez une zone, l’écran entier ou une sélection dans une autre application. Le remplacement peut sélectionner tout le champ avant de coller la traduction. Le mode dynamique suit plusieurs zones. Le lecteur de documents affiche et permet de modifier original et traduction côte à côte.
 
-## Raccourcis clavier
+## Choisissez vos moteurs
 
-| Raccourci par défaut | Action |
-| --- | --- |
-| `Ctrl + Alt + C` | Extraire le texte d'une zone et le copier |
-| `Ctrl + Alt + T` | Capturer une zone, reconnaître le texte et le traduire |
-| `Ctrl + Alt + F` | Traduire l'écran entier |
-| `Ctrl + Alt + Q` | Traduire le texte sélectionné dans l'application active |
-| `Ctrl + Shift + Q` | Remplacer le texte sélectionné par sa traduction |
-| `Ctrl + Shift + Space` | Afficher ou masquer Click'n'Translate |
-| `Ctrl + Alt + G` | Démarrer ou arrêter la traduction dynamique des zones choisies |
+Google, MyMemory, Lingva et LibreTranslate en ligne ; Argos Translate et Hy-MT hors ligne après téléchargement des modèles. OCR local : Windows OCR, Apple Vision, Tesseract, RapidOCR et EasyOCR, selon le système.
 
-Tous les raccourcis peuvent être modifiés ou effacés dans **Paramètres → Configurer les raccourcis**. Les paires de langues sont mémorisées séparément pour l'OCR, la sélection, le remplacement, le plein écran et la traduction dynamique.
+Dans **Settings → Translation and OCR → Language packages → API**, configurez votre clé OpenAI, Gemini, Claude, DeepL, LibreTranslate ou Custom API. Une entrée d’image explicitement activée permet aux modèles de vision compatibles de reconnaître et traduire avec un seul fournisseur.
 
-Le tableau indique les raccourcis Windows. Sur **macOS**, utilisez **Command** à la place de Ctrl et **Option** à la place de Alt. Sur **Linux**, associez les commandes dans les paramètres du bureau : [guide Linux](../LINUX.md).
+![Réglages et API](../images/settings-api-1.8.2.gif)
 
-## Moteurs de traduction et d’OCR
+L’OCR local conserve les images sur l’appareil. Les services en ligne reçoivent le texte ; une API de vision activée reçoit aussi l’image choisie. Les tarifs et limites du fournisseur s’appliquent. [Confidentialité](../../PRIVACY.md).
 
-| Type | Moteurs | Idéal pour |
-| --- | --- | --- |
-| Traduction en ligne | Google, MyMemory, Lingva, LibreTranslate | Traduction rapide sans télécharger de modèle |
-| Traduction hors ligne | Argos Translate, Hy-MT | Traduction privée après l'installation des paquets choisis |
-| OCR | Windows OCR / Apple Vision, Tesseract, RapidOCR, EasyOCR | Extraction de texte pour différents alphabets et types d'images |
+## À votre façon
 
-Dans **Paramètres → Paquets de langues**, installez ou supprimez moteurs OCR, langues et modèles de traduction hors ligne. Seuls les paquets choisis sont téléchargés ; les moteurs locaux installés fonctionnent sans internet. L’OCR natif utilise Windows OCR sur Windows et Apple Vision sur macOS. La disponibilité des traducteurs en ligne dépend du service.
+Huit langues d’interface avec aide et infobulles, thèmes clair et sombre, échelle d’interface et taille du texte distinctes, raccourcis personnalisables, import/export et historiques locaux facultatifs. Cliquez sur le compagnon pour ouvrir les actions, ou masquez-le.
 
-## Premiers pas
+![Compagnons](../images/companion-1.8.2.gif)
 
-1. Téléchargez le fichier adapté à votre système et ouvrez l’application. Python est inclus.
-2. Choisissez le moteur OCR, le service de traduction et les langues dans les paramètres. Téléchargez des modèles pour la traduction hors ligne.
-3. Choisissez une capture ou une traduction. Sur Mac, suivez les indications pour autoriser l’**enregistrement de l’écran** et l’**accessibilité**. Sur Linux, configurez les raccourcis du bureau avec le [guide Linux](../LINUX.md).
+Python est inclus. Windows et Mac utilisent le certificat autosigné jabrailkhalil ; SmartScreen peut apparaître et l’app Mac n’est pas notariée. [Premier lancement](../guides/setup.fr.md). Accordez les autorisations d’enregistrement d’écran et d’accessibilité sur Mac pour les fonctions concernées. [Linux et raccourcis](../LINUX.md).
 
-L’OCR fonctionne localement. La traduction en ligne envoie le texte au service choisi ; utilisez un moteur hors ligne pour une traduction locale. Voir [Confidentialité](../../PRIVACY.md).
+La version de bureau 1.8.2 télécharge les mises à jour GitHub Releases dans l’app. Mac/Linux 1.8.1 et antérieurs nécessitent une première installation manuelle ; certains emplacements protégés exigent un remplacement manuel. Les éditions Microsoft Store passent par Store.
 
-## Aide et développement
+Android propose ses propres vues écran, texte, photos et historique : [guide](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme). Le compteur mesure les téléchargements de fichiers, pas les utilisateurs uniques.
 
-[Linux](../LINUX.md) · [macOS et compilation](../MACOS.md) · [Signaler un problème](https://github.com/jabrailkhalil/clickntranslate/issues) · [Licence GPL-3.0](../../LICENSE)
-
-Pour un diagnostic, ouvrez **Aide → Rapport de bug** et joignez le ZIP créé au signalement. Il exclut le texte du presse-papiers, le contenu des documents, les historiques et les identifiants.
-
-Click’n’Translate est gratuit. S’il vous aide, merci de [mettre une étoile au projet sur GitHub](https://github.com/jabrailkhalil/clickntranslate) et de [nous rejoindre sur Telegram](https://t.me/jabrail_digital).
+[Guide complet en anglais](../../README.md) · [Signaler un problème](https://github.com/jabrailkhalil/clickntranslate/issues) · [Telegram](https://t.me/jabrail_digital) · [GPL-3.0](../../LICENSE)
