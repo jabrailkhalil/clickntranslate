@@ -29,6 +29,7 @@ def owner(app):
     widget.config = dict(main.DEFAULT_CONFIG, show_update_info=True, translator_engine='Lingva')
     widget.current_interface_language = 'ru'
     widget.current_theme = 'Темная'
+    widget._create_main_hotkey_pair = main.DarkThemeApp._create_main_hotkey_pair
     widget.save_config = mock.Mock()
     yield widget
     widget.close()
@@ -182,7 +183,7 @@ def test_followed_or_unknown_provider_never_falls_back_to_online(workspaces):
     assert not jobs
 
 
-def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
+def test_preview_reference_hover_does_not_leave_mouse_focus_highlight(app, owner):
     rail = AssistantPreview(owner, parent=owner)
     rail.motion.reactions = False  # Isolate the focus outline from the optional greeting.
     owner.resize(300, 100)
@@ -197,6 +198,10 @@ def test_preview_has_no_outline_on_hover_or_mouse_focus(app, owner):
     rail.button.setFocus(QtCore.Qt.MouseFocusReason)
     rail.button.setAttribute(QtCore.Qt.WA_UnderMouse, True)
     app.sendEvent(rail.button, QtCore.QEvent(QtCore.QEvent.Enter))
+    assert isinstance(rail.button, main.HotkeyReferenceRow)
+    assert not rail.button.property('keyboardFocus')
+    app.sendEvent(rail.button, QtCore.QEvent(QtCore.QEvent.Leave))
+    rail.button.clearFocus()
     assert rail.button.grab().toImage() == before
     rail.hide()
 

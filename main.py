@@ -4271,11 +4271,48 @@ class _ResultWindowOutsideCloseFilter(QtCore.QObject):
         return False
 
 
+def _open_translation_packages(widget, engine, source='', target=''):
+    """Open the actual installer tab, including from standalone result windows."""
+    from PyQt5 import sip
+    owner = widget
+    while owner is not None and not callable(getattr(owner, 'show_settings', None)):
+        owner = owner.parentWidget()
+    if owner is None:
+        candidates = [_main_window_ref, getattr(widget, '_translation_settings_host', None)]
+        candidates.extend(QApplication.topLevelWidgets())
+        owner = next((candidate for candidate in candidates if candidate is not None
+                      and not sip.isdeleted(candidate) and callable(getattr(candidate, 'show_settings', None))), None)
+    if owner is None:
+        # A standalone OCR result needs settings without another set of global
+        # shortcuts, tray jobs or startup announcements in this process.
+        owner = DarkThemeApp(background_services=False)
+        owner.setAttribute(Qt.WA_DeleteOnClose, True)
+        QApplication.instance()._translation_settings_host = owner
+        widget._translation_settings_host = owner
+    owner.show()
+    owner.show_settings()
+    owner.settings_window.show_ocr_language_manager(engine, source, target)
+    return owner.settings_window._language_manager_dialog
+
+
+def _resolve_translation_provider(widget, engine, source, target, language):
+    from translation_availability import missing_provider, offer_provider_recovery
+    issue = missing_provider(engine, source, target)
+    if issue is None:
+        return engine
+    choice = offer_provider_recovery(widget, issue, TRANSLATION_PROVIDER_OPTIONS, language)
+    if choice == 'install':
+        widget._provider_settings_window = _open_translation_packages(widget, issue.engine, source, target)
+        return None
+    return choice
+
+
 class TranslationResultDialog(QDialog):
     """Editable source and result, with requests bound to an exact input revision."""
 
     _retranslated_signal = QtCore.pyqtSignal(int, str, str)
     _partial_translation_signal = QtCore.pyqtSignal(int, str, int, int)
+    _provider_unavailable_signal = QtCore.pyqtSignal(int, object)
 
     def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная",
                  source_text="", source_lang="", target_lang="", result_mode="main"):
@@ -4439,6 +4476,7 @@ class TranslationResultDialog(QDialog):
         self.status_label = QLabel(self)
         self.status_label.setObjectName("translationResultStatus")
         self.status_label.setTextFormat(Qt.PlainText)
+        self.status_label.linkActivated.connect(self._open_provider_settings)
         self.status_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         layout.addWidget(self.status_label)
 
@@ -4481,6 +4519,7 @@ class TranslationResultDialog(QDialog):
         self.target_combo.currentIndexChanged.connect(self._on_target_changed)
         self._retranslated_signal.connect(self._on_retranslated)
         self._partial_translation_signal.connect(self._on_partial_translation)
+        self._provider_unavailable_signal.connect(self._on_provider_unavailable)
         self.refresh_theme(theme)
         self._reflow_editors()
         self._refresh_scale_caption()
@@ -4735,15 +4774,32 @@ class TranslationResultDialog(QDialog):
         if hasattr(self, "status_label"):
             self._render_status()
 
-    def _set_status(self, message):
+    def _set_status(self, message, provider_issue=None):
+        self._provider_issue = provider_issue
         self._status_message = str(message)
         self._render_status()
 
     def _render_status(self):
+        issue = getattr(self, '_provider_issue', None)
+        if issue is not None:
+            from html import escape
+            from translation_availability import recovery_text
+            self.status_label.setTextFormat(Qt.RichText)
+            label = f'{"Argos" if issue.engine == "argos" else "Hy-MT"}: {recovery_text(self.lang, "install")}'
+            accent = '#c5b3df' if self.theme != 'Светлая' else '#74558f'
+            self.status_label.setText(f'<a href="install" style="color:{accent}">{escape(label)}</a>')
+            self.status_label.setAccessibleDescription(self._status_message)
+            self.status_label.setToolTip(tooltip_text(self._status_message))
+            return
+        self.status_label.setTextFormat(Qt.PlainText)
         line = " ".join(self._status_message.splitlines())
         self.status_label.setText(self.status_label.fontMetrics().elidedText(
             line, Qt.ElideRight, max(1, self.status_label.contentsRect().width())) if self.isVisible() else line)
         self.status_label.setToolTip(tooltip_text(self._status_message))
+
+    def _open_provider_settings(self, *_args):
+        engine = self.engine_combo.currentData() or self.window_engine
+        self._provider_settings_window = _open_translation_packages(self, engine, self.source_code, self.target_code)
 
     def _update_actions(self):
         draft = self.translated_text if getattr(self, '_translate_edited_result', False) and self.translated_text.strip() else self.source_text
@@ -4842,6 +4898,16 @@ class TranslationResultDialog(QDialog):
             self._translate_edited_result = False
         self._remember_language_pair()
         self._update_actions()
+        from translation_availability import missing_provider
+        engine = self.engine_combo.currentData() or self.window_engine
+        issue = missing_provider(engine, self.source_code, self.target_code)
+        if issue is not None:
+            self._set_status(issue.message(self.lang), provider_issue=issue)
+            chosen = _resolve_translation_provider(self, engine, self.source_code, self.target_code, self.lang)
+            if not chosen:
+                return
+            self._engine_override = True
+            self.set_window_engine(provider_display_name(chosen, self.lang))
         if not self.source_text.strip():
             self._set_status(self.text["source_placeholder"])
             return
@@ -4865,6 +4931,13 @@ class TranslationResultDialog(QDialog):
                 result = translate_text(source_text, source_code, target_code,
                                        engine=engine, cancel_callback=cancelled.is_set)
                 error = "" if str(result or "").strip() else error_label
+            except translater.OfflineProviderUnavailable as exc:
+                if not cancelled.is_set():
+                    try:
+                        self._provider_unavailable_signal.emit(request_id, exc.issue)
+                    except RuntimeError:
+                        pass
+                return
             except Exception as exc:
                 result, error = "", f"{error_label}: {exc}"
             if cancelled.is_set():
@@ -4878,6 +4951,24 @@ class TranslationResultDialog(QDialog):
             threading.Thread(target=worker, daemon=True).start()
         except Exception as exc:
             self._on_retranslated(request_id, "", f"{error_label}: {exc}")
+
+    @QtCore.pyqtSlot(int, object)
+    def _on_provider_unavailable(self, request_id, issue):
+        if self._closed or request_id != self._request_id or self._pending_request is None:
+            return
+        self._retranslating = False
+        self._pending_request = None
+        self._cancel_event = None
+        self._update_actions()
+        self._set_status(issue.message(self.lang), provider_issue=issue)
+        from translation_availability import offer_provider_recovery
+        chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.lang)
+        if chosen == 'install':
+            self._open_provider_settings()
+        elif chosen:
+            self._engine_override = True
+            self.set_window_engine(provider_display_name(chosen, self.lang))
+            self._start_retranslate()
 
     @QtCore.pyqtSlot(int, str, int, int)
     def _on_partial_translation(self, request_id, text, done, total):
@@ -5012,9 +5103,13 @@ class TranslationResultDialog(QDialog):
         return False
 
     def _has_owned_popup(self):
+        from PyQt5 import sip
         app = QApplication.instance()
         if app is None:
             return False
+        installer = getattr(self, '_provider_settings_window', None)
+        if installer is not None and not sip.isdeleted(installer) and installer.isVisible():
+            return True
         popup = app.activePopupWidget()
         if popup is not None and popup is not self and self._widget_belongs_to_result_window(popup):
             return True
@@ -6206,6 +6301,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         text = str(text or "").strip()
         if not text or self.translation_running:
             return
+        engine = self._provider_engine()
+        source = self._source_code()
+        target = self.target_combo.currentData() or get_cached_config().get('main_translation_target_language', 'ru')
+        chosen = _resolve_translation_provider(self, engine, source, target, self.lang)
+        if not chosen:
+            return
+        if chosen != engine:
+            self._populate_provider_combo(chosen)
+            self._refresh_document_provider_languages()
         self.translation_running = True
         notify_activity(self.parent_app, 'busy', f'document:{id(self)}')
         self._translation_cancel_event = threading.Event()
@@ -6454,6 +6558,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             selected_index = self.provider_combo.findData("google")
         self.provider_combo.setCurrentIndex(selected_index)
         self.provider_combo.blockSignals(False)
+        self._previous_document_provider = self._provider_engine()
 
     def _provider_engine(self):
         if hasattr(self, "provider_combo"):
@@ -6555,6 +6660,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._update_document_swap_button()
 
     def _on_document_provider_changed(self):
+        engine = self._provider_engine()
+        source = self.source_combo.currentData() or get_cached_config().get('main_translation_source_language', 'en')
+        target = self.target_combo.currentData() or get_cached_config().get('main_translation_target_language', 'ru')
+        chosen = _resolve_translation_provider(self, engine, source, target, self.lang)
+        if not chosen:
+            chosen = getattr(self, '_previous_document_provider', engine)
+        with QtCore.QSignalBlocker(self.provider_combo):
+            self.provider_combo.setCurrentIndex(self.provider_combo.findData(chosen))
+        self._previous_document_provider = chosen
         self._refresh_document_provider_languages()
 
     def _on_document_source_changed(self):
@@ -7090,11 +7204,15 @@ class HotkeyReferenceRow(QPushButton):
                 row._pointer_inside = row is self
                 row.update()
         self._pointer_inside = True
+        from button_styles import set_pointer_hover
+        set_pointer_hover(self, True)
         self.update()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self._pointer_inside = False
+        from button_styles import set_pointer_hover
+        set_pointer_hover(self, False)
         self.update()
         super().leaveEvent(event)
 
@@ -7117,11 +7235,11 @@ class HotkeyReferenceRow(QPushButton):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        from ui_scaling import native_window_parent
+        from ui_scaling import native_window_parent, widget_global_rect
         owner = native_window_parent(self)
         if not owner.isActiveWindow():
             return
-        hovered = self._pointer_inside and self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos()))
+        hovered = bool(self.property('pointerHover')) and widget_global_rect(self).contains(QtGui.QCursor.pos())
         keyboard = self.hasFocus() and bool(self.property('keyboardFocus'))
         if hovered or keyboard:
             painter = QtGui.QPainter(self)
@@ -7388,14 +7506,19 @@ class DarkThemeApp(QMainWindow):
     _main_translation_done_signal = QtCore.pyqtSignal(str)
     _main_translation_error_signal = QtCore.pyqtSignal(str)
     _main_translation_partial_signal = QtCore.pyqtSignal(str, int, int)
+    _main_provider_unavailable_signal = QtCore.pyqtSignal(int, object)
     _argos_translation_cancelled_signal = QtCore.pyqtSignal()
     _launch_update_signal = QtCore.pyqtSignal(str)
     _copy_notification_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, *, background_services=True):
         from ui_scaling import configure_interface_style
         configure_interface_style()
         super().__init__()
+        self._background_services = bool(background_services)
+        if not self._background_services:
+            self.tray_available = False
+        services = self._background_services and not LAYOUT_EDITOR_MODE
         self._launch_update_signal.connect(self._on_launch_update_found)
         self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
@@ -7404,8 +7527,10 @@ class DarkThemeApp(QMainWindow):
         self._main_translation_done_signal.connect(self._on_main_translation_done)
         self._main_translation_error_signal.connect(self._on_main_translation_error)
         self._main_translation_partial_signal.connect(self._on_main_translation_partial)
+        self._main_provider_unavailable_signal.connect(self._on_main_provider_unavailable)
         self._argos_translation_cancelled_signal.connect(self._on_argos_translation_cancelled)
         self._main_translation_running = False
+        self._main_provider_request_id = 0
         self._argos_install_required = False
         self._argos_cancel_enabled = False
         self._argos_active_pair = ""
@@ -7434,7 +7559,7 @@ class DarkThemeApp(QMainWindow):
 
         # Показать приветственное окно, если не отключено
         welcome_was_due = bool(
-            self.config.get("show_update_info", True) and not LAYOUT_EDITOR_MODE
+            self.config.get("show_update_info", True) and services
         )
         if welcome_was_due:
             dlg = WelcomeDialog(self)
@@ -7496,7 +7621,7 @@ class DarkThemeApp(QMainWindow):
 
         self._ui_scale_controller.set_percent(self.config.get("ui_scale_percent", DEFAULT_SCALE))
 
-        if not LAYOUT_EDITOR_MODE:
+        if services:
             self.create_tray_icon()
             self._sync_desktop_assistant()
             self._sync_selection_quick_translate()
@@ -7510,13 +7635,13 @@ class DarkThemeApp(QMainWindow):
                     force=True,
                 ),
             )
-        if not welcome_was_due and not LAYOUT_EDITOR_MODE:
+        if not welcome_was_due and services:
             QTimer.singleShot(350, self._maybe_show_startup_news)
-        if not LAYOUT_EDITOR_MODE:
+        if services:
             QTimer.singleShot(700, self._maybe_start_first_run_guide)
         # Late enough that it never competes with start-up for the network or
         # the user's attention, and after the first-run guide has had its turn.
-        if not LAYOUT_EDITOR_MODE:
+        if services:
             QTimer.singleShot(9000, self._maybe_check_updates_on_launch)
 
         # Подписка на события хоткеев из потоков
@@ -7524,7 +7649,7 @@ class DarkThemeApp(QMainWindow):
             hotkey_dispatcher.triggered.connect(self._invoke_callback_safely)
         except Exception:
             pass
-        if getattr(self, "_autostart_sync_pending", False) and not LAYOUT_EDITOR_MODE:
+        if getattr(self, "_autostart_sync_pending", False) and services:
             QTimer.singleShot(0, self._start_deferred_autostart_sync)
 
         # Подписка на ошибки регистрации хоткеев
@@ -7539,14 +7664,14 @@ class DarkThemeApp(QMainWindow):
         # команды (clickntranslate --ocr и т.д.) в настройках своей среды —
         # см. single_instance.py.
         copy_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("copy_hotkey", "")
         )
         if copy_hotkey:
             self.copy_hotkey_thread = HotkeyListenerThread(copy_hotkey, self.launch_copy, hotkey_id=1)
             self.copy_hotkey_thread.start()
         translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_hotkey", "")
         )
         if translate_hotkey:
@@ -7554,7 +7679,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_hotkey_thread.start()
 
         fullscreen_translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("fullscreen_translate_hotkey", "")
         )
         if fullscreen_translate_hotkey:
@@ -7562,7 +7687,7 @@ class DarkThemeApp(QMainWindow):
             self.fullscreen_translate_hotkey_thread.start()
 
         translate_selection_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_selection_hotkey", "")
         )
         if translate_selection_hotkey:
@@ -7570,7 +7695,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_selection_hotkey_thread.start()
 
         translate_replace_selection_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_replace_selection_hotkey", "")
         )
         if translate_replace_selection_hotkey:
@@ -7582,7 +7707,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_replace_selection_hotkey_thread.start()
 
         toggle_window_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("toggle_window_hotkey", "")
         )
         if toggle_window_hotkey:
@@ -7594,7 +7719,7 @@ class DarkThemeApp(QMainWindow):
             self.toggle_window_hotkey_thread.start()
 
         game_translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("game_translate_hotkey", "")
         )
         if game_translate_hotkey:
@@ -7646,7 +7771,10 @@ class DarkThemeApp(QMainWindow):
         self._autostart_sync_pending = bool(
             platform_support.IS_WINDOWS and not portable_paths.is_windows_packaged()
         )
-        if self._autostart_sync_pending:
+        if not getattr(self, '_background_services', True):
+            self._autostart_sync_pending = False
+            self.autostart = bool(stored_autostart)
+        elif self._autostart_sync_pending:
             # Reading a .lnk through WScript.Shell starts PowerShell.  Use the
             # persisted value for first paint and verify/repair the real
             # shortcut immediately afterwards without blocking the GUI.
@@ -10427,6 +10555,7 @@ class DarkThemeApp(QMainWindow):
             sequence = QtGui.QKeySequence(sequence).toString(QtGui.QKeySequence.NativeText)
         pair = HotkeyReferenceRow()
         pair.setObjectName("mainHotkeyPair")
+        pair.setStyleSheet('QPushButton#mainHotkeyPair { background:transparent; border:0; padding:0; }')
         pair.setAccessibleName(f"{caption}: {sequence}")
         layout = QHBoxLayout(pair)
         # QFontMetrics.horizontalAdvance excludes a glyph's anti-aliased edge
@@ -10521,7 +10650,11 @@ class DarkThemeApp(QMainWindow):
                 """)
             except RuntimeError:
                 area = None
-        for pair in getattr(self, "main_hotkey_references", {}).values():
+        pairs = list(getattr(self, "main_hotkey_references", {}).values())
+        preview = getattr(self, 'assistant_preview', None)
+        if preview is not None:
+            pairs.append(preview.button)
+        for pair in pairs:
             try:
                 pair.setStyleSheet(f"""
                     QPushButton#mainHotkeyPair {{ background:transparent; border:none;
@@ -11179,6 +11312,7 @@ class DarkThemeApp(QMainWindow):
         self.assistant_preview.settings_requested.connect(self._offer_mascot_settings)
         self.assistant_preview.dismiss_requested.connect(lambda: self.set_main_assistant_visible(False))
         preview_slot = slot_order.index(None)
+        self.assistant_preview.button.setProperty('lastShortcutRow', preview_slot // 2 == 3)
         hotkey_grid.addWidget(self.assistant_preview, preview_slot // 2, preview_slot % 2)
         self.assistant_preview.setVisible(self.config.get('main_assistant_visible', True) is True)
         for slot, key in enumerate(slot_order):
@@ -11716,6 +11850,10 @@ class DarkThemeApp(QMainWindow):
             self.minimize_to_tray()
             # Опционально: показать уведомление при первом сворачивании (можно добавить позже)
             return
+        if not getattr(self, '_background_services', True):
+            self.save_config()
+            super().closeEvent(event)
+            return
         if not self.force_quit and not self.has_tray():
             # Без трея прятать окно некуда: закрытие означает выход, иначе
             # процесс остался бы работать без единого способа его вернуть.
@@ -11798,13 +11936,31 @@ class DarkThemeApp(QMainWindow):
         # Return from the Qt callback so exec_() can finish the normal cleanup.
 
     def _confirm_argos_package_install(self, pair_label):
-        dialog = ArgosPackageInstallDialog(
-            self,
-            pair_label,
-            lang=self.current_interface_language,
-            theme=self.current_theme,
-        )
-        return dialog.exec_() == QDialog.Accepted
+        from translation_availability import MissingProvider, offer_provider_recovery
+        source, target = (part.strip().lower() for part in pair_label.split('→'))
+        choice = offer_provider_recovery(self, MissingProvider('argos', source, target),
+                                         TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language,
+                                         allow_download=True)
+        if choice == 'download':
+            return True
+        if choice == 'install':
+            _open_translation_packages(self, 'argos', source, target)
+        elif choice:
+            self._set_translation_provider(choice)
+            self.translate_input_text()
+        return False
+
+    def _set_translation_provider(self, engine):
+        self.config['translator_engine'] = engine
+        self.save_config()
+        invalidate_config_cache()
+        panel = getattr(self, 'main_engine_status_panel', None)
+        summary = panel.findChild(QLabel, 'mainTranslatorSummary') if panel is not None else None
+        if summary is not None:
+            summary.setText(f'{ui_text(self.current_interface_language, "translator")}: {provider_display_name(engine, self.current_interface_language)}')
+        settings = getattr(self, '_cached_settings_window', None)
+        if settings is not None:
+            settings._set_translator_combo_silently(engine)
 
     def _show_argos_progress(self, text, percent=0, determinate=False):
         if self._argos_progress is None:
@@ -11956,9 +12112,18 @@ class DarkThemeApp(QMainWindow):
     def _start_main_translation(self, text, source_code, target_code, engine, package_installed=True):
         if self._main_translation_running:
             return
+        if engine != 'argos':
+            chosen = _resolve_translation_provider(self, engine, source_code, target_code, self.current_interface_language)
+            if not chosen:
+                return
+            if chosen != engine:
+                self._set_translation_provider(chosen)
+                engine = chosen
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
 
         self._main_translation_running = True
+        self._main_provider_request_id = getattr(self, '_main_provider_request_id', 0) + 1
+        provider_request_id = self._main_provider_request_id
         notify_activity(self, 'busy')
         self._argos_install_required = not package_installed
         self._argos_cancel_enabled = not package_installed
@@ -11994,6 +12159,8 @@ class DarkThemeApp(QMainWindow):
                 self._main_translation_done_signal.emit(str(translated_text or ""))
             except (translater.ArgosInstallCancelledError, translater.TranslationCancelledError):
                 self._argos_translation_cancelled_signal.emit()
+            except translater.OfflineProviderUnavailable as exc:
+                self._main_provider_unavailable_signal.emit(provider_request_id, exc.issue)
             except Exception as exc:
                 logging.getLogger("clickntranslate.translation").exception(
                     "%s translation failed for %s", engine, pair_label
@@ -12030,6 +12197,19 @@ class DarkThemeApp(QMainWindow):
             source_lang=source_code,
             target_lang=target_code,
         )
+
+    @QtCore.pyqtSlot(int, object)
+    def _on_main_provider_unavailable(self, request_id, issue):
+        if not self._main_translation_running or request_id != self._main_provider_request_id:
+            return
+        self._finish_main_translation_state(error=issue.message(self.current_interface_language))
+        from translation_availability import offer_provider_recovery
+        chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language)
+        if chosen == 'install':
+            _open_translation_packages(self, issue.engine, issue.source, issue.target)
+        elif chosen:
+            self._set_translation_provider(chosen)
+            self.translate_input_text()
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_error(self, error_text):

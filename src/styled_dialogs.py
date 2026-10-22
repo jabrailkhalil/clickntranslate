@@ -1320,6 +1320,7 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
         outer.addWidget(self.title_bar)
 
         body = QtWidgets.QVBoxLayout()
+        self.body_layout = body
         body.setContentsMargins(20, 18, 20, 16)
         body.setSpacing(12)
         outer.addLayout(body)

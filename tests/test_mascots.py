@@ -1,8 +1,9 @@
 """Asset, selection and capture lifecycle checks for the six companions."""
 from pathlib import Path
+from unittest import mock
 
 import pytest
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QTest
 
 from assistant_art import MASCOTS, DEFAULT_MASCOT, APPEARANCES, companion_art, walking_art_path
@@ -11,6 +12,7 @@ from assistant_text import assistant_text
 from assistant_settings import assistant_preferences
 from test_desktop_ux import app, window
 import mode_coordinator
+import main
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)
@@ -205,7 +207,11 @@ def test_selected_main_character_opens_settings_without_a_desktop_menu(window, a
         app.processEvents()
         rail = window.assistant_preview
         assert tuple(rail.buttons) == (mascot,)
-        rail.buttons[mascot].click()
+        def choose_settings(box):
+            next(button for button in box.findChildren(QtWidgets.QPushButton)
+                 if box.buttonRole(button) == main.QMessageBox.AcceptRole).click()
+        with mock.patch.object(main.QMessageBox, 'exec_', choose_settings):
+            rail.buttons[mascot].click()
         app.processEvents()
         assert window.settings_window.settings_assistant_page.isVisible()
         assert helper.menu is None

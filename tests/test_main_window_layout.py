@@ -802,18 +802,19 @@ class MainWindowGeometryTest(unittest.TestCase):
                 index,
             )
 
-    def test_the_shortcut_legend_keeps_seven_actions_in_two_columns(self):
+    def test_the_shortcut_legend_keeps_seven_actions_and_mascot_in_two_columns(self):
         """Every action is visible in four aligned rows, without card frames."""
         chips = self.window.ui_root.findChildren(QWidget, "mainHotkeyPair")
-        # All seven registered actions are listed, including Gaming.
-        self.assertEqual(len(chips), 7)
+        # The seven shortcuts and the mascot use the same row component.
+        self.assertEqual(len(chips), 8)
         self.assertTrue(all(chip.toolTip() for chip in chips))
         self.assertIn(self.window.replace_hotkey_reference, chips)
         self.assertEqual(
             set(self.window.main_hotkey_references),
             {"copy", "ocr", "fullscreen", "game", "selection", "replace", "toggle"},
         )
-        self.assertEqual(set(self.window.main_hotkey_references.values()), set(chips))
+        self.assertEqual(set(self.window.main_hotkey_references.values()),
+                         set(chips) - {self.window.assistant_preview.button})
         rows = {chip.mapTo(self.window.ui_root, chip.rect().topLeft()).y() for chip in chips}
         self.assertEqual(len(rows), 4)
         refs = self.window.main_hotkey_references

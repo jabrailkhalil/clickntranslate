@@ -4182,6 +4182,31 @@ class OcrLanguageManagerDialog(QDialog):
                 )
             )
 
+    def focus_translation_engine(self, engine, source='', target=''):
+        engine = str(engine).lower().replace('hy-mt', 'hymt')
+        table = self.hymt_table if engine == 'hymt' else self.argos_table
+        self.tabs.setCurrentWidget(self.translation_section_page)
+        self.translation_tabs.setCurrentWidget(table.parentWidget())
+        if engine == 'argos':
+            search = getattr(table, '_package_filter_edit', None)
+            if search is not None:
+                search.clear()
+            self._requested_argos_pair = (str(source), str(target))
+            self._focus_requested_argos_pair()
+
+    def _focus_requested_argos_pair(self):
+        pair = getattr(self, '_requested_argos_pair', None)
+        if not pair or not all(pair):
+            return
+        table = self.argos_table
+        direct = f'{pair[0]}->{pair[1]}'
+        for row in range(table.rowCount()):
+            item = table.item(row, 0)
+            if item is not None and item.data(Qt.UserRole) == direct:
+                table.selectRow(row)
+                table.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+                return
+
     def refresh_all(self):
         if self.windows_table is not None:
             self._populate_windows_table(self.windows_table)
@@ -4875,6 +4900,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_error = str(error or "")
         if self.argos_table is not None:
             self._populate_argos_table(self.argos_table)
+            self._focus_requested_argos_pair()
 
     def _selected_codes(self, table):
         codes = []
@@ -8550,7 +8576,7 @@ class SettingsWindow(QWidget):
         button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
         button.setAccessibleDescription(detail or help_text)
 
-    def show_ocr_language_manager(self):
+    def show_ocr_language_manager(self, engine=None, source='', target=''):
         # Completion is an unread badge until the user follows it. Opening the
         # package manager acknowledges it; ongoing and failed work remains
         # visible until it is actually resolved.
@@ -8586,6 +8612,8 @@ class SettingsWindow(QWidget):
             if dialog.argos_table.isVisible():
                 dialog._start_argos_catalog_refresh(False)
         dialog.show()
+        if isinstance(engine, str):
+            dialog.focus_translation_engine(engine, source, target)
         dialog.raise_()
         dialog.activateWindow()
 
@@ -12103,44 +12131,23 @@ finally {
             value = "google"
         if not value:
             return
-        if value != HYMT_ENGINE_KEY:
-            self.auto_save_setting("translator_engine", value)
-            return
-
-        self.previous_translator_engine = self.parent.config.get("translator_engine", "Google").lower()
-        if self._hymt_installed():
-            self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
-            return
-
         lang = self.parent.current_interface_language
-        if platform_support.IS_LINUX:
-            # The pinned llama.cpp archive is the Windows build, so instead of
-            # downloading something that cannot run, explain how to supply a
-            # local runner. Hy-MT still works once one is in place.
-            self._show_manual_hymt_hint(lang)
-            fallback = self.previous_translator_engine or "google"
-            self._set_translator_combo_silently(fallback)
-            self.auto_save_setting("translator_engine", fallback)
-            return
-
-        msg = QMessageBox(self)
-        msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
-        msg.setText(engine_text(lang, "hymt_prompt"))
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
-        yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
-        msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
-        msg.exec_()
-        if msg.clickedButton() == yes_btn:
-            if platform_support.IS_MAC:
-                self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
-            self.start_hymt_install()
-            return
-
-        fallback = self.previous_translator_engine or "google"
-        self._set_translator_combo_silently(fallback)
-        self.auto_save_setting("translator_engine", fallback)
+        if value in {'argos', HYMT_ENGINE_KEY}:
+            from translation_availability import missing_provider, offer_provider_recovery
+            previous = str(self.parent.config.get('translator_engine', 'google')).lower()
+            source = str(self.parent.config.get('main_translation_source_language', 'en'))
+            target = str(self.parent.config.get('main_translation_target_language', 'ru'))
+            issue = missing_provider(value, source, target)
+            if issue is not None:
+                choice = offer_provider_recovery(self, issue, TRANSLATOR_ENGINE_OPTIONS, lang)
+                if choice in (None, 'install'):
+                    self._set_translator_combo_silently(previous)
+                    if choice == 'install':
+                        self.show_ocr_language_manager(value, source, target)
+                    return
+                value = choice
+                self._set_translator_combo_silently(value)
+        self.auto_save_setting('translator_engine', value)
 
     def start_download_thread(self):
         self.start_tesseract_install()
@@ -13244,6 +13251,9 @@ finally {
         )
 
     def start_hymt_install(self, progress_owner=None):
+        if platform_support.IS_LINUX:
+            self._show_manual_hymt_hint(self.parent.current_interface_language)
+            return
         if (
             self._hymt_install_in_progress
             or self._tesseract_install_in_progress

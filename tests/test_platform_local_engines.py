@@ -63,13 +63,14 @@ class HymtInstallPolicyTest(unittest.TestCase):
         # The guard must come before the pinned Windows archive is returned.
         self.assertLess(body.index("IS_WINDOWS"), body.index("HYMT_RUNTIME_URL_WIN64"))
 
-    def test_engine_selection_explains_manual_setup_off_windows(self):
-        source = (ROOT / "src/settings_window.py").read_text(encoding="utf-8")
-        handler_at = source.index("def _on_translator_changed")
-        body = source[handler_at:handler_at + 1500]
-
-        self.assertIn("_show_manual_hymt_hint", body)
-        self.assertLess(body.index("_show_manual_hymt_hint"), body.index("hymt_prompt"))
+    def test_linux_install_explains_manual_setup_before_starting_downloads(self):
+        from settings_window import SettingsWindow
+        from types import SimpleNamespace
+        owner = SimpleNamespace(parent=SimpleNamespace(current_interface_language='ru'),
+                                _show_manual_hymt_hint=mock.Mock())
+        with mock.patch.object(platform_support, 'IS_LINUX', True):
+            SettingsWindow.start_hymt_install(owner)
+        owner._show_manual_hymt_hint.assert_called_once_with('ru')
 
 
 if __name__ == "__main__":

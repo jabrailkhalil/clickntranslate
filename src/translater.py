@@ -13,6 +13,7 @@ import zlib
 import hashlib
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
+from translation_availability import OfflineProviderUnavailable
 import platform_support
 import portable_paths
 
@@ -343,7 +344,8 @@ def _get_hymt_runtime():
 
 def hymt_installed():
     runtime = _get_hymt_runtime()
-    return bool(runtime.get("model") and runtime.get("runner"))
+    return bool(runtime.get('model') and runtime.get('runner')
+                and os.path.isfile(runtime['model']) and os.path.isfile(runtime['runner']))
 
 
 _HYMT_CHINESE_LANGUAGE_NAMES = {
@@ -446,8 +448,8 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
     runtime = _get_hymt_runtime()
     model_path = runtime.get("model")
     runner_path = runtime.get("runner")
-    if not model_path or not runner_path:
-        raise RuntimeError(
+    if not model_path or not runner_path or not os.path.isfile(model_path) or not os.path.isfile(runner_path):
+        raise OfflineProviderUnavailable('hymt', source_code, target_code,
             "Hy-MT не установлен. Установите пакет Hy-MT в настройках переводчика."
         )
 
@@ -1486,7 +1488,8 @@ def translate_text(
 
     if engine == "argos":
         if not argos_runtime_available():
-            raise Exception(argos_unavailable_reason())
+            raise OfflineProviderUnavailable('argos', source_code, target_code,
+                                             argos_unavailable_reason(), component='runtime')
         # Packages are large, so only download them when the caller provides the
         # dedicated byte-progress flow. A status-only callback (used by document
         # translation) must never trigger an unconfirmed background download.
@@ -1502,7 +1505,7 @@ def translate_text(
         )
         if argos_result:
             return _cache_and_return(argos_result)
-        raise Exception(
+        raise OfflineProviderUnavailable('argos', source_code, target_code,
             f"Argos offline translation package is not installed for {source_code}->{target_code}. "
             "Install the required direction in Settings > Language packages > Argos."
         )

@@ -27,6 +27,8 @@ def test_window_selection_reaches_exact_backend(workspaces, owner, monkeypatch, 
         calls[name] = mock.Mock(return_value='Result from ' + provider_key)
         monkeypatch.setattr(translater, name, calls[name])
     monkeypatch.setattr(translater, 'argos_runtime_available', lambda: True)
+    monkeypatch.setattr(translater, 'argos_installed_translation_pairs_fast', lambda: {('en', 'ru'), ('ru', 'en')})
+    monkeypatch.setattr(translater, 'hymt_installed', lambda: True)
     dialog, _, jobs = workspaces
     dialog.engine_combo.setCurrentIndex(dialog.engine_combo.findData(key))
     if not jobs:  # The initial provider is already selected.

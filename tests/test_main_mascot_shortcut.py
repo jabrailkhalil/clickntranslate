@@ -17,8 +17,13 @@ def test_mascot_caption_and_real_prompt_navigate_only_after_accepting(window, ap
     app.processEvents()
     preview = window.assistant_preview
     button = preview.button
-    assert button.text() == assistant_text(language, 'companion_section')
-    assert button.fontMetrics().horizontalAdvance(button.text()) <= button.width() - 33
+    assert isinstance(button, main.HotkeyReferenceRow)
+    assert button.caption_label.text() == assistant_text(language, 'companion_section')
+    assert button.caption_label.x() < button.value_label.x()
+    assert button.value_label.pixmap() is not None
+    assert button.caption_label.sizeHint().width() <= button.caption_label.width()
+    reference = window.main_hotkey_references['game']
+    assert button.caption_label.styleSheet() == reference.caption_label.styleSheet()
     window.text_input.setPlainText('Unsent draft')
     observed = {}
     original_exec = main.QMessageBox.exec_

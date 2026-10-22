@@ -152,15 +152,15 @@ class ArgosProgressUiTest(unittest.TestCase):
         main.QTimer.singleShot(0, cancel_dialog.cancel_button.click)
         self.assertEqual(cancel_dialog.exec_(), main.QDialog.Rejected)
 
-    def test_package_confirmation_uses_custom_dialog(self):
+    def test_package_confirmation_can_download_without_changing_provider(self):
         dummy = SimpleNamespace(current_interface_language="ru", current_theme="Темная")
-        custom_dialog = mock.Mock()
-        custom_dialog.exec_.return_value = main.QDialog.Accepted
-        with mock.patch.object(main, "ArgosPackageInstallDialog", return_value=custom_dialog) as dialog_class:
+        with mock.patch('translation_availability.offer_provider_recovery', return_value='download') as prompt:
             accepted = main.DarkThemeApp._confirm_argos_package_install(dummy, "RU→IT")
 
         self.assertTrue(accepted)
-        dialog_class.assert_called_once_with(dummy, "RU→IT", lang="ru", theme="Темная")
+        self.assertEqual(prompt.call_args.args[1].source, 'ru')
+        self.assertEqual(prompt.call_args.args[1].target, 'it')
+        self.assertTrue(prompt.call_args.kwargs['allow_download'])
 
     def test_translation_error_dialog_is_themed_localized_and_keeps_details_visible(self):
         for index, lang in enumerate(main.ARGOS_ERROR_DIALOG_TEXT):

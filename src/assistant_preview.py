@@ -12,33 +12,6 @@ def preview_art(mascot):
     return QtGui.QPixmap(art_path(f'{mascot_id(mascot)}/preview.png'))
 
 
-class _PreviewButton(QtWidgets.QAbstractButton):
-    def __init__(self, rail):
-        super().__init__(rail)
-        self.rail = rail
-        self.setMinimumWidth(28)
-        self.setFixedHeight(22)
-        self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setFocusPolicy(QtCore.Qt.StrongFocus)
-        self.clicked.connect(rail.settings_requested)
-
-    def paintEvent(self, event):
-        art = self.rail.art
-        if art is None:
-            return
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
-        size = QtCore.QSizeF(art.size()).scaled(22, 22, QtCore.Qt.KeepAspectRatio)
-        painter.drawPixmap(QtCore.QRectF(3, (22-size.height())/2, size.width(), size.height()),
-                           art, QtCore.QRectF(art.rect()))
-        font = QtGui.QFont(self.font())
-        font.setPixelSize(13)
-        painter.setFont(font)
-        painter.setPen(QtGui.QColor('#99919f' if self.rail._owner.current_theme != 'Светлая' else '#71647b'))
-        painter.drawText(QtCore.QRect(33, 0, max(0, self.width()-33), 22), QtCore.Qt.AlignVCenter,
-                         self.text())
-
-
 class AssistantPreview(QtWidgets.QWidget):
     settings_requested = QtCore.pyqtSignal()
     dismiss_requested = QtCore.pyqtSignal()
@@ -51,9 +24,13 @@ class AssistantPreview(QtWidgets.QWidget):
         self._owner, self.language = activity_owner, language
         self._choice_dialog = None
         self.art = None
-        self.button = _PreviewButton(self)
+        self.button = activity_owner._create_main_hotkey_pair(
+            assistant_text(language, 'companion_section'), '', compact=True)
+        self.button.setMinimumWidth(0)
+        self.button.value_label.setFixedWidth(28)
+        self.button.clicked.connect(self.settings_requested)
         row = QtWidgets.QHBoxLayout(self)
-        row.setContentsMargins(6, 0, 0, 0)
+        row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self.button)
         # Retain the shared activity API without a repaint timer or atlas decode.
         self.timer = QtCore.QTimer(self)
@@ -70,11 +47,18 @@ class AssistantPreview(QtWidgets.QWidget):
         self.set_reactions(getattr(self._owner, 'config', {}).get('desktop_assistant_reactions', True) is True)
         self.set_activity(getattr(self._owner, '_companion_activity', 'idle'))
         hint = assistant_text(self.language, self.mascot) + ' — ' + assistant_text(self.language, 'companion_settings')
-        self.button.setText(assistant_text(self.language, 'companion_section'))
+        self.button.caption_label.setText(assistant_text(self.language, 'companion_section'))
         self.button.setAccessibleName(hint)
         self.button.setToolTip(hint)
         self.art = preview_art(self.mascot) if self.isVisible() else None
-        self.button.update()
+        self._update_thumbnail()
+
+    def _update_thumbnail(self):
+        if self.art is not None:
+            self.button.value_label.setPixmap(self.art.scaled(
+                18, 18, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+        else:
+            self.button.value_label.clear()
 
     def set_activity(self, activity):
         self.motion.set_activity(activity)
@@ -91,7 +75,7 @@ class AssistantPreview(QtWidgets.QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self.art = preview_art(self.mascot)
-        self.button.update()
+        self._update_thumbnail()
 
     def hideEvent(self, event):
         self.timer.stop()
