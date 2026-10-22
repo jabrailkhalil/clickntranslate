@@ -8682,8 +8682,10 @@ class DarkThemeApp(QMainWindow):
         self.ui_root = self._ui_scale_controller.canvas
 
         # Показать приветственное окно, если не отключено
+        update_restart = ('--show-after-update' in sys.argv or
+                          any(arg.startswith('--update-ack=') for arg in sys.argv[1:]))
         welcome_was_due = bool(
-            self.config.get("show_update_info", True) and services
+            self.config.get("show_update_info", True) and services and not update_restart
         )
         if welcome_was_due:
             dlg = WelcomeDialog(self)
@@ -8759,9 +8761,9 @@ class DarkThemeApp(QMainWindow):
                     force=True,
                 ),
             )
-        if not welcome_was_due and services:
+        if not welcome_was_due and services and not update_restart:
             QTimer.singleShot(350, self._maybe_show_startup_news)
-        if services:
+        if services and not update_restart:
             QTimer.singleShot(700, self._maybe_start_first_run_guide)
         # Late enough that it never competes with start-up for the network or
         # the user's attention, and after the first-run guide has had its turn.
@@ -10153,7 +10155,6 @@ class DarkThemeApp(QMainWindow):
             self.show_settings()
         settings = getattr(self, "settings_window", None)
         if settings is None:
-            webbrowser.open(GITHUB_RELEASES_PAGE)
             return
         # The same download the Update button runs, so there is one code path
         # that fetches, verifies and applies a release.

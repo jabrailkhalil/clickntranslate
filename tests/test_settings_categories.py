@@ -123,6 +123,20 @@ def test_active_update_survives_settings_rebuild_and_blocks_duplicate_navigation
     assert settings.settings_pages.currentWidget() is settings.settings_general_page
 
 
+@pytest.mark.parametrize('status', ['no_asset', 'invalid_asset'])
+def test_unavailable_update_stays_in_app_without_a_release_download_link(window, status):
+    window.show_settings()
+    settings = window.settings_window
+    with mock.patch('webbrowser.open') as browser, \
+         mock.patch.object(settings, '_start_update_check') as retry:
+        settings._on_update_check_result(json.dumps(dict(status=status, latest_version='9.9.9')))
+        panel = settings._update_progress
+        panel.primary.click()
+        retry.assert_called_once()
+        browser.assert_not_called()
+        assert 'GitHub' not in panel.label.text()
+
+
 @pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it'])
 def test_api_editor_lives_in_packages_and_fits(window, language):
     from provider_settings import show_provider_settings

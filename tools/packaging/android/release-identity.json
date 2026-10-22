@@ -1,0 +1,18 @@
+{
+  "branch": "android",
+  "commit": "05493e6",
+  "source_commit": "55536f25f9dd6c526b8a9fbb83515d8fd62f8519",
+  "version": "1.8.2",
+  "version_code": 7,
+  "package": "dev.clickn.translate",
+  "architecture": "arm64-v8a",
+  "size": 60487261,
+  "sha256": "3a8d5d6ce41b368642f0b03bd1745e9764908aa9a1229660bd67b1557b114d63",
+  "signer_sha256": "1746bfc27cbbb823021ce32c1e7a2640584393d058b85e3d784711954bcafe85",
+  "signature_verification": "apksigner verify: success; v2",
+  "debuggable": false,
+  "zip_crc": "passed",
+  "device_tested": false,
+  "identity_kind": "Permanent Android APK signing certificate",
+  "private_key_in_repository": false
+}

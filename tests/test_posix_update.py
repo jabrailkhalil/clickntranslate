@@ -93,6 +93,26 @@ def test_failed_preparation_leaves_installed_program_unchanged(tmp_path):
     assert not list(tmp_path.glob('.cnt-stage-*'))
 
 
+def test_mac_verification_pins_the_installed_certificate_without_a_team_id():
+    requirement = 'identifier "example.app" and certificate root = H"1234"'
+    with mock.patch.object(update, '_command') as command:
+        command.return_value.stdout = 'designated => ' + requirement + '\n'
+        update._verify_mac_replacement(Path('/old.app'), Path('/new.app'), {})
+        assert command.call_args.args[0] == [
+            '/usr/bin/codesign', '--verify', '--strict',
+            '-R', '=' + requirement, str(Path('/new.app'))]
+        assert command.call_args_list[-2].args[0] == [
+            '/usr/bin/codesign', '--verify', '--deep', '--strict', str(Path('/new.app'))]
+
+
+def test_mac_verification_refuses_to_continue_without_an_installed_identity():
+    with mock.patch.object(update, '_command') as command:
+        command.return_value.stdout = 'no designated requirement\n'
+        with pytest.raises(ValueError, match='signing requirement'):
+            update._verify_mac_replacement(Path('/old.app'), Path('/new.app'), {})
+        assert command.call_count == 1
+
+
 def _shell():
     if sys.platform != 'win32':
         return '/bin/sh'

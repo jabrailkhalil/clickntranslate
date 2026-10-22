@@ -149,12 +149,23 @@ def _extract_linux(archive, destination):
 
 
 def _command(args, env):
-    return subprocess.run(args, env=env, capture_output=True, text=True, check=True, timeout=180)
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=180)
+    if result.returncode:
+        raise RuntimeError(f'{Path(args[0]).name}: {result.stderr.strip() or result.stdout.strip()}')
+    return result
 
 
-def _mac_identity(bundle, env):
-    result = _command(['/usr/bin/codesign', '-d', '--verbose=4', str(bundle)], env)
-    return dict(re.findall(r'^(Identifier|TeamIdentifier)=(.+)$', result.stderr, re.M))
+def _verify_mac_replacement(current, payload, env):
+    # TeamIdentifier is absent for our established self-signed identity. The
+    # installed app's designated requirement pins its certificate as well as
+    # the bundle identifier, and also works for Developer ID distributions.
+    result = _command(['/usr/bin/codesign', '-d', '-r-', str(current)], env)
+    match = re.search(r'^designated => (.+)$', result.stdout, re.M)
+    if not match:
+        raise ValueError('The installed application has no signing requirement')
+    _command(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(payload)], env)
+    # -R must apply only to the application: frameworks have their own IDs.
+    _command(['/usr/bin/codesign', '--verify', '--strict', '-R', '=' + match[1], str(payload)], env)
 
 
 def prepare(package, version, target=None):
@@ -194,11 +205,7 @@ def prepare(package, version, target=None):
             if not executable or '/' in executable or executable in ('.', '..'):
                 raise ValueError('Invalid application executable')
             relative_executable = 'Contents/MacOS/' + executable
-            _command(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(payload)], env)
-            old_identity, identity = _mac_identity(current, env), _mac_identity(payload, env)
-            team = old_identity.get('TeamIdentifier')
-            if team and team != 'not set' and identity.get('TeamIdentifier') != team:
-                raise ValueError('The update is signed by a different developer')
+            _verify_mac_replacement(current, payload, env)
         elif kind == 'linux-dir':
             _extract_linux(package, stage)
             payload = stage / 'clickntranslate'

@@ -113,6 +113,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.addCleanup(timer_patch.stop)
         timer_patch.start()
         self.dialog = OcrLanguageManagerDialog(self.owner)
+        # Owned startup timers replaced bare singleShot callbacks. Keep this
+        # layout fixture independent of asynchronous engine/catalog probes.
+        self.dialog._initial_probe_timer.stop()
+        self.dialog._initial_catalog_timer.stop()
 
     def _package_tables(self, *names):
         """Package tables that exist on this platform.
@@ -1095,6 +1099,8 @@ class EngineRemovalPlacementTest(unittest.TestCase):
         self.addCleanup(timer_patch.stop)
         timer_patch.start()
         self.dialog = OcrLanguageManagerDialog(self.owner)
+        self.dialog._initial_probe_timer.stop()
+        self.dialog._initial_catalog_timer.stop()
 
     def tearDown(self):
         self.dialog.close()

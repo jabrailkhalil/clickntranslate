@@ -9,6 +9,16 @@ import sys
 from unittest import mock
 
 
+def package_preview(owner):
+    """Render installed-package controls without starting catalogs or probes."""
+    from settings_window import OcrLanguageManagerDialog
+
+    dialog = OcrLanguageManagerDialog(owner)
+    dialog._initial_probe_timer.stop()
+    dialog._initial_catalog_timer.stop()
+    return dialog
+
+
 def api_keychain_check():
     """Test only a unique disposable QA item, never the user's API credentials."""
     import uuid
@@ -181,8 +191,7 @@ def dialog_placement_check(main, app, window, report_path, screenshots):
                         bounds.top() + min(90, max(0, bounds.height() - window.height())))
             window.show_settings()
             owner = window.settings_window
-            with mock.patch.object(QtCore.QTimer, 'singleShot'):
-                packages = settings.OcrLanguageManagerDialog(owner)
+            packages = package_preview(owner)
             dialogs = [
                 ('packages', packages), ('update', settings.UpdateProgressDialog(owner)),
                 ('install', settings.TesseractInstallProgressDialog(owner)),
@@ -393,7 +402,8 @@ def extended_screenshots(main, app, window, report_path, screenshots):
         expected = 'Темная' if theme == 'dark' else 'Светлая'
         if window.current_theme != expected:
             window.toggle_theme()
-        for language in ('en', 'ru', 'de', 'es', 'fr', 'zh'):
+        for option in main.INTERFACE_LANGUAGE_OPTIONS:
+            language = option['code']
             window.set_interface_language(language)
             for percent in (80, 100, 125, 150, 200):
                 window.set_ui_scale_percent(percent)
@@ -401,7 +411,7 @@ def extended_screenshots(main, app, window, report_path, screenshots):
                 window.show_main_screen()
                 capture(window, prefix + '-main', percent)
                 window.show_settings()
-                for page in range(3):
+                for page in range(window.settings_window.settings_pages.count()):
                     window.settings_window._set_settings_page(page)
                     capture(window, prefix + f'-settings{page}', percent)
             if language not in ('en', 'ru'):
@@ -412,8 +422,7 @@ def extended_screenshots(main, app, window, report_path, screenshots):
             # Render package pages without starting network catalogs or
             # optional-engine probes. Their actual runtimes are tested below
             # and by the separate native installation checks.
-            with mock.patch.object(QtCore.QTimer, 'singleShot'):
-                packages = OcrLanguageManagerDialog(settings)
+            packages = package_preview(settings)
             packages.show()
             for section, tabs in enumerate((packages.ocr_tabs, packages.translation_tabs)):
                 packages.tabs.setCurrentIndex(section)
@@ -758,15 +767,21 @@ def run(main, report_path):
             compact_translation_results = compact_translation_views_check(main, app, window, report_path, screenshots)
             window.show_settings()
             from provider_settings import show_provider_settings
-            show_provider_settings(window.settings_window)
-            for _ in range(5):
-                app.processEvents()
-            api_page = window.settings_window.api_connections_page
-            assert api_page.key.isVisible() and api_page.model.isVisible()
-            api_picture = report_path.with_name(report_path.stem + '-api-connections.png')
-            assert window.grab().save(str(api_picture))
+            import settings_window
+            with (mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'),
+                  mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'),
+                  mock.patch('provider_secrets.get_key', return_value='')):
+                show_provider_settings(window.settings_window)
+                for _ in range(5):
+                    app.processEvents()
+                api_page = window.settings_window.api_connections_page
+                assert api_page.key.isVisible() and api_page.model.isVisible()
+                api_picture = report_path.with_name(report_path.stem + '-api-connections.png')
+                api_surface = api_page.window()
+                assert api_surface.grab().save(str(api_picture))
             screenshots.append({'file': api_picture.name, 'requested_percent': window.config.get('ui_scale_percent'),
-                                'width': window.width(), 'height': window.height()})
+                                'width': api_surface.width(), 'height': api_surface.height()})
+            api_surface.close()
             keychain_results = api_keychain_check()
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:

@@ -6,7 +6,7 @@ import sys
 import weakref
 
 from PyQt5.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, QRegularExpression, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QCursor, QFont, QIcon, QPainter, QPalette, QRegularExpressionValidator
+from PyQt5.QtGui import QColor, QCursor, QFont, QFontDatabase, QIcon, QPainter, QPalette, QRegularExpressionValidator
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsScene, QGraphicsView, QLineEdit, QMainWindow, QPushButton,
     QGraphicsProxyWidget, QStyle, QStyleOptionButton, QStyleOptionToolButton,
@@ -33,6 +33,24 @@ def configure_qt_platform():
 def configure_interface_style():
     """Keep the custom canvas geometry independent of native Aqua insets."""
     app = QApplication.instance()
+    if sys.platform.startswith('linux') and app is not None and not getattr(app, '_cnt_font_alias_ready', False):
+        # QSS names Segoe UI throughout the fixed canvas. Its generic Linux
+        # fallback is substantially wider; use the installed Arial-compatible
+        # face before Qt computes any control's minimum size.
+        families = set(QFontDatabase().families())
+        if 'Segoe UI' not in families:
+            from project_paths import resource_root
+            for name in ('LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf'):
+                path = resource_root() / 'icons' / 'fonts' / name
+                if path.is_file():
+                    QFontDatabase.addApplicationFont(str(path))
+            families = set(QFontDatabase().families())
+        if 'Segoe UI' not in families and 'Liberation Sans' in families:
+            QFont.insertSubstitution('Segoe UI', 'Liberation Sans')
+            font = QFont(app.font())
+            font.setFamily('Liberation Sans')
+            app.setFont(font)
+        app._cnt_font_alias_ready = True
     if sys.platform == 'darwin' and app is not None and not getattr(app, '_cnt_style_ready', False):
         # Aqua extends checkbox/button layout rectangles and uses native menu
         # popups, which overlap controls inside our transformed canvas. Fusion

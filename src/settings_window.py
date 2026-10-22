@@ -2711,7 +2711,7 @@ SETTINGS_TEXT = {
      'clear_histories_question': 'Limpar histórico de tradução e histórico de cópias?',
      'settings_reset_done': 'As configurações foram redefinidas'},
     'it': {'autostart': 'Avvia con il sistema',
-     'update_check_on_launch': "Controlla gli aggiornamenti all'avvio dell'app",
+     'update_check_on_launch': "Controlla aggiornamenti all'avvio",
      'dim_screen_during_ocr': "Oscura lo schermo mentre selezioni un'area OCR",
      'ocr_dim_strength_tooltip': "Scegli quanto scura diventa l'area al di fuori della selezione OCR.",
      'restore_clipboard_after_selection': 'Ripristina gli appunti dopo le azioni del testo selezionato',
@@ -3061,7 +3061,7 @@ def history_record_text(lang, key):
 UPDATE_TEXT = {
     "en": {
         "store_updates": "Updates for this version are delivered by Microsoft Store. Open the Microsoft Store Library and choose Get updates.",
-        "dev_build": "Auto-update is available only in the packaged app.\nOpen releases page?",
+        "dev_build": 'Auto-update is available in the packaged application. Python source is updated separately.',
         "checking_button": "Checking...", "checking": "Checking updates...", "downloading_word": "Downloading",
         "downloading_button": "Downloading...", "apply_wait": "The update is being applied.\nPlease wait...",
         "apply_close": "The update is already being applied. Closing is disabled right now.\nPlease wait.",
@@ -3070,7 +3070,7 @@ UPDATE_TEXT = {
         "parse_failed": "Failed to parse update response.", "check_cancelled": "Update check was canceled.",
         "error_title": "Update error", "unknown_error": "Unknown update error.",
         "up_to_date": "You already have the latest version: V{version}",
-        "no_asset": "No compatible auto-update asset found in the release. Open releases page?",
+        "no_asset": 'This release has no compatible update package for your installation yet. Try checking again later.',
         "invalid_url": "Invalid update asset URL.", "available_title": "Update available",
         "available_prompt": "New version found: V{latest}\nCurrent version: V{current}\n\nInstall now?",
         "preparing_download": "Preparing download...", "stage_download": "Downloading update package...",
@@ -3086,7 +3086,7 @@ UPDATE_TEXT = {
     },
     "ru": {
         "store_updates": "Обновления этой версии устанавливает Microsoft Store. Откройте Библиотеку Microsoft Store и нажмите «Получить обновления».",
-        "dev_build": "Автообновление работает только в собранной версии приложения.\nОткрыть страницу релизов?",
+        "dev_build": 'Автообновление доступно в собранном приложении. Исходники Python обновляются отдельно.',
         "checking_button": "Проверка...", "checking": "Проверка обновлений...", "downloading_word": "Скачивание",
         "downloading_button": "Скачивание...", "apply_wait": "Обновление уже применяется.\nПожалуйста, подождите...",
         "apply_close": "Обновление уже применяется. Закрытие сейчас недоступно.\nПожалуйста, подождите.",
@@ -3095,7 +3095,7 @@ UPDATE_TEXT = {
         "parse_failed": "Не удалось обработать ответ от сервера обновлений.", "check_cancelled": "Проверка обновлений отменена.",
         "error_title": "Ошибка обновления", "unknown_error": "Неизвестная ошибка обновления.",
         "up_to_date": "У вас уже актуальная версия: V{version}",
-        "no_asset": "В релизе нет подходящего файла для автообновления. Открыть страницу релизов?",
+        "no_asset": 'В этой версии пока нет подходящего пакета обновления для вашей установки. Повторите проверку позже.',
         "invalid_url": "Некорректный URL файла обновления.", "available_title": "Доступно обновление",
         "available_prompt": "Найдена новая версия: V{latest}\nТекущая версия: V{current}\n\nУстановить сейчас?",
         "preparing_download": "Подготовка загрузки...", "stage_download": "Загрузка файла обновления...",
@@ -3111,7 +3111,7 @@ UPDATE_TEXT = {
     },
     "es": {
         "store_updates": "Las actualizaciones de esta versión se instalan desde Microsoft Store. Abre la Biblioteca de Microsoft Store y selecciona Obtener actualizaciones.",
-        "dev_build": "La actualización automática solo está disponible en la aplicación compilada.\n¿Abrir la página de versiones?",
+        "dev_build": 'La actualización automática está disponible en la aplicación empaquetada. El código Python se actualiza por separado.',
         "checking_button": "Comprobando...", "checking": "Buscando actualizaciones...", "downloading_word": "Descargando",
         "downloading_button": "Descargando...", "apply_wait": "La actualización se está aplicando.\nEspera...",
         "apply_close": "La actualización ya se está aplicando. No se puede cerrar ahora.\nEspera.",
@@ -3120,7 +3120,7 @@ UPDATE_TEXT = {
         "parse_failed": "No se pudo procesar la respuesta del servidor de actualizaciones.", "check_cancelled": "Se canceló la búsqueda de actualizaciones.",
         "error_title": "Error de actualización", "unknown_error": "Error de actualización desconocido.",
         "up_to_date": "Ya tienes la versión más reciente: V{version}",
-        "no_asset": "La versión no contiene un archivo compatible para la actualización automática. ¿Abrir la página de versiones?",
+        "no_asset": 'Esta versión aún no tiene un paquete de actualización compatible con tu instalación. Vuelve a comprobarlo más tarde.',
         "invalid_url": "La URL del archivo de actualización no es válida.", "available_title": "Actualización disponible",
         "available_prompt": "Nueva versión: V{latest}\nVersión actual: V{current}\n\n¿Instalar ahora?",
         "preparing_download": "Preparando la descarga...", "stage_download": "Descargando el paquete de actualización...",
@@ -3136,7 +3136,7 @@ UPDATE_TEXT = {
     },
     "de": {
         "store_updates": "Updates für diese Version werden über den Microsoft Store installiert. Öffne die Bibliothek im Microsoft Store und wähle Updates abrufen.",
-        "dev_build": "Die automatische Aktualisierung ist nur in der kompilierten App verfügbar.\nRelease-Seite öffnen?",
+        "dev_build": 'Automatische Updates sind in der gepackten Anwendung verfügbar. Python-Quellcode wird separat aktualisiert.',
         "checking_button": "Prüfen...", "checking": "Nach Updates suchen...", "downloading_word": "Herunterladen",
         "downloading_button": "Herunterladen...", "apply_wait": "Das Update wird angewendet.\nBitte warten...",
         "apply_close": "Das Update wird bereits angewendet. Schließen ist momentan nicht möglich.\nBitte warten.",
@@ -3145,7 +3145,7 @@ UPDATE_TEXT = {
         "parse_failed": "Die Antwort des Update-Servers konnte nicht verarbeitet werden.", "check_cancelled": "Die Update-Prüfung wurde abgebrochen.",
         "error_title": "Update-Fehler", "unknown_error": "Unbekannter Update-Fehler.",
         "up_to_date": "Du verwendest bereits die neueste Version: V{version}",
-        "no_asset": "Das Release enthält keine kompatible Datei für die automatische Aktualisierung. Release-Seite öffnen?",
+        "no_asset": 'Für diese Version gibt es noch kein passendes Update-Paket für deine Installation. Versuche es später erneut.',
         "invalid_url": "Die URL der Update-Datei ist ungültig.", "available_title": "Update verfügbar",
         "available_prompt": "Neue Version: V{latest}\nAktuelle Version: V{current}\n\nJetzt installieren?",
         "preparing_download": "Download wird vorbereitet...", "stage_download": "Update-Paket wird heruntergeladen...",
@@ -3161,7 +3161,7 @@ UPDATE_TEXT = {
     },
     "fr": {
         "store_updates": "Les mises à jour de cette version sont installées par le Microsoft Store. Ouvrez la Bibliothèque du Microsoft Store et choisissez Obtenir les mises à jour.",
-        "dev_build": "La mise à jour automatique est disponible uniquement dans l’application compilée.\nOuvrir la page des versions ?",
+        "dev_build": 'La mise à jour automatique est disponible dans l’application compilée. Les sources Python se mettent à jour séparément.',
         "checking_button": "Vérification...", "checking": "Recherche de mises à jour...", "downloading_word": "Téléchargement",
         "downloading_button": "Téléchargement...", "apply_wait": "La mise à jour est en cours d’application.\nVeuillez patienter...",
         "apply_close": "La mise à jour est déjà en cours d’application. La fermeture est momentanément impossible.\nVeuillez patienter.",
@@ -3170,7 +3170,7 @@ UPDATE_TEXT = {
         "parse_failed": "Impossible de traiter la réponse du serveur de mises à jour.", "check_cancelled": "La recherche de mises à jour a été annulée.",
         "error_title": "Erreur de mise à jour", "unknown_error": "Erreur de mise à jour inconnue.",
         "up_to_date": "Vous utilisez déjà la dernière version : V{version}",
-        "no_asset": "La version ne contient aucun fichier compatible avec la mise à jour automatique. Ouvrir la page des versions ?",
+        "no_asset": 'Cette version ne propose pas encore de mise à jour compatible avec votre installation. Réessayez plus tard.',
         "invalid_url": "L’URL du fichier de mise à jour n’est pas valide.", "available_title": "Mise à jour disponible",
         "available_prompt": "Nouvelle version : V{latest}\nVersion actuelle : V{current}\n\nInstaller maintenant ?",
         "preparing_download": "Préparation du téléchargement...", "stage_download": "Téléchargement du paquet de mise à jour...",
@@ -3186,7 +3186,7 @@ UPDATE_TEXT = {
     },
     "zh": {
         "store_updates": "此版本由 Microsoft Store 提供更新。请打开 Microsoft Store 的“库”，然后选择“获取更新”。",
-        "dev_build": "自动更新仅适用于已打包的应用。\n是否打开发布页面？",
+        "dev_build": '自动更新适用于打包后的应用。Python 源代码需要单独更新。',
         "checking_button": "正在检查...", "checking": "正在检查更新...", "downloading_word": "正在下载",
         "downloading_button": "正在下载...", "apply_wait": "正在应用更新。\n请稍候...",
         "apply_close": "更新已在应用中，现在无法关闭。\n请稍候。",
@@ -3195,7 +3195,7 @@ UPDATE_TEXT = {
         "parse_failed": "无法处理更新服务器的响应。", "check_cancelled": "已取消更新检查。",
         "error_title": "更新错误", "unknown_error": "未知更新错误。",
         "up_to_date": "当前已是最新版本：V{version}",
-        "no_asset": "此版本中没有兼容的自动更新文件。是否打开发布页面？",
+        "no_asset": '此版本暂时没有适用于当前安装的更新包。请稍后重新检查。',
         "invalid_url": "更新文件 URL 无效。", "available_title": "有可用更新",
         "available_prompt": "发现新版本：V{latest}\n当前版本：V{current}\n\n现在安装吗？",
         "preparing_download": "正在准备下载...", "stage_download": "正在下载更新包...",
@@ -3211,8 +3211,7 @@ UPDATE_TEXT = {
 
     'pt': {'store_updates': 'As atualizações para esta versão são fornecidas pela Microsoft Store. Abra a '
                       'biblioteca da Microsoft Store e escolha Obter atualizações.',
-     'dev_build': 'A atualização automática está disponível apenas no aplicativo empacotado.\n'
-                  'Abrir página de lançamentos?',
+     'dev_build': 'A atualização automática está disponível no aplicativo empacotado. O código Python é atualizado separadamente.',
      'checking_button': 'Verificando...',
      'checking': 'Verificando atualizações...',
      'downloading_word': 'Baixando',
@@ -3229,8 +3228,7 @@ UPDATE_TEXT = {
      'error_title': 'Erro de atualização',
      'unknown_error': 'Erro de atualização desconhecido.',
      'up_to_date': 'Você já tem a versão mais recente: V{version}',
-     'no_asset': 'Nenhum recurso de atualização automática compatível foi encontrado na versão. Abrir '
-                 'página de lançamentos?',
+     'no_asset': 'Esta versão ainda não tem um pacote de atualização compatível com sua instalação. Tente verificar novamente mais tarde.',
      'invalid_url': 'URL de recurso de atualização inválido.',
      'available_title': 'Atualização disponível',
      'available_prompt': 'Nova versão encontrada: V{latest}\n'
@@ -3253,8 +3251,7 @@ UPDATE_TEXT = {
      'launch_later': 'Mais tarde'},
     'it': {'store_updates': 'Gli aggiornamenti per questa versione vengono forniti da Microsoft Store. Apri '
                       'la Libreria di Microsoft Store e scegli Ottieni aggiornamenti.',
-     'dev_build': "L'aggiornamento automatico è disponibile solo nell'app in pacchetto.\n"
-                  'Pagina delle versioni aperte?',
+     'dev_build': 'L’aggiornamento automatico è disponibile nell’applicazione compilata. Il codice Python viene aggiornato separatamente.',
      'checking_button': 'Controllo...',
      'checking': 'Controllo aggiornamenti...',
      'downloading_word': 'Download in corso',
@@ -3273,8 +3270,7 @@ UPDATE_TEXT = {
      'error_title': 'Errore di aggiornamento',
      'unknown_error': 'Errore di aggiornamento sconosciuto.',
      'up_to_date': "Hai già l'ultima versione: V{version}",
-     'no_asset': 'Nessuna risorsa di aggiornamento automatico compatibile trovata nella versione. '
-                 'Aprire la pagina delle versioni?',
+     'no_asset': 'Questa versione non dispone ancora di un pacchetto di aggiornamento compatibile con la tua installazione. Riprova più tardi.',
      'invalid_url': 'URL della risorsa di aggiornamento non valido.',
      'available_title': 'Aggiornamento disponibile',
      'available_prompt': 'Nuova versione trovata: V{latest}\n'
@@ -4810,6 +4806,9 @@ class OcrLanguageManagerDialog(QDialog):
         for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
                       self.rapidocr_table, self.argos_table):
             if table is not None and table.isVisible():
+                # Fitting columns may remove a temporary horizontal scrollbar
+                # and change row heights. Measure the cap after that settles.
+                table.fit_columns()
                 self._snap_table_to_whole_rows(table)
 
     def _build_tabs(self):
@@ -10622,8 +10621,7 @@ class SettingsWindow(QWidget):
 
         if not getattr(sys, "frozen", False):
             from inline_update import result
-            result(self, update_text(lang, "dev_build"), settings_text(lang, "open"),
-                   lambda: webbrowser.open(GITHUB_RELEASES_PAGE),
+            result(self, update_text(lang, "dev_build"),
                    settings_text(lang, "back"), self._leave_update_page)
             return
 
@@ -10862,8 +10860,8 @@ class SettingsWindow(QWidget):
             result(self, update_text(lang, "available_prompt", latest=latest, current=APP_VERSION),
                    settings_text(lang, "install"), install, settings_text(lang, "later"), self._leave_update_page)
         else:
-            result(self, update_text(lang, "no_asset"), settings_text(lang, "open"),
-                   lambda: webbrowser.open(GITHUB_RELEASES_PAGE), back, self._leave_update_page)
+            result(self, update_text(lang, "no_asset"), settings_text(lang, "update"),
+                   self._start_update_check, back, self._leave_update_page)
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
         if self._update_in_progress:
@@ -11311,6 +11309,9 @@ class SettingsWindow(QWidget):
                 self._check_update_cancel_requested()
                 self._update_phase = "applying"
                 launch(plan, get_data_file("update-failure.txt"))
+                # The POSIX runner owns a fully extracted same-volume stage;
+                # it never reads the original download again after handoff.
+                self._cleanup_update_temp_dir()
                 return True, None
             except Exception as error:
                 if 'plan' in locals():

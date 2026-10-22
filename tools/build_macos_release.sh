@@ -64,6 +64,9 @@ for attempt in 1 2 3; do
     *) exit 1 ;;
   esac
 done
+if [[ "$LOCAL_SIGNING" == "1" ]]; then
+  "$PYTHON" tools/macos_signing.py sign "$OUTPUT.dmg" > build/macos/dmg-signing.json
+fi
 ( cd releases && shasum -a 256 "$(basename "$OUTPUT.dmg")" "$(basename "$OUTPUT.zip")" > "$(basename "$OUTPUT.sha256")" )
 echo "Created $OUTPUT.dmg and .zip"
 if [[ -z "${MACOS_NOTARY_PROFILE:-}" ]]; then

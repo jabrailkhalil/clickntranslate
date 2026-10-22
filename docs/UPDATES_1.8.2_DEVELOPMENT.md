@@ -5,11 +5,13 @@ This is local development work. No release or upload is part of this change.
 ## Settings
 
 - **General settings:** startup, tray startup, hover tips, update checks, interface
-  scale, cache/reset, settings export/import, diagnostics and hotkeys.
-- **Translation and OCR:** OCR/translation engines, result-window modes and text
-  size, automatic copy, histories, select-all before replacement, clipboard
-  restoration, outside-click closing, and quick selection translation. The quick
-  translation checkbox has a button/immediate selector on the same row.
+  scale, result-text size/preview, cache/reset, settings export/import,
+  diagnostics and hotkeys.
+- **Translation and OCR:** OCR/translation engines, result-window modes,
+  automatic copy, histories, select-all before replacement, clipboard
+  restoration and outside-click closing. Selection triggers (hotkey, nearby
+  button, immediate translation) belong to the existing selection mode's
+  language settings, rather than separate duplicate settings checkboxes.
 - **OCR options:** an expandable section on the translation page contains
   keep-visible, freeze-screen, dimming and copy notifications.
 
@@ -30,7 +32,8 @@ handoff; once replacement starts, the app finishes its restart sequence.
   required, remains an OS prompt. Failure is reported inside the restored app.
 - macOS selects the architecture-specific ZIP, validates archive paths and the
   symlink graph, extracts with `ditto`, checks bundle ID/version and signature,
-  and enforces the existing TeamIdentifier when one is present. The complete
+  and enforces the installed application's designated signing requirement.
+  This pins the previous certificate even when TeamIdentifier is absent. The complete
   `.app` is replaced by rename, rather than modifying its signed files in place.
 - Linux selects the architecture-specific AppImage or portable tarball. A tar
   installation must have the build-created `.cnt-portable-install` identity;
@@ -43,6 +46,15 @@ process, replaces the target, starts the new GUI, checks its exact version
 acknowledgment and waits five seconds for stability. Failure restores the old
 files and reopens the previous version. Paths are passed as separate, quoted
 arguments. The helper environment clears the previous frozen/AppImage runtime.
+An update restart skips blocking Welcome and startup introductions without
+changing the user's preference for ordinary starts. The POSIX download is
+removed after the detached runner has received its independent staged copy.
+
+No compatible package, a broken download or a server error stays inside the
+update page, with retry/back actions. These states do not open a GitHub page.
+GitHub Releases remains the distribution backend; the application retrieves
+the release metadata and binary files itself. No manual browser download is
+part of the supported in-app update flow.
 
 The package must have a matching SHA256 entry before any updater is launched.
 Existing Mac manifests with a `releases/` filename prefix remain readable; new
@@ -51,7 +63,7 @@ Linux AppStream metadata follow the existing development version, 1.8.2.
 
 ## Validation boundaries
 
-Automated tests cover six UI languages, both themes, scales 80–150%, visible
+Automated tests cover eight UI languages, both themes, scales 80–150%, visible
 controls and selector text fitting, persistence, guide routing, one-page update
 states, checksum failures, archive traversal/symlinks and actual shell rollback
 with user-data preservation. Windows tests invoke the compiled helper's quiet
@@ -59,9 +71,34 @@ CLI against disposable installations, including damaged files and a crashing
 GUI. POSIX transaction tests on Windows use the bundled MSYS shell/coreutils;
 they do not establish native Linux or macOS GUI compatibility.
 
-Native Mac verification is pending connection of the user's Mac. Native Linux
-bundle replacement and real Inno installation need their respective runners.
-The final local regression totals are stored in `settings-update-validation.json`.
+Native update integration now runs with `tools/qa_posix_update.py`: actual
+Settings buttons in a source Qt controller, an HTTP release fixture, real
+downloads/checksums, the production detached runner and a real frozen GUI.
+Only the source controller's frozen-install discovery/current version is
+simulated; readiness comes from the actual launched application. Mac uses an
+isolated 1.8.1 app copy and the signed 1.8.2 ZIP. Linux fixtures use existing
+1.8.1 AppImages and an explicitly marked copy of the old portable runtime.
+This validates update mechanics, not a future published release feed or the
+existence of the new updater in an older released GUI.
+
+Success, cancellation, bad checksum, unavailable asset, server failure and
+rollback after a GUI crash passed on native Mac and Linux AppImage. Portable
+Linux directory replacement and rollback also passed. Test profiles, models,
+hidden files and personal-file markers survived. Linux AppImage rollback
+kills the actual GUI PID (rather than just its outer runtime) and checks a
+different recovered GUI PID. Mac production signature verification accepts
+the previous certificate and rejects an independently valid ad-hoc signature.
+
+Packaging was stopped when the missing end-to-end validation was identified.
+Earlier 1.8.2 archives predate the Welcome fix and are not final update-tested
+artifacts. Control builds are used only to validate the startup fix in frozen
+code; they are not a release, tag, upload or replacement of the working app.
+The source controller boundary above remains explicit even after those checks.
+
+The signed Mac control build and Linux portable control build passed an
+additional 1.8.1 -> 1.8.2 transaction with `--welcome-enabled`: the real new GUI acknowledged readiness and remained
+responsive, while `show_update_info=true` stayed unchanged. This specifically
+reproduces the preference that blocked readiness in the earlier binary.
 
 Implementation references: [PyInstaller subprocess environment guidance](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#launching-external-programs-from-the-frozen-application),
 [Apple code-signature verification](https://developer.apple.com/library/archive/technotes/tn2206/).
