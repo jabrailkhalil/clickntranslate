@@ -215,7 +215,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
 
             action_rows = (
                 (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
-                (settings.ocr_languages_btn, settings.copy_history_btn, settings.translation_history_btn),
+                (settings.export_settings_btn, settings.import_settings_btn, settings.create_bug_report_btn),
                 (settings.hotkeys_button,),
             )
             action_rects = [
@@ -258,6 +258,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         parent.show()
         settings.show()
         self.app.processEvents()
+        settings._set_settings_page(1)
+        self.app.processEvents()
         return parent, settings
 
     def test_result_window_toggles_align_with_the_engine_rows(self):
@@ -280,7 +282,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         # It sits directly below the translator row and shares that row with
         # the next checkbox, so the left column no longer has a blank gap.
         self.assertGreater(result[1], translator[1])
-        copy_translated = self._rect_in_settings(settings, settings.copy_translated_checkbox)
+        copy_translated = self._rect_in_settings(settings, settings.history_checkbox)
         self.assertLessEqual(
             abs((result[1] + result[3] / 2) -
                 (copy_translated[1] + copy_translated[3] / 2)),
@@ -305,9 +307,11 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             translator = self._rect_in_settings(settings, settings.translator_combo)
             result = self._rect_in_settings(settings, settings.result_window_control)
 
-            self.assertEqual(autostart[1], self._rect_in_settings(settings, settings.settings_general_page)[1])
+            self.assertEqual(ocr[1], self._rect_in_settings(settings, settings.translation_settings_scroll.viewport())[1])
             for checkbox, control in (
-                (autostart, ocr), (start_minimized, translator), (copy_translated, result)
+                (self._rect_in_settings(settings, settings.copy_translated_checkbox), ocr),
+                (self._rect_in_settings(settings, settings.copy_history_checkbox), translator),
+                (self._rect_in_settings(settings, settings.history_checkbox), result)
             ):
                 self.assertAlmostEqual(checkbox[1] + checkbox[3] / 2, control[1] + control[3] / 2, delta=.5)
             self.assertTrue(settings.main_layout.alignment() & Qt.AlignTop)
@@ -538,17 +542,17 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 settings_text("ru", "update_check_on_launch"),
             )
 
+            settings.update_check_on_launch_checkbox.click()
+            self.assertTrue(parent.config["update_check_on_launch"])
+            save_config.assert_called_once()
             settings.settings_page_dots[1].click()
             self.app.processEvents()
             self.assertEqual(settings._settings_page_index, 1)
             self.assertTrue(settings.settings_page_dots[1].isChecked())
             self.assertTrue(settings.settings_updates_page.isVisible())
-            self.assertTrue(settings.update_check_on_launch_checkbox.isVisible())
+            self.assertFalse(settings.update_check_on_launch_checkbox.isVisible())
+            self.assertTrue(settings.close_result_on_outside_click_checkbox.isVisible())
             self.assertTrue(settings.settings_action_panel.isHidden())
-
-            settings.update_check_on_launch_checkbox.click()
-            self.assertTrue(parent.config["update_check_on_launch"])
-            save_config.assert_called_once()
 
             footer = self._rect_in_settings(settings, settings.settings_page_footer)
             self.assertLessEqual(footer[1] + footer[3], settings.height())
@@ -693,7 +697,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertTrue(all(box.objectName() == "settingsPageCheckbox" for box in secondary_checks))
             self.assertEqual({box.height() for box in secondary_checks}, {settings.autostart_checkbox.height()})
 
-            panel = self._rect_in_settings(settings, settings.settings_transfer_panel)
+            settings._set_settings_page(0)
+            self.app.processEvents()
+            panel = self._rect_in_settings(settings, settings.settings_action_panel)
             buttons = [
                 self._rect_in_settings(settings, button)
                 for button in (
@@ -702,7 +708,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     settings.create_bug_report_btn,
                 )
             ]
-            self.assertEqual(settings.settings_transfer_panel.height(), 31)
+            self.assertTrue(settings.settings_action_panel.isVisible())
             self.assertEqual({rect[1] for rect in buttons}, {buttons[0][1]})
             self.assertEqual({rect[3] for rect in buttons}, {29})
             self.assertEqual(buttons[0][0] - panel[0], 1)
@@ -752,9 +758,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             "clear_cache_btn",
             "reset_btn",
             "update_btn",
-            "ocr_languages_btn",
-            "copy_history_btn",
-            "translation_history_btn",
+            "export_settings_btn",
+            "import_settings_btn",
+            "create_bug_report_btn",
             "hotkeys_button",
         )
         try:
@@ -801,32 +807,21 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     )
                     self.assertTrue(settings.settings_action_panel.isHidden())
                     self.assertGreaterEqual(overlay[1] - (footer[1] + footer[3]), 6)
-                    for widget in (
-                        settings.keep_visible_checkbox,
-                        settings.freeze_screen_checkbox,
-                        settings.dim_screen_during_ocr_checkbox,
-                        settings.ocr_dim_strength_value,
-                        settings.ocr_dim_strength_slider,
-                        settings.restore_clipboard_checkbox,
-                        settings.copy_notification_checkbox,
-                        settings.update_check_on_launch_checkbox,
-                        settings.create_bug_report_btn,
-                    ):
+                    for widget in (settings.ocr_engine_combo, settings.translator_combo,
+                                   settings.close_result_on_outside_click_checkbox,
+                                   settings.selection_quick_translate_checkbox):
                         rect = self._rect_in_settings(settings, widget)
-                        widget_name = (
-                            widget.text() if hasattr(widget, "text")
-                            else widget.objectName()
-                        )
                         self.assertGreaterEqual(rect[0], overlay[0], (theme, language))
                         self.assertGreaterEqual(rect[1], overlay[1], (theme, language))
-                        self.assertLessEqual(
-                            rect[0] + rect[2], overlay[0] + overlay[2],
-                            (theme, language, widget_name),
-                        )
-                        self.assertLessEqual(
-                            rect[1] + rect[3], overlay[1] + overlay[3],
-                            (theme, language, widget_name),
-                        )
+                        self.assertLessEqual(rect[0] + rect[2], overlay[0] + overlay[2], (theme, language))
+                        self.assertLessEqual(rect[1] + rect[3], overlay[1] + overlay[3], (theme, language))
+                    settings.ocr_options_button.setChecked(True)
+                    self.app.processEvents()
+                    for widget in (settings.keep_visible_checkbox, settings.freeze_screen_checkbox,
+                                   settings.dim_screen_during_ocr_checkbox, settings.copy_notification_checkbox):
+                        settings.translation_settings_scroll.ensureWidgetVisible(widget)
+                        self.app.processEvents()
+                        self.assertFalse(widget.visibleRegion().isEmpty(), (theme, language, widget.text()))
 
                     settings._set_settings_page(2)
                     self.app.processEvents()
@@ -896,7 +891,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         parent, settings = self._result_window_settings()
         try:
             control = settings.translation_font_control
-            history = self._rect_in_settings(settings, settings.history_checkbox)
+            history = self._rect_in_settings(settings, settings.replace_select_all_checkbox)
             label = self._rect_in_settings(settings, settings.translation_font_label)
             font = self._rect_in_settings(settings, control)
             scale = self._rect_in_settings(settings, settings.ui_scale_control)
@@ -904,8 +899,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertEqual(control.editor.text(), "Medium")
             self.assertEqual(font[2], scale[2])
             self.assertAlmostEqual(font[3], scale[3], delta=1)
-            self.assertEqual(font[0], scale[0])
-            self.assertLess(scale[1] + scale[3], font[1])
+            self.assertTrue(settings.settings_general_page.isAncestorOf(settings.ui_scale_control))
+            self.assertTrue(settings.settings_updates_page.isAncestorOf(control))
             self.assertAlmostEqual(
                 history[1] + history[3] / 2, font[1] + font[3] / 2, delta=3
             )

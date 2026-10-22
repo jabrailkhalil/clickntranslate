@@ -417,9 +417,8 @@ def python_install_hint(version):
 
 
 def supports_in_app_update():
-    """Whether the app may replace itself.
-
-    Only the Windows build ships the updater helpers. Linux packages are updated
-    by whatever installed them, so the app only reports that a version exists.
-    """
-    return IS_WINDOWS
+    """Self-update owned portable installs; stores and distro packages manage theirs."""
+    if IS_WINDOWS:
+        return True
+    from posix_update import update_target
+    return update_target() is not None

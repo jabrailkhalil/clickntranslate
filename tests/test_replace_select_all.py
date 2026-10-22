@@ -69,11 +69,11 @@ def test_windows_select_all_validates_target_and_releases_both_keys(foreground, 
 
 
 @pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh'])
-def test_checkbox_saves_and_fits_last_left_row(window, app, language):
+def test_checkbox_saves_and_fits_translation_page(window, app, language):
     window.set_interface_language(language)
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(0)
+    settings._set_settings_page(1)
     app.processEvents()
     box = settings.replace_select_all_checkbox
     assert not box.isChecked()
@@ -82,7 +82,7 @@ def test_checkbox_saves_and_fits_last_left_row(window, app, language):
     assert window.config['replace_selection_select_all'] is True
     assert box.width() >= box.sizeHint().width()
     origin = box.mapTo(settings, QtCore.QPoint())
-    panel = settings.settings_action_panel.mapTo(settings, QtCore.QPoint())
+    panel = settings.ocr_languages_btn.mapTo(settings, QtCore.QPoint())
     assert origin.y() + box.height() < panel.y()
 
 

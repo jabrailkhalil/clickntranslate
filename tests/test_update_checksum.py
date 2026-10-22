@@ -15,6 +15,8 @@ import settings_window as sw
     ('\ufeff' + 'a' * 64 + ' *app.zip\n', True),
     ('a' * 64 + '  app.zip\n', True),
     ('SHA256 (app.zip) = ' + 'a' * 64, True),
+    ('a' * 64 + '  releases/app.zip\n', True),
+    ('a' * 64 + '  releases/another.zip\n', False),
     ('a' * 64 + ' *app.zip.exe', False),
     ('a' * 64 + ' *another.zip', False),
     ('hash: ' + 'a' * 64, False),

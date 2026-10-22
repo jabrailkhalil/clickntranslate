@@ -64,7 +64,7 @@ for attempt in 1 2 3; do
     *) exit 1 ;;
   esac
 done
-shasum -a 256 "$OUTPUT.dmg" "$OUTPUT.zip" > "$OUTPUT.sha256"
+( cd releases && shasum -a 256 "$(basename "$OUTPUT.dmg")" "$(basename "$OUTPUT.zip")" > "$(basename "$OUTPUT.sha256")" )
 echo "Created $OUTPUT.dmg and .zip"
 if [[ -z "${MACOS_NOTARY_PROFILE:-}" ]]; then
   echo "Development build: not notarized. This is not yet a trusted public Mac release."

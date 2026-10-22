@@ -63,15 +63,15 @@ GUIDE_LINUX_BODIES = {
 GUIDE_SETTING_STEPS = {
     "autostart": ("autostart_checkbox", 0, True),
     "start_minimized": ("start_minimized_checkbox", 0, True),
-    "copy_translated_text": ("copy_translated_checkbox", 0, True),
-    "history": ("history_checkbox", 0, True),
-    "copy_history": ("copy_history_checkbox", 0, True),
+    "copy_translated_text": ("copy_translated_checkbox", 1, True),
+    "history": ("history_checkbox", 1, True),
+    "copy_history": ("copy_history_checkbox", 1, True),
     "keep_visible_on_ocr": ("keep_visible_checkbox", 1, False),
     "freeze_screen_on_ocr": ("freeze_screen_checkbox", 1, True),
     "dim_screen_during_ocr": ("dim_screen_during_ocr_checkbox", 1, True),
     "restore_clipboard_after_selection": ("restore_clipboard_checkbox", 1, True),
     "notifications": ("copy_notification_checkbox", 1, True),
-    "update_check_on_launch": ("update_check_on_launch_checkbox", 1, True),
+    "update_check_on_launch": ("update_check_on_launch_checkbox", 0, True),
     "game_pause_when_inactive": ("game_pause_inactive_checkbox", 2, True),
 }
 

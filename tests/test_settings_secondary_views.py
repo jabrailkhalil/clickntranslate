@@ -180,7 +180,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
             self.settings.secondary_view_shell.height(),
         )
 
-    def test_lazy_hotkey_toggles_have_visible_indicators_in_both_themes(self):
+    def test_translation_toggles_have_visible_indicators_in_both_themes(self):
         from PyQt5.QtCore import QSignalBlocker
         from PyQt5.QtWidgets import QStyle, QStyleOptionButton
 
@@ -189,13 +189,11 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         for theme in ("Темная", "Светлая"):
             self.parent.current_theme = theme
             self.settings.apply_theme()
-            self.settings.show_hotkeys_screen()
+            self.settings._set_settings_page(1)
             self.app.processEvents()
             controls = (
                 self.settings.selection_quick_translate_checkbox,
                 self.settings.close_result_on_outside_click_checkbox,
-                self.settings.selection_quick_translate_mode_button,
-                self.settings.selection_quick_translate_mode_automatic,
             )
             for control in controls:
                 with self.subTest(theme=theme, text=control.text()):
@@ -300,8 +298,8 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Alt+G")
         self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
 
-    def test_outside_click_close_setting_persists_from_the_hotkeys_page(self):
-        self.settings.show_hotkeys_screen()
+    def test_outside_click_close_setting_persists_from_the_translation_page(self):
+        self.settings._set_settings_page(1)
         self.app.processEvents()
         checkbox = self.settings.close_result_on_outside_click_checkbox
         self.assertFalse(checkbox.isChecked())

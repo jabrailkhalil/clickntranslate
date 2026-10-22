@@ -2,6 +2,7 @@
 
 Run: .venv/Scripts/python.exe tools/run_mascot_app.py
 Add --general-settings to open the general settings page for UI review.
+Add --translation-settings to open Translation and OCR preferences.
 Add --main to open the main window and its mascot shortcut.
 Uses its own persistent profile in .tmp/mascot-app. Translation, optional quick
 selection and global hotkeys are active. Startup announcements, tray creation
@@ -78,6 +79,9 @@ def run():
         window.show_main_screen()
     elif '--general-settings' in sys.argv:
         window.show_settings()
+    elif '--translation-settings' in sys.argv:
+        window.show_settings()
+        window.settings_window._set_settings_page(1)
     else:
         window.show_assistant_settings()
     window.raise_()

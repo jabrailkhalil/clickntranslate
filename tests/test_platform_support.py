@@ -153,8 +153,10 @@ class OcrEngineAvailabilityTest(unittest.TestCase):
 
 
 class UpdatePolicyTest(unittest.TestCase):
-    def test_self_replacement_is_windows_only(self):
-        self.assertEqual(platform_support.supports_in_app_update(), platform_support.IS_WINDOWS)
+    def test_self_replacement_matches_the_installation_kind(self):
+        from posix_update import update_target
+        self.assertEqual(platform_support.supports_in_app_update(),
+                         platform_support.IS_WINDOWS or update_target() is not None)
 
 
 class LinuxPortableBaseDirTest(unittest.TestCase):

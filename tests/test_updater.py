@@ -868,7 +868,7 @@ class TestUpdateCancellation(unittest.TestCase):
         self.assertFalse(dummy._update_cancel_requested.is_set())
         dummy._set_update_controls_enabled.assert_not_called()
         dummy._show_update_progress.assert_called_once()
-        info_mock.assert_called_once()
+        info_mock.assert_not_called()
 
     def test_download_file_cancellation_raises(self):
         class FakeResponse:

@@ -239,12 +239,13 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         round((navigation.left() + 12) * ratio),
                         round((navigation.top() + 1) * ratio),
                     ).name(), expected)
+                    settings._set_settings_page(1)
+                    self.settle()
                     rows = (
-                        (settings.autostart_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
-                        (settings.start_minimized_checkbox, settings.translator_engine_label, settings.translator_combo),
-                        (settings.copy_translated_checkbox, settings.result_window_label, settings.result_window_control),
-                        (settings.copy_history_checkbox, settings.ui_scale_label, settings.ui_scale_control),
-                        (settings.history_checkbox, settings.translation_font_label, settings.translation_font_control),
+                        (settings.copy_translated_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
+                        (settings.copy_history_checkbox, settings.translator_engine_label, settings.translator_combo),
+                        (settings.history_checkbox, settings.result_window_label, settings.result_window_control),
+                        (settings.replace_select_all_checkbox, settings.translation_font_label, settings.translation_font_control),
                     )
                     for checkbox, label, combo in rows:
                         self.assertLessEqual(checkbox.sizeHint().width(), checkbox.width(), checkbox.text())
@@ -254,8 +255,8 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertLess(label_rect.right(), combo_rect.left())
                         self.assertEqual(box_rect.center().y(), combo_rect.center().y())
                     self.assertLess(
-                        self.rect_in(settings, settings.history_checkbox).bottom(),
-                        self.rect_in(settings, settings.settings_action_panel).top(),
+                        self.rect_in(settings, settings.close_result_on_outside_click_checkbox).bottom(),
+                        self.rect_in(settings, settings.ocr_languages_btn).top(),
                     )
                     for page in range(3):
                         settings._set_settings_page(page)

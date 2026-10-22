@@ -2668,7 +2668,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Start with Windows", "Enable this so Click'n'Translate is ready after you sign in."),
         "start_minimized": ("Start in shadow mode", "Enable this so automatic startup opens the compact shadow view instead of the full window."),
         "actions_panel": ("Settings actions", "Clear cache removes temporary files; Reset restores behaviour settings without changing the interface language; Update checks releases. The second row opens language packages and both histories; the last row opens hotkeys."),
-        "settings_page_updates": ("More settings", "Open the OCR and updates tab for screen capture behaviour, updates, settings transfer and diagnostics."),
+        "settings_page_updates": ("More settings", "Open Translation and OCR for engines, selected-text translation and result window behaviour."),
         "ocr_behavior": ("OCR behaviour", "Here you control window visibility, frozen or dimmed capture, clipboard restoration and quiet notifications."),
         "export_settings": ("Export settings", "Save your complete configuration to a JSON file for backup or another computer."),
         "import_settings": ("Import settings", "Restore a configuration file. The interface returns to the first settings page afterwards."),
@@ -2683,7 +2683,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Запуск вместе с ОС", "Включите, чтобы Click'n'Translate был готов сразу после входа в Windows."),
         "start_minimized": ("Запуск в режиме тени", "Включите, чтобы при автозапуске открывался компактный режим тени, а не полное окно."),
         "actions_panel": ("Кнопки настроек", "«Очистить кэш» удаляет временные файлы; «Сброс» возвращает настройки поведения, но не меняет язык интерфейса; «Обновление» проверяет релизы. Ниже — языковые пакеты, обе истории и настройка горячих клавиш."),
-        "settings_page_updates": ("Дополнительные настройки", "Откройте вкладку «OCR и обновления»: здесь захват экрана, перенос настроек и диагностика."),
+        "settings_page_updates": ("Дополнительные настройки", "Откройте вкладку «Перевод и OCR»: здесь движки, перевод выделения и поведение результата."),
         "ocr_behavior": ("Поведение OCR", "Здесь настраиваются видимость окна, заморозка или затемнение захвата, восстановление буфера и тихие уведомления."),
         "export_settings": ("Экспорт настроек", "Сохраните всю конфигурацию в JSON для резервной копии или переноса на другой компьютер."),
         "import_settings": ("Импорт настроек", "Восстановите конфигурацию из файла. После импорта настройки откроются с первой страницы."),
@@ -2698,7 +2698,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Iniciar con Windows", "Actívalo para que Click'n'Translate esté listo al iniciar sesión."),
         "start_minimized": ("Iniciar en modo sombra", "Actívalo para que el inicio automático abra la vista compacta."),
         "actions_panel": ("Acciones de ajustes", "Borrar caché elimina temporales; Restablecer recupera el comportamiento sin cambiar el idioma; Actualizar busca versiones. Debajo están paquetes, historiales y atajos."),
-        "settings_page_updates": ("Más ajustes", "Abre la pestaña OCR y actualizaciones para configurar la captura, transferencia y diagnóstico."),
+        "settings_page_updates": ("Más ajustes", "Abre Traducción y OCR para los motores, la selección y la ventana de resultados."),
         "ocr_behavior": ("Comportamiento OCR", "Controla visibilidad, captura congelada u oscurecida, restauración del portapapeles y avisos silenciosos."),
         "export_settings": ("Exportar ajustes", "Guarda toda la configuración en JSON para copiarla o usarla en otro equipo."),
         "import_settings": ("Importar ajustes", "Restaura un archivo de configuración y vuelve a la primera página."),
@@ -2713,7 +2713,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Mit Windows starten", "Aktivieren, damit Click'n'Translate nach der Anmeldung bereit ist."),
         "start_minimized": ("Im Schattenmodus starten", "Aktivieren, damit der Autostart die kompakte Ansicht öffnet."),
         "actions_panel": ("Einstellungsaktionen", "Cache leeren entfernt Temporäres; Zurücksetzen stellt Verhalten wieder her, ohne die Sprache zu ändern; Aktualisieren sucht Releases. Darunter: Pakete, Verläufe und Hotkeys."),
-        "settings_page_updates": ("Weitere Einstellungen", "Der Tab OCR und Updates enthält Aufnahmeverhalten, Übertragung und Diagnose."),
+        "settings_page_updates": ("Weitere Einstellungen", "Übersetzung und OCR enthält Engines, Auswahlübersetzung und Ergebnisfenster."),
         "ocr_behavior": ("OCR-Verhalten", "Hier steuern Sie Sichtbarkeit, eingefrorene oder abgedunkelte Aufnahme, Zwischenablage und stille Hinweise."),
         "export_settings": ("Einstellungen exportieren", "Die komplette Konfiguration als JSON sichern oder auf einen anderen PC übertragen."),
         "import_settings": ("Einstellungen importieren", "Eine Konfiguration laden; danach erscheint wieder die erste Seite."),
@@ -2728,7 +2728,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Démarrer avec Windows", "Activez cette option pour que Click'n'Translate soit prêt à la connexion."),
         "start_minimized": ("Démarrer en mode ombre", "Activez-la pour que le démarrage automatique ouvre la vue compacte."),
         "actions_panel": ("Actions des réglages", "Vider le cache supprime les temporaires ; Réinitialiser restaure le comportement sans changer la langue ; Mise à jour cherche les versions. Dessous : modules, historiques et raccourcis."),
-        "settings_page_updates": ("Autres réglages", "L’onglet OCR et mises à jour contient les réglages de capture, transfert et diagnostic."),
+        "settings_page_updates": ("Autres réglages", "Traduction et OCR contient les moteurs, la sélection et la fenêtre de résultat."),
         "ocr_behavior": ("Comportement OCR", "Réglez visibilité, capture figée ou assombrie, restauration du presse-papiers et notifications discrètes."),
         "export_settings": ("Exporter les réglages", "Enregistrez toute la configuration en JSON pour une sauvegarde ou un autre PC."),
         "import_settings": ("Importer les réglages", "Restaurez un fichier de configuration puis revenez à la première page."),
@@ -2743,7 +2743,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("随 Windows 启动", "启用后，登录系统时 Click'n'Translate 会自动就绪。"),
         "start_minimized": ("以影子模式启动", "启用后，自动启动时会打开紧凑视图。"),
         "actions_panel": ("设置操作", "清理缓存会删除临时文件；重置会恢复行为设置但保留界面语言；更新会检查新版本。下方还有语言包、两种历史记录和快捷键。"),
-        "settings_page_updates": ("更多设置", "打开“OCR 与更新”选项卡，可设置捕获行为、迁移设置和诊断。"),
+        "settings_page_updates": ("更多设置", "打开“翻译与 OCR”选项卡，设置引擎、选区翻译和结果窗口。"),
         "ocr_behavior": ("OCR 行为", "可设置窗口可见性、冻结或变暗捕获画面、恢复剪贴板和静默通知。"),
         "export_settings": ("导出设置", "将完整配置保存为 JSON，以便备份或迁移到另一台电脑。"),
         "import_settings": ("导入设置", "从文件恢复配置；完成后会返回设置第一页。"),
@@ -8997,27 +8997,34 @@ class DarkThemeApp(QMainWindow):
             return
         lang = self.current_interface_language
 
-        box = QMessageBox(self)
-        box.setWindowTitle(update_text(lang, "launch_title"))
-        box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        box.setIcon(QMessageBox.Information)
-        box.setText(update_text(lang, "launch_prompt", latest=latest_version, current=APP_VERSION))
-        update_btn = box.addButton(update_text(lang, "launch_update"), QMessageBox.AcceptRole)
-        skip_btn = box.addButton(update_text(lang, "launch_skip"), QMessageBox.DestructiveRole)
-        later_btn = box.addButton(update_text(lang, "launch_later"), QMessageBox.RejectRole)
-        box.setDefaultButton(update_btn)
-        box.exec_()
-
-        clicked = box.clickedButton()
-        if clicked is skip_btn:
-            # Remembered, so this version is never offered again; a newer one
-            # still is.
+        # Keep the offer and subsequent download in the app's own viewport.
+        self.show_settings()
+        from inline_update import result, page
+        settings = self.settings_window
+        result(settings, update_text(lang, "launch_prompt", latest=latest_version, current=APP_VERSION),
+               update_text(lang, "launch_update"), settings.check_for_updates,
+               update_text(lang, "launch_later"), settings._leave_update_page)
+        panel = page(settings)
+        def skip():
             self.config["skipped_update_version"] = latest_version
             self.save_config()
-        elif clicked is update_btn:
-            self._start_update_from_launch_prompt()
-        elif clicked is later_btn:
-            pass  # asked again next start
+            settings._leave_update_page()
+        panel.extra.setText(update_text(lang, "launch_skip"))
+        panel.extra.clicked.connect(skip)
+        panel.extra.show()
+
+    def _show_pending_update_failure(self):
+        from pathlib import Path
+        path = Path(get_data_file("update-failure.txt"))
+        if not path.is_file():
+            return
+        try:
+            error = path.read_text(encoding="utf-8")[:4000]
+            path.unlink()
+        except OSError:
+            return
+        self.show_settings()
+        self.settings_window._on_update_failed(error)
 
     def _start_update_from_launch_prompt(self):
         if getattr(self, "settings_window", None) is None:
@@ -9149,13 +9156,20 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"ocr_engine", "translator", "result_window", "language_packages", "hotkeys"}:
+                if action in {"ocr_engine", "translator", "result_window", "language_packages"}:
+                    page = 1
+                elif action == "hotkeys":
                     page = 0
                 elif action == "game_controls":
                     page = 2
                 if page is not None and settings._settings_page_index != page:
                     settings._set_settings_page(page)
                     changed = True
+            if not main_action and settings is not None:
+                target = self._guide_target_widget(action)
+                if target is not None:
+                    from settings_categories import reveal
+                    reveal(settings, target)
             self.main_layout.activate()
             if getattr(self, "settings_window", None) is not None:
                 self.settings_window.layout().activate()
@@ -11844,6 +11858,12 @@ class DarkThemeApp(QMainWindow):
         dialog.exec_()
 
     def closeEvent(self, event):
+        settings = getattr(self, 'settings_window', None) or getattr(self, '_cached_settings_window', None)
+        if (not getattr(self, 'force_quit', False) and settings is not None
+                and getattr(settings, '_update_in_progress', False)):
+            event.ignore()
+            settings._handle_update_progress_close_attempt()
+            return
         if not self.force_quit and self.has_tray():
             # Сворачиваем в трей вместо закрытия
             event.ignore()
@@ -12531,6 +12551,8 @@ if __name__ == "__main__":
     # После обновления главное окно всегда показывается: пользователь должен
     # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
     show_after_update = "--show-after-update" in sys.argv or _show_after_instance_replacement
+    if "--show-after-update" in sys.argv:
+        QTimer.singleShot(1500, window._show_pending_update_failure)
     if LAYOUT_EDITOR_MODE:
         window.show()
         from layout_editor import start_layout_editor

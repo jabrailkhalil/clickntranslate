@@ -1715,7 +1715,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR behavior",
         "updates_heading": "Updates",
         "settings_page_main": "General settings",
-        "settings_page_updates": "OCR and updates",
+        "settings_page_updates": "Translation and OCR",
         "settings_page_game": "Dynamic translation",
         "game_settings_heading": "Dynamic translation",
         "game_intro": 'Select text on screen. Translation overlays it and updates automatically. Enable separate output to choose another area.',
@@ -1852,7 +1852,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Поведение OCR",
         "updates_heading": "Обновления",
         "settings_page_main": "Основные настройки",
-        "settings_page_updates": "OCR и обновления",
+        "settings_page_updates": "Перевод и OCR",
         "settings_page_game": "Динамический перевод",
         "game_settings_heading": "Динамический перевод",
         "game_intro": 'Выделите текст на экране. Перевод появится поверх него и будет обновляться сам. Для отдельного вывода включите «Не накладывать на текст».',
@@ -1942,7 +1942,7 @@ SETTINGS_TEXT = {
         "selection_quick_translate_tooltip": "Показывает кнопку перевода рядом с выделением в других приложениях или переводит сразу. Использует языковую пару для перевода выделения из горячих клавиш. На macOS нужен универсальный доступ; на Linux — PRIMARY selection (на Wayland может не работать). Не работает во время OCR и динамического перевода.",
         "selection_quick_translate_mode_button": "Показывать кнопку после выделения",
         "selection_quick_translate_mode_automatic": "Переводить сразу после выделения",
-        "close_result_window_on_outside_click": "Закрывать окно перевода кликом снаружи",
+        "close_result_window_on_outside_click": "Закрывать результат кликом снаружи",
         "close_result_window_on_outside_click_tooltip": "Окно перевода закроется, если кликнуть другое приложение или мимо него — нажимать крестик не нужно.",
         "copy_hotkey_label": "Горячая клавиша для копирования",
         "translate_hotkey_label": "Перевод выделенного (OCR)",
@@ -1989,7 +1989,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Comportamiento de OCR",
         "updates_heading": "Actualizaciones",
         "settings_page_main": "Ajustes generales",
-        "settings_page_updates": "OCR y actualizaciones",
+        "settings_page_updates": "Traducción y OCR",
         "settings_page_game": "Traducción dinámica",
         "game_settings_heading": "Traducción dinámica",
         "game_intro": 'Selecciona texto en pantalla. La traducción lo cubre y se actualiza sola. Activa la salida separada para elegir otra zona.',
@@ -2125,7 +2125,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR-Verhalten",
         "updates_heading": "Updates",
         "settings_page_main": "Allgemeine Einstellungen",
-        "settings_page_updates": "OCR und Updates",
+        "settings_page_updates": "Übersetzung und OCR",
         "settings_page_game": "Dynamische Übersetzung",
         "game_settings_heading": "Dynamische Übersetzung",
         "game_intro": 'Text auf dem Bildschirm wählen. Die Übersetzung überlagert ihn und aktualisiert sich automatisch. Für eine andere Position die separate Ausgabe aktivieren.',
@@ -2261,7 +2261,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "Comportement OCR",
         "updates_heading": "Mises à jour",
         "settings_page_main": "Réglages généraux",
-        "settings_page_updates": "OCR et mises à jour",
+        "settings_page_updates": "Traduction et OCR",
         "settings_page_game": "Traduction dynamique",
         "game_settings_heading": "Traduction dynamique",
         "game_intro": 'Sélectionnez du texte. La traduction le recouvre et se met à jour automatiquement. Activez la sortie séparée pour choisir une autre zone.',
@@ -2397,7 +2397,7 @@ SETTINGS_TEXT = {
         "ocr_behavior_heading": "OCR 行为",
         "updates_heading": "更新",
         "settings_page_main": "常规设置",
-        "settings_page_updates": "OCR 与更新",
+        "settings_page_updates": "翻译与 OCR",
         "settings_page_game": "动态翻译",
         "game_settings_heading": "动态翻译",
         "game_intro": '框选屏幕文字，译文会覆盖原文并自动更新。启用独立输出可选择另一处显示译文。',
@@ -6919,6 +6919,9 @@ class SettingsWindow(QWidget):
         if checkbox is None:
             return
         enabled = checkbox.isChecked()
+        mode_combo = getattr(self, "selection_quick_translate_mode_combo", None)
+        if mode_combo is not None:
+            mode_combo.setEnabled(enabled)
         for widget in (
             getattr(self, "selection_quick_translate_mode_button", None),
             getattr(self, "selection_quick_translate_mode_automatic", None),
@@ -6938,17 +6941,11 @@ class SettingsWindow(QWidget):
                 return
         self.auto_save_setting("selection_quick_translate_enabled", bool(enabled))
         self._refresh_selection_quick_translate_mode_enabled()
-        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
-        if callable(sync):
-            sync()
 
     def _set_selection_quick_translate_mode(self, mode):
         if mode not in ("button", "automatic"):
             return
         self.auto_save_setting("selection_quick_translate_mode", mode)
-        sync = getattr(self.parent, "_sync_selection_quick_translate", None)
-        if callable(sync):
-            sync()
 
     def _set_translation_result_font_size(self, *_args):
         control = getattr(self, "translation_font_control", None)
@@ -7433,6 +7430,8 @@ class SettingsWindow(QWidget):
         self.ui_scale_control = None
         self.ui_scale_value = None
         self.translation_font_control = None
+        self._update_progress = None
+        self.selection_quick_translate_mode_combo = None
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -7457,6 +7456,8 @@ class SettingsWindow(QWidget):
         self.clear_main_layout()
 
     def init_ui(self):
+        if self._update_in_progress and getattr(self, 'settings_pages', None) is not None:
+            return
         # Every visit starts from the compact general page.  Remembering page
         # 2/3 made Settings appear empty or unfamiliar on the next opening.
         page_to_restore = 0
@@ -8417,6 +8418,8 @@ class SettingsWindow(QWidget):
         self.main_layout.addWidget(self.settings_pages, 1)
         # Apply shared styling only after every page has been recreated.
         # Earlier calls could reach deleted controls from the previous visit.
+        from settings_categories import organize
+        organize(self, general_layout, form_grid, updates_layout, dim_row)
         self._apply_action_panel_style()
         self._set_control_hints()
         self._position_settings_updates_page()
@@ -8454,6 +8457,9 @@ class SettingsWindow(QWidget):
             launch()
 
     def _set_settings_page(self, index):
+        progress = getattr(self, '_update_progress', None)
+        if self._update_in_progress and progress is not None:
+            index = self.settings_pages.indexOf(progress)
         updates_page = getattr(self, "settings_updates_page", None)
         game_page = getattr(self, "settings_game_page", None)
         if updates_page is None or game_page is None:
@@ -8882,69 +8888,6 @@ class SettingsWindow(QWidget):
         lang = self.parent.current_interface_language
         shell_layout = self._create_secondary_shell(settings_text(lang, "hotkeys"))
 
-        quick_card = QFrame()
-        quick_card.setObjectName("secondaryCard")
-        quick_layout = QVBoxLayout(quick_card)
-        quick_layout.setContentsMargins(12, 9, 12, 9)
-        quick_layout.setSpacing(6)
-        self.selection_quick_translate_checkbox = QCheckBox(
-            settings_text(lang, "selection_quick_translate_enabled")
-        )
-        self.selection_quick_translate_checkbox.setObjectName("settingsPageCheckbox")
-        self.selection_quick_translate_checkbox.setToolTip(
-            settings_text(lang, "selection_quick_translate_tooltip")
-        )
-        self.selection_quick_translate_checkbox.setChecked(
-            self.parent.config.get("selection_quick_translate_enabled") is True
-        )
-        quick_layout.addWidget(self.selection_quick_translate_checkbox)
-        mode_row = QHBoxLayout()
-        mode_row.setSpacing(12)
-        self.selection_quick_translate_mode_button = QRadioButton(
-            settings_text(lang, "selection_quick_translate_mode_button")
-        )
-        self.selection_quick_translate_mode_button.setObjectName("settingsPageRadio")
-        self.selection_quick_translate_mode_automatic = QRadioButton(
-            settings_text(lang, "selection_quick_translate_mode_automatic")
-        )
-        self.selection_quick_translate_mode_automatic.setObjectName("settingsPageRadio")
-        saved_mode = str(self.parent.config.get("selection_quick_translate_mode") or "button")
-        if saved_mode == "automatic":
-            self.selection_quick_translate_mode_automatic.setChecked(True)
-        else:
-            self.selection_quick_translate_mode_button.setChecked(True)
-        mode_row.addWidget(self.selection_quick_translate_mode_button)
-        mode_row.addWidget(self.selection_quick_translate_mode_automatic)
-        mode_row.addStretch(1)
-        quick_layout.addLayout(mode_row)
-        self._refresh_selection_quick_translate_mode_enabled()
-        self.selection_quick_translate_checkbox.toggled.connect(
-            self._set_selection_quick_translate_enabled
-        )
-        self.selection_quick_translate_mode_button.toggled.connect(
-            lambda checked: self._set_selection_quick_translate_mode("button") if checked else None
-        )
-        self.selection_quick_translate_mode_automatic.toggled.connect(
-            lambda checked: self._set_selection_quick_translate_mode("automatic") if checked else None
-        )
-        self.close_result_on_outside_click_checkbox = QCheckBox(
-            settings_text(lang, "close_result_window_on_outside_click")
-        )
-        self.close_result_on_outside_click_checkbox.setObjectName("settingsPageCheckbox")
-        self.close_result_on_outside_click_checkbox.setToolTip(
-            settings_text(lang, "close_result_window_on_outside_click_tooltip")
-        )
-        self.close_result_on_outside_click_checkbox.setChecked(
-            self.parent.config.get("close_result_window_on_outside_click") is True
-        )
-        self.close_result_on_outside_click_checkbox.toggled.connect(
-            lambda checked: self.auto_save_setting(
-                "close_result_window_on_outside_click", bool(checked)
-            )
-        )
-        quick_layout.addWidget(self.close_result_on_outside_click_checkbox)
-        shell_layout.addWidget(quick_card)
-
         hotkey_card = QFrame()
         hotkey_card.setObjectName("secondaryCard")
         hotkey_grid = QGridLayout(hotkey_card)
@@ -9051,10 +8994,6 @@ class SettingsWindow(QWidget):
         shell_layout.addLayout(footer)
 
         self._refresh_secondary_view_theme()
-        for radio in (self.selection_quick_translate_mode_button,
-                      self.selection_quick_translate_mode_automatic):
-            radio.setToolTip(tooltip_text(
-                f'{radio.text()}\n{settings_text(lang, "selection_quick_translate_tooltip")}'))
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
         if hasattr(self.parent, "_complete_guide_step"):
             self.parent._complete_guide_step("hotkeys")
@@ -9720,16 +9659,10 @@ class SettingsWindow(QWidget):
             return
 
         if not getattr(sys, "frozen", False):
-            msg = QMessageBox(self)
-            msg.setWindowTitle(settings_text(lang, "update"))
-            msg.setText(update_text(lang, "dev_build"))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == yes_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
+            from inline_update import result
+            result(self, update_text(lang, "dev_build"), settings_text(lang, "open"),
+                   lambda: webbrowser.open(GITHUB_RELEASES_PAGE),
+                   settings_text(lang, "back"), self._leave_update_page)
             return
 
         if self._update_in_progress:
@@ -9738,6 +9671,8 @@ class SettingsWindow(QWidget):
         self._start_update_check()
 
     def _start_update_check(self):
+        if self._update_in_progress:
+            return
         lang = self.parent.current_interface_language
         self._set_parent_update_flow_active(True)
         self._update_cancel_requested.clear()
@@ -9762,48 +9697,26 @@ class SettingsWindow(QWidget):
             text = settings_text(self.parent.current_interface_language, "update")
         self.update_btn.setEnabled(enabled)
         self.update_btn.setText(text)
+        for tab in getattr(self, 'settings_page_tabs', ()):
+            tab.setEnabled(enabled)
+
+    def _leave_update_page(self):
+        if self._update_in_progress:
+            self._handle_update_progress_close_attempt()
+            return
+        self._set_parent_update_flow_active(False)
+        self._set_settings_page(0)
 
     def _show_update_progress(self, text, determinate=False, value=0):
-        title = settings_text(self.parent.current_interface_language, "update")
-        if not hasattr(self, "_update_progress") or self._update_progress is None:
-            self._update_progress = UpdateProgressDialog(self)
-            self._update_progress.setWindowTitle(title)
-            self._update_progress.setCancelButtonText(settings_text(self.parent.current_interface_language, "cancel"))
-            self._update_progress.setWindowModality(Qt.NonModal)
-            self._update_progress.setAutoClose(False)
-            self._update_progress.setAutoReset(False)
-            self._update_progress.setMinimumDuration(0)
-            self._update_progress.setMinimumWidth(430)
-            self._update_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            try:
-                owner_window = self.window()
-                owner_center = owner_window.frameGeometry().center()
-                progress_frame = self._update_progress.frameGeometry()
-                progress_frame.moveCenter(owner_center)
-                self._update_progress.move(progress_frame.topLeft())
-            except Exception:
-                pass
-        else:
-            try:
-                self._update_progress.setWindowTitle(title)
-            except Exception:
-                pass
-        try:
-            self._update_progress.setWindowModality(Qt.NonModal)
-        except Exception:
-            pass
-        try:
-            self._update_progress.setLabelText(text)
-        except Exception:
-            pass
+        from inline_update import page
+        current = page(self)
+        current.setLabelText(text)
+        current.setRange(0, 100 if determinate else 0)
         if determinate:
-            self._update_progress.setRange(0, 100)
-            self._update_progress.setValue(max(0, min(100, int(value))))
-        else:
-            self._update_progress.setRange(0, 0)
-        if not self._update_progress.isVisible() and not getattr(self._update_progress, "_user_minimized", False):
-            self._update_progress.show()
-        self._update_progress.bring_to_front()
+            current.setValue(max(0, min(100, int(value))))
+        cancelable = self._is_update_cancelable()
+        current.actions(secondary=settings_text(self.parent.current_interface_language, "cancel") if cancelable else "",
+                        secondary_callback=self._handle_update_progress_close_attempt)
 
     @QtCore.pyqtSlot(str)
     def _on_update_progress_text(self, text):
@@ -9830,20 +9743,10 @@ class SettingsWindow(QWidget):
         self._set_update_controls_enabled(False, update_text(lang, "downloading_button"))
 
     def _hide_update_progress(self):
-        if hasattr(self, "_update_progress") and self._update_progress is not None:
-            progress = self._update_progress
-            try:
-                progress.blockSignals(True)
-                progress.hide()
-                progress.deleteLater()
-            except Exception:
-                pass
-            finally:
-                try:
-                    progress.blockSignals(False)
-                except Exception:
-                    pass
-            self._update_progress = None
+        # Terminal states stay on the same embedded page until Back is pressed.
+        current = getattr(self, "_update_progress", None)
+        if current is not None:
+            current.progress.hide()
 
     def _cleanup_update_temp_dir(self):
         temp_dir = getattr(self, "_update_temp_dir", "") or ""
@@ -9871,11 +9774,6 @@ class SettingsWindow(QWidget):
             self._show_update_progress(
                 update_text(lang, "apply_wait"),
                 determinate=False
-            )
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "apply_close"),
             )
             return
 
@@ -9974,113 +9872,42 @@ class SettingsWindow(QWidget):
 
     @QtCore.pyqtSlot(str)
     def _on_update_check_result(self, payload_text):
+        from inline_update import result
         lang = self.parent.current_interface_language
         self._update_in_progress = False
         self._update_phase = "idle"
         self._set_update_controls_enabled(True)
-        self._hide_update_progress()
-
+        self._set_parent_update_flow_active(False)
         try:
             payload = json.loads(payload_text)
         except Exception:
             payload = {"status": "error", "error": update_text(lang, "parse_failed")}
-
         status = payload.get("status")
-        latest_version = payload.get("latest_version") or APP_VERSION
-
+        latest = payload.get("latest_version") or APP_VERSION
+        back = settings_text(lang, "back")
         if status == "cancelled" or self._update_cancel_requested.is_set():
-            self._set_parent_update_flow_active(False)
             self._update_cancel_requested.clear()
-            self._cleanup_update_temp_dir()
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "check_cancelled"),
-            )
-            return
-
-        if status == "error":
-            self._set_parent_update_flow_active(False)
-            QMessageBox.warning(
-                self,
-                update_text(lang, "error_title"),
-                payload.get("error", update_text(lang, "unknown_error")),
-            )
-            return
-
-        if status == "up_to_date":
-            self._set_parent_update_flow_active(False)
-            QMessageBox.information(
-                self,
-                settings_text(lang, "update"),
-                update_text(lang, "up_to_date", version=APP_VERSION),
-            )
-            return
-
-        if status in ("no_asset", "invalid_asset"):
-            self._set_parent_update_flow_active(False)
-            msg = QMessageBox(self)
-            msg.setWindowTitle(settings_text(lang, "update"))
-            msg.setText(update_text(lang, "no_asset"))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            yes_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "cancel"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == yes_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
-            return
-
-        if status == "ready" and not platform_support.supports_in_app_update():
-            self._set_parent_update_flow_active(False)
-            # Only the Windows build ships the helpers that replace the running
-            # app. Elsewhere the new version is announced and the user updates
-            # through whatever installed it (a new AppImage, their package
-            # manager), which is what Linux desktop apps do.
-            msg = QMessageBox(self)
-            msg.setWindowTitle(update_text(lang, "available_title"))
-            msg.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            open_btn = msg.addButton(settings_text(lang, "open"), QMessageBox.YesRole)
-            msg.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
-            msg.exec_()
-            if msg.clickedButton() == open_btn:
-                webbrowser.open(GITHUB_RELEASES_PAGE)
-            return
-
-        if status == "ready":
-            asset_name = payload.get("asset_name") or f"ClicknTranslate-v{latest_version}.zip"
-            asset_url = payload.get("asset_url")
-            checksum_url = payload.get("checksum_url")
-            if not asset_url:
-                self._set_parent_update_flow_active(False)
-                QMessageBox.warning(
-                    self,
-                    update_text(lang, "error_title"),
-                    update_text(lang, "invalid_url"),
-                )
-                return
-
-            confirm = QMessageBox(self)
-            confirm.setWindowTitle(update_text(lang, "available_title"))
-            confirm.setIcon(QMessageBox.Question)
-            confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-            confirm.setText(update_text(lang, "available_prompt", latest=latest_version, current=APP_VERSION))
-            yes_btn = confirm.addButton(settings_text(lang, "install"), QMessageBox.YesRole)
-            confirm.addButton(settings_text(lang, "later"), QMessageBox.NoRole)
-            confirm.exec_()
-            if confirm.clickedButton() != yes_btn:
-                self._set_parent_update_flow_active(False)
-                return
-
-            self._start_update_download(asset_url, asset_name, latest_version, checksum_url)
-            return
-
-        self._set_parent_update_flow_active(False)
+            result(self, update_text(lang, "check_cancelled"), back, self._leave_update_page)
+        elif status == "error":
+            result(self, payload.get("error", update_text(lang, "unknown_error")),
+                   settings_text(lang, "update"), self._start_update_check, back, self._leave_update_page)
+        elif status == "up_to_date":
+            result(self, update_text(lang, "up_to_date", version=APP_VERSION), back, self._leave_update_page)
+        elif status == "ready" and payload.get("asset_url") and platform_support.supports_in_app_update():
+            def install():
+                self._set_parent_update_flow_active(True)
+                self._start_update_download(payload['asset_url'], payload['asset_name'], latest, payload.get('checksum_url', ''))
+            result(self, update_text(lang, "available_prompt", latest=latest, current=APP_VERSION),
+                   settings_text(lang, "install"), install, settings_text(lang, "later"), self._leave_update_page)
+        else:
+            result(self, update_text(lang, "no_asset"), settings_text(lang, "open"),
+                   lambda: webbrowser.open(GITHUB_RELEASES_PAGE), back, self._leave_update_page)
 
     def _start_update_download(self, asset_url, asset_name, latest_version, checksum_url=""):
+        if self._update_in_progress:
+            return
         lang = self.parent.current_interface_language
+        self._set_parent_update_flow_active(True)
         self._update_in_progress = True
         self._update_phase = "preparing_download"
         self._update_temp_dir = ""
@@ -10095,6 +9922,16 @@ class SettingsWindow(QWidget):
         worker.start()
 
     def _pick_update_asset(self, assets):
+        if not platform_support.IS_WINDOWS:
+            from posix_update import update_target, pick_asset
+            target = update_target()
+            if target is None:
+                # Still recognize the correct platform when announcing releases
+                # for an install managed outside the app.
+                kind = "macos" if platform_support.IS_MAC else "appimage"
+            else:
+                kind = target[0]
+            return pick_asset(assets, kind)
         installed_copy = _is_inno_installed_copy()
         if installed_copy:
             setup_assets = []
@@ -10162,7 +9999,7 @@ class SettingsWindow(QWidget):
     def _pick_checksum_url(self, assets, asset_name):
         if not asset_name:
             return ""
-        base_name = re.sub(r"\.(zip|exe)$", "", asset_name.lower())
+        base_name = re.sub(r"\.(tar\.gz|appimage|zip|exe)$", "", asset_name.lower())
         direct_name = f"{asset_name.lower()}"
         direct_txt_name = f"{direct_name}.txt"
         candidates = set()
@@ -10203,13 +10040,15 @@ class SettingsWindow(QWidget):
         # the exact filename; a substring or another platform's hash is invalid.
         if len(lines) == 1 and re.fullmatch(r"[0-9a-fA-F]{64}", lines[0]):
             return lines[0].lower()
+        def matches_name(name):
+            return name.lower() in (archive_name, "./" + archive_name, "releases/" + archive_name)
         matches = []
         for line in lines:
             gnu = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?(.+)", line)
             bsd = re.fullmatch(r"SHA256\s*\((.+)\)\s*=\s*([0-9a-fA-F]{64})", line, re.IGNORECASE)
-            if gnu and gnu[2].lower() == archive_name:
+            if gnu and matches_name(gnu[2]):
                 matches.append(gnu[1].lower())
-            elif bsd and bsd[1].lower() == archive_name:
+            elif bsd and matches_name(bsd[1]):
                 matches.append(bsd[2].lower())
         return matches[0] if len(matches) == 1 else ""
 
@@ -10404,7 +10243,9 @@ class SettingsWindow(QWidget):
             safe_name = os.path.basename(asset_name or f"ClicknTranslate-v{latest_version}.zip")
             package_path = os.path.join(temp_dir, safe_name)
             package_kind = os.path.splitext(safe_name)[1].lower()
-            if package_kind not in (".zip", ".exe"):
+            if safe_name.lower().endswith(".tar.gz"):
+                package_kind = ".tar.gz"
+            if package_kind not in (".zip", ".exe", ".appimage", ".AppImage", ".tar.gz"):
                 raise RuntimeError("Unsupported update package type.")
             if package_kind == ".exe" and not _is_inno_installed_copy():
                 raise RuntimeError("Installer updates are available only for an installed copy.")
@@ -10458,7 +10299,6 @@ class SettingsWindow(QWidget):
             self._check_update_cancel_requested()
             self._update_phase = "preparing"
             _emit_stage_text(stage_prepare)
-            self._update_phase = "applying"
             ok, err = self._launch_apply_updater(
                 package_path,
                 package_kind,
@@ -10502,6 +10342,21 @@ class SettingsWindow(QWidget):
             )
 
     def _launch_apply_updater(self, package_path, package_kind, latest_version):
+        if not platform_support.IS_WINDOWS:
+            try:
+                from posix_update import prepare, launch
+                plan = prepare(package_path, latest_version)
+                self._check_update_cancel_requested()
+                self._update_phase = "applying"
+                launch(plan, get_data_file("update-failure.txt"))
+                return True, None
+            except Exception as error:
+                if 'plan' in locals():
+                    shutil.rmtree(plan['stage'], ignore_errors=True)
+                if self._update_cancel_requested.is_set():
+                    raise UpdateCancelledError("Update cancelled") from error
+                return False, str(error)
+        self._update_phase = "applying"
         if portable_paths.is_windows_packaged():
             return False, "Microsoft Store manages updates for this package"
         if not getattr(sys, "frozen", False):
@@ -10539,6 +10394,8 @@ class SettingsWindow(QWidget):
             "--exe", _encoded(exe_name),
             "--version", str(latest_version),
             "--pid", str(os.getpid()),
+            "--quiet", "true",
+            "--result", _encoded(get_data_file("update-failure.txt")),
         ]
         try:
             requires_elevation = self._install_dir_requires_elevation(app_dir)
@@ -10556,6 +10413,7 @@ class SettingsWindow(QWidget):
                     [helper_path, *arguments],
                     cwd=tempfile.gettempdir(),
                     close_fds=True,
+                    **platform_support.no_window_kwargs(),
                 )
             return True, None
         except Exception as error:
@@ -11177,11 +11035,8 @@ finally {
         self._hide_update_progress()
 
         lang = self.parent.current_interface_language
-        QMessageBox.information(
-            self,
-            settings_text(lang, "update"),
-            update_text(lang, "cancelled"),
-        )
+        from inline_update import result
+        result(self, update_text(lang, "cancelled"), settings_text(lang, "back"), self._leave_update_page)
 
     @pyqtSlot(str)
     def _on_update_failed(self, error_text):
@@ -11191,20 +11046,10 @@ finally {
         self._cleanup_update_temp_dir()
         self._update_cancel_requested.clear()
         self._set_update_controls_enabled(True)
-        if hasattr(self, "_update_progress") and self._update_progress is not None:
-            try:
-                self._update_progress.close()
-            except Exception:
-                pass
-            self._update_progress = None
-
         lang = self.parent.current_interface_language
-        friendly_error = self._friendly_update_error(error_text, lang)
-        QMessageBox.warning(
-            self,
-            update_text(lang, "error_title"),
-            friendly_error,
-        )
+        from inline_update import result
+        result(self, self._friendly_update_error(error_text, lang), settings_text(lang, "update"),
+               self._start_update_check, settings_text(lang, "back"), self._leave_update_page)
 
     def _friendly_update_error(self, error_text, lang=None):
         raw = str(error_text or "").strip()
@@ -11253,6 +11098,17 @@ finally {
             },
         }
         lowered = raw.lower()
+        if not platform_support.IS_WINDOWS and any(token in lowered for token in (
+                'permission', 'not writable', 'writable application folder', 'access is denied')):
+            locations = {
+                'ru': 'Папка приложения недоступна для записи. Переместите приложение в свою папку Applications или домашнюю папку и повторите обновление. Текущая версия сохранена.',
+                'en': 'The application folder is not writable. Move the app to your own Applications or home folder and retry. The current version was kept.',
+                'es': 'No se puede escribir en la carpeta. Mueve la aplicación a tu carpeta Applications o personal y reintenta. Se conservó la versión actual.',
+                'de': 'Der App-Ordner ist nicht beschreibbar. Verschieben Sie die App in Ihren Applications- oder persönlichen Ordner und versuchen Sie es erneut. Die aktuelle Version blieb erhalten.',
+                'fr': 'Le dossier est protégé en écriture. Déplacez l’application dans votre dossier Applications ou personnel et réessayez. La version actuelle est conservée.',
+                'zh': '应用文件夹不可写。请将应用移到个人 Applications 或主目录后重试，当前版本已保留。',
+            }
+            return locations.get(language, locations['en'])
         if any(token in lowered for token in ("incompleteread", "connection", "timeout", "interrupted repeatedly", "download")):
             key = "network"
         elif any(token in lowered for token in ("checksum", "sha256", "not a valid", "not a zip", "damaged")):
@@ -11310,6 +11166,7 @@ finally {
         dark = self.parent.current_theme != "Светлая"
         colors = button_palette(dark)
         for name, object_name in (("settings_action_panel", "settingsActionPanel"),
+                                  ("translation_action_panel", "settingsActionPanel"),
                                   ("settings_transfer_panel", "settingsTransferPanel")):
             panel = getattr(self, name, None)
             if panel is not None and not sip.isdeleted(panel):
@@ -11322,13 +11179,13 @@ finally {
             ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
             ("reset_btn", "danger", 1, (0, 0, 0, 0)),
             ("update_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("ocr_languages_btn", "secondary", 0, (0, 0, 0, 0)),
+            ("ocr_languages_btn", "secondary", 0, (6, 0, 6, 0)),
             ("copy_history_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("translation_history_btn", "secondary", 2, (0, 0, 0, 0)),
+            ("translation_history_btn", "secondary", 2, (0, 6, 0, 6)),
             ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
-            ("export_settings_btn", "secondary", 0, (6, 0, 6, 0)),
+            ("export_settings_btn", "secondary", 0, (0, 0, 0, 0)),
             ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("create_bug_report_btn", "secondary", 2, (0, 6, 0, 6)),
+            ("create_bug_report_btn", "secondary", 2, (0, 0, 0, 0)),
         )
         for name, role, column, corners in specs:
             button = getattr(self, name, None)
@@ -11521,6 +11378,7 @@ finally {
         for combo_name in (
             "ocr_engine_combo",
             "translator_combo",
+            "selection_quick_translate_mode_combo",
             "game_source_combo",
             "game_target_combo",
         ):

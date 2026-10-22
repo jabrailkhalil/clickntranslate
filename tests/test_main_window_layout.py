@@ -546,13 +546,12 @@ class MainWindowGeometryTest(unittest.TestCase):
                     for info in panel.overlay._detached_buttons.values()
                 }
                 self.assertTrue({
-                    "export_settings_btn",
-                    "import_settings_btn",
-                    "create_bug_report_btn",
-                    "update_check_on_launch_checkbox",
+                    "ocr_engine_combo", "translator_combo",
+                    "close_result_on_outside_click_checkbox",
+                    "selection_quick_translate_checkbox",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
-                self.assertNotIn("ocr_engine_combo", detached_keys)
+                self.assertNotIn("export_settings_btn", detached_keys)
                 self.assertTrue(
                     any(
                         target["id"] == "settings-actions"
