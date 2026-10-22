@@ -80,6 +80,7 @@ def test_libretranslate_key_is_sent_only_to_selected_server(custom_url):
     post.assert_called_once()
     assert post.call_args.args[0] == (custom_url or 'https://libretranslate.com') + '/translate'
     assert post.call_args.kwargs['json']['api_key'] == 'test-only-key'
+    assert post.call_args.kwargs['allow_redirects'] is False
 
 
 def test_provider_failure_never_caches_a_substitute_translation():

@@ -7,7 +7,7 @@ from PyQt5 import QtCore, QtWidgets
 
 import main
 from test_desktop_ux import app, window
-from ui_scaling import widget_global_point, widget_global_rect, widget_popup_geometry
+from ui_scaling import BASE_SCALE, widget_global_point, widget_global_rect, widget_popup_geometry
 
 
 @pytest.mark.parametrize('scale', [80, 100, 150])
@@ -27,7 +27,7 @@ def test_header_anchor_uses_viewport_coordinates_after_moving_between_monitors(w
         assert widget_global_point(flag, local) == expected
         rect = widget_global_rect(flag)
     assert rect.center().x() > origin.x()
-    assert rect.width() >= flag.width() * scale / 80 - 2
+    assert rect.width() >= flag.width() * scale / BASE_SCALE - 2
 
 
 @pytest.mark.parametrize('bounds', [QtCore.QRect(1920, 0, 1920, 1080), QtCore.QRect(-1600, -200, 1600, 900)])

@@ -226,7 +226,10 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.window.current_interface_language = language
                     settings.update_language()
                     self.settle()
-                    self.assertEqual((settings.width(), settings.height()), (672, 346))
+                    # A fractional Cocoa proxy edge rounds to either adjacent
+                    # logical pixel; the body must still fit its fixed bounds.
+                    self.assertLessEqual(abs(settings.width() - 672), 1)
+                    self.assertEqual(settings.height(), 346)
                     navigation = self.rect_in(self.window, settings.settings_page_navigation)
                     self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 1)
                     self.assertLessEqual(abs(navigation.center().x() - self.window.ui_root.rect().center().x()), 1)
@@ -243,9 +246,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.settle()
                     rows = (
                         (settings.copy_translated_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
-                        (settings.copy_history_checkbox, settings.translator_engine_label, settings.translator_combo),
-                        (settings.history_checkbox, settings.result_window_label, settings.result_window_control),
-                        (settings.replace_select_all_checkbox, settings.translation_font_label, settings.translation_font_control),
+                        (settings.replace_select_all_checkbox, settings.translator_engine_label, settings.translator_combo),
                     )
                     for checkbox, label, combo in rows:
                         self.assertLessEqual(checkbox.sizeHint().width(), checkbox.width(), checkbox.text())
@@ -255,7 +256,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertLess(label_rect.right(), combo_rect.left())
                         self.assertEqual(box_rect.center().y(), combo_rect.center().y())
                     self.assertLess(
-                        self.rect_in(settings, settings.close_result_on_outside_click_checkbox).bottom(),
+                        self.rect_in(settings, settings.selection_quick_translate_mode_automatic).bottom(),
                         self.rect_in(settings, settings.ocr_languages_btn).top(),
                     )
                     for page in range(3):

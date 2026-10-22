@@ -207,14 +207,7 @@ EASYOCR_PIP_PACKAGES_ANY_PYTHON = (
 # Do not apply this lock to an untested future Python version either.
 EASYOCR_PINNED_PYTHONS = {(3, 12), (3, 13)}
 
-TRANSLATOR_ENGINE_OPTIONS = (
-    ("google", "Google", "online"),
-    ("argos", "Argos", "offline"),
-    (HYMT_ENGINE_KEY, HYMT_ENGINE_DISPLAY, "offline"),
-    ("mymemory", "MyMemory", "online"),
-    ("lingva", "Lingva", "online"),
-    ("libretranslate", "LibreTranslate", "online"),
-)
+from provider_catalog import TRANSLATION_PROVIDERS as TRANSLATOR_ENGINE_OPTIONS
 
 
 def _update_feed_api_url():
@@ -330,8 +323,8 @@ def _populate_grouped_translator_combo(
     groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     engines_by_index = []
-    for kind in ("online", "offline"):
-        combo.addItem(f"  {groups[kind]}", None)
+    for kind in ("online", "offline", "api"):
+        combo.addItem(f"  {groups.get(kind, 'API')}", None)
         header_index = combo.count() - 1
         engines_by_index.append(None)
         _configure_engine_group_header(combo, header_index, foreground)
@@ -532,9 +525,14 @@ class DropDownCombo(QComboBox):
 
     def showPopup(self):
         self.aboutToShowPopup.emit()
+        from language_search import prepare_language_search
+        prepare_language_search(self)
         self._prepare_popup()
         super().showPopup()
         self._layout_open_popup()
+        search = getattr(self, '_language_search', None)
+        if search is not None:
+            search.setFocus(Qt.PopupFocusReason)
         # Cocoa synchronizes a newly created QGraphicsProxyWidget after Show.
         # That can overwrite the scene position with unscaled window coordinates.
         self._queue_popup_layout()
@@ -1154,6 +1152,13 @@ def _populate_grouped_ocr_combo(
             _ocr_combo_tooltip(engine, lang),
             Qt.ToolTipRole,
         )
+    from api_providers import VISION_ENGINES
+    from provider_settings import provider_text
+    combo.addItem('  API', None)
+    _configure_engine_group_header(combo, combo.count() - 1, foreground)
+    for name in VISION_ENGINES:
+        combo.addItem(name, name)
+        combo.setItemData(combo.count() - 1, tooltip_text(provider_text(lang, 'help')), Qt.ToolTipRole)
 
 
 OCR_DETAIL_TEXT = {
@@ -1215,6 +1220,9 @@ TRANSLATOR_DETAIL_TEXT = {
 
 
 def _translator_combo_tooltip(engine, name, kind, lang):
+    if kind == 'api':
+        from provider_settings import provider_text
+        return name + ' · API\n' + provider_text(lang, 'help')
     kind_text = _provider_kind_text(kind, lang)
     details = TRANSLATOR_DETAIL_TEXT.get(lang, TRANSLATOR_DETAIL_TEXT["en"])
     return f"{name}: {kind_text}. {details.get(engine, '')}".strip()
@@ -2549,6 +2557,9 @@ SETTINGS_EXPORT_SCHEMA = 1
 def settings_export_payload(config):
     """Return a portable, JSON-only settings document."""
     safe = json.loads(json.dumps(dict(config or {}), ensure_ascii=False))
+    if 'api_providers' in safe:
+        from api_providers import clean_profiles
+        safe['api_providers'] = clean_profiles(safe['api_providers'])
     return {
         "format": SETTINGS_EXPORT_FORMAT,
         "schema": SETTINGS_EXPORT_SCHEMA,
@@ -2578,6 +2589,10 @@ def validated_import_settings(payload, defaults):
         if key not in defaults:
             continue
         default = defaults[key]
+        if key == 'api_providers':
+            from api_providers import clean_profiles
+            accepted[key] = clean_profiles(value)
+            continue
         valid = False
         if isinstance(default, bool):
             valid = isinstance(value, bool)
@@ -4641,6 +4656,10 @@ class OcrLanguageManagerDialog(QDialog):
                 "status": (
                     self._status_checking()
                     if checking else
+                    {'ru': 'Язык не поддерживается этим движком', 'en': 'Language not supported by this engine',
+                     'es': 'Idioma no compatible con este motor', 'de': 'Sprache von dieser Engine nicht unterstützt',
+                     'fr': 'Langue non prise en charge par ce moteur', 'zh': '此引擎不支持该语言'}.get(self.lang, 'Language not supported by this engine')
+                    if not groups else
                     self._status_engine_missing(EASYOCR_ENGINE_DISPLAY)
                     if not engine_ready else
                     self._status_installed()
@@ -4648,7 +4667,7 @@ class OcrLanguageManagerDialog(QDialog):
                     self._status_can_download()
                 ),
                 "checked": installed,
-                "selectable": bool(engine_ready and not installed),
+                "selectable": bool(groups and engine_ready and not installed),
             })
         self._set_language_rows(table, rows)
 
@@ -11179,9 +11198,11 @@ finally {
             ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
             ("reset_btn", "danger", 1, (0, 0, 0, 0)),
             ("update_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("ocr_languages_btn", "secondary", 0, (6, 0, 6, 0)),
+            ("ocr_languages_btn", "secondary", 0, (6, 0, 0, 0)),
             ("copy_history_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("translation_history_btn", "secondary", 2, (0, 6, 0, 6)),
+            ("translation_history_btn", "secondary", 2, (0, 6, 0, 0)),
+            ("api_connections_button", "secondary", 0, (0, 0, 0, 0)),
+            ("ocr_options_button", "secondary", 0, (0, 0, 6, 6)),
             ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
             ("export_settings_btn", "secondary", 0, (0, 0, 0, 0)),
             ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
@@ -11738,6 +11759,18 @@ finally {
         self.ocr_engine_combo.blockSignals(False)
 
     def handle_ocr_engine_change(self, text):
+        from api_providers import VISION_ENGINES, validate, ProviderError
+        if text in VISION_ENGINES:
+            self.save_ocr_engine(text)
+            provider = VISION_ENGINES[text]
+            try:
+                item = validate(provider, self.parent.config)
+                if not item['vision']:
+                    raise ProviderError('Image input is disabled')
+            except ProviderError:
+                from provider_settings import show_provider_settings
+                QtCore.QTimer.singleShot(0, lambda: show_provider_settings(self, provider))
+            return
         if text == RAPIDOCR_ENGINE_DISPLAY:
             self._handle_rapidocr_engine_change()
             return
@@ -11878,6 +11911,8 @@ finally {
 
     def save_ocr_engine(self, text):
         self.auto_save_setting("ocr_engine", text)
+        from provider_settings import refresh_provider_routing
+        refresh_provider_routing(self)
 
     def _local_hymt_dir(self):
         return os.path.join(self._portable_app_dir(), "translators", "hymt")
@@ -12006,6 +12041,15 @@ finally {
                 value = choice
                 self._set_translator_combo_silently(value)
         self.auto_save_setting('translator_engine', value)
+        from provider_settings import refresh_provider_routing
+        refresh_provider_routing(self)
+        if value in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+            from api_providers import validate, ProviderError
+            try:
+                validate(value, self.parent.config)
+            except ProviderError:
+                from provider_settings import show_provider_settings
+                QtCore.QTimer.singleShot(0, lambda: show_provider_settings(self, value))
 
     def start_download_thread(self):
         self.start_tesseract_install()

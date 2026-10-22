@@ -236,6 +236,7 @@ DEFAULT_CONFIG = {
     "first_run_guide_pending": False,
     "ocr_engine": platform_support.default_ocr_engine(),
     "translator_engine": "Google",
+    "api_providers": {},
     "allow_online_provider_fallback": False,
     "copy_history": False,
     "copy_translated_text": False,
@@ -2221,14 +2222,7 @@ def translation_session_filter(lang="en"):
     )
 
 
-TRANSLATION_PROVIDER_OPTIONS = (
-    ("google", "Google", "online"),
-    ("argos", "Argos", "offline"),
-    ("hymt", "Hy-MT", "offline"),
-    ("mymemory", "MyMemory", "online"),
-    ("lingva", "Lingva", "online"),
-    ("libretranslate", "LibreTranslate", "online"),
-)
+from provider_catalog import TRANSLATION_PROVIDERS as TRANSLATION_PROVIDER_OPTIONS
 
 PROVIDER_GROUP_TEXT = {
     "en": {"online": "Online", "offline": "Offline"},
@@ -2754,6 +2748,30 @@ GUIDE_TOUR_EXTRAS = {
     },
 }
 
+
+for _guide_lang, _bodies in {
+    'en': ('Startup, history, tooltips, updates, result window behaviour, interface scale and result text size.',
+           'Choose OCR and translation engines, API connections, selection behaviour and language packages.',
+           'Clear cache, reset or update the app; export or import settings, create a bug report, or configure hotkeys.'),
+    'ru': ('Запуск, история, подсказки, обновления, поведение окна результата, масштаб интерфейса и размер текста.',
+           'Движки OCR и перевода, API-подключения, работа с выделением и языковые пакеты.',
+           'Очистка кэша, сброс и обновление; экспорт, импорт, баг-репорт и настройка горячих клавиш.'),
+    'es': ('Inicio, historial, ayudas, actualizaciones, ventana de resultado, escala y tamaño del texto.',
+           'Motores OCR y de traducción, conexiones API, selección y paquetes de idioma.',
+           'Borrar caché, restablecer y actualizar; exportar, importar, informe de errores y atajos.'),
+    'de': ('Start, Verlauf, Hinweise, Updates, Ergebnisfenster, Skalierung und Textgröße.',
+           'OCR- und Übersetzungsdienste, API-Verbindungen, Textauswahl und Sprachpakete.',
+           'Cache löschen, zurücksetzen und aktualisieren; Export, Import, Fehlerbericht und Tastenkürzel.'),
+    'fr': ('Démarrage, historique, aides, mises à jour, fenêtre de résultat, échelle et taille du texte.',
+           'Moteurs OCR et traduction, connexions API, sélection et modules de langue.',
+           'Vider le cache, réinitialiser et mettre à jour ; export, import, rapport de bug et raccourcis.'),
+    'zh': ('启动、历史、提示、更新、结果窗口、界面缩放和结果文字大小。',
+           'OCR 和翻译引擎、API 连接、文本选择和语言包。',
+           '清除缓存、重置、更新、导出、导入、错误报告和快捷键设置。'),
+}.items():
+    for _key, _body in zip(('settings_page_main', 'settings_page_updates', 'actions_panel'), _bodies):
+        _title = GUIDE_TOUR_EXTRAS[_guide_lang][_key][0]
+        GUIDE_TOUR_EXTRAS[_guide_lang][_key] = (_title, _body)
 
 GUIDE_TOUR_ORDER = GUIDE_SETUP_ORDER
 
@@ -4547,8 +4565,9 @@ class TranslationResultDialog(QDialog):
 
     def set_window_engine(self, engine):
         """Set an initial/followed provider without changing the app or sending text."""
-        self.window_engine = str(engine)
-        key = self.window_engine.lower().replace('hy-mt', 'hymt')
+        from provider_catalog import provider_id
+        key = provider_id(engine)
+        self.window_engine = next((name for known, name, _kind in TRANSLATION_PROVIDER_OPTIONS if known == key), str(engine))
         with QtCore.QSignalBlocker(self.engine_combo):
             index = self.engine_combo.findData(key)
             if index < 0:
@@ -4568,12 +4587,13 @@ class TranslationResultDialog(QDialog):
         self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
 
     def _on_engine_changed(self, *_args):
+        from provider_catalog import provider_id
         key = self.engine_combo.currentData()
-        if not key or key == self.window_engine.lower().replace('hy-mt', 'hymt'):
+        if not key or key == provider_id(self.window_engine):
             return
         self._engine_override = True
         self._invalidate_request()
-        self.set_window_engine(self.engine_combo.currentText())
+        self.set_window_engine(key)
         self._start_retranslate()
 
     def _reflow_engine_header(self, available_width=None):
@@ -6522,6 +6542,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
             if kind == "online"
         }
+        from api_providers import configured_engines
+        available_engines.update(configured_engines(get_cached_config()))
         # Keep an explicitly selected offline engine even when its package was
         # removed. Reopening a local session must never select an online engine.
         if selected_engine in {engine for engine, _name, _kind in TRANSLATION_PROVIDER_OPTIONS}:
@@ -6540,7 +6562,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.provider_combo.blockSignals(True)
         self.provider_combo.clear()
         groups = PROVIDER_GROUP_TEXT.get(self.lang, PROVIDER_GROUP_TEXT["en"])
-        for kind in ("online", "offline"):
+        for kind in ("online", "offline", "api"):
             options = [
                 option
                 for option in TRANSLATION_PROVIDER_OPTIONS
@@ -6548,7 +6570,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             ]
             if not options:
                 continue
-            self.provider_combo.addItem(f"  {groups[kind]}", None)
+            self.provider_combo.addItem(f"  {groups.get(kind, 'API')}", None)
             self.provider_combo.set_group_header(self.provider_combo.count() - 1)
             for engine, _name, _kind in options:
                 self.provider_combo.addItem(provider_display_name(engine, self.lang), engine)
@@ -8039,19 +8061,16 @@ class DarkThemeApp(QMainWindow):
         return pairs
 
     def _main_translation_source_codes(self):
-        pairs = self._available_main_translation_pairs()
-        return (['auto'] if any(source == 'auto' for source, _ in pairs) else []) + [
-            language.code
-            for language in APP_LANGUAGES
-            if any(source == language.code for source, _target in pairs)
-        ]
+        # Lists are linear in catalog size. Building every possible pair and
+        # scanning it for every source made larger catalogs noticeably stall.
+        return (['auto'] if supports_auto_source(self.config.get('translator_engine', 'Google')) else []) + [
+            language.code for language in APP_LANGUAGES]
 
     def _main_translation_target_codes(self, source_code):
-        pairs = self._available_main_translation_pairs()
         return [
             language.code
             for language in APP_LANGUAGES
-            if (source_code, language.code) in pairs
+            if language.code != source_code
         ]
 
     def _configured_main_translation_pair(self):
@@ -9156,9 +9175,9 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"ocr_engine", "translator", "result_window", "language_packages"}:
+                if action in {"ocr_engine", "translator", "language_packages"}:
                     page = 1
-                elif action == "hotkeys":
+                elif action in {"hotkeys", "result_window"}:
                     page = 0
                 elif action == "game_controls":
                     page = 2

@@ -95,8 +95,16 @@ def offer_provider_recovery(parent, issue, options, language='en', *, allow_down
     combo.setMinimumHeight(32)
     label.setBuddy(combo)
     for engine, name, kind in options:
+        if kind == 'api':
+            from api_providers import validate, ProviderError
+            from main import get_cached_config
+            try:
+                validate(engine, get_cached_config())
+            except ProviderError:
+                continue
         if engine != issue.engine and missing_provider(engine, issue.source, issue.target) is None:
-            combo.addItem(f'{name} · {recovery_text(language, kind)}', engine)
+            kind_label = 'API' if kind == 'api' else recovery_text(language, kind)
+            combo.addItem(f'{name} · {kind_label}', engine)
     combo.setStyleSheet(modern_combo_style(box._dark, 14))
     combo.set_popup_background('#20212a' if box._dark else '#f1edf4')
     box.body_layout.insertWidget(box.body_layout.count() - 1, label)

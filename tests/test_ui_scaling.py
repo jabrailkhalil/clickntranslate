@@ -289,6 +289,10 @@ class UiScalingTest(unittest.TestCase):
         # timer and the queued popup layout settle before calculating a click
         # position; coordinates taken before this wait may already be stale.
         QTest.qWait(QApplication.doubleClickInterval() + 20)
+        if getattr(combo, '_language_search', None) is not None:
+            # The searchable picker starts in the search field. Down enters
+            # its result list; End then navigates to the final language.
+            QTest.keyClick(self.controller.view.viewport(), Qt.Key_Down)
         QTest.keyClick(self.controller.view.viewport(), Qt.Key_End)
         self.settle()
         last = combo.count() - 1
@@ -408,16 +412,16 @@ class UiScalingTest(unittest.TestCase):
                     self.assertTrue(settings.ui_scale_control.isVisible())
                     self.assertEqual(settings.ui_scale_value.text(), '150%')
                     self.assertLess(settings.ui_scale_label.geometry().right(), settings.ui_scale_control.geometry().left())
-                    for control in (
-                        settings.ocr_engine_combo,
-                        settings.translator_combo,
-                        settings.result_window_control,
-                        settings.translation_font_control,
-                    ):
-                        self.assertEqual(settings.ocr_engine_combo.x(), control.x())
+                    for control in (settings.result_window_control, settings.translation_font_control):
+                        self.assertEqual(settings.ui_scale_control.x(), control.x())
                     self.assertEqual(settings.ui_scale_control.width(), control.width())
                     self.assertAlmostEqual(settings.ui_scale_control.height(), control.height(), delta=1)
                     self.assertTrue(settings.settings_general_page.isAncestorOf(settings.ui_scale_control))
+                    settings._set_settings_page(1)
+                    self.settle()
+                    self.assertEqual(settings.ocr_engine_combo.x(), settings.translator_combo.x())
+                    self.assertEqual(settings.ocr_engine_combo.size(), settings.translator_combo.size())
+                    settings._set_settings_page(0)
 
     def test_screen_changes_clamp_size_without_losing_the_preference(self):
         self.window.set_ui_scale_percent(200)

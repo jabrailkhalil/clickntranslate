@@ -14,7 +14,7 @@ def test_named_result_font_steps_and_live_preview_fit_every_locale(window, app, 
     window.set_interface_language(language)
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
+    settings._set_settings_page(0)
     app.processEvents()
     control = settings.translation_font_control
     preview = settings.translation_font_preview
@@ -30,11 +30,10 @@ def test_named_result_font_steps_and_live_preview_fit_every_locale(window, app, 
         bounds = preview.fontMetrics().boundingRect(preview.text())
         assert bounds.width() <= preview.contentsRect().width(), (language, key, bounds, preview.contentsRect())
         assert bounds.height() <= preview.contentsRect().height(), (language, key, bounds, preview.contentsRect())
-        assert settings.translation_settings_scroll.viewport().rect().contains(
-            QtCore.QRect(preview.mapTo(settings.translation_settings_scroll.viewport(), QtCore.QPoint()), preview.size()))
+        assert settings.settings_general_page.rect().contains(
+            QtCore.QRect(preview.mapTo(settings.settings_general_page, QtCore.QPoint()), preview.size()))
         assert settings.translation_font_label.buddy() is control
-    ordered = (settings.ocr_engine_combo, settings.translator_combo,
-               settings.result_window_control, control, preview)
+    ordered = (settings.result_window_control, settings.ui_scale_control, control, preview)
     for above, below in zip(ordered, ordered[1:]):
         assert above.geometry().bottom() < below.geometry().top()
     assert settings.ui_scale_field.size() == control.size()
@@ -46,7 +45,7 @@ def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
         window.toggle_theme()
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
+    settings._set_settings_page(0)
     app.processEvents()
     fields = (settings.ocr_engine_combo, settings.translator_combo,
               settings.result_window_control, settings.ui_scale_field,
@@ -54,7 +53,7 @@ def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
     border = '#d7cde7' if window.current_theme == 'Светлая' else '#3d3948'
     boxes = []
     for field in fields:
-        settings._set_settings_page(0 if field is settings.ui_scale_field else 1)
+        settings._set_settings_page(1 if field in (settings.ocr_engine_combo, settings.translator_combo) else 0)
         app.processEvents()
         field.clearFocus()
         field.setAttribute(QtCore.Qt.WA_UnderMouse, False)
@@ -78,7 +77,7 @@ def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
 def test_font_arrows_and_keyboard_are_bounded_and_refresh_an_open_result(window, app):
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
+    settings._set_settings_page(0)
     app.processEvents()
     control = settings.translation_font_control
     dialog = main.show_translation_dialog(window, 'Result', source_text='Original', auto_copy=False)
@@ -113,7 +112,7 @@ def test_font_arrows_and_keyboard_are_bounded_and_refresh_an_open_result(window,
 
 def test_font_choice_center_does_not_leave_a_text_selection(window, app):
     window.show_settings()
-    window.settings_window._set_settings_page(1)
+    window.settings_window._set_settings_page(0)
     app.processEvents()
     control = window.settings_window.translation_font_control
     controller = window._ui_scale_controller
@@ -128,7 +127,7 @@ def test_font_choice_center_does_not_leave_a_text_selection(window, app):
 @pytest.mark.parametrize('direction,endpoint', [('decrease', 'xsmall'), ('increase', 'xlarge')])
 def test_mouse_clicking_to_font_limit_does_not_transfer_keyboard_highlight(window, app, direction, endpoint):
     window.show_settings()
-    window.settings_window._set_settings_page(1)
+    window.settings_window._set_settings_page(0)
     app.processEvents()
     control = window.settings_window.translation_font_control
     controller = window._ui_scale_controller
@@ -148,7 +147,7 @@ def test_mouse_clicking_to_font_limit_does_not_transfer_keyboard_highlight(windo
 
 def test_keyboard_steps_after_a_mouse_click_keep_real_keyboard_focus(window, app):
     window.show_settings()
-    window.settings_window._set_settings_page(1)
+    window.settings_window._set_settings_page(0)
     app.processEvents()
     control = window.settings_window.translation_font_control
     controller = window._ui_scale_controller

@@ -43,7 +43,11 @@ def test_data_is_outside_the_signed_app_even_for_workers(mac, monkeypatch):
     assert portable_paths.portable_base_dir() == str(mac / "Library/Application Support/ClicknTranslate")
     assert platform_support.default_ocr_engine() == "Apple Vision"
     assert "windows" not in platform_support.available_ocr_engines()
-    assert not platform_support.supports_in_app_update()
+    # Ownership, rather than a platform name alone, enables POSIX updates.
+    with mock.patch('posix_update.update_target', return_value=None):
+        assert not platform_support.supports_in_app_update()
+    with mock.patch('posix_update.update_target', return_value={'path': str(mac / 'ClicknTranslate.app')}):
+        assert platform_support.supports_in_app_update()
 
 
 def test_autostart_round_trip_preserves_paths_and_other_agents(mac, monkeypatch):
@@ -319,7 +323,10 @@ def test_macos_engine_picker_has_vision_and_no_windows(mac, app):
     combo = QComboBox()
     settings._populate_grouped_ocr_combo(combo, 'ru', installed_engines={'Apple Vision'})
     engines = [combo.itemData(i) for i in range(combo.count()) if combo.itemData(i)]
-    assert engines == ['Apple Vision', 'Tesseract', 'RapidOCR', 'EasyOCR']
+    assert engines[:4] == ['Apple Vision', 'Tesseract', 'RapidOCR', 'EasyOCR']
+    from api_providers import VISION_ENGINES
+    assert set(engines[4:]) == set(VISION_ENGINES)
+    assert 'Windows' not in engines
 
 
 def test_macos_permission_copy_is_localized():

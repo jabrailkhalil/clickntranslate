@@ -131,7 +131,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         expected_tail = ["Windows", "RapidOCR"] if platform_support.supports_windows_ocr() else ["RapidOCR"]
         if platform_support.IS_MAC:
             expected_tail.insert(0, "Apple Vision")
-        self.assertEqual(ocr_values[2:], expected_tail)
+        self.assertEqual(ocr_values[2:2 + len(expected_tail)], expected_tail)
+        from api_providers import VISION_ENGINES
+        self.assertEqual(set(ocr_values[2 + len(expected_tail):]), set(VISION_ENGINES))
         tesseract_index = ocr_combo.findData("Tesseract")
         self.assertIn("classic OCR", ocr_combo.itemData(tesseract_index, Qt.ToolTipRole))
 
@@ -258,7 +260,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         parent.show()
         settings.show()
         self.app.processEvents()
-        settings._set_settings_page(1)
+        settings._set_settings_page(0)
         self.app.processEvents()
         return parent, settings
 
@@ -274,15 +276,14 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         self.assertEqual(result[2], settings.ocr_engine_combo.width())
         # Native proxy layouts may round their integer heights one pixel apart.
         self.assertAlmostEqual(result[3], settings.ocr_engine_combo.height(), delta=1)
-        self.assertEqual(ocr[0] + ocr[2], result[0] + result[2])
-        self.assertEqual(translator[0] + translator[2], result[0] + result[2])
+        # The result controls now live in General; compare their own column.
+        scale = self._rect_in_settings(settings, settings.ui_scale_control)
+        self.assertEqual(scale[0] + scale[2], result[0] + result[2])
         label = self._rect_in_settings(settings, settings.result_window_label)
         self.assertAlmostEqual(label[1] + label[3] / 2, result[1] + result[3] / 2, delta=.5)
         self.assertTrue(settings.result_window_label.alignment() & Qt.AlignVCenter)
-        # It sits directly below the translator row and shares that row with
-        # the next checkbox, so the left column no longer has a blank gap.
-        self.assertGreater(result[1], translator[1])
-        copy_translated = self._rect_in_settings(settings, settings.history_checkbox)
+        self.assertTrue(settings.settings_general_page.isAncestorOf(control))
+        copy_translated = self._rect_in_settings(settings, settings.autostart_checkbox)
         self.assertLessEqual(
             abs((result[1] + result[3] / 2) -
                 (copy_translated[1] + copy_translated[3] / 2)),
@@ -310,8 +311,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertEqual(ocr[1], self._rect_in_settings(settings, settings.translation_settings_scroll.viewport())[1])
             for checkbox, control in (
                 (self._rect_in_settings(settings, settings.copy_translated_checkbox), ocr),
-                (self._rect_in_settings(settings, settings.copy_history_checkbox), translator),
-                (self._rect_in_settings(settings, settings.history_checkbox), result)
+                (self._rect_in_settings(settings, settings.replace_select_all_checkbox), translator),
+                (self._rect_in_settings(settings, settings.autostart_checkbox), result)
             ):
                 self.assertAlmostEqual(checkbox[1] + checkbox[3] / 2, control[1] + control[3] / 2, delta=.5)
             self.assertTrue(settings.main_layout.alignment() & Qt.AlignTop)
@@ -551,7 +552,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertTrue(settings.settings_page_dots[1].isChecked())
             self.assertTrue(settings.settings_updates_page.isVisible())
             self.assertFalse(settings.update_check_on_launch_checkbox.isVisible())
-            self.assertTrue(settings.close_result_on_outside_click_checkbox.isVisible())
+            self.assertFalse(settings.close_result_on_outside_click_checkbox.isVisible())
             self.assertTrue(settings.settings_action_panel.isHidden())
 
             footer = self._rect_in_settings(settings, settings.settings_page_footer)
@@ -808,7 +809,6 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     self.assertTrue(settings.settings_action_panel.isHidden())
                     self.assertGreaterEqual(overlay[1] - (footer[1] + footer[3]), 6)
                     for widget in (settings.ocr_engine_combo, settings.translator_combo,
-                                   settings.close_result_on_outside_click_checkbox,
                                    settings.selection_quick_translate_checkbox):
                         rect = self._rect_in_settings(settings, widget)
                         self.assertGreaterEqual(rect[0], overlay[0], (theme, language))
@@ -891,7 +891,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         parent, settings = self._result_window_settings()
         try:
             control = settings.translation_font_control
-            history = self._rect_in_settings(settings, settings.replace_select_all_checkbox)
+            history = self._rect_in_settings(settings, settings.copy_history_checkbox)
             label = self._rect_in_settings(settings, settings.translation_font_label)
             font = self._rect_in_settings(settings, control)
             scale = self._rect_in_settings(settings, settings.ui_scale_control)
@@ -900,7 +900,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertEqual(font[2], scale[2])
             self.assertAlmostEqual(font[3], scale[3], delta=1)
             self.assertTrue(settings.settings_general_page.isAncestorOf(settings.ui_scale_control))
-            self.assertTrue(settings.settings_updates_page.isAncestorOf(control))
+            self.assertTrue(settings.settings_general_page.isAncestorOf(control))
             self.assertAlmostEqual(
                 history[1] + history[3] / 2, font[1] + font[3] / 2, delta=3
             )

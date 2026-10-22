@@ -16,6 +16,7 @@ def window():
     ensure_layout_fonts(app)
     with mock.patch.object(main, 'LAYOUT_EDITOR_MODE', True), \
          mock.patch.object(main.DarkThemeApp, 'save_config'), \
+         mock.patch.object(main.DarkThemeApp, 'ensure_mac_accessibility_for_selection', return_value=True), \
          mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False), \
          mock.patch('ui_scaling.MainWindowScaleController.available_geometry', return_value=QRect(0, 0, 3000, 2000)):
         owner = main.DarkThemeApp()
@@ -41,22 +42,24 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
         QApplication.processEvents()
         scroll = settings.translation_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
-        mode = settings.selection_quick_translate_mode_combo
-        option = QStyleOptionComboBox()
-        mode.initStyleOption(option)
-        text_area = mode.style().subControlRect(QStyle.CC_ComboBox, option, QStyle.SC_ComboBoxEditField, mode)
-        for row in range(mode.count()):
-            assert mode.fontMetrics().horizontalAdvance(mode.itemText(row)) <= text_area.width(), (language, mode.itemText(row))
         for control in (settings.ocr_engine_combo, settings.translator_combo,
-                        settings.result_window_control, settings.translation_font_control,
-                        settings.close_result_on_outside_click_checkbox,
-                        settings.selection_quick_translate_checkbox):
+                        settings.selection_quick_translate_checkbox,
+                        settings.selection_quick_translate_mode_automatic):
             rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
             assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
-        for flag in (settings.copy_translated_checkbox, settings.copy_history_checkbox,
-                     settings.history_checkbox, settings.restore_clipboard_checkbox,
-                     settings.close_result_on_outside_click_checkbox):
+        for flag in (settings.copy_translated_checkbox, settings.restore_clipboard_checkbox,
+                     settings.selection_quick_translate_mode_automatic):
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
+        settings._set_settings_page(0)
+        QApplication.processEvents()
+        page = settings.settings_general_page
+        for control in (settings.result_window_control, settings.translation_font_control,
+                        settings.translation_font_preview, settings.ui_scale_control,
+                        settings.copy_history_checkbox, settings.history_checkbox,
+                        settings.close_result_on_outside_click_checkbox):
+            rect = QRect(control.mapTo(page, QPoint()), control.size())
+            assert page.rect().contains(rect), (language, scale, control.objectName(), rect)
+            assert control.isVisible()
 
 
 def test_flags_persist_and_ocr_options_are_reachable(window):
@@ -70,7 +73,7 @@ def test_flags_persist_and_ocr_options_are_reachable(window):
         flag.setChecked(False)
         flag.click()
         assert window.config[key] is True
-    settings.selection_quick_translate_mode_combo.setCurrentIndex(1)
+    settings.selection_quick_translate_mode_automatic.setChecked(True)
     assert window.config['selection_quick_translate_mode'] == 'automatic'
     settings.ocr_options_button.click()
     QApplication.processEvents()
@@ -120,3 +123,35 @@ def test_active_update_survives_settings_rebuild_and_blocks_duplicate_navigation
     settings._on_update_failed('Network interrupted')
     panel.secondary.click()
     assert settings.settings_pages.currentWidget() is settings.settings_general_page
+
+
+@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh'])
+def test_api_editor_fits_and_back_returns_to_translation(window, language):
+    from provider_settings import show_provider_settings
+    from api_providers import PROVIDERS
+    window.set_interface_language(language)
+    window.show_settings()
+    settings=window.settings_window
+    with mock.patch('provider_secrets.get_key',return_value=''):
+        show_provider_settings(settings)
+        page=settings.api_connections_page
+        for spec in PROVIDERS:
+            page.service.setCurrentIndex(page.service.findData(spec.key))
+            QApplication.processEvents()
+            assert page.isVisible()
+            for control in (page.service,page.address,page.key,page.model,page.back,page.save):
+                assert control.isVisible()
+            assert page.key.echoMode() == page.key.Password
+        page.back.click(); QApplication.processEvents()
+        assert settings.settings_pages.currentWidget() is settings.settings_updates_page
+
+
+def test_translation_footer_matches_general_button_rows(window):
+    window.show_settings()
+    settings=window.settings_window
+    assert settings.translation_action_panel.height() == settings.settings_action_panel.height()
+    for button in (settings.ocr_languages_btn,settings.copy_history_btn,settings.translation_history_btn,
+                   settings.api_connections_button,settings.ocr_options_button):
+        assert button.height() == settings.clear_cache_btn.height()
+        assert button.font().pixelSize() == settings.clear_cache_btn.font().pixelSize()
+        assert 'padding:0 6px' in button.styleSheet()

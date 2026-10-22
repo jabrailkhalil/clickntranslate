@@ -1778,6 +1778,9 @@ def installed_ocr_language_codes(engine=None, config=None):
     engine_name = usable_ocr_engine(
         engine or config.get("ocr_engine", platform_support.default_ocr_engine())
     ).strip().lower()
+    from api_providers import VISION_ENGINES
+    if engine_name in {name.lower() for name in VISION_ENGINES}:
+        return [language.code for language in APP_LANGUAGES]
     if engine_name == "apple vision":
         from macos_ocr import language_codes
         return language_codes()
@@ -2087,6 +2090,9 @@ def usable_ocr_engine(engine):
     missing engine instead of simply using the platform default.
     """
     name = str(engine or "").strip()
+    from api_providers import VISION_ENGINES
+    if name.lower() in {label.lower() for label in VISION_ENGINES}:
+        return name
     if name.lower() in platform_support.available_ocr_engines():
         return name
     default = platform_support.default_ocr_engine()
@@ -4656,6 +4662,26 @@ class ScreenCaptureOverlay(QWidget):
         )
         raw_pil_for_ocr = pil_image.convert('L')
 
+        from api_providers import VISION_ENGINES
+        api_engine = {name.lower(): key for name, key in VISION_ENGINES.items()}.get(self.get_ocr_engine().lower())
+        if api_engine:
+            from api_ocr import ApiOCRWorker
+            source, target = self._current_translate_pair() if self.mode == 'translate' else (
+                _combo_data_to_ocr_language(self.lang_combo.currentData(), 'en'), None)
+            self._api_translation = None
+            from api_providers import profile
+            api_config = get_cached_ocr_config()
+            self._api_translation_engine = (api_engine if target and profile(api_engine, api_config)['direct']
+                                            else api_config.get('translator_engine', 'google'))
+            self._api_language_pair = (source, target)
+            self.ocr_worker = ApiOCRWorker(api_engine, pil_image, source, target, get_cached_ocr_config())
+            self._ocr_worker_session_id = session_id
+            self.ocr_worker.result_ready.connect(lambda result, sid=session_id: self._handle_api_ocr_result(result, sid))
+            self.ocr_worker.failed.connect(lambda error, sid=session_id: self._handle_api_ocr_error(error, sid))
+            self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+            self.ocr_worker.start()
+            return
+
         # --- 1. Определяем тёмный/светлый фон ---
         gray = pil_image.convert('L')
         stat = ImageStat.Stat(gray)
@@ -4908,6 +4934,23 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
         self.ocr_worker.start()
 
+    def _handle_api_ocr_result(self, result, session_id):
+        if self._ignore_ocr_results or session_id != self._session_id:
+            return
+        self._api_translation = result
+        self.handle_ocr_result(result.source, session_id)
+
+    def _handle_api_ocr_error(self, error, session_id):
+        if self._ignore_ocr_results or session_id != self._session_id:
+            return
+        self._ocr_in_progress = False
+        self._ocr_worker_session_id = None
+        notify_current_activity('error', f'ocr:{id(self)}')
+        self.hide()
+        lang = get_cached_ocr_config().get('interface_language', 'en')
+        QMessageBox.warning(None, ocr_ui_text(lang, 'translation_failed'), error)
+        self.close()
+
     def handle_ocr_result(self, text, session_id=None):
         try:
             current_session = getattr(self, "_session_id", "unknown")
@@ -4956,7 +4999,13 @@ class ScreenCaptureOverlay(QWidget):
                     f"source_len={len(text)}"
                 )
                 try:
-                    translated_text = translate_text(text, source_code, target_code)
+                    api_result = getattr(self, '_api_translation', None)
+                    if api_result is not None and api_result.source == text:
+                        translated_text = api_result.translation
+                        source_code, target_code = self._api_language_pair
+                        self._api_translation = None
+                    else:
+                        translated_text = translate_text(text, source_code, target_code)
                     if translated_text:
                         logging.info(
                             f"[OCR:{session_id}] Translation completed successfully; "
@@ -5004,7 +5053,7 @@ class ScreenCaptureOverlay(QWidget):
                                 dialog_parent = widget
                                 break
 
-                    show_translation_dialog(
+                    result_dialog = show_translation_dialog(
                         dialog_parent,
                         translated_text,
                         auto_copy=auto_copy,
@@ -5015,6 +5064,9 @@ class ScreenCaptureOverlay(QWidget):
                         target_lang=target_code,
                         result_mode="area",
                     )
+                    if api_result is not None:
+                        result_dialog.set_window_engine(self._api_translation_engine)
+                        result_dialog._engine_override = True
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
                 self.close()
@@ -5473,7 +5525,13 @@ class FullScreenOCRWorker(QtCore.QThread):
             if self.isInterruptionRequested():
                 return
             if self.engine != "windows":
-                lines_data = _recognize_image_layout(self.bitmap, self.engine, self.language_code)
+                from api_providers import VISION_ENGINES, recognize_regions
+                api_engine = {name.lower(): key for name, key in VISION_ENGINES.items()}.get(self.engine)
+                if api_engine:
+                    lines_data = recognize_regions(api_engine, self.bitmap, self.language_code,
+                        getattr(self, 'translation_target_code', None), get_cached_ocr_config(), self.isInterruptionRequested)
+                else:
+                    lines_data = _recognize_image_layout(self.bitmap, self.engine, self.language_code)
                 if not self.isInterruptionRequested():
                     self.result_ready.emit(lines_data)
                 return
@@ -5506,6 +5564,7 @@ class FullScreenOCRWorker(QtCore.QThread):
                     recognized, self.bitmap.pixel_width, self.bitmap.pixel_height)
             logging.info(f"FullScreenOCR: found {len(lines_data)} text blocks")
         except Exception as e:
+            self.error_message = str(e)
             logging.error(f"FullScreenOCRWorker error: {e}")
             import traceback
             traceback.print_exc()
@@ -5826,6 +5885,9 @@ class FullScreenTranslateOverlay(QWidget):
         worker = self.sender() or self.ocr_worker
         if worker is None:
             return
+        if getattr(worker, 'error_message', ''):
+            self._translation_result_ready.emit(int(getattr(worker, 'translation_run_id', -1)), [], worker.error_message)
+            return
         self._on_ocr_complete(
             lines,
             int(getattr(worker, "translation_run_id", -1)),
@@ -5850,7 +5912,8 @@ class FullScreenTranslateOverlay(QWidget):
             return
 
         try:
-            self._lines_data = _group_screen_ocr_lines(lines_data)
+            from api_providers import VisionLayout
+            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data)
             if not self._lines_data:
                 self._fail_translation(run_id, "screen_no_text")
                 return
@@ -5879,7 +5942,9 @@ class FullScreenTranslateOverlay(QWidget):
                 translate_text, engine=engine,
                 cancel_callback=lambda: run_id != self._translation_run_id,
             )
-            translated_texts = _translate_screen_texts(all_texts, translate, src, tgt)
+            translated_texts = getattr(lines_data, 'translations', None)
+            if translated_texts is None:
+                translated_texts = _translate_screen_texts(all_texts, translate, src, tgt)
 
             if translated_texts and any(translated_texts):
                 for i, (x, y, w, h, orig) in enumerate(lines_data):
