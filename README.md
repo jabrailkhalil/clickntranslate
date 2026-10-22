@@ -26,6 +26,8 @@ Windows and macOS builds currently use a **self-signed certificate named `jabrai
 
 **Updates:** Windows uses the Update button in the app. On macOS and Linux, download the new DMG/AppImage and replace the application manually; keep your existing user data. [Update checks and limitations](docs/UPDATE_AUDIT_2026-09-25.md).
 
+**Development 1.8.2:** program and translation preferences are separated; updates use an embedded page, with new Mac/Linux portable update paths. Native platform validation is pending. [Scope and checks](docs/UPDATES_1.8.2_DEVELOPMENT.md).
+
 ## What is included
 
 - Screen OCR, selected-text translation, full-screen overlays and dynamic translation of multiple regions.

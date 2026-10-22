@@ -1,5 +1,17 @@
 # Validation
 
+The settings/update follow-up at source `efdabcd` passed **2073 tests and 915
+subtests**, with **77 skipped and zero failures/errors** in the selected final
+eight partitions (part 3 replaced after updating a brittle source-prefix check).
+Every selected run kept user data unchanged. See
+[`settings-update-validation.json`](../../settings-update-validation.json) and
+[development scope](../../UPDATES_1.8.2_DEVELOPMENT.md). Native Mac/Linux GUI
+replacement still needs its platform runner. Five real Inno installation cases
+were skipped; automatic approval review blocked installing the missing compiler.
+Windows portable replacement and rollback exercised the compiled quiet helper.
+
+## Earlier validation
+
 The latest source at `84e166a195802380ab03776bc90dfcdf1e88ba2e` uses the actual
 hotkey row for the home mascot: caption left, cached thumbnail right, with the
 same typography, padding and pointer states. The offline-translator follow-up
