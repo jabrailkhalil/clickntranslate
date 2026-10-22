@@ -64,7 +64,8 @@ def test_unverified_package_never_reaches_apply_helper(tmp_path, checksum_url, c
     'ClicknTranslate-windows-arm64.zip',
 ])
 def test_windows_never_uses_another_platform_or_service_archive(name):
-    with mock.patch.object(sw, '_is_inno_installed_copy', return_value=False):
+    with mock.patch.object(sw, '_is_inno_installed_copy', return_value=False), \
+         mock.patch.object(sw.platform_support, 'IS_WINDOWS', True):
         assert sw.SettingsWindow._pick_update_asset(None, [
             {'name': name, 'browser_download_url': 'https://example.invalid/file'},
         ]) is None
