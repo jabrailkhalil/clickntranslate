@@ -1,4 +1,4 @@
-// Layout adapted from Astroship by Web3Templates, GPL-3.0. See DESIGN.md.
+// Static Click'n'Translate pages generated from the project's locale content.
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -1,6 +1,8 @@
-# Click'n'Translate
+# clickntranslate
 
 Free, open-source screen OCR and translation for **Windows, Linux and macOS**. Capture text from apps, images and games, translate selected text, or follow changing text in one or more screen regions.
+
+[Website and features](https://translate.clickn.dev/en/) · [Guides](https://clickn.dev/en/guides/) · [All projects](https://clickn.dev/)
 
 **English** · [Русский](docs/readme/README.ru.md) · [简体中文](docs/readme/README.zh-CN.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md)
 
@@ -23,6 +25,8 @@ Windows and macOS builds currently use a **self-signed certificate named `jabrai
 **First launch:** [Windows: SmartScreen and Defender](docs/guides/setup.en.md#windows) · [Mac: opening the app and granting permissions](docs/guides/setup.en.md#macos).
 
 **Updates:** Windows uses the Update button in the app. On macOS and Linux, download the new DMG/AppImage and replace the application manually; keep your existing user data. [Update checks and limitations](docs/UPDATE_AUDIT_2026-09-25.md).
+
+**Development 1.8.2:** program and translation preferences are separated; updates use an embedded page, with new Mac/Linux portable update paths. Native platform validation is pending. [Scope and checks](docs/UPDATES_1.8.2_DEVELOPMENT.md).
 
 ## What is included
 

@@ -18,6 +18,17 @@ GUIDE_SETUP_INTRO = {
     "de": ("Übersetzung für Ihren Alltag", "Zuerst Autostart und Infobereich, dann Übersetzung, Aufnahme und Tastenkürzel. Jeder Schritt erklärt den Nutzen und bietet die passende Aktion. Empfehlungen lassen sich überspringen.", "App einrichten"),
     "fr": ("Configurez votre traducteur", "D’abord le démarrage automatique et la zone de notification, puis la traduction, la capture et les raccourcis. Chaque étape explique son intérêt et permet d’appliquer le réglage. Vous pouvez reporter chaque conseil.", "Configurer l’application"),
     "zh": ("让翻译更适合你", "先设置自动启动和托盘，再配置翻译、屏幕截取及快捷键。每一步都会说明用途，并提供直接应用设置的按钮。任何建议都可以稍后再处理。", "设置应用"),
+
+    'pt': ('Configure a tradução para você',
+     'Comece pelo início automático e pela bandeja. Depois configure a tradução, a captura e os '
+     'atalhos. Cada etapa explica a opção e permite aplicá-la. Você pode deixar qualquer recomendação '
+     'para depois.',
+     'Configure o aplicativo'),
+    'it': ('Configura la traduzione per te',
+     'Inizia dall’avvio automatico e dall’area di notifica, poi configura traduzione, acquisizione e '
+     'scorciatoie. Ogni passaggio spiega un’opzione e permette di applicarla. Puoi rimandare qualsiasi '
+     'consiglio.',
+     "Configura l'app"),
 }
 
 GUIDE_LINUX_BODIES = {
@@ -57,13 +68,34 @@ GUIDE_LINUX_BODIES = {
         "shortcut_replace": "自动替换选中文字目前仅支持 Windows。在 Linux 中，请先翻译所选文字，再手动粘贴结果。",
         "ocr_engine": "Linux 支持 Tesseract、EasyOCR 和 RapidOCR。识别前请安装相应引擎及语言包。此平台不支持 Windows OCR。",
     },
+
+    'pt': {'hotkeys': 'No Linux, atribua atalhos nas configurações de teclado da sua área de trabalho. '
+                'Vincule sua combinação preferida a clickntranslate --ocr. A edição de um campo no '
+                'aplicativo não registra um atalho do sistema.',
+     'shortcut_selection': 'Selecione o texto em outro aplicativo. Nas configurações do teclado Linux, '
+                           'atribua um atalho a clickntranslate --selection para traduzir esse texto.',
+     'shortcut_replace': 'A substituição de seleção automática está atualmente disponível apenas no '
+                         'Windows. No Linux, traduza a seleção e cole o resultado manualmente.',
+     'ocr_engine': 'Linux suporta Tesseract, EasyOCR e RapidOCR. Instale o motor escolhido e seus '
+                   'pacotes de idiomas antes do reconhecimento. Windows OCR não está disponível aqui.'},
+    'it': {'hotkeys': 'Su Linux, assegna scorciatoie nelle impostazioni della tastiera del desktop. Associa '
+                'la tua combinazione preferita a clickntranslate --ocr. La modifica di un campo in-app '
+                'non registra un collegamento di sistema.',
+     'shortcut_selection': "Seleziona il testo in un'altra app. Nelle impostazioni della tastiera "
+                           'Linux, assegna una scorciatoia a clickntranslate --selection per tradurre '
+                           'quel testo.',
+     'shortcut_replace': 'La sostituzione automatica della selezione è attualmente disponibile solo su '
+                         'Windows. Su Linux, traduci la selezione e incolla il risultato manualmente.',
+     'ocr_engine': 'Linux supporta Tesseract, EasyOCR e RapidOCR. Installare il motore scelto ed i '
+                   'relativi pacchetti lingua prima del riconoscimento. Windows OCR non è disponibile '
+                   'qui.'},
 }
 
 # config key: (settings widget, page index, recommended value)
 GUIDE_SETTING_STEPS = {
     "autostart": ("autostart_checkbox", 0, True),
     "start_minimized": ("start_minimized_checkbox", 0, True),
-    "copy_translated_text": ("copy_translated_checkbox", 0, True),
+    "copy_translated_text": ("copy_translated_checkbox", 1, True),
     "history": ("history_checkbox", 0, True),
     "copy_history": ("copy_history_checkbox", 0, True),
     "keep_visible_on_ocr": ("keep_visible_checkbox", 1, False),
@@ -71,16 +103,16 @@ GUIDE_SETTING_STEPS = {
     "dim_screen_during_ocr": ("dim_screen_during_ocr_checkbox", 1, True),
     "restore_clipboard_after_selection": ("restore_clipboard_checkbox", 1, True),
     "notifications": ("copy_notification_checkbox", 1, True),
-    "update_check_on_launch": ("update_check_on_launch_checkbox", 1, True),
+    "update_check_on_launch": ("update_check_on_launch_checkbox", 0, True),
     "game_pause_when_inactive": ("game_pause_inactive_checkbox", 2, True),
 }
 
 GUIDE_SETUP_CHAPTERS = (
-    ("startup", ("settings", "autostart", "start_minimized", "copy_translated_text", "history", "copy_history")),
-    ("translation", ("ocr_engine", "translator", "result_window", "language_packages")),
-    ("capture", ("settings_page_updates", "keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "update_check_on_launch")),
+    ("startup", ("settings", "autostart", "start_minimized", "history", "copy_history", "update_check_on_launch")),
+    ("translation", ("settings_page_updates", "ocr_engine", "translator", "copy_translated_text", "language_packages", "api_connections")),
+    ("capture", ("keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "result_behavior")),
     ("dynamic", ("settings_page_game", "game_controls", "game_pause_when_inactive")),
-    ("finish", ("settings_page_main", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
+    ("finish", ("settings_page_main", "result_window", "result_text", "selection_behavior", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
 )
 GUIDE_SETUP_ORDER = tuple(action for _chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions)
 GUIDE_CHAPTER_BY_ACTION = {action: chapter for chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions}
@@ -88,46 +120,89 @@ GUIDE_CHAPTER_BY_ACTION = {action: chapter for chapter, actions in GUIDE_SETUP_C
 GUIDE_SETUP_LABELS = {
     "ru": {
         "completed": "Гайд завершён",
-        "startup": "Удобный запуск", "translation": "Перевод", "capture": "Экран и обновления", "dynamic": "Динамический перевод", "finish": "Последние штрихи",
+        "startup": "Удобный запуск", "translation": "Перевод", "capture": "Захват экрана", "dynamic": "Динамический перевод", "finish": "Последние штрихи",
         "enable": "Включить и дальше", "disable": "Выключить и дальше", "next": "Далее", "later": "Позже", "open": "Открыть", "close": "Завершить гайд",
         "ready": "Уже настроено", "recommended": "Рекомендуем включить", "recommended_off": "Рекомендуем выключить", "inspect": "Проверьте настройку и продолжайте",
         "failed": "Настройка не применилась. Попробуйте ещё раз.", "done": "Можно переводить!", "done_body": "Готово полезных настроек: {ready} из {total}. Остальные можно включить позже. Гайд доступен в справке.", "finish_button": "Начать работу",
     },
     "en": {
         "completed": "Guide complete",
-        "startup": "Everyday setup", "translation": "Translation", "capture": "Capture and updates", "dynamic": "Dynamic translation", "finish": "Finishing touches",
+        "startup": "Everyday setup", "translation": "Translation", "capture": "Screen capture", "dynamic": "Dynamic translation", "finish": "Finishing touches",
         "enable": "Enable and next", "disable": "Disable and next", "next": "Next", "later": "Later", "open": "Open", "close": "Close guide",
         "ready": "Already configured", "recommended": "Recommended: on", "recommended_off": "Recommended: off", "inspect": "Check the setting, then continue",
         "failed": "The setting did not apply. Please try again.", "done": "Ready to translate!", "done_body": "{ready} of {total} recommended settings are ready. You can change the rest later and reopen this guide from Help.", "finish_button": "Start using the app",
     },
     "es": {
         "completed": "Guía completada",
-        "startup": "Uso diario", "translation": "Traducción", "capture": "Captura y actualizaciones", "dynamic": "Traducción dinámica", "finish": "Últimos ajustes",
+        "startup": "Uso diario", "translation": "Traducción", "capture": "Captura de pantalla", "dynamic": "Traducción dinámica", "finish": "Últimos ajustes",
         "enable": "Activar y seguir", "disable": "Desactivar y seguir", "next": "Siguiente", "later": "Después", "open": "Abrir", "close": "Cerrar guía",
         "ready": "Ya configurado", "recommended": "Recomendado: activar", "recommended_off": "Recomendado: desactivar", "inspect": "Revisa el ajuste y continúa",
         "failed": "No se aplicó el ajuste. Inténtalo de nuevo.", "done": "¡Todo listo para traducir!", "done_body": "Hay {ready} de {total} ajustes recomendados listos. Puedes cambiar el resto después y abrir la guía desde Ayuda.", "finish_button": "Empezar",
     },
     "de": {
         "completed": "Anleitung abgeschlossen",
-        "startup": "Für den Alltag", "translation": "Übersetzung", "capture": "Aufnahme und Updates", "dynamic": "Dynamische Übersetzung", "finish": "Letzte Schritte",
+        "startup": "Für den Alltag", "translation": "Übersetzung", "capture": "Bildschirmaufnahme", "dynamic": "Dynamische Übersetzung", "finish": "Letzte Schritte",
         "enable": "Aktivieren & weiter", "disable": "Deaktivieren & weiter", "next": "Weiter", "later": "Später", "open": "Öffnen", "close": "Anleitung schließen",
         "ready": "Bereits eingerichtet", "recommended": "Empfehlung: aktivieren", "recommended_off": "Empfehlung: deaktivieren", "inspect": "Einstellung prüfen und fortfahren",
         "failed": "Einstellung nicht übernommen. Bitte erneut versuchen.", "done": "Bereit zum Übersetzen!", "done_body": "{ready} von {total} empfohlenen Einstellungen sind bereit. Den Rest können Sie später ändern. Die Anleitung bleibt in der Hilfe verfügbar.", "finish_button": "Loslegen",
     },
     "fr": {
         "completed": "Guide terminé",
-        "startup": "Au quotidien", "translation": "Traduction", "capture": "Capture et mises à jour", "dynamic": "Traduction dynamique", "finish": "Derniers réglages",
+        "startup": "Au quotidien", "translation": "Traduction", "capture": "Capture d’écran", "dynamic": "Traduction dynamique", "finish": "Derniers réglages",
         "enable": "Activer et continuer", "disable": "Désactiver et continuer", "next": "Suivant", "later": "Plus tard", "open": "Ouvrir", "close": "Fermer le guide",
         "ready": "Déjà configuré", "recommended": "Activation conseillée", "recommended_off": "Désactivation conseillée", "inspect": "Vérifiez le réglage, puis continuez",
         "failed": "Le réglage n’a pas été appliqué. Réessayez.", "done": "Prêt à traduire !", "done_body": "{ready} réglages recommandés sur {total} sont prêts. Les autres peuvent attendre. Le guide reste disponible dans l’aide.", "finish_button": "Commencer",
     },
     "zh": {
         "completed": "引导已完成",
-        "startup": "日常使用", "translation": "翻译设置", "capture": "屏幕与更新", "dynamic": "动态翻译", "finish": "最后几步",
+        "startup": "日常使用", "translation": "翻译设置", "capture": "屏幕捕获", "dynamic": "动态翻译", "finish": "最后几步",
         "enable": "启用并继续", "disable": "关闭并继续", "next": "下一步", "later": "稍后", "open": "打开", "close": "关闭引导",
         "ready": "已设置", "recommended": "建议启用", "recommended_off": "建议关闭", "inspect": "检查设置后继续",
         "failed": "设置未生效，请重试。", "done": "可以开始翻译了！", "done_body": "已完成 {total} 项推荐设置中的 {ready} 项。其余可稍后修改，也可从帮助中重新打开引导。", "finish_button": "开始使用",
     },
+
+    'pt': {'completed': 'Guia completo',
+     'startup': 'Configuração diária',
+     'translation': 'Tradução',
+     'capture': 'Captura de tela',
+     'dynamic': 'Tradução dinâmica',
+     'finish': 'Toques finais',
+     'enable': 'Ativar e avançar',
+     'disable': 'Desativar e avançar',
+     'next': 'Avançar',
+     'later': 'Mais tarde',
+     'open': 'Abrir',
+     'close': 'Fechar guia',
+     'ready': 'Já configurado',
+     'recommended': 'Recomendado: ativado',
+     'recommended_off': 'Recomendado: desativado',
+     'inspect': 'Verifique a configuração e continue',
+     'failed': 'A configuração não se aplica. Por favor, tente novamente.',
+     'done': 'Pronto para traduzir!',
+     'done_body': '{ready} de {total} configurações recomendadas estão prontas. Você pode alterar as '
+                  'outras depois e reabrir este guia na Ajuda.',
+     'finish_button': 'Comece a usar o aplicativo'},
+    'it': {'completed': 'Guida completata',
+     'startup': 'Configurazione quotidiana',
+     'translation': 'Traduzione',
+     'capture': 'Cattura dello schermo',
+     'dynamic': 'Traduzione dinamica',
+     'finish': 'Tocchi finali',
+     'enable': 'Attiva e avanti',
+     'disable': 'Disattiva e avanti',
+     'next': 'Avanti',
+     'later': 'Più tardi',
+     'open': 'Apri',
+     'close': 'Chiudi guida',
+     'ready': 'Già configurato',
+     'recommended': 'Consigliato: attivo',
+     'recommended_off': 'Consigliato: disattivato',
+     'inspect': "Controllare l'impostazione, quindi continuare",
+     'failed': "L'impostazione non è stata applicata. Per favore riprova.",
+     'done': 'Pronto per tradurre!',
+     'done_body': '{ready} impostazioni consigliate su {total} sono pronte. Puoi modificare le altre '
+                  'in seguito e riaprire questa guida da Aiuto.',
+     'finish_button': "Inizia a utilizzare l'app"},
 }
 
 # Bodies use the same setting order in every language; titles are read from
@@ -223,6 +298,57 @@ GUIDE_SETTING_BODIES = {
         "切换到其他应用时暂停识别，返回后继续动态翻译。",
         "在译文上方显示原文，方便核对名称和含义。需要简洁视图时可再关闭。",
     ),
+
+    'pt': ('Inicie o aplicativo ao fazer login para que a tradução e os atalhos estejam sempre prontas.',
+     'Comece escondido na bandeja do sistema em vez de cobrir a área de trabalho. As atalhos continuam '
+     'funcionando; o ícone da bandeja traz a janela de volta.',
+     'Copie cada tradução finalizada para a área de transferência, pronta para colar em um bate-papo '
+     'ou documento.',
+     'Salve o texto original e as traduções localmente para poder encontrá-los novamente no histórico '
+     'de traduções.',
+     'Mantenha o texto reconhecido e copiado no histórico local, mesmo após a alteração da área de '
+     'transferência.',
+     'Oculte o aplicativo durante a captura da tela para que sua janela não cubra o texto que você '
+     'deseja reconhecer.',
+     'Congele a imagem durante a seleção da área. Isso facilita capturar texto em vídeos e janelas que '
+     'mudam.',
+     'Escureça o ambiente para tornar a área selecionada clara. Ajuste a força com o controle '
+     'deslizante ao lado.',
+     'Restaure sua área de transferência anterior após traduzir uma seleção. Os resultados solicitados '
+     'explicitamente na área de transferência permanecem lá.',
+     'Uma breve notificação confirma que o texto foi copiado, para que você saiba que o atalho '
+     'funcionou.',
+     'Verifique se há uma nova versão na inicialização e ofereça uma atualização quando as correções '
+     'estiverem disponíveis.',
+     'Pause o reconhecimento enquanto você usa outro aplicativo. A tradução dinâmica é retomada quando '
+     'você retorna.',
+     'Mostre o original acima da tradução para verificar nomes e significados. Desligue-o mais tarde '
+     'para uma visualização compacta.'),
+    'it': ("Avvia l'app quando accedi in modo che la traduzione e le scorciatoie siano sempre pronti.",
+     'Inizia nascosto nella barra delle applicazioni invece di coprire il desktop. I scorciatoie '
+     "continuano a funzionare; l'icona nella barra delle applicazioni riporta la finestra.",
+     'Copia ogni traduzione completata negli appunti, pronta per essere incollata in una chat o in un '
+     'documento.',
+     'Salva il testo sorgente e le traduzioni localmente in modo da poterli ritrovare nella cronologia '
+     'delle traduzioni.',
+     'Conserva il testo riconosciuto e copiato nella cronologia locale, anche dopo la modifica degli '
+     'appunti.',
+     "Nascondi l'app durante l'acquisizione dello schermo in modo che la sua finestra non copra il "
+     'testo che desideri riconoscere.',
+     'Congela l’immagine durante la selezione dell’area. Così è più facile acquisire testo da video e '
+     'finestre che cambiano.',
+     "Oscura l'ambiente circostante per rendere chiara l'area selezionata. Regola la forza con il "
+     'cursore accanto ad esso.',
+     'Ripristina gli appunti precedenti dopo aver tradotto una selezione. I risultati esplicitamente '
+     'richiesti negli appunti rimangono lì.',
+     'Una breve notifica conferma che il testo è stato copiato, quindi sai che la scorciatoia ha '
+     'funzionato.',
+     "Verifica la presenza di una nuova versione all'avvio e offri un aggiornamento quando le "
+     'correzioni diventano disponibili.',
+     "Metti in pausa il riconoscimento mentre usi un'altra app. La traduzione dinamica riprende al tuo "
+     'ritorno.',
+     "Mostra l'originale sopra la traduzione per verificare nomi e significato. Spegnilo più tardi per "
+     'una visualizzazione compatta.'),
 }
 
 

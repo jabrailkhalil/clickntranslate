@@ -203,6 +203,13 @@ class TestUpdateProgressDialog(unittest.TestCase):
 
 
 class TestUpdateAssetSelection(unittest.TestCase):
+    def setUp(self):
+        # Exercise Windows routing on every CI host; POSIX routing has its own
+        # architecture/format tests in test_posix_update.
+        patch = mock.patch.object(platform_support, 'IS_WINDOWS', True)
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def test_release_1_4_7_detects_1_5_0_portable_update(self):
         response = mock.Mock()
         response.raise_for_status.return_value = None
@@ -868,7 +875,7 @@ class TestUpdateCancellation(unittest.TestCase):
         self.assertFalse(dummy._update_cancel_requested.is_set())
         dummy._set_update_controls_enabled.assert_not_called()
         dummy._show_update_progress.assert_called_once()
-        info_mock.assert_called_once()
+        info_mock.assert_not_called()
 
     def test_download_file_cancellation_raises(self):
         class FakeResponse:

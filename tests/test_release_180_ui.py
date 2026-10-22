@@ -41,7 +41,7 @@ def test_result_actions_fit_canvas_at_every_scale_and_toggle(window, app, langua
 def test_companion_settings_have_no_document_context_menu_or_explanatory_labels(window, app):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    page.show_category('static')
+    page.choose_appearance('portrait')
     assert not page.findChildren(QtWidgets.QLabel, 'assistantSection')
     assert not [label for label in page.findChildren(QtWidgets.QLabel, 'assistantNote') if label.wordWrap()]
     with mock.patch.object(main.QMenu, 'exec_') as menu:

@@ -2,8 +2,7 @@
 
 Windows keeps its named mutex and `RegisterHotKey` listeners. Linux cannot rely
 on global hotkeys — X11 grabs conflict with the desktop and Wayland forbids them
-outright — so the app follows the convention used by NormCap and Flameshot: the
-user binds a command such as `clickntranslate --ocr` to a key in their desktop
+outright. The user binds a command such as `clickntranslate --ocr` to a key in their desktop
 environment, and that second launch hands the action to the instance already
 running in the tray through this socket.
 

@@ -19,7 +19,7 @@ class TestLanguages(unittest.TestCase):
         self.assertEqual(languages.language_code_from_name("German", "en"), "de")
 
     def test_every_supported_interface_has_localized_language_names(self):
-        for interface_language in ("en", "ru", "es", "de", "fr", "zh"):
+        for interface_language in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             names = languages.language_names(interface_language)
             self.assertEqual(len(names), len(languages.LANGUAGES))
             self.assertEqual(len(set(names)), len(names))

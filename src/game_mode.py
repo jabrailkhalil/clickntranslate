@@ -1,10 +1,8 @@
 """Dynamic OCR translation for one or more user-selected screen regions.
 
-The mode intentionally reuses Click'n'Translate's OCR and translation engines.
-Its orchestration follows the useful parts shared by open-source game
-translators such as Translumo, SubLens and GameLingo: skip visually unchanged
-frames, ignore small OCR jitter, pause outside the bound app, and paint the
-translation over the source location instead of opening a separate result UI.
+The mode uses Click'n'Translate's OCR and translation engines. It skips visually
+unchanged frames, ignores small OCR jitter, pauses outside the bound app, and
+paints translations over the source location instead of a separate result UI.
 """
 
 from __future__ import annotations
@@ -20,6 +18,7 @@ import time
 
 from button_styles import button_qss
 from live_translation import LiveTextState, live_frame_changed
+from assistant_motion import notify_current_activity
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -40,6 +39,8 @@ GAME_TEXT = {
         "start": "Start",
         "stop": "Stop",
         "undo": "Undo",
+        "undo_hint": "Remove the last selected area",
+        "cancel_selection": "Cancel area selection",
         "selected_count": "Selected: {count}",
         "waiting": "Waiting for new text…",
         "scanning": "Reading the selected area…",
@@ -61,7 +62,9 @@ GAME_TEXT = {
         "select_hint": "Перетаскивайте области · × — удалить · Enter — запустить",
         "start": "Запустить",
         "stop": "Стоп",
-        "undo": "Назад",
+        "undo": "Отменить",
+        "undo_hint": "Убрать последнюю выбранную область",
+        "cancel_selection": "Отменить выбор областей",
         "selected_count": "Выбрано: {count}",
         "waiting": "Жду новый текст…",
         "scanning": "Читаю выбранную область…",
@@ -84,6 +87,8 @@ GAME_TEXT = {
         "start": "Iniciar",
         "stop": "Detener",
         "undo": "Deshacer",
+        "undo_hint": "Eliminar la última área seleccionada",
+        "cancel_selection": "Cancelar la selección de áreas",
         "selected_count": "Seleccionadas: {count}",
         "waiting": "Esperando texto nuevo…",
         "scanning": "Leyendo el área seleccionada…",
@@ -105,7 +110,9 @@ GAME_TEXT = {
         "select_hint": "Ziehen zum Verschieben · × zum Entfernen · Enter zum Starten",
         "start": "Start",
         "stop": "Beenden",
-        "undo": "Zurück",
+        "undo": "Rückgängig",
+        "undo_hint": "Den zuletzt ausgewählten Bereich entfernen",
+        "cancel_selection": "Bereichsauswahl abbrechen",
         "selected_count": "Ausgewählt: {count}",
         "waiting": "Warte auf neuen Text…",
         "scanning": "Ausgewählter Bereich wird gelesen…",
@@ -128,6 +135,8 @@ GAME_TEXT = {
         "start": "Démarrer",
         "stop": "Arrêter",
         "undo": "Annuler",
+        "undo_hint": "Retirer la dernière zone sélectionnée",
+        "cancel_selection": "Annuler la sélection des zones",
         "selected_count": "Sélectionnées : {count}",
         "waiting": "En attente d’un nouveau texte…",
         "scanning": "Lecture de la zone sélectionnée…",
@@ -150,6 +159,8 @@ GAME_TEXT = {
         "start": "开始",
         "stop": "停止",
         "undo": "撤销",
+        "undo_hint": "移除最后选择的区域",
+        "cancel_selection": "取消区域选择",
         "selected_count": "已选择：{count}",
         "waiting": "等待新文字…",
         "scanning": "正在读取所选区域…",
@@ -165,6 +176,53 @@ GAME_TEXT = {
         "translation_error": "翻译失败，稍后将重试",
         "wayland_error": "Wayland 截图门户不支持连续捕获。请使用 X11 会话。",
     },
+
+    'pt': {'title': 'Tradução dinâmica',
+     'select': 'Selecione uma ou mais áreas cujo texto deve ser substituído',
+     'select_hint': 'Arraste para mover · × para remover · Enter para começar',
+     'start': 'Iniciar',
+     'stop': 'Parar',
+     'undo': 'Desfazer',
+     'undo_hint': 'Remova a última área selecionada',
+     'cancel_selection': 'Cancelar seleção de área',
+     'selected_count': 'Selecionado: {count}',
+     'waiting': 'Aguardando novo texto…',
+     'scanning': 'Lendo a área selecionada…',
+     'translating': 'Traduzindo…',
+     'paused': 'Pausado enquanto o aplicativo de destino está inativo',
+     'no_text': 'Ainda não há texto legível',
+     'pause': 'Pausa',
+     'resume': 'Continuar',
+     'reselect': 'Selecione outra área',
+     'close': 'Pare a tradução dinâmica',
+     'capture_error': 'A área selecionada não pode ser capturada',
+     'ocr_error': 'OCR não está disponível para este modo',
+     'translation_error': 'A tradução falhou; o modo tentará novamente',
+     'wayland_error': 'A captura contínua não está disponível no portal de capturas de tela do '
+                      'Wayland. Use uma sessão X11.'},
+    'it': {'title': 'Traduzione dinamica',
+     'select': 'Seleziona una o più aree di cui sostituire il testo',
+     'select_hint': 'Trascina per spostare · × per rimuovere · Invio per iniziare',
+     'start': 'Avvia',
+     'stop': 'Interrompi',
+     'undo': 'Annulla',
+     'undo_hint': "Rimuove l'ultima area selezionata",
+     'cancel_selection': "Annulla la selezione dell'area",
+     'selected_count': 'Selezionato: {count}',
+     'waiting': 'In attesa del nuovo testo...',
+     'scanning': "Lettura dell'area selezionata…",
+     'translating': 'Traduzione…',
+     'paused': "In pausa mentre l'app di destinazione è inattiva",
+     'no_text': 'Nessun testo ancora leggibile',
+     'pause': 'Pausa',
+     'resume': 'Riprendi',
+     'reselect': "Seleziona un'altra zona",
+     'close': 'Arresta la traduzione dinamica',
+     'capture_error': "L'area selezionata non può essere catturata",
+     'ocr_error': "L'OCR non è disponibile per questa modalità",
+     'translation_error': 'Traduzione fallita; la modalità riproverà',
+     'wayland_error': "L'acquisizione continua non è disponibile tramite il portale screenshot di "
+                      'Wayland. Utilizza una sessione X11.'},
 }
 
 
@@ -405,6 +463,7 @@ class GameRegionSelector(QtWidgets.QWidget):
             _translation_targets_for_source,
             get_cached_ocr_config,
             installed_ocr_language_codes,
+            ocr_ui_text,
         )
         from languages import LANGUAGES, default_target_for_source, language_icon_path
 
@@ -443,6 +502,16 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.swap_button = LanguageSwapButton(self)
         self.undo_button = QtWidgets.QPushButton(game_text(self._language, "undo"), self)
         self.start_button = QtWidgets.QPushButton(self)
+        for control, key in ((self.source_combo, "source_language"),
+                             (self.target_combo, "target_language"),
+                             (self.swap_button, "swap_languages")):
+            hint = ocr_ui_text(self._language, key)
+            control.setToolTip(hint)
+            control.setAccessibleName(hint)
+        self.undo_button.setToolTip(game_text(self._language, "undo_hint"))
+        self.undo_button.setAccessibleName(game_text(self._language, "undo_hint"))
+        self.start_button.setToolTip(game_text(self._language, "start"))
+        self.start_button.setAccessibleName(game_text(self._language, "start"))
         available = set(installed_ocr_language_codes(config=self._config))
         if str(self._config.get("translator_engine", "Google")).lower() == "argos":
             available = {
@@ -498,7 +567,8 @@ class GameRegionSelector(QtWidgets.QWidget):
         self.start_button.setStyleSheet(
             button_qss(True, "primary", compact=True)
         )
-        self.undo_button.setFixedSize(92, 44)
+        self.undo_button.ensurePolished()
+        self.undo_button.setFixedSize(max(92, self.undo_button.sizeHint().width()), 44)
         self.start_button.setFixedSize(142, 44)
         from window_appearance import style_capture_controls
         style_capture_controls(self, self._config,
@@ -518,6 +588,8 @@ class GameRegionSelector(QtWidgets.QWidget):
     def _layout_controls(self):
         if not hasattr(self, 'start_button'):
             return
+        self.undo_button.ensurePolished()
+        self.undo_button.setFixedWidth(max(self.undo_button.width(), self.undo_button.sizeHint().width()))
         languages = [self.source_combo, self.swap_button, self.target_combo]
         actions = [self.undo_button, self.start_button]
         controls = languages + actions
@@ -910,6 +982,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self.close_button.setText("×")
         self.close_button.setToolTip(game_text(self.language, "close"))
         for button in (self.reselect_button, self.pause_button, self.close_button):
+            button.setAccessibleName(button.toolTip())
             button.setFixedSize(26, 26)
             header.addWidget(button)
         card_layout.addLayout(header)
@@ -1276,6 +1349,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 self._translation_cancel.set()
             return
         self._translation_busy = True
+        notify_current_activity('busy', f'live:{id(self)}')
         cancelled = self._translation_cancel = threading.Event()
         engine = self.config.get('translator_engine', 'Google')
         self._revision += 1
@@ -1321,16 +1395,20 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if self.paused or not self._target_is_active():
             self._last_source_text = ''
             self._last_frame = ()
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         if pending:
             self._start_translation(pending)
             return
         if was_cancelled or (self._has_ocr_source and source_text != self._last_source_text):
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         if error or not translated:
+            notify_current_activity('error', f'live:{id(self)}')
             self._last_source_text = ''
             self._set_status("translation_error", active=False)
         else:
+            notify_current_activity('success', f'live:{id(self)}')
             from ocr import save_translation_history
             self.original_label.setText(source_text)
             self.original_label.setVisible(
@@ -1348,10 +1426,13 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def _toggle_pause(self):
         self.paused = not self.paused
+        if self.paused:
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self.pause_button.setText("▶" if self.paused else "Ⅱ")
         self.pause_button.setToolTip(
             game_text(self.language, "resume" if self.paused else "pause")
         )
+        self.pause_button.setAccessibleName(self.pause_button.toolTip())
         self._set_status("paused" if self.paused else "waiting", active=not self.paused)
 
     def _reselect(self):
@@ -1381,6 +1462,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     def closeEvent(self, event):
         self._timer.stop()
         self._closed = True
+        notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         if self._translation_cancel is not None:
             self._translation_cancel.set()
         self._revision += 1
@@ -1555,6 +1637,8 @@ class GameSessionControls(QtWidgets.QFrame):
         layout.addWidget(self.label)
         self.pause_button = QtWidgets.QPushButton(game_text(overlay.language, 'pause'))
         self.stop_button = QtWidgets.QPushButton(game_text(overlay.language, 'stop'))
+        self.pause_button.setToolTip(game_text(overlay.language, 'pause'))
+        self.pause_button.setAccessibleName(game_text(overlay.language, 'pause'))
         for button in (self.pause_button, self.stop_button):
             button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.setStyleSheet(button_qss(dark, compact=True))
@@ -1572,6 +1656,7 @@ class GameSessionControls(QtWidgets.QFrame):
         self.pause_button.clicked.connect(overlay._toggle_pause)
         self.stop_button.clicked.connect(overlay.close)
         self.stop_button.setToolTip(game_text(overlay.language, 'close'))
+        self.stop_button.setAccessibleName(game_text(overlay.language, 'close'))
         self.adjustSize()
         from windows_overlay import rounded_region, set_surface_region
         set_surface_region(self, rounded_region(self.rect(), 9), windows=platform_support.IS_WINDOWS)
@@ -1915,6 +2000,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._pending_lines = None
         self._requested_texts = {normalize_game_ocr_text(item[4]) for item in lines}
         self._translation_busy = True
+        notify_current_activity('busy', f'live:{id(self)}')
         cancelled = self._translation_cancel = threading.Event()
         engine = self.engine
         self._revision += 1
@@ -1984,9 +2070,11 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._last_layout_signature = ()
             self._pending_lines = None
             self._live.reset_visible()
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
         self._pending_lines = None
         if error and not was_cancelled:
+            notify_current_activity('error', f'live:{id(self)}')
             self._last_layout_signature = ()
             self._set_status("translation_error", error=True)
             return
@@ -2004,6 +2092,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             translated = "\n".join(block[5] for block in self._blocks)
             save_translation_history(source, translated, self.target_language)
         if final:
+            notify_current_activity('idle' if was_cancelled else ('success' if blocks else 'error'),
+                                    f'live:{id(self)}')
             pending = set(self._live.pending(time.monotonic()))
             if pending:
                 self._start_block_translation([item for item in self._live.lines if item[4] in pending])
@@ -2011,6 +2101,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _toggle_pause(self):
         self.paused = not self.paused
         self.controls.pause_button.setText(game_text(self.language, 'resume' if self.paused else 'pause'))
+        self.controls.pause_button.setToolTip(self.controls.pause_button.text())
+        self.controls.pause_button.setAccessibleName(self.controls.pause_button.text())
+        if self.paused:
+            notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._settle_timer.stop()
         self._live.reset_visible()
         self._blocks = []
@@ -2155,6 +2249,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         global _game_fullscreen_ref
+        notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._timer.stop()
         self._settle_timer.stop()
         self._closed = True

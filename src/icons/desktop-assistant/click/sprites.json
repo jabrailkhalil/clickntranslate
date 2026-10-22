@@ -1,0 +1,156 @@
+{
+  "name": "Click",
+  "cellWidth": 192,
+  "cellHeight": 208,
+  "columns": 8,
+  "rows": 11,
+  "spriteVersion": 2,
+  "image": "pets-v2.png",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "durationsMs": [
+        280,
+        110,
+        110,
+        140,
+        140,
+        320
+      ]
+    },
+    "running-right": {
+      "row": 1,
+      "frames": 8,
+      "durationsMs": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        220
+      ]
+    },
+    "running-left": {
+      "row": 2,
+      "frames": 8,
+      "durationsMs": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        220
+      ]
+    },
+    "waving": {
+      "row": 3,
+      "frames": 4,
+      "durationsMs": [
+        140,
+        140,
+        140,
+        280
+      ]
+    },
+    "jumping": {
+      "row": 4,
+      "frames": 5,
+      "durationsMs": [
+        140,
+        140,
+        140,
+        140,
+        280
+      ]
+    },
+    "failed": {
+      "row": 5,
+      "frames": 8,
+      "durationsMs": [
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        240
+      ]
+    },
+    "waiting": {
+      "row": 6,
+      "frames": 6,
+      "durationsMs": [
+        150,
+        150,
+        150,
+        150,
+        150,
+        260
+      ]
+    },
+    "running": {
+      "row": 7,
+      "frames": 6,
+      "durationsMs": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        220
+      ]
+    },
+    "review": {
+      "row": 8,
+      "frames": 6,
+      "durationsMs": [
+        150,
+        150,
+        150,
+        150,
+        150,
+        280
+      ]
+    }
+  },
+  "lookDirections": {
+    "firstRow": 9,
+    "count": 16,
+    "clockwise": true,
+    "zero": "up",
+    "stepDegrees": 22.5
+  },
+  "extras": {
+    "sleep": {
+      "image": "sleep.png",
+      "frames": 4,
+      "durationsMs": [
+        360,
+        280,
+        280,
+        360
+      ]
+    },
+    "expressions": {
+      "image": "expressions.png",
+      "frames": [
+        "neutral",
+        "happy",
+        "curious",
+        "thinking",
+        "surprised",
+        "sad",
+        "sleepy",
+        "proud"
+      ]
+    }
+  },
+  "sha256": "4003554f70c1956e32e6365dc0952f0c984be0d3865a44704cb7ea57a03e28e7",
+  "generator": "OpenAI built-in imagegen through Pets create-pet v0.1.6 workflow"
+}

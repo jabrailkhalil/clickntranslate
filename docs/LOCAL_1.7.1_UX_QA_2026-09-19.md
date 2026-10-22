@@ -5,17 +5,9 @@
 Qt `offscreen`, без окон на рабочем столе. Работающий экземпляр пользователя
 из предыдущей сборки не останавливается и не подменяется.
 
-## Сравнение с приложениями на GitHub
+## Захват и масштаб интерфейса
 
-- [Text Grab: FullscreenGrab.xaml](https://github.com/TheJoeFin/Text-Grab/blob/a8d4c2b060ffa8efa102c22f80c31ee65c11ce82/Text-Grab/Views/FullscreenGrab.xaml)
-  использует выбор языка по имени, обычные WPF-размеры элементов (поле высотой 34).
-  [Код захвата](https://github.com/TheJoeFin/Text-Grab/blob/a8d4c2b060ffa8efa102c22f80c31ee65c11ce82/Text-Grab/Views/FullscreenGrab.xaml.cs)
-  отдельно учитывает `VisualTreeHelper.GetDpi`; manifest объявляет PerMonitorV2.
-- [PowerToys Text Extractor: OverlayPage.xaml](https://github.com/microsoft/PowerToys/blob/cb25632f5b61eb2e57a3b0b52053409403ae9e98/src/modules/PowerOCR/PowerOCR/PowerOCRXAML/Views/OverlayPage.xaml)
-  использует WinUI ComboBox с `NativeName` языка и минимальной шириной 120.
-  Это не система флагов и не процент масштаба собственного окна настроек.
-
-Вывод для нашей архитектуры: язык и управление захватом относятся к рабочему
+В архитектуре приложения язык и управление захватом относятся к рабочему
 столу, а не к масштабу главной формы. Оставлены флаги + коды, полные имена
 доступны в списке; размер зависит только от DPI текущего экрана. Геометрия
 самого захвата неизменна. Общий режим DPI Qt не менялся во избежание

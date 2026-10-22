@@ -31,7 +31,8 @@ class OcrEngineComboTest(unittest.TestCase):
         with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False):
             sw._populate_grouped_ocr_combo(combo, "en")
 
-        self.assertEqual(self._engines_in_combo(combo), ["Windows", "Tesseract", "RapidOCR", "EasyOCR"])
+        from api_providers import VISION_ENGINES
+        self.assertEqual(self._engines_in_combo(combo), ["Windows", "Tesseract", "RapidOCR", "EasyOCR", *VISION_ENGINES])
 
     def test_linux_drops_the_windows_engine(self):
         combo = QComboBox()
@@ -40,7 +41,8 @@ class OcrEngineComboTest(unittest.TestCase):
 
         engines = self._engines_in_combo(combo)
         self.assertNotIn("Windows", engines)
-        self.assertEqual(engines, ["Tesseract", "RapidOCR", "EasyOCR"])
+        from api_providers import VISION_ENGINES
+        self.assertEqual(engines, ["Tesseract", "RapidOCR", "EasyOCR", *VISION_ENGINES])
 
     def test_installed_engines_are_listed_first(self):
         combo = QComboBox()

@@ -5,6 +5,7 @@ from __future__ import annotations
 from button_styles import standard_buttons
 from scrollbar_styles import scrollbar_stylesheet, install_scrollbar_theme
 from ui_scaling import native_window_parent, interface_scale_factor
+from dialog_text import LANGUAGES as DIALOG_LANGUAGES, dialog_action_text
 
 import ctypes
 import logging
@@ -114,6 +115,49 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 
+def _ensure_control_tooltip(widget):
+    """Fill missing control hints without overwriting dedicated explanations.
+
+    Resolve generated tips again after label/locale changes. Editors inside
+    composite controls inherit their parent's explanation.
+    """
+    generated = widget.property('automaticHoverHint')
+    if widget.toolTip() and widget.toolTip() != generated:
+        return
+    if not isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QComboBox,
+                              QtWidgets.QLineEdit, QtWidgets.QAbstractSpinBox,
+                              QtWidgets.QAbstractSlider, QtWidgets.QKeySequenceEdit,
+                              QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
+        return
+    text = widget.accessibleDescription() or widget.accessibleName()
+    if not text and isinstance(widget, QtWidgets.QLineEdit):
+        parent = widget.parentWidget()
+        while parent is not None:
+            if parent.toolTip():
+                text = parent.toolTip()
+                break
+            parent = parent.parentWidget()
+    if not text and isinstance(widget, QtWidgets.QAbstractButton):
+        text = widget.text().replace('&&', '\0').replace('&', '').replace('\0', '&')
+    if not text:
+        root = widget.parentWidget()
+        if root is not None:
+            label = next((label for label in root.findChildren(
+                          QtWidgets.QLabel, options=QtCore.Qt.FindDirectChildrenOnly)
+                          if label.buddy() is widget), None)
+            text = label.text().rstrip(':： ') if label is not None else ''
+    if not text and isinstance(widget, QtWidgets.QComboBox):
+        text = widget.currentData(QtCore.Qt.ToolTipRole) or widget.currentText()
+    if not text and hasattr(widget, 'placeholderText'):
+        text = widget.placeholderText()
+    value = str(text or '')
+    if not value.startswith('<qt>'):
+        value = tooltip_text(value)
+    if widget.toolTip() != value:
+        widget.setToolTip(value)
+    widget.setProperty('automaticHoverHint', value)
+
+
 class _RoundedTooltipFilter(QtCore.QObject):
     """Paint compact hover tips and keep popup corners transparent.
 
@@ -128,11 +172,13 @@ class _RoundedTooltipFilter(QtCore.QObject):
         if event_type not in (
             QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.Resize,
             QtCore.QEvent.StyleChange, QtCore.QEvent.PaletteChange, QtCore.QEvent.Move,
-            QtCore.QEvent.Paint,
+            QtCore.QEvent.Paint, QtCore.QEvent.ToolTip,
         ):
             return False
         if not isinstance(watched, QtWidgets.QWidget) or sip.isdeleted(watched):
             return False
+        if event_type in (QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.ToolTip):
+            _ensure_control_tooltip(watched)
         is_tooltip = _is_tooltip(watched)
         if event_type == QtCore.QEvent.Paint:
             if is_tooltip:
@@ -488,12 +534,18 @@ def _theme_value(widget) -> str:
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         try:
+            attributes = vars(current)
             for attr in ("current_theme", "theme", "theme_name"):
-                value = getattr(current, attr, None)
+                # A missing PyQt attribute falls through to meta-object lookup.
+                # Most children have none of these attributes; a theme change
+                # used to repeat that slow path for every scrollbar/style event.
+                value = attributes.get(attr)
+                if value is None and hasattr(type(current), attr):
+                    value = getattr(current, attr, None)
                 if isinstance(value, str) and value:
                     return value.lower()
 
-            owner = getattr(current, "owner", None)
+            owner = attributes.get("owner")
             if owner is not None:
                 current = owner
                 continue
@@ -501,7 +553,7 @@ def _theme_value(widget) -> str:
             # SettingsWindow intentionally stores its QWidget parent in a
             # ``parent`` instance attribute, shadowing QObject.parent().  Both
             # forms are valid in this project, so never assume it is callable.
-            parent_ref = getattr(current, "parent", None)
+            parent_ref = attributes.get("parent") if 'parent' in attributes else getattr(current, "parent", None)
             current = parent_ref() if callable(parent_ref) else parent_ref
         except (RuntimeError, TypeError):
             # Theme detection must never escape into a Qt signal handler: an
@@ -626,6 +678,21 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
         if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
             self._draw_chevron(option, painter)
             return
+        if element == QtWidgets.QStyle.PE_IndicatorRadioButton:
+            fill, border, checked, _ = self._colors(option)
+            rect = QtCore.QRectF(option.rect).adjusted(1.5, 1.5, -1.5, -1.5)
+            painter.save()
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            painter.setPen(QtGui.QPen(border, 1.6))
+            painter.setBrush(fill)
+            painter.drawEllipse(rect)
+            if checked:
+                inset = rect.width() * .3
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.setBrush(QtGui.QColor('#ffffff'))
+                painter.drawEllipse(rect.adjusted(inset, inset, -inset, -inset))
+            painter.restore()
+            return
         if element not in self._CHECK_ELEMENTS:
             super().drawPrimitive(element, option, painter, widget)
             return
@@ -722,6 +789,7 @@ def install_accent_controls(widget, dark: bool = True) -> None:
         # Drop-down popups are separate top-level widgets, so the check boxes on
         # checkable rows would otherwise keep the platform's white squares.
         controls = [widget, *widget.findChildren(QtWidgets.QCheckBox),
+                    *widget.findChildren(QtWidgets.QRadioButton),
                     *widget.findChildren(QtWidgets.QAbstractItemView)]
         for control in controls:
             if control.property('_cntAccentStyle') is not style:
@@ -809,7 +877,9 @@ class _TitleBar(QtWidgets.QFrame):
         self.close_button.setText("×")
         self.close_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.close_button.setFixedSize(34, 32)
-        self.close_button.setToolTip("Close")
+        close_label = dialog_action_text(dialog, 'Close')
+        self.close_button.setToolTip(close_label)
+        self.close_button.setAccessibleName(close_label)
         self.close_button.clicked.connect(dialog.reject)
         layout.addWidget(self.close_button)
 
@@ -1256,6 +1326,7 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
         outer.addWidget(self.title_bar)
 
         body = QtWidgets.QVBoxLayout()
+        self.body_layout = body
         body.setContentsMargins(20, 18, 20, 16)
         body.setSpacing(12)
         outer.addLayout(body)
@@ -1303,6 +1374,26 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
     def setWindowTitle(self, title):
         super().setWindowTitle(str(title))
         self.title_bar.title_label.setText(str(title))
+
+    def setInterfaceLanguage(self, language):
+        """Use an explicit language for dialogs opened before the main window."""
+        self._dialog_language_code = language if language in DIALOG_LANGUAGES else 'en'
+        self._refresh_action_labels()
+
+    def _refresh_action_labels(self):
+        close_label = dialog_action_text(self, 'Close')
+        self.title_bar.close_button.setToolTip(close_label)
+        self.title_bar.close_button.setAccessibleName(close_label)
+        for button in self._button_standards:
+            key = button.property('dialogStandardLabel')
+            previous = button.property('dialogAutomaticLabel')
+            if key and button.text() == previous:
+                label = dialog_action_text(self, key)
+                button.setText(label)
+                button.setAccessibleName(label)
+                button.setProperty('dialogAutomaticLabel', label)
+            elif key and button.accessibleName() == previous:
+                button.setAccessibleName(button.text())
 
     def setWindowIcon(self, icon):
         super().setWindowIcon(icon)
@@ -1398,8 +1489,12 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
             actual_role = self.ActionRole if role is None else role
         elif role is None and isinstance(button_or_text, int):
             standard = button_or_text
-            label, actual_role = self._standard_button_details(standard)
+            key, actual_role = self._standard_button_details(standard)
+            label = dialog_action_text(self, key)
             button = QtWidgets.QPushButton(label, self)
+            button.setAccessibleName(label)
+            button.setProperty('dialogStandardLabel', key)
+            button.setProperty('dialogAutomaticLabel', label)
             self._button_standards[button] = standard
         else:
             button = QtWidgets.QPushButton(str(button_or_text), self)
@@ -1512,6 +1607,7 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._refresh_action_labels()
         self.adjustSize()
         if self.width() < self.minimumWidth():
             self.resize(self.minimumWidth(), self.height())

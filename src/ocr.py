@@ -18,6 +18,7 @@ import math
 from button_styles import button_qss
 from settings_window import LanguageSwapButton
 from capture_widgets import CaptureLanguageCombo as DropDownCombo
+from assistant_motion import notify_current_activity
 from window_appearance import style_capture_controls
 from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
@@ -66,7 +67,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No OCR languages installed",
         "no_installed_translation_pairs": "No installed translation pairs",
         "install_languages_first": "Install a language first in Settings → Language packages.",
+        "language_packages": "Language packages",
         "swap_languages": "Swap languages",
+        "source_language": "Recognition language",
+        "target_language": "Translation language",
     },
     "ru": {
         "tess_download_data": "Tesseract: скачиваю языковой пакет {language}...", "tess_downloading": "Tesseract: скачиваю {language}... {percent}%",
@@ -89,7 +93,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Нет установленных языков OCR",
         "no_installed_translation_pairs": "Нет установленных направлений перевода",
         "install_languages_first": "Сначала установите язык: Настройки → Языковые пакеты.",
+        "language_packages": "Языковые пакеты",
         "swap_languages": "Поменять языки местами",
+        "source_language": "Язык распознавания",
+        "target_language": "Язык перевода",
     },
     "es": {
         "tess_download_data": "Tesseract: descargando datos de idioma para {language}...", "tess_downloading": "Tesseract: descargando {language}... {percent}%",
@@ -109,7 +116,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "No hay idiomas OCR instalados",
         "no_installed_translation_pairs": "No hay direcciones de traducción instaladas",
         "install_languages_first": "Instala primero un idioma en Ajustes → Paquetes de idioma.",
+        "language_packages": "Paquetes de idioma",
         "swap_languages": "Intercambiar idiomas",
+        "source_language": "Idioma de reconocimiento",
+        "target_language": "Idioma de traducción",
     },
     "de": {
         "tess_download_data": "Tesseract: Sprachdaten für {language} werden heruntergeladen...", "tess_downloading": "Tesseract: {language} wird heruntergeladen... {percent}%",
@@ -129,7 +139,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Keine OCR-Sprachen installiert",
         "no_installed_translation_pairs": "Keine Übersetzungsrichtungen installiert",
         "install_languages_first": "Installiere zuerst eine Sprache unter Einstellungen → Sprachpakete.",
+        "language_packages": "Sprachpakete",
         "swap_languages": "Sprachen tauschen",
+        "source_language": "Erkennungssprache",
+        "target_language": "Übersetzungssprache",
     },
     "fr": {
         "tess_download_data": "Tesseract : téléchargement des données de langue {language}...", "tess_downloading": "Tesseract : téléchargement de {language}... {percent}%",
@@ -149,7 +162,10 @@ OCR_UI_TEXT = {
         "no_installed_languages": "Aucune langue OCR installée",
         "no_installed_translation_pairs": "Aucune direction de traduction installée",
         "install_languages_first": "Installez d’abord une langue dans Réglages → Modules de langue.",
+        "language_packages": "Modules de langue",
         "swap_languages": "Inverser les langues",
+        "source_language": "Langue de reconnaissance",
+        "target_language": "Langue de traduction",
     },
     "zh": {
         "tess_download_data": "Tesseract：正在下载 {language} 语言数据...", "tess_downloading": "Tesseract：正在下载 {language}... {percent}%",
@@ -169,8 +185,131 @@ OCR_UI_TEXT = {
         "no_installed_languages": "未安装 OCR 语言",
         "no_installed_translation_pairs": "未安装翻译方向",
         "install_languages_first": "请先在设置 → 语言包中安装语言。",
+        "language_packages": "语言包",
         "swap_languages": "交换语言",
+        "source_language": "识别语言",
+        "target_language": "翻译语言",
     },
+
+    'pt': {'tess_download_data': 'Tesseract: baixando dados de idioma {language}...',
+     'tess_downloading': 'Tesseract: baixando {language}... {percent}%',
+     'tess_ready': 'Tesseract: Os dados do idioma {language} estão prontos',
+     'tess_retrying': 'Tesseract: tentando novamente o download do {language} ({attempt}/{total})...',
+     'recognizing': 'Reconhecendo texto...',
+     'win_missing_title': 'PacoteWindows OCR ausente',
+     'win_unavailable': 'Windows OCR não está disponível no momento.',
+     'win_components': 'Falha ao carregar componentesWindows OCR. O aplicativo pode continuar com '
+                       'Tesseract se estiver instalado.',
+     'win_unsupported': 'Windows OCR não suporta: {language} ({tag}).',
+     'win_pack': 'O pacote de idiomas Windows OCR provavelmente não está instalado. Você pode abrir as '
+                 'configurações de idioma Windows e adicionar o idioma necessário.',
+     'win_continue': 'O reconhecimento continuará com Tesseract agora.',
+     'win_stopped': 'Tesseract não foi encontrado, portanto o reconhecimento deste idioma foi '
+                    'interrompido.',
+     'open_windows': 'Abra as configurações do Windows',
+     'continue_tesseract': 'Continuar com Tesseract',
+     'close': 'Fechar',
+     'recognition_failed': 'Falha no reconhecimento',
+     'engine_unavailable': '{engine} não está disponível',
+     'engine_unavailable_info': 'O mecanismo {engine} não está instalado ou falhou ao carregar.\n'
+                                '\n'
+                                'Tente:\n'
+                                '• Escolha {engine} nas configurações e instale o pacote local\n'
+                                '• Escolha outro mecanismo de OCR nas configurações',
+     'engine_unreliable': '{engine} não encontrou texto confiável',
+     'engine_unreliable_info': '{engine} não detectou texto com confiança suficiente.\n'
+                               '\n'
+                               'Tente:\n'
+                               '• Verifique o idioma de reconhecimento selecionado\n'
+                               '• Selecione uma área mais estreita e de maior contraste\n'
+                               '• Mude para outro mecanismo de OCR',
+     'auto_unreliable': 'O texto não foi reconhecido de forma confiável',
+     'auto_unreliable_info': 'Os resultados fracos foram filtrados para que o ruído não fosse enviado '
+                             'ao tradutor.\n'
+                             '\n'
+                             'Tente:\n'
+                             '• Selecione a área de texto com mais precisão, sem bordas extras ou '
+                             'fundo\n'
+                             '• Escolha o idioma de origem específico\n'
+                             '• Experimente outro mecanismo de OCR ou instale o pacote de idiomas '
+                             'Windows OCR',
+     'not_recognized': '😔 Texto não reconhecido',
+     'not_recognized_info': 'Tente:\n'
+                            '• Selecione uma área com texto maior\n'
+                            '• Certifique-se de que o texto tenha bom contraste\n'
+                            '• Escolha um mecanismo de OCR diferente nas configurações',
+     'translate': 'Traduzir',
+     'ocr_init_failed': 'Falha na inicialização do OCR',
+     'screen_no_text': 'Nenhum texto reconhecido na tela',
+     'translation_failed': 'Falha na tradução',
+     'translating_screen': 'Traduzindo tela...',
+     'fullscreen_hint': 'Esc / clique com o botão direito – fechar',
+     'no_installed_languages': 'Nenhum idioma de OCR instalado',
+     'no_installed_translation_pairs': 'Nenhum par de tradução instalado',
+     'install_languages_first': 'Instale um idioma primeiro em Configurações → Pacotes de idiomas.',
+     'language_packages': 'Pacotes de idiomas',
+     'swap_languages': 'Trocar idiomas',
+     'source_language': 'Idioma do reconhecimento',
+     'target_language': 'Idioma de tradução'},
+    'it': {'tess_download_data': 'Tesseract: download dei dati della lingua {language}...',
+     'tess_downloading': 'Tesseract: download {language}... {percent}%',
+     'tess_ready': 'Tesseract: i dati della lingua {language} sono pronti',
+     'tess_retrying': 'Tesseract: nuovo tentativo di download di {language} ({attempt}/{total})...',
+     'recognizing': 'Riconoscimento del testo...',
+     'win_missing_title': 'PacchettoWindows OCR mancante',
+     'win_unavailable': 'Windows OCR non è disponibile al momento.',
+     'win_components': "Impossibile caricare i componentiWindows OCR. L'app può continuare con "
+                       'Tesseract se è installata.',
+     'win_unsupported': 'Windows OCR non supporta: {language} ({tag}).',
+     'win_pack': 'Probabilmente il pacchetto lingua Windows OCR non è installato. È possibile aprire '
+                 'le impostazioni della lingua Windows e aggiungere la lingua richiesta.',
+     'win_continue': 'Il riconoscimento continuerà ora con Tesseract.',
+     'win_stopped': 'Tesseract non è stato trovato, quindi il riconoscimento di questa lingua viene '
+                    'interrotto.',
+     'open_windows': 'Apri le impostazioni Windows',
+     'continue_tesseract': 'Continuare con Tesseract',
+     'close': 'Chiudi',
+     'recognition_failed': 'Il riconoscimento non è riuscito',
+     'engine_unavailable': '{engine} non è disponibile',
+     'engine_unavailable_info': 'Il motore {engine} non è installato o non è stato caricato.\n'
+                                '\n'
+                                'Prova:\n'
+                                '• Scegli {engine} nelle impostazioni e installa il pacchetto locale\n'
+                                '• Scegli un altro motore OCR nelle impostazioni',
+     'engine_unreliable': '{engine} non ha trovato testo affidabile',
+     'engine_unreliable_info': '{engine} non ha rilevato il testo con sufficiente sicurezza.\n'
+                               '\n'
+                               'Prova:\n'
+                               '• Controlla la lingua di riconoscimento selezionata\n'
+                               "• Seleziona un'area più ristretta e con contrasto più elevato\n"
+                               '• Passa a un altro motore OCR',
+     'auto_unreliable': 'Il testo non è stato riconosciuto in modo affidabile',
+     'auto_unreliable_info': 'I risultati deboli sono stati filtrati in modo che il rumore non venga '
+                             'inviato al traduttore.\n'
+                             '\n'
+                             'Prova:\n'
+                             "• Seleziona l'area di testo in modo più stretto, senza bordi o sfondo "
+                             'aggiuntivi\n'
+                             '• Scegli la lingua di origine specifica\n'
+                             '• Prova un altro motore OCR o installa il pacchetto lingua Windows OCR',
+     'not_recognized': '😔 Testo non riconosciuto',
+     'not_recognized_info': 'Prova:\n'
+                            "• Seleziona un'area con testo più grande\n"
+                            '• Assicurati che il testo abbia un buon contrasto\n'
+                            '• Scegli un motore OCR diverso nelle impostazioni',
+     'translate': 'Traduci',
+     'ocr_init_failed': "Inizializzazione dell'OCR non riuscita",
+     'screen_no_text': 'Nessun testo riconosciuto sullo schermo',
+     'translation_failed': 'Traduzione fallita',
+     'translating_screen': 'Traduzione della schermata in corso...',
+     'fullscreen_hint': 'Esc/clic destro: chiudi',
+     'no_installed_languages': 'Nessuna lingua OCR installata',
+     'no_installed_translation_pairs': 'Nessuna coppia di traduzione installata',
+     'install_languages_first': 'Installare prima una lingua in Impostazioni → Pacchetti lingua.',
+     'language_packages': 'Pacchetti lingua',
+     'swap_languages': 'Scambiare le lingue',
+     'source_language': 'Lingua di riconoscimento',
+     'target_language': 'Lingua di traduzione'},
 }
 
 
@@ -290,27 +429,27 @@ try:
     import winrt
     debug_log(f"winrt imported: {winrt}")
     debug_log(f"winrt location: {getattr(winrt, '__file__', 'N/A')}")
-    
+
     debug_log("Trying to import winrt.windows.media.ocr...")
     import winrt.windows.media.ocr as winrt_ocr
     debug_log(f"winrt_ocr imported: {winrt_ocr}")
-    
+
     debug_log("Trying to import winrt.windows.globalization...")
     import winrt.windows.globalization as winrt_glob
     debug_log(f"winrt_glob imported: {winrt_glob}")
-    
+
     debug_log("Trying to import winrt.windows.graphics.imaging...")
     import winrt.windows.graphics.imaging as winrt_imaging
     debug_log(f"winrt_imaging imported: {winrt_imaging}")
-    
+
     debug_log("Trying to import winrt.windows.storage.streams...")
     import winrt.windows.storage.streams as winrt_streams
     debug_log(f"winrt_streams imported: {winrt_streams}")
-    
+
     debug_log("Trying to import winrt.windows.foundation...")
     import winrt.windows.foundation as winrt_foundation
     debug_log(f"winrt_foundation imported: {winrt_foundation}")
-    
+
     # collections импортируем опционально (используется лениво)
     try:
         debug_log("Trying to import winrt.windows.foundation.collections...")
@@ -318,7 +457,7 @@ try:
         debug_log(f"winrt_collections imported: {winrt_collections}")
     except ImportError:
         debug_log("winrt.windows.foundation.collections not available at startup (will try lazy load)")
-    
+
     _WINRT_AVAILABLE = True
     debug_log("SUCCESS: Core winrt modules imported!")
 except ImportError as e:
@@ -1759,6 +1898,9 @@ def installed_ocr_language_codes(engine=None, config=None):
     engine_name = usable_ocr_engine(
         engine or config.get("ocr_engine", platform_support.default_ocr_engine())
     ).strip().lower()
+    from api_providers import VISION_ENGINES
+    if engine_name in {name.lower() for name in VISION_ENGINES}:
+        return [language.code for language in APP_LANGUAGES]
     if engine_name == "apple vision":
         from macos_ocr import language_codes
         return language_codes()
@@ -1935,7 +2077,7 @@ def _save_translation_history_sync(original_text, translated_text, language):
     if not os.path.exists(history_file):
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=4)
-    
+
     history = []
     try:
         if sys.platform == "win32":
@@ -2029,11 +2171,11 @@ async def run_ocr_with_engine(bitmap, engine):
         if bitmap is None:
             debug_log("ERROR: Bitmap is None!")
             return None
-        
+
         debug_log("Calling engine.recognize_async...")
         result = await engine.recognize_async(bitmap)
         debug_log(f"recognize_async returned: {result}")
-        
+
         if result:
             debug_log(f"Result object: {result}")
             # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
@@ -2068,6 +2210,9 @@ def usable_ocr_engine(engine):
     missing engine instead of simply using the platform default.
     """
     name = str(engine or "").strip()
+    from api_providers import VISION_ENGINES
+    if name.lower() in {label.lower() for label in VISION_ENGINES}:
+        return name
     if name.lower() in platform_support.available_ocr_engines():
         return name
     default = platform_support.default_ocr_engine()
@@ -2154,10 +2299,10 @@ def _write_data_writer_bytes(data_writer, byte_data):
 def _get_windows_ocr_engine(lang_tag: str):
     """Получить Windows OCR движок для указанного языка."""
     global _WINRT_AVAILABLE
-    
+
     debug_log(f"_get_windows_ocr_engine called with lang_tag={lang_tag}")
     debug_log(f"_WINRT_AVAILABLE = {_WINRT_AVAILABLE}")
-    
+
     if not _WINRT_AVAILABLE:
         debug_log(f"FAILED: WinRT not available. Error was: {_WINRT_ERROR}")
         if platform_support.supports_windows_ocr():
@@ -2166,14 +2311,14 @@ def _get_windows_ocr_engine(lang_tag: str):
             # WinRT is a Windows API; its absence elsewhere is normal, not a fault.
             logging.debug("WinRT is not available on this platform; another OCR engine is used")
         return None
-    
+
     try:
         debug_log("Getting Language and OcrEngine classes...")
         # Используем предзагруженные модули
         Language = winrt_glob.Language
         OcrEngine = winrt_ocr.OcrEngine
         debug_log(f"Language={Language}, OcrEngine={OcrEngine}")
-        
+
         # Prefer the exact installed WinRT tag before probing.  Windows exposes
         # Simplified Chinese as zh-Hans-CN on some builds even though the DISM
         # capability is named zh-CN.  Creating the generic tag can otherwise
@@ -2192,7 +2337,7 @@ def _get_windows_ocr_engine(lang_tag: str):
         debug_log(f"Checking if language {lang_tag} is supported...")
         is_supported = OcrEngine.is_language_supported(Language(lang_tag))
         debug_log(f"is_language_supported = {is_supported}")
-        
+
         if not is_supported:
             primary_subtag = str(lang_tag).split("-", 1)[0].lower()
             for available_tag in _get_available_windows_ocr_language_tags():
@@ -2225,7 +2370,7 @@ def _get_windows_ocr_engine(lang_tag: str):
                 debug_log(f"SUCCESS: OCR engine cached for {lang_tag}")
             else:
                 debug_log("FAILED: OcrEngine.try_create_from_language returned None")
-        
+
         result = _OCR_ENGINE_CACHE.get(lang_tag)
         debug_log(f"Returning engine: {result}")
         return result
@@ -2262,13 +2407,13 @@ _UNIVERSAL_OCR_ENGINE = None
 def _get_universal_ocr_engine():
     """Получить OCR движок по языкам профиля Windows, затем fallback на en-US/первый доступный."""
     global _UNIVERSAL_OCR_ENGINE, _WINRT_AVAILABLE
-    
+
     debug_log("_get_universal_ocr_engine called")
-    
+
     if _UNIVERSAL_OCR_ENGINE is not None:
         debug_log("Returning cached universal OCR engine")
         return _UNIVERSAL_OCR_ENGINE
-    
+
     if not _WINRT_AVAILABLE:
         debug_log(f"FAILED: WinRT not available. Error was: {_WINRT_ERROR}")
         if platform_support.supports_windows_ocr():
@@ -2277,7 +2422,7 @@ def _get_universal_ocr_engine():
             # WinRT is a Windows API; its absence elsewhere is normal, not a fault.
             logging.debug("WinRT is not available on this platform; another OCR engine is used")
         return None
-    
+
     try:
         OcrEngine = winrt_ocr.OcrEngine
         Language = winrt_glob.Language
@@ -2293,7 +2438,7 @@ def _get_universal_ocr_engine():
                     return engine
             except Exception as e:
                 debug_log(f"User profile OCR engine failed: {e}")
-        
+
         # Fallback: en-US хорошо работает с цифрами и латиницей.
         debug_log("Using en-US for universal mode (best for numbers)...")
         try:
@@ -2305,7 +2450,7 @@ def _get_universal_ocr_engine():
                     return engine
         except Exception as e:
             debug_log(f"en-US failed: {e}")
-        
+
         # Fallback: любой доступный язык
         debug_log("Falling back to first available language...")
         available_langs = getattr(OcrEngine, "available_recognizer_languages", None)
@@ -2320,7 +2465,7 @@ def _get_universal_ocr_engine():
             if engine:
                 _UNIVERSAL_OCR_ENGINE = engine
                 return engine
-        
+
         debug_log("ERROR: No OCR languages available")
         return None
     except Exception as e:
@@ -2333,7 +2478,7 @@ def _get_universal_ocr_engine():
 def qimage_to_softwarebitmap(qimage):
     debug_log("qimage_to_softwarebitmap called")
     debug_log(f"qimage = {qimage}, isNull = {qimage.isNull() if qimage else 'N/A'}")
-    
+
     # Convert QImage (RGBA8888) to SoftwareBitmap without PIL
     if not _WINRT_AVAILABLE:
         debug_log("ERROR: WINRT not available in qimage_to_softwarebitmap")
@@ -3045,9 +3190,9 @@ class OCRWorker(QtCore.QThread):
                 lang_tag = windows_ocr_tag(self.language_code)
                 debug_log(f"lang_tag = {lang_tag}")
                 engine = _get_windows_ocr_engine(lang_tag)
-            
+
             debug_log(f"engine = {engine}")
-            
+
             if engine is None:
                 debug_log("ERROR: engine is None")
                 recognized_text = ""
@@ -3210,7 +3355,7 @@ class OCRWorker(QtCore.QThread):
                     loop.close()
             except Exception:
                 pass
-        
+
         if self._is_cancelled():
             logging.info(f"[OCR:{self.session_id}] OCR worker result suppressed after interruption")
             return
@@ -3436,7 +3581,7 @@ class ScreenCaptureOverlay(QWidget):
         super().__init__()
         # Устанавливаем иконку приложения
         self.setWindowIcon(_cached_qt_icon("icons/icon.ico"))
-        
+
         self.mode = mode
         self.start_point = None
         self.end_point = None
@@ -3480,9 +3625,11 @@ class ScreenCaptureOverlay(QWidget):
         self._selection_started_at = None
         self._move_event_count = 0
         self._last_move_log_ts = 0.0
-        
+
         # Используем текущий язык (уже загружен из конфига в __init__)
         self.lang_combo = DropDownCombo(self)
+        self.lang_combo.setToolTip(ocr_ui_text(config.get("interface_language", "en"), "source_language"))
+        self.lang_combo.setAccessibleName(self.lang_combo.toolTip())
         self.target_lang_combo = None
         self.translate_arrow_label = None
         available_source_codes = installed_ocr_language_codes(config=config)
@@ -3491,7 +3638,7 @@ class ScreenCaptureOverlay(QWidget):
                 code for code in available_source_codes
                 if _translation_targets_for_source(code, config)
             ]
-        
+
         if self.mode == "copy":
             for language in APP_LANGUAGES:
                 if language.code not in available_source_codes:
@@ -3516,9 +3663,12 @@ class ScreenCaptureOverlay(QWidget):
             self.translate_arrow_label.setToolTip(
                 ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
             )
+            self.translate_arrow_label.setAccessibleName(self.translate_arrow_label.toolTip())
             self.translate_arrow_label.setStyleSheet(button_qss(True, selector="QToolButton", icon=True))
             self.translate_arrow_label.clicked.connect(self._swap_translate_languages)
             self.target_lang_combo = DropDownCombo(self)
+            self.target_lang_combo.setToolTip(ocr_ui_text(config.get("interface_language", "en"), "target_language"))
+            self.target_lang_combo.setAccessibleName(self.target_lang_combo.toolTip())
         else:
             for language in APP_LANGUAGES:
                 if language.code not in available_source_codes:
@@ -3528,7 +3678,7 @@ class ScreenCaptureOverlay(QWidget):
                     language.short_label,
                     language.code,
                 )
-        
+
         # Устанавливаем индекс на основе self.current_language (сохраненного)
         if self.lang_combo.count() == 0:
             interface_language = config.get("interface_language", "en")
@@ -3537,7 +3687,7 @@ class ScreenCaptureOverlay(QWidget):
         idx = self.lang_combo.findData(self.current_language)
         default_index = idx if idx >= 0 else 0
         self.lang_combo.setCurrentIndex(default_index)
-        
+
         # CaptureLanguageCombo owns the shared compact field and language list.
         if self.target_lang_combo is not None:
             self._populate_translate_target_combo(self.current_target_language)
@@ -3550,7 +3700,7 @@ class ScreenCaptureOverlay(QWidget):
             self.translate_arrow_label.setVisible(True if not defer_show else False)
         if self.target_lang_combo is not None:
             self.target_lang_combo.setVisible(True if not defer_show else False)
-        
+
         # Сохраняем язык при изменении
         self.lang_combo.currentIndexChanged.connect(self.on_language_changed)
         if self.target_lang_combo is not None:
@@ -3727,9 +3877,9 @@ class ScreenCaptureOverlay(QWidget):
         A translucent window only looks translucent where a compositing manager
         is running. GNOME and KDE composite; openbox, i3 and a plain XFCE do not,
         and there the selection overlay comes out solid black — the user drags a
-        box across a black screen. Flameshot and NormCap both sidestep this by
-        selecting on a frozen screenshot, so Linux does the same here whatever
-        the setting says. Windows composites always and keeps the setting.
+        box across a black screen. Linux uses a frozen screenshot regardless of
+        the setting, ensuring that the screen stays visible during selection.
+        Windows composites always and keeps the setting.
         """
         if platform_support.IS_LINUX or platform_support.IS_MAC:
             return True
@@ -3831,7 +3981,7 @@ class ScreenCaptureOverlay(QWidget):
                 f"all_screens={[ _screen_to_text(scr) for scr in QApplication.screens() ]}"
             )
             self._capture_frozen_background(overlay_rect)
-            
+
             self.show()
             self.raise_()
             self.activateWindow()
@@ -3839,7 +3989,7 @@ class ScreenCaptureOverlay(QWidget):
             self._force_topmost()
             QtCore.QTimer.singleShot(80, self._force_topmost)
             QtCore.QTimer.singleShot(220, self._force_topmost)
-            
+
             # Ensure combo is visible and raised
             self.lang_combo.setVisible(True)
             self.lang_combo.raise_()
@@ -3851,14 +4001,14 @@ class ScreenCaptureOverlay(QWidget):
                 self.target_lang_combo.raise_()
             QApplication.processEvents()
             self.update_combo_position()
-            
+
             logging.info(
                 f"[OCR:{self._session_id}] Controls: source_geom=({_rect_to_text(self.lang_combo.geometry())}), "
                 f"source_visible={self.lang_combo.isVisible()}, "
                 f"target_geom=({_rect_to_text(self.target_lang_combo.geometry()) if self.target_lang_combo else 'None'}), "
                 f"source={self.lang_combo.currentData()}, target={self.target_lang_combo.currentData() if self.target_lang_combo else None}"
             )
-            
+
             self.update()
             logging.info(f"[OCR:{self._session_id}] Overlay show command executed.")
         except Exception as e:
@@ -3906,16 +4056,16 @@ class ScreenCaptureOverlay(QWidget):
             target_screen = self._active_screen or self._get_active_screen()
             if not target_screen:
                 target_screen = QApplication.primaryScreen()
-            
+
             screen_geo = target_screen.geometry()
-            
+
             # Calculate position relative to the overlay's coordinate system
             # The overlay covers the whole virtual desktop, so its (0,0) might be negative relative to primary screen
             # We need to map screen coordinates to overlay coordinates
-            
+
             # Overlay local coordinates are relative to self.pos() (top-left of virtual desktop)
             overlay_top_left = self.geometry().topLeft()
-            
+
             # Center on the target screen
             screen_center_x = screen_geo.center().x()
             controls = [self.lang_combo]
@@ -3923,13 +4073,13 @@ class ScreenCaptureOverlay(QWidget):
                 controls.extend([self.translate_arrow_label, self.target_lang_combo])
             spacing = 8 if len(controls) > 1 else 0
             combo_width = sum(widget.width() for widget in controls) + spacing * (len(controls) - 1)
-            
+
             # X in overlay coordinates = Screen Center X - Overlay X - Half Combo Width
             x = screen_center_x - overlay_top_left.x() - (combo_width // 2)
-            
+
             # Y is just a fixed offset from the top of that screen
             y = screen_geo.top() - overlay_top_left.y() + 50 # 50px margin from top
-            
+
             current_x = x
             for widget in controls:
                 widget.move(current_x, y)
@@ -3963,6 +4113,7 @@ class ScreenCaptureOverlay(QWidget):
 
     def closeEvent(self, event):
         # Сначала убираем себя из активных оверлеев
+        notify_current_activity('idle', f'ocr:{id(self)}', only_if_busy=True)
         try:
             for active_mode, overlay in list(_ACTIVE_OVERLAYS.items()):
                 if overlay is self:
@@ -4001,7 +4152,7 @@ class ScreenCaptureOverlay(QWidget):
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        
+
         # Затемнение снова управляется настройкой. По умолчанию оно выключено,
         # чтобы сохранить привычное поведение существующих установок.
         no_dimming = not self._dim_screen_during_ocr
@@ -4011,7 +4162,7 @@ class ScreenCaptureOverlay(QWidget):
             self._capture_frozen_background(self.geometry())
         if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
             painter.drawPixmap(0, 0, self._frozen_background)
-        
+
         # Если не требуется затемнение, рисуем минимальный невидимый фон для перехвата мыши
         if not no_dimming:
             alpha = round(255 * max(0, min(80, self._ocr_dim_strength)) / 100)
@@ -4020,10 +4171,10 @@ class ScreenCaptureOverlay(QWidget):
             # Минимальное затемнение (практически невидимое) для перехвата событий мыши
             # Без этого окно полностью прозрачно и клики проваливаются сквозь него
             painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 5))
-        
+
         if self.start_point is not None and self.end_point is not None:
             rect = QtCore.QRect(self.start_point, self.end_point).normalized()
-            
+
             # Очищаем внутреннюю область (если было затемнение)
             if not no_dimming:
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
@@ -4035,20 +4186,20 @@ class ScreenCaptureOverlay(QWidget):
                 # В режиме без затемнения добавляем легкий полупрозрачный белый фон
                 # чтобы область выделения была видна
                 painter.fillRect(rect, QtGui.QColor(255, 255, 255, 30))
-            
+
             # Photoshop-style рамка: голубая с эффектом свечения
             # Внешнее свечение (glow effect)
             glow_pen = QtGui.QPen(QtGui.QColor(80, 160, 255, 60), 5)
             glow_pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(glow_pen)
             painter.drawRect(rect.adjusted(-2, -2, 2, 2))
-            
+
             # Основная рамка (яркая голубая, как в Photoshop)
             main_pen = QtGui.QPen(QtGui.QColor(80, 160, 255, 255), 1)
             main_pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(main_pen)
             painter.drawRect(rect)
-            
+
             # Внутренняя светлая рамка для контраста
             inner_pen = QtGui.QPen(QtGui.QColor(200, 230, 255, 100), 1)
             inner_pen.setStyle(QtCore.Qt.SolidLine)
@@ -4076,7 +4227,7 @@ class ScreenCaptureOverlay(QWidget):
             painter.drawRoundedRect(box, 10, 10)
             painter.setPen(QtGui.QColor(245, 248, 252))
             painter.drawText(box.adjusted(14, 0, -14, 0), QtCore.Qt.AlignCenter, text)
-            
+
         painter.end()
 
     def mousePressEvent(self, event):
@@ -4156,7 +4307,7 @@ class ScreenCaptureOverlay(QWidget):
                 interface_language = get_cached_ocr_config().get("interface_language", "en")
                 QMessageBox.information(
                     self,
-                    "Language packages",
+                    ocr_ui_text(interface_language, "language_packages"),
                     ocr_ui_text(interface_language, "install_languages_first"),
                 )
                 self.close()
@@ -4599,6 +4750,7 @@ class ScreenCaptureOverlay(QWidget):
             return
 
         self._last_ocr_raw_capture = screenshot.copy()
+        notify_current_activity('busy', f'ocr:{id(self)}')
         self._last_ocr_capture_meta = {
             "local_rect": _rect_to_text(rect),
             "global_rect": _rect_to_text(global_rect),
@@ -4629,6 +4781,26 @@ class ScreenCaptureOverlay(QWidget):
             bytes(ptr), "raw", "RGBA", 0, 1
         )
         raw_pil_for_ocr = pil_image.convert('L')
+
+        from api_providers import VISION_ENGINES
+        api_engine = {name.lower(): key for name, key in VISION_ENGINES.items()}.get(self.get_ocr_engine().lower())
+        if api_engine:
+            from api_ocr import ApiOCRWorker
+            source, target = self._current_translate_pair() if self.mode == 'translate' else (
+                _combo_data_to_ocr_language(self.lang_combo.currentData(), 'en'), None)
+            self._api_translation = None
+            from api_providers import profile
+            api_config = get_cached_ocr_config()
+            self._api_translation_engine = (api_engine if target and profile(api_engine, api_config)['direct']
+                                            else api_config.get('translator_engine', 'google'))
+            self._api_language_pair = (source, target)
+            self.ocr_worker = ApiOCRWorker(api_engine, pil_image, source, target, get_cached_ocr_config())
+            self._ocr_worker_session_id = session_id
+            self.ocr_worker.result_ready.connect(lambda result, sid=session_id: self._handle_api_ocr_result(result, sid))
+            self.ocr_worker.failed.connect(lambda error, sid=session_id: self._handle_api_ocr_error(error, sid))
+            self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+            self.ocr_worker.start()
+            return
 
         # --- 1. Определяем тёмный/светлый фон ---
         gray = pil_image.convert('L')
@@ -4787,11 +4959,11 @@ class ScreenCaptureOverlay(QWidget):
             f"[OCR:{session_id}] Primary preprocessed variant={primary_label}; "
             f"final={pil_image.width}x{pil_image.height}"
         )
-        
+
         combo_data = self.lang_combo.currentData()
         language_code = _combo_data_to_ocr_language(combo_data, "ru")
         self.current_language = language_code
-        
+
         # Сохраняем выбранный язык в конфигурации
         config = get_cached_ocr_config()
         updates = {}
@@ -4875,12 +5047,29 @@ class ScreenCaptureOverlay(QWidget):
             attempts=bitmap_attempts,
             session_id=session_id,
         )
-        
+
         self._ocr_worker_session_id = session_id
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
         self.ocr_worker.start()
+
+    def _handle_api_ocr_result(self, result, session_id):
+        if self._ignore_ocr_results or session_id != self._session_id:
+            return
+        self._api_translation = result
+        self.handle_ocr_result(result.source, session_id)
+
+    def _handle_api_ocr_error(self, error, session_id):
+        if self._ignore_ocr_results or session_id != self._session_id:
+            return
+        self._ocr_in_progress = False
+        self._ocr_worker_session_id = None
+        notify_current_activity('error', f'ocr:{id(self)}')
+        self.hide()
+        lang = get_cached_ocr_config().get('interface_language', 'en')
+        QMessageBox.warning(None, ocr_ui_text(lang, 'translation_failed'), error)
+        self.close()
 
     def handle_ocr_result(self, text, session_id=None):
         try:
@@ -4903,8 +5092,10 @@ class ScreenCaptureOverlay(QWidget):
                 f"[OCR:{getattr(self, '_session_id', 'unknown')}] handle_ocr_result; "
                 f"text_len={len(text or '')}, preview={_text_preview(text)}"
             )
-            self._handle_ocr_result_inner(text)
+            success = self._handle_ocr_result_inner(text)
+            notify_current_activity('success' if success else 'error', f'ocr:{id(self)}')
         except Exception as e:
+            notify_current_activity('error', f'ocr:{id(self)}')
             logging.exception(f"[OCR:{getattr(self, '_session_id', 'unknown')}] Critical error in handle_ocr_result: {e}")
             # Гарантированно закрываем оверлей при любом краше
             try:
@@ -4928,7 +5119,13 @@ class ScreenCaptureOverlay(QWidget):
                     f"source_len={len(text)}"
                 )
                 try:
-                    translated_text = translate_text(text, source_code, target_code)
+                    api_result = getattr(self, '_api_translation', None)
+                    if api_result is not None and api_result.source == text:
+                        translated_text = api_result.translation
+                        source_code, target_code = self._api_language_pair
+                        self._api_translation = None
+                    else:
+                        translated_text = translate_text(text, source_code, target_code)
                     if translated_text:
                         logging.info(
                             f"[OCR:{session_id}] Translation completed successfully; "
@@ -4939,7 +5136,8 @@ class ScreenCaptureOverlay(QWidget):
                 except Exception as e:
                     logging.exception(f"[OCR:{session_id}] Translation error: {e}")
                     self.hide()
-                    QMessageBox.warning(None, "Ошибка перевода", str(e))
+                    interface_language = get_cached_ocr_config().get("interface_language", "en")
+                    QMessageBox.warning(None, ocr_ui_text(interface_language, "translation_failed"), str(e))
                     translated_text = ""
                 if translated_text:
                     # Определяем тему и язык из кэша
@@ -4959,7 +5157,7 @@ class ScreenCaptureOverlay(QWidget):
                         save_copy_history(translated_text)
                         save_translation_history(text, translated_text, target_code)
                         self.close()
-                        return
+                        return True
 
                     # Скрываем оверлей ПЕРЕД показом диалога, чтобы:
                     # 1) Пользователь видел исходный контент за диалогом
@@ -4975,7 +5173,7 @@ class ScreenCaptureOverlay(QWidget):
                                 dialog_parent = widget
                                 break
 
-                    show_translation_dialog(
+                    result_dialog = show_translation_dialog(
                         dialog_parent,
                         translated_text,
                         auto_copy=auto_copy,
@@ -4986,9 +5184,13 @@ class ScreenCaptureOverlay(QWidget):
                         target_lang=target_code,
                         result_mode="area",
                     )
+                    if api_result is not None:
+                        result_dialog.set_window_engine(self._api_translation_engine)
+                        result_dialog._engine_override = True
                     # Сохраняем переводы в историю (исходный текст и перевод)
                     save_translation_history(text, translated_text, target_code)
                 self.close()
+                return bool(translated_text)
             else:
                 try:
                     # Ленивый импорт для избежания циклического импорта
@@ -5001,6 +5203,7 @@ class ScreenCaptureOverlay(QWidget):
                     )
                     # НЕ сохраняем обычный текст в историю переводов!
                     self.close()
+                    return True
                 except Exception as e:
                     logging.exception(f"[OCR:{session_id}] OCR result handling error: {e}")
         else:
@@ -5018,7 +5221,7 @@ class ScreenCaptureOverlay(QWidget):
             msg.setIcon(QMessageBox.NoIcon)
             worker = getattr(self, "ocr_worker", None)
             failure_reason = getattr(worker, "failure_reason", "") if worker is not None else ""
-            
+
             msg.setWindowTitle(ocr_ui_text(lang, "recognition_failed"))
             if failure_reason in {"rapidocr_unavailable", "easyocr_unavailable"}:
                 engine = "RapidOCR" if failure_reason.startswith("rapid") else "EasyOCR"
@@ -5037,54 +5240,54 @@ class ScreenCaptureOverlay(QWidget):
             else:
                 msg.setText(ocr_ui_text(lang, "not_recognized"))
                 msg.setInformativeText(ocr_ui_text(lang, "not_recognized_info"))
-            
+
             msg.setStandardButtons(QMessageBox.Ok)
-            
+
             if theme == "Темная":
                 msg.setStyleSheet("""
-                    QMessageBox { 
-                        background-color: #1a1a2e; 
+                    QMessageBox {
+                        background-color: #1a1a2e;
                     }
-                    QMessageBox QLabel { 
-                        color: #ffffff; 
-                        font-size: 14px; 
+                    QMessageBox QLabel {
+                        color: #ffffff;
+                        font-size: 14px;
                     }
-                    QPushButton { 
-                        background-color: #7A5FA1; 
-                        color: #ffffff; 
-                        border: none; 
+                    QPushButton {
+                        background-color: #7A5FA1;
+                        color: #ffffff;
+                        border: none;
                         border-radius: 6px;
-                        padding: 8px 24px; 
+                        padding: 8px 24px;
                         min-width: 80px;
                         font-size: 14px;
                     }
-                    QPushButton:hover { 
-                        background-color: #8B70B2; 
+                    QPushButton:hover {
+                        background-color: #8B70B2;
                     }
                 """)
             else:
                 msg.setStyleSheet("""
-                    QMessageBox { 
-                        background-color: #ffffff; 
+                    QMessageBox {
+                        background-color: #ffffff;
                     }
-                    QMessageBox QLabel { 
-                        color: #333333; 
-                        font-size: 14px; 
+                    QMessageBox QLabel {
+                        color: #333333;
+                        font-size: 14px;
                     }
-                    QPushButton { 
-                        background-color: #7A5FA1; 
-                        color: #ffffff; 
-                        border: none; 
+                    QPushButton {
+                        background-color: #7A5FA1;
+                        color: #ffffff;
+                        border: none;
                         border-radius: 6px;
-                        padding: 8px 24px; 
+                        padding: 8px 24px;
                         min-width: 80px;
                         font-size: 14px;
                     }
-                    QPushButton:hover { 
-                        background-color: #8B70B2; 
+                    QPushButton:hover {
+                        background-color: #8B70B2;
                     }
                 """)
-            
+
             msg.exec_()
             self.close()
 
@@ -5159,7 +5362,7 @@ def get_or_show_overlay(mode="ocr"):
             _ACTIVE_OVERLAYS[mode] = None
         except Exception:
             pass
-    
+
     # Создаем или показываем оверлей
     ov = _OVERLAY_POOL.get(mode)
     app = QApplication.instance()
@@ -5171,7 +5374,7 @@ def get_or_show_overlay(mode="ocr"):
         ov = ScreenCaptureOverlay(mode, defer_show=False)
     else:
         ov.show_overlay()
-    
+
     # Keep reference to prevent garbage collection
     _ACTIVE_OVERLAYS[mode] = ov
     _OVERLAY_POOL[mode] = None
@@ -5442,7 +5645,13 @@ class FullScreenOCRWorker(QtCore.QThread):
             if self.isInterruptionRequested():
                 return
             if self.engine != "windows":
-                lines_data = _recognize_image_layout(self.bitmap, self.engine, self.language_code)
+                from api_providers import VISION_ENGINES, recognize_regions
+                api_engine = {name.lower(): key for name, key in VISION_ENGINES.items()}.get(self.engine)
+                if api_engine:
+                    lines_data = recognize_regions(api_engine, self.bitmap, self.language_code,
+                        getattr(self, 'translation_target_code', None), get_cached_ocr_config(), self.isInterruptionRequested)
+                else:
+                    lines_data = _recognize_image_layout(self.bitmap, self.engine, self.language_code)
                 if not self.isInterruptionRequested():
                     self.result_ready.emit(lines_data)
                 return
@@ -5475,6 +5684,7 @@ class FullScreenOCRWorker(QtCore.QThread):
                     recognized, self.bitmap.pixel_width, self.bitmap.pixel_height)
             logging.info(f"FullScreenOCR: found {len(lines_data)} text blocks")
         except Exception as e:
+            self.error_message = str(e)
             logging.error(f"FullScreenOCRWorker error: {e}")
             import traceback
             traceback.print_exc()
@@ -5558,6 +5768,10 @@ class FullScreenTranslateOverlay(QWidget):
         self.translate_arrow_label.setToolTip(
             ocr_ui_text(config.get("interface_language", "en"), "swap_languages")
         )
+        self.translate_arrow_label.setAccessibleName(self.translate_arrow_label.toolTip())
+        for control, key in ((self.lang_combo, "source_language"), (self.target_lang_combo, "target_language")):
+            control.setToolTip(ocr_ui_text(config.get("interface_language", "en"), key))
+            control.setAccessibleName(control.toolTip())
         fullscreen_config = dict(config)
         available_sources = installed_ocr_language_codes(config=fullscreen_config)
         if str(config.get("translator_engine", "Google")).strip().lower() == "argos":
@@ -5763,12 +5977,14 @@ class FullScreenTranslateOverlay(QWidget):
         """Leave the overlay in a readable failed state instead of loading forever."""
         if run_id != self._translation_run_id:
             return
+        notify_current_activity('error', f'fullscreen:{id(self)}')
         self.loading = False
         lang = get_cached_ocr_config().get("interface_language", "en")
         self.error_message = ocr_ui_text(lang, message_key)
         self.update()
 
     def _start_ocr(self, run_id, source_code, target_code):
+        notify_current_activity('busy', f'fullscreen:{id(self)}')
         qimage = self.screenshot.toImage()
         worker = create_position_ocr_worker(qimage, source_code, get_cached_ocr_config().get("ocr_engine"))
         if worker is None:
@@ -5788,6 +6004,9 @@ class FullScreenTranslateOverlay(QWidget):
     def _on_fullscreen_ocr_result(self, lines):
         worker = self.sender() or self.ocr_worker
         if worker is None:
+            return
+        if getattr(worker, 'error_message', ''):
+            self._translation_result_ready.emit(int(getattr(worker, 'translation_run_id', -1)), [], worker.error_message)
             return
         self._on_ocr_complete(
             lines,
@@ -5813,7 +6032,8 @@ class FullScreenTranslateOverlay(QWidget):
             return
 
         try:
-            self._lines_data = _group_screen_ocr_lines(lines_data)
+            from api_providers import VisionLayout
+            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data)
             if not self._lines_data:
                 self._fail_translation(run_id, "screen_no_text")
                 return
@@ -5842,7 +6062,9 @@ class FullScreenTranslateOverlay(QWidget):
                 translate_text, engine=engine,
                 cancel_callback=lambda: run_id != self._translation_run_id,
             )
-            translated_texts = _translate_screen_texts(all_texts, translate, src, tgt)
+            translated_texts = getattr(lines_data, 'translations', None)
+            if translated_texts is None:
+                translated_texts = _translate_screen_texts(all_texts, translate, src, tgt)
 
             if translated_texts and any(translated_texts):
                 for i, (x, y, w, h, orig) in enumerate(lines_data):
@@ -5877,6 +6099,8 @@ class FullScreenTranslateOverlay(QWidget):
         self.translated_blocks = list(blocks or [])
         self.error_message = str(error_message or "") or None
         self.loading = False
+        notify_current_activity('error' if self.error_message or not self.translated_blocks else 'success',
+                                f'fullscreen:{id(self)}')
         if self.translated_blocks and not self.error_message:
             original_text = "\n".join(str(block[1] or "") for block in self.translated_blocks)
             translated_text = "\n".join(str(block[2] or "") for block in self.translated_blocks)
@@ -6205,6 +6429,7 @@ class FullScreenTranslateOverlay(QWidget):
 
     def closeEvent(self, event):
         global _fullscreen_overlay_ref
+        notify_current_activity('idle', f'fullscreen:{id(self)}', only_if_busy=True)
         self._translation_run_id += 1
         self._rerun_timer.stop()
         self._pending_translation_pair = None

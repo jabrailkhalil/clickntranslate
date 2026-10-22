@@ -41,6 +41,37 @@ TEXT = {
     'zh': ('准备好在 Mac 上翻译', '请为需要使用的功能授权。下面的按钮会直接打开对应的 macOS 设置。',
            '屏幕录制', '辅助功能', '启用', '已允许', '未启用', '重新检查', '继续', '无法打开设置，请重试。',
            '识别并翻译屏幕上的文字。', '复制和替换其他应用中选中的文字。', '请在 macOS 中授权，然后通过程序坞或 Cmd+Tab 返回。如果系统提示，请重启应用。'),
+
+    'pt': ('Pronto para traduzir no Mac',
+     'Permita o acesso aos recursos que você deseja usar. Os botões abrem as configurações corretas do '
+     'macOS.',
+     'Gravação de tela',
+     'Acessibilidade',
+     'Habilitar',
+     'Permitido',
+     'Não ativado',
+     'Verifique novamente',
+     'Continuar',
+     'Não foi possível abrir as configurações. Por favor, tente novamente.',
+     'Reconheça e traduza texto na tela.',
+     'Copie e substitua o texto selecionado em outros aplicativos.',
+     'Permita o acesso no macOS e retorne pelo Dock ou Cmd+Tab. Reinicie o aplicativo se o macOS '
+     'solicitar.'),
+    'it': ('Pronto per la traduzione su Mac',
+     "Consenti l'accesso alle funzionalità che desideri utilizzare. I pulsanti aprono le giuste "
+     'impostazioni macOS.',
+     'Registrazione dello schermo',
+     'Accessibilità',
+     'Abilita',
+     'Consentito',
+     'Non abilitato',
+     'Controlla di nuovo',
+     'Continua',
+     'Impossibile aprire le impostazioni. Per favore riprova.',
+     'Riconosci e traduci il testo sullo schermo.',
+     'Copia e sostituisci il testo selezionato in altre app.',
+     "Consenti l'accesso in macOS, quindi ritorna tramite Dock o Cmd+Tab. Riavvia l'app se macOS te lo "
+     'chiede.'),
 }
 
 

@@ -39,17 +39,53 @@ LOCALIZED_LANGUAGE_NAMES = {
         "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
         "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
     },
+
+    'pt': {'en': 'Inglês',
+     'ru': 'Russo',
+     'de': 'Alemão',
+     'fr': 'Francês',
+     'es': 'Espanhol',
+     'it': 'Italiano',
+     'pt': 'Português',
+     'pl': 'Polonês',
+     'uk': 'Ucraniano',
+     'tr': 'Turco',
+     'nl': 'Holandês',
+     'zh': 'Chinês',
+     'ja': 'Japonês',
+     'ko': 'Coreano',
+     'ar': 'Árabe',
+     'hi': 'Híndi'},
+    'it': {'en': 'Inglese',
+     'ru': 'Russo',
+     'de': 'Tedesco',
+     'fr': 'Francese',
+     'es': 'Spagnolo',
+     'it': 'Italiano',
+     'pt': 'Portoghese',
+     'pl': 'Polacco',
+     'uk': 'Ucraino',
+     'tr': 'Turco',
+     'nl': 'Olandese',
+     'zh': 'Cinese',
+     'ja': 'Giapponese',
+     'ko': 'Coreano',
+     'ar': 'Arabo',
+     'hi': 'Hindi'},
 }
 
 AUTO_LANGUAGE_NAMES = {
     'en': 'Detect language', 'ru': 'Определить язык', 'de': 'Sprache erkennen',
     'es': 'Detectar idioma', 'fr': 'Détecter la langue', 'zh': '自动检测语言',
+
+    'pt': 'Detectar idioma',
+    'it': 'Rileva la lingua',
 }
 
 
 def supports_auto_source(engine):
     """Text detection is a provider capability, not an OCR language."""
-    return str(engine or '').lower() == 'google'
+    return str(engine or '').lower() in {'google', 'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}
 
 
 def valid_translation_source(code, engine):
@@ -98,6 +134,15 @@ LANGUAGES = [
     LanguageInfo("hi", "Hindi", "Хинди", "HI", "Hindi_flag.png", "hi-IN", "hin"),
 ]
 
+from extended_languages import EXTRA_NAMES, EXTRA_OCR_CODES, EXTRA_WINDOWS_TAGS
+
+for _locale, _names in EXTRA_NAMES.items():
+    LOCALIZED_LANGUAGE_NAMES[_locale].update(_names)
+for _code, _tesseract in EXTRA_OCR_CODES.items():
+    LANGUAGES.append(LanguageInfo(_code, EXTRA_NAMES['en'][_code], EXTRA_NAMES['ru'][_code],
+                                  _code.upper(), '', EXTRA_WINDOWS_TAGS[_code], _tesseract,
+                                  easyocr_code='no' if _code == 'nb' else ''))
+
 LANGUAGE_BY_CODE = {language.code: language for language in LANGUAGES}
 
 
@@ -126,7 +171,7 @@ def language_icon_path(code):
     language = get_language(code)
     if not language:
         return ""
-    return "icons/" + language.flag_icon
+    return "icons/" + language.flag_icon if language.flag_icon else ''
 
 
 def language_names(interface_language="en"):

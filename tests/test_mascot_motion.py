@@ -1,4 +1,4 @@
-"""Check contact in screen coordinates, jelly hops, and real application events."""
+"""Check whole-frame playback, state transitions and real application events."""
 from unittest import mock
 
 import pytest
@@ -6,51 +6,29 @@ from PyQt5 import QtCore, QtGui
 
 import main
 from assistant_art import MASCOTS
-from assistant_motion import PetMotion, STRIDE, foot_pose, paint_pet, skin, notify_activity
+from assistant_motion import PetMotion, paint_pet, skin, notify_activity, notify_current_activity
+from assistant_sprites import frame_index, look_index
 from test_desktop_ux import app, window
+
+
+def test_frame_cadence_and_clockwise_cardinal_selection():
+    assert frame_index((100, 200, 300), 0) == 0
+    assert frame_index((100, 200, 300), .1) == 1
+    assert frame_index((100, 200, 300), .3) == 2
+    assert frame_index((100, 200, 300), .6) == 0
+    assert [look_index(a) for a in (0, 90, 180, 270, 360, -90)] == [0, 4, 8, 12, 0, 12]
 
 
 @pytest.mark.parametrize('extent', [60, 84, 150])
 @pytest.mark.parametrize('speed', [20, 40, 100])
-@pytest.mark.parametrize('facing', [-1, 1])
-def test_contact_foot_stays_fixed_in_world_at_all_speeds_and_sizes(extent, speed, facing):
+def test_legacy_speed_and_size_never_move_the_pet(extent, speed):
     pet = PetMotion('pancake')
     pet.reactions = False
-    x, remainder = 200, 0.
-    contacts = {}
-    samples = 0
-    for _ in range(300):
-        remainder += pet.advance(.02, speed, extent)
-        step = int(remainder)
-        remainder -= step
-        x += step * facing
-        pet.moved(step, extent)
-        for leg in (0, 1):
-            offset, lift, planted = foot_pose(pet.phase, leg)
-            cycle = int(pet.distance / STRIDE + leg * .5)
-            if planted:
-                world = x + facing * offset * extent / 128
-                key = leg, cycle
-                if key in contacts:
-                    assert world == pytest.approx(contacts[key], abs=1e-8)
-                    samples += 1
-                contacts[key] = world
-                assert lift == 0
-            else:
-                assert lift < 0
-    assert samples > 150
-
-
-def test_jelly_compresses_without_sliding_then_travels_in_flight():
-    pet = PetMotion('bubu')
-    pet.reactions = False
-    distances = []
-    for _ in range(100):
-        distances.append(pet.advance(.01, 26, 128))
-    assert sum(distances[:19]) == pytest.approx(0)
-    assert sum(distances[83:]) == pytest.approx(0)
-    assert sum(distances[20:80]) > 24
-    assert sum(distances) == pytest.approx(26)
+    distances = [pet.advance(.02, speed, extent) for _ in range(50)]
+    assert sum(distances) == 0
+    assert pet.walk_time == 0
+    assert pet.advance(.1, speed, extent, locomotion=False) == 0
+    assert pet.walk_time == 0
 
 
 def render(mascot, **kwargs):
@@ -62,44 +40,93 @@ def render(mascot, **kwargs):
     return canvas
 
 
-def test_jelly_never_renders_limbs_and_hop_is_visible(app):
-    poses = [render('bubu', action='walk', hop_phase=p) for p in (.0, .1, .5, .9)]
-    assert all(poses[a] != poses[b] for a in range(4) for b in range(a+1, 4))
-    wrong_limb = QtGui.QPixmap(200, 200)
-    wrong_limb.fill(QtCore.Qt.red)
-    replacement = {key: wrong_limb for key in ('foot-left', 'foot-right', 'arm-left', 'arm-right')}
-    with mock.patch.dict(skin('bubu'), replacement):
-        assert [render('bubu', action='walk', hop_phase=p) for p in (.0, .1, .5, .9)] == poses
+@pytest.mark.parametrize('mascot', MASCOTS)
+def test_whole_frames_animate_without_using_directional_gaits(app, mascot):
+    poses = [render(mascot, action='wave', time=t) for t in (0., .15, .3, .45)]
+    assert len({image.cacheKey() for image in poses}) == 4
+    assert poses[0] != poses[1]
+    assert render(mascot, action='walk') == render(mascot, action='idle')
+    assert render(mascot, action='idle', facing=-1) == render(mascot, action='idle')
+    assert skin(mascot) is skin(mascot)
+
+def test_activity_clock_starts_at_first_frame_and_success_transitions_to_review():
+    pet = PetMotion('click')
+    pet.time = 103.3
+    pet.set_activity('success')
+    assert pet.seconds(pet.action()) == 0
+    for _ in range(4):
+        pet.advance(.21, 40, 84)
+    assert pet.action() == 'review'
+    assert pet.seconds('review') == pytest.approx(0)
+
+
+def test_gui_activity_bridge_keeps_concurrent_sources_and_ignores_late_cancel(window):
+    with mock.patch.object(main, '_main_window_ref', window):
+        notify_current_activity('busy', 'ocr:one')
+        notify_current_activity('busy', 'live:two')
+        notify_current_activity('success', 'ocr:one')
+        assert window._companion_activity == 'busy'
+        notify_current_activity('error', 'live:two')
+        assert window._companion_activity == 'error'
+        notify_current_activity('idle', 'ocr:one', only_if_busy=True)
+        assert window._companion_activity == 'error'
+
+
+@pytest.mark.parametrize('result', ['success', 'error', 'cancel'])
+def test_live_translation_drives_reactions_and_stale_results_cannot_replace_them(window, result):
+    import game_mode
+    import ocr
+    with (mock.patch.object(main, '_main_window_ref', window),
+          mock.patch.object(ocr, 'get_cached_ocr_config', return_value=dict(window.config)),
+          mock.patch.object(game_mode, '_exclude_from_windows_capture', return_value=True),
+          mock.patch.object(game_mode.threading, 'Thread')):
+        overlay = game_mode.GameTranslationOverlay(QtCore.QRect(100, 100, 300, 100), 'en', 'ru')
+        overlay._timer.stop()
+        try:
+            with mock.patch.object(overlay, '_target_is_active', return_value=True):
+                overlay._start_translation('Hello')
+                revision = overlay._revision
+                assert window._companion_activity == 'busy'
+                overlay._has_ocr_source = False
+                if result == 'cancel':
+                    overlay.close()
+                else:
+                    overlay._apply_translation(revision, 'Hello', 'Привет' if result == 'success' else '',
+                                               'Unavailable' if result == 'error' else '')
+                assert window._companion_activity == ('idle' if result == 'cancel' else result)
+                overlay._apply_translation(revision - 1, 'Old text', '', 'Old failure')
+                assert window._companion_activity == ('idle' if result == 'cancel' else result)
+                assert not window._companion_jobs
+        finally:
+            overlay.close()
 
 
 @pytest.mark.parametrize('mascot', MASCOTS)
-def test_busy_reactions_rest_and_sleep_have_intentional_transitions(mascot):
+def test_native_reactions_have_intentional_stationary_transitions(mascot):
     pet = PetMotion(mascot)
     pet.set_activity('busy')
     for _ in range(250):
-        assert pet.advance(.2, 40, 84) == 0
+        assert pet.advance(.2, 40, 84, locomotion=True) == 0
         assert pet.action() == 'work'
-    assert pet.time > 49 and pet.quiet == 0
+    assert not pet.play('jumping')  # Do not obscure an active translation.
     pet.set_activity('success')
     assert pet.action() == 'success'
-    for _ in range(16):
-        pet.advance(.2, 40, 84)
-    assert pet.action() == 'walk'
+    for _ in range(5): pet.advance(.2)
+    assert pet.action() == 'review'
+    for _ in range(11): pet.advance(.2)
+    assert pet.action() == 'idle'
     pet.set_activity('error')
     assert pet.action() == 'error'
-    for _ in range(230):
-        pet.advance(.2, 40, 84)
-    assert pet.action() == 'sleep'
-    pet.interact()
-    assert pet.action() == 'walk'
-    pet.quiet = 6.5
-    assert pet.action() == 'wave'
-    pet.quiet = 8.5
-    assert pet.action() == 'curious'
+    for _ in range(230): pet.advance(.2)
+    assert pet.action() == 'idle'  # No spontaneous walking, sleep or extra poses.
     pet.reactions = False
     pet.set_activity('busy')
-    assert pet.action() == 'walk'
-
+    assert pet.action() == 'idle'
+    pet.set_activity('idle')
+    pet.greet()
+    assert pet.action() == 'wave'  # Explicit clicks also work with auto reactions off.
+    for _ in range(4): pet.advance(.2)
+    assert pet.action() == 'idle'
 
 def test_notifications_reach_both_pets_and_concurrent_jobs_hold_busy(window):
     window.config.update(desktop_assistant_appearance='walking', desktop_assistant_behavior='walk')
@@ -150,20 +177,29 @@ def test_document_translation_cancel_and_completion_drive_reactions(window, app)
         app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
 
-def test_emotion_selector_and_reaction_preference_persist(window):
+def test_display_mode_and_event_reactions_persist_without_manual_emotion_choices(window):
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
-    assert page.pose_combo.count() == 11
-    page.choose_appearance('walking')
-    page.show_category('static')
-    page.pose_combo.activated.emit(0)
+    assert tuple(page.mode_combo.itemData(i) for i in range(page.mode_combo.count())) == ('animated', 'portrait', 'custom')
+    assert not hasattr(page, 'pose_combo')
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('portrait'))
     assert window.config['desktop_assistant_appearance'] == 'portrait'
-    page.pose_combo.setCurrentIndex(page.pose_combo.findData('thinking'))
-    assert window.config['desktop_assistant_appearance'] == 'thinking'
-    assert window.config['desktop_assistant_behavior'] == 'idle'
-    page.choose_appearance('walking')
+    page.mode_combo.setCurrentIndex(page.mode_combo.findData('animated'))
     page.reactions.setChecked(False)
-    assert window.config['desktop_assistant_reactions'] is False
     page.toggle.click()
+    assert window.config['desktop_assistant_reactions'] is False
     assert window._desktop_assistant.anchor.motion.reactions is False
-    assert window.assistant_preview.motion.reactions is False
+    assert all(not motion.reactions for motion in window.assistant_preview.motions.values())
+    assert page.mascot_preview.motion.reactions is False
+
+@pytest.mark.parametrize('state', ['idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'])
+def test_explicit_native_reaction_plays_once_then_waits_for_menu_choice(state):
+    pet = PetMotion('click')
+    pet.menu_open = True
+    assert pet.play(state)
+    assert pet.seconds(pet.action()) == 0
+    for _ in range(10): pet.advance(.2)
+    assert pet.action() == 'waiting'
+    pet.menu_open = False
+    assert pet.action() == 'idle'
+    assert not pet.play('sleep') and not pet.play('running-right')

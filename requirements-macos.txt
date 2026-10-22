@@ -29,3 +29,4 @@ pyobjc-framework-ScreenCaptureKit==11.1
 # Bundled in the isolated worker. This ONNX version has Intel AND arm64 wheels.
 rapidocr-onnxruntime==1.4.4
 onnxruntime==1.23.2
+keyring

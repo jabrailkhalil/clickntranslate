@@ -13,6 +13,7 @@ import zlib
 import hashlib
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
+from translation_availability import OfflineProviderUnavailable
 import platform_support
 import portable_paths
 
@@ -343,7 +344,8 @@ def _get_hymt_runtime():
 
 def hymt_installed():
     runtime = _get_hymt_runtime()
-    return bool(runtime.get("model") and runtime.get("runner"))
+    return bool(runtime.get('model') and runtime.get('runner')
+                and os.path.isfile(runtime['model']) and os.path.isfile(runtime['runner']))
 
 
 _HYMT_CHINESE_LANGUAGE_NAMES = {
@@ -446,8 +448,8 @@ def _hymt_translate_chunk(text, source_code, target_code, status_callback=None):
     runtime = _get_hymt_runtime()
     model_path = runtime.get("model")
     runner_path = runtime.get("runner")
-    if not model_path or not runner_path:
-        raise RuntimeError(
+    if not model_path or not runner_path or not os.path.isfile(model_path) or not os.path.isfile(runner_path):
+        raise OfflineProviderUnavailable('hymt', source_code, target_code,
             "Hy-MT не установлен. Установите пакет Hy-MT в настройках переводчика."
         )
 
@@ -1388,6 +1390,11 @@ def _check_translation_cancelled(callback):
 def _libretranslate_server():
     key = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_API_KEY', '').strip()
     url = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_URL', '').strip().rstrip('/')
+    config = get_cached_translator_config()
+    if not url and config.get('api_providers', {}).get('libretranslate'):
+        from api_providers import profile, credential
+        item = profile('libretranslate', config)
+        return item['url'], key or credential('libretranslate', config)
     return url or ('https://libretranslate.com' if key else 'https://translate.disroot.org'), key
 
 
@@ -1402,13 +1409,16 @@ class _TranslationCache:
 
     @staticmethod
     def _engine_key(engine, segment=False):
+        if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+            from api_providers import cache_identity
+            engine = cache_identity(engine, get_cached_translator_config())
         if engine == 'hymt':
             # Ignore translations produced with the old, duplicated template.
             engine = 'hymt:prompt-v2'
         if engine == 'libretranslate':
             # A custom LibreTranslate server may use different models.
-            url, _key = _libretranslate_server()
-            engine += ':' + hashlib.sha256(url.encode('utf-8')).hexdigest()[:16]
+            url, key = _libretranslate_server()
+            engine += ':' + hashlib.sha256((url + '\0' + key).encode('utf-8')).hexdigest()[:16]
         return ('segment-v2:' if segment else '') + engine
 
     def get(self, text, engine, segment=False):
@@ -1444,7 +1454,8 @@ def translate_text(
 ):
     """Translate with the selected engine; failures never change providers."""
     config = get_cached_translator_config()
-    engine = (engine or config.get("translator_engine", "Google")).lower()
+    from provider_catalog import provider_id
+    engine = provider_id(engine or config.get("translator_engine", "Google"))
     _check_translation_cancelled(cancel_callback)
     print(f"Using translator: {engine.upper()}")
 
@@ -1477,6 +1488,14 @@ def translate_text(
         return _cache_and_return(hymt_translate(text, source_code, target_code, status_callback=status_callback,
             cancel_callback=cancel_callback, _cache=cache, partial_callback=partial_callback))
 
+    if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+        from api_providers import translate, ProviderError, display_error
+        try:
+            result = translate(engine, text, source_code, target_code, config, cancel_callback)
+        except ProviderError as error:
+            raise ProviderError(display_error(error, config.get('interface_language', 'en'))) from None
+        return _cache_and_return(result)
+
     if engine in online_engines:
         _check_translation_cancelled(cancel_callback)
         result = _call_online(engine, text, source_code, target_code)
@@ -1486,7 +1505,8 @@ def translate_text(
 
     if engine == "argos":
         if not argos_runtime_available():
-            raise Exception(argos_unavailable_reason())
+            raise OfflineProviderUnavailable('argos', source_code, target_code,
+                                             argos_unavailable_reason(), component='runtime')
         # Packages are large, so only download them when the caller provides the
         # dedicated byte-progress flow. A status-only callback (used by document
         # translation) must never trigger an unconfirmed background download.
@@ -1502,7 +1522,7 @@ def translate_text(
         )
         if argos_result:
             return _cache_and_return(argos_result)
-        raise Exception(
+        raise OfflineProviderUnavailable('argos', source_code, target_code,
             f"Argos offline translation package is not installed for {source_code}->{target_code}. "
             "Install the required direction in Settings > Language packages > Argos."
         )
@@ -1742,7 +1762,10 @@ def _libretranslate_request(text, source_code, target_code):
             }
             if api_key:
                 payload['api_key'] = api_key
-            r = session.post(url, json=payload, timeout=10)
+            request_options = {'json': payload, 'timeout': 10}
+            if api_key:
+                request_options['allow_redirects'] = False
+            r = session.post(url, **request_options)
             if r.status_code == 200:
                 data = r.json()
                 if isinstance(text, list):
@@ -1751,7 +1774,10 @@ def _libretranslate_request(text, source_code, target_code):
                         raise ValueError('LibreTranslate returned an invalid batch response')
                     return [_validated_translation(item, 'LibreTranslate') for item in result]
                 return _validated_translation(data.get('translatedText'), 'LibreTranslate')
-            last_error = f"{base_url}: {_server_error_detail(r)}"
+            detail = _server_error_detail(r)
+            if api_key:
+                detail = detail.replace(api_key, '[redacted]')
+            last_error = f"{base_url}: {detail}"
             if isinstance(text, list) and r.status_code in (400, 413, 422):
                 raise _BatchNotSupportedError(last_error)
             if r.status_code == 429:

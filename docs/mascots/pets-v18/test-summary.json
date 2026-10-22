@@ -1,0 +1,151 @@
+{
+  "baseCommit": "959175faefcd4b7591d0d91fde5535785d155ae5",
+  "testedSourceCommit": "eae52e40a3e4087b91d7eb41977ebe8bf6fc9457",
+  "latestSourceCommit": "688a51e928140a6d5c541bcfa2e78f3fafeddf3d",
+  "fullSuiteCommand": "python tools/run_ci_tests.py --parts 8 --timeout 160",
+  "fullSuiteCounts": {
+    "passed": 1981,
+    "skipped": 77,
+    "failure": 2
+  },
+  "counts": {
+    "passed": 1981,
+    "skipped": 77,
+    "failure": 2
+  },
+  "totalReportedCases": 2060,
+  "partitions": [
+    {
+      "part": 1,
+      "counts": {
+        "passed": 256,
+        "skipped": 1
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 2,
+      "counts": {
+        "passed": 248
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 3,
+      "counts": {
+        "passed": 224,
+        "skipped": 12,
+        "failure": 1
+      },
+      "exitCode": 1
+    },
+    {
+      "part": 4,
+      "counts": {
+        "passed": 273,
+        "skipped": 17
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 5,
+      "counts": {
+        "passed": 205,
+        "skipped": 1
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 6,
+      "counts": {
+        "passed": 284,
+        "skipped": 9
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 7,
+      "counts": {
+        "passed": 286,
+        "skipped": 35
+      },
+      "exitCode": 0
+    },
+    {
+      "part": 8,
+      "counts": {
+        "passed": 205,
+        "failure": 1,
+        "skipped": 2
+      },
+      "exitCode": 1
+    }
+  ],
+  "nativeWindowsCounts": {
+    "passed": 35
+  },
+  "nativeWindowsRuns": [
+    "qa-native-popup-hover-font-final"
+  ],
+  "pr7": {
+    "number": 7,
+    "merged": true,
+    "testedHead": "e704dfa257e919404a41c98fa0813b7dd25273c1",
+    "mergeCommit": "be5c5350586fd3086269d76c72592712bef20668",
+    "fullSuiteCounts": {
+      "passed": 1769,
+      "skipped": 67,
+      "failure": 0
+    }
+  },
+  "latestRechecks": [
+    "Real QMenu.exec_ placement on both physical monitors, bidirectional moves, flag/editor/background routes and 80/100/150 percent UI scales (35 native cases passed including hover, font and held-arrow checks)",
+    "Six-language visible-control hover coverage for home, four settings tabs and hotkeys; live font previews at all five sizes; no clipping at 24px",
+    "Atomic production theme changes, rapid navigation and final-theme repaint checks passed; visible test fixtures also deliberately exercise individual palette states",
+    "Previous native checks: Doc animation (58 passed) and two physical monitors/navigation/focus/controls (54 passed)",
+    "Tracked text audit including sparse files; retained engine/model/font/library dependencies and license notices",
+    "Isolated six-locale landing page build: 31 public files and retained font license",
+    "Quick selection lifecycle, clipboard text restoration and stale-result rejection"
+  ],
+  "userDataUnchanged": true,
+  "failures": [
+    {
+      "test": "tests.test_linux_packaging.AppStreamMetadataTest::test_latest_metadata_release_matches_the_application_version",
+      "message": "AssertionError: '1.8.1' != '1.8.2'\n- 1.8.1\n?     ^\n+ 1.8.2\n?     ^"
+    },
+    {
+      "test": "tests.test_version_consistency::test_release_version_is_synchronized_everywhere",
+      "message": "AssertionError: assert '1.8.2' == '1.8.1'\n  \n  - 1.8.1\n  ?     ^\n  + 1.8.2\n  ?     ^"
+    }
+  ],
+  "note": "All eight partitions completed on testedSourceCommit. The subsequent compact numeric font labels and size tooltip update passed the recorded focused follow-up suite. Only the two unchanged development-version checks fail: 1.8.1 metadata/assertions versus APP_VERSION 1.8.2. PR #7 passed independently with no failures before merge. The final focused native Windows run passed; macOS/Linux builds and installers were not produced.",
+  "focusedFollowupRuns": [
+    {
+      "run": "qa-font-compact-final",
+      "counts": {
+        "passed": 80,
+        "skipped": 1
+      },
+      "userDataUnchanged": true
+    }
+  ],
+  "projectAudit": {
+    "date": "2026-10-22",
+    "trackedTextFiles": 626,
+    "remainingAuditedApplicationReferences": 0,
+    "includesSparseFiles": true,
+    "runtimeAtlasHashesUnchanged": true,
+    "retiredResourcesRemoved": true,
+    "dependencyLicenseNoticesRetained": true,
+    "landingLocalesBuilt": 6,
+    "landingPublicFiles": 31,
+    "deployed": false,
+    "newlyBrokenTrackedMarkdownLinks": 0
+  },
+  "manualReview": {
+    "sourceAppRestarted": true,
+    "generalSettingsOpened": true,
+    "isolatedProfile": true,
+    "stderrEmpty": true
+  }
+}

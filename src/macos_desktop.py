@@ -297,12 +297,47 @@ def return_focus_to_window_application(number):
     return bool(target.activateWithOptions_(AppKit.NSApplicationActivateIgnoringOtherApps))
 
 
+def _ax_string(element, attribute):
+    import ApplicationServices as AX
+
+    error, value = AX.AXUIElementCopyAttributeValue(element, attribute, None)
+    if error or value is None:
+        return ""
+    return str(value).strip()
+
+
+def read_foreground_selected_text():
+    """Return highlighted text in the frontmost application when Accessibility is granted."""
+    import AppKit
+    import ApplicationServices as AX
+
+    if not permission_granted("accessibility"):
+        return ""
+    application = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
+    if application is None or int(application.processIdentifier()) == os.getpid():
+        return ""
+    app_element = AX.AXUIElementCreateApplication(int(application.processIdentifier()))
+    error, focused = AX.AXUIElementCopyAttributeValue(
+        app_element, AX.kAXFocusedUIElementAttribute, None
+    )
+    if error or focused is None:
+        error, focused = AX.AXUIElementCopyAttributeValue(
+            app_element, AX.kAXFocusedWindowAttribute, None
+        )
+        if error or focused is None:
+            return ""
+    selected = _ax_string(focused, AX.kAXSelectedTextAttribute)
+    if selected:
+        return selected
+    return ""
+
+
 def send_edit_shortcut(key, validate_target=None):
     """Send Cmd+C/V without synthesizing releases of keys the user is holding."""
     import Quartz
     if not permission_granted("accessibility"):
         raise RuntimeError("macOS Accessibility permission is required.")
-    codes = {"c": 8, "v": 9}
+    codes = {"a": 0, "c": 8, "v": 9}
     code = codes[key]
     mask = (Quartz.kCGEventFlagMaskControl | Quartz.kCGEventFlagMaskAlternate
             | Quartz.kCGEventFlagMaskShift | Quartz.kCGEventFlagMaskCommand)

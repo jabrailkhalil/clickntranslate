@@ -26,6 +26,11 @@ MAX_LOG_BYTES = 2 * 1024 * 1024
 SAFE_CONFIG_KEYS = (
     "interface_language",
     "theme",
+    "ui_scale_percent",
+    "button_tooltips_enabled",
+    "replace_selection_select_all",
+    "selection_quick_translate_enabled",
+    "selection_quick_translate_mode",
     "ocr_engine",
     "translator_engine",
     "autostart",
@@ -58,6 +63,8 @@ SAFE_CONFIG_KEYS = (
     "replace_selection_source_language",
     "replace_selection_target_language",
     "result_window_hidden_modes",
+    "close_result_window_on_outside_click",
+    "translation_result_font_size",
     "copy_hotkey",
     "translate_hotkey",
     "fullscreen_translate_hotkey",
@@ -102,11 +109,14 @@ def _redact(value: object) -> str:
     for source, replacement in _redactor():
         text = re.sub(re.escape(source), replacement, text, flags=re.IGNORECASE)
     # Redact obvious bearer/API tokens that may have reached a third-party log.
-    text = re.sub(
-        r"(?i)(authorization\s*[:=]\s*bearer\s+|api[_-]?key\s*[:=]\s*)[^\s,;]+",
-        r"\1<redacted>",
-        text,
-    )
+    text = re.sub(r'''(?ix)(["']?(?:authorization|x-api-key|x-goog-api-key|api[_-]?key|auth[_-]?key|access_token|refresh_token|password)["']?\s*[:=]\s*["']?(?:bearer\s+)?)[^\s,"';}&]+''', r'\1<redacted>', text)
+    text = re.sub(r'(?i)([?&](?:key|api_key|access_token)=)[^&\s]+', r'\1<redacted>', text)
+    text = re.sub(r'(?i)(https?://)[^/\s@]+@', r'\1<redacted>@', text)
+    text = re.sub(r'\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}', '<redacted>', text)
+    from provider_secrets import _SESSION
+    for secret in tuple(_SESSION.values()):
+        if isinstance(secret, str) and len(secret) >= 4:
+            text = text.replace(secret, '<redacted>')
     return text
 
 
@@ -181,6 +191,8 @@ def _package_versions() -> dict[str, str]:
         "rapidocr-onnxruntime",
         "argostranslate",
         "psutil",
+        "keyring",
+        "onnxruntime",
     ):
         try:
             versions[distribution] = importlib.metadata.version(distribution)
@@ -240,11 +252,46 @@ OCR images, recognized text and API keys.
 """
 
 
-def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_version: str = "unknown") -> Path:
+def application_snapshot(owner):
+    """Capture Qt data on its own thread before report I/O moves to a worker."""
+    from PyQt5.QtCore import QT_VERSION_STR, PYQT_VERSION_STR
+    from PyQt5.QtWidgets import QApplication
+    from runtime_metrics import snapshot
+    from api_providers import BY_KEY, profile
+    from urllib.parse import urlsplit
+    screens = []
+    app = QApplication.instance()
+    for screen in app.screens() if app else ():
+        geometry, available = screen.geometry(), screen.availableGeometry()
+        rect = lambda r: [r.x(), r.y(), r.width(), r.height()]
+        screens.append(dict(geometry=rect(geometry), available=rect(available),
+            dpr=screen.devicePixelRatio(), logical_dpi=round(screen.logicalDotsPerInch(), 2)))
+    connections = {}
+    for key in BY_KEY:
+        item = profile(key, owner.config)
+        try:
+            host = urlsplit(item['url']).hostname
+        except ValueError:
+            host = None
+        connections[key] = dict(has_model=bool(item['model']), vision=item['vision'], direct=item['direct'],
+            endpoint='local' if host in {'localhost','127.0.0.1','::1'} else
+                'official' if item['url'] == BY_KEY[key].url else 'custom')
+    process = {}
+    try:
+        import psutil
+        p = psutil.Process()
+        process = dict(rss_bytes=p.memory_info().rss, threads=p.num_threads())
+    except Exception:
+        pass
+    return dict(qt=QT_VERSION_STR, pyqt=PYQT_VERSION_STR, screens=screens,
+                timings=snapshot(), process=process, api_connections=connections)
+
+
+def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_version: str = "unknown", data_dir=None, runtime=None) -> Path:
     """Create and return a local ZIP that is safe to share with maintainers."""
 
     root = _portable_root()
-    data_root = root / "data"
+    data_root = Path(data_dir) if data_dir is not None else root / "data"
     destination = Path(output_dir) if output_dir is not None else _default_output_dir()
     destination.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -319,6 +366,7 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
             "safe-config.json",
             json.dumps(safe_config, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         )
+        archive.writestr('runtime.json', _redact(json.dumps(runtime or {}, ensure_ascii=False, indent=2)) + '\n')
         used_names: set[str] = set()
         for candidate in log_candidates:
             if not candidate.is_file():

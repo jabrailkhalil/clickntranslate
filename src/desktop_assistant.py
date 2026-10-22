@@ -14,7 +14,7 @@ from assistant_text import assistant_text
 from button_styles import button_qss
 from assistant_settings import BEHAVIORS, assistant_preferences
 from assistant_art import DEFAULT_MASCOT, companion_art, mascot_id
-from assistant_motion import PetMotion, paint_pet
+from assistant_motion import PetMotion, paint_pet, play_reaction
 from ui_scaling import desktop_control_scale
 import mode_coordinator
 
@@ -66,18 +66,17 @@ class AssistantAnchor(QtWidgets.QWidget):
             self.setAttribute(QtCore.Qt.WA_MacAlwaysShowToolWindow)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setMouseTracking(True)
         self.setFixedSize(84, 84)
         self._press = None
         self._dragging = False
         self._hover = False
+        self._gaze_angle = None
         self.dark = True
         self.behavior = 'idle'
         self.appearance = 'portrait'
         self.mascot = DEFAULT_MASCOT
         self.custom_image = ''
-        self.speed = 40
-        self.facing = 1
-        self._walk_x = None
         self.menu_open = False
         self._clock = QtCore.QElapsedTimer()
         self._animation = QtCore.QTimer(self)
@@ -93,27 +92,26 @@ class AssistantAnchor(QtWidgets.QWidget):
         self.mascot = mascot
         self.motion.mascot = mascot
         self.motion.crawl_phase = 0
+        self.motion.greet()
         self._sync_motion()
         self.update()
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
+        # Layered Windows surfaces retain old pixels when a smaller pose is
+        # blended over the previous frame. Replace its alpha before drawing.
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+        painter.fillRect(self.rect(), QtCore.Qt.transparent)
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         # Transparent in every state: no hover disc, border or native focus box.
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
-        walking = self.appearance == 'walking'
-        if walking:
-            # Keep the fractional movement inside the sprite while the native
-            # window itself can only move in whole logical pixels.
-            rect = QtCore.QRectF(self.rect())
-            if self._walk_x is not None and abs(self._walk_x-self.x()) < 1:
-                rect.translate(self._walk_x-self.x(), 0)
+        if self.appearance in ('animated', 'walking') or self._explicit_reaction():
             action = self.motion.action()
-            # Hover, click and drag freeze the current animation frame. The
-            # old wave/drag substitution used a smaller, separate body rig.
-            paint_pet(painter, rect, self.mascot,
-                      phase=self.motion.phase, time=self.motion.time, action=action,
-                      facing=self.facing, crawl_phase=self.motion.crawl_phase)
+            paint_pet(painter, QtCore.QRectF(self.rect()), self.mascot,
+                      time=self.motion.time, action=action,
+                      state_time=self.motion.seconds(action),
+                      gaze=self._gaze_angle if self._hover and action == 'idle' else None)
             return
         pixmap = companion_art(self.appearance, self.custom_image, self.mascot)
         if not pixmap.isNull():
@@ -135,13 +133,18 @@ class AssistantAnchor(QtWidgets.QWidget):
         self._sync_motion()
 
     def _sync_motion(self):
-        active = self.appearance == 'walking' and self.isVisible() and not self._hover and self._press is None and not self.menu_open
-        animate = active and self.behavior == 'walk'
+        active = ((self.appearance in ('animated', 'walking') or self._explicit_reaction()) and self.isVisible()
+                  and self._press is None)
+        animate = active
         if animate and not self._animation.isActive():
             self._clock.start()
             self._animation.start()
         elif not animate:
             self._animation.stop()
+
+    def _explicit_reaction(self):
+        return (self.appearance != 'custom' and bool(self.motion.gesture)
+                and self.motion.gesture_age < self.motion.gesture_duration)
 
     def set_behavior(self, behavior):
         self.behavior = behavior if behavior in BEHAVIORS else 'idle'
@@ -149,24 +152,12 @@ class AssistantAnchor(QtWidgets.QWidget):
         self.update()
 
     def _advance(self, seconds=None):
-        if (self.appearance != 'walking' or self.behavior != 'walk'
-                or not self.isVisible() or self._hover or self._press is not None or self.menu_open):
+        if (not (self.appearance in ('animated', 'walking') or self._explicit_reaction())
+                or not self.isVisible() or self._press is not None):
             return
         dt = min(.1, self._clock.restart() / 1000) if seconds is None else seconds
-        if self.appearance == 'walking' and self.behavior == 'walk':
-            screen = QtWidgets.QApplication.screenAt(self.geometry().center()) or self.screen()
-            bounds = screen.availableGeometry()
-            if self._walk_x is None or round(self._walk_x) != self.x():
-                self._walk_x = float(self.x())
-            distance = self.motion.advance(dt, self.speed * desktop_control_scale(screen), self.width())
-            target_x = self._walk_x + distance*self.facing
-            clamped_x = max(float(bounds.left()), min(target_x, float(bounds.right()-self.width()+1)))
-            self.motion.moved(clamped_x-self._walk_x, self.width())
-            self._walk_x = clamped_x
-            if clamped_x != target_x:
-                self.facing *= -1
-                self.motion.crawl_phase = 0
-            self.move(round(clamped_x), self.y())
+        self.motion.advance(dt)
+        self._sync_motion()
         self.update()
 
     def hideEvent(self, event):
@@ -183,6 +174,7 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def leaveEvent(self, event):
         self._hover = False
+        self._gaze_angle = None
         self._sync_motion()
         self.update()
 
@@ -197,6 +189,10 @@ class AssistantAnchor(QtWidgets.QWidget):
 
     def mouseMoveEvent(self, event):
         if self._press is None or not event.buttons() & QtCore.Qt.LeftButton:
+            offset = event.localPos() - QtCore.QPointF(self.width()/2, self.height()*.44)
+            self._gaze_angle = (math.degrees(math.atan2(offset.x(), -offset.y())) % 360
+                                if abs(offset.x()) + abs(offset.y()) > self.width()*.08 else None)
+            self.update()
             return
         offset = event.globalPos() - self._press
         if offset.manhattanLength() >= QtWidgets.QApplication.startDragDistance():
@@ -224,29 +220,22 @@ class ActionButton(QtWidgets.QPushButton):
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setAccessibleName(title)
         self.setAccessibleDescription(description)
-        # Each program action is its own card. The previous transparent
-        # buttons ran together into one large block, especially on dark mode.
-        self.setStyleSheet(button_qss(dark, 'secondary') + 'QPushButton { text-align:left; }')
+        self.setToolTip(description)
+        self.setStyleSheet(button_qss(dark, 'secondary', compact=True))
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(3)
-        for text, bold in ((title, True), (description, False)):
-            label = QtWidgets.QLabel(text)
-            label.setWordWrap(True)
-            label.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
-            color = ('#f5f0fa' if dark else '#302837') if bold else ('#bdb2ca' if dark else '#70647e')
-            label.setStyleSheet(f'color:{color}; background:transparent; border:none; font-size:{13 if bold else 12}px; font-weight:{600 if bold else 400};')
-            layout.addWidget(label)
-        policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-        policy.setHeightForWidth(True)
-        self.setSizePolicy(policy)
+        layout.setContentsMargins(8, 5, 8, 5)
+        label = QtWidgets.QLabel(title)
+        label.setWordWrap(True)
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        label.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        label.setStyleSheet(f'color:{"#f5f0fa" if dark else "#302837"}; background:transparent; border:0; font-size:13px;')
+        layout.addWidget(label)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
 
     def sizeHint(self):
         return self.layout().totalSizeHint()
 
     def minimumSizeHint(self):
-        # Two-column cards must wrap their descriptions instead of forcing the
-        # scroll area's content wider than the popup viewport.
         return self.layout().minimumSize()
 
     def heightForWidth(self, width):
@@ -254,16 +243,17 @@ class ActionButton(QtWidgets.QPushButton):
 
 
 class AssistantMenu(QtWidgets.QFrame):
-    """One translation launcher, without companion preferences or scrolling."""
+    """Compact actions and native reactions, anchored below the companion."""
     action_requested = QtCore.pyqtSignal(str)
     visibility_changed = QtCore.pyqtSignal(bool)
 
-    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='portrait'):
+    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='animated', mascot=DEFAULT_MASCOT):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
+        self.language = language
         self.setObjectName('desktopAssistantMenu')
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
-        self.setWindowTitle(assistant_text(language, 'translation_section'))
+        self.setWindowTitle(assistant_text(language, 'quick_actions'))
         self.factor = factor
         self._background = QtGui.QColor('#121212' if dark else '#f0edf3')
         self._border = QtGui.QColor('#584963' if dark else '#bcaacb')
@@ -271,10 +261,10 @@ class AssistantMenu(QtWidgets.QFrame):
         clip_rounded_window(self, self, 8)
         self.setStyleSheet('QFrame#desktopAssistantMenu { background:transparent; border:0; }')
         outer = QtWidgets.QVBoxLayout(self)
-        outer.setContentsMargins(14, 12, 14, 12)
-        outer.setSpacing(10)
+        outer.setContentsMargins(12, 10, 12, 10)
+        outer.setSpacing(8)
         header = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel(assistant_text(language, 'translation_section'))
+        title = QtWidgets.QLabel(assistant_text(language, mascot))
         title.setStyleSheet(f'color:{"#eee7f5" if dark else "#302639"}; background:transparent; font-size:16px; font-weight:600;')
         header.addWidget(title, 1)
         close = QtWidgets.QPushButton('×')
@@ -284,26 +274,37 @@ class AssistantMenu(QtWidgets.QFrame):
         close.clicked.connect(self.hide)
         header.addWidget(close)
         outer.addLayout(header)
+        self.activity_label = QtWidgets.QLabel()
+        self.activity_label.setWordWrap(True)
+        self.activity_label.setStyleSheet(f'color:{"#bdb2ca" if dark else "#70647e"}; background:transparent; border:0; font-size:12px;')
+        outer.addWidget(self.activity_label)
         grid = QtWidgets.QGridLayout()
-        grid.setSpacing(8)
+        grid.setSpacing(6)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         self.buttons = {}
         for index, action in enumerate(('area', 'screen', 'text', 'copy', 'dynamic', 'documents')):
             button = ActionButton(*assistant_text(language, action), dark)
-            button.setMinimumHeight(68)
+            button.setMinimumHeight(44)
             button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
             grid.addWidget(button, index // 2, index % 2)
             self.buttons[action] = button
         outer.addLayout(grid)
-        hide = QtWidgets.QPushButton(assistant_text(language, 'tray_hide'))
-        hide.setStyleSheet(button_qss(dark, 'quiet', compact=True))
-        hide.setFixedHeight(28)
-        hide.clicked.connect(lambda: self.action_requested.emit('hide'))
-        self.buttons['hide'] = hide
-        outer.addWidget(hide, 0, QtCore.Qt.AlignRight)
+        footer = QtWidgets.QHBoxLayout()
+        for action, label in (('settings', 'settings'), ('hide', 'tray_hide')):
+            button = QtWidgets.QPushButton(assistant_text(language, label))
+            button.setStyleSheet(button_qss(dark, 'quiet', compact=True))
+            button.setMinimumHeight(28)
+            button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
+            self.buttons[action] = button
+            footer.addWidget(button)
+        outer.addLayout(footer)
+        self.set_activity('idle')
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
+
+    def set_activity(self, activity):
+        self.activity_label.setText(assistant_text(self.language, 'activity_' + activity))
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -315,15 +316,16 @@ class AssistantMenu(QtWidgets.QFrame):
 
     def open_beside(self, anchor, available):
         self.ensurePolished()
-        width = min(round(430 * self.factor), available.width())
+        width = min(round(360 * self.factor), available.width())
         self.setFixedWidth(width)
         self.layout().activate()
         height = max(self.layout().totalHeightForWidth(width), self.layout().minimumSize().height())
         self.resize(width, height)
-        x = anchor.left() - width - 8
-        if x < available.left():
-            x = anchor.right() + 9
-        self.move(clamp_position(QtCore.QPoint(x, anchor.bottom() - self.height() + 1), self.size(), available))
+        x = anchor.center().x() - width // 2
+        y = anchor.bottom() + 8
+        if y + self.height() > available.bottom() + 1:
+            y = anchor.top() - self.height() - 8
+        self.move(clamp_position(QtCore.QPoint(x, y), self.size(), available))
         self.show()
 
     def showEvent(self, event):
@@ -425,9 +427,10 @@ class DesktopAssistant(QtCore.QObject):
         screen = QtWidgets.QApplication.screenAt(self.anchor.geometry().center()) or self.anchor.screen()
         factor = desktop_control_scale(screen)
         available = screen.availableGeometry()
-        menu_factor = min(factor, available.width()/430, available.height()/420)
+        menu_factor = min(factor, available.width()/360, available.height()/360)
         context = (self.owner.current_interface_language, self.owner.current_theme != 'Светлая', menu_factor,
-                   preferences['desktop_assistant_behavior'], preferences['desktop_assistant_appearance'])
+                   preferences['desktop_assistant_behavior'], preferences['desktop_assistant_appearance'],
+                   preferences['desktop_assistant_mascot'])
         if context != self._context:
             if self.menu is not None:
                 self.menu.close()
@@ -443,7 +446,6 @@ class DesktopAssistant(QtCore.QObject):
         self.anchor.setFixedSize(size, size)
         if resized:
             self.restore_position()
-        self.anchor.speed = preferences['desktop_assistant_speed']
         self.anchor.appearance = preferences['desktop_assistant_appearance']
         self.anchor.set_mascot(preferences['desktop_assistant_mascot'])
         self.anchor.motion.reactions = preferences['desktop_assistant_reactions']
@@ -486,10 +488,13 @@ class DesktopAssistant(QtCore.QObject):
             self.menu.action_requested.connect(self.request_action)
             self.menu.visibility_changed.connect(self._menu_visibility)
         screen = QtWidgets.QApplication.screenAt(self.anchor.geometry().center()) or self.anchor.screen()
+        play_reaction(self.owner, 'waving', anchor=self.anchor)
+        self.menu.set_activity(getattr(self.owner, '_companion_activity', 'idle'))
         self.menu.open_beside(self.anchor.geometry(), screen.availableGeometry())
 
     def _menu_visibility(self, visible):
         self.anchor.menu_open = visible
+        self.anchor.motion.menu_open = visible
         self.anchor._sync_motion()
 
     def request_action(self, action):
@@ -498,7 +503,7 @@ class DesktopAssistant(QtCore.QObject):
             return
         if action not in (*ACTION_METHODS, *BEHAVIORS, 'home', 'text', 'settings', 'hide'):
             return
-        if action in BEHAVIORS and self.anchor.appearance != 'walking':
+        if action in BEHAVIORS and self.anchor.appearance not in ('animated', 'walking'):
             return
         if self.menu is not None:
             self.menu.hide()
@@ -512,10 +517,13 @@ class DesktopAssistant(QtCore.QObject):
             return
         if action == 'home':
             self.restore_position()
+            play_reaction(self.owner, 'jumping', anchor=self.anchor)
             return
         if action == 'hide':
             self.owner.set_desktop_assistant_enabled(False)
             return
+        if action not in CAPTURE_ACTIONS:
+            play_reaction(self.owner, 'review', anchor=self.anchor)
         self._action = action
         self._dispatching = True
         self.refresh_visibility()

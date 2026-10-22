@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 # Keep the public source entry point stable while implementation modules live in src/.
 # Frozen builds discover these modules through the explicit PyInstaller search path.
@@ -26,6 +27,7 @@ import time
 import logging
 import translater
 import diagnostics
+from runtime_metrics import measure
 from translation_chunks import completion_percent
 
 # CTranslate2 can crash when its native runtime is first loaded after Qt on
@@ -94,8 +96,11 @@ try:
     from PyQt5.QtGui import QIcon, QColor, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics
 except Exception:
     _show_dependency_error()
-from ui_scaling import BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton, configure_qt_platform
+from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
+                        configure_qt_platform, widget_global_point, widget_popup_geometry,
+                        prepare_native_popup)
 from header_icons import header_icon
+from control_hints import control_hint
 configure_qt_platform()
 
 from guide_setup import (
@@ -164,6 +169,8 @@ INTERFACE_LANGUAGE_OPTIONS = [
     {"code": "de", "name": "Deutsch", "icon": "icons/German_flag.png"},
     {"code": "fr", "name": "Français", "icon": "icons/French_flag.png"},
     {"code": "zh", "name": "中文", "icon": "icons/Chinese_flag.png"},
+    {"code": "pt", "name": "Português", "icon": "icons/Portuguese_flag.png"},
+    {"code": "it", "name": "Italiano", "icon": "icons/Italian_flag.png"},
 ]
 INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
@@ -233,6 +240,7 @@ DEFAULT_CONFIG = {
     "first_run_guide_pending": False,
     "ocr_engine": platform_support.default_ocr_engine(),
     "translator_engine": "Google",
+    "api_providers": {},
     "allow_online_provider_fallback": False,
     "copy_history": False,
     "copy_translated_text": False,
@@ -265,6 +273,11 @@ DEFAULT_CONFIG = {
     "fullscreen_translate_hotkey": "Ctrl+Alt+F",
     "translate_selection_hotkey": DEFAULT_SELECTION_HOTKEY,
     "translate_replace_selection_hotkey": DEFAULT_REPLACE_SELECTION_HOTKEY,
+    "replace_selection_select_all": False,
+    "selection_quick_translate_enabled": False,
+    "selection_quick_translate_mode": "button",
+    "close_result_window_on_outside_click": False,
+    "translation_result_font_size": "medium",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
     "hotkey_defaults_revision": HOTKEY_DEFAULTS_REVISION,
@@ -304,6 +317,28 @@ def result_window_hidden_modes(config):
 def result_window_hidden_for(config, mode):
     """True when `mode` should copy the translation instead of showing a window."""
     return mode in result_window_hidden_modes(config)
+
+
+TRANSLATION_RESULT_FONT_SIZE_KEYS = ("xsmall", "small", "medium", "large", "xlarge")
+TRANSLATION_RESULT_FONT_SIZE_PX = {
+    "xsmall": 11,
+    "small": 13,
+    "medium": 16,
+    "large": 20,
+    "xlarge": 24,
+}
+
+
+def normalize_translation_result_font_size(value):
+    key = str(value or "medium").strip().lower()
+    return key if key in TRANSLATION_RESULT_FONT_SIZE_PX else "medium"
+
+
+def translation_result_font_px(config):
+    key = normalize_translation_result_font_size(
+        (config or {}).get("translation_result_font_size")
+    )
+    return TRANSLATION_RESULT_FONT_SIZE_PX[key]
 
 
 TRANSLATION_PAIR_KEYS = (
@@ -1055,6 +1090,26 @@ def simulate_paste():
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 
+def select_all_text_in_foreground(expected_target):
+    """Select the whole input only while the requested replacement target owns focus."""
+    if platform_support.IS_MAC:
+        from macos_desktop import same_foreground_target, send_edit_shortcut
+        return send_edit_shortcut("a", validate_target=lambda: same_foreground_target(expected_target))
+    if not platform_support.IS_WINDOWS or not expected_target:
+        return False
+    if _windows_foreground_window() != expected_target:
+        return False
+    user32 = ctypes.windll.user32
+    try:
+        user32.keybd_event(0x11, 0, 0, 0)
+        user32.keybd_event(0x41, 0, 0, 0)
+        time.sleep(0.02)
+    finally:
+        user32.keybd_event(0x41, 0, 0x0002, 0)
+        user32.keybd_event(0x11, 0, 0x0002, 0)
+    return _windows_foreground_window() == expected_target
+
+
 def _windows_foreground_window():
     """Return the active HWND, or zero when Windows cannot provide one."""
     if not platform_support.IS_WINDOWS:
@@ -1205,7 +1260,7 @@ def _save_copy_history_sync(text):
 
     record = {"timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "text": text}
     history_file = get_data_file("copy_history.json")
-    
+
     history = []
     try:
         if sys.platform == "win32":
@@ -1333,7 +1388,7 @@ class HotkeyListenerThread(threading.Thread):
         self.modifiers, self.vk = (0, self._double_tap[1]) if self._double_tap else self.parse_hotkey(self.hotkey_str)
         if self.vk is None:
             print("Неверный формат горячей клавиши.")
-    
+
     def start(self):
         if self._double_tap:
             try:
@@ -1512,7 +1567,7 @@ class HotkeyListenerThread(threading.Thread):
                         print(f"Error handling hotkey press: {e}")
                 ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
                 ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
-        
+
         # Отменяем регистрацию при выходе
         if self._registered:
             try:
@@ -1586,7 +1641,7 @@ INTERFACE_TEXT = {
         "start": "Старт",
         "translation_selected": "Выбран перевод: {src} → {tgt}",
         "settings": "Настройки",
-        "back": "Назад",
+        "back": "На главный экран",
         "ocr": "OCR",
         "help": "Помощь",
         "choose_interface_language": "Выбрать язык интерфейса",
@@ -1639,7 +1694,7 @@ INTERFACE_TEXT = {
         "start": "Iniciar",
         "translation_selected": "Traducción: {src} → {tgt}",
         "settings": "Ajustes",
-        "back": "Volver",
+        "back": "Volver al inicio",
         "ocr": "OCR",
         "help": "Ayuda",
         "choose_interface_language": "Elegir idioma de la interfaz",
@@ -1692,7 +1747,7 @@ INTERFACE_TEXT = {
         "start": "Start",
         "translation_selected": "Übersetzung: {src} → {tgt}",
         "settings": "Einstellungen",
-        "back": "Zurück",
+        "back": "Zur Startseite",
         "ocr": "OCR",
         "help": "Hilfe",
         "choose_interface_language": "Sprache der Oberfläche wählen",
@@ -1745,7 +1800,7 @@ INTERFACE_TEXT = {
         "start": "Démarrer",
         "translation_selected": "Traduction : {src} → {tgt}",
         "settings": "Réglages",
-        "back": "Retour",
+        "back": "Retour à l’accueil",
         "ocr": "OCR",
         "help": "Aide",
         "choose_interface_language": "Choisir la langue de l'interface",
@@ -1798,7 +1853,7 @@ INTERFACE_TEXT = {
         "start": "开始",
         "translation_selected": "已选翻译：{src} → {tgt}",
         "settings": "设置",
-        "back": "返回",
+        "back": "返回主页",
         "ocr": "OCR",
         "help": "帮助",
         "choose_interface_language": "选择界面语言",
@@ -1844,7 +1899,123 @@ INTERFACE_TEXT = {
         "argos_canceling": "正在取消 Argos 语言包安装…",
         "argos_install_cancelled": "Argos 语言包安装已取消。",
         "install_argos_packages_hint": "请在设置 → 语言包 → Argos 中安装所需的翻译方向。"
-    }
+    },
+    'pt': {'title': "Click'n'Translate",
+     'select_language': 'Selecione os idiomas para tradução',
+     'start': 'Iniciar',
+     'translation_selected': 'Tradução selecionada: {src} → {tgt}',
+     'settings': 'Configurações',
+     'back': 'Voltar ao início',
+     'ocr': 'OCR',
+     'help': 'Ajuda',
+     'choose_interface_language': 'Escolha o idioma da interface',
+     'theme': 'Alterar tema',
+     'minimize': 'Minimizar',
+     'tray_open': 'Abrir',
+     'tray_exit': 'Sair',
+     'tray_copy': 'Copiar texto',
+     'tray_translate': 'Traduzir',
+     'tray_translate_screen': 'Traduzir tela',
+     'game_translate': 'Tradução dinâmica',
+     'tray_game_translate': 'Tradução Dinâmica',
+     'input_placeholder': 'Digite o texto para traduzir',
+     'translate_button': 'Traduzir',
+     'hotkey_copy': 'Copiar',
+     'hotkey_ocr_translate': 'Traduzir área',
+     'hotkey_fullscreen': 'Tela cheia',
+     'hotkey_gaming': 'Dinâmico',
+     'hotkey_selection': 'Seleção',
+     'hotkey_toggle': 'Janela',
+     'hotkey_replace': 'Substituir',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Texto digitado',
+     'direction_shortcuts': 'Atalhos',
+     'direction_hint': 'A caixa acima traduz o texto digitado.\n'
+                       'Os atalhos traduzem a tela ou o texto selecionado. Cada modo\n'
+                       'tem seu próprio par de idiomas, configurável na linha abaixo.',
+     'translator': 'Tradutor',
+     'shadow_mode': 'Modo sombra',
+     'copy': 'Copiar',
+     'google': 'Google',
+     'close': 'Fechar',
+     'got_it': 'Entendi',
+     'no_text_selected': 'Nenhum texto selecionado',
+     'translating': 'Traduzindo...',
+     'translation_error': 'Erro de tradução',
+     'selection_replaced': 'Texto selecionado substituído',
+     'selection_replace_fallback': 'A seleção mudou. A tradução foi copiada.',
+     'installing_language_packages': 'Instalando pacotes de idiomas…',
+     'argos_package_missing_title': 'Pacote de idiomasArgos necessário',
+     'argos_package_missing_prompt': 'O pacote Argos para {pair} não está instalado. Baixe e instale '
+                                     'agora?\n'
+                                     '\n'
+                                     'O tamanho depende do idioma e pode ser de várias centenas de '
+                                     'megabytes.',
+     'argos_preparing': 'Preparando pacote Argos {pair}…',
+     'argos_downloading': 'Baixando o pacote Argos {pair}…',
+     'argos_installing': 'Instalando o pacote Argos {pair}…',
+     'argos_canceling': 'Cancelando a instalação do pacote Argos …',
+     'argos_install_cancelled': 'A instalação do pacoteArgos foi cancelada.',
+     'install_argos_packages_hint': 'Instale o par de idiomas do Argos em Configurações → Pacotes de '
+                                    'idiomas → Argos.'},
+    'it': {'title': "Click'n'Translate",
+     'select_language': 'Seleziona le lingue per la traduzione',
+     'start': 'Avvia',
+     'translation_selected': 'Traduzione selezionata: {src} → {tgt}',
+     'settings': 'Impostazioni',
+     'back': 'Torna alla schermata principale',
+     'ocr': 'OCR',
+     'help': 'Aiuto',
+     'choose_interface_language': "Scegli la lingua dell'interfaccia",
+     'theme': 'Cambia tema',
+     'minimize': 'Riduci a icona',
+     'tray_open': 'Apri',
+     'tray_exit': 'Esci',
+     'tray_copy': 'Copia testo',
+     'tray_translate': 'Traduci',
+     'tray_translate_screen': 'Traduci schermo',
+     'game_translate': 'Traduzione dinamica',
+     'tray_game_translate': 'Traduzione dinamica',
+     'input_placeholder': 'Inserisci il testo da tradurre',
+     'translate_button': 'Traduci',
+     'hotkey_copy': 'Copia',
+     'hotkey_ocr_translate': 'Traduci area',
+     'hotkey_fullscreen': 'Schermo intero',
+     'hotkey_gaming': 'Dinamico',
+     'hotkey_selection': 'Selezione',
+     'hotkey_toggle': 'Finestra',
+     'hotkey_replace': 'Sostituisci',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Testo digitato',
+     'direction_shortcuts': 'Scorciatoie',
+     'direction_hint': 'La casella sopra traduce il testo digitato.\n'
+                       'Le scorciatoie traducono lo schermo o il testo selezionato. Ogni modalità\n'
+                       'ha una propria coppia di lingue, modificabile nella riga sotto.',
+     'translator': 'Traduttore',
+     'shadow_mode': 'Modalità ombra',
+     'copy': 'Copia',
+     'google': 'Google',
+     'close': 'Chiudi',
+     'got_it': 'Capito',
+     'no_text_selected': 'Nessun testo selezionato',
+     'translating': 'Traduzione...',
+     'translation_error': 'Errore di traduzione',
+     'selection_replaced': 'Il testo selezionato è stato sostituito',
+     'selection_replace_fallback': 'La selezione è cambiata. La traduzione è stata copiata.',
+     'installing_language_packages': 'Installazione dei pacchetti lingua…',
+     'argos_package_missing_title': 'È richiesto il pacchetto linguisticoArgos',
+     'argos_package_missing_prompt': 'Il pacchetto Argos per {pair} non è installato. Scaricarlo e '
+                                     'installarlo adesso?\n'
+                                     '\n'
+                                     'La dimensione dipende dalla lingua e può essere di diverse '
+                                     'centinaia di megabyte.',
+     'argos_preparing': 'Preparazione del pacchetto Argos {pair}…',
+     'argos_downloading': 'Download del pacchetto Argos {pair}…',
+     'argos_installing': 'Installazione del pacchetto Argos {pair}…',
+     'argos_canceling': "Annullamento dell'installazione del pacchetto Argos …",
+     'argos_install_cancelled': "L'installazione del pacchettoArgos è stata annullata.",
+     'install_argos_packages_hint': 'Installa la coppia di lingue Argos in Impostazioni → Pacchetti '
+                                    'lingua → Argos.'},
 }
 
 
@@ -1859,6 +2030,14 @@ HOTKEY_ERROR_TEXT = {
     "de": {"title": "Tastenkürzel nicht verfügbar", "message": "<b>{hotkey}</b> konnte nicht registriert werden.<br><br>Diese globale Kombination wird bereits von einer anderen App oder dem System verwendet.<br><br>Wähle in den Einstellungen eine andere Kombination."},
     "fr": {"title": "Raccourci indisponible", "message": "Impossible d’enregistrer <b>{hotkey}</b>.<br><br>Cette combinaison globale est déjà utilisée par une autre application ou par le système.<br><br>Choisissez une autre combinaison dans les réglages."},
     "zh": {"title": "快捷键不可用", "message": "无法注册 <b>{hotkey}</b>。<br><br>该全局组合键已被其他应用或系统占用。<br><br>请在设置中选择其他组合键。"},
+
+    'pt': {'title': 'Atalho indisponível',
+     'message': 'Falha ao registrar <b>{hotkey}</b>.<br><br>Outra aplicação ou sistema já possui esta '
+                'combinação global.<br><br>Escolha uma combinação diferente nas configurações.'},
+    'it': {'title': 'Scorciatoia non disponibile',
+     'message': "Impossibile registrare <b>{hotkey}</b>.<br><br>Un'altra applicazione o il sistema "
+                'possiede già questa combinazione globale.<br><br>Scegli una combinazione diversa '
+                'nelle impostazioni.'},
 }
 
 
@@ -2132,6 +2311,120 @@ DOCUMENT_TEXT = {
         "text_file_filter": "文本文件", "markdown_file_filter": "Markdown 文件", "session_file_filter": "会话文件",
         "translation_sessions_filter": "翻译会话",
     },
+
+    'pt': {'title': 'Tradução de documentos',
+     'main_file_tooltip': 'Enter traduz  ·  Shift+Enter insere uma nova linha\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Solte um arquivo aqui, pressione Ctrl+O ou clique com o botão direito na '
+                          'janela principal.',
+     'main_file_hint': 'Solte um documento aqui ou clique com o botão direito',
+     'attach_file': 'Anexar arquivo',
+     'remove_file': 'Remover arquivo',
+     'translate_file': 'Traduzir texto',
+     'translate_selected': 'Traduzir selecionado',
+     'save_translation': 'Salvar tradução',
+     'open_session': 'Abrir sessão',
+     'context_translate_file': 'Escolha o arquivo para traduzir',
+     'context_choose_folder': 'Escolha a pasta com o arquivo',
+     'source': 'Origem',
+     'target': 'Destino',
+     'auto_detect': 'Detecção automática',
+     'original': 'Original',
+     'translated': 'Traduzido',
+     'drop_hint': 'Digite ou cole texto aqui ou solte um documento.',
+     'no_file': 'Digite o texto ou anexe um arquivo.',
+     'loading': 'Carregando arquivo...',
+     'loaded': 'Carregado',
+     'translating': 'Traduzindo',
+     'done': 'Tradução concluída',
+     'error': 'Erro na tradução do documento',
+     'file': 'Arquivo',
+     'size': 'Tamanho',
+     'detected': 'Detectado',
+     'provider': 'Provedor',
+     'status': 'Status',
+     'chunks': 'Blocos',
+     'no_selection': 'Selecione primeiro o texto no documento original.',
+     'no_translation': 'Não há texto traduzido para salvar.',
+     'saved': 'Salvo',
+     'session_loaded': 'Sessão carregada',
+     'translate_failed': 'Tradução concluída com falhas em alguns blocos',
+     'provider_unavailable_title': 'O provedor selecionado não está pronto',
+     'provider_unavailable_argos': 'Argos funciona offline, mas o pacote de idioma local necessário '
+                                   'não está instalado para este par de idiomas. Abra Configurações, '
+                                   'escolha Argos e instale o pacote de idiomas necessário ou escolha '
+                                   'outro provedor aqui.',
+     'provider_unavailable_hymt': 'Hy-MT funciona offline, mas o pacote Hy-MT local não está '
+                                  'instalado. Abra Configurações, escolha Hy-MT e baixe o pacote '
+                                  'offline ou escolha outro provedor aqui.',
+     'provider_unavailable_online': 'Este provedor on-line não retornou uma tradução. Verifique sua '
+                                    'conexão com a Internet ou escolha outro provedor aqui.',
+     'provider_unavailable_generic': 'Escolha outro provedor aqui ou abra Configurações e instale o '
+                                     'pacote local necessário para o provedor selecionado.',
+     'technical_error': 'Erro técnico',
+     'documents_filter': 'Documentos',
+     'all_files_filter': 'Todos os arquivos',
+     'text_file_filter': 'Arquivo de texto',
+     'markdown_file_filter': 'Arquivo Markdown',
+     'session_file_filter': 'Arquivo de sessão',
+     'translation_sessions_filter': 'Sessões de tradução'},
+    'it': {'title': 'Traduzione di documenti',
+     'main_file_tooltip': 'Invio traduce  ·  Shift+Enter va a capo\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Trascina qui un file, premi Ctrl+O o fai clic destro sulla finestra '
+                          'principale.',
+     'main_file_hint': 'Rilascia un documento qui o fai clic con il pulsante destro del mouse',
+     'attach_file': 'Allega file',
+     'remove_file': 'Rimuovi file',
+     'translate_file': 'Traduci il testo',
+     'translate_selected': 'Traduci selezionato',
+     'save_translation': 'Salva la traduzione',
+     'open_session': 'Apri sessione',
+     'context_translate_file': 'Scegli il file da tradurre',
+     'context_choose_folder': 'Scegli la cartella con il file',
+     'source': 'Origine',
+     'target': 'Destinazione',
+     'auto_detect': 'Rilevamento automatico',
+     'original': 'Originale',
+     'translated': 'Tradotto',
+     'drop_hint': 'Digita o incolla il testo qui oppure rilascia un documento.',
+     'no_file': 'Inserisci il testo o allega un file.',
+     'loading': 'Caricamento file...',
+     'loaded': 'Caricato',
+     'translating': 'Traduzione in corso',
+     'done': 'Traduzione completata',
+     'error': 'Errore di traduzione del documento',
+     'file': 'File',
+     'size': 'Dimensioni',
+     'detected': 'Rilevato',
+     'provider': 'Fornitore',
+     'status': 'Stato',
+     'chunks': 'Blocchi',
+     'no_selection': 'Seleziona prima il testo nel documento originale.',
+     'no_translation': "Non c'è testo tradotto da salvare.",
+     'saved': 'Salvato',
+     'session_loaded': 'Sessione caricata',
+     'translate_failed': 'Traduzione completata con errori in alcuni blocchi',
+     'provider_unavailable_title': 'Il fornitore selezionato non è pronto',
+     'provider_unavailable_argos': 'Argos funziona offline, ma il pacchetto della lingua locale '
+                                   'richiesto non è installato per questa coppia linguistica. Apri '
+                                   'Impostazioni, scegli Argos e installa il pacchetto linguistico '
+                                   'necessario oppure scegli un altro provider qui.',
+     'provider_unavailable_hymt': 'Hy-MT funziona offline, ma il pacchetto Hy-MT locale non è '
+                                  'installato. Apri Impostazioni, scegli Hy-MT e scarica il pacchetto '
+                                  'offline oppure scegli un altro provider qui.',
+     'provider_unavailable_online': 'Questo fornitore online non ha restituito una traduzione. '
+                                    'Controlla la tua connessione Internet o scegli un altro provider '
+                                    'qui.',
+     'provider_unavailable_generic': 'Scegli un altro provider qui oppure apri Impostazioni e installa '
+                                     'il pacchetto locale richiesto per il provider selezionato.',
+     'technical_error': 'Errore tecnico',
+     'documents_filter': 'Documenti',
+     'all_files_filter': 'Tutti i file',
+     'text_file_filter': 'File di testo',
+     'markdown_file_filter': 'File Markdown',
+     'session_file_filter': 'File di sessione',
+     'translation_sessions_filter': 'Sessioni di traduzione'},
 }
 
 
@@ -2142,6 +2435,9 @@ for _doc_language, _doc_cancel_text in {
     'de': ('Stoppen', 'Wird nach der aktuellen Anfrage gestoppt…', 'Übersetzung gestoppt'),
     'fr': ('Arrêter', 'Arrêt après la requête en cours…', 'Traduction arrêtée'),
     'zh': ('停止', '当前请求完成后停止…', '翻译已停止'),
+
+    'pt': ('Parar', 'Parando após a solicitação atual…', 'Tradução interrompida'),
+    'it': ('Interrompi', 'Interruzione dopo la richiesta corrente…', 'La traduzione è stata interrotta'),
 }.items():
     DOCUMENT_TEXT[_doc_language].update(zip(('cancel_translation', 'canceling_translation', 'translation_canceled'), _doc_cancel_text))
 
@@ -2171,14 +2467,7 @@ def translation_session_filter(lang="en"):
     )
 
 
-TRANSLATION_PROVIDER_OPTIONS = (
-    ("google", "Google", "online"),
-    ("argos", "Argos", "offline"),
-    ("hymt", "Hy-MT", "offline"),
-    ("mymemory", "MyMemory", "online"),
-    ("lingva", "Lingva", "online"),
-    ("libretranslate", "LibreTranslate", "online"),
-)
+from provider_catalog import TRANSLATION_PROVIDERS as TRANSLATION_PROVIDER_OPTIONS
 
 PROVIDER_GROUP_TEXT = {
     "en": {"online": "Online", "offline": "Offline"},
@@ -2187,6 +2476,9 @@ PROVIDER_GROUP_TEXT = {
     "de": {"online": "Online", "offline": "Offline"},
     "fr": {"online": "En ligne", "offline": "Hors ligne"},
     "zh": {"online": "在线", "offline": "离线"},
+
+    'pt': {'online': 'Online', 'offline': 'Offline'},
+    'it': {'online': 'Online', 'offline': 'Offline'},
 }
 
 
@@ -2198,6 +2490,9 @@ def provider_kind_text(kind, lang):
             "de": "offline",
             "fr": "offline",
             "zh": "离线",
+
+            'pt': 'offline',
+            'it': 'offline',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -2205,6 +2500,9 @@ def provider_kind_text(kind, lang):
         "de": "online",
         "fr": "online",
         "zh": "在线",
+
+        'pt': 'online',
+        'it': 'online',
     }.get(lang, "online")
 
 
@@ -2390,6 +2688,39 @@ WELCOME_TEXT = {
         "skip": "跳过",
         "close": "开始",
     },
+
+    'pt': {'window': 'Notícias',
+     'eyebrow': 'Tradutor de tela portátil',
+     'title': "Bem-vindo ao Click'n'Translate!",
+     'body': 'A versão {version} traz uma grande atualização na interface e nos fluxos de trabalho '
+             'diários. Obrigado pelo seu apoio – já são 3.000 downloads!',
+     'feature_ocr': 'OCR de tela',
+     'feature_translate': 'Online + offline',
+     'feature_updates': '3.000 downloads',
+     'telegram': 'Abra Telegram',
+     'github': 'Dê uma estrela ao projeto no GitHub',
+     'support': "Click'n'Translate é um projeto gratuito. Ficaríamos gratos se você se juntasse a nós "
+                'no Telegram e nos desse uma estrela no GitHub.',
+     'checkbox': 'Não mostrar esta janela novamente',
+     'guide': 'Conhecer o aplicativo',
+     'skip': 'Pular',
+     'close': 'Iniciar'},
+    'it': {'window': 'Novità',
+     'eyebrow': 'Traduttore di schermi portatile',
+     'title': "Benvenuto in Click'n'Translate!",
+     'body': "La versione {version} apporta un importante aggiornamento all'interfaccia e ai flussi di "
+             'lavoro quotidiani. Grazie per il vostro supporto: già 3.000 download!',
+     'feature_ocr': 'OCR dello schermo',
+     'feature_translate': 'Online + offline',
+     'feature_updates': '3.000 download',
+     'telegram': 'Apri Telegram',
+     'github': 'Aggiungi una stella al progetto su GitHub',
+     'support': "Click'n'Translate è un progetto gratuito. Ti saremmo grati se ti unissi a noi su "
+                'Telegram e ci dessi una stella su GitHub.',
+     'checkbox': 'Non mostrare più questa finestra',
+     'guide': 'Mostra la guida',
+     'skip': 'Salta',
+     'close': 'Avvia'},
 }
 
 
@@ -2406,7 +2737,10 @@ STARTUP_NEWS_TEXT = {
         "window": copy["window"] + " · V{version}",
         "title": copy["feature_updates"],
         "intro": copy["body"].format(version=APP_VERSION),
-        "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了'}[language],
+        "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了',
+            'pt': 'Entendi',
+            'it': 'Capito',
+        }[language],
     }
     for language, copy in WELCOME_TEXT.items()
 }
@@ -2608,6 +2942,167 @@ GUIDE_TEXT = {
             ("back_home", "返回主页", "返回主界面。上方语言对用于输入文本；下方每个快捷键模式都会保存自己独立的语言对。"),
         ],
     },
+
+    'pt': {'progress': '{current}/{total}',
+     'click_hint': 'Clique no controle destacado',
+     'read_hint': 'Passe o mouse para ver detalhes · Próximo',
+     'document_hint': 'Abra o ícone · Avançar',
+     'skip': 'Avançar',
+     'done_title': 'Pronto',
+     'done_body': 'Você conhece os controles principais agora. O FAQ completo fica no botão de '
+                  'informações.',
+     'steps': [('language',
+                'Idioma da interface',
+                'A bandeira altera o idioma do aplicativo, das configurações, do menu da bandeja e da '
+                'ajuda.'),
+               ('theme', 'Tema', 'Sol/lua alterna temas claros e escuros.'),
+               ('help',
+                'Ajuda',
+                'O botão de informações abre a ajuda sobre OCR, atalhos e tradutores.'),
+               ('shortcut_overview',
+                'Seus atalhos',
+                'Estas são suas atalhos atuais. Passe o mouse sobre qualquer um na tela principal para '
+                'ver sua descrição completa. A linha de modo acima define um par de idiomas separado '
+                'para cada ação de tradução.'),
+               ('shortcut_copy',
+                'Copiar',
+                'Selecione uma área da tela. OCR reconhece seu texto e o copia para a área de '
+                'transferência sem traduzi-lo.'),
+               ('shortcut_ocr',
+                'Traduzir área',
+                'Selecione uma área da tela. O OCR o reconhece e depois o traduz com o par de idiomas '
+                'salvo para o modo OCR.'),
+               ('shortcut_fullscreen',
+                'Tela cheia',
+                'Captura a tela inteira e coloca traduções sobre blocos de texto visíveis, usando o '
+                'par de idiomas salvo no modo Tela.'),
+               ('shortcut_game',
+                'Dinâmico',
+                'Pressione Ctrl+Alt+G, selecione uma ou mais áreas de texto e depois Iniciar. As '
+                'traduções continuam sendo atualizadas; pressione o atalho novamente para parar.'),
+               ('shortcut_selection',
+                'Seleção',
+                'Selecione o texto existente em outro aplicativo e pressione o atalho atribuído em '
+                'Configurações. Este modo traduz sem alterar a seleção original.'),
+               ('shortcut_replace',
+                'Substituir',
+                'Selecione o texto editável em outro aplicativo e pressione o atalho atribuído. A '
+                'mesma seleção é substituída pela sua tradução; se o foco for alterado, o resultado '
+                'será apenas copiado.'),
+               ('shortcut_toggle',
+                'Janela',
+                'Oculta o aplicativo no destino usado anteriormente ou o restaura pela bandeja ou '
+                'barra de tarefas. Os atalhos de tradução continuam funcionando com a janela oculta.'),
+               ('document_translation',
+                'Tradução de documentos',
+                'Abra o ícone do documento para um texto longo ou um arquivo. Cole, solte ou anexe um '
+                'documento e traduza tudo ou apenas o fragmento selecionado. O texto longo no campo '
+                'principal também revela um ícone de expansão.'),
+               ('settings', 'Configurações', 'O Gear abre motores, histórico, atualizações e atalhos.'),
+               ('ocr_engine',
+                'Mecanismo de OCR',
+                'Escolha Windows, Tesseract, EasyOCR ou RapidOCR. Instale cada mecanismo e seus '
+                'idiomas antes do reconhecimento.'),
+               ('translator', 'Tradutor', 'Tradutor: Google on-line; Argos e Hy-MT off-line.'),
+               ('result_window',
+                'Janela de resultados',
+                'Escolha quais ações de tradução abrem a janela de resultados. As ações desmarcadas '
+                'copiam o resultado.'),
+               ('language_packages',
+                'Pacotes de idiomas',
+                'Instale aqui os idiomas de OCR e os pares de idiomas do Argos. Os seletores mostram '
+                'apenas os idiomas disponíveis.'),
+               ('hotkeys',
+                'Configurar atalhos',
+                'Se um atalho for inconveniente, abra Configurar atalhos. Clique no seu campo e '
+                'pressione uma nova combinação; pressione Esc para limpá-lo. As alterações aplicam-se '
+                'imediatamente.'),
+               ('back_home',
+                'Voltar ao início',
+                'Home retorna à tela principal. O par superior traduz o texto digitado; cada modo de '
+                'atalho abaixo mantém seu próprio par de idiomas.')]},
+    'it': {'progress': '{current}/{total}',
+     'click_hint': 'Fare clic sul controllo evidenziato',
+     'read_hint': 'Passa il mouse per i dettagli · Avanti',
+     'document_hint': 'Apri l’icona · Avanti',
+     'skip': 'Avanti',
+     'done_title': 'Pronto',
+     'done_body': 'Adesso conosci i controlli principali. Le domande frequenti complete si trovano '
+                  'sotto il pulsante informazioni.',
+     'steps': [('language',
+                'Lingua dell’interfaccia',
+                'La bandiera cambia la lingua dell’app, delle impostazioni, del menu nell’area di '
+                'notifica e della guida.'),
+               ('theme', 'Tema', 'Sole/Luna alterna i temi chiaro e scuro.'),
+               ('help',
+                'Aiuto',
+                'Il pulsante informazioni apre la guida a OCR, scorciatoie e traduttori.'),
+               ('shortcut_overview',
+                'Le tue scorciatoie',
+                'Questi sono le scorciatoie attuali. Passa il mouse su uno qualsiasi della schermata '
+                'principale per visualizzarne la descrizione completa. La riga della modalità sopra '
+                'imposta una coppia linguistica separata per ogni azione di traduzione.'),
+               ('shortcut_copy',
+                'Copia',
+                "Seleziona un'area dello schermo. L'OCR ne riconosce il testo e lo copia negli appunti "
+                'senza tradurlo.'),
+               ('shortcut_ocr',
+                'Traduci area',
+                "Seleziona un'area dello schermo. L'OCR lo riconosce, quindi lo traduce con la coppia "
+                'linguistica salvata per la modalità OCR.'),
+               ('shortcut_fullscreen',
+                'Schermo intero',
+                "Cattura l'intero schermo e inserisce le traduzioni su blocchi di testo visibili, "
+                'utilizzando la coppia linguistica salvata della modalità Schermo.'),
+               ('shortcut_game',
+                'Dinamico',
+                'Premere Ctrl+Alt+G, selezionare una o più aree di testo, quindi Avvia. Le traduzioni '
+                'continuano ad essere aggiornate; premere nuovamente la scorciatoia per interrompere.'),
+               ('shortcut_selection',
+                'Selezione',
+                "Seleziona il testo esistente in un'altra app e premi la scorciatoia assegnata in "
+                'Impostazioni. Questa modalità lo traduce senza modificare la selezione originale.'),
+               ('shortcut_replace',
+                'Sostituisci',
+                "Seleziona il testo modificabile in un'altra app e premi la scorciatoia assegnata. La "
+                'stessa selezione è sostituita dalla sua traduzione; se il focus è cambiato, il '
+                'risultato viene solo copiato.'),
+               ('shortcut_toggle',
+                'Finestra',
+                'Nasconde l’app nella destinazione usata in precedenza oppure la ripristina dall’area '
+                'di notifica o dalla barra delle applicazioni. Le scorciatoie di traduzione continuano '
+                'a funzionare con la finestra nascosta.'),
+               ('document_translation',
+                'Traduzione di documenti',
+                "Apri l'icona del documento per un testo lungo o un file. Incolla, rilascia o allega "
+                'un documento, quindi traduci tutto o solo il frammento selezionato. Il testo lungo '
+                "nel campo principale rivela anche un'icona di espansione."),
+               ('settings',
+                'Impostazioni',
+                'Gear apre motori, cronologia, aggiornamenti e scorciatoie.'),
+               ('ocr_engine',
+                "Motore dell'OCR",
+                'Scegli Windows, Tesseract, EasyOCR o RapidOCR. Installare ciascun motore e le '
+                'relative lingue prima del riconoscimento.'),
+               ('translator', 'Traduttore', 'Traduttore: Google in linea; Argos e Hy-MT offline.'),
+               ('result_window',
+                'Finestra dei risultati',
+                'Scegli quali azioni di traduzione aprono la finestra dei risultati. Le azioni '
+                'deselezionate copiano invece il risultato.'),
+               ('language_packages',
+                'Pacchetti lingua',
+                'Installa qui le lingue OCR e le coppie di lingue Argos. I selettori mostrano solo le '
+                'lingue disponibili.'),
+               ('hotkeys',
+                'Configura scorciatoie',
+                'Se una scorciatoia è scomoda, apri Configura scorciatoie. Fare clic sul suo campo e '
+                'premere una nuova combinazione; premere Esc per cancellarlo. Le modifiche si '
+                'applicano immediatamente.'),
+               ('back_home',
+                'Torna alla schermata principale',
+                'L’icona Home torna alla schermata principale. La coppia superiore traduce il testo '
+                'digitato; ciascuna modalità di scorciatoia riportata di seguito mantiene la propria '
+                'coppia linguistica.')]},
 }
 
 
@@ -2618,7 +3113,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Start with Windows", "Enable this so Click'n'Translate is ready after you sign in."),
         "start_minimized": ("Start in shadow mode", "Enable this so automatic startup opens the compact shadow view instead of the full window."),
         "actions_panel": ("Settings actions", "Clear cache removes temporary files; Reset restores behaviour settings without changing the interface language; Update checks releases. The second row opens language packages and both histories; the last row opens hotkeys."),
-        "settings_page_updates": ("More settings", "Open the OCR and updates tab for screen capture behaviour, updates, settings transfer and diagnostics."),
+        "settings_page_updates": ("More settings", "Open Translation and OCR for engines, selected-text translation and result window behaviour."),
         "ocr_behavior": ("OCR behaviour", "Here you control window visibility, frozen or dimmed capture, clipboard restoration and quiet notifications."),
         "export_settings": ("Export settings", "Save your complete configuration to a JSON file for backup or another computer."),
         "import_settings": ("Import settings", "Restore a configuration file. The interface returns to the first settings page afterwards."),
@@ -2633,7 +3128,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Запуск вместе с ОС", "Включите, чтобы Click'n'Translate был готов сразу после входа в Windows."),
         "start_minimized": ("Запуск в режиме тени", "Включите, чтобы при автозапуске открывался компактный режим тени, а не полное окно."),
         "actions_panel": ("Кнопки настроек", "«Очистить кэш» удаляет временные файлы; «Сброс» возвращает настройки поведения, но не меняет язык интерфейса; «Обновление» проверяет релизы. Ниже — языковые пакеты, обе истории и настройка горячих клавиш."),
-        "settings_page_updates": ("Дополнительные настройки", "Откройте вкладку «OCR и обновления»: здесь захват экрана, перенос настроек и диагностика."),
+        "settings_page_updates": ("Дополнительные настройки", "Откройте вкладку «Перевод и OCR»: здесь движки, перевод выделения и поведение результата."),
         "ocr_behavior": ("Поведение OCR", "Здесь настраиваются видимость окна, заморозка или затемнение захвата, восстановление буфера и тихие уведомления."),
         "export_settings": ("Экспорт настроек", "Сохраните всю конфигурацию в JSON для резервной копии или переноса на другой компьютер."),
         "import_settings": ("Импорт настроек", "Восстановите конфигурацию из файла. После импорта настройки откроются с первой страницы."),
@@ -2648,7 +3143,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Iniciar con Windows", "Actívalo para que Click'n'Translate esté listo al iniciar sesión."),
         "start_minimized": ("Iniciar en modo sombra", "Actívalo para que el inicio automático abra la vista compacta."),
         "actions_panel": ("Acciones de ajustes", "Borrar caché elimina temporales; Restablecer recupera el comportamiento sin cambiar el idioma; Actualizar busca versiones. Debajo están paquetes, historiales y atajos."),
-        "settings_page_updates": ("Más ajustes", "Abre la pestaña OCR y actualizaciones para configurar la captura, transferencia y diagnóstico."),
+        "settings_page_updates": ("Más ajustes", "Abre Traducción y OCR para los motores, la selección y la ventana de resultados."),
         "ocr_behavior": ("Comportamiento OCR", "Controla visibilidad, captura congelada u oscurecida, restauración del portapapeles y avisos silenciosos."),
         "export_settings": ("Exportar ajustes", "Guarda toda la configuración en JSON para copiarla o usarla en otro equipo."),
         "import_settings": ("Importar ajustes", "Restaura un archivo de configuración y vuelve a la primera página."),
@@ -2663,7 +3158,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Mit Windows starten", "Aktivieren, damit Click'n'Translate nach der Anmeldung bereit ist."),
         "start_minimized": ("Im Schattenmodus starten", "Aktivieren, damit der Autostart die kompakte Ansicht öffnet."),
         "actions_panel": ("Einstellungsaktionen", "Cache leeren entfernt Temporäres; Zurücksetzen stellt Verhalten wieder her, ohne die Sprache zu ändern; Aktualisieren sucht Releases. Darunter: Pakete, Verläufe und Hotkeys."),
-        "settings_page_updates": ("Weitere Einstellungen", "Der Tab OCR und Updates enthält Aufnahmeverhalten, Übertragung und Diagnose."),
+        "settings_page_updates": ("Weitere Einstellungen", "Übersetzung und OCR enthält Engines, Auswahlübersetzung und Ergebnisfenster."),
         "ocr_behavior": ("OCR-Verhalten", "Hier steuern Sie Sichtbarkeit, eingefrorene oder abgedunkelte Aufnahme, Zwischenablage und stille Hinweise."),
         "export_settings": ("Einstellungen exportieren", "Die komplette Konfiguration als JSON sichern oder auf einen anderen PC übertragen."),
         "import_settings": ("Einstellungen importieren", "Eine Konfiguration laden; danach erscheint wieder die erste Seite."),
@@ -2678,7 +3173,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("Démarrer avec Windows", "Activez cette option pour que Click'n'Translate soit prêt à la connexion."),
         "start_minimized": ("Démarrer en mode ombre", "Activez-la pour que le démarrage automatique ouvre la vue compacte."),
         "actions_panel": ("Actions des réglages", "Vider le cache supprime les temporaires ; Réinitialiser restaure le comportement sans changer la langue ; Mise à jour cherche les versions. Dessous : modules, historiques et raccourcis."),
-        "settings_page_updates": ("Autres réglages", "L’onglet OCR et mises à jour contient les réglages de capture, transfert et diagnostic."),
+        "settings_page_updates": ("Autres réglages", "Traduction et OCR contient les moteurs, la sélection et la fenêtre de résultat."),
         "ocr_behavior": ("Comportement OCR", "Réglez visibilité, capture figée ou assombrie, restauration du presse-papiers et notifications discrètes."),
         "export_settings": ("Exporter les réglages", "Enregistrez toute la configuration en JSON pour une sauvegarde ou un autre PC."),
         "import_settings": ("Importer les réglages", "Restaurez un fichier de configuration puis revenez à la première page."),
@@ -2693,7 +3188,7 @@ GUIDE_TOUR_EXTRAS = {
         "autostart": ("随 Windows 启动", "启用后，登录系统时 Click'n'Translate 会自动就绪。"),
         "start_minimized": ("以影子模式启动", "启用后，自动启动时会打开紧凑视图。"),
         "actions_panel": ("设置操作", "清理缓存会删除临时文件；重置会恢复行为设置但保留界面语言；更新会检查新版本。下方还有语言包、两种历史记录和快捷键。"),
-        "settings_page_updates": ("更多设置", "打开“OCR 与更新”选项卡，可设置捕获行为、迁移设置和诊断。"),
+        "settings_page_updates": ("更多设置", "打开“翻译与 OCR”选项卡，设置引擎、选区翻译和结果窗口。"),
         "ocr_behavior": ("OCR 行为", "可设置窗口可见性、冻结或变暗捕获画面、恢复剪贴板和静默通知。"),
         "export_settings": ("导出设置", "将完整配置保存为 JSON，以便备份或迁移到另一台电脑。"),
         "import_settings": ("导入设置", "从文件恢复配置；完成后会返回设置第一页。"),
@@ -2702,9 +3197,136 @@ GUIDE_TOUR_EXTRAS = {
         "game_controls": ("动态模式", "选择语言对、刷新间隔和透明度；还可在绑定应用失去焦点时暂停，并显示原文。"),
         "settings_page_main": ("常规设置", "打开“常规设置”选项卡，返回引擎、启动选项和历史记录。"),
     },
+
+    'pt': {'main_translate': ('Enviar tradução',
+                        'A seta envia o texto do campo principal para tradução, como o botão enviar de '
+                        'um messenger.'),
+     'shadow_mode': ('Modo sombra',
+                     'Este botão inferior oculta toda a janela e deixa disponível o tradutor '
+                     'compacto.'),
+     'autostart': ('Iniciar com o Windows',
+                   "Habilite isto para que Click'n'Translate esteja pronto após você entrar."),
+     'start_minimized': ('Iniciar no modo sombra',
+                         'Habilite isto para que a inicialização automática abra a visualização de '
+                         'sombra compacta em vez da janela completa.'),
+     'actions_panel': ('Ações de configurações',
+                       'Limpar cache remove arquivos temporários; Redefinir restaura as configurações '
+                       'de comportamento sem alterar o idioma da interface; Atualizar verificações de '
+                       'lançamentos. A segunda linha abre pacotes de idiomas e ambos os históricos; a '
+                       'última linha abre atalhos.'),
+     'settings_page_updates': ('Mais configurações',
+                               'Abra Tradução e OCR para configurar os mecanismos, a tradução de texto '
+                               'selecionado e o comportamento do resultado.'),
+     'ocr_behavior': ('Comportamento de OCR',
+                      'Aqui você controla a visibilidade da janela, captura congelada ou esmaecida, '
+                      'restauração da área de transferência e notificações silenciosas.'),
+     'export_settings': ('Exportar configurações',
+                         'Salve sua configuração completa em um arquivo JSON para backup ou em outro '
+                         'computador.'),
+     'import_settings': ('Importar configurações',
+                         'Restaure um arquivo de configuração. A interface retorna à primeira página '
+                         'de configurações posteriormente.'),
+     'bug_report': ('Relatar problema',
+                    'Cria uma pasta de diagnóstico segura e a abre. Descreva o problema e envie o ZIP '
+                    'ao desenvolvedor via Telegram ou GitHub.'),
+     'settings_page_game': ('Configurações de tradução dinâmica',
+                            'Abra a guia Tradução dinâmica para configurar e iniciar a tradução de '
+                            'áreas variáveis da tela.'),
+     'game_controls': ('Modo dinâmico',
+                       'Escolha seu par de idiomas, intervalo de atualização e opacidade da '
+                       'sobreposição. Ele pode pausar quando o aplicativo vinculado estiver inativo e, '
+                       'opcionalmente, manter o texto original visível.'),
+     'settings_page_main': ('Configurações gerais',
+                            'Abra a guia Configurações gerais para retornar aos mecanismos, opções de '
+                            'inicialização e histórico.')},
+    'it': {'main_translate': ('Invia traduzione',
+                        'La freccia invia il testo dal campo principale per la traduzione, come il '
+                        'pulsante di invio in un messenger.'),
+     'shadow_mode': ('Modalità ombra',
+                     "Questo pulsante in basso nasconde l'intera finestra e lascia disponibile il "
+                     'traduttore compatto.'),
+     'autostart': ('Avvia con Windows',
+                   "Abilitalo in modo che Click'n'Translate sia pronto dopo aver effettuato "
+                   "l'accesso."),
+     'start_minimized': ('Avvia in modalità ombra',
+                         "Abilita questa opzione in modo che l'avvio automatico apra la vista ombra "
+                         'compatta invece della finestra intera.'),
+     'actions_panel': ('Azioni delle impostazioni',
+                       'Cancella cache rimuove i file temporanei; Reset ripristina le impostazioni del '
+                       "comportamento senza modificare la lingua dell'interfaccia; L'aggiornamento "
+                       'controlla le versioni. La seconda riga apre i pacchetti lingua ed entrambe le '
+                       "cronologie; l'ultima riga apre le scorciatoie."),
+     'settings_page_updates': ('Più impostazioni',
+                               'Apri Traduzione e OCR per configurare motori, traduzione del testo '
+                               'selezionato e comportamento del risultato.'),
+     'ocr_behavior': ("Comportamento dell'OCR",
+                      "Qui puoi controllare la visibilità della finestra, l'acquisizione bloccata o "
+                      'oscurata, il ripristino degli appunti e le notifiche silenziose.'),
+     'export_settings': ('Esporta impostazioni',
+                         'Salva la configurazione completa in un file JSON per il backup o su un altro '
+                         'computer.'),
+     'import_settings': ('Importa impostazioni',
+                         "Ripristinare un file di configurazione. Successivamente l'interfaccia "
+                         'ritorna alla prima pagina delle impostazioni.'),
+     'bug_report': ('Segnala un problema',
+                    'Crea una cartella diagnostica sicura e la apre. Descrivi il problema e invia lo '
+                    'ZIP allo sviluppatore tramite Telegram o GitHub.'),
+     'settings_page_game': ('Impostazioni di traduzione dinamica',
+                            'Apri la scheda Traduzione dinamica per configurare e avviare la '
+                            'traduzione delle aree variabili dello schermo.'),
+     'game_controls': ('Modalità dinamica',
+                       "Scegli la coppia linguistica, l'intervallo di aggiornamento e l'opacità della "
+                       "sovrapposizione. Può essere messo in pausa quando l'app associata è inattiva "
+                       'e, facoltativamente, mantenere visibile il testo originale.'),
+     'settings_page_main': ('Impostazioni generali',
+                            'Apri la scheda Impostazioni generali per tornare ai motori, alle opzioni '
+                            'di avvio e alla cronologia.')},
 }
 
 
+for _guide_lang, _bodies in {
+    'en': ('Startup, history, tooltips, updates, result window behaviour, interface scale and result text size.',
+           'Choose OCR and translation engines, API connections, selection behaviour and language packages.',
+           'Clear cache, reset or update the app; export or import settings, create a bug report, or configure hotkeys.'),
+    'ru': ('Запуск, история, подсказки, обновления, поведение окна результата, масштаб интерфейса и размер текста.',
+           'Движки OCR и перевода, API-подключения, работа с выделением и языковые пакеты.',
+           'Очистка кэша, сброс и обновление; экспорт, импорт, баг-репорт и настройка горячих клавиш.'),
+    'es': ('Inicio, historial, ayudas, actualizaciones, ventana de resultado, escala y tamaño del texto.',
+           'Motores OCR y de traducción, conexiones API, selección y paquetes de idioma.',
+           'Borrar caché, restablecer y actualizar; exportar, importar, informe de errores y atajos.'),
+    'de': ('Start, Verlauf, Hinweise, Updates, Ergebnisfenster, Skalierung und Textgröße.',
+           'OCR- und Übersetzungsdienste, API-Verbindungen, Textauswahl und Sprachpakete.',
+           'Cache löschen, zurücksetzen und aktualisieren; Export, Import, Fehlerbericht und Tastenkürzel.'),
+    'fr': ('Démarrage, historique, aides, mises à jour, fenêtre de résultat, échelle et taille du texte.',
+           'Moteurs OCR et traduction, connexions API, sélection et modules de langue.',
+           'Vider le cache, réinitialiser et mettre à jour ; export, import, rapport de bug et raccourcis.'),
+    'zh': ('启动、历史、提示、更新、结果窗口、界面缩放和结果文字大小。',
+           'OCR 和翻译引擎、API 连接、文本选择和语言包。',
+           '清除缓存、重置、更新、导出、导入、错误报告和快捷键设置。'),
+
+    'pt': ('Inicialização, histórico, dicas de ferramentas, atualizações, comportamento da janela de '
+     'resultados, escala da interface e tamanho do texto do resultado.',
+     'Escolha mecanismos de OCR e tradução, conexões API, comportamento de seleção e pacotes de '
+     'idiomas.',
+     'Limpe o cache, redefina ou atualize o aplicativo; exporte ou importe configurações, crie um '
+     'relatório de bug ou configure atalhos.'),
+    'it': ('Avvio, cronologia, descrizioni comandi, aggiornamenti, comportamento della finestra dei '
+     "risultati, scala dell'interfaccia e dimensione del testo dei risultati.",
+     'Scegli OCR e motori di traduzione, connessioni API, comportamento di selezione e pacchetti '
+     'lingua.',
+     "Svuota cache, reimposta o aggiorna l'app; esportare o importare impostazioni, creare una "
+     'segnalazione di bug o configurare le scorciatoie.'),
+}.items():
+    for _key, _body in zip(('settings_page_main', 'settings_page_updates', 'actions_panel'), _bodies):
+        _title = GUIDE_TOUR_EXTRAS[_guide_lang][_key][0]
+        GUIDE_TOUR_EXTRAS[_guide_lang][_key] = (_title, _body)
+
+from settings_guide_content import guide_updates, COPY as SETTINGS_GUIDE_COPY
+for _guide_language in GUIDE_TOUR_EXTRAS:
+    GUIDE_TOUR_EXTRAS[_guide_language].update(guide_updates(_guide_language))
+    for _action, _body_index in (('settings_page_main', 1), ('settings_page_updates', 2)):
+        _title = GUIDE_TOUR_EXTRAS[_guide_language][_action][0]
+        GUIDE_TOUR_EXTRAS[_guide_language][_action] = (_title, SETTINGS_GUIDE_COPY[_guide_language][_body_index])
 GUIDE_TOUR_ORDER = GUIDE_SETUP_ORDER
 
 
@@ -3039,7 +3661,7 @@ HELP_CONTENT = {
         ]),
         ("Настройки: галочки", [
             "<span class='item-title'>Запускать вместе с ОС</span> — программа стартует вместе с Windows.",
-            "<span class='item-title'>Запускать в режиме тень</span> — старт скрытым в трее. Горячие клавиши работают, окно открывается из трея.",
+            "<span class='item-title'>Запускать в режиме тени</span> — старт скрытым в трее. Горячие клавиши работают, окно открывается из трея.",
             "<span class='item-title'>Копировать переведённый текст</span> — каждый перевод попадает в буфер обмена сразу после готовности.",
             "<span class='item-title'>Сохранять историю копирований</span> и <span class='item-title'>Сохранять историю переводов</span> — хранят скопированное и переведённое. Выключите их, и на диск ничего не пишется.",
             "<span class='item-title'>Не сворачивать при OCR</span> — главное окно остаётся на экране, пока вы выделяете область.",
@@ -3321,6 +3943,196 @@ HELP_CONTENT = {
             "启用自启动或创建快捷方式前，请先把程序文件夹移动到最终位置。",
         ]),
     ],
+
+    'pt': [('Início rápido',
+      ['<b>1.</b> Pressione o atalho copiar ou traduzir.',
+       '<b>2.</b> Selecione a área da tela que contém texto.',
+       '<b>3.</b> Escolha o OCR/idioma de origem no seletor de sinalizadores quando necessário.',
+       '<b>4.</b> O aplicativo copia o texto reconhecido ou mostra a tradução.']),
+     ('Idioma da interface',
+      ['Use o botão de bandeira na barra de título para mudar o idioma da interface.',
+       'A janela principal, configurações, atalhos, telas de histórico, menu da bandeja e este FAQ '
+       'seguem o idioma selecionado.',
+       'A seleção do idioma de OCR e de tradução é separada do idioma da interface.']),
+     ('Tradutores',
+      ["<span class='item-title'>Google</span> - tradução online rápida, recomendada por padrão.",
+       "<span class='item-title'>Argos</span> - off-line e privado, requer pacotes de idiomas locais.",
+       "<span class='item-title'>Hy-MT</span> - pacote de tradução LLM local, instalado separadamente "
+       'em Configurações.',
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - provedores online "
+       'alternativos.']),
+     ('Mecanismos de OCR',
+      ["<span class='item-title'>Windows</span> - integrado ao Windows, rápido, depende dos pacotes de "
+       'idiomas Windows instalados.',
+       "<span class='item-title'>Tesseract</span> - mecanismo de OCR off-line; As configurações podem "
+       'baixar um pacote portátil local.',
+       "<span class='item-title'>AUTO</span> não consegue saber o idioma antes do OCR. Com Windows OCR "
+       'ele tenta os idiomas OCR instalados e seleciona o resultado mais legível.',
+       'Se o idioma necessário não estiver instalado em Windows OCR, instale o pacote de idiomas '
+       'Windows, escolha um idioma específico ou use Tesseract.']),
+     ('Configurações: as listas à direita',
+      ["<span class='item-title'>OCR</span> escolhe o mecanismo que lê o texto na tela. Apenas os "
+       'motores que você instalou são oferecidos. Os mecanismos são instalados e removidos em sua '
+       "própria guia em <span class='item-title'>Pacotes de idiomas</span>.",
+       "<span class='item-title'>Traduzir</span> escolhe o provedor de tradução. Provedores online "
+       'enviam seu texto embora; Argos e Hy-MT o mantêm neste computador.',
+       "<span class='item-title'>Mostrar janela</span> marca as ações que abrem a janela de tradução: "
+       'traduzir o texto selecionado, traduzir uma área da tela e pressionar Traduzir.',
+       'Esses três são interruptores independentes, portanto qualquer combinação é permitida. Uma ação '
+       'desmarcada ainda é traduzida – ela copia o resultado diretamente para a área de transferência '
+       'em vez de abrir uma janela.',
+       'O campo mostra as ações ativadas, ou Tudo e Nunca quando todas têm o mesmo estado. Passe o '
+       'mouse para ver a lista completa.']),
+     ('Configurações: caixas de seleção',
+      ["<span class='item-title'>Iniciar com o sistema</span> inicia o aplicativo quando Windows é "
+       'iniciado.',
+       "<span class='item-title'>Iniciar no modo sombra</span> inicia escondido na bandeja. As atalhos "
+       'continuam funcionando e o ícone da bandeja abre a janela.',
+       "<span class='item-title'>Copiar texto traduzido</span> coloca cada tradução na área de "
+       'transferência assim que estiver pronta.',
+       "<span class='item-title'>Salvar histórico de cópias</span> e <span class='item-title'>Salvar "
+       'histórico de tradução</span> mantém o que você copiou e traduziu. Deixe-os desligados e nada '
+       'será gravado no disco.',
+       "<span class='item-title'>Mantenha a janela visível durante o OCR</span> impede que a janela "
+       'principal fique oculta enquanto você arrasta uma seleção.',
+       "<span class='item-title'>Congelar tela durante OCR</span> mantém a imagem imóvel, que é como "
+       'você captura texto que se move ou desaparece.']),
+     ('Configurações: os botões',
+      ["<span class='item-title'>Limpar cache</span> descarta traduções e arquivos temporários "
+       'armazenados em cache. Os mecanismos instalados e os pacotes de idiomas permanecem.',
+       "<span class='item-title'>Redefinir</span> coloca todas as configurações de volta ao padrão. "
+       'Não desinstala nada.',
+       "<span class='item-title'>Atualizar</span> verifica se há uma versão mais recente e substitui a "
+       'pasta portátil por ela.',
+       "<span class='item-title'>Pacotes de idiomas</span> instala idiomas OCR e instruções Argos com "
+       'antecedência.',
+       "<span class='item-title'>Histórico de cópias</span> e <span class='item-title'>Histórico de "
+       'traduções</span> abrir o que foi salvo. Eles permanecem vazios enquanto a caixa de seleção '
+       'correspondente estiver desativada.',
+       "<span class='item-title'>Configurar atalhos</span> define cópia, OCR, tela cheia, tradução de "
+       'seleção segura, traduzir e substituir e mostrar/ocultar atalhos.']),
+     ('Atalhos',
+      ['Passe o mouse sobre qualquer atalho na tela principal para ver sua descrição ou clique no '
+       'emblema da tecla para abrir a configuração exata. A linha de modo armazena um idioma de origem '
+       'e de destino separados para OCR, Tela Cheia, Dinâmico, Seleção e Substituição.',
+       "<span class='item-title'>Copiar</span> reconhece a área selecionada e copia o texto.",
+       "<span class='item-title'>Traduzir área</span> reconhece a área selecionada e a traduz.",
+       "<span class='item-title'>Tela cheia</span> traduz blocos de texto visíveis na tela.",
+       "<span class='item-title'>Dinâmico</span> dinâmico começa com Ctrl+Alt+G, permite selecionar "
+       'uma ou mais áreas de texto e mantém suas traduções atualizadas. Pressione o atalho novamente '
+       'para parar.',
+       "<span class='item-title'>Seleção</span> traduz o texto atualmente selecionado de outro "
+       'aplicativo.',
+       "<span class='item-title'>Traduzir e substituir seleção</span> grava a tradução de volta "
+       'somente se o mesmo texto permanecer selecionado na mesma janela. Caso contrário, ele copia a '
+       'tradução com segurança.',
+       "<span class='item-title'>Janela</span> oculta o aplicativo em seu destino anterior ou o "
+       'restaura da bandeja/barra de tarefas.',
+       "Se uma combinação for inconveniente, abra Configurações <span class='item-title'>Configurações "
+       '→ Configurar atalhos</span>, clique em seu campo e pressione uma nova combinação. Esc limpa o '
+       'campo; as alterações se aplicam imediatamente.']),
+     ('Aplicativo portátil',
+      ['O aplicativo armazena configuração, histórico, cache e mecanismos locais opcionais próximos à '
+       'pasta do programa.',
+       'Mova a pasta para seu local final antes de ativar a inicialização automática ou criar '
+       'atalhos.'])],
+    'it': [('Avvio rapido',
+      ['<b>1.</b> Premere la scorciatoia copia o traduci.',
+       "<b>2.</b> Selezionare l'area dello schermo che contiene testo.",
+       '<b>3.</b> Scegliere la lingua OCR/origine dal selettore flag quando necessario.',
+       "<b>4.</b> L'app copia il testo riconosciuto o mostra la traduzione."]),
+     ('Lingua dell’interfaccia',
+      ['Utilizzare il pulsante bandiera nella barra del titolo per cambiare la lingua '
+       "dell'interfaccia.",
+       'La finestra principale, le impostazioni, le scorciatoie, le schermate della cronologia, il '
+       'menu della barra delle applicazioni e queste domande frequenti seguono la lingua selezionata.',
+       "La selezione della lingua OCR e di traduzione è separata dalla lingua dell'interfaccia."]),
+     ('Traduttori',
+      ["<span class='item-title'>Google</span> : traduzione online veloce, consigliata per "
+       'impostazione predefinita.',
+       "<span class='item-title'>Argos</span> - offline e privato, richiede pacchetti in lingua "
+       'locale.',
+       "<span class='item-title'>Hy-MT</span> - pacchetto di traduzione LLM locale, installato "
+       'separatamente da Impostazioni.',
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - fornitori online "
+       'alternativi.']),
+     ('Motori OCR',
+      ["<span class='item-title'>Windows</span> - integrato in Windows, veloce, dipende dai pacchetti "
+       'lingua Windows installati.',
+       "<span class='item-title'>Tesseract</span> - motore OCR offline; Le impostazioni possono "
+       'scaricare un pacchetto portatile locale.',
+       "<span class='item-title'>AUTO</span> non può conoscere la lingua prima dell'OCR. Con Windows "
+       'OCR prova le lingue OCR installate e seleziona il risultato più leggibile.',
+       'Se la lingua necessaria non è installata in Windows OCR, installare il relativo pacchetto '
+       'lingua Windows, scegliere una lingua specifica o utilizzare Tesseract.']),
+     ('Impostazioni: gli elenchi a destra',
+      ["<span class='item-title'>OCR</span> seleziona il motore che legge il testo dallo schermo. "
+       'Vengono offerti solo i motori che hai installato. I motori vengono installati e rimossi nella '
+       "propria scheda in <span class='item-title'>Pacchetti lingua</span>.",
+       "<span class='item-title'>Traduci</span> sceglie il fornitore di traduzione. I fornitori online "
+       'inviano il tuo testo; Argos e Hy-MT lo mantengono su questo computer.',
+       "<span class='item-title'>Mostra finestra</span> seleziona le azioni che aprono la finestra di "
+       "traduzione: tradurre il testo selezionato, tradurre un'area dello schermo e premere Traduci.",
+       'Questi tre sono interruttori indipendenti, quindi è consentita qualsiasi combinazione. '
+       "Un'azione deselezionata si traduce comunque: copia il risultato direttamente negli appunti "
+       'invece di aprire una finestra.',
+       'Il campo mostra le azioni attive, oppure Tutte e Mai quando hanno tutte lo stesso stato. Passa '
+       'il puntatore sul campo per vedere l’elenco completo.']),
+     ('Impostazioni: caselle di controllo',
+      ["<span class='item-title'>Avvia con il sistema</span> avvia l'app all'avvio di Windows.",
+       "<span class='item-title'>Avvia in modalità ombra</span> lo avvia nascosto nell’area di "
+       "notifica. I scorciatoie continuano a funzionare e l'icona nella barra delle applicazioni apre "
+       'la finestra.',
+       "<span class='item-title'>Copia il testo tradotto</span> inserisce ogni traduzione negli "
+       'appunti non appena è pronta.',
+       "<span class='item-title'>Salva la cronologia delle copie</span> e <span "
+       "class='item-title'>Salva la cronologia delle traduzioni</span> conserva ciò che hai copiato e "
+       'tradotto. Lasciali disattivati e nulla verrà scritto sul disco.',
+       "<span class='item-title'>Mantieni la finestra visibile durante l'OCR</span> impedisce alla "
+       'finestra principale di nascondersi mentre si trascina una selezione.',
+       "<span class='item-title'>Blocca lo schermo durante l'OCR</span> mantiene ferma l'immagine, "
+       'ovvero il modo in cui si cattura il testo che si muove o scompare.']),
+     ('Impostazioni: i pulsanti',
+      ["<span class='item-title'>Svuota cache</span> elimina le traduzioni memorizzate nella cache e i "
+       'file temporanei. I motori installati e i pacchetti lingua rimangono.',
+       "<span class='item-title'>Ripristina</span> riporta tutte le impostazioni ai valori "
+       'predefiniti. Non disinstalla nulla.',
+       "<span class='item-title'>Aggiorna</span> verifica la presenza di una versione più recente e "
+       'sostituisce con essa la cartella portatile.',
+       "<span class='item-title'>Pacchetti lingua</span> installa in anticipo le lingue OCR e le "
+       'indicazioni Argos.',
+       "<span class='item-title'>Cronologia copie</span> e <span class='item-title'>Cronologia "
+       'traduzioni</span> aprono ciò che è stato salvato. Rimangono vuoti finché la casella di '
+       'controllo corrispondente è disattivata.',
+       "<span class='item-title'>Configura scorciatoie</span> imposta copia, OCR, schermo intero, "
+       'traduzione selezione sicura, traduci e sostituisci e mostra/nascondle scorciatoie.']),
+     ('Scorciatoie',
+      ['Passa il mouse su qualsiasi collegamento nella schermata principale per visualizzarne la '
+       "descrizione o fai clic sul badge del tasto per aprire l'impostazione esatta. La riga della "
+       'modalità memorizza una lingua di origine e di destinazione separata per OCR, Schermo intero, '
+       'Dinamico, Selezione e Sostituisci.',
+       "<span class='item-title'>Copia</span> riconosce l'area selezionata e copia il testo.",
+       "<span class='item-title'>Traduci area</span> riconosce l'area selezionata e la traduce.",
+       "<span class='item-title'>Schermo intero</span> traduce i blocchi di testo visibili sullo "
+       'schermo.',
+       "<span class='item-title'>Dinamico</span> inizia con Ctrl+Alt+G, consente di selezionare una o "
+       'più aree di testo e mantiene aggiornate le relative traduzioni. Premi di nuovo la scorciatoia '
+       'per interrompere.',
+       "<span class='item-title'>Selezione</span> traduce il testo attualmente selezionato da un'altra "
+       'app.',
+       "<span class='item-title'>Traduci e sostituisci selezione</span> riscrive la traduzione solo se "
+       'lo stesso testo rimane selezionato nella stessa finestra. Altrimenti copia in modo sicuro la '
+       'traduzione.',
+       "<span class='item-title'>Finestra</span> nasconde l'app nella sua destinazione precedente o la "
+       'ripristina dalla barra delle applicazioni/barra delle applicazioni.',
+       "Se una combinazione è scomoda, apri <span class='item-title'>Impostazioni → Configura "
+       'scorciatoie</span>, fai clic sul suo campo e premi una nuova combinazione. Esc libera il '
+       'campo; le modifiche si applicano immediatamente.']),
+     ('Applicazione portatile',
+      ["L'app memorizza configurazione, cronologia, cache e motori locali opzionali accanto alla "
+       'cartella del programma.',
+       "Sposta la cartella nella sua posizione finale prima di abilitare l'avvio automatico o creare "
+       'scorciatoie.'])],
 }
 
 
@@ -3349,6 +4161,13 @@ HELP_INTRO = {
         "Click'n'Translate 是便携式屏幕 OCR、快速翻译、快捷键和可选离线引擎助手。"
         "这份 FAQ 是功能地图；底部按钮可以重新启动交互式引导。"
     ),
+
+    'pt': ("Click'n'Translate é um assistente portátil para OCR de tela, tradução rápida, atalhos e "
+     'mecanismos off-line opcionais. Use este FAQ como um mapa; o guia interativo pode ser iniciado '
+     'novamente a partir do botão abaixo.'),
+    'it': ("Click'n'Translate è un assistente portatile per OCR dello schermo, traduzione rapida, "
+     'scorciatoie e motori offline opzionali. Usa queste FAQ come una mappa; la guida interattiva può '
+     'essere lanciata nuovamente dal pulsante sottostante.'),
 }
 
 HELP_EXTRA_CONTENT = {
@@ -3484,7 +4303,69 @@ HELP_EXTRA_CONTENT = {
             "历史记录是可选的；如果不想本地保存文本，可以关闭。",
         ]),
     ],
+
+    'pt': [('Melhores resultados de OCR',
+      ['Selecione apenas a área de texto, não a janela inteira. Capturas menores são mais rápidas e '
+       'limpas.',
+       "Use <span class='item-title'>Congelar tela durante OCR</span> quando a fonte se move, "
+       'desaparece ou desaparece.',
+       'Se faltar um idioma no Windows OCR, tente Tesseract ou instale o pacote de idiomas Windows '
+       'necessário.']),
+     ('Pacotes off-line',
+      ["<span class='item-title'>Tesseract</span> adiciona OCR offline e muitos idiomas de "
+       'reconhecimento.',
+       "<span class='item-title'>Argos</span> é uma tradução offline com pequenos pacotes de idiomas.",
+       "<span class='item-title'>Hy-MT</span> é um modelo local maior; instale-o somente quando "
+       'precisar de qualidade offline e tiver espaço em disco.']),
+     ('Atualizações e modo portátil',
+      ['Na inicialização, o aplicativo solicita silenciosamente ao GitHub a versão mais recente. Se o '
+       'seu estiver atual, você não verá nada; caso contrário, será oferecido a você <span '
+       "class='item-title'>Atualizar agora</span>, <span class='item-title'>Pular esta versão</span> "
+       "ou <span class='item-title'>Mais tarde</span>. Uma versão ignorada nunca mais será oferecida.",
+       'O botão de atualização baixa o arquivo de lançamento e substitui a pasta portátil '
+       'automaticamente.',
+       'Mantenha o aplicativo em uma pasta estável antes de ativar a inicialização automática, caso '
+       'contrário, Windows poderá apontar para o caminho antigo.',
+       'Configuração, cache, histórico e mecanismos locais ficam na pasta de dados do programa para '
+       'que o aplicativo possa ser movido como um pacote.']),
+     ('Privacidade',
+      ['Provedores online enviam texto para seus serviços. Use Argos, Hy-MT e Tesseract quando '
+       'precisar de trabalho apenas local.',
+       'O histórico e o histórico de cópias são opcionais; desative-os se não quiser que o texto seja '
+       'armazenado localmente.'])],
+    'it': [("I migliori risultati dell'OCR",
+      ["Seleziona solo l'area di testo, non l'intera finestra. Le acquisizioni più piccole sono più "
+       'veloci e più pulite.',
+       "Utilizzare <span class='item-title'>Blocca lo schermo durante l'OCR</span> quando la sorgente "
+       'si sposta, si attenua o scompare.',
+       'Se a Windows OCR manca una lingua, provare Tesseract o installare il pacchetto lingua Windows '
+       'necessario.']),
+     ('Pacchetti offline',
+      ["<span class='item-title'>Tesseract</span> aggiunge OCR offline e molte lingue di "
+       'riconoscimento.',
+       "<span class='item-title'>Argos</span> è la traduzione offline con piccoli pacchetti lingua.",
+       "<span class='item-title'>Hy-MT</span> è un modello locale più grande; installalo solo quando "
+       'hai bisogno della qualità offline e disponi di spazio su disco.']),
+     ('Aggiornamenti e modalità portatile',
+      ["All'avvio l'app richiede silenziosamente a GitHub la versione più recente. Se il tuo è attuale "
+       "non vedi nulla; in caso contrario, ti verrà offerto <span class='item-title'>Aggiorna "
+       "ora</span>, <span class='item-title'>Salta questa versione</span> o <span "
+       "class='item-title'>Più tardi</span>. Una versione saltata non viene mai più offerta.",
+       "Il pulsante Aggiorna scarica l'archivio della versione e sostituisce automaticamente la "
+       'cartella portatile.',
+       "Conserva l'app in una cartella stabile prima di abilitare l'avvio automatico, altrimenti "
+       'Windows potrebbe puntare al vecchio percorso.',
+       'Configurazione, cache, cronologia e motori locali risiedono nella cartella dei dati del '
+       "programma in modo che l'app possa essere spostata come un unico pacchetto."]),
+     ('Privacy',
+      ['I fornitori online inviano testo al loro servizio. Utilizza Argos, Hy-MT e Tesseract quando '
+       'hai bisogno di lavoro solo locale.',
+       'La cronologia e la cronologia delle copie sono facoltative; disattivali se non desideri che il '
+       'testo venga archiviato localmente.'])],
 }
+
+from settings_guide_content import update_help as _update_settings_help
+_update_settings_help(HELP_CONTENT)
 
 BUG_REPORT_HELP_CONTENT = {
     "en": [("Bug reports", [
@@ -3517,6 +4398,25 @@ BUG_REPORT_HELP_CONTENT = {
         "报告不包含剪贴板、历史记录、文档文本或 OCR 日志。",
         "如果应用无法启动，请在启动错误窗口中选择 <span class='item-title'>Create bug report</span>。",
     ])],
+
+    'pt': [('Relatórios de bugs',
+      ["Abra Ajuda <span class='item-title'>Ajuda → Relatar problema</span> para criar um ZIP de "
+       'diagnóstico e anexe-o a Problemas GitHub ou Telegram.',
+       'O relatório contém versão, sistema operacional, opções de mecanismo, verificações de arquivos '
+       'e logs do atualizador. Área de transferência, históricos, texto de documentos e registros de '
+       'OCR são excluídos.',
+       "Se o aplicativo não puder ser iniciado, use <span class='item-title'>Criar relatório de "
+       'problema</span> na janela de erro de inicialização; ele cria o mesmo tipo de relatório de '
+       'inicialização segura.'])],
+    'it': [('Segnalazioni di bug',
+      ["Apri Guida <span class='item-title'>Aiuto → Segnala un problema</span> per creare uno ZIP "
+       'diagnostico, quindi allegalo a GitHub Issues o Telegram.',
+       'Il rapporto contiene la versione, il sistema operativo, le scelte del motore, i controlli dei '
+       'file e i registri degli aggiornamenti. Sono esclusi gli appunti, le cronologie, il testo dei '
+       'documenti e i registri OCR.',
+       "Se l'app non può essere avviata, utilizza <span class='item-title'>Crea rapporto "
+       'diagnostico</span> nella finestra di errore di avvio; crea lo stesso tipo di rapporto di avvio '
+       'sicuro.'])],
 }
 
 LANGUAGE_PACKAGE_HELP_CONTENT = {
@@ -3574,6 +4474,33 @@ LANGUAGE_PACKAGE_HELP_CONTENT = {
             "如需删除语言包，请高亮已安装的行并选择“删除高亮项”。一个共享的 EasyOCR 模型可能同时用于多种相关语言。",
         ]),
     ],
+
+    'pt': [('Pacotes de idiomas',
+      ["Abra Configurações <span class='item-title'>Configurações → Pacotes de idiomas</span> e "
+       'instale os idiomas antes do OCR ou da tradução offline. O reconhecimento e a tradução nunca os '
+       'baixam silenciosamente.',
+       'Windows instala componentes OCR opcionais com permissão de administrador e mostra progresso '
+       'real. Tesseract e EasyOCR usam modelos de idioma local separados.',
+       'RapidOCR possui um pacote compartilhado em inglês + chinês; não suporta russo. Os pacotes '
+       'Argos são direcionais, como RU→EN, e um par que não seja em inglês pode exigir duas direções '
+       'através do inglês.',
+       'Os seletores de idioma mostram apenas os pacotes instalados e utilizáveis pelo mecanismo '
+       'escolhido.',
+       'Para remover um pacote, destaque sua linha instalada e escolha Remover destacado. Os modelos '
+       'EasyOCR compartilhados podem atender vários idiomas relacionados.'])],
+    'it': [('Pacchetti lingua',
+      ["Apri <span class='item-title'>Impostazioni → Pacchetti lingua</span> e installa le lingue "
+       "prima dell'OCR o della traduzione offline. Il riconoscimento e la traduzione non li scaricano "
+       'mai silenziosamente.',
+       'Windows installa componenti OCR opzionali con autorizzazione di amministratore e mostra '
+       'progressi reali. Tesseract e EasyOCR utilizzano modelli linguistici locali separati.',
+       'RapidOCR ha un pacchetto inglese + cinese condiviso; non supporta il russo. I pacchetti Argos '
+       'sono direzionali, come RU→EN, e una coppia non inglese può richiedere due direzioni tramite '
+       "l'inglese.",
+       'I selettori della lingua mostrano solo i pacchetti installati e utilizzabili dal motore '
+       'scelto.',
+       'Per rimuovere un pacchetto, evidenzia la riga installata e scegli Rimuovi evidenziato. I '
+       'modelli EasyOCR condivisi possono supportare diverse lingue correlate.'])],
 }
 
 
@@ -3638,6 +4565,35 @@ DOCUMENT_HELP_CONTENT = {
             "译文可本地保存为 .txt、.md 或可重新打开的会话。",
         ]),
     ],
+
+    'pt': [('Tradução de documentos',
+      ['Abra o ícone do documento na barra de título a qualquer momento. Para texto com mais de duas '
+       'linhas visuais, a entrada principal também mostra um ícone de expansão e transfere o texto '
+       'para a área de trabalho do documento.',
+       'Cole o texto lá, solte ou anexe um arquivo.txt,.md,.docx,.pdf,.html ou.rtf ou pressione Ctrl+O '
+       'na janela principal.',
+       'Escolha explicitamente o idioma de origem, o idioma de destino e o provedor. Argos mostra '
+       'apenas as direções cujos pacotes estão instalados.',
+       'Traduza o documento inteiro ou selecione um fragmento no campo esquerdo e escolha Traduzir '
+       'seleção.',
+       'Arquivos longos são divididos em partes ordenadas; pedaços com falha permanecem visíveis no '
+       'resultado.',
+       'As traduções podem ser salvas localmente como.txt,.md ou uma sessão reaberta na pasta de dados '
+       'do programa.'])],
+    'it': [('Traduzione di documenti',
+      ["Apri l'icona del documento nella barra del titolo in qualsiasi momento. Per il testo più lungo "
+       "di due righe visive, l'input principale mostra anche un'icona di espansione e trasferisce il "
+       "testo nell'area di lavoro del documento.",
+       'Incolla il testo lì, rilascia o allega un file.txt,.md,.docx,.pdf,.html o.rtf oppure premi '
+       'Ctrl+O dalla finestra principale.',
+       'Scegli esplicitamente la lingua di origine, la lingua di destinazione e il fornitore. Argos '
+       'mostra solo le direzioni i cui pacchetti sono installati.',
+       "Traduci l'intero documento oppure seleziona un frammento nel campo a sinistra e scegli Traduci "
+       'selezione.',
+       'I file lunghi vengono suddivisi in blocchi ordinati; i pezzi non riusciti rimangono visibili '
+       'nel risultato.',
+       'Le traduzioni possono essere salvate localmente come.txt,.md o come sessione riapribile nella '
+       'cartella dei dati del programma.'])],
 }
 
 
@@ -3648,6 +4604,37 @@ HELP_ACTION_TEXT = {
     "de": {"title": "Hilfe", "guide": "Tour starten", "github": "Projekt auf GitHub", "telegram": "Telegram", "report": "Fehlerbericht", "report_ready": "Der Berichtsordner ist fertig. Beschreiben Sie Schritte, Erwartung und Ergebnis und senden Sie die ZIP über GitHub oder Telegram.\n\nOrdner:\n{directory}\n\nDatei:\n{file}", "report_failed": "Der Diagnosebericht konnte nicht erstellt werden.\n\n{error}", "close": "Verstanden"},
     "fr": {"title": "Aide", "guide": "Lancer le guide", "github": "Projet sur GitHub", "telegram": "Telegram", "report": "Rapport d’erreur", "report_ready": "Le dossier du rapport est prêt. Décrivez les étapes, le résultat attendu et le résultat obtenu, puis envoyez le ZIP via GitHub ou Telegram.\n\nDossier :\n{directory}\n\nFichier :\n{file}", "report_failed": "Impossible de créer le rapport de diagnostic.\n\n{error}", "close": "Compris"},
     "zh": {"title": "帮助", "guide": "开始引导", "github": "GitHub 项目", "telegram": "Telegram", "report": "错误报告", "report_ready": "错误报告文件夹已创建。请说明操作步骤、预期结果和实际结果，并通过 GitHub 或 Telegram 发送 ZIP。\n\n文件夹：\n{directory}\n\n文件：\n{file}", "report_failed": "无法创建诊断报告。\n\n{error}", "close": "知道了"},
+
+    'pt': {'title': 'FAQ',
+     'guide': 'Iniciar guia interativo',
+     'github': 'ProjetoGitHub',
+     'telegram': 'Telegram',
+     'report': 'Relatar problema',
+     'report_ready': 'A pasta do relatório está pronta. Envie o arquivo ZIP pelo GitHub ou Telegram e '
+                     'descreva o que fez, o que esperava e o que aconteceu.\n'
+                     '\n'
+                     'Pasta:\n'
+                     '{directory}\n'
+                     '\n'
+                     'Arquivo para enviar:\n'
+                     '{file}',
+     'report_failed': 'Não foi possível criar o relatório de diagnóstico.\n\n{error}',
+     'close': 'Entendi'},
+    'it': {'title': 'FAQ',
+     'guide': 'Avvia la guida interattiva',
+     'github': 'ProgettoGitHub',
+     'telegram': 'Telegram',
+     'report': 'Segnala un problema',
+     'report_ready': 'La cartella del rapporto è pronta. Invia il file ZIP tramite GitHub o Telegram e '
+                     'descrivi cosa hai fatto, cosa ti aspettavi e cosa è successo.\n'
+                     '\n'
+                     'Cartella:\n'
+                     '{directory}\n'
+                     '\n'
+                     'File da inviare:\n'
+                     '{file}',
+     'report_failed': 'Impossibile creare il report diagnostico.\n\n{error}',
+     'close': 'Capito'},
 }
 
 
@@ -3768,6 +4755,25 @@ ARGOS_PACKAGE_DIALOG_TEXT = {
         "install": "下载并安装",
         "cancel": "暂不",
     },
+
+    'pt': {'title': 'Baixar o pacote de idiomas Argos?',
+     'eyebrow': 'ARGOS · TRADUÇÃO OFFLINE',
+     'direction': 'DIREÇÃO DE TRADUÇÃO',
+     'body': 'Esta direção ainda não está instalada. Após um download único, a tradução funciona '
+             'totalmente offline.',
+     'detail': 'Argos escolhe automaticamente um pacote direto ou uma rota em inglês. O download pode '
+               'ter várias centenas de megabytes.',
+     'install': 'Baixe e instale',
+     'cancel': 'Agora não'},
+    'it': {'title': 'Scaricare il pacchetto linguistico Argos?',
+     'eyebrow': 'ARGOS · TRADUZIONE OFFLINE',
+     'direction': 'DIREZIONE DELLA TRADUZIONE',
+     'body': 'Questa direzione non è ancora installata. Dopo un download una tantum, la traduzione '
+             'funziona completamente offline.',
+     'detail': "Argos sceglie automaticamente un pacchetto diretto o un percorso attraverso l'inglese. "
+               'Il download può essere di diverse centinaia di megabyte.',
+     'install': 'Scarica e installa',
+     'cancel': 'Non ora'},
 }
 
 
@@ -3931,6 +4937,23 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "close": "关闭",
         "cancel": "取消",
     },
+
+    'pt': {'title': 'Falha na tradução',
+     'eyebrow': 'ARGOS · TRADUÇÃO OFFLINE',
+     'body': 'Argos não pôde concluir esta tradução. Tente mais uma vez. Se o erro persistir, '
+             'reinstale os pacotes para esta direção.',
+     'details': 'DETALHES TÉCNICOS',
+     'fallback': 'Argos não retornou uma descrição de erro.',
+     'close': 'Fechar',
+     'cancel': 'Cancelar'},
+    'it': {'title': 'Traduzione fallita',
+     'eyebrow': 'ARGOS · TRADUZIONE OFFLINE',
+     'body': "Argos non ha potuto completare questa traduzione. Prova ancora una volta. Se l'errore si "
+             'ripete, reinstallare i pacchetti per questa direzione.',
+     'details': 'DETTAGLI TECNICI',
+     'fallback': "Argos non ha restituito una descrizione dell'errore.",
+     'close': 'Chiudi',
+     'cancel': 'Annulla'},
 }
 
 
@@ -4081,6 +5104,21 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
         "copy_again": "再次复制",
         "swap": "交换语言",
     },
+
+    'pt': {'eyebrow': 'RESULTADO DA TRADUÇÃO',
+     'title': 'Tradução pronta',
+     'auto_copied': 'Copiado para a área de transferência automaticamente',
+     'ready': 'O resultado está pronto para ser copiado',
+     'copied': 'Copiado para a área de transferência',
+     'copy_again': 'Copie novamente',
+     'swap': 'Troque os idiomas'},
+    'it': {'eyebrow': 'RISULTATO DELLA TRADUZIONE',
+     'title': 'Traduzione pronta',
+     'auto_copied': 'Copiato automaticamente negli appunti',
+     'ready': 'Il risultato è pronto per la copia',
+     'copied': 'Copiato negli appunti',
+     'copy_again': 'Copia di nuovo',
+     'swap': 'Scambia le lingue'},
 }
 
 
@@ -4091,6 +5129,9 @@ for _lang, _edited in {
     "fr": "Texte modifié — prêt à copier",
     "es": "Texto editado — listo para copiar",
     "zh": "文本已修改，可以复制",
+
+    'pt': 'Texto editado – pronto para copiar',
+    'it': 'Testo modificato: pronto per la copia',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]["edited"] = _edited
 
@@ -4102,6 +5143,9 @@ for _lang, _labels in {
     "fr": ("Traduction", "Texte source", "Texte source modifié — cliquez sur Traduire"),
     "es": ("Traducción", "Texto original", "Texto original editado — pulsa Traducir"),
     "zh": ("译文", "原文", "原文已修改，请点击翻译"),
+
+    'pt': ('Tradução', 'Texto original', 'Texto fonte editado – clique em Traduzir'),
+    'it': ('Traduzione', 'Testo originale', 'Testo sorgente modificato: fai clic su Traduci'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(result_tab=_labels[0], source_tab=_labels[1], source_edited=_labels[2])
 
@@ -4113,6 +5157,12 @@ for _lang, _labels in {
     "fr": ("Traducteur", "Saisissez ou collez du texte", "La traduction apparaît ici", "Inverser les langues et les textes"),
     "es": ("Traductor", "Escribe o pega texto", "La traducción aparecerá aquí", "Intercambiar idiomas y textos"),
     "zh": ("翻译器", "输入或粘贴文本", "译文将显示在这里", "交换语言和文本"),
+
+    'pt': ('Tradutor', 'Digite ou cole o texto', 'Sua tradução aparece aqui', 'Trocar idiomas e texto'),
+    'it': ('Traduttore',
+     'Digita o incolla il testo',
+     'La tua traduzione appare qui',
+     'Scambia lingue e testo'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("workspace_title", "source_placeholder", "result_placeholder", "swap_texts"), _labels))
@@ -4125,6 +5175,19 @@ for _lang, _labels in {
     "fr": ("Saisie", "Masquer la saisie", "Afficher la saisie", "Ouvrir la traduction dans une fenêtre séparée", "Traduction précédente", "La saisie ou les langues ont changé. Cliquez sur Traduire."),
     "es": ("Entrada", "Ocultar entrada", "Mostrar entrada", "Abrir la traducción en otra ventana", "Traducción anterior", "La entrada o los idiomas han cambiado. Pulsa Traducir."),
     "zh": ("输入", "隐藏输入", "显示输入", "在独立窗口中打开译文", "上次译文", "输入或语言已更改，请点击翻译。"),
+
+    'pt': ('Entrada',
+     'Ocultar entrada',
+     'Mostrar entrada',
+     'Abra a tradução em uma janela separada',
+     'Tradução anterior',
+     'A entrada ou os idiomas foram alterados. Clique em Traduzir.'),
+    'it': ('Input',
+     'Nascondi input',
+     'Mostra input',
+     'Apri la traduzione in una finestra separata',
+     'Traduzione precedente',
+     "L'input o le lingue sono cambiati. Fare clic su Traduci."),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("input_tab", "hide_source", "show_source", "open_result", "previous_result", "result_needs_update"), _labels))
@@ -4137,6 +5200,9 @@ for _lang, _label in {
     'de': 'Übersetzung in Echtzeit',
     'fr': 'Traduction en temps réel',
     'zh': '正在实时翻译',
+
+    'pt': 'Traduzindo em tempo real',
+    'it': 'Traduzione in tempo reale',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]['live_translation'] = _label + '...'
 
@@ -4195,11 +5261,74 @@ def _update_translation_editor(editor, text, *, reset=False):
     scroll.setValue((scroll.maximum() if following_end else position) if append else 0)
 
 
+class _ResultWindowOutsideCloseFilter(QtCore.QObject):
+    """Close the result window when the user clicks another app or window."""
+
+    def __init__(self, dialog):
+        super().__init__(dialog)
+        self._dialog = dialog
+
+    def eventFilter(self, watched, event):
+        try:
+            dialog = getattr(self, "_dialog", None)
+            if dialog is None or getattr(dialog, "_closed", True):
+                return False
+        except RuntimeError:
+            return False
+        etype = event.type()
+        if etype == QtCore.QEvent.ApplicationDeactivate:
+            dialog._schedule_outside_close()
+        elif etype == QtCore.QEvent.ApplicationActivate:
+            dialog._pending_outside_close = False
+        elif etype == QtCore.QEvent.MouseButtonPress:
+            widget = watched if isinstance(watched, QWidget) else None
+            if widget is not None and not dialog._widget_belongs_to_result_window(widget):
+                dialog._schedule_outside_close()
+        return False
+
+
+def _open_translation_packages(widget, engine, source='', target=''):
+    """Open the actual installer tab, including from standalone result windows."""
+    from PyQt5 import sip
+    owner = widget
+    while owner is not None and not callable(getattr(owner, 'show_settings', None)):
+        owner = owner.parentWidget()
+    if owner is None:
+        candidates = [_main_window_ref, getattr(widget, '_translation_settings_host', None)]
+        candidates.extend(QApplication.topLevelWidgets())
+        owner = next((candidate for candidate in candidates if candidate is not None
+                      and not sip.isdeleted(candidate) and callable(getattr(candidate, 'show_settings', None))), None)
+    if owner is None:
+        # A standalone OCR result needs settings without another set of global
+        # shortcuts, tray jobs or startup announcements in this process.
+        owner = DarkThemeApp(background_services=False)
+        owner.setAttribute(Qt.WA_DeleteOnClose, True)
+        QApplication.instance()._translation_settings_host = owner
+        widget._translation_settings_host = owner
+    owner.show()
+    owner.show_settings()
+    owner.settings_window.show_ocr_language_manager(engine, source, target)
+    return owner.settings_window._language_manager_dialog
+
+
+def _resolve_translation_provider(widget, engine, source, target, language):
+    from translation_availability import missing_provider, offer_provider_recovery
+    issue = missing_provider(engine, source, target)
+    if issue is None:
+        return engine
+    choice = offer_provider_recovery(widget, issue, TRANSLATION_PROVIDER_OPTIONS, language)
+    if choice == 'install':
+        widget._provider_settings_window = _open_translation_packages(widget, issue.engine, source, target)
+        return None
+    return choice
+
+
 class TranslationResultDialog(QDialog):
     """Editable source and result, with requests bound to an exact input revision."""
 
     _retranslated_signal = QtCore.pyqtSignal(int, str, str)
     _partial_translation_signal = QtCore.pyqtSignal(int, str, int, int)
+    _provider_unavailable_signal = QtCore.pyqtSignal(int, object)
 
     def __init__(self, parent, translated_text, auto_copy=True, lang="ru", theme="Темная",
                  source_text="", source_lang="", target_lang="", result_mode="main"):
@@ -4317,6 +5446,7 @@ class TranslationResultDialog(QDialog):
         self.title_close_button.setText("×")
         self.title_close_button.setFixedSize(32, 32)
         self.title_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.title_close_button.setAccessibleName(ui_text(self.lang, "close"))
         self.title_close_button.clicked.connect(self.accept)
         header.addWidget(self.title_close_button, 0, 3)
         layout.addLayout(header)
@@ -4362,6 +5492,7 @@ class TranslationResultDialog(QDialog):
         self.status_label = QLabel(self)
         self.status_label.setObjectName("translationResultStatus")
         self.status_label.setTextFormat(Qt.PlainText)
+        self.status_label.linkActivated.connect(self._open_provider_settings)
         self.status_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         layout.addWidget(self.status_label)
 
@@ -4404,6 +5535,7 @@ class TranslationResultDialog(QDialog):
         self.target_combo.currentIndexChanged.connect(self._on_target_changed)
         self._retranslated_signal.connect(self._on_retranslated)
         self._partial_translation_signal.connect(self._on_partial_translation)
+        self._provider_unavailable_signal.connect(self._on_provider_unavailable)
         self.refresh_theme(theme)
         self._reflow_editors()
         self._refresh_scale_caption()
@@ -4418,10 +5550,22 @@ class TranslationResultDialog(QDialog):
         if initial_size is not None:
             self._resize_result_view(initial_size)
 
+        self._pending_outside_close = False
+        self._outside_close_ready_at = time.monotonic() + 0.25
+        self._outside_close_timer = QTimer(self)
+        self._outside_close_timer.setSingleShot(True)
+        self._outside_close_timer.setInterval(60)
+        self._outside_close_timer.timeout.connect(self._close_after_outside_click)
+        self._outside_close_filter = _ResultWindowOutsideCloseFilter(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self._outside_close_filter)
+
     def set_window_engine(self, engine):
         """Set an initial/followed provider without changing the app or sending text."""
-        self.window_engine = str(engine)
-        key = self.window_engine.lower().replace('hy-mt', 'hymt')
+        from provider_catalog import provider_id
+        key = provider_id(engine)
+        self.window_engine = next((name for known, name, _kind in TRANSLATION_PROVIDER_OPTIONS if known == key), str(engine))
         with QtCore.QSignalBlocker(self.engine_combo):
             index = self.engine_combo.findData(key)
             if index < 0:
@@ -4437,16 +5581,20 @@ class TranslationResultDialog(QDialog):
             'es': 'Proveedor solo para esta ventana. Los ajustes globales no cambian.',
             'fr': 'Fournisseur pour cette fenêtre uniquement. Les réglages globaux restent inchangés.',
             'zh': '仅更改此窗口的翻译引擎，不影响全局设置。',
+
+            'pt': 'Provedor apenas para esta janela. As configurações globais permanecem inalteradas.',
+            'it': 'Provider solo per questa finestra. Le impostazioni globali rimangono invariate.',
         }
         self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
 
     def _on_engine_changed(self, *_args):
+        from provider_catalog import provider_id
         key = self.engine_combo.currentData()
-        if not key or key == self.window_engine.lower().replace('hy-mt', 'hymt'):
+        if not key or key == provider_id(self.window_engine):
             return
         self._engine_override = True
         self._invalidate_request()
-        self.set_window_engine(self.engine_combo.currentText())
+        self.set_window_engine(key)
         self._start_retranslate()
 
     def _reflow_engine_header(self, available_width=None):
@@ -4647,15 +5795,32 @@ class TranslationResultDialog(QDialog):
         if hasattr(self, "status_label"):
             self._render_status()
 
-    def _set_status(self, message):
+    def _set_status(self, message, provider_issue=None):
+        self._provider_issue = provider_issue
         self._status_message = str(message)
         self._render_status()
 
     def _render_status(self):
+        issue = getattr(self, '_provider_issue', None)
+        if issue is not None:
+            from html import escape
+            from translation_availability import recovery_text
+            self.status_label.setTextFormat(Qt.RichText)
+            label = f'{"Argos" if issue.engine == "argos" else "Hy-MT"}: {recovery_text(self.lang, "install")}'
+            accent = '#c5b3df' if self.theme != 'Светлая' else '#74558f'
+            self.status_label.setText(f'<a href="install" style="color:{accent}">{escape(label)}</a>')
+            self.status_label.setAccessibleDescription(self._status_message)
+            self.status_label.setToolTip(tooltip_text(self._status_message))
+            return
+        self.status_label.setTextFormat(Qt.PlainText)
         line = " ".join(self._status_message.splitlines())
         self.status_label.setText(self.status_label.fontMetrics().elidedText(
             line, Qt.ElideRight, max(1, self.status_label.contentsRect().width())) if self.isVisible() else line)
         self.status_label.setToolTip(tooltip_text(self._status_message))
+
+    def _open_provider_settings(self, *_args):
+        engine = self.engine_combo.currentData() or self.window_engine
+        self._provider_settings_window = _open_translation_packages(self, engine, self.source_code, self.target_code)
 
     def _update_actions(self):
         draft = self.translated_text if getattr(self, '_translate_edited_result', False) and self.translated_text.strip() else self.source_text
@@ -4754,6 +5919,16 @@ class TranslationResultDialog(QDialog):
             self._translate_edited_result = False
         self._remember_language_pair()
         self._update_actions()
+        from translation_availability import missing_provider
+        engine = self.engine_combo.currentData() or self.window_engine
+        issue = missing_provider(engine, self.source_code, self.target_code)
+        if issue is not None:
+            self._set_status(issue.message(self.lang), provider_issue=issue)
+            chosen = _resolve_translation_provider(self, engine, self.source_code, self.target_code, self.lang)
+            if not chosen:
+                return
+            self._engine_override = True
+            self.set_window_engine(provider_display_name(chosen, self.lang))
         if not self.source_text.strip():
             self._set_status(self.text["source_placeholder"])
             return
@@ -4777,6 +5952,13 @@ class TranslationResultDialog(QDialog):
                 result = translate_text(source_text, source_code, target_code,
                                        engine=engine, cancel_callback=cancelled.is_set)
                 error = "" if str(result or "").strip() else error_label
+            except translater.OfflineProviderUnavailable as exc:
+                if not cancelled.is_set():
+                    try:
+                        self._provider_unavailable_signal.emit(request_id, exc.issue)
+                    except RuntimeError:
+                        pass
+                return
             except Exception as exc:
                 result, error = "", f"{error_label}: {exc}"
             if cancelled.is_set():
@@ -4790,6 +5972,24 @@ class TranslationResultDialog(QDialog):
             threading.Thread(target=worker, daemon=True).start()
         except Exception as exc:
             self._on_retranslated(request_id, "", f"{error_label}: {exc}")
+
+    @QtCore.pyqtSlot(int, object)
+    def _on_provider_unavailable(self, request_id, issue):
+        if self._closed or request_id != self._request_id or self._pending_request is None:
+            return
+        self._retranslating = False
+        self._pending_request = None
+        self._cancel_event = None
+        self._update_actions()
+        self._set_status(issue.message(self.lang), provider_issue=issue)
+        from translation_availability import offer_provider_recovery
+        chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.lang)
+        if chosen == 'install':
+            self._open_provider_settings()
+        elif chosen:
+            self._engine_override = True
+            self.set_window_engine(provider_display_name(chosen, self.lang))
+            self._start_retranslate()
 
     @QtCore.pyqtSlot(int, str, int, int)
     def _on_partial_translation(self, request_id, text, done, total):
@@ -4862,16 +6062,25 @@ class TranslationResultDialog(QDialog):
         self._set_status(self.text["copied"])
 
     def done(self, result):
+        self._closed = True
+        self._pending_outside_close = False
+        timer = getattr(self, "_outside_close_timer", None)
+        if timer is not None:
+            timer.stop()
+        app = QApplication.instance()
+        filter_obj = getattr(self, "_outside_close_filter", None)
+        if app is not None and filter_obj is not None:
+            app.removeEventFilter(filter_obj)
         try:
             self._save_mode_preferences()
         except (OSError, ValueError, RuntimeError):
             logging.getLogger('clickntranslate.result').exception('Could not save result-window preferences')
-        self._closed = True
         self._invalidate_request()
         super().done(result)
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._outside_close_ready_at = time.monotonic() + 0.25
         if not self._centered_once:
             self._centered_once = True
             self._center_on_parent()
@@ -4880,11 +6089,85 @@ class TranslationResultDialog(QDialog):
         QTimer.singleShot(0, self._render_status)
         QTimer.singleShot(0, self._restore_mode_view)
 
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+            return
+        if event.type() == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+
+    def event(self, event):
+        etype = event.type()
+        if etype == QtCore.QEvent.WindowActivate:
+            self._pending_outside_close = False
+        elif etype == QtCore.QEvent.WindowDeactivate:
+            self._schedule_outside_close()
+        return super().event(event)
+
+    def _outside_click_close_enabled(self):
+        return self._current_config().get("close_result_window_on_outside_click") is True
+
+    def _widget_belongs_to_result_window(self, widget):
+        current = widget
+        while current is not None:
+            if current is self:
+                return True
+            current = current.parentWidget()
+        try:
+            handle = widget.windowHandle() if widget is not None else None
+            ours = self.windowHandle()
+            if handle is not None and ours is not None and handle.transientParent() is ours:
+                return True
+        except RuntimeError:
+            return False
+        return False
+
+    def _has_owned_popup(self):
+        from PyQt5 import sip
+        app = QApplication.instance()
+        if app is None:
+            return False
+        installer = getattr(self, '_provider_settings_window', None)
+        if installer is not None and not sip.isdeleted(installer) and installer.isVisible():
+            return True
+        popup = app.activePopupWidget()
+        if popup is not None and popup is not self and self._widget_belongs_to_result_window(popup):
+            return True
+        modal = app.activeModalWidget()
+        if modal is not None and modal is not self and self._widget_belongs_to_result_window(modal):
+            return True
+        for combo in self.findChildren(QComboBox):
+            view = combo.view()
+            try:
+                if view is not None and view.isVisible() and view.window() is not self:
+                    return True
+            except RuntimeError:
+                continue
+        return False
+
+    def _schedule_outside_close(self):
+        if self._closed or not self.isVisible() or not self._outside_click_close_enabled():
+            return
+        if time.monotonic() < self._outside_close_ready_at:
+            return
+        self._pending_outside_close = True
+        self._outside_close_timer.start()
+
+    def _close_after_outside_click(self):
+        if self._closed or not self._pending_outside_close or not self.isVisible():
+            return
+        if not self._outside_click_close_enabled() or self._has_owned_popup():
+            self._pending_outside_close = False
+            return
+        self.accept()
+
     def refresh_theme(self, theme):
         self.theme = theme
         dark = theme != "Светлая"
         background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
         ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        font_px = translation_result_font_px(self._current_config())
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
             QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
@@ -4892,7 +6175,7 @@ class TranslationResultDialog(QDialog):
             QLabel#translationResultEngine, QLabel#translationResultStatus {{ color:{muted}; font-size:12px; }}
             QFrame#translationEditorPanel {{ background:{surface}; border:1px solid {edge}; border-radius:8px; }}
             QLabel#translationEditorCaption {{ color:{muted}; font-size:12px; font-weight:600; }}
-            QTextEdit {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:16px; selection-background-color:#7a5fa1; }}
+            QTextEdit#translationSourceText, QTextEdit#translationResultText {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:{font_px}px; selection-background-color:#7a5fa1; }}
             QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
             QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
@@ -5135,11 +6418,15 @@ class WelcomeDialog(QDialog):
         self.flag_button.setIcon(QIcon(resource_path(get_interface_language_option(self.lang)["icon"])))
         self.flag_button.setIconSize(QSize(24, 24))
         self.flag_button.setFixedSize(46, 38)
+        self.flag_button.setAccessibleName(ui_text(self.lang, "choose_interface_language"))
+        self.flag_button.setToolTip(tooltip_text(ui_text(self.lang, "choose_interface_language")))
         self.flag_button.clicked.connect(self.show_language_menu)
         top_row.addWidget(self.flag_button)
 
         close_x = QPushButton("×")
         close_x.setObjectName("welcomeClose")
+        close_x.setAccessibleName(ui_text(self.lang, "close"))
+        close_x.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         close_x.setFixedSize(38, 38)
         close_x.setStyleSheet("font-size: 22px; font-weight: 700;")
         close_x.clicked.connect(self.skip_guide)
@@ -5332,16 +6619,18 @@ class WelcomeDialog(QDialog):
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
         menu.ensurePolished()
         size = menu.sizeHint()
-        anchor = self.flag_button.mapToGlobal(self.flag_button.rect().bottomRight())
+        anchor = widget_global_point(self.flag_button, self.flag_button.rect().bottomRight())
         screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
         bounds = screen.availableGeometry()
         x = max(bounds.left(), min(anchor.x()-size.width()+1, bounds.right()-size.width()+1))
         y = anchor.y()+6
         if y+size.height() > bounds.bottom()+1:
-            y = self.flag_button.mapToGlobal(QtCore.QPoint()).y()-size.height()-6
+            y = widget_global_point(self.flag_button).y()-size.height()-6
         y = max(bounds.top(), min(y, bounds.bottom()-size.height()+1))
         menu.aboutToHide.connect(menu.deleteLater)
-        menu.popup(QtCore.QPoint(x, y))
+        position = QtCore.QPoint(x, y)
+        prepare_native_popup(menu, position)
+        menu.popup(position)
 
     def set_language(self, language_code):
         self.lang = normalize_interface_language(language_code)
@@ -5487,6 +6776,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_minimize_button.setObjectName("docWindowButton")
         self.doc_minimize_button.setText("−")
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
+        self.doc_minimize_button.setAccessibleName(ui_text(self.lang, "minimize"))
         self.doc_minimize_button.setFixedSize(34, 32)
         self.doc_minimize_button.clicked.connect(self.showMinimized)
         header_top.addWidget(self.doc_minimize_button, alignment=Qt.AlignVCenter)
@@ -5495,6 +6785,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.doc_close_button.setObjectName("docWindowClose")
         self.doc_close_button.setText("×")
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.doc_close_button.setAccessibleName(ui_text(self.lang, "close"))
         self.doc_close_button.setFixedSize(34, 32)
         self.doc_close_button.clicked.connect(self.close)
         header_top.addWidget(self.doc_close_button, alignment=Qt.AlignVCenter)
@@ -5516,6 +6807,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.language_arrow = LanguageSwapButton()
         self.language_arrow.setObjectName("docLanguageSwap")
         self.language_arrow.setFixedSize(34, 34)
+        self.language_arrow.setAccessibleName(hotkey_language_text(self.lang, "swap"))
         self.language_arrow.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
         )
@@ -5862,7 +7154,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.header_title.setText(doc_text(self.lang, "title"))
         self.doc_minimize_button.setToolTip(tooltip_text(ui_text(self.lang, "minimize")))
+        self.doc_minimize_button.setAccessibleName(ui_text(self.lang, "minimize"))
         self.doc_close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
+        self.doc_close_button.setAccessibleName(ui_text(self.lang, "close"))
+        self.language_arrow.setAccessibleName(hotkey_language_text(self.lang, "swap"))
+        self.language_arrow.setToolTip(tooltip_text(hotkey_language_text(self.lang, "swap")))
         self.attach_button.setText(doc_text(self.lang, "attach_file"))
         self.remove_button.setText(doc_text(self.lang, "remove_file"))
         self.translate_file_button.setText(doc_text(self.lang, "cancel_translation" if self.translation_running else "translate_file"))
@@ -6026,6 +7322,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         text = str(text or "").strip()
         if not text or self.translation_running:
             return
+        engine = self._provider_engine()
+        source = self._source_code()
+        target = self.target_combo.currentData() or get_cached_config().get('main_translation_target_language', 'ru')
+        chosen = _resolve_translation_provider(self, engine, source, target, self.lang)
+        if not chosen:
+            return
+        if chosen != engine:
+            self._populate_provider_combo(chosen)
+            self._refresh_document_provider_languages()
         self.translation_running = True
         notify_activity(self.parent_app, 'busy', f'document:{id(self)}')
         self._translation_cancel_event = threading.Event()
@@ -6238,6 +7543,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             for engine, _name, kind in TRANSLATION_PROVIDER_OPTIONS
             if kind == "online"
         }
+        from api_providers import configured_engines
+        available_engines.update(configured_engines(get_cached_config()))
         # Keep an explicitly selected offline engine even when its package was
         # removed. Reopening a local session must never select an online engine.
         if selected_engine in {engine for engine, _name, _kind in TRANSLATION_PROVIDER_OPTIONS}:
@@ -6256,7 +7563,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.provider_combo.blockSignals(True)
         self.provider_combo.clear()
         groups = PROVIDER_GROUP_TEXT.get(self.lang, PROVIDER_GROUP_TEXT["en"])
-        for kind in ("online", "offline"):
+        for kind in ("online", "offline", "api"):
             options = [
                 option
                 for option in TRANSLATION_PROVIDER_OPTIONS
@@ -6264,7 +7571,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             ]
             if not options:
                 continue
-            self.provider_combo.addItem(f"  {groups[kind]}", None)
+            self.provider_combo.addItem(f"  {groups.get(kind, 'API')}", None)
             self.provider_combo.set_group_header(self.provider_combo.count() - 1)
             for engine, _name, _kind in options:
                 self.provider_combo.addItem(provider_display_name(engine, self.lang), engine)
@@ -6274,6 +7581,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             selected_index = self.provider_combo.findData("google")
         self.provider_combo.setCurrentIndex(selected_index)
         self.provider_combo.blockSignals(False)
+        self._previous_document_provider = self._provider_engine()
 
     def _provider_engine(self):
         if hasattr(self, "provider_combo"):
@@ -6375,6 +7683,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._update_document_swap_button()
 
     def _on_document_provider_changed(self):
+        engine = self._provider_engine()
+        source = self.source_combo.currentData() or get_cached_config().get('main_translation_source_language', 'en')
+        target = self.target_combo.currentData() or get_cached_config().get('main_translation_target_language', 'ru')
+        chosen = _resolve_translation_provider(self, engine, source, target, self.lang)
+        if not chosen:
+            chosen = getattr(self, '_previous_document_provider', engine)
+        with QtCore.QSignalBlocker(self.provider_combo):
+            self.provider_combo.setCurrentIndex(self.provider_combo.findData(chosen))
+        self._previous_document_provider = chosen
         self._refresh_document_provider_languages()
 
     def _on_document_source_changed(self):
@@ -6742,6 +8059,48 @@ HOTKEY_LANGUAGE_TEXT = {
         "replace": "替换",
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
+
+    'pt': {'mode_direction': 'Idiomas para o modo selecionado',
+     'text_section': 'Tradução de texto',
+     'hotkey_section': 'Atalhos de teclado',
+     'title': 'Idiomas para atalhos',
+     'body': 'Cada atalho de tradução mantém seu próprio par de idiomas.',
+     'bar_hint': 'Idiomas de atalhos — escolha um modo e depois sua direção',
+     'bar_caption': 'Idiomas:',
+     'mode_language_heading': 'Idiomas de tradução por modo',
+     'mode': 'Ação',
+     'from': 'De',
+     'to': 'Para',
+     'swap': 'Trocar idiomas',
+     'done': 'Concluído',
+     'no_pairs': 'Nenhum par de idiomas pronto. Instale primeiro os pacotes OCR ou Argos necessários.',
+     'ocr': 'OCR',
+     'fullscreen': 'Tela',
+     'game': 'Dinâmico',
+     'selection': 'Seleção',
+     'replace': 'Substituir',
+     'hint': '{mode} · {hotkey}: {src} → {tgt} ▾'},
+    'it': {'mode_direction': 'Lingue per la modalità selezionata',
+     'text_section': 'Traduzione del testo',
+     'hotkey_section': 'Scorciatoie da tastiera',
+     'title': 'Lingue per le scorciatoie',
+     'body': 'Ogni scorciatoia di traduzione mantiene la propria coppia linguistica.',
+     'bar_hint': 'Lingue dele scorciatoie: scegli una modalità, quindi la sua direzione',
+     'bar_caption': 'Lingue:',
+     'mode_language_heading': 'Lingue di traduzione per modalità',
+     'mode': 'Azione',
+     'from': 'Da',
+     'to': 'A',
+     'swap': 'Scambiare le lingue',
+     'done': 'Fatto',
+     'no_pairs': 'Nessuna coppia linguistica pronta. Installare prima i pacchetti OCR o Argos '
+                 'richiesti.',
+     'ocr': 'OCR',
+     'fullscreen': 'Schermo',
+     'game': 'Dinamico',
+     'selection': 'Selezione',
+     'replace': 'Sostituisci',
+     'hint': '{mode} · {hotkey}: {src} → {tgt} ▾'},
 }
 
 
@@ -6808,6 +8167,28 @@ MAIN_HOTKEY_TOOLTIPS = {
         "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
         "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",
     },
+
+    'pt': {'copy': 'Selecione uma área da tela. OCR copia o texto reconhecido.',
+     'ocr': 'Selecione uma área da tela. OCR traduz com o par de idiomas deste modo.',
+     'fullscreen': 'Traduza blocos de texto visíveis em toda a tela com o par Tela.',
+     'game': 'Selecione o texto para ler e escolha onde exibir sua tradução ao vivo. Ajuste a saída e '
+             'salve os modelos. Pressione o atalho novamente para parar.',
+     'selection': 'Selecione o texto em outro aplicativo e traduza-o sem alterar o original.',
+     'replace': 'Selecione texto editável em outro aplicativo. A mesma seleção é substituída pela sua '
+                'tradução; se o foco for alterado, o resultado será apenas copiado.',
+     'toggle': 'Oculte o aplicativo em seu local anterior ou restaure-o na bandeja/barra de tarefas.'},
+    'it': {'copy': "Seleziona un'area dello schermo. L'OCR copia il testo riconosciuto.",
+     'ocr': "Seleziona un'area dello schermo. L'OCR lo traduce con la coppia linguistica di questa "
+            'modalità.',
+     'fullscreen': "Traduci i blocchi di testo visibili sull'intero schermo con la coppia di schermi.",
+     'game': 'Seleziona il testo da leggere, quindi scegli dove visualizzarne la traduzione in tempo '
+             "reale. Regola l'output e salva i modelli. Premi di nuovo la scorciatoia per "
+             'interrompere.',
+     'selection': "Seleziona il testo in un'altra app, quindi traducilo senza modificare l'originale.",
+     'replace': "Seleziona il testo modificabile in un'altra app. La stessa selezione è sostituita "
+                'dalla sua traduzione; se il focus è cambiato, il risultato viene solo copiato.',
+     'toggle': "Nascondi l'app nella posizione precedente o ripristinala dalla barra delle "
+               'applicazioni/barra delle applicazioni.'},
 }
 
 
@@ -6865,6 +8246,19 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
         "open": "打开设置",
         "cancel": "取消",
     },
+
+    'pt': {'title': 'Configurações de atalhos',
+     'edit_hint': 'Clique em qualquer lugar nesta linha para configurar o atalho.',
+     'set': 'Definir um atalho para “{action}” em Configurações?',
+     'change': 'Alterar o atalho “{action}” ({hotkey}) em Configurações?',
+     'open': 'Abrir configurações',
+     'cancel': 'Cancelar'},
+    'it': {'title': 'Impostazioni dele scorciatoie',
+     'edit_hint': 'Fare clic in un punto qualsiasi di questa riga per configurare la scorciatoia.',
+     'set': 'Impostare un scorciatoia per "{action}" in Impostazioni?',
+     'change': 'Modificare la scorciatoia "{action}" ({hotkey}) in Impostazioni?',
+     'open': 'Apri le impostazioni',
+     'cancel': 'Annulla'},
 }
 
 # Full action names share a line with their shortcuts in two aligned columns.
@@ -6875,6 +8269,23 @@ MAIN_HOTKEY_COMPACT_CAPTIONS = {
     "de": {"copy": "Text kopieren", "ocr": "Bereich übersetzen", "fullscreen": "Bildschirm übersetzen", "selection": "Auswahl übersetzen", "replace": "Auswahl ersetzen", "toggle": "Fenster ein- oder ausblenden", "game": "Dynamische Übersetzung", "recognition": "Texterkennung"},
     "fr": {"copy": "Copier le texte", "ocr": "Traduire une zone", "fullscreen": "Traduire l’écran", "selection": "Traduire la sélection", "replace": "Remplacer par la traduction", "toggle": "Afficher/masquer la fenêtre", "game": "Traduction dynamique", "recognition": "Reconnaissance"},
     "zh": {"copy": "复制文字", "ocr": "翻译屏幕区域", "fullscreen": "翻译整个屏幕", "selection": "翻译选中文字", "replace": "用译文替换选区", "toggle": "显示或隐藏窗口", "game": "动态翻译", "recognition": "文字识别"},
+
+    'pt': {'copy': 'Copiar texto',
+     'ocr': 'Traduzir área',
+     'fullscreen': 'Traduzir tela',
+     'selection': 'Traduzir seleção',
+     'replace': 'Substitua pela tradução',
+     'toggle': 'Mostrar ou ocultar janela',
+     'game': 'Tradução dinâmica',
+     'recognition': 'Reconhecimento de texto'},
+    'it': {'copy': 'Copia testo',
+     'ocr': 'Traduci area',
+     'fullscreen': 'Traduci schermo',
+     'selection': 'Traduci la selezione',
+     'replace': 'Sostituisci con la traduzione',
+     'toggle': 'Mostra o nascondi la finestra',
+     'game': 'Traduzione dinamica',
+     'recognition': 'Riconoscimento del testo'},
 }
 
 
@@ -6910,11 +8321,15 @@ class HotkeyReferenceRow(QPushButton):
                 row._pointer_inside = row is self
                 row.update()
         self._pointer_inside = True
+        from button_styles import set_pointer_hover
+        set_pointer_hover(self, True)
         self.update()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self._pointer_inside = False
+        from button_styles import set_pointer_hover
+        set_pointer_hover(self, False)
         self.update()
         super().leaveEvent(event)
 
@@ -6937,11 +8352,11 @@ class HotkeyReferenceRow(QPushButton):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        from ui_scaling import native_window_parent
+        from ui_scaling import native_window_parent, widget_global_rect
         owner = native_window_parent(self)
         if not owner.isActiveWindow():
             return
-        hovered = self._pointer_inside and self.rect().contains(self.mapFromGlobal(QtGui.QCursor.pos()))
+        hovered = bool(self.property('pointerHover')) and widget_global_rect(self).contains(QtGui.QCursor.pos())
         keyboard = self.hasFocus() and bool(self.property('keyboardFocus'))
         if hovered or keyboard:
             painter = QtGui.QPainter(self)
@@ -6996,6 +8411,8 @@ class HotkeyLanguageDialog(QDialog):
         title_row.addWidget(title, 1)
         close_button = QToolButton()
         close_button.setObjectName("hotkeyLanguageClose")
+        close_button.setAccessibleName(ui_text(self.lang, "close"))
+        close_button.setToolTip(tooltip_text(ui_text(self.lang, "close")))
         close_button.setText("×")
         close_button.setFixedSize(30, 30)
         close_button.clicked.connect(self.close)
@@ -7026,6 +8443,7 @@ class HotkeyLanguageDialog(QDialog):
         self.source_combo.setAccessibleName(hotkey_language_text(self.lang, "from"))
         self.swap_button = LanguageSwapButton()
         self.swap_button.setObjectName("hotkeyLanguageSwap")
+        self.swap_button.setAccessibleName(hotkey_language_text(self.lang, "swap"))
         self.swap_button.setFixedSize(38, 38)
         self.swap_button.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
@@ -7037,6 +8455,10 @@ class HotkeyLanguageDialog(QDialog):
         pair_row.addWidget(self.swap_button)
         pair_row.addWidget(self.target_combo, 1)
         layout.addLayout(pair_row)
+
+        from selection_options import SelectionTriggerControl
+        self.selection_trigger = SelectionTriggerControl(owner, root)
+        layout.addWidget(self.selection_trigger)
 
         self.status_label = QLabel("")
         self.status_label.setObjectName("hotkeyLanguageStatus")
@@ -7070,7 +8492,7 @@ class HotkeyLanguageDialog(QDialog):
 
         """ + standard_buttons(dark, compact=False))
         combo_style = modern_combo_style(dark, font_size=14)
-        for combo in (self.mode_combo, self.source_combo, self.target_combo):
+        for combo in (self.mode_combo, self.source_combo, self.target_combo, self.selection_trigger.combo):
             combo.setStyleSheet(combo_style)
             combo.setMinimumHeight(38)
 
@@ -7079,6 +8501,9 @@ class HotkeyLanguageDialog(QDialog):
 
     def _load_mode(self):
         mode = self.current_mode()
+        self.selection_trigger.setVisible(mode == 'selection')
+        self.setFixedHeight(302 if mode == 'selection' else 258)
+        self.findChild(QFrame, 'hotkeyLanguageCard').setGeometry(self.rect())
         pairs = self.owner._available_hotkey_translation_pairs(mode)
         source, target = self.owner._configured_hotkey_translation_pair(mode)
         source_codes = [
@@ -7177,6 +8602,26 @@ class HotkeyLanguageDialog(QDialog):
         super().closeEvent(event)
 
 
+def _atomic_page_change(method):
+    """Keep the previous frame visible until the next page has its final geometry."""
+    from functools import wraps
+
+    @wraps(method)
+    def change(self):
+        roots = list(dict.fromkeys((self, getattr(self, 'ui_root', self))))
+        frozen = [(widget, widget.updatesEnabled()) for widget in roots]
+        for widget, _ in frozen:
+            widget.setUpdatesEnabled(False)
+        try:
+            return method(self)
+        finally:
+            for widget, enabled in reversed(frozen):
+                widget.setUpdatesEnabled(enabled)
+                if enabled:
+                    widget.update()
+    return change
+
+
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str, str, str, str)
@@ -7185,14 +8630,19 @@ class DarkThemeApp(QMainWindow):
     _main_translation_done_signal = QtCore.pyqtSignal(str)
     _main_translation_error_signal = QtCore.pyqtSignal(str)
     _main_translation_partial_signal = QtCore.pyqtSignal(str, int, int)
+    _main_provider_unavailable_signal = QtCore.pyqtSignal(int, object)
     _argos_translation_cancelled_signal = QtCore.pyqtSignal()
     _launch_update_signal = QtCore.pyqtSignal(str)
     _copy_notification_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, *, background_services=True):
         from ui_scaling import configure_interface_style
         configure_interface_style()
         super().__init__()
+        self._background_services = bool(background_services)
+        if not self._background_services:
+            self.tray_available = False
+        services = self._background_services and not LAYOUT_EDITOR_MODE
         self._launch_update_signal.connect(self._on_launch_update_found)
         self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
@@ -7201,8 +8651,10 @@ class DarkThemeApp(QMainWindow):
         self._main_translation_done_signal.connect(self._on_main_translation_done)
         self._main_translation_error_signal.connect(self._on_main_translation_error)
         self._main_translation_partial_signal.connect(self._on_main_translation_partial)
+        self._main_provider_unavailable_signal.connect(self._on_main_provider_unavailable)
         self._argos_translation_cancelled_signal.connect(self._on_argos_translation_cancelled)
         self._main_translation_running = False
+        self._main_provider_request_id = 0
         self._argos_install_required = False
         self._argos_cancel_enabled = False
         self._argos_active_pair = ""
@@ -7230,8 +8682,10 @@ class DarkThemeApp(QMainWindow):
         self.ui_root = self._ui_scale_controller.canvas
 
         # Показать приветственное окно, если не отключено
+        update_restart = ('--show-after-update' in sys.argv or
+                          any(arg.startswith('--update-ack=') for arg in sys.argv[1:]))
         welcome_was_due = bool(
-            self.config.get("show_update_info", True) and not LAYOUT_EDITOR_MODE
+            self.config.get("show_update_info", True) and services and not update_restart
         )
         if welcome_was_due:
             dlg = WelcomeDialog(self)
@@ -7254,7 +8708,7 @@ class DarkThemeApp(QMainWindow):
         self.ui_root.setCentralWidget(self.central_widget)
         self.central_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.central_widget.customContextMenuRequested.connect(
-            lambda pos: self.show_main_context_menu(self.central_widget.mapToGlobal(pos))
+            lambda pos: self.show_main_context_menu(widget_global_point(self.central_widget, pos))
         )
         self.main_layout = QVBoxLayout()
         # 5px on every side put the content against the frame, and 45 left the
@@ -7293,9 +8747,10 @@ class DarkThemeApp(QMainWindow):
 
         self._ui_scale_controller.set_percent(self.config.get("ui_scale_percent", DEFAULT_SCALE))
 
-        if not LAYOUT_EDITOR_MODE:
+        if services:
             self.create_tray_icon()
             self._sync_desktop_assistant()
+            self._sync_selection_quick_translate()
         if os.environ.get("CLICKNTRANSLATE_PREVIEW_NOTIFICATION") == "1":
             # Developer/UI preview only: show the real notification without
             # changing the user's opt-in setting in config.json.
@@ -7306,13 +8761,13 @@ class DarkThemeApp(QMainWindow):
                     force=True,
                 ),
             )
-        if not welcome_was_due and not LAYOUT_EDITOR_MODE:
+        if not welcome_was_due and services and not update_restart:
             QTimer.singleShot(350, self._maybe_show_startup_news)
-        if not LAYOUT_EDITOR_MODE:
+        if services and not update_restart:
             QTimer.singleShot(700, self._maybe_start_first_run_guide)
         # Late enough that it never competes with start-up for the network or
         # the user's attention, and after the first-run guide has had its turn.
-        if not LAYOUT_EDITOR_MODE:
+        if services:
             QTimer.singleShot(9000, self._maybe_check_updates_on_launch)
 
         # Подписка на события хоткеев из потоков
@@ -7320,7 +8775,7 @@ class DarkThemeApp(QMainWindow):
             hotkey_dispatcher.triggered.connect(self._invoke_callback_safely)
         except Exception:
             pass
-        if getattr(self, "_autostart_sync_pending", False) and not LAYOUT_EDITOR_MODE:
+        if getattr(self, "_autostart_sync_pending", False) and services:
             QTimer.singleShot(0, self._start_deferred_autostart_sync)
 
         # Подписка на ошибки регистрации хоткеев
@@ -7335,14 +8790,14 @@ class DarkThemeApp(QMainWindow):
         # команды (clickntranslate --ocr и т.д.) в настройках своей среды —
         # см. single_instance.py.
         copy_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("copy_hotkey", "")
         )
         if copy_hotkey:
             self.copy_hotkey_thread = HotkeyListenerThread(copy_hotkey, self.launch_copy, hotkey_id=1)
             self.copy_hotkey_thread.start()
         translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_hotkey", "")
         )
         if translate_hotkey:
@@ -7350,7 +8805,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_hotkey_thread.start()
 
         fullscreen_translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("fullscreen_translate_hotkey", "")
         )
         if fullscreen_translate_hotkey:
@@ -7358,7 +8813,7 @@ class DarkThemeApp(QMainWindow):
             self.fullscreen_translate_hotkey_thread.start()
 
         translate_selection_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_selection_hotkey", "")
         )
         if translate_selection_hotkey:
@@ -7366,7 +8821,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_selection_hotkey_thread.start()
 
         translate_replace_selection_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("translate_replace_selection_hotkey", "")
         )
         if translate_replace_selection_hotkey:
@@ -7378,7 +8833,7 @@ class DarkThemeApp(QMainWindow):
             self.translate_replace_selection_hotkey_thread.start()
 
         toggle_window_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("toggle_window_hotkey", "")
         )
         if toggle_window_hotkey:
@@ -7390,7 +8845,7 @@ class DarkThemeApp(QMainWindow):
             self.toggle_window_hotkey_thread.start()
 
         game_translate_hotkey = (
-            "" if platform_support.IS_LINUX or LAYOUT_EDITOR_MODE
+            "" if platform_support.IS_LINUX or not services
             else self.config.get("game_translate_hotkey", "")
         )
         if game_translate_hotkey:
@@ -7442,7 +8897,10 @@ class DarkThemeApp(QMainWindow):
         self._autostart_sync_pending = bool(
             platform_support.IS_WINDOWS and not portable_paths.is_windows_packaged()
         )
-        if self._autostart_sync_pending:
+        if not getattr(self, '_background_services', True):
+            self._autostart_sync_pending = False
+            self.autostart = bool(stored_autostart)
+        elif self._autostart_sync_pending:
             # Reading a .lnk through WScript.Shell starts PowerShell.  Use the
             # persisted value for first paint and verify/repair the real
             # shortcut immediately afterwards without blocking the GUI.
@@ -7558,8 +9016,9 @@ class DarkThemeApp(QMainWindow):
             daemon=True,
         ).start()
 
-    def save_config(self):
-        self._capture_main_translation_languages()
+    def save_config(self, *, capture_languages=True):
+        if capture_languages:
+            self._capture_main_translation_languages()
         self.config["theme"] = self.current_theme
         self.config["interface_language"] = self.current_interface_language
         self.config["autostart"] = getattr(self, "autostart", False)
@@ -7600,6 +9059,44 @@ class DarkThemeApp(QMainWindow):
         page = getattr(settings, 'settings_assistant_page', None)
         if page is not None:
             page.refresh()
+
+    def ensure_mac_accessibility_for_selection(self):
+        if not platform_support.IS_MAC:
+            return True
+        from macos_desktop import ensure_permission
+
+        return ensure_permission("accessibility", self, self.current_interface_language)
+
+    def _sync_selection_quick_translate(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        enabled = self.config.get("selection_quick_translate_enabled") is True
+        mode = str(self.config.get("selection_quick_translate_mode") or "button")
+        if enabled and not LAYOUT_EDITOR_MODE:
+            if controller is None:
+                from selection_quick_translate import SelectionQuickTranslateController
+
+                self._selection_quick_translate = SelectionQuickTranslateController(self)
+                self._selection_quick_translate.translate_requested.connect(
+                    self.launch_translate_selection_from_quick_action
+                )
+                controller = self._selection_quick_translate
+            controller.configure(True, mode)
+        elif controller is not None:
+            controller.configure(False, mode)
+
+    def _apply_translation_result_font_size(self):
+        controller = getattr(self, "_selection_quick_translate", None)
+        clear = getattr(controller, "clear_auto_dedupe", None)
+        if callable(clear):
+            clear()
+        for dialog in _live_translation_result_dialogs():
+            try:
+                dialog.refresh_theme(dialog.theme)
+            except RuntimeError:
+                continue
+
+    def launch_translate_selection_from_quick_action(self, text):
+        self._launch_translate_selection(replace_selection=False, preloaded_text=str(text or ""))
 
     def set_desktop_assistant_enabled(self, enabled):
         self.config['desktop_assistant_enabled'] = bool(enabled)
@@ -7669,19 +9166,16 @@ class DarkThemeApp(QMainWindow):
         return pairs
 
     def _main_translation_source_codes(self):
-        pairs = self._available_main_translation_pairs()
-        return (['auto'] if any(source == 'auto' for source, _ in pairs) else []) + [
-            language.code
-            for language in APP_LANGUAGES
-            if any(source == language.code for source, _target in pairs)
-        ]
+        # Lists are linear in catalog size. Building every possible pair and
+        # scanning it for every source made larger catalogs noticeably stall.
+        return (['auto'] if supports_auto_source(self.config.get('translator_engine', 'Google')) else []) + [
+            language.code for language in APP_LANGUAGES]
 
     def _main_translation_target_codes(self, source_code):
-        pairs = self._available_main_translation_pairs()
         return [
             language.code
             for language in APP_LANGUAGES
-            if (source_code, language.code) in pairs
+            if language.code != source_code
         ]
 
     def _configured_main_translation_pair(self):
@@ -8045,7 +9539,7 @@ class DarkThemeApp(QMainWindow):
         self._hotkey_language_dialog = dialog
         anchor = getattr(self, "label", None)
         if anchor is not None:
-            point = anchor.mapToGlobal(
+            point = widget_global_point(anchor,
                 QtCore.QPoint((anchor.width() - dialog.width()) // 2, anchor.height() + 3)
             )
         else:
@@ -8364,7 +9858,8 @@ class DarkThemeApp(QMainWindow):
 
         self.close_button = QPushButton(self.ui_root)
         self.close_button.setText("×")
-        self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
+        self.close_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "close")))
+        self.close_button.setAccessibleName(ui_text(self.current_interface_language, "close"))
         self.close_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.close_button.clicked.connect(self.close)
 
@@ -8626,34 +10121,40 @@ class DarkThemeApp(QMainWindow):
             return
         lang = self.current_interface_language
 
-        box = QMessageBox(self)
-        box.setWindowTitle(update_text(lang, "launch_title"))
-        box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
-        box.setIcon(QMessageBox.Information)
-        box.setText(update_text(lang, "launch_prompt", latest=latest_version, current=APP_VERSION))
-        update_btn = box.addButton(update_text(lang, "launch_update"), QMessageBox.AcceptRole)
-        skip_btn = box.addButton(update_text(lang, "launch_skip"), QMessageBox.DestructiveRole)
-        later_btn = box.addButton(update_text(lang, "launch_later"), QMessageBox.RejectRole)
-        box.setDefaultButton(update_btn)
-        box.exec_()
-
-        clicked = box.clickedButton()
-        if clicked is skip_btn:
-            # Remembered, so this version is never offered again; a newer one
-            # still is.
+        # Keep the offer and subsequent download in the app's own viewport.
+        self.show_settings()
+        from inline_update import result, page
+        settings = self.settings_window
+        result(settings, update_text(lang, "launch_prompt", latest=latest_version, current=APP_VERSION),
+               update_text(lang, "launch_update"), settings.check_for_updates,
+               update_text(lang, "launch_later"), settings._leave_update_page)
+        panel = page(settings)
+        def skip():
             self.config["skipped_update_version"] = latest_version
             self.save_config()
-        elif clicked is update_btn:
-            self._start_update_from_launch_prompt()
-        elif clicked is later_btn:
-            pass  # asked again next start
+            settings._leave_update_page()
+        panel.extra.setText(update_text(lang, "launch_skip"))
+        panel.extra.clicked.connect(skip)
+        panel.extra.show()
+
+    def _show_pending_update_failure(self):
+        from pathlib import Path
+        path = Path(get_data_file("update-failure.txt"))
+        if not path.is_file():
+            return
+        try:
+            error = path.read_text(encoding="utf-8")[:4000]
+            path.unlink()
+        except OSError:
+            return
+        self.show_settings()
+        self.settings_window._on_update_failed(error)
 
     def _start_update_from_launch_prompt(self):
         if getattr(self, "settings_window", None) is None:
             self.show_settings()
         settings = getattr(self, "settings_window", None)
         if settings is None:
-            webbrowser.open(GITHUB_RELEASES_PAGE)
             return
         # The same download the Update button runs, so there is one code path
         # that fetches, verifies and applies a release.
@@ -8733,6 +10234,14 @@ class DarkThemeApp(QMainWindow):
             return getattr(settings_window, "translator_combo", None)
         if action == "result_window":
             return getattr(settings_window, "result_window_control", None)
+        if action == "result_text":
+            return getattr(settings_window, "translation_font_control", None)
+        if action == "result_behavior":
+            return getattr(settings_window, "close_result_on_outside_click_checkbox", None)
+        if action == "api_connections":
+            return getattr(settings_window, "ocr_languages_btn", None)
+        if action == "selection_behavior":
+            return getattr(settings_window, "hotkeys_button", None)
         if action == "language_packages":
             return getattr(settings_window, "ocr_languages_btn", None)
         if action == "hotkeys":
@@ -8778,13 +10287,20 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"ocr_engine", "translator", "result_window", "language_packages", "hotkeys"}:
+                if action in {"ocr_engine", "translator", "language_packages", "api_connections", "result_behavior"}:
+                    page = 1
+                elif action in {"hotkeys", "result_window", "result_text", "selection_behavior"}:
                     page = 0
                 elif action == "game_controls":
                     page = 2
                 if page is not None and settings._settings_page_index != page:
                     settings._set_settings_page(page)
                     changed = True
+            if not main_action and settings is not None:
+                target = self._guide_target_widget(action)
+                if target is not None:
+                    from settings_categories import reveal
+                    reveal(settings, target)
             self.main_layout.activate()
             if getattr(self, "settings_window", None) is not None:
                 self.settings_window.layout().activate()
@@ -9284,9 +10800,9 @@ class DarkThemeApp(QMainWindow):
         """Translate selected text and safely replace that exact selection on Windows."""
         return self._launch_translate_selection(replace_selection=True)
 
-    def _launch_translate_selection(self, replace_selection=False):
+    def _launch_translate_selection(self, replace_selection=False, preloaded_text=None):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
-        if platform_support.IS_MAC:
+        if platform_support.IS_MAC and not (preloaded_text and str(preloaded_text).strip()):
             from macos_desktop import ensure_permission
             if not ensure_permission("accessibility", self, self.current_interface_language):
                 return
@@ -9320,7 +10836,10 @@ class DarkThemeApp(QMainWindow):
                     platform_support.copy_text(clipboard_before_capture)
 
             try:
-                if platform_support.IS_LINUX:
+                preloaded = str(preloaded_text or "").strip()
+                if preloaded:
+                    text = preloaded
+                elif platform_support.IS_LINUX:
                     # X11 and Wayland keep the highlighted text in the PRIMARY
                     # selection, so it can be read directly — no key simulation,
                     # and nothing is written to the user's clipboard.
@@ -9335,6 +10854,10 @@ class DarkThemeApp(QMainWindow):
                     for vk in ((0x11, 0x12, 0x10, 0x5B, 0x5C) if platform_support.IS_WINDOWS else ()):
                         ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
                     time.sleep(0.35)
+                    if (replace_selection and self.config.get("replace_selection_select_all") is True):
+                        if not select_all_text_in_foreground(selection_window):
+                            return
+                        time.sleep(0.08)
                     # Clear clipboard, then Ctrl+C to capture selection
                     platform_support.copy_text("")
                     simulate_copy()
@@ -9342,11 +10865,14 @@ class DarkThemeApp(QMainWindow):
                     text = pyperclip.paste()
                 if not text or not text.strip():
                     time.sleep(0.3)
-                    text = (
-                        self._read_primary_selection()
-                        if platform_support.IS_LINUX
-                        else pyperclip.paste()
-                    )
+                    if preloaded:
+                        text = preloaded
+                    else:
+                        text = (
+                            self._read_primary_selection()
+                            if platform_support.IS_LINUX
+                            else pyperclip.paste()
+                        )
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")
@@ -9626,11 +11152,13 @@ class DarkThemeApp(QMainWindow):
             requested = normalize_ui_scale(self.config.get('ui_scale_percent', DEFAULT_SCALE))
             if controller.requested_percent != requested:
                 controller.set_percent(requested)
-        self._apply_main_combo_theme(is_dark)
-        self._apply_main_hotkey_theme()
-        # The theme decides the font, and the font decides how wide the mode
-        # picker has to be to show its longest entry.
-        self._fit_hotkey_mode_combo()
+        if self.settings_window is None:
+            self._apply_main_combo_theme(is_dark)
+            self._apply_main_hotkey_theme()
+            self._fit_hotkey_mode_combo()
+            self._main_controls_theme = self.current_theme
+        # Hidden home controls retain the theme they actually have. Refresh
+        # only if it differs when returning home (two toggles need no work).
         if hasattr(self, "title_bar"):
             header_bg = window_header_color(self.current_theme != "Светлая")
             self.title_bar.setStyleSheet(
@@ -9835,6 +11363,7 @@ class DarkThemeApp(QMainWindow):
             except RuntimeError:
                 self.document_button = None
 
+    @measure('ui.theme')
     def toggle_theme(self):
         # Apply the parent and every open child as one paint transaction.  Qt
         # otherwise exposes the parent with the new palette while cached child
@@ -9895,6 +11424,7 @@ class DarkThemeApp(QMainWindow):
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
         self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
+        self.flag_button.setAccessibleName(ui_text(self.current_interface_language, "choose_interface_language"))
 
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
@@ -9904,10 +11434,13 @@ class DarkThemeApp(QMainWindow):
             self.update_interface_language_button()
         if hasattr(self, "theme_button"):
             self.theme_button.setToolTip(tooltip_text(ui_text(lang, "theme")))
+            self.theme_button.setAccessibleName(ui_text(lang, "theme"))
         if hasattr(self, "minimize_button"):
             self.minimize_button.setToolTip(tooltip_text(ui_text(lang, "minimize")))
+            self.minimize_button.setAccessibleName(ui_text(lang, "minimize"))
         if hasattr(self, "help_button"):
             self.help_button.setToolTip(tooltip_text(ui_text(lang, "help")))
+            self.help_button.setAccessibleName(ui_text(lang, "help"))
         document_button = getattr(self, "document_button", None)
         if isinstance(document_button, QPushButton):
             try:
@@ -9918,8 +11451,10 @@ class DarkThemeApp(QMainWindow):
         if hasattr(self, "settings_button"):
             key = "back" if getattr(self, "settings_window", None) is not None else "settings"
             self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang][key]))
+            self.settings_button.setAccessibleName(INTERFACE_TEXT[lang][key])
         if hasattr(self, "close_button"):
-            self.close_button.setToolTip(tooltip_text(INTERFACE_TEXT[lang]["back"]))
+            self.close_button.setToolTip(tooltip_text(ui_text(lang, "close")))
+            self.close_button.setAccessibleName(ui_text(lang, "close"))
         if hasattr(self, "tray_icon"):
             self.update_tray_menu()
         if (
@@ -9959,7 +11494,11 @@ class DarkThemeApp(QMainWindow):
             selected = option["code"] == self.current_interface_language
             action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
-        menu.exec_(self.flag_button.mapToGlobal(self.flag_button.rect().bottomLeft()))
+        menu.ensurePolished()
+        position = widget_popup_geometry(self.flag_button, menu.sizeHint()).topLeft()
+        prepare_native_popup(menu, position)
+        menu.exec_(position)
+        menu.deleteLater()
         self._complete_guide_step("language")
 
     def set_interface_language(self, language_code):
@@ -10021,7 +11560,8 @@ class DarkThemeApp(QMainWindow):
         close.setObjectName('helpTitleClose')
         close.setText('×')
         close.setFixedSize(28, 28)
-        close.setAccessibleName(help_action_text(lang, 'close'))
+        close.setAccessibleName(ui_text(lang, 'close'))
+        close.setToolTip(tooltip_text(ui_text(lang, 'close')))
         close.setStyleSheet(button_qss(dark, 'close', 'QToolButton', icon=True))
         close.clicked.connect(dialog.accept)
         header.addWidget(close)
@@ -10067,17 +11607,43 @@ class DarkThemeApp(QMainWindow):
         self._complete_guide_step('help')
 
     def _create_bug_report(self, parent=None):
+        active = getattr(self, '_diagnostic_job', None)
+        if active is not None:
+            return active
+        from diagnostic_job import DiagnosticJob
+        job = DiagnosticJob(self, app_version=APP_VERSION,
+            data_dir=Path(get_data_file('config.json')).parent,
+            runtime=diagnostics.application_snapshot(self))
+        self._diagnostic_job = job
+        self._diagnostic_parent = parent
+        button = getattr(parent, 'create_bug_report_btn', None)
+        if button is not None:
+            button.setEnabled(False)
+        job.finished.connect(self._finish_bug_report)
+        job.start()
+        return job
+
+    def _finish_bug_report(self, report_path, error):
+        from PyQt5 import sip
+        job = getattr(self, '_diagnostic_job', None)
+        self._diagnostic_job = None
+        if job is not None:
+            job.deleteLater()
+        parent = getattr(self, '_diagnostic_parent', None)
+        self._diagnostic_parent = None
+        if parent is not None and sip.isdeleted(parent):
+            parent = None
+        button = getattr(parent, 'create_bug_report_btn', None)
+        if button is not None and not sip.isdeleted(button):
+            button.setEnabled(True)
         lang = self.current_interface_language
-        try:
-            report_path = diagnostics.create_bug_report(app_version=APP_VERSION)
-        except Exception as error:
-            logging.exception("Could not create the user diagnostic report")
+        if error:
             QMessageBox.warning(
                 parent or self,
                 help_action_text(lang, "report"),
                 help_action_text(lang, "report_failed").format(error=error),
             )
-            return None
+            return
 
         try:
             if platform_support.IS_WINDOWS:
@@ -10131,6 +11697,7 @@ class DarkThemeApp(QMainWindow):
     def set_settings_button_to_home(self):
         self.settings_button.setIcon(header_icon('home', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['back']))
+        self.settings_button.setAccessibleName(INTERFACE_TEXT[self.current_interface_language]['back'])
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -10140,6 +11707,7 @@ class DarkThemeApp(QMainWindow):
     def set_settings_button_to_settings(self):
         self.settings_button.setIcon(header_icon('settings', self.current_theme))
         self.settings_button.setToolTip(tooltip_text(INTERFACE_TEXT[self.current_interface_language]['settings']))
+        self.settings_button.setAccessibleName(INTERFACE_TEXT[self.current_interface_language]['settings'])
         try:
             self.settings_button.clicked.disconnect()
         except Exception:
@@ -10161,6 +11729,7 @@ class DarkThemeApp(QMainWindow):
             sequence = QtGui.QKeySequence(sequence).toString(QtGui.QKeySequence.NativeText)
         pair = HotkeyReferenceRow()
         pair.setObjectName("mainHotkeyPair")
+        pair.setStyleSheet('QPushButton#mainHotkeyPair { background:transparent; border:0; padding:0; }')
         pair.setAccessibleName(f"{caption}: {sequence}")
         layout = QHBoxLayout(pair)
         # QFontMetrics.horizontalAdvance excludes a glyph's anti-aliased edge
@@ -10255,7 +11824,11 @@ class DarkThemeApp(QMainWindow):
                 """)
             except RuntimeError:
                 area = None
-        for pair in getattr(self, "main_hotkey_references", {}).values():
+        pairs = list(getattr(self, "main_hotkey_references", {}).values())
+        preview = getattr(self, 'assistant_preview', None)
+        if preview is not None:
+            pairs.append(preview.button)
+        for pair in pairs:
             try:
                 pair.setStyleSheet(f"""
                     QPushButton#mainHotkeyPair {{ background:transparent; border:none;
@@ -10345,6 +11918,25 @@ class DarkThemeApp(QMainWindow):
         self._open_hotkey_setting(config_key)
         return True
 
+    def _offer_mascot_settings(self):
+        from assistant_text import assistant_text
+        lang = self.current_interface_language
+        box = QMessageBox(self)
+        box.setWindowTitle(assistant_text(lang, 'companion_section'))
+        box.setWindowIcon(QIcon(resource_path('icons/icon.ico')))
+        box.setIcon(QMessageBox.Question)
+        box.setText(assistant_text(lang, 'preview_settings_question'))
+        open_button = box.addButton(assistant_text(lang, 'preview_open_settings'), QMessageBox.AcceptRole)
+        box.addButton(hotkey_settings_prompt_text(lang, 'cancel'), QMessageBox.RejectRole)
+        box.setDefaultButton(open_button)
+        box.exec_()
+        accepted = box.clickedButton() is open_button
+        box.deleteLater()
+        if accepted:
+            self.activateWindow()
+            self.show_desktop_assistant_settings()
+        return accepted
+
     def _open_hotkey_setting(self, config_key):
         self.show_settings()
         settings = getattr(self, "settings_window", None)
@@ -10371,15 +11963,64 @@ class DarkThemeApp(QMainWindow):
                 + pair.trailing_glyph_room
             )
 
+    def _main_page_signature(self):
+        from PyQt5 import sip
+        composer = getattr(self, 'main_composer', None)
+        minimum = composer.minimumSize() if composer is not None and not sip.isdeleted(composer) else None
+        # History, startup flags and scale do not change the home widget tree.
+        # Serializing every preference used to rebuild the page after editing
+        # any setting, including a theme that can be applied to existing items.
+        keys = (
+            'ocr_engine', 'translator_engine', 'api_providers',
+            'copy_hotkey', 'translate_hotkey', 'fullscreen_translate_hotkey',
+            'game_translate_hotkey', 'translate_selection_hotkey',
+            'translate_replace_selection_hotkey', 'toggle_window_hotkey',
+            'main_assistant_visible', 'desktop_assistant_mascot', 'desktop_assistant_reactions',
+            'hotkey_language_editor_mode', 'main_translation_source_language',
+            'main_translation_target_language', 'ocr_translate_source_language',
+            'ocr_translate_target_language', 'fullscreen_translate_from', 'fullscreen_translate_to',
+            'selection_translate_source_language', 'selection_translate_target_language',
+            'replace_selection_source_language', 'replace_selection_target_language',
+            'game_translate_source_language', 'game_translate_target_language',
+        )
+        state = {key: self.config.get(key) for key in keys}
+        return (self.current_interface_language,
+                json.dumps(state, sort_keys=True, ensure_ascii=False, default=str), minimum)
+
+    @_atomic_page_change
+    @measure('ui.home')
     def show_main_screen(self):
         active_settings = getattr(self, "settings_window", None)
         if active_settings is not None:
             self._cached_settings_window = active_settings
-        self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
+        from PyQt5 import sip
+        cached = getattr(self, '_main_page_widgets', ())
+        reuse = (bool(cached) and all(not sip.isdeleted(widget) for widget in cached)
+                 and getattr(self, '_main_page_key', None) == self._main_page_signature())
+        preserved = ((active_settings,) if active_settings is not None else ()) + (cached if reuse else ())
+        self.clear_layout(preserve_widgets=preserved)
+        if cached and not reuse:
+            for widget in cached:
+                if not sip.isdeleted(widget):
+                    widget.hide()
+                    widget.deleteLater()
+            self._main_page_widgets = ()
         self.main_layout.setContentsMargins(14, 48, 14, 14)
         self.main_layout.setSpacing(8)
         self.settings_window = None
         self.set_settings_button_to_settings()
+        if reuse:
+            for widget in cached:
+                self.main_layout.addWidget(widget)
+                widget.show()
+            if getattr(self, '_main_controls_theme', None) != self.current_theme:
+                self._apply_main_combo_theme(self.current_theme != 'Светлая')
+                self._apply_main_hotkey_theme()
+                self._fit_hotkey_mode_combo()
+                self._main_controls_theme = self.current_theme
+            self._ui_scale_controller.refresh()
+            self._complete_guide_step("back_home")
+            return
 
         # Read both passive engine names once.  They belong in the quiet status
         # column used by the original compact main page, not in another card.
@@ -10388,7 +12029,7 @@ class DarkThemeApp(QMainWindow):
         ocr_engine = cached_config.get(
             "ocr_engine", platform_support.default_ocr_engine()
         )
-        
+
         self.main_text_section = QFrame()
         self.main_text_section.setObjectName("mainTextSection")
         text_section_layout = QVBoxLayout(self.main_text_section)
@@ -10474,6 +12115,7 @@ class DarkThemeApp(QMainWindow):
             combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.hotkey_language_swap = LanguageSwapButton()
         self.hotkey_language_swap.setObjectName("hotkeyLanguageBarSwap")
+        self.hotkey_language_swap.setAccessibleName(hotkey_language_text(self.current_interface_language, "swap"))
         self.hotkey_language_swap.setFixedSize(30, 30)
         self.hotkey_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
@@ -10489,6 +12131,12 @@ class DarkThemeApp(QMainWindow):
         self.source_lang.addItems(LANGUAGES[self.current_interface_language])
         self.target_lang = DropDownCombo()
         self.target_lang.setMaxVisibleItems(9)
+        for combo, key in ((self.source_lang, 'source_language'),
+                           (self.target_lang, 'target_language'),
+                           (self.hotkey_source_combo, 'source_language'),
+                           (self.hotkey_target_combo, 'target_language')):
+            combo.setToolTip(tooltip_text(control_hint(self.current_interface_language, key)))
+            combo.setAccessibleName(control_hint(self.current_interface_language, key))
         self._apply_main_combo_theme(self.current_theme == "Темная")
         # Side by side with an arrow between them, so it reads as one direction
         # rather than two unrelated drop-downs — and it costs one row instead of
@@ -10498,6 +12146,7 @@ class DarkThemeApp(QMainWindow):
         language_picker_layout.setSpacing(6)
         self.main_language_swap = LanguageSwapButton()
         self.main_language_swap.setObjectName("mainLanguageSwap")
+        self.main_language_swap.setAccessibleName(hotkey_language_text(self.current_interface_language, "swap"))
         self.main_language_swap.setFixedSize(30, 30)
         self.main_language_swap.setToolTip(
             tooltip_text(hotkey_language_text(self.current_interface_language, "swap"))
@@ -10857,9 +12506,10 @@ class DarkThemeApp(QMainWindow):
         self.main_hotkey_slot_order = list(slot_order)
         from assistant_preview import AssistantPreview
         self.assistant_preview = AssistantPreview(self, lang, self.main_hotkey_area)
-        self.assistant_preview.settings_requested.connect(self.show_desktop_assistant_settings)
+        self.assistant_preview.settings_requested.connect(self._offer_mascot_settings)
         self.assistant_preview.dismiss_requested.connect(lambda: self.set_main_assistant_visible(False))
         preview_slot = slot_order.index(None)
+        self.assistant_preview.button.setProperty('lastShortcutRow', preview_slot // 2 == 3)
         hotkey_grid.addWidget(self.assistant_preview, preview_slot // 2, preview_slot % 2)
         self.assistant_preview.setVisible(self.config.get('main_assistant_visible', True) is True)
         for slot, key in enumerate(slot_order):
@@ -10893,6 +12543,7 @@ class DarkThemeApp(QMainWindow):
         # Secondary: it sends the window away, which is not what someone opening
         # this window came to do. It used to be the only filled button here.
         self.start_button.setObjectName("mainShadowButton")
+        self.start_button.setToolTip(tooltip_text(control_hint(self.current_interface_language, 'shadow_mode')))
         footer_layout.addWidget(self.start_button, 0, 1)
         ocr_summary.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         footer_layout.addWidget(ocr_summary, 0, 2)
@@ -10907,6 +12558,9 @@ class DarkThemeApp(QMainWindow):
         self._apply_main_hotkey_theme()
         self._ui_scale_controller.refresh()
         self._complete_guide_step("back_home")
+        self._main_controls_theme = self.current_theme
+        self._main_page_widgets = (self.main_text_section, self.main_shortcut_section, self.main_footer)
+        self._main_page_key = self._main_page_signature()
 
     def _fit_hotkey_mode_combo(self):
         """Measure full mode names before dividing the remaining language space."""
@@ -10928,19 +12582,14 @@ class DarkThemeApp(QMainWindow):
 
     def show_desktop_assistant_settings(self):
         self.show_assistant_settings()
-        checkbox = self.settings_window.desktop_assistant_checkbox
-        checkbox.setFocus(Qt.OtherFocusReason)
-        # Focus the actual setting; do not enable an overlay just by visiting.
-        page = checkbox.parentWidget()
-        while page is not None:
-            if isinstance(page, QtWidgets.QScrollArea):
-                page.ensureWidgetVisible(checkbox)
-                break
-            page = page.parentWidget()
+        self.settings_window.settings_assistant_page.mascot_preview.next_button.setFocus(Qt.OtherFocusReason)
 
+    @_atomic_page_change
+    @measure('ui.settings')
     def show_settings(self):
         active_settings = getattr(self, "settings_window", None)
-        self.clear_layout(preserve_widgets=(active_settings,) if active_settings else ())
+        preserved = ((active_settings,) if active_settings is not None else ()) + getattr(self, '_main_page_widgets', ())
+        self.clear_layout(preserve_widgets=preserved)
         # Derive the attachment edge from the actual title bar. The settings
         # layout owns the shelf and the pages beneath it; nothing overlays them.
         self.main_layout.setContentsMargins(14, self.title_bar.geometry().bottom() + 1, 14, 14)
@@ -11256,14 +12905,24 @@ class DarkThemeApp(QMainWindow):
         menu = QMenu(self)
         self._apply_main_context_menu_style(menu)
         self._add_document_context_actions(menu)
+        prepare_native_popup(menu, global_pos)
         menu.exec_(global_pos)
+        menu.deleteLater()
 
     def _show_text_input_context_menu(self, pos):
-        menu = self.text_input.createStandardContextMenu()
+        standard_menu = self.text_input.createStandardContextMenu()
+        # Borrow the editor's standard actions in a native menu. Reparenting
+        # its original menu leaves Qt's automatic child proxy attached.
+        menu = QMenu(self)
+        menu.addActions(standard_menu.actions())
         menu.addSeparator()
         self._add_document_context_actions(menu)
         self._apply_main_context_menu_style(menu)
-        menu.exec_(self.text_input.mapToGlobal(pos))
+        position = widget_global_point(self.text_input, pos)
+        prepare_native_popup(menu, position)
+        menu.exec_(position)
+        menu.deleteLater()
+        standard_menu.deleteLater()
 
     def _choose_document_from_main(self, initial_dir=""):
         path, _ = QFileDialog.getOpenFileName(
@@ -11384,11 +13043,21 @@ class DarkThemeApp(QMainWindow):
         dialog.exec_()
 
     def closeEvent(self, event):
+        settings = getattr(self, 'settings_window', None) or getattr(self, '_cached_settings_window', None)
+        if (not getattr(self, 'force_quit', False) and settings is not None
+                and getattr(settings, '_update_in_progress', False)):
+            event.ignore()
+            settings._handle_update_progress_close_attempt()
+            return
         if not self.force_quit and self.has_tray():
             # Сворачиваем в трей вместо закрытия
             event.ignore()
             self.minimize_to_tray()
             # Опционально: показать уведомление при первом сворачивании (можно добавить позже)
+            return
+        if not getattr(self, '_background_services', True):
+            self.save_config()
+            super().closeEvent(event)
             return
         if not self.force_quit and not self.has_tray():
             # Без трея прятать окно некуда: закрытие означает выход, иначе
@@ -11472,13 +13141,31 @@ class DarkThemeApp(QMainWindow):
         # Return from the Qt callback so exec_() can finish the normal cleanup.
 
     def _confirm_argos_package_install(self, pair_label):
-        dialog = ArgosPackageInstallDialog(
-            self,
-            pair_label,
-            lang=self.current_interface_language,
-            theme=self.current_theme,
-        )
-        return dialog.exec_() == QDialog.Accepted
+        from translation_availability import MissingProvider, offer_provider_recovery
+        source, target = (part.strip().lower() for part in pair_label.split('→'))
+        choice = offer_provider_recovery(self, MissingProvider('argos', source, target),
+                                         TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language,
+                                         allow_download=True)
+        if choice == 'download':
+            return True
+        if choice == 'install':
+            _open_translation_packages(self, 'argos', source, target)
+        elif choice:
+            self._set_translation_provider(choice)
+            self.translate_input_text()
+        return False
+
+    def _set_translation_provider(self, engine):
+        self.config['translator_engine'] = engine
+        self.save_config()
+        invalidate_config_cache()
+        panel = getattr(self, 'main_engine_status_panel', None)
+        summary = panel.findChild(QLabel, 'mainTranslatorSummary') if panel is not None else None
+        if summary is not None:
+            summary.setText(f'{ui_text(self.current_interface_language, "translator")}: {provider_display_name(engine, self.current_interface_language)}')
+        settings = getattr(self, '_cached_settings_window', None)
+        if settings is not None:
+            settings._set_translator_combo_silently(engine)
 
     def _show_argos_progress(self, text, percent=0, determinate=False):
         if self._argos_progress is None:
@@ -11630,9 +13317,18 @@ class DarkThemeApp(QMainWindow):
     def _start_main_translation(self, text, source_code, target_code, engine, package_installed=True):
         if self._main_translation_running:
             return
+        if engine != 'argos':
+            chosen = _resolve_translation_provider(self, engine, source_code, target_code, self.current_interface_language)
+            if not chosen:
+                return
+            if chosen != engine:
+                self._set_translation_provider(chosen)
+                engine = chosen
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
 
         self._main_translation_running = True
+        self._main_provider_request_id = getattr(self, '_main_provider_request_id', 0) + 1
+        provider_request_id = self._main_provider_request_id
         notify_activity(self, 'busy')
         self._argos_install_required = not package_installed
         self._argos_cancel_enabled = not package_installed
@@ -11668,6 +13364,8 @@ class DarkThemeApp(QMainWindow):
                 self._main_translation_done_signal.emit(str(translated_text or ""))
             except (translater.ArgosInstallCancelledError, translater.TranslationCancelledError):
                 self._argos_translation_cancelled_signal.emit()
+            except translater.OfflineProviderUnavailable as exc:
+                self._main_provider_unavailable_signal.emit(provider_request_id, exc.issue)
             except Exception as exc:
                 logging.getLogger("clickntranslate.translation").exception(
                     "%s translation failed for %s", engine, pair_label
@@ -11704,6 +13402,19 @@ class DarkThemeApp(QMainWindow):
             source_lang=source_code,
             target_lang=target_code,
         )
+
+    @QtCore.pyqtSlot(int, object)
+    def _on_main_provider_unavailable(self, request_id, issue):
+        if not self._main_translation_running or request_id != self._main_provider_request_id:
+            return
+        self._finish_main_translation_state(error=issue.message(self.current_interface_language))
+        from translation_availability import offer_provider_recovery
+        chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language)
+        if chosen == 'install':
+            _open_translation_packages(self, issue.engine, issue.source, issue.target)
+        elif chosen:
+            self._set_translation_provider(chosen)
+            self.translate_input_text()
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_error(self, error_text):
@@ -12025,6 +13736,8 @@ if __name__ == "__main__":
     # После обновления главное окно всегда показывается: пользователь должен
     # сразу увидеть, что запущена новая версия, даже если обычно стартует в трее.
     show_after_update = "--show-after-update" in sys.argv or _show_after_instance_replacement
+    if "--show-after-update" in sys.argv:
+        QTimer.singleShot(1500, window._show_pending_update_failure)
     if LAYOUT_EDITOR_MODE:
         window.show()
         from layout_editor import start_layout_editor

@@ -1,9 +1,12 @@
 """Open the full source application for hands-on mascot review.
 
 Run: .venv/Scripts/python.exe tools/run_mascot_app.py
-Uses its own persistent profile in .tmp/mascot-app. The existing developer UI
-mode keeps global hotkeys, startup dialogs and autostart sync out of this copy.
-Translation buttons, settings and the desktop companion are real app widgets.
+Add --general-settings to open the general settings page for UI review.
+Add --translation-settings to open Translation and OCR preferences.
+Add --main to open the main window and its mascot shortcut.
+Uses its own persistent profile in .tmp/mascot-app. Translation, optional quick
+selection and global hotkeys are active. Startup announcements, tray creation
+and OS autostart changes are disabled for this review copy.
 """
 from pathlib import Path
 import json
@@ -27,16 +30,16 @@ def run():
     from assistant_text import assistant_text
     from PyQt5 import QtCore
 
-    main.LAYOUT_EDITOR_MODE = True
+    main.LAYOUT_EDITOR_MODE = False
     config_path = PROFILE / 'data/config.json'
     if not config_path.exists():
         config = dict(main.DEFAULT_CONFIG,
                       interface_language='ru',
                       desktop_assistant_enabled=True,
-                      desktop_assistant_mascot='pancake',
-                      desktop_assistant_appearance='walking',
-                      desktop_assistant_behavior='walk',
-                      desktop_assistant_reactions=False,
+                      desktop_assistant_mascot='click',
+                      desktop_assistant_appearance='animated',
+                      desktop_assistant_behavior='idle',
+                      desktop_assistant_reactions=True,
                       desktop_assistant_position={'screen': '', 'x': .55, 'y': .85},
                       show_update_info=False, update_check_on_launch=False,
                       first_run_guide_completed=True, first_run_guide_pending=False,
@@ -46,6 +49,18 @@ def run():
     main.invalidate_config_cache()
 
     class MascotApp(main.DarkThemeApp):
+        def create_tray_icon(self):
+            pass
+
+        def _maybe_show_startup_news(self):
+            pass
+
+        def _maybe_start_first_run_guide(self):
+            pass
+
+        def _maybe_check_updates_on_launch(self):
+            pass
+
         def sync_autostart_state(self, repair_stale=False):
             return False
 
@@ -57,10 +72,18 @@ def run():
     app.setQuitOnLastWindowClosed(True)
     window = MascotApp()
     main._main_window_ref = window
-    window.setWindowTitle(f"Click'n'Translate 1.8.2 — Python · {assistant_text('ru', 'orbit')} v17")
+    window.setWindowTitle(f"Click'n'Translate {main.APP_VERSION} — Python · Pets v18")
     window._sync_desktop_assistant()
     window.show()
-    window.show_assistant_settings()
+    if '--main' in sys.argv:
+        window.show_main_screen()
+    elif '--general-settings' in sys.argv:
+        window.show_settings()
+    elif '--translation-settings' in sys.argv:
+        window.show_settings()
+        window.settings_window._set_settings_page(1)
+    else:
+        window.show_assistant_settings()
     window.raise_()
     window.activateWindow()
 

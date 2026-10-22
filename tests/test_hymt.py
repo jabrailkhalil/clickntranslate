@@ -7,6 +7,7 @@ import zipfile
 import io
 import tarfile
 from types import SimpleNamespace
+from pathlib import Path
 from unittest import mock
 
 import cache_manager
@@ -149,10 +150,13 @@ class TestHyMTTranslatorHelpers(unittest.TestCase):
                 stderr="",
             )
 
-        runtime = {"model": "model.gguf", "runner": "llama-cli.exe"}
-        with mock.patch.object(translater, "_get_hymt_runtime", return_value=runtime):
-            with mock.patch.object(translater.subprocess, "run", side_effect=fake_run):
-                result = translater.hymt_translate(prompt_text, "ru", "en")
+        with tempfile.TemporaryDirectory() as root:
+            runtime = {"model": os.path.join(root, "model.gguf"), "runner": os.path.join(root, "llama-cli.exe")}
+            for path in runtime.values():
+                Path(path).write_text('fixture', encoding='utf-8')
+            with mock.patch.object(translater, "_get_hymt_runtime", return_value=runtime):
+                with mock.patch.object(translater.subprocess, "run", side_effect=fake_run):
+                    result = translater.hymt_translate(prompt_text, "ru", "en")
 
         self.assertEqual(result, "Hello, world!")
         self.assertIn(prompt_text, captured["prompt"])

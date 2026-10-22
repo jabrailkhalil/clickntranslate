@@ -46,12 +46,15 @@ def test_animation_and_capture_lifecycle_do_not_leave_the_companion_in_ocr(compa
     companion.refresh()
     assert not companion.anchor.grab().isNull()
     assert companion.anchor.isVisible()
-    assert not companion.anchor._animation.isActive()
+    assert companion.anchor._animation.isActive()
+    position = companion.anchor.pos()
+    companion.anchor._advance(.1)
+    assert companion.anchor.pos() == position
     companion.request_action('walk')
     assert companion.anchor._animation.isActive()
     companion.toggle_menu()
     assert companion.menu.isVisible()
-    assert not companion.anchor._animation.isActive()
+    assert companion.anchor._animation.isActive()
     mode_coordinator.request_mode('capture:translate', lambda: None)
     # Synchronous: already hidden when request_mode returns to the grabber.
     assert not companion.anchor.isVisible()
@@ -124,7 +127,7 @@ def test_theme_and_language_change_replace_the_menu_immediately(companion):
     companion.refresh()
     assert not old_menu.isVisible()
     companion.toggle_menu()
-    assert companion.menu.windowTitle() == assistant_text('de', 'translation_section')
+    assert companion.menu.windowTitle() == assistant_text('de', 'quick_actions')
     assert companion.menu._background.name() == '#f0edf3'
     assert not companion.anchor.dark
 
@@ -221,7 +224,7 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
                 required = label.heightForWidth(label.width())
                 assert required <= label.height(), (language, key, label.text(), required, label.height())
             assert button.width() > 0
-        assert set(menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'hide'}
+        assert set(menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'settings', 'hide'}
         assert not menu.findChildren(QtWidgets.QScrollArea)
         assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()
@@ -279,3 +282,58 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
         assert len(mode_coordinator._listeners) == listeners
     QTest.qWait(220)
     owner.launch_fullscreen_translate.assert_not_called()
+
+
+def test_click_greets_and_opens_actions_without_a_manual_emotion_picker(companion, app):
+    companion.anchor.move(250, 80)
+    QTest.mouseClick(companion.anchor, QtCore.Qt.LeftButton, pos=QtCore.QPoint(42, 42))
+    assert companion.menu.isVisible()
+    assert companion.anchor.motion.action() == 'wave'
+    assert companion.anchor._animation.isActive()
+    assert companion.menu.y() > companion.anchor.geometry().bottom()
+    assert not companion.menu.findChildren(QtWidgets.QComboBox)
+    for _ in range(10): companion.anchor._advance(.2)
+    assert companion.anchor.motion.action() == 'waiting'
+    companion.menu.hide()
+    assert companion.anchor.motion.action() == 'idle'
+
+def test_translation_events_automatically_drive_the_pet_and_popup_status(companion):
+    from assistant_motion import notify_activity
+    companion.owner._desktop_assistant = companion
+    companion.toggle_menu()
+    notify_activity(companion.owner, 'busy')
+    assert companion.menu.activity_label.text() == assistant_text('ru', 'activity_busy')
+    assert companion.anchor.motion.action() == 'work'
+    notify_activity(companion.owner, 'success')
+    assert companion.anchor.motion.action() == 'success'
+    for _ in range(5): companion.anchor._advance(.2)
+    assert companion.anchor.motion.action() == 'review'
+    notify_activity(companion.owner, 'error')
+    assert companion.anchor.motion.action() == 'error'
+
+@pytest.mark.parametrize('appearance', ['portrait', 'waiting'])
+def test_static_native_pose_reacts_once_to_click_and_then_returns_to_its_pose(companion, appearance):
+    companion.owner.config['desktop_assistant_appearance'] = appearance
+    companion.refresh()
+    assert not companion.anchor._animation.isActive()
+    before = companion.anchor.grab().toImage()
+    companion.toggle_menu()
+    assert companion.anchor.motion.action() == 'wave'
+    assert companion.anchor._animation.isActive()
+    for _ in range(10): companion.anchor._advance(.2)
+    assert not companion.anchor._animation.isActive()
+    assert companion.anchor.grab().toImage() == before
+    companion.menu.hide()
+    companion.toggle_menu()
+    assert companion.anchor._animation.isActive()
+
+
+
+def test_return_home_action_triggers_a_native_jump_without_exposing_emotion_controls(companion):
+    companion.request_action('home')
+    assert companion.anchor.motion.action() == 'success'
+    assert companion.anchor._animation.isActive()
+    position = companion.anchor.pos()
+    for _ in range(10): companion.anchor._advance(.2)
+    assert companion.anchor.pos() == position
+    assert companion.anchor.motion.action() == 'idle'

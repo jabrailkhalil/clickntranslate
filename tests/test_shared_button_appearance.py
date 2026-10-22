@@ -175,3 +175,64 @@ def test_destructive_confirmation_keeps_its_role_when_default(app, theme):
     finally:
         box.close()
         owner.close()
+
+
+@pytest.mark.parametrize('dark', [True, False])
+def test_blank_click_commits_number_draft_clears_selection_and_keyboard_arrow_focus(app, dark):
+    from number_controls import NumberStepper
+    owner = QWidget()
+    owner.resize(300, 130)
+    field = NumberStepper(owner, dark=dark)
+    field.setRange(40, 100)
+    field.setSuffix('%')
+    field.setValue(100)
+    field.setGeometry(10, 10, 180, 28)
+    try:
+        owner.show()
+        app.processEvents()
+        editor = field.lineEdit()
+        QTest.mouseClick(editor, Qt.LeftButton)
+        editor.selectAll()
+        QTest.keyClicks(editor, '77')
+        assert editor.text().startswith('77')
+        assert field.value() == 100
+        QTest.mouseClick(owner, Qt.LeftButton, pos=QPoint(250, 100))
+        app.processEvents()
+        assert field.value() == 77
+        assert not editor.hasSelectedText()
+        assert not editor.hasFocus() and not field.editor.hasFocus()
+        field.decrease.setFocus(Qt.TabFocusReason)
+        app.processEvents()
+        assert field.decrease.property('keyboardFocus')
+        QTest.mouseClick(owner, Qt.LeftButton, pos=QPoint(250, 100))
+        assert not field.decrease.hasFocus()
+        assert not field.decrease.property('keyboardFocus')
+    finally:
+        owner.close()
+        owner.deleteLater()
+
+
+def test_blank_click_clears_text_selection_but_copy_button_can_still_read_it(app):
+    from PyQt5.QtWidgets import QTextEdit
+    owner = QWidget()
+    owner.resize(320, 180)
+    editor = QTextEdit(owner)
+    editor.setGeometry(10, 10, 200, 90)
+    editor.setPlainText('Selected text')
+    copy = QPushButton('Copy', owner)
+    copy.setGeometry(220, 10, 80, 28)
+    copy.setFocusPolicy(Qt.NoFocus)
+    copy.setStyleSheet(button_qss(True))
+    selected = []
+    copy.clicked.connect(lambda: selected.append(editor.textCursor().selectedText()))
+    try:
+        owner.show()
+        editor.setFocus()
+        editor.selectAll()
+        QTest.mouseClick(copy, Qt.LeftButton)
+        assert selected == ['Selected text']
+        QTest.mouseClick(owner, Qt.LeftButton, pos=QPoint(280, 150))
+        assert not editor.textCursor().hasSelection()
+    finally:
+        owner.close()
+        owner.deleteLater()

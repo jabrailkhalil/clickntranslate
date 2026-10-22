@@ -546,13 +546,12 @@ class MainWindowGeometryTest(unittest.TestCase):
                     for info in panel.overlay._detached_buttons.values()
                 }
                 self.assertTrue({
-                    "export_settings_btn",
-                    "import_settings_btn",
-                    "create_bug_report_btn",
-                    "update_check_on_launch_checkbox",
+                    "ocr_engine_combo", "translator_combo",
+                    "copy_notification_checkbox",
+                    "close_result_on_outside_click_checkbox",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
-                self.assertNotIn("ocr_engine_combo", detached_keys)
+                self.assertNotIn("export_settings_btn", detached_keys)
                 self.assertTrue(
                     any(
                         target["id"] == "settings-actions"
@@ -802,18 +801,19 @@ class MainWindowGeometryTest(unittest.TestCase):
                 index,
             )
 
-    def test_the_shortcut_legend_keeps_seven_actions_in_two_columns(self):
+    def test_the_shortcut_legend_keeps_seven_actions_and_mascot_in_two_columns(self):
         """Every action is visible in four aligned rows, without card frames."""
         chips = self.window.ui_root.findChildren(QWidget, "mainHotkeyPair")
-        # All seven registered actions are listed, including Gaming.
-        self.assertEqual(len(chips), 7)
+        # The seven shortcuts and the mascot use the same row component.
+        self.assertEqual(len(chips), 8)
         self.assertTrue(all(chip.toolTip() for chip in chips))
         self.assertIn(self.window.replace_hotkey_reference, chips)
         self.assertEqual(
             set(self.window.main_hotkey_references),
             {"copy", "ocr", "fullscreen", "game", "selection", "replace", "toggle"},
         )
-        self.assertEqual(set(self.window.main_hotkey_references.values()), set(chips))
+        self.assertEqual(set(self.window.main_hotkey_references.values()),
+                         set(chips) - {self.window.assistant_preview.button})
         rows = {chip.mapTo(self.window.ui_root, chip.rect().topLeft()).y() for chip in chips}
         self.assertEqual(len(rows), 4)
         refs = self.window.main_hotkey_references

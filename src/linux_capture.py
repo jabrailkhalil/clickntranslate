@@ -3,7 +3,7 @@
 On X11 Qt can grab the root window directly, which is what the Windows build
 does too. Wayland forbids that: a client may not read the screen, so the capture
 has to go through the desktop portal (or a compositor helper the user already
-trusts). This mirrors how Flameshot and NormCap handle Wayland.
+trusts).
 
 Order of preference on Wayland:
 

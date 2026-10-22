@@ -9,6 +9,7 @@ import game_mode
 import platform_support
 from button_styles import button_qss
 from number_controls import NumberStepper
+from settings_window import DropDownCombo
 from dynamic_templates import TemplateStore, decode_rect, encode_rect, output_style, text
 from windows_overlay import configure_surface, rounded_region, set_surface_region
 
@@ -58,12 +59,13 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self.step_label.setWordWrap(True)
         self.step_label.setStyleSheet(f'font-size:{round(15*factor)}px; font-weight:600;')
         heading.addWidget(self.step_label, 1)
-        close = QtWidgets.QPushButton('×')
-        close.setFixedSize(round(28*factor), round(28*factor))
-        close.setAccessibleName(game_mode.game_text(self._language, 'close'))
-        close.setStyleSheet(button_qss(dark, 'close', icon=True))
-        close.clicked.connect(self.close)
-        heading.addWidget(close)
+        self.cancel_button = QtWidgets.QPushButton('×')
+        self.cancel_button.setFixedSize(round(28*factor), round(28*factor))
+        self.cancel_button.setAccessibleName(game_mode.game_text(self._language, 'cancel_selection'))
+        self.cancel_button.setToolTip(self.cancel_button.accessibleName())
+        self.cancel_button.setStyleSheet(button_qss(dark, 'close', icon=True))
+        self.cancel_button.clicked.connect(self.close)
+        heading.addWidget(self.cancel_button)
         layout.addLayout(heading)
         self.selection_controls = QtWidgets.QGridLayout()
         self.selection_controls.setSpacing(round(6*factor))
@@ -74,9 +76,10 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             widget.show()
         layout.addLayout(self.selection_controls)
         self._manual_output = bool(self._config.get('game_manual_output', False))
-        self.template_combo = QtWidgets.QComboBox()
+        self.template_combo = DropDownCombo()
         self.template_combo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
         self.template_combo.setAccessibleName(text(self._language, 'choose_template'))
+        self.template_combo.setToolTip(text(self._language, 'choose_template'))
         self.template_combo.setMinimumHeight(round(28*factor))
         self.template_combo.activated.connect(self._load_template)
         layout.addWidget(self.template_combo)
@@ -94,6 +97,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
     def _layout_controls(self):
         if not hasattr(self, 'toolbar'):
             return super()._layout_controls()
+        self.undo_button.ensurePolished()
+        self.undo_button.setFixedWidth(max(self.undo_button.width(), self.undo_button.sizeHint().width()))
         monitor = self._screen.geometry().translated(-self.geometry().topLeft())
         factor = float(self.property('ui_effective_scale') or 1.0)
         self.toolbar.setFixedWidth(min(round(640*factor), monitor.width()-24))
@@ -525,8 +530,14 @@ class OutputControls(QtWidgets.QFrame):
         header.addWidget(self.direction, 1)
         self.gear = QtWidgets.QPushButton(text(self.language, 'parameters'))
         self.gear.setCheckable(True)
+        self.gear.setToolTip(text(self.language, 'settings'))
+        self.gear.setAccessibleName(text(self.language, 'parameters'))
         self.pause_button = QtWidgets.QPushButton(game_mode.game_text(self.language, 'pause'))
+        self.pause_button.setToolTip(game_mode.game_text(self.language, 'pause'))
+        self.pause_button.setAccessibleName(self.pause_button.toolTip())
         self.stop_button = QtWidgets.QPushButton(game_mode.game_text(self.language, 'stop'))
+        self.stop_button.setToolTip(game_mode.game_text(self.language, 'close'))
+        self.stop_button.setAccessibleName(self.stop_button.toolTip())
         for button in (self.gear, self.pause_button, self.stop_button):
             button.setFixedHeight(30)
             button.setStyleSheet(button_qss(dark, 'quiet' if button is self.gear else 'secondary', compact=True))
@@ -536,7 +547,7 @@ class OutputControls(QtWidgets.QFrame):
         form = QtWidgets.QVBoxLayout(self.panel)
         form.setContentsMargins(0, 2, 0, 0)
         form.setSpacing(8)
-        self.output_combo = QtWidgets.QComboBox()
+        self.output_combo = DropDownCombo()
         self.output_combo.setMinimumHeight(28)
         self.output_combo.setAccessibleName(text(self.language, 'output_choice'))
         form.addWidget(self.output_combo)
@@ -566,6 +577,7 @@ class OutputControls(QtWidgets.QFrame):
         self.resize_button = QtWidgets.QPushButton(text(self.language, 'resize_short'))
         for button, key in ((self.move_button, 'move'), (self.resize_button, 'resize')):
             button.setToolTip(text(self.language, key))
+            button.setAccessibleName(button.toolTip())
             button.setFixedHeight(28)
             button.setStyleSheet(button_qss(dark, compact=True))
             button.installEventFilter(self)
@@ -576,8 +588,10 @@ class OutputControls(QtWidgets.QFrame):
         form.addWidget(template_label)
         templates = QtWidgets.QHBoxLayout()
         templates.setSpacing(6)
-        self.template_name = QtWidgets.QComboBox()
+        self.template_name = DropDownCombo()
         self.template_name.setEditable(True)
+        self.template_name.setToolTip(text(self.language, 'templates'))
+        self.template_name.setAccessibleName(text(self.language, 'templates'))
         self.template_name.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         self.template_name.lineEdit().setMaxLength(80)
         self.template_name.lineEdit().setPlaceholderText(text(self.language, 'templates'))
@@ -586,6 +600,8 @@ class OutputControls(QtWidgets.QFrame):
         self.template_name.setFixedHeight(30)
         templates.addWidget(self.template_name, 1)
         self.save_button = QtWidgets.QPushButton(text(self.language, 'save_short'))
+        self.save_button.setToolTip(text(self.language, 'save'))
+        self.save_button.setAccessibleName(text(self.language, 'save'))
         self.save_button.setStyleSheet(button_qss(dark, 'primary', compact=True))
         self.save_button.setFixedHeight(30)
         templates.addWidget(self.save_button)
@@ -714,6 +730,8 @@ class OutputControls(QtWidgets.QFrame):
             if item.paused != paused:
                 item._toggle_pause()
         self.pause_button.setText(game_mode.game_text(self.language, 'resume' if paused else 'pause'))
+        self.pause_button.setToolTip(self.pause_button.text())
+        self.pause_button.setAccessibleName(self.pause_button.text())
         self._resize_panel()
 
     def _lock_changed(self, locked):

@@ -5,7 +5,44 @@ import os
 import platform
 from pathlib import Path
 import tempfile
+import sys
 from unittest import mock
+
+
+def package_preview(owner):
+    """Render installed-package controls without starting catalogs or probes."""
+    from settings_window import OcrLanguageManagerDialog
+
+    dialog = OcrLanguageManagerDialog(owner)
+    dialog._initial_probe_timer.stop()
+    dialog._initial_catalog_timer.stop()
+    return dialog
+
+
+def api_keychain_check():
+    """Test only a unique disposable QA item, never the user's API credentials."""
+    import uuid
+    import provider_secrets as vault
+    if sys.platform == 'darwin':
+        # A missing frozen backend is a packaging failure, not a locked vault.
+        from keyring.backends.macOS import Keyring
+    previous = vault._SERVICE
+    vault._SERVICE = 'ClicknTranslate.QA'
+    provider, endpoint = 'qa-' + uuid.uuid4().hex, 'https://qa.invalid'
+    account = vault.account(provider, endpoint)
+    persisted = False
+    try:
+        persisted = vault.set_key(provider, endpoint, 'temporary-qa-value')
+        vault._SESSION.pop(account, None)
+        reread = vault.get_key(provider, endpoint) == 'temporary-qa-value'
+        assert not persisted or reread, 'Keychain did not return the written QA item'
+    finally:
+        removed = vault.set_key(provider, endpoint, '')
+        vault._SESSION.pop(account, None)
+        vault._SERVICE = previous
+    assert not persisted or removed, 'Could not remove the disposable QA item'
+    return {'storage': 'keychain' if persisted else 'session', 'persisted': persisted,
+            'read_back': reread, 'removed': removed}
 
 
 def hotkey_dispatch_check():
@@ -154,8 +191,7 @@ def dialog_placement_check(main, app, window, report_path, screenshots):
                         bounds.top() + min(90, max(0, bounds.height() - window.height())))
             window.show_settings()
             owner = window.settings_window
-            with mock.patch.object(QtCore.QTimer, 'singleShot'):
-                packages = settings.OcrLanguageManagerDialog(owner)
+            packages = package_preview(owner)
             dialogs = [
                 ('packages', packages), ('update', settings.UpdateProgressDialog(owner)),
                 ('install', settings.TesseractInstallProgressDialog(owner)),
@@ -319,7 +355,9 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
             window.show_settings()
             settings = window.settings_window
             settings._set_settings_page(0)
-            for key in ('ocr_engine_combo', 'translator_combo', 'result_window_control'):
+            inspect(settings.result_window_control, prefix + '-settings-result_window_control', percent, actual)
+            settings._set_settings_page(1)
+            for key in ('ocr_engine_combo', 'translator_combo'):
                 inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
             settings._set_settings_page(2)
             for key in ('game_source_combo', 'game_target_combo'):
@@ -364,7 +402,8 @@ def extended_screenshots(main, app, window, report_path, screenshots):
         expected = 'Темная' if theme == 'dark' else 'Светлая'
         if window.current_theme != expected:
             window.toggle_theme()
-        for language in ('en', 'ru', 'de', 'es', 'fr', 'zh'):
+        for option in main.INTERFACE_LANGUAGE_OPTIONS:
+            language = option['code']
             window.set_interface_language(language)
             for percent in (80, 100, 125, 150, 200):
                 window.set_ui_scale_percent(percent)
@@ -372,7 +411,7 @@ def extended_screenshots(main, app, window, report_path, screenshots):
                 window.show_main_screen()
                 capture(window, prefix + '-main', percent)
                 window.show_settings()
-                for page in range(3):
+                for page in range(window.settings_window.settings_pages.count()):
                     window.settings_window._set_settings_page(page)
                     capture(window, prefix + f'-settings{page}', percent)
             if language not in ('en', 'ru'):
@@ -383,8 +422,7 @@ def extended_screenshots(main, app, window, report_path, screenshots):
             # Render package pages without starting network catalogs or
             # optional-engine probes. Their actual runtimes are tested below
             # and by the separate native installation checks.
-            with mock.patch.object(QtCore.QTimer, 'singleShot'):
-                packages = OcrLanguageManagerDialog(settings)
+            packages = package_preview(settings)
             packages.show()
             for section, tabs in enumerate((packages.ocr_tabs, packages.translation_tabs)):
                 packages.tabs.setCurrentIndex(section)
@@ -727,6 +765,24 @@ def run(main, report_path):
             direction_theme_results = main_direction_and_theme_check(main, app, window)
             capture_notice_results = capture_picker_and_notice_check(main, app, window, report_path, screenshots)
             compact_translation_results = compact_translation_views_check(main, app, window, report_path, screenshots)
+            window.show_settings()
+            from provider_settings import show_provider_settings
+            import settings_window
+            with (mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'),
+                  mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'),
+                  mock.patch('provider_secrets.get_key', return_value='')):
+                show_provider_settings(window.settings_window)
+                for _ in range(5):
+                    app.processEvents()
+                api_page = window.settings_window.api_connections_page
+                assert api_page.key.isVisible() and api_page.model.isVisible()
+                api_picture = report_path.with_name(report_path.stem + '-api-connections.png')
+                api_surface = api_page.window()
+                assert api_surface.grab().save(str(api_picture))
+            screenshots.append({'file': api_picture.name, 'requested_percent': window.config.get('ui_scale_percent'),
+                                'width': api_surface.width(), 'height': api_surface.height()})
+            api_surface.close()
+            keychain_results = api_keychain_check()
             hotkey = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
             try:
                 duplicate = registry().register("Ctrl+Alt+Shift+F19", lambda: None)
@@ -763,6 +819,7 @@ def run(main, report_path):
                 "main_direction_and_theme": direction_theme_results,
                 "capture_picker_and_notice": capture_notice_results,
                 "compact_translation_views": compact_translation_results,
+                "api_connections": "ok", "api_keychain": keychain_results,
             }, indent=2), encoding="utf-8")
             window.force_quit = True
             window.close()
