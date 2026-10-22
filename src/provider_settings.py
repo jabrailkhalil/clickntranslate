@@ -37,6 +37,45 @@ _TEXT = {
         '密钥仅保存于本次会话。系统密钥库不可用，重启后需要重新输入。',
         '在翻译或 OCR 列表中选择服务。一次请求模式使用此模型翻译所选图像，不再调用其他翻译服务。密钥保存在系统密钥库中，不会导出。服务可能按请求收费。',
         '已保存密钥；留空保留', '输入服务的 API 密钥'),
+
+    'pt': ('Conexões de API',
+     'Serviço:',
+     'Endereço da API:',
+     'Chave de API:',
+     'Modelo:',
+     'Modelo aceita imagens',
+     'Reconheça e traduza em uma solicitação',
+     'Salvar',
+     'Voltar',
+     'Excluir chave',
+     'Salvo',
+     'Salvo para esta sessão. O cofre de chaves do sistema não está disponível; digite a chave '
+     'novamente após reiniciar.',
+     'A tradução utiliza o serviço selecionado. Para OCR, escolha este serviço na lista de OCR. O modo '
+     'de solicitação única traduz a imagem selecionada com este modelo e ignora o tradutor separado. '
+     'As chaves permanecem no cofre do sistema e são excluídas das exportações. O uso da API pode ser '
+     'cobrado pelo serviço.',
+     'Chave salva; deixe em branco para mantê-la',
+     'Insira a chave da API do serviço'),
+    'it': ('Connessioni API',
+     'Servizio:',
+     "Indirizzo dell'API:",
+     'Chiave API:',
+     'Modello:',
+     'Il modello accetta immagini',
+     'Riconoscere e tradurre in una sola richiesta',
+     'Salva',
+     'Indietro',
+     'Cancella chiave',
+     'Salvato',
+     "Salvato per questa sessione. L'insieme di credenziali delle chiavi di sistema non è disponibile; "
+     'immettere nuovamente la chiave dopo il riavvio.',
+     "La traduzione utilizza il servizio selezionato. Per OCR, scegli questo servizio nell'elenco OCR. "
+     "La modalità a richiesta singola traduce l'immagine selezionata con questo modello e salta il "
+     'traduttore separato. Le chiavi rimangono nel caveau del sistema e sono escluse dalle '
+     "esportazioni. L'utilizzo dell'API può essere fatturato dal servizio.",
+     'Chiave salvata; lascia vuoto per conservarla',
+     'Inserisci la chiave API del servizio'),
 }
 
 
@@ -67,12 +106,19 @@ def refresh_provider_routing(settings):
         'de': 'Bilder: {provider} · {model}. Eine Anfrage; der separate Übersetzer wird nur für Text verwendet.',
         'fr': 'Images : {provider} · {model}. Une requête ; le traducteur séparé sert uniquement au texte.',
         'zh': '图像：{provider} · {model}。一次请求；单独的翻译服务仅用于普通文本。',
+
+        'pt': 'Imagens: {provider} · {model}. Um pedido; o tradutor separado é usado apenas para texto simples.',
+        'it': ('Immagini: {provider} · {model}. Una richiesta; il traduttore separato viene utilizzato solo per '
+         'il testo semplice.'),
     }
     description = text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else ''
     captions = {
         'ru': ('Один API: ', 'API изображений: '), 'en': ('One API: ', 'Image API: '),
         'es': ('Una API: ', 'API de imagen: '), 'de': ('Eine API: ', 'Bild-API: '),
         'fr': ('Une API : ', 'API d’image : '), 'zh': ('统一 API：', '图像 API：'),
+
+        'pt': ('Uma API: ', 'API de imagem: '),
+        'it': ("Un'API: ", 'API immagine: '),
     }
     import html
     note.setText(captions.get(lang,captions['en'])[0 if shared else 1] +
@@ -94,6 +140,27 @@ EXTRA = {
  'de': ('Modus:', 'Nur Textübersetzung', 'Texterkennung (OCR)', 'Erkennen und übersetzen', 'Speichern und wählen', 'Dienst einrichten und für Übersetzung und OCR auswählen.', 'Für Übersetzung ausgewählt.', 'Für Übersetzung und OCR ausgewählt.', 'Geben Sie eine Modell-ID ein.', 'API'),
  'fr': ('Mode :', 'Traduction de texte seule', 'Reconnaissance de texte (OCR)', 'Reconnaissance et traduction', 'Enregistrer et choisir', 'Configurez un service, puis sélectionnez-le pour la traduction et l’OCR.', 'Choisi pour la traduction.', 'Choisi pour la traduction et l’OCR.', 'Saisissez un identifiant de modèle.', 'API'),
  'zh': ('模式：', '仅翻译文字', '文字识别 (OCR)', '识别并翻译', '保存并选用', '配置服务，然后将其用于翻译和 OCR。', '已选择用于翻译。', '已选择用于翻译和 OCR。', '请输入模型 ID。', 'API'),
+
+    'pt': ('Modo:',
+     'Apenas tradução de texto',
+     'Reconhecimento de texto (OCR)',
+     'Reconhecimento e tradução',
+     'Salvar e selecionar',
+     'Configure um serviço e selecione-o para tradução e OCR.',
+     'Selecionado para tradução.',
+     'Selecionado para tradução e OCR.',
+     'Insira um ID de modelo no campo Modelo.',
+     'API'),
+    'it': ('Modalità:',
+     'Solo traduzione del testo',
+     'Riconoscimento del testo (OCR)',
+     'Riconoscimento e traduzione',
+     'Salva e seleziona',
+     "Configura un servizio, quindi selezionalo per la traduzione e l'OCR.",
+     'Selezionato per la traduzione.',
+     'Selezionato per traduzione e OCR.',
+     'Immettere un ID modello nel campo Modello.',
+     'API'),
 }
 
 
@@ -149,7 +216,11 @@ class ProviderSettingsPage(QWidget):
         self.key.setEchoMode(QLineEdit.Password)
         self.key.setClearButtonEnabled(True)
         self.address.setPlaceholderText('https://…/v1')
-        self.model.setPlaceholderText('Model ID')
+        model_placeholder = {
+            'en': 'Model ID', 'ru': 'ID модели', 'es': 'ID del modelo', 'de': 'Modell-ID',
+            'fr': 'ID du modèle', 'zh': '模型 ID', 'pt': 'ID do modelo', 'it': 'ID del modello',
+        }
+        self.model.setPlaceholderText(model_placeholder.get(self.lang,model_placeholder['en']))
         self.labels = []
         for name, widget in (('service', self.service), ('address', self.address), ('key', self.key), ('model', self.model)):
             widget.setMinimumHeight(32)
@@ -264,7 +335,9 @@ class ProviderSettingsPage(QWidget):
             if spec.protocol not in {'deepl', 'libre'} and not item['model']:
                 raise ProviderError(connection_text(self.lang, 8))
         except ProviderError as error:
-            self.status.setText(str(error))
+            from api_providers import display_error
+            self.status.setText(str(error) if str(error) == connection_text(self.lang, 8)
+                                else display_error(error, self.lang))
             return False
         persisted = True
         if item['key']:

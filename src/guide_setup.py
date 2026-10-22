@@ -18,6 +18,17 @@ GUIDE_SETUP_INTRO = {
     "de": ("Übersetzung für Ihren Alltag", "Zuerst Autostart und Infobereich, dann Übersetzung, Aufnahme und Tastenkürzel. Jeder Schritt erklärt den Nutzen und bietet die passende Aktion. Empfehlungen lassen sich überspringen.", "App einrichten"),
     "fr": ("Configurez votre traducteur", "D’abord le démarrage automatique et la zone de notification, puis la traduction, la capture et les raccourcis. Chaque étape explique son intérêt et permet d’appliquer le réglage. Vous pouvez reporter chaque conseil.", "Configurer l’application"),
     "zh": ("让翻译更适合你", "先设置自动启动和托盘，再配置翻译、屏幕截取及快捷键。每一步都会说明用途，并提供直接应用设置的按钮。任何建议都可以稍后再处理。", "设置应用"),
+
+    'pt': ('Configure a tradução para você',
+     'Comece pelo início automático e pela bandeja. Depois configure a tradução, a captura e os '
+     'atalhos. Cada etapa explica a opção e permite aplicá-la. Você pode deixar qualquer recomendação '
+     'para depois.',
+     'Configure o aplicativo'),
+    'it': ('Configura la traduzione per te',
+     'Inizia dall’avvio automatico e dall’area di notifica, poi configura traduzione, acquisizione e '
+     'scorciatoie. Ogni passaggio spiega un’opzione e permette di applicarla. Puoi rimandare qualsiasi '
+     'consiglio.',
+     "Configura l'app"),
 }
 
 GUIDE_LINUX_BODIES = {
@@ -57,6 +68,27 @@ GUIDE_LINUX_BODIES = {
         "shortcut_replace": "自动替换选中文字目前仅支持 Windows。在 Linux 中，请先翻译所选文字，再手动粘贴结果。",
         "ocr_engine": "Linux 支持 Tesseract、EasyOCR 和 RapidOCR。识别前请安装相应引擎及语言包。此平台不支持 Windows OCR。",
     },
+
+    'pt': {'hotkeys': 'No Linux, atribua atalhos nas configurações de teclado da sua área de trabalho. '
+                'Vincule sua combinação preferida a clickntranslate --ocr. A edição de um campo no '
+                'aplicativo não registra um atalho do sistema.',
+     'shortcut_selection': 'Selecione o texto em outro aplicativo. Nas configurações do teclado Linux, '
+                           'atribua um atalho a clickntranslate --selection para traduzir esse texto.',
+     'shortcut_replace': 'A substituição de seleção automática está atualmente disponível apenas no '
+                         'Windows. No Linux, traduza a seleção e cole o resultado manualmente.',
+     'ocr_engine': 'Linux suporta Tesseract, EasyOCR e RapidOCR. Instale o motor escolhido e seus '
+                   'pacotes de idiomas antes do reconhecimento. Windows OCR não está disponível aqui.'},
+    'it': {'hotkeys': 'Su Linux, assegna scorciatoie nelle impostazioni della tastiera del desktop. Associa '
+                'la tua combinazione preferita a clickntranslate --ocr. La modifica di un campo in-app '
+                'non registra un collegamento di sistema.',
+     'shortcut_selection': "Seleziona il testo in un'altra app. Nelle impostazioni della tastiera "
+                           'Linux, assegna una scorciatoia a clickntranslate --selection per tradurre '
+                           'quel testo.',
+     'shortcut_replace': 'La sostituzione automatica della selezione è attualmente disponibile solo su '
+                         'Windows. Su Linux, traduci la selezione e incolla il risultato manualmente.',
+     'ocr_engine': 'Linux supporta Tesseract, EasyOCR e RapidOCR. Installare il motore scelto ed i '
+                   'relativi pacchetti lingua prima del riconoscimento. Windows OCR non è disponibile '
+                   'qui.'},
 }
 
 # config key: (settings widget, page index, recommended value)
@@ -128,6 +160,49 @@ GUIDE_SETUP_LABELS = {
         "ready": "已设置", "recommended": "建议启用", "recommended_off": "建议关闭", "inspect": "检查设置后继续",
         "failed": "设置未生效，请重试。", "done": "可以开始翻译了！", "done_body": "已完成 {total} 项推荐设置中的 {ready} 项。其余可稍后修改，也可从帮助中重新打开引导。", "finish_button": "开始使用",
     },
+
+    'pt': {'completed': 'Guia completo',
+     'startup': 'Configuração diária',
+     'translation': 'Tradução',
+     'capture': 'Captura de tela',
+     'dynamic': 'Tradução dinâmica',
+     'finish': 'Toques finais',
+     'enable': 'Ativar e avançar',
+     'disable': 'Desativar e avançar',
+     'next': 'Avançar',
+     'later': 'Mais tarde',
+     'open': 'Abrir',
+     'close': 'Fechar guia',
+     'ready': 'Já configurado',
+     'recommended': 'Recomendado: ativado',
+     'recommended_off': 'Recomendado: desativado',
+     'inspect': 'Verifique a configuração e continue',
+     'failed': 'A configuração não se aplica. Por favor, tente novamente.',
+     'done': 'Pronto para traduzir!',
+     'done_body': '{ready} de {total} configurações recomendadas estão prontas. Você pode alterar as '
+                  'outras depois e reabrir este guia na Ajuda.',
+     'finish_button': 'Comece a usar o aplicativo'},
+    'it': {'completed': 'Guida completata',
+     'startup': 'Configurazione quotidiana',
+     'translation': 'Traduzione',
+     'capture': 'Cattura dello schermo',
+     'dynamic': 'Traduzione dinamica',
+     'finish': 'Tocchi finali',
+     'enable': 'Attiva e avanti',
+     'disable': 'Disattiva e avanti',
+     'next': 'Avanti',
+     'later': 'Più tardi',
+     'open': 'Apri',
+     'close': 'Chiudi guida',
+     'ready': 'Già configurato',
+     'recommended': 'Consigliato: attivo',
+     'recommended_off': 'Consigliato: disattivato',
+     'inspect': "Controllare l'impostazione, quindi continuare",
+     'failed': "L'impostazione non è stata applicata. Per favore riprova.",
+     'done': 'Pronto per tradurre!',
+     'done_body': '{ready} impostazioni consigliate su {total} sono pronte. Puoi modificare le altre '
+                  'in seguito e riaprire questa guida da Aiuto.',
+     'finish_button': "Inizia a utilizzare l'app"},
 }
 
 # Bodies use the same setting order in every language; titles are read from
@@ -223,6 +298,57 @@ GUIDE_SETTING_BODIES = {
         "切换到其他应用时暂停识别，返回后继续动态翻译。",
         "在译文上方显示原文，方便核对名称和含义。需要简洁视图时可再关闭。",
     ),
+
+    'pt': ('Inicie o aplicativo ao fazer login para que a tradução e os atalhos estejam sempre prontas.',
+     'Comece escondido na bandeja do sistema em vez de cobrir a área de trabalho. As atalhos continuam '
+     'funcionando; o ícone da bandeja traz a janela de volta.',
+     'Copie cada tradução finalizada para a área de transferência, pronta para colar em um bate-papo '
+     'ou documento.',
+     'Salve o texto original e as traduções localmente para poder encontrá-los novamente no histórico '
+     'de traduções.',
+     'Mantenha o texto reconhecido e copiado no histórico local, mesmo após a alteração da área de '
+     'transferência.',
+     'Oculte o aplicativo durante a captura da tela para que sua janela não cubra o texto que você '
+     'deseja reconhecer.',
+     'Congele a imagem durante a seleção da área. Isso facilita capturar texto em vídeos e janelas que '
+     'mudam.',
+     'Escureça o ambiente para tornar a área selecionada clara. Ajuste a força com o controle '
+     'deslizante ao lado.',
+     'Restaure sua área de transferência anterior após traduzir uma seleção. Os resultados solicitados '
+     'explicitamente na área de transferência permanecem lá.',
+     'Uma breve notificação confirma que o texto foi copiado, para que você saiba que o atalho '
+     'funcionou.',
+     'Verifique se há uma nova versão na inicialização e ofereça uma atualização quando as correções '
+     'estiverem disponíveis.',
+     'Pause o reconhecimento enquanto você usa outro aplicativo. A tradução dinâmica é retomada quando '
+     'você retorna.',
+     'Mostre o original acima da tradução para verificar nomes e significados. Desligue-o mais tarde '
+     'para uma visualização compacta.'),
+    'it': ("Avvia l'app quando accedi in modo che la traduzione e le scorciatoie siano sempre pronti.",
+     'Inizia nascosto nella barra delle applicazioni invece di coprire il desktop. I scorciatoie '
+     "continuano a funzionare; l'icona nella barra delle applicazioni riporta la finestra.",
+     'Copia ogni traduzione completata negli appunti, pronta per essere incollata in una chat o in un '
+     'documento.',
+     'Salva il testo sorgente e le traduzioni localmente in modo da poterli ritrovare nella cronologia '
+     'delle traduzioni.',
+     'Conserva il testo riconosciuto e copiato nella cronologia locale, anche dopo la modifica degli '
+     'appunti.',
+     "Nascondi l'app durante l'acquisizione dello schermo in modo che la sua finestra non copra il "
+     'testo che desideri riconoscere.',
+     'Congela l’immagine durante la selezione dell’area. Così è più facile acquisire testo da video e '
+     'finestre che cambiano.',
+     "Oscura l'ambiente circostante per rendere chiara l'area selezionata. Regola la forza con il "
+     'cursore accanto ad esso.',
+     'Ripristina gli appunti precedenti dopo aver tradotto una selezione. I risultati esplicitamente '
+     'richiesti negli appunti rimangono lì.',
+     'Una breve notifica conferma che il testo è stato copiato, quindi sai che la scorciatoia ha '
+     'funzionato.',
+     "Verifica la presenza di una nuova versione all'avvio e offri un aggiornamento quando le "
+     'correzioni diventano disponibili.',
+     "Metti in pausa il riconoscimento mentre usi un'altra app. La traduzione dinamica riprende al tuo "
+     'ritorno.',
+     "Mostra l'originale sopra la traduzione per verificare nomi e significato. Spegnilo più tardi per "
+     'una visualizzazione compatta.'),
 }
 
 

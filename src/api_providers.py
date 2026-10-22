@@ -54,6 +54,38 @@ def _valid_response(function):
 
 def display_error(error, lang):
     """Localize actionable failures without reflecting arbitrary server text."""
+    raw = str(error)
+    address_prefixes = ('Use an HTTPS API address', 'Use the official service address',
+                        'DeepL API accepts only')
+    address_index = next((i for i,prefix in enumerate(address_prefixes) if raw.startswith(prefix)),None)
+    if address_index is not None:
+        labels = {
+            'en': ('Use an HTTPS API address. HTTP is allowed only for localhost.',
+                   'Use the official service address, or choose Custom API.',
+                   'Use the official DeepL Free or Pro API address.'),
+            'ru': ('Укажите HTTPS-адрес API. HTTP разрешён только для localhost.',
+                   'Укажите официальный адрес сервиса или выберите Custom API.',
+                   'Укажите официальный адрес DeepL Free или Pro API.'),
+            'es': ('Usa una dirección API HTTPS. HTTP solo se permite para localhost.',
+                   'Usa la dirección oficial del servicio o elige Custom API.',
+                   'Usa la dirección oficial de DeepL Free o Pro API.'),
+            'de': ('Eine HTTPS-API-Adresse verwenden. HTTP ist nur für localhost erlaubt.',
+                   'Die offizielle Dienstadresse verwenden oder Custom API wählen.',
+                   'Die offizielle Adresse von DeepL Free oder Pro API verwenden.'),
+            'fr': ('Utilisez une adresse API HTTPS. HTTP est réservé à localhost.',
+                   'Utilisez l’adresse officielle du service ou choisissez Custom API.',
+                   'Utilisez l’adresse officielle de DeepL Free ou Pro API.'),
+            'zh': ('请使用 HTTPS API 地址。只有 localhost 允许使用 HTTP。',
+                   '请使用服务的官方地址，或选择 Custom API。',
+                   '请使用 DeepL Free 或 Pro API 的官方地址。'),
+            'pt': ('Use um endereço de API HTTPS. HTTP só é permitido para localhost.',
+                   'Use o endereço oficial do serviço ou escolha Custom API.',
+                   'Use o endereço oficial da API DeepL Free ou Pro.'),
+            'it': ('Usa un indirizzo API HTTPS. HTTP è consentito solo per localhost.',
+                   'Usa l’indirizzo ufficiale del servizio oppure scegli Custom API.',
+                   'Usa l’indirizzo ufficiale dell’API DeepL Free o Pro.'),
+        }
+        return labels.get(lang,labels['en'])[address_index]
     messages = {
         'en': ('API request failed. Check the connection in Language packages → API.',
                'Add an API key in Language packages → API.',
@@ -90,6 +122,23 @@ def display_error(error, lang):
                '请在“API 连接”中设置模型。', 'API 密钥被拒绝，请检查已保存的密钥。',
                'API 配额或请求频率已达上限，请检查服务账户。', 'API 连接失败，请检查地址和网络。',
                '请在“API 连接”中为此模型启用图像输入。', '模型返回的结果不完整或无效，请选择更小的区域。'),
+
+        'pt': ('Falha na solicitação da API. Verifique a conexão em Pacotes de idiomas → API.',
+         'Adicione uma chave de API em Pacotes de idiomas → API.',
+         'Defina o modelo em Pacotes de idiomas → API.',
+         'A chave de API foi rejeitada. Verifique a chave salva.',
+         'Cota de API ou limite de taxa atingido. Verifique sua conta de serviço.',
+         'A conexão da API expirou ou falhou. Verifique o endereço e a rede.',
+         'Habilite a entrada de imagem para este modelo nas conexões API.',
+         'O modelo retornou um resultado incompleto ou inválido. Experimente uma seleção menor.'),
+        'it': ('Richiesta API non riuscita. Controlla la connessione in Pacchetti lingua → API.',
+         'Aggiungi una chiave API in Pacchetti lingua → API.',
+         'Imposta il modello in Pacchetti lingua → API.',
+         'La chiave API è stata rifiutata. Controlla la chiave salvata.',
+         'Quota API o limite di velocità raggiunto. Controlla il tuo account di servizio.',
+         "La connessione API è scaduta o non è riuscita. Controlla l'indirizzo e la rete.",
+         "Abilita l'input di immagini per questo modello nelle connessioni API.",
+         'Il modello ha restituito un risultato incompleto o non valido. Prova una selezione più piccola.'),
     }
     raw = str(error)
     checks = ('Add an API key', 'Set the model', 'API key rejected', 'API quota', 'API connection', 'Enable image input')

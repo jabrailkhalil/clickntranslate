@@ -8,6 +8,21 @@ TEXT = {
     'de': ('Nach der Auswahl:', 'Mit Tastenkürzel', 'Übersetzen-Schaltfläche zeigen', 'Sofort übersetzen', 'Auswahlmodus', 'Text in einer anderen App auswählen. Mit Tastenkürzel, Schaltfläche neben dem Text oder automatisch übersetzen. Verwendet den gewählten Übersetzer und das Auswahl-Sprachpaar.'),
     'fr': ('Après sélection :', 'Utiliser le raccourci', 'Afficher un bouton de traduction', 'Traduire aussitôt', 'Mode Sélection', 'Sélectionnez du texte dans une autre app. Traduisez par raccourci, bouton près du texte ou automatiquement. Utilise le traducteur choisi et les langues du mode Sélection.'),
     'zh': ('选择文字后：', '使用快捷键', '显示翻译按钮', '立即翻译', '选中文字模式', '在其他应用中选择文字，通过快捷键、文字旁的按钮或自动翻译。使用所选翻译服务和选中文字模式的语言。'),
+
+    'pt': ('Após selecionar:',
+     'Usar o atalho',
+     'Mostrar um botão de tradução',
+     'Traduzir imediatamente',
+     'Modo de seleção',
+     'Selecione o texto em outro aplicativo. Inicie a tradução com o atalho, um botão ao lado da '
+     'seleção ou automaticamente. Usa o tradutor selecionado e os idiomas de seleção.'),
+    'it': ('Dopo la selezione:',
+     'Usa la scorciatoia',
+     'Mostra un pulsante di traduzione',
+     'Traduci immediatamente',
+     'Modalità di selezione',
+     "Seleziona il testo in un'altra app. Avvia la traduzione con la scorciatoia, un pulsante accanto "
+     'alla selezione o automaticamente. Utilizza il traduttore selezionato e le lingue di selezione.'),
 }
 
 

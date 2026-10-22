@@ -28,7 +28,7 @@ def window():
         app.processEvents()
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh'])
+@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh', 'pt', 'it'])
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 def test_translation_controls_fit_all_languages_and_scales(window, language, theme):
     if window.current_theme != theme:
@@ -123,7 +123,7 @@ def test_active_update_survives_settings_rebuild_and_blocks_duplicate_navigation
     assert settings.settings_pages.currentWidget() is settings.settings_general_page
 
 
-@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh'])
+@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it'])
 def test_api_editor_lives_in_packages_and_fits(window, language):
     from provider_settings import show_provider_settings
     from api_providers import PROVIDERS

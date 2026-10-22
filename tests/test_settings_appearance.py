@@ -192,7 +192,7 @@ class CheckBoxIndicatorTest(unittest.TestCase):
             settings.setFixedSize(672, 334)
             settings.show()
             self.app.processEvents()
-            for language in ("ru", "en", "de", "fr", "es", "zh"):
+            for language in ("ru", "en", "de", "fr", "es", "zh", "pt", "it"):
                 parent.current_interface_language = language
                 settings.update_language()
                 settings._set_settings_page(1)
@@ -457,7 +457,7 @@ class LanguagePackageTabsTest(unittest.TestCase):
         )
 
     def test_each_tab_is_wide_enough_for_its_own_label(self):
-        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+        for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             parent, settings, dialog = self._dialog(lang)
             try:
                 for name, tab_widget in self._bars(dialog):

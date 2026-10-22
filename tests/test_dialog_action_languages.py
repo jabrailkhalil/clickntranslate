@@ -19,6 +19,7 @@ def app():
     ('en', 'Close', 'Cancel', 'Save'), ('ru', 'Закрыть', 'Отмена', 'Сохранить'),
     ('es', 'Cerrar', 'Cancelar', 'Guardar'), ('de', 'Schließen', 'Abbrechen', 'Speichern'),
     ('fr', 'Fermer', 'Annuler', 'Enregistrer'), ('zh', '关闭', '取消', '保存'),
+    ('pt', 'Fechar', 'Cancelar', 'Salvar'), ('it', 'Chiudi', 'Annulla', 'Salva'),
 ])
 def test_shared_close_and_standard_actions_match_parent_language(app, language, close, cancel, save):
     parent = QtWidgets.QWidget()

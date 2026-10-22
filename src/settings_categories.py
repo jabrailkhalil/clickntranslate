@@ -13,6 +13,9 @@ CAPTIONS = {
     'de': ('Übersetzung und OCR', 'OCR-Optionen', 'Schnellübersetzung'),
     'fr': ('Traduction et OCR', 'Options OCR', 'Traduction rapide'),
     'zh': ('翻译与 OCR', 'OCR 选项', '快速翻译'),
+
+    'pt': ('Tradução e OCR', 'Opções de OCR', 'Tradução rápida'),
+    'it': ('Traduzione e OCR', "Opzioni dell'OCR", 'Traduzione veloce'),
 }
 
 COMPACT = {
@@ -27,6 +30,17 @@ COMPACT = {
     'fr': ('Restaurer le presse-papiers', 'Fermer le résultat au clic extérieur', 'Traduction rapide de sélection',
            'Bouton de texte', 'Traduire aussitôt'),
     'zh': ('恢复剪贴板', '点击外部关闭结果', '快速翻译选中文本', '显示按钮', '立即翻译'),
+
+    'pt': ('Restaurar área de transferência',
+     'Fechar resultado ao clicar fora',
+     'Tradução de seleção rápida',
+     'Mostrar um botão',
+     'Traduzir agora'),
+    'it': ('Ripristina appunti',
+     'Chiudi risultato con clic esterno',
+     'Traduzione di selezione rapida',
+     'Mostra un pulsante',
+     'Traduci adesso'),
 }
 
 

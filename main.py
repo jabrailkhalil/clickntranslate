@@ -169,6 +169,8 @@ INTERFACE_LANGUAGE_OPTIONS = [
     {"code": "de", "name": "Deutsch", "icon": "icons/German_flag.png"},
     {"code": "fr", "name": "Français", "icon": "icons/French_flag.png"},
     {"code": "zh", "name": "中文", "icon": "icons/Chinese_flag.png"},
+    {"code": "pt", "name": "Português", "icon": "icons/Portuguese_flag.png"},
+    {"code": "it", "name": "Italiano", "icon": "icons/Italian_flag.png"},
 ]
 INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
@@ -1258,7 +1260,7 @@ def _save_copy_history_sync(text):
 
     record = {"timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "text": text}
     history_file = get_data_file("copy_history.json")
-    
+
     history = []
     try:
         if sys.platform == "win32":
@@ -1386,7 +1388,7 @@ class HotkeyListenerThread(threading.Thread):
         self.modifiers, self.vk = (0, self._double_tap[1]) if self._double_tap else self.parse_hotkey(self.hotkey_str)
         if self.vk is None:
             print("Неверный формат горячей клавиши.")
-    
+
     def start(self):
         if self._double_tap:
             try:
@@ -1565,7 +1567,7 @@ class HotkeyListenerThread(threading.Thread):
                         print(f"Error handling hotkey press: {e}")
                 ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
                 ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
-        
+
         # Отменяем регистрацию при выходе
         if self._registered:
             try:
@@ -1897,7 +1899,123 @@ INTERFACE_TEXT = {
         "argos_canceling": "正在取消 Argos 语言包安装…",
         "argos_install_cancelled": "Argos 语言包安装已取消。",
         "install_argos_packages_hint": "请在设置 → 语言包 → Argos 中安装所需的翻译方向。"
-    }
+    },
+    'pt': {'title': "Click'n'Translate",
+     'select_language': 'Selecione os idiomas para tradução',
+     'start': 'Iniciar',
+     'translation_selected': 'Tradução selecionada: {src} → {tgt}',
+     'settings': 'Configurações',
+     'back': 'Voltar ao início',
+     'ocr': 'OCR',
+     'help': 'Ajuda',
+     'choose_interface_language': 'Escolha o idioma da interface',
+     'theme': 'Alterar tema',
+     'minimize': 'Minimizar',
+     'tray_open': 'Abrir',
+     'tray_exit': 'Sair',
+     'tray_copy': 'Copiar texto',
+     'tray_translate': 'Traduzir',
+     'tray_translate_screen': 'Traduzir tela',
+     'game_translate': 'Tradução dinâmica',
+     'tray_game_translate': 'Tradução Dinâmica',
+     'input_placeholder': 'Digite o texto para traduzir',
+     'translate_button': 'Traduzir',
+     'hotkey_copy': 'Copiar',
+     'hotkey_ocr_translate': 'Traduzir área',
+     'hotkey_fullscreen': 'Tela cheia',
+     'hotkey_gaming': 'Dinâmico',
+     'hotkey_selection': 'Seleção',
+     'hotkey_toggle': 'Janela',
+     'hotkey_replace': 'Substituir',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Texto digitado',
+     'direction_shortcuts': 'Atalhos',
+     'direction_hint': 'A caixa acima traduz o texto digitado.\n'
+                       'Os atalhos traduzem a tela ou o texto selecionado. Cada modo\n'
+                       'tem seu próprio par de idiomas, configurável na linha abaixo.',
+     'translator': 'Tradutor',
+     'shadow_mode': 'Modo sombra',
+     'copy': 'Copiar',
+     'google': 'Google',
+     'close': 'Fechar',
+     'got_it': 'Entendi',
+     'no_text_selected': 'Nenhum texto selecionado',
+     'translating': 'Traduzindo...',
+     'translation_error': 'Erro de tradução',
+     'selection_replaced': 'Texto selecionado substituído',
+     'selection_replace_fallback': 'A seleção mudou. A tradução foi copiada.',
+     'installing_language_packages': 'Instalando pacotes de idiomas…',
+     'argos_package_missing_title': 'Pacote de idiomasArgos necessário',
+     'argos_package_missing_prompt': 'O pacote Argos para {pair} não está instalado. Baixe e instale '
+                                     'agora?\n'
+                                     '\n'
+                                     'O tamanho depende do idioma e pode ser de várias centenas de '
+                                     'megabytes.',
+     'argos_preparing': 'Preparando pacote Argos {pair}…',
+     'argos_downloading': 'Baixando o pacote Argos {pair}…',
+     'argos_installing': 'Instalando o pacote Argos {pair}…',
+     'argos_canceling': 'Cancelando a instalação do pacote Argos …',
+     'argos_install_cancelled': 'A instalação do pacoteArgos foi cancelada.',
+     'install_argos_packages_hint': 'Instale o par de idiomas do Argos em Configurações → Pacotes de '
+                                    'idiomas → Argos.'},
+    'it': {'title': "Click'n'Translate",
+     'select_language': 'Seleziona le lingue per la traduzione',
+     'start': 'Avvia',
+     'translation_selected': 'Traduzione selezionata: {src} → {tgt}',
+     'settings': 'Impostazioni',
+     'back': 'Torna alla schermata principale',
+     'ocr': 'OCR',
+     'help': 'Aiuto',
+     'choose_interface_language': "Scegli la lingua dell'interfaccia",
+     'theme': 'Cambia tema',
+     'minimize': 'Riduci a icona',
+     'tray_open': 'Apri',
+     'tray_exit': 'Esci',
+     'tray_copy': 'Copia testo',
+     'tray_translate': 'Traduci',
+     'tray_translate_screen': 'Traduci schermo',
+     'game_translate': 'Traduzione dinamica',
+     'tray_game_translate': 'Traduzione dinamica',
+     'input_placeholder': 'Inserisci il testo da tradurre',
+     'translate_button': 'Traduci',
+     'hotkey_copy': 'Copia',
+     'hotkey_ocr_translate': 'Traduci area',
+     'hotkey_fullscreen': 'Schermo intero',
+     'hotkey_gaming': 'Dinamico',
+     'hotkey_selection': 'Selezione',
+     'hotkey_toggle': 'Finestra',
+     'hotkey_replace': 'Sostituisci',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Testo digitato',
+     'direction_shortcuts': 'Scorciatoie',
+     'direction_hint': 'La casella sopra traduce il testo digitato.\n'
+                       'Le scorciatoie traducono lo schermo o il testo selezionato. Ogni modalità\n'
+                       'ha una propria coppia di lingue, modificabile nella riga sotto.',
+     'translator': 'Traduttore',
+     'shadow_mode': 'Modalità ombra',
+     'copy': 'Copia',
+     'google': 'Google',
+     'close': 'Chiudi',
+     'got_it': 'Capito',
+     'no_text_selected': 'Nessun testo selezionato',
+     'translating': 'Traduzione...',
+     'translation_error': 'Errore di traduzione',
+     'selection_replaced': 'Il testo selezionato è stato sostituito',
+     'selection_replace_fallback': 'La selezione è cambiata. La traduzione è stata copiata.',
+     'installing_language_packages': 'Installazione dei pacchetti lingua…',
+     'argos_package_missing_title': 'È richiesto il pacchetto linguisticoArgos',
+     'argos_package_missing_prompt': 'Il pacchetto Argos per {pair} non è installato. Scaricarlo e '
+                                     'installarlo adesso?\n'
+                                     '\n'
+                                     'La dimensione dipende dalla lingua e può essere di diverse '
+                                     'centinaia di megabyte.',
+     'argos_preparing': 'Preparazione del pacchetto Argos {pair}…',
+     'argos_downloading': 'Download del pacchetto Argos {pair}…',
+     'argos_installing': 'Installazione del pacchetto Argos {pair}…',
+     'argos_canceling': "Annullamento dell'installazione del pacchetto Argos …",
+     'argos_install_cancelled': "L'installazione del pacchettoArgos è stata annullata.",
+     'install_argos_packages_hint': 'Installa la coppia di lingue Argos in Impostazioni → Pacchetti '
+                                    'lingua → Argos.'},
 }
 
 
@@ -1912,6 +2030,14 @@ HOTKEY_ERROR_TEXT = {
     "de": {"title": "Tastenkürzel nicht verfügbar", "message": "<b>{hotkey}</b> konnte nicht registriert werden.<br><br>Diese globale Kombination wird bereits von einer anderen App oder dem System verwendet.<br><br>Wähle in den Einstellungen eine andere Kombination."},
     "fr": {"title": "Raccourci indisponible", "message": "Impossible d’enregistrer <b>{hotkey}</b>.<br><br>Cette combinaison globale est déjà utilisée par une autre application ou par le système.<br><br>Choisissez une autre combinaison dans les réglages."},
     "zh": {"title": "快捷键不可用", "message": "无法注册 <b>{hotkey}</b>。<br><br>该全局组合键已被其他应用或系统占用。<br><br>请在设置中选择其他组合键。"},
+
+    'pt': {'title': 'Atalho indisponível',
+     'message': 'Falha ao registrar <b>{hotkey}</b>.<br><br>Outra aplicação ou sistema já possui esta '
+                'combinação global.<br><br>Escolha uma combinação diferente nas configurações.'},
+    'it': {'title': 'Scorciatoia non disponibile',
+     'message': "Impossibile registrare <b>{hotkey}</b>.<br><br>Un'altra applicazione o il sistema "
+                'possiede già questa combinazione globale.<br><br>Scegli una combinazione diversa '
+                'nelle impostazioni.'},
 }
 
 
@@ -2185,6 +2311,120 @@ DOCUMENT_TEXT = {
         "text_file_filter": "文本文件", "markdown_file_filter": "Markdown 文件", "session_file_filter": "会话文件",
         "translation_sessions_filter": "翻译会话",
     },
+
+    'pt': {'title': 'Tradução de documentos',
+     'main_file_tooltip': 'Enter traduz  ·  Shift+Enter insere uma nova linha\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Solte um arquivo aqui, pressione Ctrl+O ou clique com o botão direito na '
+                          'janela principal.',
+     'main_file_hint': 'Solte um documento aqui ou clique com o botão direito',
+     'attach_file': 'Anexar arquivo',
+     'remove_file': 'Remover arquivo',
+     'translate_file': 'Traduzir texto',
+     'translate_selected': 'Traduzir selecionado',
+     'save_translation': 'Salvar tradução',
+     'open_session': 'Abrir sessão',
+     'context_translate_file': 'Escolha o arquivo para traduzir',
+     'context_choose_folder': 'Escolha a pasta com o arquivo',
+     'source': 'Origem',
+     'target': 'Destino',
+     'auto_detect': 'Detecção automática',
+     'original': 'Original',
+     'translated': 'Traduzido',
+     'drop_hint': 'Digite ou cole texto aqui ou solte um documento.',
+     'no_file': 'Digite o texto ou anexe um arquivo.',
+     'loading': 'Carregando arquivo...',
+     'loaded': 'Carregado',
+     'translating': 'Traduzindo',
+     'done': 'Tradução concluída',
+     'error': 'Erro na tradução do documento',
+     'file': 'Arquivo',
+     'size': 'Tamanho',
+     'detected': 'Detectado',
+     'provider': 'Provedor',
+     'status': 'Status',
+     'chunks': 'Blocos',
+     'no_selection': 'Selecione primeiro o texto no documento original.',
+     'no_translation': 'Não há texto traduzido para salvar.',
+     'saved': 'Salvo',
+     'session_loaded': 'Sessão carregada',
+     'translate_failed': 'Tradução concluída com falhas em alguns blocos',
+     'provider_unavailable_title': 'O provedor selecionado não está pronto',
+     'provider_unavailable_argos': 'Argos funciona offline, mas o pacote de idioma local necessário '
+                                   'não está instalado para este par de idiomas. Abra Configurações, '
+                                   'escolha Argos e instale o pacote de idiomas necessário ou escolha '
+                                   'outro provedor aqui.',
+     'provider_unavailable_hymt': 'Hy-MT funciona offline, mas o pacote Hy-MT local não está '
+                                  'instalado. Abra Configurações, escolha Hy-MT e baixe o pacote '
+                                  'offline ou escolha outro provedor aqui.',
+     'provider_unavailable_online': 'Este provedor on-line não retornou uma tradução. Verifique sua '
+                                    'conexão com a Internet ou escolha outro provedor aqui.',
+     'provider_unavailable_generic': 'Escolha outro provedor aqui ou abra Configurações e instale o '
+                                     'pacote local necessário para o provedor selecionado.',
+     'technical_error': 'Erro técnico',
+     'documents_filter': 'Documentos',
+     'all_files_filter': 'Todos os arquivos',
+     'text_file_filter': 'Arquivo de texto',
+     'markdown_file_filter': 'Arquivo Markdown',
+     'session_file_filter': 'Arquivo de sessão',
+     'translation_sessions_filter': 'Sessões de tradução'},
+    'it': {'title': 'Traduzione di documenti',
+     'main_file_tooltip': 'Invio traduce  ·  Shift+Enter va a capo\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Trascina qui un file, premi Ctrl+O o fai clic destro sulla finestra '
+                          'principale.',
+     'main_file_hint': 'Rilascia un documento qui o fai clic con il pulsante destro del mouse',
+     'attach_file': 'Allega file',
+     'remove_file': 'Rimuovi file',
+     'translate_file': 'Traduci il testo',
+     'translate_selected': 'Traduci selezionato',
+     'save_translation': 'Salva la traduzione',
+     'open_session': 'Apri sessione',
+     'context_translate_file': 'Scegli il file da tradurre',
+     'context_choose_folder': 'Scegli la cartella con il file',
+     'source': 'Origine',
+     'target': 'Destinazione',
+     'auto_detect': 'Rilevamento automatico',
+     'original': 'Originale',
+     'translated': 'Tradotto',
+     'drop_hint': 'Digita o incolla il testo qui oppure rilascia un documento.',
+     'no_file': 'Inserisci il testo o allega un file.',
+     'loading': 'Caricamento file...',
+     'loaded': 'Caricato',
+     'translating': 'Traduzione in corso',
+     'done': 'Traduzione completata',
+     'error': 'Errore di traduzione del documento',
+     'file': 'File',
+     'size': 'Dimensioni',
+     'detected': 'Rilevato',
+     'provider': 'Fornitore',
+     'status': 'Stato',
+     'chunks': 'Blocchi',
+     'no_selection': 'Seleziona prima il testo nel documento originale.',
+     'no_translation': "Non c'è testo tradotto da salvare.",
+     'saved': 'Salvato',
+     'session_loaded': 'Sessione caricata',
+     'translate_failed': 'Traduzione completata con errori in alcuni blocchi',
+     'provider_unavailable_title': 'Il fornitore selezionato non è pronto',
+     'provider_unavailable_argos': 'Argos funziona offline, ma il pacchetto della lingua locale '
+                                   'richiesto non è installato per questa coppia linguistica. Apri '
+                                   'Impostazioni, scegli Argos e installa il pacchetto linguistico '
+                                   'necessario oppure scegli un altro provider qui.',
+     'provider_unavailable_hymt': 'Hy-MT funziona offline, ma il pacchetto Hy-MT locale non è '
+                                  'installato. Apri Impostazioni, scegli Hy-MT e scarica il pacchetto '
+                                  'offline oppure scegli un altro provider qui.',
+     'provider_unavailable_online': 'Questo fornitore online non ha restituito una traduzione. '
+                                    'Controlla la tua connessione Internet o scegli un altro provider '
+                                    'qui.',
+     'provider_unavailable_generic': 'Scegli un altro provider qui oppure apri Impostazioni e installa '
+                                     'il pacchetto locale richiesto per il provider selezionato.',
+     'technical_error': 'Errore tecnico',
+     'documents_filter': 'Documenti',
+     'all_files_filter': 'Tutti i file',
+     'text_file_filter': 'File di testo',
+     'markdown_file_filter': 'File Markdown',
+     'session_file_filter': 'File di sessione',
+     'translation_sessions_filter': 'Sessioni di traduzione'},
 }
 
 
@@ -2195,6 +2435,9 @@ for _doc_language, _doc_cancel_text in {
     'de': ('Stoppen', 'Wird nach der aktuellen Anfrage gestoppt…', 'Übersetzung gestoppt'),
     'fr': ('Arrêter', 'Arrêt après la requête en cours…', 'Traduction arrêtée'),
     'zh': ('停止', '当前请求完成后停止…', '翻译已停止'),
+
+    'pt': ('Parar', 'Parando após a solicitação atual…', 'Tradução interrompida'),
+    'it': ('Interrompi', 'Interruzione dopo la richiesta corrente…', 'La traduzione è stata interrotta'),
 }.items():
     DOCUMENT_TEXT[_doc_language].update(zip(('cancel_translation', 'canceling_translation', 'translation_canceled'), _doc_cancel_text))
 
@@ -2233,6 +2476,9 @@ PROVIDER_GROUP_TEXT = {
     "de": {"online": "Online", "offline": "Offline"},
     "fr": {"online": "En ligne", "offline": "Hors ligne"},
     "zh": {"online": "在线", "offline": "离线"},
+
+    'pt': {'online': 'Online', 'offline': 'Offline'},
+    'it': {'online': 'Online', 'offline': 'Offline'},
 }
 
 
@@ -2244,6 +2490,9 @@ def provider_kind_text(kind, lang):
             "de": "offline",
             "fr": "offline",
             "zh": "离线",
+
+            'pt': 'offline',
+            'it': 'offline',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -2251,6 +2500,9 @@ def provider_kind_text(kind, lang):
         "de": "online",
         "fr": "online",
         "zh": "在线",
+
+        'pt': 'online',
+        'it': 'online',
     }.get(lang, "online")
 
 
@@ -2436,6 +2688,39 @@ WELCOME_TEXT = {
         "skip": "跳过",
         "close": "开始",
     },
+
+    'pt': {'window': 'Notícias',
+     'eyebrow': 'Tradutor de tela portátil',
+     'title': "Bem-vindo ao Click'n'Translate!",
+     'body': 'A versão {version} traz uma grande atualização na interface e nos fluxos de trabalho '
+             'diários. Obrigado pelo seu apoio – já são 3.000 downloads!',
+     'feature_ocr': 'OCR de tela',
+     'feature_translate': 'Online + offline',
+     'feature_updates': '3.000 downloads',
+     'telegram': 'Abra Telegram',
+     'github': 'Dê uma estrela ao projeto no GitHub',
+     'support': "Click'n'Translate é um projeto gratuito. Ficaríamos gratos se você se juntasse a nós "
+                'no Telegram e nos desse uma estrela no GitHub.',
+     'checkbox': 'Não mostrar esta janela novamente',
+     'guide': 'Conhecer o aplicativo',
+     'skip': 'Pular',
+     'close': 'Iniciar'},
+    'it': {'window': 'Novità',
+     'eyebrow': 'Traduttore di schermi portatile',
+     'title': "Benvenuto in Click'n'Translate!",
+     'body': "La versione {version} apporta un importante aggiornamento all'interfaccia e ai flussi di "
+             'lavoro quotidiani. Grazie per il vostro supporto: già 3.000 download!',
+     'feature_ocr': 'OCR dello schermo',
+     'feature_translate': 'Online + offline',
+     'feature_updates': '3.000 download',
+     'telegram': 'Apri Telegram',
+     'github': 'Aggiungi una stella al progetto su GitHub',
+     'support': "Click'n'Translate è un progetto gratuito. Ti saremmo grati se ti unissi a noi su "
+                'Telegram e ci dessi una stella su GitHub.',
+     'checkbox': 'Non mostrare più questa finestra',
+     'guide': 'Mostra la guida',
+     'skip': 'Salta',
+     'close': 'Avvia'},
 }
 
 
@@ -2452,7 +2737,10 @@ STARTUP_NEWS_TEXT = {
         "window": copy["window"] + " · V{version}",
         "title": copy["feature_updates"],
         "intro": copy["body"].format(version=APP_VERSION),
-        "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了'}[language],
+        "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了',
+            'pt': 'Entendi',
+            'it': 'Capito',
+        }[language],
     }
     for language, copy in WELCOME_TEXT.items()
 }
@@ -2654,6 +2942,167 @@ GUIDE_TEXT = {
             ("back_home", "返回主页", "返回主界面。上方语言对用于输入文本；下方每个快捷键模式都会保存自己独立的语言对。"),
         ],
     },
+
+    'pt': {'progress': '{current}/{total}',
+     'click_hint': 'Clique no controle destacado',
+     'read_hint': 'Passe o mouse para ver detalhes · Próximo',
+     'document_hint': 'Abra o ícone · Avançar',
+     'skip': 'Avançar',
+     'done_title': 'Pronto',
+     'done_body': 'Você conhece os controles principais agora. O FAQ completo fica no botão de '
+                  'informações.',
+     'steps': [('language',
+                'Idioma da interface',
+                'A bandeira altera o idioma do aplicativo, das configurações, do menu da bandeja e da '
+                'ajuda.'),
+               ('theme', 'Tema', 'Sol/lua alterna temas claros e escuros.'),
+               ('help',
+                'Ajuda',
+                'O botão de informações abre a ajuda sobre OCR, atalhos e tradutores.'),
+               ('shortcut_overview',
+                'Seus atalhos',
+                'Estas são suas atalhos atuais. Passe o mouse sobre qualquer um na tela principal para '
+                'ver sua descrição completa. A linha de modo acima define um par de idiomas separado '
+                'para cada ação de tradução.'),
+               ('shortcut_copy',
+                'Copiar',
+                'Selecione uma área da tela. OCR reconhece seu texto e o copia para a área de '
+                'transferência sem traduzi-lo.'),
+               ('shortcut_ocr',
+                'Traduzir área',
+                'Selecione uma área da tela. O OCR o reconhece e depois o traduz com o par de idiomas '
+                'salvo para o modo OCR.'),
+               ('shortcut_fullscreen',
+                'Tela cheia',
+                'Captura a tela inteira e coloca traduções sobre blocos de texto visíveis, usando o '
+                'par de idiomas salvo no modo Tela.'),
+               ('shortcut_game',
+                'Dinâmico',
+                'Pressione Ctrl+Alt+G, selecione uma ou mais áreas de texto e depois Iniciar. As '
+                'traduções continuam sendo atualizadas; pressione o atalho novamente para parar.'),
+               ('shortcut_selection',
+                'Seleção',
+                'Selecione o texto existente em outro aplicativo e pressione o atalho atribuído em '
+                'Configurações. Este modo traduz sem alterar a seleção original.'),
+               ('shortcut_replace',
+                'Substituir',
+                'Selecione o texto editável em outro aplicativo e pressione o atalho atribuído. A '
+                'mesma seleção é substituída pela sua tradução; se o foco for alterado, o resultado '
+                'será apenas copiado.'),
+               ('shortcut_toggle',
+                'Janela',
+                'Oculta o aplicativo no destino usado anteriormente ou o restaura pela bandeja ou '
+                'barra de tarefas. Os atalhos de tradução continuam funcionando com a janela oculta.'),
+               ('document_translation',
+                'Tradução de documentos',
+                'Abra o ícone do documento para um texto longo ou um arquivo. Cole, solte ou anexe um '
+                'documento e traduza tudo ou apenas o fragmento selecionado. O texto longo no campo '
+                'principal também revela um ícone de expansão.'),
+               ('settings', 'Configurações', 'O Gear abre motores, histórico, atualizações e atalhos.'),
+               ('ocr_engine',
+                'Mecanismo de OCR',
+                'Escolha Windows, Tesseract, EasyOCR ou RapidOCR. Instale cada mecanismo e seus '
+                'idiomas antes do reconhecimento.'),
+               ('translator', 'Tradutor', 'Tradutor: Google on-line; Argos e Hy-MT off-line.'),
+               ('result_window',
+                'Janela de resultados',
+                'Escolha quais ações de tradução abrem a janela de resultados. As ações desmarcadas '
+                'copiam o resultado.'),
+               ('language_packages',
+                'Pacotes de idiomas',
+                'Instale aqui os idiomas de OCR e os pares de idiomas do Argos. Os seletores mostram '
+                'apenas os idiomas disponíveis.'),
+               ('hotkeys',
+                'Configurar atalhos',
+                'Se um atalho for inconveniente, abra Configurar atalhos. Clique no seu campo e '
+                'pressione uma nova combinação; pressione Esc para limpá-lo. As alterações aplicam-se '
+                'imediatamente.'),
+               ('back_home',
+                'Voltar ao início',
+                'Home retorna à tela principal. O par superior traduz o texto digitado; cada modo de '
+                'atalho abaixo mantém seu próprio par de idiomas.')]},
+    'it': {'progress': '{current}/{total}',
+     'click_hint': 'Fare clic sul controllo evidenziato',
+     'read_hint': 'Passa il mouse per i dettagli · Avanti',
+     'document_hint': 'Apri l’icona · Avanti',
+     'skip': 'Avanti',
+     'done_title': 'Pronto',
+     'done_body': 'Adesso conosci i controlli principali. Le domande frequenti complete si trovano '
+                  'sotto il pulsante informazioni.',
+     'steps': [('language',
+                'Lingua dell’interfaccia',
+                'La bandiera cambia la lingua dell’app, delle impostazioni, del menu nell’area di '
+                'notifica e della guida.'),
+               ('theme', 'Tema', 'Sole/Luna alterna i temi chiaro e scuro.'),
+               ('help',
+                'Aiuto',
+                'Il pulsante informazioni apre la guida a OCR, scorciatoie e traduttori.'),
+               ('shortcut_overview',
+                'Le tue scorciatoie',
+                'Questi sono le scorciatoie attuali. Passa il mouse su uno qualsiasi della schermata '
+                'principale per visualizzarne la descrizione completa. La riga della modalità sopra '
+                'imposta una coppia linguistica separata per ogni azione di traduzione.'),
+               ('shortcut_copy',
+                'Copia',
+                "Seleziona un'area dello schermo. L'OCR ne riconosce il testo e lo copia negli appunti "
+                'senza tradurlo.'),
+               ('shortcut_ocr',
+                'Traduci area',
+                "Seleziona un'area dello schermo. L'OCR lo riconosce, quindi lo traduce con la coppia "
+                'linguistica salvata per la modalità OCR.'),
+               ('shortcut_fullscreen',
+                'Schermo intero',
+                "Cattura l'intero schermo e inserisce le traduzioni su blocchi di testo visibili, "
+                'utilizzando la coppia linguistica salvata della modalità Schermo.'),
+               ('shortcut_game',
+                'Dinamico',
+                'Premere Ctrl+Alt+G, selezionare una o più aree di testo, quindi Avvia. Le traduzioni '
+                'continuano ad essere aggiornate; premere nuovamente la scorciatoia per interrompere.'),
+               ('shortcut_selection',
+                'Selezione',
+                "Seleziona il testo esistente in un'altra app e premi la scorciatoia assegnata in "
+                'Impostazioni. Questa modalità lo traduce senza modificare la selezione originale.'),
+               ('shortcut_replace',
+                'Sostituisci',
+                "Seleziona il testo modificabile in un'altra app e premi la scorciatoia assegnata. La "
+                'stessa selezione è sostituita dalla sua traduzione; se il focus è cambiato, il '
+                'risultato viene solo copiato.'),
+               ('shortcut_toggle',
+                'Finestra',
+                'Nasconde l’app nella destinazione usata in precedenza oppure la ripristina dall’area '
+                'di notifica o dalla barra delle applicazioni. Le scorciatoie di traduzione continuano '
+                'a funzionare con la finestra nascosta.'),
+               ('document_translation',
+                'Traduzione di documenti',
+                "Apri l'icona del documento per un testo lungo o un file. Incolla, rilascia o allega "
+                'un documento, quindi traduci tutto o solo il frammento selezionato. Il testo lungo '
+                "nel campo principale rivela anche un'icona di espansione."),
+               ('settings',
+                'Impostazioni',
+                'Gear apre motori, cronologia, aggiornamenti e scorciatoie.'),
+               ('ocr_engine',
+                "Motore dell'OCR",
+                'Scegli Windows, Tesseract, EasyOCR o RapidOCR. Installare ciascun motore e le '
+                'relative lingue prima del riconoscimento.'),
+               ('translator', 'Traduttore', 'Traduttore: Google in linea; Argos e Hy-MT offline.'),
+               ('result_window',
+                'Finestra dei risultati',
+                'Scegli quali azioni di traduzione aprono la finestra dei risultati. Le azioni '
+                'deselezionate copiano invece il risultato.'),
+               ('language_packages',
+                'Pacchetti lingua',
+                'Installa qui le lingue OCR e le coppie di lingue Argos. I selettori mostrano solo le '
+                'lingue disponibili.'),
+               ('hotkeys',
+                'Configura scorciatoie',
+                'Se una scorciatoia è scomoda, apri Configura scorciatoie. Fare clic sul suo campo e '
+                'premere una nuova combinazione; premere Esc per cancellarlo. Le modifiche si '
+                'applicano immediatamente.'),
+               ('back_home',
+                'Torna alla schermata principale',
+                'L’icona Home torna alla schermata principale. La coppia superiore traduce il testo '
+                'digitato; ciascuna modalità di scorciatoia riportata di seguito mantiene la propria '
+                'coppia linguistica.')]},
 }
 
 
@@ -2748,6 +3197,90 @@ GUIDE_TOUR_EXTRAS = {
         "game_controls": ("动态模式", "选择语言对、刷新间隔和透明度；还可在绑定应用失去焦点时暂停，并显示原文。"),
         "settings_page_main": ("常规设置", "打开“常规设置”选项卡，返回引擎、启动选项和历史记录。"),
     },
+
+    'pt': {'main_translate': ('Enviar tradução',
+                        'A seta envia o texto do campo principal para tradução, como o botão enviar de '
+                        'um messenger.'),
+     'shadow_mode': ('Modo sombra',
+                     'Este botão inferior oculta toda a janela e deixa disponível o tradutor '
+                     'compacto.'),
+     'autostart': ('Iniciar com o Windows',
+                   "Habilite isto para que Click'n'Translate esteja pronto após você entrar."),
+     'start_minimized': ('Iniciar no modo sombra',
+                         'Habilite isto para que a inicialização automática abra a visualização de '
+                         'sombra compacta em vez da janela completa.'),
+     'actions_panel': ('Ações de configurações',
+                       'Limpar cache remove arquivos temporários; Redefinir restaura as configurações '
+                       'de comportamento sem alterar o idioma da interface; Atualizar verificações de '
+                       'lançamentos. A segunda linha abre pacotes de idiomas e ambos os históricos; a '
+                       'última linha abre atalhos.'),
+     'settings_page_updates': ('Mais configurações',
+                               'Abra Tradução e OCR para configurar os mecanismos, a tradução de texto '
+                               'selecionado e o comportamento do resultado.'),
+     'ocr_behavior': ('Comportamento de OCR',
+                      'Aqui você controla a visibilidade da janela, captura congelada ou esmaecida, '
+                      'restauração da área de transferência e notificações silenciosas.'),
+     'export_settings': ('Exportar configurações',
+                         'Salve sua configuração completa em um arquivo JSON para backup ou em outro '
+                         'computador.'),
+     'import_settings': ('Importar configurações',
+                         'Restaure um arquivo de configuração. A interface retorna à primeira página '
+                         'de configurações posteriormente.'),
+     'bug_report': ('Relatar problema',
+                    'Cria uma pasta de diagnóstico segura e a abre. Descreva o problema e envie o ZIP '
+                    'ao desenvolvedor via Telegram ou GitHub.'),
+     'settings_page_game': ('Configurações de tradução dinâmica',
+                            'Abra a guia Tradução dinâmica para configurar e iniciar a tradução de '
+                            'áreas variáveis da tela.'),
+     'game_controls': ('Modo dinâmico',
+                       'Escolha seu par de idiomas, intervalo de atualização e opacidade da '
+                       'sobreposição. Ele pode pausar quando o aplicativo vinculado estiver inativo e, '
+                       'opcionalmente, manter o texto original visível.'),
+     'settings_page_main': ('Configurações gerais',
+                            'Abra a guia Configurações gerais para retornar aos mecanismos, opções de '
+                            'inicialização e histórico.')},
+    'it': {'main_translate': ('Invia traduzione',
+                        'La freccia invia il testo dal campo principale per la traduzione, come il '
+                        'pulsante di invio in un messenger.'),
+     'shadow_mode': ('Modalità ombra',
+                     "Questo pulsante in basso nasconde l'intera finestra e lascia disponibile il "
+                     'traduttore compatto.'),
+     'autostart': ('Avvia con Windows',
+                   "Abilitalo in modo che Click'n'Translate sia pronto dopo aver effettuato "
+                   "l'accesso."),
+     'start_minimized': ('Avvia in modalità ombra',
+                         "Abilita questa opzione in modo che l'avvio automatico apra la vista ombra "
+                         'compatta invece della finestra intera.'),
+     'actions_panel': ('Azioni delle impostazioni',
+                       'Cancella cache rimuove i file temporanei; Reset ripristina le impostazioni del '
+                       "comportamento senza modificare la lingua dell'interfaccia; L'aggiornamento "
+                       'controlla le versioni. La seconda riga apre i pacchetti lingua ed entrambe le '
+                       "cronologie; l'ultima riga apre le scorciatoie."),
+     'settings_page_updates': ('Più impostazioni',
+                               'Apri Traduzione e OCR per configurare motori, traduzione del testo '
+                               'selezionato e comportamento del risultato.'),
+     'ocr_behavior': ("Comportamento dell'OCR",
+                      "Qui puoi controllare la visibilità della finestra, l'acquisizione bloccata o "
+                      'oscurata, il ripristino degli appunti e le notifiche silenziose.'),
+     'export_settings': ('Esporta impostazioni',
+                         'Salva la configurazione completa in un file JSON per il backup o su un altro '
+                         'computer.'),
+     'import_settings': ('Importa impostazioni',
+                         "Ripristinare un file di configurazione. Successivamente l'interfaccia "
+                         'ritorna alla prima pagina delle impostazioni.'),
+     'bug_report': ('Segnala un problema',
+                    'Crea una cartella diagnostica sicura e la apre. Descrivi il problema e invia lo '
+                    'ZIP allo sviluppatore tramite Telegram o GitHub.'),
+     'settings_page_game': ('Impostazioni di traduzione dinamica',
+                            'Apri la scheda Traduzione dinamica per configurare e avviare la '
+                            'traduzione delle aree variabili dello schermo.'),
+     'game_controls': ('Modalità dinamica',
+                       "Scegli la coppia linguistica, l'intervallo di aggiornamento e l'opacità della "
+                       "sovrapposizione. Può essere messo in pausa quando l'app associata è inattiva "
+                       'e, facoltativamente, mantenere visibile il testo originale.'),
+     'settings_page_main': ('Impostazioni generali',
+                            'Apri la scheda Impostazioni generali per tornare ai motori, alle opzioni '
+                            'di avvio e alla cronologia.')},
 }
 
 
@@ -2770,6 +3303,19 @@ for _guide_lang, _bodies in {
     'zh': ('启动、历史、提示、更新、结果窗口、界面缩放和结果文字大小。',
            'OCR 和翻译引擎、API 连接、文本选择和语言包。',
            '清除缓存、重置、更新、导出、导入、错误报告和快捷键设置。'),
+
+    'pt': ('Inicialização, histórico, dicas de ferramentas, atualizações, comportamento da janela de '
+     'resultados, escala da interface e tamanho do texto do resultado.',
+     'Escolha mecanismos de OCR e tradução, conexões API, comportamento de seleção e pacotes de '
+     'idiomas.',
+     'Limpe o cache, redefina ou atualize o aplicativo; exporte ou importe configurações, crie um '
+     'relatório de bug ou configure atalhos.'),
+    'it': ('Avvio, cronologia, descrizioni comandi, aggiornamenti, comportamento della finestra dei '
+     "risultati, scala dell'interfaccia e dimensione del testo dei risultati.",
+     'Scegli OCR e motori di traduzione, connessioni API, comportamento di selezione e pacchetti '
+     'lingua.',
+     "Svuota cache, reimposta o aggiorna l'app; esportare o importare impostazioni, creare una "
+     'segnalazione di bug o configurare le scorciatoie.'),
 }.items():
     for _key, _body in zip(('settings_page_main', 'settings_page_updates', 'actions_panel'), _bodies):
         _title = GUIDE_TOUR_EXTRAS[_guide_lang][_key][0]
@@ -3397,6 +3943,196 @@ HELP_CONTENT = {
             "启用自启动或创建快捷方式前，请先把程序文件夹移动到最终位置。",
         ]),
     ],
+
+    'pt': [('Início rápido',
+      ['<b>1.</b> Pressione o atalho copiar ou traduzir.',
+       '<b>2.</b> Selecione a área da tela que contém texto.',
+       '<b>3.</b> Escolha o OCR/idioma de origem no seletor de sinalizadores quando necessário.',
+       '<b>4.</b> O aplicativo copia o texto reconhecido ou mostra a tradução.']),
+     ('Idioma da interface',
+      ['Use o botão de bandeira na barra de título para mudar o idioma da interface.',
+       'A janela principal, configurações, atalhos, telas de histórico, menu da bandeja e este FAQ '
+       'seguem o idioma selecionado.',
+       'A seleção do idioma de OCR e de tradução é separada do idioma da interface.']),
+     ('Tradutores',
+      ["<span class='item-title'>Google</span> - tradução online rápida, recomendada por padrão.",
+       "<span class='item-title'>Argos</span> - off-line e privado, requer pacotes de idiomas locais.",
+       "<span class='item-title'>Hy-MT</span> - pacote de tradução LLM local, instalado separadamente "
+       'em Configurações.',
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - provedores online "
+       'alternativos.']),
+     ('Mecanismos de OCR',
+      ["<span class='item-title'>Windows</span> - integrado ao Windows, rápido, depende dos pacotes de "
+       'idiomas Windows instalados.',
+       "<span class='item-title'>Tesseract</span> - mecanismo de OCR off-line; As configurações podem "
+       'baixar um pacote portátil local.',
+       "<span class='item-title'>AUTO</span> não consegue saber o idioma antes do OCR. Com Windows OCR "
+       'ele tenta os idiomas OCR instalados e seleciona o resultado mais legível.',
+       'Se o idioma necessário não estiver instalado em Windows OCR, instale o pacote de idiomas '
+       'Windows, escolha um idioma específico ou use Tesseract.']),
+     ('Configurações: as listas à direita',
+      ["<span class='item-title'>OCR</span> escolhe o mecanismo que lê o texto na tela. Apenas os "
+       'motores que você instalou são oferecidos. Os mecanismos são instalados e removidos em sua '
+       "própria guia em <span class='item-title'>Pacotes de idiomas</span>.",
+       "<span class='item-title'>Traduzir</span> escolhe o provedor de tradução. Provedores online "
+       'enviam seu texto embora; Argos e Hy-MT o mantêm neste computador.',
+       "<span class='item-title'>Mostrar janela</span> marca as ações que abrem a janela de tradução: "
+       'traduzir o texto selecionado, traduzir uma área da tela e pressionar Traduzir.',
+       'Esses três são interruptores independentes, portanto qualquer combinação é permitida. Uma ação '
+       'desmarcada ainda é traduzida – ela copia o resultado diretamente para a área de transferência '
+       'em vez de abrir uma janela.',
+       'O campo mostra as ações ativadas, ou Tudo e Nunca quando todas têm o mesmo estado. Passe o '
+       'mouse para ver a lista completa.']),
+     ('Configurações: caixas de seleção',
+      ["<span class='item-title'>Iniciar com o sistema</span> inicia o aplicativo quando Windows é "
+       'iniciado.',
+       "<span class='item-title'>Iniciar no modo sombra</span> inicia escondido na bandeja. As atalhos "
+       'continuam funcionando e o ícone da bandeja abre a janela.',
+       "<span class='item-title'>Copiar texto traduzido</span> coloca cada tradução na área de "
+       'transferência assim que estiver pronta.',
+       "<span class='item-title'>Salvar histórico de cópias</span> e <span class='item-title'>Salvar "
+       'histórico de tradução</span> mantém o que você copiou e traduziu. Deixe-os desligados e nada '
+       'será gravado no disco.',
+       "<span class='item-title'>Mantenha a janela visível durante o OCR</span> impede que a janela "
+       'principal fique oculta enquanto você arrasta uma seleção.',
+       "<span class='item-title'>Congelar tela durante OCR</span> mantém a imagem imóvel, que é como "
+       'você captura texto que se move ou desaparece.']),
+     ('Configurações: os botões',
+      ["<span class='item-title'>Limpar cache</span> descarta traduções e arquivos temporários "
+       'armazenados em cache. Os mecanismos instalados e os pacotes de idiomas permanecem.',
+       "<span class='item-title'>Redefinir</span> coloca todas as configurações de volta ao padrão. "
+       'Não desinstala nada.',
+       "<span class='item-title'>Atualizar</span> verifica se há uma versão mais recente e substitui a "
+       'pasta portátil por ela.',
+       "<span class='item-title'>Pacotes de idiomas</span> instala idiomas OCR e instruções Argos com "
+       'antecedência.',
+       "<span class='item-title'>Histórico de cópias</span> e <span class='item-title'>Histórico de "
+       'traduções</span> abrir o que foi salvo. Eles permanecem vazios enquanto a caixa de seleção '
+       'correspondente estiver desativada.',
+       "<span class='item-title'>Configurar atalhos</span> define cópia, OCR, tela cheia, tradução de "
+       'seleção segura, traduzir e substituir e mostrar/ocultar atalhos.']),
+     ('Atalhos',
+      ['Passe o mouse sobre qualquer atalho na tela principal para ver sua descrição ou clique no '
+       'emblema da tecla para abrir a configuração exata. A linha de modo armazena um idioma de origem '
+       'e de destino separados para OCR, Tela Cheia, Dinâmico, Seleção e Substituição.',
+       "<span class='item-title'>Copiar</span> reconhece a área selecionada e copia o texto.",
+       "<span class='item-title'>Traduzir área</span> reconhece a área selecionada e a traduz.",
+       "<span class='item-title'>Tela cheia</span> traduz blocos de texto visíveis na tela.",
+       "<span class='item-title'>Dinâmico</span> dinâmico começa com Ctrl+Alt+G, permite selecionar "
+       'uma ou mais áreas de texto e mantém suas traduções atualizadas. Pressione o atalho novamente '
+       'para parar.',
+       "<span class='item-title'>Seleção</span> traduz o texto atualmente selecionado de outro "
+       'aplicativo.',
+       "<span class='item-title'>Traduzir e substituir seleção</span> grava a tradução de volta "
+       'somente se o mesmo texto permanecer selecionado na mesma janela. Caso contrário, ele copia a '
+       'tradução com segurança.',
+       "<span class='item-title'>Janela</span> oculta o aplicativo em seu destino anterior ou o "
+       'restaura da bandeja/barra de tarefas.',
+       "Se uma combinação for inconveniente, abra Configurações <span class='item-title'>Configurações "
+       '→ Configurar atalhos</span>, clique em seu campo e pressione uma nova combinação. Esc limpa o '
+       'campo; as alterações se aplicam imediatamente.']),
+     ('Aplicativo portátil',
+      ['O aplicativo armazena configuração, histórico, cache e mecanismos locais opcionais próximos à '
+       'pasta do programa.',
+       'Mova a pasta para seu local final antes de ativar a inicialização automática ou criar '
+       'atalhos.'])],
+    'it': [('Avvio rapido',
+      ['<b>1.</b> Premere la scorciatoia copia o traduci.',
+       "<b>2.</b> Selezionare l'area dello schermo che contiene testo.",
+       '<b>3.</b> Scegliere la lingua OCR/origine dal selettore flag quando necessario.',
+       "<b>4.</b> L'app copia il testo riconosciuto o mostra la traduzione."]),
+     ('Lingua dell’interfaccia',
+      ['Utilizzare il pulsante bandiera nella barra del titolo per cambiare la lingua '
+       "dell'interfaccia.",
+       'La finestra principale, le impostazioni, le scorciatoie, le schermate della cronologia, il '
+       'menu della barra delle applicazioni e queste domande frequenti seguono la lingua selezionata.',
+       "La selezione della lingua OCR e di traduzione è separata dalla lingua dell'interfaccia."]),
+     ('Traduttori',
+      ["<span class='item-title'>Google</span> : traduzione online veloce, consigliata per "
+       'impostazione predefinita.',
+       "<span class='item-title'>Argos</span> - offline e privato, richiede pacchetti in lingua "
+       'locale.',
+       "<span class='item-title'>Hy-MT</span> - pacchetto di traduzione LLM locale, installato "
+       'separatamente da Impostazioni.',
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - fornitori online "
+       'alternativi.']),
+     ('Motori OCR',
+      ["<span class='item-title'>Windows</span> - integrato in Windows, veloce, dipende dai pacchetti "
+       'lingua Windows installati.',
+       "<span class='item-title'>Tesseract</span> - motore OCR offline; Le impostazioni possono "
+       'scaricare un pacchetto portatile locale.',
+       "<span class='item-title'>AUTO</span> non può conoscere la lingua prima dell'OCR. Con Windows "
+       'OCR prova le lingue OCR installate e seleziona il risultato più leggibile.',
+       'Se la lingua necessaria non è installata in Windows OCR, installare il relativo pacchetto '
+       'lingua Windows, scegliere una lingua specifica o utilizzare Tesseract.']),
+     ('Impostazioni: gli elenchi a destra',
+      ["<span class='item-title'>OCR</span> seleziona il motore che legge il testo dallo schermo. "
+       'Vengono offerti solo i motori che hai installato. I motori vengono installati e rimossi nella '
+       "propria scheda in <span class='item-title'>Pacchetti lingua</span>.",
+       "<span class='item-title'>Traduci</span> sceglie il fornitore di traduzione. I fornitori online "
+       'inviano il tuo testo; Argos e Hy-MT lo mantengono su questo computer.',
+       "<span class='item-title'>Mostra finestra</span> seleziona le azioni che aprono la finestra di "
+       "traduzione: tradurre il testo selezionato, tradurre un'area dello schermo e premere Traduci.",
+       'Questi tre sono interruttori indipendenti, quindi è consentita qualsiasi combinazione. '
+       "Un'azione deselezionata si traduce comunque: copia il risultato direttamente negli appunti "
+       'invece di aprire una finestra.',
+       'Il campo mostra le azioni attive, oppure Tutte e Mai quando hanno tutte lo stesso stato. Passa '
+       'il puntatore sul campo per vedere l’elenco completo.']),
+     ('Impostazioni: caselle di controllo',
+      ["<span class='item-title'>Avvia con il sistema</span> avvia l'app all'avvio di Windows.",
+       "<span class='item-title'>Avvia in modalità ombra</span> lo avvia nascosto nell’area di "
+       "notifica. I scorciatoie continuano a funzionare e l'icona nella barra delle applicazioni apre "
+       'la finestra.',
+       "<span class='item-title'>Copia il testo tradotto</span> inserisce ogni traduzione negli "
+       'appunti non appena è pronta.',
+       "<span class='item-title'>Salva la cronologia delle copie</span> e <span "
+       "class='item-title'>Salva la cronologia delle traduzioni</span> conserva ciò che hai copiato e "
+       'tradotto. Lasciali disattivati e nulla verrà scritto sul disco.',
+       "<span class='item-title'>Mantieni la finestra visibile durante l'OCR</span> impedisce alla "
+       'finestra principale di nascondersi mentre si trascina una selezione.',
+       "<span class='item-title'>Blocca lo schermo durante l'OCR</span> mantiene ferma l'immagine, "
+       'ovvero il modo in cui si cattura il testo che si muove o scompare.']),
+     ('Impostazioni: i pulsanti',
+      ["<span class='item-title'>Svuota cache</span> elimina le traduzioni memorizzate nella cache e i "
+       'file temporanei. I motori installati e i pacchetti lingua rimangono.',
+       "<span class='item-title'>Ripristina</span> riporta tutte le impostazioni ai valori "
+       'predefiniti. Non disinstalla nulla.',
+       "<span class='item-title'>Aggiorna</span> verifica la presenza di una versione più recente e "
+       'sostituisce con essa la cartella portatile.',
+       "<span class='item-title'>Pacchetti lingua</span> installa in anticipo le lingue OCR e le "
+       'indicazioni Argos.',
+       "<span class='item-title'>Cronologia copie</span> e <span class='item-title'>Cronologia "
+       'traduzioni</span> aprono ciò che è stato salvato. Rimangono vuoti finché la casella di '
+       'controllo corrispondente è disattivata.',
+       "<span class='item-title'>Configura scorciatoie</span> imposta copia, OCR, schermo intero, "
+       'traduzione selezione sicura, traduci e sostituisci e mostra/nascondle scorciatoie.']),
+     ('Scorciatoie',
+      ['Passa il mouse su qualsiasi collegamento nella schermata principale per visualizzarne la '
+       "descrizione o fai clic sul badge del tasto per aprire l'impostazione esatta. La riga della "
+       'modalità memorizza una lingua di origine e di destinazione separata per OCR, Schermo intero, '
+       'Dinamico, Selezione e Sostituisci.',
+       "<span class='item-title'>Copia</span> riconosce l'area selezionata e copia il testo.",
+       "<span class='item-title'>Traduci area</span> riconosce l'area selezionata e la traduce.",
+       "<span class='item-title'>Schermo intero</span> traduce i blocchi di testo visibili sullo "
+       'schermo.',
+       "<span class='item-title'>Dinamico</span> inizia con Ctrl+Alt+G, consente di selezionare una o "
+       'più aree di testo e mantiene aggiornate le relative traduzioni. Premi di nuovo la scorciatoia '
+       'per interrompere.',
+       "<span class='item-title'>Selezione</span> traduce il testo attualmente selezionato da un'altra "
+       'app.',
+       "<span class='item-title'>Traduci e sostituisci selezione</span> riscrive la traduzione solo se "
+       'lo stesso testo rimane selezionato nella stessa finestra. Altrimenti copia in modo sicuro la '
+       'traduzione.',
+       "<span class='item-title'>Finestra</span> nasconde l'app nella sua destinazione precedente o la "
+       'ripristina dalla barra delle applicazioni/barra delle applicazioni.',
+       "Se una combinazione è scomoda, apri <span class='item-title'>Impostazioni → Configura "
+       'scorciatoie</span>, fai clic sul suo campo e premi una nuova combinazione. Esc libera il '
+       'campo; le modifiche si applicano immediatamente.']),
+     ('Applicazione portatile',
+      ["L'app memorizza configurazione, cronologia, cache e motori locali opzionali accanto alla "
+       'cartella del programma.',
+       "Sposta la cartella nella sua posizione finale prima di abilitare l'avvio automatico o creare "
+       'scorciatoie.'])],
 }
 
 
@@ -3425,6 +4161,13 @@ HELP_INTRO = {
         "Click'n'Translate 是便携式屏幕 OCR、快速翻译、快捷键和可选离线引擎助手。"
         "这份 FAQ 是功能地图；底部按钮可以重新启动交互式引导。"
     ),
+
+    'pt': ("Click'n'Translate é um assistente portátil para OCR de tela, tradução rápida, atalhos e "
+     'mecanismos off-line opcionais. Use este FAQ como um mapa; o guia interativo pode ser iniciado '
+     'novamente a partir do botão abaixo.'),
+    'it': ("Click'n'Translate è un assistente portatile per OCR dello schermo, traduzione rapida, "
+     'scorciatoie e motori offline opzionali. Usa queste FAQ come una mappa; la guida interattiva può '
+     'essere lanciata nuovamente dal pulsante sottostante.'),
 }
 
 HELP_EXTRA_CONTENT = {
@@ -3560,6 +4303,65 @@ HELP_EXTRA_CONTENT = {
             "历史记录是可选的；如果不想本地保存文本，可以关闭。",
         ]),
     ],
+
+    'pt': [('Melhores resultados de OCR',
+      ['Selecione apenas a área de texto, não a janela inteira. Capturas menores são mais rápidas e '
+       'limpas.',
+       "Use <span class='item-title'>Congelar tela durante OCR</span> quando a fonte se move, "
+       'desaparece ou desaparece.',
+       'Se faltar um idioma no Windows OCR, tente Tesseract ou instale o pacote de idiomas Windows '
+       'necessário.']),
+     ('Pacotes off-line',
+      ["<span class='item-title'>Tesseract</span> adiciona OCR offline e muitos idiomas de "
+       'reconhecimento.',
+       "<span class='item-title'>Argos</span> é uma tradução offline com pequenos pacotes de idiomas.",
+       "<span class='item-title'>Hy-MT</span> é um modelo local maior; instale-o somente quando "
+       'precisar de qualidade offline e tiver espaço em disco.']),
+     ('Atualizações e modo portátil',
+      ['Na inicialização, o aplicativo solicita silenciosamente ao GitHub a versão mais recente. Se o '
+       'seu estiver atual, você não verá nada; caso contrário, será oferecido a você <span '
+       "class='item-title'>Atualizar agora</span>, <span class='item-title'>Pular esta versão</span> "
+       "ou <span class='item-title'>Mais tarde</span>. Uma versão ignorada nunca mais será oferecida.",
+       'O botão de atualização baixa o arquivo de lançamento e substitui a pasta portátil '
+       'automaticamente.',
+       'Mantenha o aplicativo em uma pasta estável antes de ativar a inicialização automática, caso '
+       'contrário, Windows poderá apontar para o caminho antigo.',
+       'Configuração, cache, histórico e mecanismos locais ficam na pasta de dados do programa para '
+       'que o aplicativo possa ser movido como um pacote.']),
+     ('Privacidade',
+      ['Provedores online enviam texto para seus serviços. Use Argos, Hy-MT e Tesseract quando '
+       'precisar de trabalho apenas local.',
+       'O histórico e o histórico de cópias são opcionais; desative-os se não quiser que o texto seja '
+       'armazenado localmente.'])],
+    'it': [("I migliori risultati dell'OCR",
+      ["Seleziona solo l'area di testo, non l'intera finestra. Le acquisizioni più piccole sono più "
+       'veloci e più pulite.',
+       "Utilizzare <span class='item-title'>Blocca lo schermo durante l'OCR</span> quando la sorgente "
+       'si sposta, si attenua o scompare.',
+       'Se a Windows OCR manca una lingua, provare Tesseract o installare il pacchetto lingua Windows '
+       'necessario.']),
+     ('Pacchetti offline',
+      ["<span class='item-title'>Tesseract</span> aggiunge OCR offline e molte lingue di "
+       'riconoscimento.',
+       "<span class='item-title'>Argos</span> è la traduzione offline con piccoli pacchetti lingua.",
+       "<span class='item-title'>Hy-MT</span> è un modello locale più grande; installalo solo quando "
+       'hai bisogno della qualità offline e disponi di spazio su disco.']),
+     ('Aggiornamenti e modalità portatile',
+      ["All'avvio l'app richiede silenziosamente a GitHub la versione più recente. Se il tuo è attuale "
+       "non vedi nulla; in caso contrario, ti verrà offerto <span class='item-title'>Aggiorna "
+       "ora</span>, <span class='item-title'>Salta questa versione</span> o <span "
+       "class='item-title'>Più tardi</span>. Una versione saltata non viene mai più offerta.",
+       "Il pulsante Aggiorna scarica l'archivio della versione e sostituisce automaticamente la "
+       'cartella portatile.',
+       "Conserva l'app in una cartella stabile prima di abilitare l'avvio automatico, altrimenti "
+       'Windows potrebbe puntare al vecchio percorso.',
+       'Configurazione, cache, cronologia e motori locali risiedono nella cartella dei dati del '
+       "programma in modo che l'app possa essere spostata come un unico pacchetto."]),
+     ('Privacy',
+      ['I fornitori online inviano testo al loro servizio. Utilizza Argos, Hy-MT e Tesseract quando '
+       'hai bisogno di lavoro solo locale.',
+       'La cronologia e la cronologia delle copie sono facoltative; disattivali se non desideri che il '
+       'testo venga archiviato localmente.'])],
 }
 
 from settings_guide_content import update_help as _update_settings_help
@@ -3596,6 +4398,25 @@ BUG_REPORT_HELP_CONTENT = {
         "报告不包含剪贴板、历史记录、文档文本或 OCR 日志。",
         "如果应用无法启动，请在启动错误窗口中选择 <span class='item-title'>Create bug report</span>。",
     ])],
+
+    'pt': [('Relatórios de bugs',
+      ["Abra Ajuda <span class='item-title'>Ajuda → Relatar problema</span> para criar um ZIP de "
+       'diagnóstico e anexe-o a Problemas GitHub ou Telegram.',
+       'O relatório contém versão, sistema operacional, opções de mecanismo, verificações de arquivos '
+       'e logs do atualizador. Área de transferência, históricos, texto de documentos e registros de '
+       'OCR são excluídos.',
+       "Se o aplicativo não puder ser iniciado, use <span class='item-title'>Criar relatório de "
+       'problema</span> na janela de erro de inicialização; ele cria o mesmo tipo de relatório de '
+       'inicialização segura.'])],
+    'it': [('Segnalazioni di bug',
+      ["Apri Guida <span class='item-title'>Aiuto → Segnala un problema</span> per creare uno ZIP "
+       'diagnostico, quindi allegalo a GitHub Issues o Telegram.',
+       'Il rapporto contiene la versione, il sistema operativo, le scelte del motore, i controlli dei '
+       'file e i registri degli aggiornamenti. Sono esclusi gli appunti, le cronologie, il testo dei '
+       'documenti e i registri OCR.',
+       "Se l'app non può essere avviata, utilizza <span class='item-title'>Crea rapporto "
+       'diagnostico</span> nella finestra di errore di avvio; crea lo stesso tipo di rapporto di avvio '
+       'sicuro.'])],
 }
 
 LANGUAGE_PACKAGE_HELP_CONTENT = {
@@ -3653,6 +4474,33 @@ LANGUAGE_PACKAGE_HELP_CONTENT = {
             "如需删除语言包，请高亮已安装的行并选择“删除高亮项”。一个共享的 EasyOCR 模型可能同时用于多种相关语言。",
         ]),
     ],
+
+    'pt': [('Pacotes de idiomas',
+      ["Abra Configurações <span class='item-title'>Configurações → Pacotes de idiomas</span> e "
+       'instale os idiomas antes do OCR ou da tradução offline. O reconhecimento e a tradução nunca os '
+       'baixam silenciosamente.',
+       'Windows instala componentes OCR opcionais com permissão de administrador e mostra progresso '
+       'real. Tesseract e EasyOCR usam modelos de idioma local separados.',
+       'RapidOCR possui um pacote compartilhado em inglês + chinês; não suporta russo. Os pacotes '
+       'Argos são direcionais, como RU→EN, e um par que não seja em inglês pode exigir duas direções '
+       'através do inglês.',
+       'Os seletores de idioma mostram apenas os pacotes instalados e utilizáveis pelo mecanismo '
+       'escolhido.',
+       'Para remover um pacote, destaque sua linha instalada e escolha Remover destacado. Os modelos '
+       'EasyOCR compartilhados podem atender vários idiomas relacionados.'])],
+    'it': [('Pacchetti lingua',
+      ["Apri <span class='item-title'>Impostazioni → Pacchetti lingua</span> e installa le lingue "
+       "prima dell'OCR o della traduzione offline. Il riconoscimento e la traduzione non li scaricano "
+       'mai silenziosamente.',
+       'Windows installa componenti OCR opzionali con autorizzazione di amministratore e mostra '
+       'progressi reali. Tesseract e EasyOCR utilizzano modelli linguistici locali separati.',
+       'RapidOCR ha un pacchetto inglese + cinese condiviso; non supporta il russo. I pacchetti Argos '
+       'sono direzionali, come RU→EN, e una coppia non inglese può richiedere due direzioni tramite '
+       "l'inglese.",
+       'I selettori della lingua mostrano solo i pacchetti installati e utilizzabili dal motore '
+       'scelto.',
+       'Per rimuovere un pacchetto, evidenzia la riga installata e scegli Rimuovi evidenziato. I '
+       'modelli EasyOCR condivisi possono supportare diverse lingue correlate.'])],
 }
 
 
@@ -3717,6 +4565,35 @@ DOCUMENT_HELP_CONTENT = {
             "译文可本地保存为 .txt、.md 或可重新打开的会话。",
         ]),
     ],
+
+    'pt': [('Tradução de documentos',
+      ['Abra o ícone do documento na barra de título a qualquer momento. Para texto com mais de duas '
+       'linhas visuais, a entrada principal também mostra um ícone de expansão e transfere o texto '
+       'para a área de trabalho do documento.',
+       'Cole o texto lá, solte ou anexe um arquivo.txt,.md,.docx,.pdf,.html ou.rtf ou pressione Ctrl+O '
+       'na janela principal.',
+       'Escolha explicitamente o idioma de origem, o idioma de destino e o provedor. Argos mostra '
+       'apenas as direções cujos pacotes estão instalados.',
+       'Traduza o documento inteiro ou selecione um fragmento no campo esquerdo e escolha Traduzir '
+       'seleção.',
+       'Arquivos longos são divididos em partes ordenadas; pedaços com falha permanecem visíveis no '
+       'resultado.',
+       'As traduções podem ser salvas localmente como.txt,.md ou uma sessão reaberta na pasta de dados '
+       'do programa.'])],
+    'it': [('Traduzione di documenti',
+      ["Apri l'icona del documento nella barra del titolo in qualsiasi momento. Per il testo più lungo "
+       "di due righe visive, l'input principale mostra anche un'icona di espansione e trasferisce il "
+       "testo nell'area di lavoro del documento.",
+       'Incolla il testo lì, rilascia o allega un file.txt,.md,.docx,.pdf,.html o.rtf oppure premi '
+       'Ctrl+O dalla finestra principale.',
+       'Scegli esplicitamente la lingua di origine, la lingua di destinazione e il fornitore. Argos '
+       'mostra solo le direzioni i cui pacchetti sono installati.',
+       "Traduci l'intero documento oppure seleziona un frammento nel campo a sinistra e scegli Traduci "
+       'selezione.',
+       'I file lunghi vengono suddivisi in blocchi ordinati; i pezzi non riusciti rimangono visibili '
+       'nel risultato.',
+       'Le traduzioni possono essere salvate localmente come.txt,.md o come sessione riapribile nella '
+       'cartella dei dati del programma.'])],
 }
 
 
@@ -3727,6 +4604,37 @@ HELP_ACTION_TEXT = {
     "de": {"title": "Hilfe", "guide": "Tour starten", "github": "Projekt auf GitHub", "telegram": "Telegram", "report": "Fehlerbericht", "report_ready": "Der Berichtsordner ist fertig. Beschreiben Sie Schritte, Erwartung und Ergebnis und senden Sie die ZIP über GitHub oder Telegram.\n\nOrdner:\n{directory}\n\nDatei:\n{file}", "report_failed": "Der Diagnosebericht konnte nicht erstellt werden.\n\n{error}", "close": "Verstanden"},
     "fr": {"title": "Aide", "guide": "Lancer le guide", "github": "Projet sur GitHub", "telegram": "Telegram", "report": "Rapport d’erreur", "report_ready": "Le dossier du rapport est prêt. Décrivez les étapes, le résultat attendu et le résultat obtenu, puis envoyez le ZIP via GitHub ou Telegram.\n\nDossier :\n{directory}\n\nFichier :\n{file}", "report_failed": "Impossible de créer le rapport de diagnostic.\n\n{error}", "close": "Compris"},
     "zh": {"title": "帮助", "guide": "开始引导", "github": "GitHub 项目", "telegram": "Telegram", "report": "错误报告", "report_ready": "错误报告文件夹已创建。请说明操作步骤、预期结果和实际结果，并通过 GitHub 或 Telegram 发送 ZIP。\n\n文件夹：\n{directory}\n\n文件：\n{file}", "report_failed": "无法创建诊断报告。\n\n{error}", "close": "知道了"},
+
+    'pt': {'title': 'FAQ',
+     'guide': 'Iniciar guia interativo',
+     'github': 'ProjetoGitHub',
+     'telegram': 'Telegram',
+     'report': 'Relatar problema',
+     'report_ready': 'A pasta do relatório está pronta. Envie o arquivo ZIP pelo GitHub ou Telegram e '
+                     'descreva o que fez, o que esperava e o que aconteceu.\n'
+                     '\n'
+                     'Pasta:\n'
+                     '{directory}\n'
+                     '\n'
+                     'Arquivo para enviar:\n'
+                     '{file}',
+     'report_failed': 'Não foi possível criar o relatório de diagnóstico.\n\n{error}',
+     'close': 'Entendi'},
+    'it': {'title': 'FAQ',
+     'guide': 'Avvia la guida interattiva',
+     'github': 'ProgettoGitHub',
+     'telegram': 'Telegram',
+     'report': 'Segnala un problema',
+     'report_ready': 'La cartella del rapporto è pronta. Invia il file ZIP tramite GitHub o Telegram e '
+                     'descrivi cosa hai fatto, cosa ti aspettavi e cosa è successo.\n'
+                     '\n'
+                     'Cartella:\n'
+                     '{directory}\n'
+                     '\n'
+                     'File da inviare:\n'
+                     '{file}',
+     'report_failed': 'Impossibile creare il report diagnostico.\n\n{error}',
+     'close': 'Capito'},
 }
 
 
@@ -3847,6 +4755,25 @@ ARGOS_PACKAGE_DIALOG_TEXT = {
         "install": "下载并安装",
         "cancel": "暂不",
     },
+
+    'pt': {'title': 'Baixar o pacote de idiomas Argos?',
+     'eyebrow': 'ARGOS · TRADUÇÃO OFFLINE',
+     'direction': 'DIREÇÃO DE TRADUÇÃO',
+     'body': 'Esta direção ainda não está instalada. Após um download único, a tradução funciona '
+             'totalmente offline.',
+     'detail': 'Argos escolhe automaticamente um pacote direto ou uma rota em inglês. O download pode '
+               'ter várias centenas de megabytes.',
+     'install': 'Baixe e instale',
+     'cancel': 'Agora não'},
+    'it': {'title': 'Scaricare il pacchetto linguistico Argos?',
+     'eyebrow': 'ARGOS · TRADUZIONE OFFLINE',
+     'direction': 'DIREZIONE DELLA TRADUZIONE',
+     'body': 'Questa direzione non è ancora installata. Dopo un download una tantum, la traduzione '
+             'funziona completamente offline.',
+     'detail': "Argos sceglie automaticamente un pacchetto diretto o un percorso attraverso l'inglese. "
+               'Il download può essere di diverse centinaia di megabyte.',
+     'install': 'Scarica e installa',
+     'cancel': 'Non ora'},
 }
 
 
@@ -4010,6 +4937,23 @@ ARGOS_ERROR_DIALOG_TEXT = {
         "close": "关闭",
         "cancel": "取消",
     },
+
+    'pt': {'title': 'Falha na tradução',
+     'eyebrow': 'ARGOS · TRADUÇÃO OFFLINE',
+     'body': 'Argos não pôde concluir esta tradução. Tente mais uma vez. Se o erro persistir, '
+             'reinstale os pacotes para esta direção.',
+     'details': 'DETALHES TÉCNICOS',
+     'fallback': 'Argos não retornou uma descrição de erro.',
+     'close': 'Fechar',
+     'cancel': 'Cancelar'},
+    'it': {'title': 'Traduzione fallita',
+     'eyebrow': 'ARGOS · TRADUZIONE OFFLINE',
+     'body': "Argos non ha potuto completare questa traduzione. Prova ancora una volta. Se l'errore si "
+             'ripete, reinstallare i pacchetti per questa direzione.',
+     'details': 'DETTAGLI TECNICI',
+     'fallback': "Argos non ha restituito una descrizione dell'errore.",
+     'close': 'Chiudi',
+     'cancel': 'Annulla'},
 }
 
 
@@ -4160,6 +5104,21 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
         "copy_again": "再次复制",
         "swap": "交换语言",
     },
+
+    'pt': {'eyebrow': 'RESULTADO DA TRADUÇÃO',
+     'title': 'Tradução pronta',
+     'auto_copied': 'Copiado para a área de transferência automaticamente',
+     'ready': 'O resultado está pronto para ser copiado',
+     'copied': 'Copiado para a área de transferência',
+     'copy_again': 'Copie novamente',
+     'swap': 'Troque os idiomas'},
+    'it': {'eyebrow': 'RISULTATO DELLA TRADUZIONE',
+     'title': 'Traduzione pronta',
+     'auto_copied': 'Copiato automaticamente negli appunti',
+     'ready': 'Il risultato è pronto per la copia',
+     'copied': 'Copiato negli appunti',
+     'copy_again': 'Copia di nuovo',
+     'swap': 'Scambia le lingue'},
 }
 
 
@@ -4170,6 +5129,9 @@ for _lang, _edited in {
     "fr": "Texte modifié — prêt à copier",
     "es": "Texto editado — listo para copiar",
     "zh": "文本已修改，可以复制",
+
+    'pt': 'Texto editado – pronto para copiar',
+    'it': 'Testo modificato: pronto per la copia',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]["edited"] = _edited
 
@@ -4181,6 +5143,9 @@ for _lang, _labels in {
     "fr": ("Traduction", "Texte source", "Texte source modifié — cliquez sur Traduire"),
     "es": ("Traducción", "Texto original", "Texto original editado — pulsa Traducir"),
     "zh": ("译文", "原文", "原文已修改，请点击翻译"),
+
+    'pt': ('Tradução', 'Texto original', 'Texto fonte editado – clique em Traduzir'),
+    'it': ('Traduzione', 'Testo originale', 'Testo sorgente modificato: fai clic su Traduci'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(result_tab=_labels[0], source_tab=_labels[1], source_edited=_labels[2])
 
@@ -4192,6 +5157,12 @@ for _lang, _labels in {
     "fr": ("Traducteur", "Saisissez ou collez du texte", "La traduction apparaît ici", "Inverser les langues et les textes"),
     "es": ("Traductor", "Escribe o pega texto", "La traducción aparecerá aquí", "Intercambiar idiomas y textos"),
     "zh": ("翻译器", "输入或粘贴文本", "译文将显示在这里", "交换语言和文本"),
+
+    'pt': ('Tradutor', 'Digite ou cole o texto', 'Sua tradução aparece aqui', 'Trocar idiomas e texto'),
+    'it': ('Traduttore',
+     'Digita o incolla il testo',
+     'La tua traduzione appare qui',
+     'Scambia lingue e testo'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("workspace_title", "source_placeholder", "result_placeholder", "swap_texts"), _labels))
@@ -4204,6 +5175,19 @@ for _lang, _labels in {
     "fr": ("Saisie", "Masquer la saisie", "Afficher la saisie", "Ouvrir la traduction dans une fenêtre séparée", "Traduction précédente", "La saisie ou les langues ont changé. Cliquez sur Traduire."),
     "es": ("Entrada", "Ocultar entrada", "Mostrar entrada", "Abrir la traducción en otra ventana", "Traducción anterior", "La entrada o los idiomas han cambiado. Pulsa Traducir."),
     "zh": ("输入", "隐藏输入", "显示输入", "在独立窗口中打开译文", "上次译文", "输入或语言已更改，请点击翻译。"),
+
+    'pt': ('Entrada',
+     'Ocultar entrada',
+     'Mostrar entrada',
+     'Abra a tradução em uma janela separada',
+     'Tradução anterior',
+     'A entrada ou os idiomas foram alterados. Clique em Traduzir.'),
+    'it': ('Input',
+     'Nascondi input',
+     'Mostra input',
+     'Apri la traduzione in una finestra separata',
+     'Traduzione precedente',
+     "L'input o le lingue sono cambiati. Fare clic su Traduci."),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("input_tab", "hide_source", "show_source", "open_result", "previous_result", "result_needs_update"), _labels))
@@ -4216,6 +5200,9 @@ for _lang, _label in {
     'de': 'Übersetzung in Echtzeit',
     'fr': 'Traduction en temps réel',
     'zh': '正在实时翻译',
+
+    'pt': 'Traduzindo em tempo real',
+    'it': 'Traduzione in tempo reale',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]['live_translation'] = _label + '...'
 
@@ -4594,6 +5581,9 @@ class TranslationResultDialog(QDialog):
             'es': 'Proveedor solo para esta ventana. Los ajustes globales no cambian.',
             'fr': 'Fournisseur pour cette fenêtre uniquement. Les réglages globaux restent inchangés.',
             'zh': '仅更改此窗口的翻译引擎，不影响全局设置。',
+
+            'pt': 'Provedor apenas para esta janela. As configurações globais permanecem inalteradas.',
+            'it': 'Provider solo per questa finestra. Le impostazioni globali rimangono invariate.',
         }
         self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
 
@@ -7069,6 +8059,48 @@ HOTKEY_LANGUAGE_TEXT = {
         "replace": "替换",
         "hint": "{mode} · {hotkey}: {src} → {tgt}  ▾",
     },
+
+    'pt': {'mode_direction': 'Idiomas para o modo selecionado',
+     'text_section': 'Tradução de texto',
+     'hotkey_section': 'Atalhos de teclado',
+     'title': 'Idiomas para atalhos',
+     'body': 'Cada atalho de tradução mantém seu próprio par de idiomas.',
+     'bar_hint': 'Idiomas de atalhos — escolha um modo e depois sua direção',
+     'bar_caption': 'Idiomas:',
+     'mode_language_heading': 'Idiomas de tradução por modo',
+     'mode': 'Ação',
+     'from': 'De',
+     'to': 'Para',
+     'swap': 'Trocar idiomas',
+     'done': 'Concluído',
+     'no_pairs': 'Nenhum par de idiomas pronto. Instale primeiro os pacotes OCR ou Argos necessários.',
+     'ocr': 'OCR',
+     'fullscreen': 'Tela',
+     'game': 'Dinâmico',
+     'selection': 'Seleção',
+     'replace': 'Substituir',
+     'hint': '{mode} · {hotkey}: {src} → {tgt} ▾'},
+    'it': {'mode_direction': 'Lingue per la modalità selezionata',
+     'text_section': 'Traduzione del testo',
+     'hotkey_section': 'Scorciatoie da tastiera',
+     'title': 'Lingue per le scorciatoie',
+     'body': 'Ogni scorciatoia di traduzione mantiene la propria coppia linguistica.',
+     'bar_hint': 'Lingue dele scorciatoie: scegli una modalità, quindi la sua direzione',
+     'bar_caption': 'Lingue:',
+     'mode_language_heading': 'Lingue di traduzione per modalità',
+     'mode': 'Azione',
+     'from': 'Da',
+     'to': 'A',
+     'swap': 'Scambiare le lingue',
+     'done': 'Fatto',
+     'no_pairs': 'Nessuna coppia linguistica pronta. Installare prima i pacchetti OCR o Argos '
+                 'richiesti.',
+     'ocr': 'OCR',
+     'fullscreen': 'Schermo',
+     'game': 'Dinamico',
+     'selection': 'Selezione',
+     'replace': 'Sostituisci',
+     'hint': '{mode} · {hotkey}: {src} → {tgt} ▾'},
 }
 
 
@@ -7135,6 +8167,28 @@ MAIN_HOTKEY_TOOLTIPS = {
         "replace": "在其他应用中选中可编辑文字；相同选区会被译文替换，焦点变化时只复制结果。",
         "toggle": "隐藏应用到原来的位置，或从托盘/任务栏恢复。",
     },
+
+    'pt': {'copy': 'Selecione uma área da tela. OCR copia o texto reconhecido.',
+     'ocr': 'Selecione uma área da tela. OCR traduz com o par de idiomas deste modo.',
+     'fullscreen': 'Traduza blocos de texto visíveis em toda a tela com o par Tela.',
+     'game': 'Selecione o texto para ler e escolha onde exibir sua tradução ao vivo. Ajuste a saída e '
+             'salve os modelos. Pressione o atalho novamente para parar.',
+     'selection': 'Selecione o texto em outro aplicativo e traduza-o sem alterar o original.',
+     'replace': 'Selecione texto editável em outro aplicativo. A mesma seleção é substituída pela sua '
+                'tradução; se o foco for alterado, o resultado será apenas copiado.',
+     'toggle': 'Oculte o aplicativo em seu local anterior ou restaure-o na bandeja/barra de tarefas.'},
+    'it': {'copy': "Seleziona un'area dello schermo. L'OCR copia il testo riconosciuto.",
+     'ocr': "Seleziona un'area dello schermo. L'OCR lo traduce con la coppia linguistica di questa "
+            'modalità.',
+     'fullscreen': "Traduci i blocchi di testo visibili sull'intero schermo con la coppia di schermi.",
+     'game': 'Seleziona il testo da leggere, quindi scegli dove visualizzarne la traduzione in tempo '
+             "reale. Regola l'output e salva i modelli. Premi di nuovo la scorciatoia per "
+             'interrompere.',
+     'selection': "Seleziona il testo in un'altra app, quindi traducilo senza modificare l'originale.",
+     'replace': "Seleziona il testo modificabile in un'altra app. La stessa selezione è sostituita "
+                'dalla sua traduzione; se il focus è cambiato, il risultato viene solo copiato.',
+     'toggle': "Nascondi l'app nella posizione precedente o ripristinala dalla barra delle "
+               'applicazioni/barra delle applicazioni.'},
 }
 
 
@@ -7192,6 +8246,19 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
         "open": "打开设置",
         "cancel": "取消",
     },
+
+    'pt': {'title': 'Configurações de atalhos',
+     'edit_hint': 'Clique em qualquer lugar nesta linha para configurar o atalho.',
+     'set': 'Definir um atalho para “{action}” em Configurações?',
+     'change': 'Alterar o atalho “{action}” ({hotkey}) em Configurações?',
+     'open': 'Abrir configurações',
+     'cancel': 'Cancelar'},
+    'it': {'title': 'Impostazioni dele scorciatoie',
+     'edit_hint': 'Fare clic in un punto qualsiasi di questa riga per configurare la scorciatoia.',
+     'set': 'Impostare un scorciatoia per "{action}" in Impostazioni?',
+     'change': 'Modificare la scorciatoia "{action}" ({hotkey}) in Impostazioni?',
+     'open': 'Apri le impostazioni',
+     'cancel': 'Annulla'},
 }
 
 # Full action names share a line with their shortcuts in two aligned columns.
@@ -7202,6 +8269,23 @@ MAIN_HOTKEY_COMPACT_CAPTIONS = {
     "de": {"copy": "Text kopieren", "ocr": "Bereich übersetzen", "fullscreen": "Bildschirm übersetzen", "selection": "Auswahl übersetzen", "replace": "Auswahl ersetzen", "toggle": "Fenster ein- oder ausblenden", "game": "Dynamische Übersetzung", "recognition": "Texterkennung"},
     "fr": {"copy": "Copier le texte", "ocr": "Traduire une zone", "fullscreen": "Traduire l’écran", "selection": "Traduire la sélection", "replace": "Remplacer par la traduction", "toggle": "Afficher/masquer la fenêtre", "game": "Traduction dynamique", "recognition": "Reconnaissance"},
     "zh": {"copy": "复制文字", "ocr": "翻译屏幕区域", "fullscreen": "翻译整个屏幕", "selection": "翻译选中文字", "replace": "用译文替换选区", "toggle": "显示或隐藏窗口", "game": "动态翻译", "recognition": "文字识别"},
+
+    'pt': {'copy': 'Copiar texto',
+     'ocr': 'Traduzir área',
+     'fullscreen': 'Traduzir tela',
+     'selection': 'Traduzir seleção',
+     'replace': 'Substitua pela tradução',
+     'toggle': 'Mostrar ou ocultar janela',
+     'game': 'Tradução dinâmica',
+     'recognition': 'Reconhecimento de texto'},
+    'it': {'copy': 'Copia testo',
+     'ocr': 'Traduci area',
+     'fullscreen': 'Traduci schermo',
+     'selection': 'Traduci la selezione',
+     'replace': 'Sostituisci con la traduzione',
+     'toggle': 'Mostra o nascondi la finestra',
+     'game': 'Traduzione dinamica',
+     'recognition': 'Riconoscimento del testo'},
 }
 
 
@@ -10944,7 +12028,7 @@ class DarkThemeApp(QMainWindow):
         ocr_engine = cached_config.get(
             "ocr_engine", platform_support.default_ocr_engine()
         )
-        
+
         self.main_text_section = QFrame()
         self.main_text_section.setObjectName("mainTextSection")
         text_section_layout = QVBoxLayout(self.main_text_section)

@@ -145,7 +145,7 @@ def test_builtin_art_is_valid_with_transparent_background(app, appearance):
     assert pixmap.toImage().pixelColor(0, 0).alpha() == 0
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh'])
+@pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh', 'pt', 'it'])
 @pytest.mark.parametrize('selected_appearance', ['portrait', 'animated'])
 def test_companion_settings_and_menu_fit(window, app, language, selected_appearance):
     from qt_layout_test_support import ensure_layout_fonts

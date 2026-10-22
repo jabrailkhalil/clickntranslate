@@ -64,7 +64,10 @@ def prepare_language_search(combo):
                 break
             owner = owner.parentWidget()
         search.setPlaceholderText({'ru': 'Найти язык…', 'es': 'Buscar idioma…', 'de': 'Sprache suchen…',
-                                   'fr': 'Rechercher une langue…', 'zh': '搜索语言…'}.get(lang, 'Find a language…'))
+                                   'fr': 'Rechercher une langue…', 'zh': '搜索语言…',
+            'pt': 'Encontre um idioma…',
+            'it': 'Trova una lingua...',
+        }.get(lang, 'Find a language…'))
         search.setAccessibleName(search.placeholderText())
         search.setClearButtonEnabled(True)
         popup.layout().insertWidget(0, search)

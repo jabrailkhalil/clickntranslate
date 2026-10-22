@@ -39,11 +39,47 @@ LOCALIZED_LANGUAGE_NAMES = {
         "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
         "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
     },
+
+    'pt': {'en': 'Inglês',
+     'ru': 'Russo',
+     'de': 'Alemão',
+     'fr': 'Francês',
+     'es': 'Espanhol',
+     'it': 'Italiano',
+     'pt': 'Português',
+     'pl': 'Polonês',
+     'uk': 'Ucraniano',
+     'tr': 'Turco',
+     'nl': 'Holandês',
+     'zh': 'Chinês',
+     'ja': 'Japonês',
+     'ko': 'Coreano',
+     'ar': 'Árabe',
+     'hi': 'Híndi'},
+    'it': {'en': 'Inglese',
+     'ru': 'Russo',
+     'de': 'Tedesco',
+     'fr': 'Francese',
+     'es': 'Spagnolo',
+     'it': 'Italiano',
+     'pt': 'Portoghese',
+     'pl': 'Polacco',
+     'uk': 'Ucraino',
+     'tr': 'Turco',
+     'nl': 'Olandese',
+     'zh': 'Cinese',
+     'ja': 'Giapponese',
+     'ko': 'Coreano',
+     'ar': 'Arabo',
+     'hi': 'Hindi'},
 }
 
 AUTO_LANGUAGE_NAMES = {
     'en': 'Detect language', 'ru': 'Определить язык', 'de': 'Sprache erkennen',
     'es': 'Detectar idioma', 'fr': 'Détecter la langue', 'zh': '自动检测语言',
+
+    'pt': 'Detectar idioma',
+    'it': 'Rileva la lingua',
 }
 
 

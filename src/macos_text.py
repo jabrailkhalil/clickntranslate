@@ -49,6 +49,33 @@ TEXT = {
         'python': '运行 Python 版本时，macOS 可能会显示 Python 或 Terminal，而不是应用名称。',
         'vision_note': 'macOS 内置识别。语言由系统管理，无需下载语言包。',
     },
+
+    'pt': {'title': 'Permissão do macOS',
+     'open': 'Abrir ajustes',
+     'later': 'Mais tarde',
+     'screen': 'Autorize Click’n’Translate em Ajustes do Sistema → Privacidade e Segurança → '
+               'Gravação de tela. Isso é necessário para reconhecer o texto na tela.',
+     'accessibility': 'Autorize Click’n’Translate em Ajustes do Sistema → Privacidade e '
+                      'Segurança → Acessibilidade. Isso é necessário para copiar e substituir o texto '
+                      'selecionado em outros aplicativos.',
+     'retry': 'Em seguida, repita a ação. Reinicie o aplicativo se o macOS solicitar.',
+     'python': 'Ao executar a versão Python, o macOS pode listar Python ou Terminal em vez do '
+               'aplicativo.',
+     'vision_note': 'Integrado ao macOS. Os idiomas são gerenciados pelo sistema; nenhum download de '
+                    'pacote é necessário.'},
+    'it': {'title': 'Autorizzazione macOS',
+     'open': 'Apri Impostazioni',
+     'later': 'Più tardi',
+     'screen': 'Consenti Click’n’Translate in Impostazioni di sistema → Privacy e sicurezza → '
+               'Registrazione schermo. Ciò è necessario per riconoscere il testo sullo schermo.',
+     'accessibility': 'Consenti Click’n’Translate in Impostazioni di sistema → Privacy e sicurezza → '
+                      'Accessibilità. Ciò è necessario per copiare e sostituire il testo selezionato '
+                      'in altre app.',
+     'retry': "Quindi riprovare l'azione. Riavvia l'app se macOS te lo chiede.",
+     'python': 'Quando si esegue la versione Python, macOS potrebbe elencare Python o Terminale '
+               "anziché l'app.",
+     'vision_note': 'Integrato in macOS. Le lingue sono gestite dal sistema; non è necessario '
+                    'scaricare alcun pacchetto.'},
 }
 
 

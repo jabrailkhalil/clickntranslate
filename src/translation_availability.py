@@ -21,10 +21,30 @@ _TEXT = {
     'zh': ('离线翻译尚未就绪', '尚未安装 {pair} 的 Argos 语言包。',
            '缺少 Hy-MT 模型或本地运行程序。', '打开安装页面',
            '可用翻译引擎', '使用所选引擎', '在线 · 需要网络', '离线'),
+
+    'pt': ('A tradução offline não está pronta',
+     'O pacote Argos para {pair} não está instalado.',
+     'O modelo Hy-MT ou seu executável local não foi encontrado.',
+     'Abrir instalação',
+     'Tradutores disponíveis',
+     'Usar selecionado',
+     'On-line · internet necessária',
+     'Offline'),
+    'it': ('La traduzione offline non è pronta',
+     'Il pacchetto Argos per {pair} non è installato.',
+     'Il modello Hy-MT o il suo eseguibile locale non è presente.',
+     'Apri installazione',
+     'Traduttori disponibili',
+     'Usa selezionato',
+     'Online · Internet richiesto',
+     'Offline'),
 }
 _KEYS = ('title', 'argos', 'hymt', 'install', 'available', 'use', 'online', 'offline')
 _DOWNLOAD = {'en': 'Download now', 'ru': 'Скачать сейчас', 'es': 'Descargar ahora',
-             'de': 'Jetzt herunterladen', 'fr': 'Télécharger', 'zh': '立即下载'}
+             'de': 'Jetzt herunterladen', 'fr': 'Télécharger', 'zh': '立即下载',
+    'pt': 'Baixe agora',
+    'it': 'Scarica ora',
+}
 _RUNTIME = {
     'en': 'Argos could not start. Check its installation or choose another translator.',
     'ru': 'Не удалось запустить Argos. Проверьте установку или выберите другой переводчик.',
@@ -32,6 +52,9 @@ _RUNTIME = {
     'de': 'Argos konnte nicht starten. Installation prüfen oder einen anderen Übersetzer wählen.',
     'fr': 'Argos n’a pas pu démarrer. Vérifiez l’installation ou choisissez un autre traducteur.',
     'zh': 'Argos 无法启动。请检查安装或选择其他翻译引擎。',
+
+    'pt': 'Argos não pôde ser iniciado. Verifique sua instalação ou escolha outro tradutor.',
+    'it': 'Impossibile avviareArgos. Controlla la sua installazione o scegli un altro traduttore.',
 }
 
 

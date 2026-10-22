@@ -241,6 +241,9 @@ class SelectionQuickTranslateController(QtCore.QObject):
                 "de": "Bedienungshilfen für die Auswahlübersetzung aktivieren",
                 "fr": "Activez l’accessibilité pour traduire le texte sélectionné",
                 "zh": "请启用辅助功能以翻译选中的文字",
+
+                'pt': 'Ative a acessibilidade para tradução de seleção rápida',
+                'it': "Abilita l'accessibilità per la traduzione rapida della selezione",
             }
         }
         localized = messages.get(message_key, {})

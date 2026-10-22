@@ -84,6 +84,53 @@ COPY = {
     '主窗口 → 选中文字 → 语言设置，或设置快捷键 → 选中文字模式。选择文字后可使用快捷键、显示文字旁的按钮或立即翻译。它们使用相同模式、语言和翻译服务。',
     '一次请求使用所选模型识别并翻译图像。“保存并选用”也将此服务用于普通文字。密钥保留在系统密钥库中，不会导出。云服务可能收费。',
  ),
+
+    'pt': ('Configurações de tradução e resultados',
+     'Geral: inicialização, histórico, dicas de ferramentas, verificações de atualização, janela de '
+     'resultados, escala de interface e tamanho do texto do resultado com visualização.',
+     'Tradução e OCR: motores, cópia, substituição de seleção, restauração da área de transferência, '
+     'fechamento do resultado ao clicar fora e opções de captura. Todas as opções de OCR ficam '
+     'visíveis.',
+     'Pacotes de idiomas → API',
+     'Na aba API de Pacotes de idiomas, escolha um serviço e informe a chave e o ID do modelo. Salvar '
+     'e selecionar ativa o serviço para tradução; os modos de reconhecimento também o ativam para OCR. '
+     'O uso de API é opcional.',
+     'Texto do resultado',
+     'Em Configurações gerais, as setas de Texto do resultado alteram o tamanho da tradução e '
+     'atualizam o exemplo imediatamente. Escala ajusta toda a interface separadamente.',
+     'Fechamento do resultado',
+     'Fechar resultado ao clicar fora fica em Tradução e OCR. Ative para fechar a janela de tradução '
+     'ao clicar em outro aplicativo. Vem desativado.',
+     'Iniciando tradução de seleção',
+     'Janela principal → Seleção → idiomas, ou Configurar atalhos → Modo de seleção. Em Após '
+     'selecionar, escolha o atalho, um botão ao lado do texto ou tradução imediata. As três opções '
+     'usam o mesmo modo, par de idiomas e tradutor.',
+     'Uma solicitação reconhece e traduz uma imagem usando o modelo escolhido. Salvar e selecionar '
+     'também usa este serviço para texto simples. As chaves permanecem no cofre do sistema e não são '
+     'exportadas. O serviço de nuvem pode cobrar pelas solicitações.'),
+    'it': ('Impostazioni di traduzione e risultati',
+     'Generale: avvio, cronologia, descrizioni comandi, controlli degli aggiornamenti, finestra dei '
+     "risultati, scala dell'interfaccia e dimensione del testo dei risultati con un'anteprima.",
+     'Traduzione e OCR: motori, copia, sostituzione della selezione, ripristino degli appunti, '
+     'chiusura con clic esterno e opzioni di acquisizione. Tutte le opzioni OCR sono subito visibili.',
+     'Pacchetti lingua → API',
+     'Nella scheda API di Pacchetti lingua, scegli un servizio e inserisci la chiave e l’ID del '
+     'modello. Salva e seleziona lo attiva per la traduzione; le modalità di riconoscimento lo '
+     'attivano anche per l’OCR. L’API è facoltativa.',
+     'Testo del risultato',
+     'In Impostazioni generali, le frecce di Testo del risultato cambiano la dimensione della '
+     'traduzione e aggiornano subito l’esempio. Scala regola separatamente l’intera interfaccia.',
+     'Chiusura del risultato',
+     'Chiudi risultato con clic esterno si trova in Traduzione e OCR. Attivalo per chiudere la '
+     'finestra della traduzione quando fai clic in un’altra app. È disattivato per impostazione '
+     'predefinita.',
+     'Avvio della traduzione della selezione',
+     'Finestra principale → Selezione → lingue, oppure Configura scorciatoie → Modalità di selezione. '
+     'In Dopo la selezione, scegli la scorciatoia, un pulsante accanto al testo o la traduzione '
+     'immediata. Le tre opzioni usano la stessa modalità, coppia di lingue e servizio.',
+     "Una richiesta riconosce e traduce un'immagine utilizzando il modello scelto. Salva e seleziona "
+     'utilizza questo servizio anche per il testo semplice. Le chiavi rimangono nel vault di sistema e '
+     'non vengono esportate. Il servizio cloud potrebbe addebitare costi per le richieste.'),
 }
 
 

@@ -175,7 +175,7 @@ class GuideSetupTest(unittest.TestCase):
 
     def _check_card_layout(self, configured):
         for theme in ("Темная", "Светлая"):
-            for language in ("ru", "en", "de", "fr", "es", "zh"):
+            for language in ("ru", "en", "de", "fr", "es", "zh", "pt", "it"):
                 self.window._guide_active = False
                 self.window.config.update({
                     key: desired if configured else not desired

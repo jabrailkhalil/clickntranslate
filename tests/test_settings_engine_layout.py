@@ -63,7 +63,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         return point.x(), point.y(), widget.width(), widget.height()
 
     def test_dynamic_page_note_never_hard_codes_the_configurable_shortcut(self):
-        for language in ("en", "ru", "es", "de", "fr", "zh"):
+        for language in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             self.assertNotIn(
                 "Ctrl+Alt+G",
                 settings_text(language, "game_workflow_note"),
@@ -404,7 +404,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
 
     def test_every_language_says_what_the_row_controls(self):
         """"Show:" and one-word rows did not say show what, or after what."""
-        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+        for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             parent, settings = self._result_window_settings(lang=lang)
             control = settings.result_window_control
 
@@ -433,7 +433,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         """It shares its line with the Show-window picker, so anything past the
         box is drawn over by that control — which is what happened to the longer
         languages while the box was a flat 260px."""
-        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+        for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             parent, settings = self._result_window_settings(lang=lang)
             box = settings.copy_translated_checkbox
             self.assertGreaterEqual(box.width(), box.sizeHint().width(), (lang, box.text()))
@@ -479,7 +479,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
 
     def test_the_summary_fits_the_closed_control_in_every_language(self):
         """The window cannot grow, so the summary has to fit at its widest."""
-        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+        for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             parent, settings = self._result_window_settings(lang=lang)
             label = settings.result_window_label
             control = settings.result_window_control
@@ -506,7 +506,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.app.processEvents()
 
     def test_the_new_row_does_not_push_content_out_of_the_fixed_window(self):
-        for lang in ("en", "ru", "es", "de", "fr", "zh"):
+        for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
             parent, settings = self._result_window_settings(lang=lang)
             lowest = max(
                 child.mapTo(settings, child.rect().bottomLeft()).y()
@@ -768,7 +768,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             for theme in ("Темная", "Светлая"):
                 parent.current_theme = theme
                 theme_geometry = None
-                for language in ("en", "ru", "es", "de", "fr", "zh"):
+                for language in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
                     parent.current_interface_language = language
                     settings._set_settings_page(0)
                     settings.update_language()
