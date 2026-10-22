@@ -90,7 +90,7 @@ jobs:
         run: |
           .venv-macos/bin/python tools/run_regression_tests.py --output build/macos/portable-tests \
             tests/test_macos_*.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py \
-            tests/test_document_services.py tests/test_single_instance.py
+            tests/test_document_services.py tests/test_single_instance.py tests/test_theme_button.py
       - name: Keep platform test results
         if: always() && !inputs.signing_only
         uses: actions/upload-artifact@v4

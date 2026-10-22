@@ -11363,6 +11363,9 @@ class DarkThemeApp(QMainWindow):
             except RuntimeError:
                 self.document_button = None
 
+    # Keep the zero-argument Qt slot explicit: the timing wrapper accepts
+    # *args, so PyQt otherwise forwards clicked(bool) into toggle_theme(self).
+    @QtCore.pyqtSlot()
     @measure('ui.theme')
     def toggle_theme(self):
         # Apply the parent and every open child as one paint transaction.  Qt

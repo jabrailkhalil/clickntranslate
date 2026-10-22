@@ -521,7 +521,7 @@ def main_direction_and_theme_check(main, app, window):
     from PyQt5.QtCore import Qt
     from PyQt5.QtTest import QTest
     previous = dict(window.config)
-    results = {'direction_clicks': 0, 'theme_frames': 0}
+    results = {'direction_clicks': 0, 'theme_clicks': 0, 'theme_frames': 0}
     try:
         window.config.update(translator_engine='argos', main_translation_source_language='en',
                              main_translation_target_language='ru', hotkey_language_editor_mode='selection',
@@ -545,7 +545,12 @@ def main_direction_and_theme_check(main, app, window):
         for page in ('main', 'settings'):
             window.show_main_screen() if page == 'main' else window.show_settings()
             for _ in range(4):
+                previous_theme = window.current_theme
                 click(window.theme_button)
+                expected_theme = 'Светлая' if previous_theme == 'Темная' else 'Темная'
+                assert window.current_theme == expected_theme, (page, previous_theme, window.current_theme)
+                assert window.config['theme'] == expected_theme
+                results['theme_clicks'] += 1
                 expected = main.THEMES[window.current_theme]['background']
                 for delay in (0, 40):
                     QTest.qWait(delay)
