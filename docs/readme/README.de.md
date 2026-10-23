@@ -5,7 +5,7 @@
 <h1 align="center">Click’n’Translate</h1>
 
 <p align="center"><strong>Lies Bildschirmtext in deiner Sprache.</strong></p>
-<p align="center">Windows · macOS · Linux · Android</p>
+<p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
@@ -43,7 +43,30 @@
 
 [Alle Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
 
-## Text verstehen, ohne Umwege
+<a name="android"></a>
+
+## Auf Android: übersetzen, ohne die App zu verlassen
+
+**Eine schwebende Schaltfläche für Spiele und Apps sowie Text- und Fotoübersetzung.** Die App läuft auf dem Smartphone; Computer und Root-Zugriff sind nicht nötig.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/android-home-dark-1.8.2.png">
+    <img src="../images/android-home-light-1.8.2.png" alt="Android-Startseite mit Sprachauswahl sowie Bildschirm-, Bild- und Textübersetzung" width="280">
+  </picture>
+</p>
+
+<p align="center"><sub>Android 1.8.2, hier auf Russisch. Sechs Oberflächensprachen stehen zur Verfügung, darunter Deutsch.</sub></p>
+
+1. **Installiere die APK** auf einem ARM64-Gerät mit Android 8.0 oder neuer. Wähle Sprache, Design und Übersetzungssprachen.
+2. **Starte die Bildschirmübersetzung.** Erlaube die Anzeige über anderen Apps und bestätige die Bildschirmfreigabe. Wähle ab Android 14 den gesamten Bildschirm, um in anderen Apps zu übersetzen.
+3. **Öffne dein Spiel oder deine App und tippe auf die schwebende Schaltfläche.** Die Übersetzung erscheint darüber. Halte die Schaltfläche gedrückt, um einen Bereich oder einen anderen Modus auszuwählen.
+
+Du kannst auch Text eingeben, einfügen oder aus einer anderen App mit **Clickn** teilen sowie Fotos und Screenshots aus der Galerie übersetzen. Ergebnisse lassen sich kopieren, teilen und im lokalen Textverlauf wiederfinden. Google benötigt keinen Schlüssel; ML Kit übersetzt nach dem Herunterladen unterstützter Sprachmodelle offline. Zusätzliche API-Dienste verwenden deine eigenen Zugangsdaten.
+
+**[APK herunterladen](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android-Anleitung (Englisch)](../ANDROID.md) · [Android-Quellcode](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+
+## Auf dem Desktop: Text verstehen, ohne Umwege
 
 Bereichs-OCR, Vollbildübersetzung, markierter Text in anderen Apps, Ersetzen durch Übersetzung und dynamische Übersetzung mehrerer Bereiche. Dokumente lassen sich mit Original und Übersetzung nebeneinander bearbeiten.
 
