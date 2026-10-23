@@ -8417,7 +8417,9 @@ class SettingsWindow(QWidget):
         # --- ГРУППА ЧЕКБОКСОВ ---
         # The layout margin already supplies the intended 5px top inset.
 
-        fixed_height = 28
+        # One checkbox size across every page; nine OCR rows must also fit the
+        # fixed settings viewport without hiding the last option.
+        fixed_height = 25
         engine_combo_width = 180
         engine_control_height = 28
         # Three joined action rows must fit above the pager in the real

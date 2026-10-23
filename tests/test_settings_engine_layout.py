@@ -693,6 +693,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 settings.dim_screen_during_ocr_checkbox,
                 settings.restore_clipboard_checkbox,
                 settings.copy_notification_checkbox,
+                settings.close_result_on_outside_click_checkbox,
+                settings.ocr_join_paragraphs_checkbox,
                 settings.update_check_on_launch_checkbox,
             )
             self.assertTrue(all(box.objectName() == "settingsPageCheckbox" for box in secondary_checks))

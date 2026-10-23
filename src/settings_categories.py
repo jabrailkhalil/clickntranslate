@@ -63,6 +63,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     lang = settings.parent.current_interface_language
     captions = CAPTIONS.get(lang, CAPTIONS['en'])
     compact = COMPACT.get(lang, COMPACT['en'])
+    checkbox_height = settings.autostart_checkbox.height()
     # Detach layout items, retaining the existing controls and their signals.
     while form.count():
         form.takeAt(0)
@@ -128,7 +129,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     for row, flag in enumerate(flags):
         flag.setParent(content)
         flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(25)
+        flag.setFixedHeight(checkbox_height)
         grid.addWidget(flag, row, 0, Qt.AlignLeft)
     settings.close_result_on_outside_click_checkbox = QCheckBox(
         settings_text(lang, 'close_result_window_on_outside_click'), content)
@@ -139,7 +140,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     close_flag.toggled.connect(lambda checked: settings.auto_save_setting(
         'close_result_window_on_outside_click', bool(checked)))
     close_flag.setObjectName('settingsPageCheckbox')
-    close_flag.setFixedHeight(25)
+    close_flag.setFixedHeight(checkbox_height)
     grid.addWidget(close_flag, 3, 0, 1, 3, Qt.AlignLeft)
     paragraph_label, paragraph_hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
     settings.ocr_join_paragraphs_checkbox = QCheckBox(paragraph_label, content)
@@ -148,7 +149,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs') is True)
     paragraph_flag.setToolTip(tooltip_text(paragraph_hint))
     paragraph_flag.setAccessibleDescription(paragraph_hint)
-    paragraph_flag.setFixedHeight(25)
+    paragraph_flag.setFixedHeight(checkbox_height)
     paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))
     grid.addWidget(paragraph_flag, 4, 0, 1, 3, Qt.AlignLeft)
     for row, label, control in (
@@ -176,17 +177,17 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     for row, flag in ((5, settings.keep_visible_checkbox), (6, settings.freeze_screen_checkbox)):
         flag.setParent(content)
         flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(25)
+        flag.setFixedHeight(checkbox_height)
         grid.addWidget(flag, row, 0, 1, 3, Qt.AlignLeft)
     # Dimming belongs to the same visible form, not an expanding subpage.
     while dim_row.count():
         dim_row.takeAt(0)
     settings.dim_screen_during_ocr_checkbox.setParent(content)
-    settings.dim_screen_during_ocr_checkbox.setFixedHeight(25)
+    settings.dim_screen_during_ocr_checkbox.setFixedHeight(checkbox_height)
     grid.addWidget(settings.dim_screen_during_ocr_checkbox, 7, 0, Qt.AlignLeft)
     from PyQt5.QtWidgets import QHBoxLayout
     dim_controls = QWidget(content)
-    dim_controls.setFixedHeight(25)
+    dim_controls.setFixedHeight(checkbox_height)
     slider_row = QHBoxLayout(dim_controls)
     slider_row.setContentsMargins(0, 0, 0, 0)
     slider_row.addStretch(1)
@@ -194,7 +195,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     slider_row.addWidget(settings.ocr_dim_strength_slider)
     grid.addWidget(dim_controls, 7, 1, 1, 2)
     settings.copy_notification_checkbox.setParent(content)
-    settings.copy_notification_checkbox.setFixedHeight(25)
+    settings.copy_notification_checkbox.setFixedHeight(checkbox_height)
     grid.addWidget(settings.copy_notification_checkbox, 8, 0, 1, 3, Qt.AlignLeft)
     body.addStretch(1)
     settings.translation_action_panel = QWidget(settings.settings_updates_page)
