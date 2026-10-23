@@ -5,7 +5,7 @@
 <h1 align="center">Click’n’Translate</h1>
 
 <p align="center"><strong>Lee el texto de tu pantalla en tu idioma.</strong></p>
-<p align="center">Windows · macOS · Linux · Android</p>
+<p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
@@ -43,7 +43,30 @@ Traduce juegos, copia texto de imágenes, entiende documentos y sustituye mensaj
 
 [Todas las descargas](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
 
-## Del texto al resultado
+<a name="android"></a>
+
+## En Android: traduce sin salir de tu aplicación
+
+**Un botón flotante para juegos y aplicaciones, además de traducción de texto y fotos.** Funciona en el teléfono; no necesita ordenador ni acceso root.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/android-home-dark-1.8.2.png">
+    <img src="../images/android-home-light-1.8.2.png" alt="Pantalla de inicio de Android con idiomas y acciones de traducción de pantalla, imágenes y texto" width="280">
+  </picture>
+</p>
+
+<p align="center"><sub>Interfaz de Android 1.8.2, mostrada en ruso. Disponible en seis idiomas, incluido español.</sub></p>
+
+1. **Instala el APK** en un dispositivo Android 8.0+ ARM64. Elige el idioma de la interfaz, el tema y los idiomas de traducción.
+2. **Inicia la traducción de pantalla.** Permite mostrar sobre otras aplicaciones y acepta la captura de pantalla. En Android 14+, comparte toda la pantalla para traducir entre aplicaciones.
+3. **Abre tu juego o aplicación y toca el botón flotante.** Lee la traducción sobre la pantalla. Mantén pulsado el botón para elegir una región u otro modo en su menú.
+
+También puedes escribir o pegar texto, compartirlo con **Clickn** desde otra aplicación y traducir fotos o capturas de la galería. Copia o comparte los resultados y consulta el historial local de texto. Google funciona sin clave; ML Kit permite traducir sin conexión tras descargar los modelos de los idiomas compatibles. Los servicios API adicionales utilizan tus propias credenciales.
+
+**[Descargar APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Guía de Android (inglés)](../ANDROID.md) · [Código de Android](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+
+## En el ordenador: del texto al resultado
 
 Traduce una zona, toda la pantalla o una selección de otra aplicación. El modo de sustitución puede seleccionar todo el campo antes de pegar la traducción. La traducción dinámica sigue varias zonas; el espacio de documentos permite editar original y resultado.
 

@@ -5,7 +5,7 @@
 <h1 align="center">Click’n’Translate</h1>
 
 <p align="center"><strong>Your screen. Your language.</strong></p>
-<p align="center">Windows · macOS · Linux · Android</p>
+<p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
@@ -43,14 +43,37 @@
 
 [All downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
 
-## Translate where you already are
+<a name="android"></a>
+
+## On Android: translate without leaving your app
+
+**A floating button for games and apps, plus text and photo translation.** The Android app runs on your phone; no computer or root access is needed.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/android-home-dark-1.8.2.png">
+    <img src="docs/images/android-home-light-1.8.2.png" alt="Android home screen with translation languages, screen capture, image and text actions" width="280">
+  </picture>
+</p>
+
+<p align="center"><sub>Android 1.8.2 interface, shown in Russian. Six interface languages are available.</sub></p>
+
+1. **Install the APK** on an Android 8.0+ ARM64 device. Choose the interface language, theme and translation languages.
+2. **Start screen translation.** Allow display over other apps and approve Android’s screen-sharing prompt. On Android 14+, share the entire screen to translate across apps.
+3. **Open your game or app and tap the floating button.** Read the translation over the screen. Hold the button to open its menu and choose a region or another translation mode.
+
+You can also type or paste text, share text to **Clickn** from another app, or translate a photo or screenshot from your gallery. Copy or share results and revisit local text history. Google works without a key; ML Kit offers offline translation after downloading supported language models. Additional API services use your own credentials.
+
+**[Download APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android guide](docs/ANDROID.md) · [Android source](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+
+## On desktop: translate where you already are
 
 - **Games, screenshots and apps:** draw a rectangle to recognize and translate text you cannot select.
 - **Messages and documents:** translate a selection, replace a draft with its translation, or edit original and result side by side.
 - **Changing text:** follow one or more screen regions with dynamic translation. Read results over the original or in a separate area.
 - **Just need the text?** Copy recognized text from any screen area straight to the clipboard.
 
-The desktop document workspace opens TXT, Markdown, DOCX, text-based PDF, HTML and RTF. Android has a dedicated [screen, text and photo translation interface](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme).
+The desktop document workspace opens TXT, Markdown, DOCX, text-based PDF, HTML and RTF. See the [Android guide](docs/ANDROID.md) for the mobile screen, text and photo workflows.
 
 ## More ways to use it
 
@@ -81,7 +104,7 @@ Local OCR processes images on your device. Online services receive text; an enab
 
 ## Make it comfortable
 
-Eight interface languages, light and dark themes, adjustable interface scale and a separate result-text size. Customize shortcuts and language pairs for each mode; keep optional local histories or export your settings. An optional desktop companion puts translation actions a click away.
+The desktop app has eight interface languages, light and dark themes, adjustable interface scale and a separate result-text size. Customize shortcuts and language pairs for each mode; keep optional local histories or export your settings. An optional desktop companion puts translation actions a click away.
 
 <details>
 <summary>Default desktop shortcuts</summary>
@@ -100,7 +123,7 @@ Change them in **Settings → Configure hotkeys**. On Mac, use Command for Ctrl 
 
 </details>
 
-## Get started
+## Get started on desktop
 
 1. **Install your build.** Python is included. Extract the whole archive if you choose Windows portable.
 2. **Choose a service and your languages.** For offline use, install the engine and language direction in Language packages.

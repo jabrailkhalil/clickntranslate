@@ -5,7 +5,7 @@
 <h1 align="center">Click’n’Translate</h1>
 
 <p align="center"><strong>用自己的语言，读懂屏幕上的文字。</strong></p>
-<p align="center">Windows · macOS · Linux · Android</p>
+<p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
@@ -43,7 +43,30 @@
 
 [全部下载](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
 
-## 输入文字，获得翻译
+<a name="android"></a>
+
+## Android：无需离开当前应用即可翻译
+
+**用悬浮按钮翻译游戏和应用，也能翻译文字与照片。** 应用直接在手机上运行，无需电脑或 root 权限。
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/android-home-dark-1.8.2.png">
+    <img src="../images/android-home-light-1.8.2.png" alt="Android 主界面：翻译语言、屏幕翻译、图片翻译与文字翻译" width="280">
+  </picture>
+</p>
+
+<p align="center"><sub>Android 1.8.2 界面，图中使用俄语。支持包括中文在内的六种界面语言。</sub></p>
+
+1. **安装 APK**，需要 Android 8.0 及以上版本的 ARM64 设备。选择界面语言、主题和翻译语言。
+2. **启动屏幕翻译。** 授予悬浮窗权限，并确认 Android 的屏幕共享请求。在 Android 14 及以上版本中，选择共享整个屏幕，以便在其他应用中翻译。
+3. **打开游戏或应用，点击悬浮按钮。** 译文会显示在屏幕上。长按按钮打开菜单，可选择区域或切换翻译模式。
+
+还可以输入或粘贴文字，从其他应用分享文字到 **Clickn**，或者翻译图库中的照片和截图。结果可复制、分享，文字翻译会保存在本地历史记录中。Google 无需密钥；下载支持的语言模型后，可使用 ML Kit 离线翻译。其他 API 服务使用你自己的凭据。
+
+**[下载 APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android 指南（英语）](../ANDROID.md) · [Android 源代码](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+
+## 桌面版：输入文字，获得翻译
 
 支持区域 OCR、全屏翻译、其他应用中的选中文本翻译、译文替换，以及跟随多个区域变化的动态翻译。替换模式可先全选输入框。文档工作区支持并排编辑原文和译文。
 
