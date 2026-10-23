@@ -862,7 +862,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         async def fake_runner(_bitmap, _engine):
             return Result()
 
-        def fake_tesseract(_variants, _cmd, _lang, context, _session_id, status_callback=None, cancel_check=None):
+        def fake_tesseract(_variants, _cmd, _lang, context, _session_id, status_callback=None, cancel_check=None, join_paragraphs=False):
+            self.assertFalse(join_paragraphs)
             self.assertEqual(context, "windows-empty-fallback")
             self.assertFalse(cancel_check())
             return "fallback text"
@@ -1005,7 +1006,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         async def fake_runner(_bitmap, _engine):
             return Result()
 
-        def fake_tesseract(_variants, _cmd, lang, context, _session_id, status_callback=None, cancel_check=None):
+        def fake_tesseract(_variants, _cmd, lang, context, _session_id, status_callback=None, cancel_check=None, join_paragraphs=False):
+            self.assertFalse(join_paragraphs)
             self.assertEqual(lang, "eng+rus")
             self.assertEqual(context, "windows-auto-empty-fallback")
             self.assertFalse(cancel_check())
@@ -1039,7 +1041,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         old_tesseract = ocr._recognize_tesseract_variants_with_cmd
         worker = None
 
-        def fake_tesseract(_variants, _cmd, _lang, _context, _session_id, status_callback=None, cancel_check=None):
+        def fake_tesseract(_variants, _cmd, _lang, _context, _session_id, status_callback=None, cancel_check=None, join_paragraphs=False):
+            self.assertFalse(join_paragraphs)
             worker.cancel()
             self.assertTrue(cancel_check())
             return "STALE TESSERACT TEXT"

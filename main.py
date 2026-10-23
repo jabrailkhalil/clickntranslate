@@ -277,6 +277,7 @@ DEFAULT_CONFIG = {
     "selection_quick_translate_enabled": False,
     "selection_quick_translate_mode": "button",
     "close_result_window_on_outside_click": False,
+    "ocr_join_paragraphs": False,
     "translation_result_font_size": "medium",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,

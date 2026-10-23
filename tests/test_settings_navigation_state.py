@@ -95,6 +95,28 @@ class SettingsNavigationStateTest(unittest.TestCase):
         self.assertIs(self.window.settings_window, settings)
         self.assertTrue(settings.isVisible())
 
+    def test_back_from_histories_returns_to_the_translation_tab_even_after_theme_change(self):
+        for button_name, back_name in (
+            ('translation_history_btn', 'history_back_button'),
+            ('copy_history_btn', 'copy_history_back_button'),
+        ):
+            with self.subTest(history=button_name), \
+                    mock.patch('settings_window.ensure_json_file'), \
+                    mock.patch('settings_window.open', mock.mock_open(read_data='[]')):
+                self.window.show_settings()
+                settings=self.window.settings_window
+                settings._set_settings_page(1)
+                self.settle()
+                getattr(settings,button_name).click()
+                self.settle()
+                self.window.toggle_theme()
+                self.settle()
+                getattr(settings,back_name).click()
+                self.settle()
+                self.assertEqual(settings.settings_pages.currentIndex(),1)
+                self.assertTrue(settings.settings_updates_page.isVisible())
+                self.assertTrue(settings.translation_history_btn.isVisible())
+
     def test_game_page_reads_the_pair_changed_from_the_main_menu(self):
         settings = self.open_game_page()
         self.window.show_main_screen()

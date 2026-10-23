@@ -4,6 +4,7 @@ import pytest
 
 from capture_widgets import CaptureLanguageCombo
 from languages import LANGUAGES, language_icon_path, language_display_name
+from project_paths import resource_root
 from styled_dialogs import install_tooltip_style
 
 
@@ -14,7 +15,10 @@ def test_capture_picker_keeps_codes_and_reopens_inside_screen(dark):
     owner = QtWidgets.QWidget()
     combo = CaptureLanguageCombo(owner)
     for language in LANGUAGES:
-        combo.addItem(QtGui.QIcon(language_icon_path(language.code)), language.short_label, language.code)
+        icon = QtGui.QIcon(str(resource_root() / language_icon_path(language.code)))
+        assert not icon.isNull(), language.code
+        assert not icon.pixmap(24, 18).isNull(), language.code
+        combo.addItem(icon, language.short_label, language.code)
     combo.set_capture_theme(dark, 'ru')
     combo.setCurrentIndex(combo.findData('en'))
     owner.resize(160, 90)

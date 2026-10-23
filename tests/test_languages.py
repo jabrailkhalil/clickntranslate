@@ -2,9 +2,20 @@ import unittest
 
 import languages
 import translater
+from pathlib import Path
 
 
 class TestLanguages(unittest.TestCase):
+    def test_all_translation_languages_have_bundled_decodable_flags(self):
+        from PIL import Image
+        root=Path(__file__).resolve().parents[1]/'src'
+        for language in languages.LANGUAGES:
+            with self.subTest(language=language.code):
+                icon=languages.language_icon_path(language.code)
+                self.assertTrue(icon)
+                with Image.open(root/icon) as image:
+                    image.verify()
+
     def test_language_lists_include_more_than_ru_en(self):
         codes = {language.code for language in languages.LANGUAGES}
 

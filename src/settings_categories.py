@@ -44,6 +44,18 @@ COMPACT = {
 }
 
 
+PARAGRAPH_TEXT = {
+    'en': ('Join OCR lines into paragraphs', 'Before translating captured text, joins wrapped lines within a paragraph. Visible gaps, columns and list items remain separate. Useful for books and dialogue; turn off to keep the original line layout.'),
+    'ru': ('Объединять строки в абзацы', 'Перед переводом текста с экрана убирает переносы внутри абзацев. Видимые промежутки, колонки и пункты списков сохраняются. Удобно для книг и диалогов; выключите, чтобы сохранить исходные строки.'),
+    'es': ('Unir líneas OCR en párrafos', 'Antes de traducir el texto capturado, une las líneas de cada párrafo. Conserva espacios visibles entre bloques, columnas y elementos de listas. Útil para libros y diálogos; desactiva para conservar las líneas originales.'),
+    'de': ('OCR-Zeilen zu Absätzen verbinden', 'Verbindet umgebrochene Zeilen vor der Übersetzung. Sichtbare Absatzabstände, Spalten und Listeneinträge bleiben getrennt. Für Bücher und Dialoge; ausschalten, um die ursprünglichen Zeilen beizubehalten.'),
+    'fr': ('Réunir les lignes OCR en paragraphes', 'Réunit les lignes d’un paragraphe avant de traduire le texte capturé. Préserve les espacements visibles, colonnes et éléments de liste. Utile pour les livres et dialogues ; désactivez pour conserver les lignes d’origine.'),
+    'zh': ('将 OCR 行合并为段落', '翻译屏幕文字前，合并段落内因排版产生的换行。保留可见的段落间距、分栏和列表项。适合书籍和对话；关闭后保留原始行布局。'),
+    'pt': ('Unir linhas OCR em parágrafos', 'Antes de traduzir o texto capturado, une as linhas de cada parágrafo. Mantém separados os espaços visíveis entre blocos, as colunas e os itens de listas. Útil para livros e diálogos; desative para manter as linhas originais.'),
+    'it': ('Unisci le righe OCR in paragrafi', 'Prima di tradurre il testo acquisito, unisce le righe di ogni paragrafo. Mantiene separati spazi visibili tra blocchi, colonne e voci degli elenchi. Utile per libri e dialoghi; disattiva per mantenere le righe originali.'),
+}
+
+
 def organize(settings, general_layout, form, updates_layout, dim_row):
     from settings_window import DropDownCombo, settings_text
     from styled_dialogs import tooltip_text, install_accent_controls
@@ -104,7 +116,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     grid = QGridLayout()
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(8)
-    grid.setVerticalSpacing(1)
+    grid.setVerticalSpacing(0)
     grid.setColumnStretch(0, 1)
     body.addLayout(grid)
     settings.translation_settings_grid = grid
@@ -116,6 +128,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     for row, flag in enumerate(flags):
         flag.setParent(content)
         flag.setObjectName('settingsPageCheckbox')
+        flag.setFixedHeight(25)
         grid.addWidget(flag, row, 0, Qt.AlignLeft)
     settings.close_result_on_outside_click_checkbox = QCheckBox(
         settings_text(lang, 'close_result_window_on_outside_click'), content)
@@ -126,8 +139,18 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     close_flag.toggled.connect(lambda checked: settings.auto_save_setting(
         'close_result_window_on_outside_click', bool(checked)))
     close_flag.setObjectName('settingsPageCheckbox')
-    close_flag.setFixedHeight(28)
+    close_flag.setFixedHeight(25)
     grid.addWidget(close_flag, 3, 0, 1, 3, Qt.AlignLeft)
+    paragraph_label, paragraph_hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
+    settings.ocr_join_paragraphs_checkbox = QCheckBox(paragraph_label, content)
+    paragraph_flag = settings.ocr_join_paragraphs_checkbox
+    paragraph_flag.setObjectName('settingsPageCheckbox')
+    paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs') is True)
+    paragraph_flag.setToolTip(tooltip_text(paragraph_hint))
+    paragraph_flag.setAccessibleDescription(paragraph_hint)
+    paragraph_flag.setFixedHeight(25)
+    paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))
+    grid.addWidget(paragraph_flag, 4, 0, 1, 3, Qt.AlignLeft)
     for row, label, control in (
         (0, settings.ocr_engine_label, settings.ocr_engine_combo),
         (1, settings.translator_engine_label, settings.translator_combo),
@@ -150,27 +173,29 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     from provider_settings import refresh_provider_routing
     refresh_provider_routing(settings)
 
-    for row, flag in ((4, settings.keep_visible_checkbox), (5, settings.freeze_screen_checkbox)):
+    for row, flag in ((5, settings.keep_visible_checkbox), (6, settings.freeze_screen_checkbox)):
         flag.setParent(content)
         flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(28)
+        flag.setFixedHeight(25)
         grid.addWidget(flag, row, 0, 1, 3, Qt.AlignLeft)
     # Dimming belongs to the same visible form, not an expanding subpage.
     while dim_row.count():
         dim_row.takeAt(0)
     settings.dim_screen_during_ocr_checkbox.setParent(content)
-    grid.addWidget(settings.dim_screen_during_ocr_checkbox, 6, 0, Qt.AlignLeft)
+    settings.dim_screen_during_ocr_checkbox.setFixedHeight(25)
+    grid.addWidget(settings.dim_screen_during_ocr_checkbox, 7, 0, Qt.AlignLeft)
     from PyQt5.QtWidgets import QHBoxLayout
     dim_controls = QWidget(content)
+    dim_controls.setFixedHeight(25)
     slider_row = QHBoxLayout(dim_controls)
     slider_row.setContentsMargins(0, 0, 0, 0)
     slider_row.addStretch(1)
     slider_row.addWidget(settings.ocr_dim_strength_value)
     slider_row.addWidget(settings.ocr_dim_strength_slider)
-    grid.addWidget(dim_controls, 6, 1, 1, 2)
+    grid.addWidget(dim_controls, 7, 1, 1, 2)
     settings.copy_notification_checkbox.setParent(content)
-    settings.copy_notification_checkbox.setFixedHeight(28)
-    grid.addWidget(settings.copy_notification_checkbox, 7, 0, 1, 3, Qt.AlignLeft)
+    settings.copy_notification_checkbox.setFixedHeight(25)
+    grid.addWidget(settings.copy_notification_checkbox, 8, 0, 1, 3, Qt.AlignLeft)
     body.addStretch(1)
     settings.translation_action_panel = QWidget(settings.settings_updates_page)
     settings.translation_action_panel.setObjectName('settingsActionPanel')

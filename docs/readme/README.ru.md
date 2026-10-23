@@ -4,6 +4,19 @@
 
 <h1 align="center">Click’n’Translate</h1>
 
+<a name="readme-languages"></a>
+
+<p align="center">
+  <a href="../../README.md">English</a> ·
+  <strong>Русский</strong> ·
+  <a href="README.es.md">Español</a> ·
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.fr.md">Français</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.pt.md">Português</a> ·
+  <a href="README.it.md">Italiano</a>
+</p>
+
 <p align="center"><strong>Читайте текст с экрана на своём языке.</strong></p>
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
@@ -19,8 +32,6 @@
   <a href="https://translate.clickn.dev/ru/">Сайт</a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://t.me/jabrail_digital">Telegram</a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#readme-languages">Языки</a>
 </p>
 
 Переводите игры, копируйте текст с картинок, читайте документы и заменяйте сообщения переводом. Бесплатное приложение с открытым кодом для **Windows, macOS и Linux**. Для **Android** есть отдельная мобильная версия.
@@ -147,11 +158,3 @@
 Счётчик показывает скачивания файлов релизов, включая файлы обновлений, а не число уникальных пользователей.
 
 </details>
-
----
-
-<a name="readme-languages"></a>
-
-README на других языках:
-
-[English](../../README.md) · **Русский** · [Español](README.es.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [简体中文](README.zh-CN.md) · [Português](README.pt.md) · [Italiano](README.it.md)

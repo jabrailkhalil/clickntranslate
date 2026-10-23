@@ -1,0 +1,195 @@
+"""Reflow OCR text before translation, without a language model or extra requests.
+
+Geometry is in capture pixels, so all thresholds scale with text height. Separate
+columns and visible paragraph gaps remain separate translation blocks.
+"""
+import math
+import re
+import unicodedata
+
+
+_LIST_START = re.compile(r'^\s*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
+_PARAGRAPH_BREAK = re.compile(r'\n[ \t]*\n+')
+
+
+def _join(left, right):
+    if not left:
+        return right
+    if not right:
+        return left
+    # A soft hyphen explicitly marks a discretionary word break. Do not guess
+    # whether a visible hyphen is part of a word such as "cross-reference".
+    if left.endswith('\u00ad'):
+        return left[:-1] + right
+    if len(left)>1 and left.endswith(('-', '\u2010')) and left[-2].isalpha() and right[0].isalpha():
+        return left + right
+    cjk = lambda c: '\u3400' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff'
+    return left + ('' if cjk(left[-1]) and cjk(right[0]) else ' ') + right
+
+
+def merge_text_lines(text):
+    """Fallback when boxes are unavailable; retain blank lines and list items."""
+    text = str(text or '').replace('\r\n', '\n').replace('\r', '\n')
+    paragraphs = []
+    for section in _PARAGRAPH_BREAK.split(text.strip()):
+        current = ''
+        for line in section.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if current and _LIST_START.match(line):
+                paragraphs.append(current)
+                current = ''
+            current = _join(current, line)
+        if current:
+            paragraphs.append(current)
+    return '\n\n'.join(paragraphs)
+
+
+def boxes_from_items(items):
+    rows = []
+    for box, text, _confidence in items or []:
+        try:
+            xs, ys = [float(p[0]) for p in box], [float(p[1]) for p in box]
+            rows.append((min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys), text))
+        except (TypeError, ValueError, IndexError):
+            # Unknown geometry is kept as its own block, never dropped.
+            rows.append((None, None, None, None, text))
+    return rows
+
+
+def _valid_rows(rows):
+    valid, unknown = [], []
+    for item in rows or []:
+        if not isinstance(item, (tuple, list)) or len(item) < 5:
+            continue
+        text = str(item[4] or '').strip()
+        if not text:
+            continue
+        try:
+            x, y, w, h = map(float, item[:4])
+            if not all(map(math.isfinite, (x, y, w, h))) or w <= 0 or h <= 0:
+                raise ValueError('Invalid OCR bounds')
+            valid.append((x, y, w, h, text))
+        except (TypeError, ValueError):
+            unknown.append(text)
+    return valid, unknown
+
+
+def _union(rows, text):
+    left, top = min(r[0] for r in rows), min(r[1] for r in rows)
+    right, bottom = max(r[0]+r[2] for r in rows), max(r[1]+r[3] for r in rows)
+    return left, top, right-left, bottom-top, text
+
+
+def _visual_rows(rows):
+    """Join adjacent word fragments, leaving a column gutter untouched."""
+    groups = []
+    active = []
+    for row in sorted(rows, key=lambda r: (r[1], r[0])):
+        x, y, w, h, text = row
+        active = [entry for entry in active if entry[1][1]+entry[1][3]>=y]
+        for entry in reversed(active):
+            group, bounds = entry
+            left, top, width, height, _ = bounds
+            overlap = min(y+h, top+height)-max(y, top)
+            gap = max(0, max(left, x)-min(left+width, x+w))
+            if overlap >= .6*min(h, height) and gap <= .9*max(h, height):
+                group.append(row)
+                entry[1] = _union([bounds, row], '')
+                break
+        else:
+            group=[row]
+            groups.append(group)
+            active.append([group,row])
+    result=[]
+    for group in groups:
+        ordered=sorted(group, key=lambda r:r[0])
+        # Most engines return whole lines in logical order. Only the order of
+        # separately detected word boxes needs adjustment for RTL source text.
+        directions=[unicodedata.bidirectional(c) for r in ordered for c in r[4]]
+        if sum(d in {'R','AL'} for d in directions) > directions.count('L'):
+            ordered.reverse()
+        text=' '.join(r[4] for r in ordered)
+        result.append(_union(group,text))
+    return sorted(result,key=lambda r:(r[1],r[0]))
+
+
+def _reading_order(blocks):
+    """Read columns top-to-bottom, with separate horizontal bands for headings."""
+    if len(blocks) < 2:
+        return blocks
+    for axis, extent in ((0,2),(1,3)):
+        groups=[]
+        edge=None
+        for block in sorted(blocks,key=lambda b:b[axis]):
+            start, end=block[axis],block[axis]+block[extent]
+            if edge is None or start > edge:
+                groups.append([])
+            groups[-1].append(block)
+            edge=max(edge if edge is not None else end,end)
+        if len(groups)>1:
+            return [block for group in groups for block in _reading_order(group)]
+    return sorted(blocks,key=lambda b:(b[1],b[0]))
+
+
+def paragraph_blocks(rows):
+    """Return positioned paragraphs as (x, y, width, height, text) tuples."""
+    positioned, unknown = _valid_rows(rows)
+    lines = _visual_rows(positioned)
+    groups=[]
+    active=[]
+    for row in lines:
+        x,y,w,h,text=row
+        best=None
+        best_cost=None
+        active=[group for group in active if group[-1][1]+1.85*group[-1][3]>=y]
+        for group in active:
+            previous=group[-1]
+            px,py,pw,ph,pt=previous
+            typical=ph
+            gap=y-(py+ph)
+            overlap=min(x+w,px+pw)-max(x,px)
+            aligned=min(abs(x-px),abs(x+w-px-pw)) <= .85*typical
+            # A first-line indent can differ from the rest of its paragraph.
+            indent=len(group)==1 and abs(x-px)<=2*typical and overlap>=.6*min(w,pw)
+            if (gap < -.15*min(h,ph) or gap > .85*typical
+                    or max(h,typical)>1.5*min(h,typical)
+                    or overlap < .25*min(w,pw) or not (aligned or indent)
+                    or _LIST_START.match(text)):
+                continue
+            cost=abs(gap)+min(abs(x-px),abs(x+w-px-pw))
+            if best_cost is None or cost<best_cost:
+                best,best_cost=group,cost
+        if best is None:
+            group=[row]
+            groups.append(group)
+            active.append(group)
+        else:
+            best.append(row)
+    paragraphs=[]
+    for group in groups:
+        text=''
+        for row in group:
+            text=_join(text,row[4])
+        paragraphs.append(_union(group,text))
+    # Unknown boxes cannot be positioned as overlays, but their text is retained
+    # by paragraph_text instead of being silently lost.
+    return _reading_order(paragraphs)
+
+
+def paragraph_text(rows):
+    positioned, unknown=_valid_rows(rows)
+    return '\n\n'.join([block[4] for block in paragraph_blocks(positioned)] + unknown)
+
+
+def tesseract_items(data):
+    """Keep word boxes so even PSM 6 cannot mix two distant columns into a row."""
+    items=[]
+    for i,value in enumerate(data.get('text', [])):
+        text=str(value or '').strip()
+        if not text:
+            continue
+        x,y,w,h=(float(data[name][i]) for name in ('left','top','width','height'))
+        items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
+    return items

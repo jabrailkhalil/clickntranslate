@@ -8,6 +8,15 @@ EXTRA_WINDOWS_TAGS = dict(item.split(':', 1) for item in (
     'ro:ro-RO sr:sr-Cyrl-RS sk:sk-SK sl:sl-SI sw:sw-KE ta:ta-IN te:te-IN ur:ur-PK '
     'uz:uz-Latn-UZ vi:vi-VN cy:cy-GB th:th-TH').split())
 
+# Representative country flags, matching the existing language picker convention.
+# Regional and shared languages may intentionally use the same country image.
+EXTRA_FLAG_COUNTRIES = dict(item.split(':', 1) for item in (
+    'af:za sq:al hy:am az:az eu:es be:by bn:bd bs:ba bg:bg ca:es hr:hr '
+    'cs:cz da:dk et:ee fi:fi gl:es ka:ge el:gr gu:in he:il hu:hu is:is '
+    'id:id ga:ie kk:kz ky:kg lv:lv lt:lt mk:mk ms:my mt:mt mr:in ne:np '
+    'nb:no fa:ir ro:ro sr:rs sk:sk sl:si sw:ke ta:in te:in ur:pk uz:uz '
+    'vi:vn cy:gb-wls th:th').split())
+
 EXTRA_OCR_CODES = {'af': 'afr',
  'sq': 'sqi',
  'hy': 'hye',

@@ -821,7 +821,7 @@ def _configure_pytesseract_system_environment(pytesseract):
     subprocess_args._clickntranslate_system_env = True
     module.subprocess_args = subprocess_args
 
-def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None):
+def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None, join_paragraphs=False):
     import pytesseract
 
     _configure_pytesseract_system_environment(pytesseract)
@@ -844,7 +844,13 @@ def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, s
         tess_config = f"--oem 3 --psm {psm}"
         try:
             started = time.perf_counter()
-            text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
+            if join_paragraphs:
+                from ocr_paragraphs import tesseract_items
+                data = pytesseract.image_to_data(pil_image, lang=tess_lang, config=tess_config,
+                                                 output_type=pytesseract.Output.DICT)
+                text = ocr_text_from_items(tesseract_items(data), join_paragraphs=True)
+            else:
+                text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             stripped = text.strip()
             score = _score_recognized_text(stripped)
@@ -873,6 +879,7 @@ def _recognize_tesseract_variants_with_cmd(
     session_id,
     status_callback=None,
     cancel_check=None,
+    join_paragraphs=False,
 ):
     if not tess_cmd:
         logging.error(f"[OCR:{session_id}] Tesseract executable not found for {context}.")
@@ -902,6 +909,7 @@ def _recognize_tesseract_variants_with_cmd(
             f"{context}-{label}",
             session_id,
             cancel_check=cancel_check,
+            join_paragraphs=join_paragraphs,
         )
         score = _score_recognized_text(text)
         logging.info(
@@ -1053,6 +1061,7 @@ def _recognize_with_native_ocr_worker(
     session_id,
     language_code="en",
     status_callback=None,
+    join_paragraphs=False,
 ):
     if status_callback:
         engine_name = "RapidOCR" if engine == "rapidocr" else "EasyOCR" if engine == "easyocr" else engine
@@ -1083,6 +1092,10 @@ def _recognize_with_native_ocr_worker(
             )
             continue
         text = str(result.get("text") or "").strip()
+        if join_paragraphs:
+            from ocr_paragraphs import merge_text_lines
+            text = (ocr_text_from_items(result['items'], join_paragraphs=True)
+                    if result.get('items') else merge_text_lines(text))
         confidence = float(result.get("confidence") or 0.0)
         confidence_floor = 0.20 if engine == "easyocr" else 0.28
         reject_reason = (
@@ -1338,11 +1351,12 @@ def _parse_rapidocr_output(output):
     return order_ocr_items(items)
 
 
-def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None):
+def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None, join_paragraphs=False):
     if _native_ocr_worker_enabled():
         try:
             return _recognize_with_native_ocr_worker(
-                "rapidocr", pil_variants, context, session_id
+                "rapidocr", pil_variants, context, session_id,
+                join_paragraphs=join_paragraphs,
             )
         except Exception as exc:
             logging.exception(f"[OCR:{session_id}] RapidOCR worker failed: {exc}")
@@ -1366,7 +1380,7 @@ def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check
                 logging.info(f"[OCR:{session_id}] RapidOCR interrupted after variant={label}; context={context}")
                 break
             items = _parse_rapidocr_output(output)
-            text = ocr_text_from_items(items)
+            text = ocr_text_from_items(items, join_paragraphs=join_paragraphs)
             confidences = [item[2] for item in items if item[2] > 0]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             reject_reason = ""
@@ -1602,7 +1616,7 @@ def _parse_easyocr_output(output):
     return order_ocr_items(items)
 
 
-def _recognize_easyocr_variants(pil_variants, language_code, context, session_id, status_callback=None, cancel_check=None):
+def _recognize_easyocr_variants(pil_variants, language_code, context, session_id, status_callback=None, cancel_check=None, join_paragraphs=False):
     if _native_ocr_worker_enabled():
         try:
             return _recognize_with_native_ocr_worker(
@@ -1612,6 +1626,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
                 session_id,
                 language_code=language_code,
                 status_callback=status_callback,
+                join_paragraphs=join_paragraphs,
             )
         except Exception as exc:
             logging.exception(f"[OCR:{session_id}] EasyOCR worker failed: {exc}")
@@ -1639,7 +1654,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
                 logging.info(f"[OCR:{session_id}] EasyOCR interrupted after variant={label}; context={context}")
                 break
             items = _parse_easyocr_output(output)
-            text = ocr_text_from_items(items)
+            text = ocr_text_from_items(items, join_paragraphs=join_paragraphs)
             confidences = [item[2] for item in items if item[2] > 0]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             reject_reason = ""
@@ -2535,7 +2550,7 @@ def _limit_qimage_for_windows_ocr(qimage, session_id, label):
     return scaled
 
 
-def _windows_ocr_result_to_text(recognized):
+def _windows_ocr_result_to_text(recognized, *, join_paragraphs=False):
     if not recognized:
         return ""
     try:
@@ -2552,6 +2567,7 @@ def _windows_ocr_result_to_text(recognized):
         return ""
 
     lines_text = []
+    positioned = []
     for line in lines:
         try:
             words = list(line.words)
@@ -2563,6 +2579,19 @@ def _windows_ocr_result_to_text(recognized):
         line_text = line_text.strip()
         if line_text:
             lines_text.append(line_text)
+            if join_paragraphs:
+                try:
+                    rects = [word.bounding_rect for word in line.words]
+                    left, top = min(r.x for r in rects), min(r.y for r in rects)
+                    right, bottom = max(r.x+r.width for r in rects), max(r.y+r.height for r in rects)
+                    positioned.append((left, top, right-left, bottom-top, line_text))
+                except (AttributeError, ValueError, TypeError):
+                    positioned.append((None, None, None, None, line_text))
+    if join_paragraphs:
+        from ocr_paragraphs import paragraph_text, merge_text_lines
+        if positioned and all(row[0] is not None for row in positioned):
+            return paragraph_text(positioned)
+        return merge_text_lines('\n'.join(lines_text))
     return "\n".join(lines_text).strip()
 
 
@@ -2946,7 +2975,7 @@ def _coerce_ocr_attempts(attempts_or_bitmap):
     return [("primary", attempts_or_bitmap)]
 
 
-def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_id="unknown"):
+def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_id="unknown", join_paragraphs=False):
     attempts = _coerce_ocr_attempts(attempts_or_bitmap)
     if not attempts:
         logging.warning(f"[OCR:{session_id}] Windows OCR AUTO has no bitmap attempts.")
@@ -2985,7 +3014,7 @@ def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_
                                 f"candidate lang={code}, attempt={attempt_label}"
                             )
                             break
-                        text = _windows_ocr_result_to_text(recognized)
+                        text = _windows_ocr_result_to_text(recognized, join_paragraphs=join_paragraphs)
                         auto_candidates.append(
                             _make_auto_ocr_candidate(
                                 text,
@@ -3026,7 +3055,7 @@ def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_
                                     f"[OCR:{session_id}] Windows OCR AUTO universal interrupted after attempt={attempt_label}"
                                 )
                                 break
-                            text = _windows_ocr_result_to_text(recognized)
+                            text = _windows_ocr_result_to_text(recognized, join_paragraphs=join_paragraphs)
                             auto_candidates.append(
                                 _make_auto_ocr_candidate(
                                     text,
@@ -3092,7 +3121,9 @@ class OCRWorker(QtCore.QThread):
         return self.cancel_requested or self.isInterruptionRequested()
 
     @staticmethod
-    def _extract_result_text(recognized):
+    def _extract_result_text(recognized, *, join_paragraphs=False):
+        if join_paragraphs:
+            return _windows_ocr_result_to_text(recognized, join_paragraphs=True)
         recognized_text = ""
         if not recognized:
             return recognized_text
@@ -3136,6 +3167,7 @@ class OCRWorker(QtCore.QThread):
                     self.attempts,
                     cancel_check=self._is_cancelled,
                     session_id=self.session_id,
+                    join_paragraphs=getattr(self, 'join_paragraphs', False),
                 )
                 if (
                     not recognized_text
@@ -3158,6 +3190,7 @@ class OCRWorker(QtCore.QThread):
                         self.session_id,
                         status_callback=self.status_update.emit,
                         cancel_check=self._is_cancelled,
+                        join_paragraphs=getattr(self, 'join_paragraphs', False),
                     ) or ""
                     if recognized_text:
                         candidate = _make_auto_ocr_candidate(
@@ -3211,6 +3244,7 @@ class OCRWorker(QtCore.QThread):
                         self.session_id,
                         status_callback=self.status_update.emit,
                         cancel_check=self._is_cancelled,
+                        join_paragraphs=getattr(self, 'join_paragraphs', False),
                     ) or ""
                 if not self._is_cancelled():
                     self.result_ready.emit(recognized_text)
@@ -3247,7 +3281,7 @@ class OCRWorker(QtCore.QThread):
                             f"elapsed_ms={elapsed_ms:.1f}"
                         )
                         continue
-                    attempt_text = self._extract_result_text(recognized)
+                    attempt_text = self._extract_result_text(recognized, join_paragraphs=getattr(self, 'join_paragraphs', False))
                     attempt_score = _score_recognized_text(attempt_text)
                     logging.info(
                         f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label}; "
@@ -3297,7 +3331,7 @@ class OCRWorker(QtCore.QThread):
                                         f"[OCR:{self.session_id}] Universal OCR retry interrupted after attempt={attempt_label}"
                                     )
                                     break
-                                attempt_text = self._extract_result_text(recognized)
+                                attempt_text = self._extract_result_text(recognized, join_paragraphs=getattr(self, 'join_paragraphs', False))
                                 attempt_score = _score_recognized_text(attempt_text)
                                 logging.info(
                                     f"[OCR:{self.session_id}] Universal Windows OCR attempt={attempt_label}; "
@@ -3342,6 +3376,7 @@ class OCRWorker(QtCore.QThread):
                     self.session_id,
                     status_callback=self.status_update.emit,
                     cancel_check=self._is_cancelled,
+                    join_paragraphs=getattr(self, 'join_paragraphs', False),
                 ) or ""
 
         except Exception as e:
@@ -3404,6 +3439,7 @@ class TesseractOCRWorker(QtCore.QThread):
                     self.session_id,
                     status_callback=self.status_update.emit,
                     cancel_check=self._is_cancelled,
+                    join_paragraphs=getattr(self, 'join_paragraphs', False),
                 ) or ""
                 if self.language_code in {"universal", "auto"} and text:
                     candidate = _make_auto_ocr_candidate(
@@ -3475,6 +3511,7 @@ class RapidOCRWorker(QtCore.QThread):
                     self.context,
                     self.session_id,
                     cancel_check=self._is_cancelled,
+                    join_paragraphs=getattr(self, 'join_paragraphs', False),
                 )
                 self.failure_reason = failure_reason or None
         except Exception as e:
@@ -3507,7 +3544,7 @@ class AppleVisionOCRWorker(RapidOCRWorker):
                 items = recognize_image(image, self.language_code)
                 confidence = sum(item[2] for item in items) / len(items) if items else 0.0
                 candidates.append(_make_auto_ocr_candidate(
-                    ocr_text_from_items(items), engine="apple vision",
+                    ocr_text_from_items(items, join_paragraphs=getattr(self, 'join_paragraphs', False)), engine="apple vision",
                     language_code=self.language_code, image_label=label,
                     confidence=confidence, boxes_count=len(items)))
             selected, reason = _select_best_auto_ocr_candidate(
@@ -3560,6 +3597,7 @@ class EasyOCRWorker(QtCore.QThread):
                     self.session_id,
                     status_callback=self.status_update.emit,
                     cancel_check=self._is_cancelled,
+                    join_paragraphs=getattr(self, 'join_paragraphs', False),
                 )
                 self.failure_reason = failure_reason or None
         except Exception as e:
@@ -4648,6 +4686,7 @@ class ScreenCaptureOverlay(QWidget):
         self._ocr_worker_session_id = session_id
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
         self.ocr_worker.start()
 
     def _start_rapidocr_worker(self, pil_variants, context, session_id):
@@ -4660,6 +4699,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
         self.ocr_worker.start()
 
     def _start_easyocr_worker(self, pil_variants, language_code, context, session_id):
@@ -4674,6 +4714,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
         self.ocr_worker.start()
 
     def _persist_failed_ocr_artifacts(self, reason):
@@ -4799,6 +4840,7 @@ class ScreenCaptureOverlay(QWidget):
             self.ocr_worker.result_ready.connect(lambda result, sid=session_id: self._handle_api_ocr_result(result, sid))
             self.ocr_worker.failed.connect(lambda error, sid=session_id: self._handle_api_ocr_error(error, sid))
             self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+            self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
             self.ocr_worker.start()
             return
 
@@ -5052,6 +5094,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
         self.ocr_worker.start()
 
     def _handle_api_ocr_result(self, result, session_id):
@@ -5418,7 +5461,7 @@ def warm_up():
 # Fullscreen Translate — OCR all text on screen and overlay translations
 # ============================================================
 
-def _group_screen_ocr_lines(lines_data):
+def _group_screen_ocr_lines(lines_data, *, join_paragraphs=False):
     """Return stable visual lines, merging only fragments on the same baseline.
 
     Full-screen translation is a replacement layer, not a collection of
@@ -5428,6 +5471,9 @@ def _group_screen_ocr_lines(lines_data):
     when they substantially overlap vertically and are separated by a small
     horizontal gap.
     """
+    if join_paragraphs:
+        from ocr_paragraphs import paragraph_blocks
+        return paragraph_blocks(lines_data)
     lines = []
     for item in lines_data or []:
         if not isinstance(item, (list, tuple)) or len(item) < 5:
@@ -6033,7 +6079,7 @@ class FullScreenTranslateOverlay(QWidget):
 
         try:
             from api_providers import VisionLayout
-            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data)
+            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data, join_paragraphs=get_cached_ocr_config().get('ocr_join_paragraphs') is True)
             if not self._lines_data:
                 self._fail_translation(run_id, "screen_no_text")
                 return
