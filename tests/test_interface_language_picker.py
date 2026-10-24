@@ -23,11 +23,11 @@ def test_picker_preserves_home_draft_size_and_language_pair(window, app):
     picker = window._interface_language_picker
     settle(app)
     assert window.size() == before
-    assert not original.isVisible()
+    assert original.isVisible()
     assert picker.isVisible()
     assert window.flag_button.isChecked()
     assert window.flag_button.isCheckable()
-    assert picker.parentWidget().parentWidget() == original.parentWidget()
+    assert picker.parentWidget() == original.parentWidget()
     assert picker.pager.isVisible() == (len(main.INTERFACE_LANGUAGE_OPTIONS) > 10)
     window.show_interface_language_menu()  # Flag toggles the same view.
     settle(app)
@@ -62,7 +62,9 @@ def test_selecting_language_from_settings_preserves_current_tab(window, app):
     assert window.settings_window is settings
     assert window.current_interface_language == 'es'
     assert settings.settings_pages.currentIndex() == 1
-    assert not window.flag_button.isChecked()
+    assert window.flag_button.isChecked()
+    assert window._interface_language_picker is not None
+    window._close_interface_language_picker()
 
 
 def test_picker_pages_open_on_current_language_and_have_bounded_arrows(app):
@@ -109,9 +111,11 @@ def test_picker_theme_corners_and_selection(window, app, theme):
     language = 'ar' if window.current_interface_language != 'ar' else 'en'
     picker.buttons[language].click()
     settle(app)
-    assert window._interface_language_picker is None
+    assert window._interface_language_picker is picker
+    assert picker.isVisible()
     assert window.current_interface_language == language
     assert window.text_input.toPlainText() == 'Keep this text'
+    picker.close_button.click()
     window.set_interface_language('en')
 
 

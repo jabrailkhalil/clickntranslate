@@ -13780,32 +13780,37 @@ finally {
                     f"QWidget#{object_name} {{ background:{colors['border']}; "
                     f"border:1px solid {colors['border']}; border-radius:7px; }}"
                 )
-        # Only the outside corners are rounded; the layout supplies row dividers.
-        specs = (
-            ("clear_cache_btn", "secondary", 0, (6, 0, 0, 0)),
-            ("reset_btn", "danger", 1, (0, 0, 0, 0)),
-            ("update_btn", "secondary", 2, (0, 6, 0, 0)),
-            ("ocr_languages_btn", "secondary", 0, (6, 6, 0, 0)),
-            ("copy_history_btn", "secondary", 0, (0, 0, 6, 0)),
-            ("translation_history_btn", "secondary", 1, (0, 0, 0, 6)),
-            ("hotkeys_button", "secondary", 0, (0, 0, 6, 6)),
-            ("export_settings_btn", "secondary", 0, (0, 0, 0, 0)),
-            ("import_settings_btn", "secondary", 1, (0, 0, 0, 0)),
-            ("create_bug_report_btn", "secondary", 2, (0, 0, 0, 0)),
-        )
-        for name, role, column, corners in specs:
-            button = getattr(self, name, None)
-            if button is None or sip.isdeleted(button):
+        # Derive physical edges from the actual grid, including spans and RTL.
+        # Reusing LTR corner numbers on Arabic put rounded holes in inner
+        # dividers and square fills over the panel's outside corners.
+        for name in ('settings_action_panel', 'translation_action_panel', 'settings_transfer_panel'):
+            panel = getattr(self, name, None)
+            if panel is None or sip.isdeleted(panel):
                 continue
-            tl, tr, bl, br = corners
-            divider = f"border-left:1px solid {colors['border']};" if column else ""
-            set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f"""
-                QPushButton {{ border:none; {divider} padding:0 6px;
-                    border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
-                    border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
-                QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
-                QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
-            """)
+            grid = panel.layout()
+            if not isinstance(grid, QGridLayout):
+                continue
+            rtl = panel.layoutDirection() == Qt.RightToLeft
+            for index in range(grid.count()):
+                button = grid.itemAt(index).widget()
+                if not isinstance(button, QPushButton):
+                    continue
+                row, column, row_span, column_span = grid.getItemPosition(index)
+                left = column+column_span == grid.columnCount() if rtl else column == 0
+                right = column == 0 if rtl else column+column_span == grid.columnCount()
+                top = row == 0
+                bottom = row+row_span == grid.rowCount()
+                tl, tr, bl, br = (6 if edge else 0 for edge in (
+                    top and left, top and right, bottom and left, bottom and right))
+                divider = '' if left else f"border-left:1px solid {colors['border']};"
+                role = 'danger' if button is getattr(self, 'reset_btn', None) else 'secondary'
+                set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f'''
+                    QPushButton {{ border:none; {divider} padding:0 6px;
+                        border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
+                        border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
+                    QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
+                    QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
+                ''')
 
     def apply_theme(self):
         THEMES_LOCAL = {
@@ -14031,6 +14036,30 @@ finally {
                 self.load_copy_history_embedded()
             except RuntimeError:
                 self.copy_history_scroll_area = None
+
+    def refresh_current_language(self):
+        """Relabel the current destination without returning to General."""
+        kind = getattr(self, '_secondary_view_kind', None)
+        page = getattr(self, '_settings_page_index', 0)
+        area_name = {'history': 'history_scroll_area', 'copy_history': 'copy_history_scroll_area'}.get(
+            kind, 'translation_settings_scroll' if page == 1 else '')
+        area = getattr(self, area_name, None) if area_name else None
+        position = area.verticalScrollBar().value() if area is not None and not sip.isdeleted(area) else 0
+        rebuild = {'hotkeys': self.show_hotkeys_screen, 'history': self.show_history_view,
+                   'copy_history': self.show_copy_history_view}.get(kind)
+        if rebuild is not None:
+            rebuild()
+            self._ui_language = self.parent.current_interface_language
+            self.apply_theme()
+        else:
+            self.update_language()
+            self._set_settings_page(page)
+        area = getattr(self, area_name, None) if area_name else None
+        if area is not None and not sip.isdeleted(area):
+            # Layouts calculate the final scroll range after the translated
+            # controls have been polished; restore position in that turn.
+            QtCore.QTimer.singleShot(0, lambda area=area: (
+                area.verticalScrollBar().setValue(position) if not sip.isdeleted(area) else None))
 
     def update_language(self):
         self.init_ui()

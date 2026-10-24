@@ -54,7 +54,8 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.setObjectName('interfaceLanguagePicker')
         self.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
-        self.buttons, self.name_labels, self.ticks = {}, {}, []
+        self.buttons, self.name_labels, self.ticks = {}, {}, {}
+        self._dark = dark
         texts = PICKER_TEXT.get(current, PICKER_TEXT['en'])
         body = QtWidgets.QVBoxLayout(self)
         body.setContentsMargins(1, 1, 1, 1)
@@ -143,7 +144,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                     cell.setProperty('current', code == current)
                     if code == current:
                         selected_page = offset // self.PAGE_SIZE
-                        self.ticks.append(tick)
+                    self.ticks[code] = tick
                     for child in (flag, label, tick):
                         child.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
                     self.buttons[code], self.name_labels[code] = cell, label
@@ -170,6 +171,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         super().keyPressEvent(event)
 
     def set_theme(self, dark):
+        self._dark = dark
         colors = button_palette(dark)
         ink, surface, edge, frame = (('#f2eff6', '#121116', '#433a4c', '#62566e') if dark
                                     else ('#27222d', '#f8f5fb', '#d7cde3', '#927cab'))
@@ -206,5 +208,25 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                                   QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
         painter.drawPolyline(QtGui.QPolygonF([QtCore.QPointF(1, 7), QtCore.QPointF(4.5, 10.5), QtCore.QPointF(11, 3.5)]))
         painter.end()
-        for tick in self.ticks:
+        for tick in self.ticks.values():
             tick.setPixmap(check)
+
+    def set_language(self, current):
+        """Apply a choice immediately and keep the current language page open."""
+        texts = PICKER_TEXT.get(current, PICKER_TEXT['en'])
+        self.title.setText(texts[0])
+        self.pager.setAccessibleName(texts[0])
+        self.pager.editor.setAccessibleName(texts[0])
+        self.pager.editor.setToolTip(tooltip_text(texts[0]))
+        for button, label in ((self.pager.decrease, texts[1]), (self.pager.increase, texts[2]),
+                              (self.close_button, texts[3])):
+            button.setToolTip(tooltip_text(label))
+            button.setAccessibleName(label)
+        for code, button in self.buttons.items():
+            selected = code == current
+            if bool(button.property('current')) != selected:
+                button.setProperty('current', selected)
+                self.ticks[code].setFixedWidth(12 if selected else 0)
+                button.style().unpolish(button)
+                button.style().polish(button)
+                button.update()

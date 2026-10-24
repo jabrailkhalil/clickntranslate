@@ -406,21 +406,40 @@ class _ScaleView(QGraphicsView):
         self._hover_timer.setInterval(600)
         self._hover_timer.timeout.connect(self._show_control_hint)
         self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
 
-    def _hint_target_at(self, position):
+    def _widget_at(self, position):
         scene_point = self.mapToScene(position)
         item = self.scene().itemAt(scene_point, self.transform()) if self.scene() is not None else None
         if not isinstance(item, QGraphicsProxyWidget) or item.widget() is None:
             return None
         root = item.widget()
-        widget = root.childAt(item.mapFromScene(scene_point).toPoint()) or root
+        return root.childAt(item.mapFromScene(scene_point).toPoint()) or root
+
+    def _hint_target_at(self, position):
+        widget = self._widget_at(position)
         while widget is not None:
             if widget.toolTip():
                 return widget
-            if widget is root:
-                break
             widget = widget.parentWidget()
         return None
+
+    def _sync_button_hover(self, position=None):
+        """Use the actual hit target when a proxy omits or reorders Enter/Leave."""
+        from PyQt5 import sip
+        from PyQt5.QtWidgets import QAbstractButton
+        from button_styles import set_pointer_hover
+        target = self._widget_at(position) if position is not None else None
+        while target is not None and not isinstance(target, QAbstractButton):
+            target = target.parentWidget()
+        if target is not None and (not target.isEnabled() or not target.isVisible()):
+            target = None
+        app = QApplication.instance()
+        previous = getattr(app, '_hovered_app_button', lambda: None)()
+        if previous is not None and not sip.isdeleted(previous) and previous is not target:
+            set_pointer_hover(previous, False)
+        if target is not None:
+            set_pointer_hover(target, True)
 
     def _cancel_control_hint(self):
         self._hover_timer.stop()
@@ -462,6 +481,7 @@ class _ScaleView(QGraphicsView):
 
     def hideEvent(self, event):
         self._cancel_control_hint()
+        self._sync_button_hover()
         super().hideEvent(event)
 
     def viewportEvent(self, event):
@@ -476,6 +496,8 @@ class _ScaleView(QGraphicsView):
                 return True
         if event.type() in (QEvent.Leave, QEvent.Hide, QEvent.MouseButtonPress):
             self._cancel_control_hint()
+            if event.type() in (QEvent.Leave, QEvent.Hide):
+                self._sync_button_hover()
         elif event.type() == QEvent.MouseMove:
             self._track_control_hint(event)
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.MouseButtonRelease):
@@ -485,7 +507,13 @@ class _ScaleView(QGraphicsView):
             try:
                 if event.type() == QEvent.MouseButtonRelease:
                     self.before_mouse_release.emit()
-                return super().viewportEvent(event)
+                result = super().viewportEvent(event)
+                if event.type() in (QEvent.MouseMove, QEvent.MouseButtonRelease):
+                    # Qt forwards these moves through the proxy after native
+                    # hover notifications. Resolve the final state once, with
+                    # the same coordinate mapping as the visible canvas.
+                    self._sync_button_hover(event.pos())
+                return result
             finally:
                 self.mouse_global_position = None
                 self.mouse_event_type = None

@@ -13565,42 +13565,47 @@ class DarkThemeApp(QMainWindow):
             self._close_interface_language_picker()
             return
         from interface_language_picker import InterfaceLanguagePicker
-        original = self.settings_window if self.settings_window is not None else self.main_text_section
-        host = QWidget(original.parentWidget())
-        host.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        layout = QVBoxLayout(host)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
         picker = InterfaceLanguagePicker(INTERFACE_LANGUAGE_OPTIONS, self.current_interface_language,
-                                         resource_path, host, dark=self.current_theme != 'Светлая')
-        layout.addWidget(picker, 1)
-        if self.settings_window is not None:
-            # Keep the current settings tab intact beneath this temporary view.
-            picker.setFixedHeight(max(140, self.main_text_section.height()))
-            layout.addStretch(1)
-        item = self.main_layout.replaceWidget(original, host)
-        del item
-        original.hide()
+                                         resource_path, self.central_widget,
+                                         dark=self.current_theme != 'Светлая')
         self._interface_language_picker = picker
-        self._interface_language_view = (original, host, QApplication.focusWidget())
+        self._interface_language_focus = QApplication.focusWidget()
         self.update_interface_language_button()
         picker.languageSelected.connect(self.set_interface_language)
         picker.dismissed.connect(self._close_interface_language_picker)
-        host.show()
+        if not getattr(self, '_language_picker_position_connected', False):
+            self._ui_scale_controller.changed.connect(self._position_interface_language_picker)
+            self._language_picker_position_connected = True
+        self._position_interface_language_picker()
+        picker.show()
+        picker.raise_()
         picker.setFocus(Qt.OtherFocusReason)
 
-    def _close_interface_language_picker(self, restore_focus=True):
-        if getattr(self, '_interface_language_picker', None) is None:
+    def _position_interface_language_picker(self, *_args):
+        picker = getattr(self, '_interface_language_picker', None)
+        if picker is None:
             return
-        original, host, focus = self._interface_language_view
+        # A child overlay stays in the same scaled canvas and never removes
+        # settings, hides their contents or changes the layout's minimum size.
+        anchor = self.settings_window if self.settings_window is not None else self.main_text_section
+        origin = anchor.mapTo(self.central_widget, QtCore.QPoint())
+        height = max(140, self.main_text_section.height())
+        if self.settings_window is not None:
+            origin.setY(origin.y()+8)
+        available = self.central_widget.height()-origin.y()-14
+        picker.setGeometry(origin.x(), origin.y(), anchor.width(), min(height, available))
+        picker.raise_()
+
+    def _close_interface_language_picker(self, restore_focus=True):
+        picker = getattr(self, '_interface_language_picker', None)
+        if picker is None:
+            return
+        focus = self._interface_language_focus
         self._interface_language_picker = None
-        self._interface_language_view = None
+        self._interface_language_focus = None
         self.update_interface_language_button()
-        item = self.main_layout.replaceWidget(host, original)
-        del item
-        host.hide()
-        original.show()
-        host.deleteLater()
+        picker.hide()
+        picker.deleteLater()
         if restore_focus:
             from PyQt5 import sip
             target = focus if focus is not None and not sip.isdeleted(focus) else self.flag_button
@@ -13608,9 +13613,6 @@ class DarkThemeApp(QMainWindow):
         self._complete_guide_step('language')
 
     def set_interface_language(self, language_code):
-        close_picker = getattr(self, '_close_interface_language_picker', None)
-        if callable(close_picker):
-            close_picker()
         language_code = normalize_interface_language(language_code)
         if language_code == self.current_interface_language:
             self.refresh_interface_language_ui()
@@ -13624,13 +13626,22 @@ class DarkThemeApp(QMainWindow):
         self.save_config()
         self.refresh_interface_language_ui()
         if self.settings_window is not None:
-            pages = getattr(self.settings_window, 'settings_pages', None)
-            index = pages.currentIndex() if pages is not None else 0
-            self.settings_window.update_language()
-            if pages is not None:
-                self.settings_window._set_settings_page(index)
+            refresh = getattr(self.settings_window, 'refresh_current_language', None)
+            if callable(refresh):
+                refresh()
+            else:
+                self.settings_window.update_language()
         else:
-            self.show_main_screen()
+            # Keep the language overlay while replacing only the home content.
+            self._relabeling_interface = True
+            try:
+                self.show_main_screen()
+            finally:
+                self._relabeling_interface = False
+        picker = getattr(self, '_interface_language_picker', None)
+        if picker is not None:
+            picker.set_language(language_code)
+            self._position_interface_language_picker()
         if self.document_dialog is not None and self.document_dialog.isVisible():
             self.document_dialog.refresh_language(language_code)
         for dialog in _live_translation_result_dialogs():
@@ -14108,7 +14119,8 @@ class DarkThemeApp(QMainWindow):
     @_atomic_page_change
     @measure('ui.home')
     def show_main_screen(self):
-        self._close_interface_language_picker(restore_focus=False)
+        if not getattr(self, '_relabeling_interface', False):
+            self._close_interface_language_picker(restore_focus=False)
         active_settings = getattr(self, "settings_window", None)
         if active_settings is not None:
             self._cached_settings_window = active_settings
