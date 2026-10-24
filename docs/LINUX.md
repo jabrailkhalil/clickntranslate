@@ -1,19 +1,30 @@
 # Click'n'Translate on Linux
 
-Version **1.8.1** is distributed as an x86_64 AppImage. The final package starts
-on Ubuntu 22.04.5; replacement of the original 1.7 AppImage is checked separately
-on Ubuntu 24.04 because the old binary requires glibc 2.38. Linux updates open
-the download page: replace the AppImage manually and retain your XDG user data.
-See the [current QA report](QA_1.8.1_2026-09-25.md) and the
-[earlier native OCR/capture audit](QA_1.8.0_2026-09-25.md).
+The current release, **1.8.2**, provides an x86_64 **AppImage** and a
+**portable tar.gz archive**. Download either from the
+[official release page](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+or [translate.clickn.dev](https://translate.clickn.dev/).
+
+Make an AppImage executable before opening it:
+
+```bash
+chmod +x Click-n-Translate-1.8.2-linux-x86_64.AppImage
+./Click-n-Translate-1.8.2-linux-x86_64.AppImage
+```
+
+For the portable archive, extract the whole directory and run `clickntranslate`.
+Keep the accompanying program files. Version 1.8.2 supports in-app updates for
+writable AppImage and supported portable installations. To upgrade **1.8.1 or
+earlier** for the first time, replace the application manually and keep user data.
+See [1.8.2 package checks and limitations](RELEASE_QA_1.8.2.md) and
+[the current update flow](UPDATES_1.8.2_DEVELOPMENT.md).
 
 Earlier source audit: [19 September 2026](QA_LINUX_2026_09_19.md) (Russian).
-It covers real X11 and two-output Wayland capture, mixed scaling, desktop
-launchers, autostart, clipboard, OCR and Argos package lifecycle. It also records
-the current Lingva service failure and the remaining desktop/build limitations.
+It records the X11/Wayland capture, scaling, launcher, clipboard, OCR and Argos
+checks performed at that date, including the service failures observed then.
 
-The Linux build shares all application code with the Windows build. Everything
-that differs is isolated in four modules:
+The Linux build shares its application code with the other desktop editions.
+Platform adapters include:
 
 | Module | Responsibility |
 | --- | --- |
@@ -21,9 +32,6 @@ that differs is isolated in four modules:
 | `single_instance.py` | The command socket that replaces global hotkeys |
 | `linux_capture.py` | Screen capture through the desktop portal or a compositor helper |
 | `linux_desktop.py` | `.desktop` entries, launcher icon, autostart |
-
-Windows behaviour is unchanged: every Windows-only path is still reached through
-the same code as before.
 
 ## What is different from the Windows build
 
@@ -95,12 +103,26 @@ Tesseract data is found wherever your distribution keeps it — Debian's
 `/usr/share/tesseract-ocr/<version>/tessdata`, `/usr/share/tessdata` on Fedora
 and Arch, or whatever the binary itself reports.
 
+**Ubuntu 24.04 / Tesseract:** if Tesseract works in a terminal but fullscreen
+OCR reports no text or a `GLIBCXX` error, see
+[issue #8](https://github.com/jabrailkhalil/clickntranslate/issues/8).
+The AppImage library-path fix was verified in an isolated Ubuntu 24.04.5
+X11/Xvfb environment and is planned for the next release; it is not part of
+the published 1.8.2 package. RapidOCR is an alternative while awaiting the fix.
+
 ### Updates
 
-The Windows updater replaces its own executable using helper programs written in
-C#; none of that ports. On Linux the app reports that a new version exists and
-links to the release page. Update by downloading the new AppImage or through
-whatever installed the app.
+From 1.8.2, the in-app updater downloads the matching AppImage or portable
+tarball, verifies the package, stages it beside the installed application and
+restarts into the replacement. Failed startup restores the previous program.
+AppImage updates require a writable application file and parent directory.
+Portable directory updates require the build-created `.cnt-portable-install`
+marker; system/package-manager installations use their original installation
+method. An unwritable installation needs manual replacement.
+
+Versions 1.8.1 and earlier do not contain this POSIX updater. Download 1.8.2
+and replace them manually first. Settings and downloaded models remain in
+their existing data directories. See [update behavior and boundaries](UPDATES_1.8.2_DEVELOPMENT.md).
 
 ### The tray
 
@@ -129,8 +151,8 @@ your clipboard.
 
 ### Local translation and OCR engines
 
-* **Hy-MT** — the automatic download is the pinned Windows llama.cpp build, so
-  it is not offered here. Put a llama.cpp runner (`llama-cli`, `llama-run`,
+* **Hy-MT** — Linux requires a compatible native runtime installed manually.
+  Put a llama.cpp runner (`llama-cli`, `llama-run`,
   `hymt` or `main`) together with the GGUF model in `translators/hymt` and the
   engine works exactly as on Windows.
 * **RapidOCR** — bundled into the `OcrWorker`, so it needs nothing installed.
@@ -182,12 +204,12 @@ python tools/functional_check.py --frozen dist/clickntranslate
 python tools/functional_check.py --offline     # skip the live providers
 ```
 
-It runs on both systems and skips whatever this machine does not have, so a
-skip means "not installed here", never "not checked".
+Unavailable components are skipped and remain unverified in that run. Consult
+the output and the dated QA report for the actual checks performed.
 
 ## Behaviour shared with Windows that the port improved
 
-Three fixes came out of porting and apply to both systems:
+The port introduced the following shared behavior:
 
 * **Tesseract languages are read from `tesseract --list-langs`** instead of only
   scanning directories next to the binary. Distribution packages keep their
@@ -207,8 +229,9 @@ Three fixes came out of porting and apply to both systems:
 
 ## Earlier packaged verification
 
-The following results describe earlier packaged builds. For the current source
-and the exact scope checked on 19 September, use the audit linked above.
+The following results describe earlier packaged builds. For current release
+coverage use [the 1.8.2 QA report](RELEASE_QA_1.8.2.md). The September audit
+linked above retains its original scope and date.
 
 The port is checked in separate layers so a WSL-only success is not mistaken
 for a working Linux desktop build.

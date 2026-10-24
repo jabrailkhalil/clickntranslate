@@ -22,11 +22,11 @@
     <binary>clickntranslate</binary>
   </provides>
   <developer_name>Jabrail Digital</developer_name>
-  <url type="homepage">https://github.com/jabrailkhalil/clickntranslate</url>
+  <url type="homepage">https://translate.clickn.dev/</url>
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
-    <release version="1.8.2" date="2026-10-22" type="development">
+    <release version="1.8.2" date="2026-10-22">
       <description><p>Separated program and translation settings and added in-app updates for portable Windows, macOS and Linux builds.</p></description>
     </release>
     <release version="1.8.1" date="2026-09-25" type="development">

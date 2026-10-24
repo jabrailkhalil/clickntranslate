@@ -21,7 +21,7 @@
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
-  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
 </p>
@@ -52,7 +52,7 @@
 | **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
 | **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[Alle Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
+[Alle Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 <a name="android"></a>
 
@@ -75,7 +75,7 @@
 
 Du kannst auch Text eingeben, einfügen oder aus einer anderen App mit **Clickn** teilen sowie Fotos und Screenshots aus der Galerie übersetzen. Ergebnisse lassen sich kopieren, teilen und im lokalen Textverlauf wiederfinden. Google benötigt keinen Schlüssel; ML Kit übersetzt nach dem Herunterladen unterstützter Sprachmodelle offline. Zusätzliche API-Dienste verwenden deine eigenen Zugangsdaten.
 
-**[APK herunterladen](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android-Anleitung (Englisch)](../ANDROID.md) · [Android-Quellcode](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+[Android-Anleitung (Englisch)](../ANDROID.md) · [Android-Quellcode](https://github.com/jabrailkhalil/clickntranslate/tree/android)
 
 ## Auf dem Desktop: Text verstehen, ohne Umwege
 
@@ -91,7 +91,7 @@ Acht Oberflächensprachen mit Hinweisen und Anleitung, helle und dunkle Themes, 
 
 Python ist enthalten. Windows und Mac nutzen das selbstsignierte jabrailkhalil-Zertifikat; SmartScreen kann warnen, die Mac-App ist nicht notarisiert. [Erster Start](../guides/setup.de.md). Für passende Mac-Funktionen sind Bildschirmaufnahme und Bedienungshilfen nötig. [Linux](../LINUX.md).
 
-Desktop 1.8.2 lädt Updates von GitHub Releases innerhalb der App. Bei Mac/Linux 1.8.1 und älter ist dieses erste Upgrade manuell zu installieren; geschützte Installationsorte können einen manuellen Austausch erfordern. Store-Versionen nutzen Microsoft Store. Android hat eine eigene [Oberfläche und Anleitung](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme). Der Zähler misst Dateidownloads, keine einzelnen Personen.
+Desktop 1.8.2 lädt Updates von GitHub Releases innerhalb der App. Bei Mac/Linux 1.8.1 und älter ist dieses erste Upgrade manuell zu installieren; geschützte Installationsorte können einen manuellen Austausch erfordern. Store-Versionen nutzen Microsoft Store. Android hat eine eigene [Oberfläche und Anleitung](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme).
 
 [Ausführliche englische Anleitung](../../README.md) · [Fehler melden](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0](../../LICENSE)
 

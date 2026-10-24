@@ -1,59 +1,37 @@
-# Click'n'Translate landing page
+# Previous website source
 
-Static landing page for the Click'n'Translate section on xynapse.online.
+## Current public sites
 
-## Local preview
+- **Click’n’Translate:** [translate.clickn.dev](https://translate.clickn.dev/).
+- **Author and other projects:** [clickn.dev](https://clickn.dev/).
+- **Android:** [mobile overview and APK](https://translate.clickn.dev/en/#android),
+  [installation guide](../ANDROID.md), [Android source](https://github.com/jabrailkhalil/clickntranslate/tree/android).
+- **Current application downloads:** [GitHub Releases](https://github.com/jabrailkhalil/clickntranslate/releases/latest).
 
-From this directory, generate the six locales and assemble public files:
+The old `xynapse.online` and `xynapse.online/clickntranslate/` addresses redirect
+visitors to the new domains. Use the new addresses for links, product metadata
+and documentation.
 
-```powershell
-npm run build
-python -m http.server 4287 --bind 127.0.0.1 --directory dist
-```
+## Source snapshot
 
-## Public URL
+This directory preserves the **September 2026** static website: six locales,
+recordings, styles, font licenses, generators and the former nginx configuration.
+The live site has since changed its branding, navigation, Android section and
+downloads. Treat these files as historical source and design references, rather
+than the current deployment bundle. The old `/var/www/xynapse.online/` paths
+record the former host layout.
 
-`https://xynapse.online/clickntranslate/`
+For current product information use the [main README](../../README.md),
+[Android guide](../ANDROID.md), [Linux guide](../LINUX.md),
+[Mac guide](../MACOS.md) and the public site above. Current website privacy
+information is maintained at [clickn.dev](https://clickn.dev/en/privacy/).
 
-Canonical links, Open Graph URLs, `robots.txt`, and `sitemap.xml` use that
-address. The landing page is available in English, Russian, Spanish, German,
-French, and Simplified Chinese. The root page selects a language from the
-browser locale until the visitor makes a manual choice.
+## Reproducing the historical snapshot
 
-## Editing
+The former build uses `npm run build` and writes public files into `dist/`.
+Its locale generator also rewrites `../guides/setup.*.md` from
+`tools/setup-content.mjs`. Reproduce it in an isolated checkout to preserve
+current documentation. The generated snapshot is for historical preview;
+maintaining the live site requires its current source and hosting configuration.
 
-- Text and translations: `tools/content.mjs`.
-- Shared HTML: `tools/generate-locales.mjs` (the six HTML files are generated).
-- Styling: `styles.css`; interactions and current GitHub downloads: `app.js`.
-- Design decisions and font license: [DESIGN.md](DESIGN.md).
-- Real app recordings and owner-supplied screenshots: `assets/`.
-
-Run `npm run build` after editing. `dist/` includes only public files; it omits
-source tools, private configuration and the old unused generated social card.
-The site is static and does not require Node.js on the host.
-
-## Hosting
-
-The existing host serves the site from `/var/www/xynapse.online/clickntranslate/`.
-Deploy the contents of `dist/` only. Preserve the previous version outside the
-public document root before switching versions. Other paths on xynapse.online
-and the application release assets are independent of this site.
-
-Download buttons resolve the latest stable GitHub release at page load. Windows
-has installer/portable choices, Mac has Apple Silicon/Intel choices, and Linux
-uses AppImage. API failures fall back to the latest release page.
-
-`tools/site-assets.mjs` generates content-hashed CSS/JS filenames and a shared
-page revision. All locales use the same assets and revision. The host includes
-`hosting/nginx-cache.conf` in its HTTPS server block: HTML is not cached,
-fingerprinted CSS/JS is immutable, and other site resources are revalidated.
-The file also includes the host's existing global security headers so adding
-cache headers does not discard them. Keep previous fingerprinted bundles during
-deployment for visitors who still have an older page open.
-
-First-launch instructions live in `tools/setup-content.mjs`. The locale
-generator renders the website's Windows/Mac setup sections and the six
-`docs/guides/setup.*.md` files from that shared content. Edit the content, then
-run `npm run build`. Download-card links and `#setup-windows` / `#setup-macos`
-links open the appropriate guide. These links are also used by the READMEs and
-the existing release table; no application package changes are needed.
+[Historical design record and font license](DESIGN.md).

@@ -9,13 +9,14 @@ authors:
     given-names: Dzhabrail Elnurovich
     orcid: "https://orcid.org/0009-0002-2391-692X"
 repository-code: "https://github.com/jabrailkhalil/clickntranslate"
-url: "https://github.com/jabrailkhalil/clickntranslate"
+url: "https://translate.clickn.dev/"
 version: 1.8.2
 date-released: 2026-10-22
 license: GPL-3.0-only
 abstract: >-
-  Click'n'Translate is a cross-platform desktop application for capturing,
-  recognizing, copying, and translating text from graphical user interfaces.
+  Click'n'Translate is a screen translation application for Windows, macOS,
+  Linux, and Android. It captures, recognizes, copies, and translates text
+  from graphical user interfaces, images, and user-provided text.
   It provides multiple local OCR backends, online and offline translation
   routes, versioned release artifacts, and testable platform adapters for
   research on screen text and multilingual interface workflows.
