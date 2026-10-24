@@ -39,8 +39,7 @@ def trace(app):
 
 
 def controls(window, picker):
-    return [window.flag_button, *picker.buttons.values(), picker.previous_button,
-            picker.next_button, picker.close_button]
+    return [window.flag_button, *picker.buttons.values(), picker.search, picker.close_button]
 
 
 def assert_pointer_feedback_only(window, picker, app, trace):
@@ -76,48 +75,61 @@ def test_mouse_choice_does_not_become_tab_navigation_during_live_relabel(window,
     assert_pointer_feedback_only(window, picker, app, trace)
 
 
-def test_mouse_page_arrows_preserve_pointer_mode_and_do_not_select(window, app, trace):
-    install_keyboard_navigation(app)
-    settle(app)
-    initial = window.current_interface_language
-    click(window, window.flag_button, app)
-    picker = window._interface_language_picker
-    click(window, picker.next_button, app)
-    assert picker.pages.currentIndex() == 1 and window.current_interface_language == initial
-    assert_pointer_feedback_only(window, picker, app, trace)
-    click(window, picker.previous_button, app)
-    assert picker.pages.currentIndex() == 0 and window.current_interface_language == initial
-    assert_pointer_feedback_only(window, picker, app, trace)
-
-
-def test_keyboard_enter_on_page_arrow_keeps_keyboard_feedback(window, app):
-    install_keyboard_navigation(app)
+def test_mouse_search_and_clear_keep_pointer_feedback(window, app, trace):
     settle(app)
     click(window, window.flag_button, app)
     picker = window._interface_language_picker
-    initial = window.current_interface_language
-    focus_control(picker.next_button)
-    QTest.keyClick(picker.next_button, QtCore.Qt.Key_Return)
+    click(window, picker.search, app)
+    assert_pointer_feedback_only(window, picker, app, trace)
+    picker.search.setText('Hindi')
     settle(app)
-    assert picker.pages.currentIndex() == 1 and picker.keyboard_mode
-    assert picker.buttons['hi'].hasFocus() and picker.buttons['hi'].property('keyboardFocus')
-    assert window.current_interface_language == initial
+    assert picker.visible_codes == ('hi',)
+    picker.search.clear()
+    settle(app)
+    assert len(picker.visible_codes) == 12
+    assert_pointer_feedback_only(window, picker, app, trace)
 
 
-def test_keyboard_arrows_take_over_after_mouse_paging(window, app, trace):
+def test_keyboard_tab_treats_catalog_as_one_stop(window, app):
     settle(app)
     click(window, window.flag_button, app)
     picker = window._interface_language_picker
-    initial = window.current_interface_language
-    click(window, picker.next_button, app)
+    focus_control(picker.search)
+    QTest.keyClick(picker.search, QtCore.Qt.Key_Tab)
+    assert picker.buttons[window.current_interface_language].hasFocus()
+    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Tab)
+    assert picker.close_button.hasFocus()
+    QTest.keyClick(picker.close_button, QtCore.Qt.Key_Tab)
+    assert picker.search.hasFocus()
+
+
+def test_mouse_clear_search_after_typing_clears_keyboard_feedback(window, app, trace):
+    settle(app)
+    click(window, window.flag_button, app)
+    picker = window._interface_language_picker
+    focus_control(picker.search)
+    QTest.keyClicks(picker.search, 'port')
+    settle(app)
+    clear = next(control for control in picker.search.findChildren(QtWidgets.QAbstractButton)
+                 if control.isVisible())
+    click(window, clear, app)
+    assert picker.search.text() == '' and len(picker.visible_codes) == 12
     assert_pointer_feedback_only(window, picker, app, trace)
+
+
+def test_keyboard_arrows_take_over_after_mouse_filter_choice(window, app, trace):
+    settle(app)
+    click(window, window.flag_button, app)
+    picker = window._interface_language_picker
+    picker.search.setText('Hindi')
+    click(window, picker.buttons['hi'], app)
+    assert_pointer_feedback_only(window, picker, app, trace)
+    picker.search.clear()
     QTest.keyClick(picker.buttons['hi'], QtCore.Qt.Key_Right)
     settle(app)
     assert picker.keyboard_mode and picker.buttons['id'].hasFocus()
     assert picker.buttons['id'].property('keyboardFocus')
-    assert window.current_interface_language == initial
-    click(window, picker.previous_button, app)
-    assert picker.pages.currentIndex() == 0 and window.current_interface_language == initial
+    click(window, picker.buttons['fr'], app)
     assert_pointer_feedback_only(window, picker, app, trace)
 
 
@@ -145,7 +157,7 @@ def test_mouse_focused_current_cell_has_no_extra_native_focus_pixels(window, app
     assert focused == unfocused
 
 
-@pytest.mark.parametrize('page', [0, 1, 2, 3])
+@pytest.mark.parametrize('page', [0, 1, 2, 3, 4])
 @pytest.mark.parametrize('locale', ['en', 'ar'])
 def test_mouse_choice_after_keyboard_settings_navigation_keeps_mouse_feedback(window, app, trace, page, locale):
     window.show_settings()
@@ -202,29 +214,20 @@ def test_outside_action_closes_picker_and_runs_once_after_keyboard_navigation(wi
     assert not window.theme_button.property('keyboardFocus')
 
 
-def test_connection_stem_is_part_of_open_picker_without_selecting_or_clicking_below(window, app, trace):
-    from ui_scaling import widget_global_point
+def test_gap_under_flag_is_outside_flat_panel_and_dismisses(window, app):
     settle(app)
     click(window, window.flag_button, app)
     picker = window._interface_language_picker
-    connection = window._interface_language_connection
+    assert not hasattr(window, '_interface_language_connection')
     flag = QtCore.QRect(window.flag_button.mapTo(window.ui_root, QtCore.QPoint()), window.flag_button.size())
     panel = QtCore.QRect(picker.mapTo(window.ui_root, QtCore.QPoint()), picker.size())
-    overlap_left, overlap_right = max(flag.left(), panel.left()), min(flag.right(), panel.right())
-    point = QtCore.QPoint((overlap_left+overlap_right)//2, (flag.bottom()+panel.top())//2)
-    assert overlap_right > overlap_left and flag.bottom() < point.y() < panel.top()
-    assert connection.contains_global(widget_global_point(window.ui_root, point))
-    selected = QSignalSpy(picker.languageSelected)
-    focus_control(picker.buttons[window.current_interface_language])
-    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Right)
-    assert picker.keyboard_mode
+    point = QtCore.QPoint(flag.center().x(), (flag.bottom()+panel.top())//2)
+    assert flag.bottom() < point.y() < panel.top()
     controller = window._ui_scale_controller
     view_point = controller.view.mapFromScene(window.ui_root.graphicsProxyWidget().mapToScene(QtCore.QPointF(point)))
     QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=view_point)
     settle(app)
-    assert window._interface_language_picker is picker and picker.isVisible()
-    assert len(selected) == 0 and window.flag_button.isChecked()
-    assert_pointer_feedback_only(window, picker, app, trace)
+    assert window._interface_language_picker is None
 
 
 def test_escape_after_mouse_open_restores_keyboard_focus_to_flag(window, app):

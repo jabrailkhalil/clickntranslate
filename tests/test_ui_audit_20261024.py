@@ -47,7 +47,7 @@ def test_ctrl_tab_does_not_crash_on_embedded_update_page(window, app, direction,
     settings._update_in_progress = busy
     settings._set_settings_page(settings.settings_pages.indexOf(settings._update_progress))
     app.processEvents()
-    assert settings._settings_page_index not in (0, 1, 2, 3)
+    assert settings._settings_page_index not in (0, 1, 2, 3, 4)
     assert isinstance(app._keyboard_navigation._settings_tab(window, direction), bool)
     if busy:
         assert settings.settings_pages.currentWidget() is settings._update_progress

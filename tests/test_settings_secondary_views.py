@@ -298,8 +298,8 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.assertEqual(self.parent.config["game_translate_hotkey"], "Ctrl+Alt+G")
         self.assertEqual(self.parent.config["toggle_window_hotkey"], "Ctrl+Shift+Space")
 
-    def test_outside_click_close_setting_persists_from_the_general_page(self):
-        self.settings._set_settings_page(0)
+    def test_outside_click_close_setting_persists_from_the_translation_page(self):
+        self.settings._set_settings_page(1)
         self.app.processEvents()
         checkbox = self.settings.close_result_on_outside_click_checkbox
         self.assertFalse(checkbox.isChecked())

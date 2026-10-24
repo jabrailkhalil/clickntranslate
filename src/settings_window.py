@@ -1,6 +1,10 @@
 from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
 from number_controls import ChoiceStepper, StepperFrame
 from control_hints import control_hint
+from settings_sections import (
+    PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR,
+    PAGE_COUNT, VISUAL_PAGE_ORDER, page_caption, section_text,
+)
 from package_table import PackageTable
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
 from PyQt5 import sip
@@ -1014,6 +1018,24 @@ class OpticallyCenteredPushButton(QPushButton):
         painter.end()
 
 
+class InterfaceLanguageButton(OpticallyCenteredPushButton):
+    """Open the shared language picker, with the same field and arrow as combos."""
+
+    def _label_area(self):
+        return super()._label_area().adjusted(23, 0, -18, 0)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        if not self.icon().isNull():
+            self.icon().paint(painter, QtCore.QRect(9, (self.height()-18)//2, 18, 18))
+        color = self.palette().color(QtGui.QPalette.ButtonText)
+        paint_down_arrow(painter, QtCore.QRectF(self.width()-24, 0, 20, self.height()),
+                         self.font(), color)
+        painter.end()
+
+
 class LanguageSwapButton(ScaledIconToolButton):
     """Consistent vector swap icon for every language-pair control.
 
@@ -1107,7 +1129,7 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{text};
                 border:1px solid transparent; border-radius:0;
-                padding:0 3px; font-size:13px; font-weight:500; }}
+                padding:0 5px; font-size:12px; font-weight:600; }}
             QPushButton:hover, QPushButton:checked, QPushButton:focus {{ color:{active}; }}
         """)
 
@@ -1128,7 +1150,7 @@ class SettingsPageNavigation(QFrame):
         super().__init__(parent)
         self.setObjectName("settingsPageNavigation")
         self.setFixedHeight(32)
-        self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.set_dark(dark)
 
     def set_dark(self, dark):
@@ -9930,6 +9952,8 @@ class SettingsWindow(QWidget):
             "settings_updates_page",
             "settings_game_page",
             "settings_assistant_page",
+            "settings_ocr_page",
+            "maintenance_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -9985,6 +10009,8 @@ class SettingsWindow(QWidget):
             "settings_updates_page",
             "settings_game_page",
             "settings_assistant_page",
+            "settings_ocr_page",
+            "maintenance_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -10468,7 +10494,7 @@ class SettingsWindow(QWidget):
 
         self.ocr_languages_btn = OpticallyCenteredPushButton(settings_text(lang, "ocr_language_packs"))
         self.ocr_languages_btn.setObjectName("settingsLanguagePackagesButton")
-        self.ocr_languages_btn.clicked.connect(self.show_ocr_language_manager)
+        self.ocr_languages_btn.clicked.connect(self.show_ocr_packages)
         self.ocr_languages_btn.setToolTip(tooltip_text(settings_text(lang, "manage_ocr_languages")))
         self.ocr_languages_btn.setStyleSheet("")
         self.ocr_languages_btn.setFixedHeight(action_button_height)
@@ -10969,14 +10995,11 @@ class SettingsWindow(QWidget):
         dots_layout.setSpacing(2)
         self.settings_page_dots = []
         self.settings_page_tabs = self.settings_page_dots
-        for index, text_key in enumerate((
-            "settings_page_main",
-            "settings_page_updates",
-            "settings_page_game",
-            "settings_page_assistant",
-        )):
-            caption = assistant_text(lang, 'page') if text_key == 'settings_page_assistant' else settings_text(lang, text_key)
+        for index in range(PAGE_COUNT):
+            caption = page_caption(lang, index)
             dot = SettingsPageTabButton(caption, self.settings_page_footer, dark=dark)
+            dot.setMinimumWidth(0)
+            dot.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             dot.setAccessibleName(caption)
             dot.setToolTip(tooltip_text(caption))
             dot.clicked.connect(
@@ -10985,9 +11008,9 @@ class SettingsWindow(QWidget):
             dot.toggled.connect(
                 lambda _checked, navigation=self.settings_page_footer: navigation.update()
             )
-            # Keep semantic page IDs stable for guide/editor integrations, but
-            # put the short Companion tab between Updates and Dynamic.
-            dots_layout.addWidget(dot, 0, {0: 0, 1: 1, 2: 3, 3: 2}[index])
+            column = VISUAL_PAGE_ORDER.index(index)
+            dots_layout.addWidget(dot, 0, column)
+            dots_layout.setColumnStretch(column, 1)
             self.settings_page_dots.append(dot)
         self.settings_page_footer.setFixedHeight(32)
 
@@ -11014,7 +11037,7 @@ class SettingsWindow(QWidget):
             self.settings_general_page, self.settings_updates_page, self.settings_game_page, self.settings_assistant_page
         ):
             self.settings_pages.addWidget(page)
-        self.main_layout.addWidget(self.settings_page_footer, 0, Qt.AlignHCenter)
+        self.main_layout.addWidget(self.settings_page_footer, 0)
         self.main_layout.addWidget(self.settings_pages, 1)
         # Apply shared styling only after every page has been recreated.
         # Earlier calls could reach deleted controls from the previous visit.
@@ -11109,6 +11132,9 @@ class SettingsWindow(QWidget):
         updates_page.setVisible(index == 1)
         game_page.setVisible(index == 2)
         self.settings_assistant_page.setVisible(index == 3)
+        ocr_page = getattr(self, 'settings_ocr_page', None)
+        if ocr_page is not None:
+            ocr_page.setVisible(index == PAGE_OCR)
         if index == 3:
             self.settings_assistant_page.refresh()
         if index == 1:
@@ -11121,7 +11147,7 @@ class SettingsWindow(QWidget):
             self._refresh_game_templates()
         footer = getattr(self, "settings_page_footer", None)
         if footer is not None:
-            footer.show()
+            footer.setVisible(getattr(self, '_secondary_view_kind', None) != 'maintenance')
             footer.raise_()
         for dot_index, dot in enumerate(getattr(self, "settings_page_dots", ())):
             dot.setChecked(dot_index == index)
@@ -11180,10 +11206,10 @@ class SettingsWindow(QWidget):
 
     def _apply_language_package_task_status(self):
         button = getattr(self, "ocr_languages_btn", None)
-        if button is None:
+        if button is None or sip.isdeleted(button):
             return
         lang = getattr(self.parent, "current_interface_language", "en")
-        base = settings_text(lang, "ocr_language_packs")
+        base = section_text(lang, 'ocr_packages')
         state = dict(getattr(self, "_language_package_task_state", {}) or {})
         kind = state.get("kind", "idle")
         if kind in {"running", "done", "failed"}:
@@ -11208,10 +11234,36 @@ class SettingsWindow(QWidget):
         # recalculation.
         button.style().unpolish(button)
         button.style().polish(button)
-        help_text = settings_text(lang, "manage_ocr_languages")
+        help_text = section_text(lang, 'ocr_packages_hint')
         detail = str(state.get("text") or "").strip()
         button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
         button.setAccessibleDescription(detail or help_text)
+
+    def show_maintenance_view(self):
+        """Open the nested tools page without destroying the inline updater's stack."""
+        if self._update_in_progress:
+            return
+        if getattr(self, 'maintenance_page', None) is None:
+            self.init_ui()
+            self.apply_theme()
+        self._remember_secondary_return_page()
+        page = self.maintenance_page
+        if self.settings_pages.indexOf(page) < 0:
+            self.settings_pages.addWidget(page)
+        self._secondary_view_kind = 'maintenance'
+        self._set_settings_page(self.settings_pages.indexOf(page))
+        self._apply_action_panel_style()
+
+    def show_offline_translation_packages(self, _checked=False):
+        engine = self.parent.config.get('translator_engine', 'argos')
+        self.show_ocr_language_manager(engine if engine in ('argos', 'hymt') else None)
+        dialog = self._language_manager_dialog
+        dialog.tabs.setCurrentWidget(dialog.translation_section_page)
+
+    def show_ocr_packages(self, _checked=False):
+        self.show_ocr_language_manager()
+        dialog = self._language_manager_dialog
+        dialog.tabs.setCurrentWidget(dialog.ocr_section_page)
 
     def show_ocr_language_manager(self, engine=None, source='', target=''):
         # Completion is an unread badge until the user follows it. Opening the
@@ -12236,19 +12288,29 @@ class SettingsWindow(QWidget):
         # Only entering from the real settings stack changes its destination.
         if not getattr(self, '_secondary_view_kind', None):
             self._secondary_return_page = getattr(self, '_settings_page_index', 0)
-            scroll = getattr(self, 'translation_settings_scroll', None)
+            scroll = self._settings_scroll_for_page(self._secondary_return_page)
             self._secondary_return_scroll = scroll.verticalScrollBar().value() if scroll else 0
 
+    def _settings_scroll_for_page(self, page):
+        name = {PAGE_APPLICATION: 'application_settings_scroll',
+                PAGE_TRANSLATION: 'translation_settings_scroll', PAGE_OCR: 'ocr_settings_scroll',
+                PAGE_DYNAMIC: 'game_settings_scroll', PAGE_COMPANION: 'assistant_settings_scroll'}.get(page)
+        scroll = getattr(self, name, None) if name else None
+        return scroll if scroll is not None and not sip.isdeleted(scroll) else None
+
     def _return_from_secondary_view(self):
+        if self._update_in_progress:
+            self._handle_update_progress_close_attempt()
+            return
         page = getattr(self, '_secondary_return_page', 0)
         position = getattr(self, '_secondary_return_scroll', 0)
         self.init_ui()
         self._set_settings_page(page)
         self.apply_theme()
-        if page == 1:
-            scroll = self.translation_settings_scroll
+        scroll = self._settings_scroll_for_page(page)
+        if scroll is not None:
             def restore_scroll():
-                if getattr(self, 'translation_settings_scroll', None) is scroll:
+                if not sip.isdeleted(scroll):
                     scroll.verticalScrollBar().setValue(position)
             QtCore.QTimer.singleShot(0, restore_scroll)
 
@@ -12391,7 +12453,10 @@ class SettingsWindow(QWidget):
             self._handle_update_progress_close_attempt()
             return
         self._set_parent_update_flow_active(False)
-        self._set_settings_page(0)
+        if getattr(self, '_secondary_view_kind', None) == 'maintenance':
+            self.show_maintenance_view()
+        else:
+            self._set_settings_page(PAGE_APPLICATION)
 
     def _show_update_progress(self, text, determinate=False, value=0):
         from inline_update import page
@@ -13918,9 +13983,11 @@ finally {
         """Connected actions use the same palette and states as dialog buttons."""
         dark = self.parent.current_theme != "Светлая"
         colors = button_palette(dark)
-        for name, object_name in (("settings_action_panel", "settingsActionPanel"),
-                                  ("translation_action_panel", "settingsActionPanel"),
-                                  ("settings_transfer_panel", "settingsTransferPanel")):
+        panel_names = ('settings_action_panel', 'translation_action_panel',
+                       'ocr_action_panel', 'game_action_panel', 'assistant_action_panel',
+                       'maintenance_action_panel', 'maintenance_footer')
+        for name, object_name in tuple((name, 'settingsActionPanel') for name in panel_names) + (
+                                  ("settings_transfer_panel", "settingsTransferPanel"),):
             panel = getattr(self, name, None)
             if panel is not None and not sip.isdeleted(panel):
                 set_widget_stylesheet(panel,
@@ -13930,7 +13997,7 @@ finally {
         # Derive physical edges from the actual grid, including spans and RTL.
         # Reusing LTR corner numbers on Arabic put rounded holes in inner
         # dividers and square fills over the panel's outside corners.
-        for name in ('settings_action_panel', 'translation_action_panel', 'settings_transfer_panel'):
+        for name in panel_names + ('settings_transfer_panel',):
             panel = getattr(self, name, None)
             if panel is None or sip.isdeleted(panel):
                 continue
@@ -14126,6 +14193,16 @@ finally {
                 navigation.set_dark(self.parent.current_theme != "Светлая")
             except RuntimeError:
                 pass
+        language_button = getattr(self, 'interface_language_button', None)
+        if language_button is not None and not sip.isdeleted(language_button):
+            field, ink, edge = (('#20212a', '#f4f6fb', '#4b4056') if dark
+                                else ('#f1edf4', '#241f2a', '#bcb2c7'))
+            set_widget_stylesheet(language_button, f'''
+                QPushButton {{ background:{field}; color:{ink}; border:1px solid {edge};
+                    border-radius:7px; padding:0 6px; font-size:14px; font-weight:400; }}
+                QPushButton:hover, QPushButton:pressed {{ border-color:#9B78C8; }}
+                QPushButton[keyboardFocus="true"]:focus {{ border-color:#9B78C8; }}
+            ''')
         for dot in getattr(self, "settings_page_dots", ()):
             try:
                 dot.set_dark(self.parent.current_theme != "Светлая")
@@ -14189,20 +14266,25 @@ finally {
         """Relabel the current destination without returning to General."""
         kind = getattr(self, '_secondary_view_kind', None)
         page = getattr(self, '_settings_page_index', 0)
-        area_name = {'history': 'history_scroll_area', 'copy_history': 'copy_history_scroll_area'}.get(
-            kind, 'translation_settings_scroll' if page == 1 else '')
-        area = getattr(self, area_name, None) if area_name else None
+        area_name = {'history': 'history_scroll_area', 'copy_history': 'copy_history_scroll_area'}.get(kind)
+        area = getattr(self, area_name, None) if area_name else self._settings_scroll_for_page(page)
         position = area.verticalScrollBar().value() if area is not None and not sip.isdeleted(area) else 0
         rebuild = {'hotkeys': self.show_hotkeys_screen, 'history': self.show_history_view,
                    'copy_history': self.show_copy_history_view}.get(kind)
-        if rebuild is not None:
+        if kind == 'maintenance':
+            return_page = getattr(self, '_secondary_return_page', PAGE_APPLICATION)
+            return_scroll = getattr(self, '_secondary_return_scroll', 0)
+            self.update_language()
+            self.show_maintenance_view()
+            self._secondary_return_page, self._secondary_return_scroll = return_page, return_scroll
+        elif rebuild is not None:
             rebuild()
             self._ui_language = self.parent.current_interface_language
             self.apply_theme()
         else:
             self.update_language()
             self._set_settings_page(page)
-        area = getattr(self, area_name, None) if area_name else None
+        area = getattr(self, area_name, None) if area_name else self._settings_scroll_for_page(page)
         if area is not None and not sip.isdeleted(area):
             # Layouts calculate the final scroll range after the translated
             # controls have been polished; restore position in that turn.

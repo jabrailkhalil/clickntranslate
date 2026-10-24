@@ -8,6 +8,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import main
 from button_styles import button_palette, set_pointer_hover
 from interface_language_picker import PICKER_TEXT
+from settings_sections import VISUAL_PAGE_ORDER
 from test_desktop_ux import app, window
 from ui_scaling import widget_global_rect
 
@@ -26,7 +27,7 @@ def move(view, point, app):
     settle(app)
 
 
-@pytest.mark.parametrize('page', range(4))
+@pytest.mark.parametrize('page', VISUAL_PAGE_ORDER)
 def test_language_picker_preserves_the_settings_underneath(window, app, page):
     window.show_settings()
     settings = window.settings_window
@@ -49,7 +50,7 @@ def test_language_picker_preserves_the_settings_underneath(window, app, page):
     assert settings.settings_pages.currentIndex() == page
 
 
-@pytest.mark.parametrize('page', [None, 0, 1, 2, 3])
+@pytest.mark.parametrize('page', (None, *VISUAL_PAGE_ORDER))
 def test_language_changes_live_while_the_same_overlay_stays_open(window, app, page):
     window.text_input.setPlainText('Keep the draft')
     if page is not None:
@@ -57,8 +58,8 @@ def test_language_changes_live_while_the_same_overlay_stays_open(window, app, pa
         window.settings_window._set_settings_page(page)
     window.show_interface_language_menu()
     picker = window._interface_language_picker
-    for index, locale in enumerate(main.INTERFACE_LANGUAGE_BY_CODE):
-        picker.set_page(index//10)
+    for locale in main.INTERFACE_LANGUAGE_BY_CODE:
+        picker.scroll.ensureWidgetVisible(picker.buttons[locale], 0, 0)
         picker.buttons[locale].click()
         settle(app)
         assert window.current_interface_language == locale
@@ -83,7 +84,8 @@ def test_connected_button_corners_and_dividers_follow_the_physical_grid(window, 
         window.toggle_theme()
     window.show_settings()
     settings = window.settings_window
-    for page, panel_name in ((0, 'settings_action_panel'), (1, 'translation_action_panel')):
+    for page, panel_name in ((0, 'settings_action_panel'), (1, 'translation_action_panel'),
+                             (4, 'ocr_action_panel')):
         settings._set_settings_page(page)
         settle(app)
         panel = getattr(settings, panel_name)
@@ -117,9 +119,11 @@ def test_hover_recovers_without_an_enter_event_and_tracks_both_directions(window
     settle(app)
     settings = window.settings_window
     view = window._ui_scale_controller.view
+    settings.show_maintenance_view()
+    settle(app)
     buttons = [settings.clear_cache_btn, settings.reset_btn, settings.update_btn,
                settings.export_settings_btn, settings.import_settings_btn,
-               settings.create_bug_report_btn, settings.hotkeys_button]
+               settings.create_bug_report_btn]
     for button in buttons+list(reversed(buttons)):
         point = window._ui_scale_controller.map_widget_to_view(button)
         # Simulate a missing Enter while Qt still considers the pointer inside.
@@ -143,7 +147,7 @@ def test_overlay_occludes_hover_only_where_it_covers_buttons(window, app):
     button = picker.buttons['en']
     move(view, window._ui_scale_controller.map_widget_to_view(button), app)
     assert button.property('pointerHover')
-    lower = window.settings_window.reset_btn
+    lower = window.settings_window.maintenance_button
     assert widget_global_rect(picker).bottom() < widget_global_rect(lower).top()
     move(view, window._ui_scale_controller.map_widget_to_view(lower), app)
     assert lower.property('pointerHover') and not button.property('pointerHover')
@@ -180,7 +184,7 @@ def test_language_overlay_keeps_secondary_screen_and_its_back_destination(window
 def test_hover_releases_when_target_is_disabled_or_covered_and_does_not_repolish_on_every_move(window, app):
     window.show_settings()
     settle(app)
-    button = window.settings_window.reset_btn
+    button = window.settings_window.maintenance_button
     view = window._ui_scale_controller.view
     point = window._ui_scale_controller.map_widget_to_view(button)
     move(view, point, app)

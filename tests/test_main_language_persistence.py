@@ -11,8 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import main  # noqa: E402
-from PyQt5.QtCore import QEvent  # noqa: E402
+from PyQt5.QtCore import QEvent, Qt  # noqa: E402
 from PyQt5.QtTest import QTest
+from PyQt5.QtWidgets import QAbstractItemView
 
 
 def test_main_language_popup_uses_the_app_scrollbar_style():
@@ -352,12 +353,24 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         self.app.processEvents()
 
         popup = combo.view().window()
-        row_height = max(24, combo.view().sizeHintForRow(0))
-        self.assertLessEqual(popup.height(), row_height * 9 + 12)
-        self.assertGreater(combo.view().verticalScrollBar().maximum(), 0)
-        self.assertIn("selection-background-color: #7A5FA1", combo.view().styleSheet())
-        self.assertIn("QScrollBar::handle:vertical", self.app.styleSheet())
-        self.assertEqual(combo.view().verticalScrollBar().width(), 6)
+        view = combo.view()
+        viewport = view.viewport().rect()
+        fully_visible = [row for row in range(combo.count())
+                         if viewport.contains(view.visualRect(combo.model().index(row, 0)))]
+        # The card has its own measured border/search chrome. Its useful
+        # viewport still caps the number of complete language rows.
+        self.assertGreaterEqual(len(fully_visible), 7)
+        self.assertLessEqual(len(fully_visible), 9)
+        self.assertGreater(view.verticalScrollBar().maximum(), 0)
+        self.assertEqual(view.horizontalScrollBar().maximum(), 0)
+        self.assertLessEqual(view.verticalScrollBar().width(), 12)
+        last = combo.model().index(combo.count()-1, 0)
+        view.scrollTo(last, QAbstractItemView.PositionAtBottom)
+        self.app.processEvents()
+        self.assertTrue(view.viewport().rect().contains(view.visualRect(last)))
+        view.setCurrentIndex(last)
+        QTest.keyClick(view, Qt.Key_Return)
+        self.assertEqual(combo.currentIndex(), last.row())
 
         combo.hidePopup()
         combo.close()
@@ -454,11 +467,12 @@ class MainLanguagePersistenceTest(unittest.TestCase):
                 for action, _title, _body in main.guide_text(language_code)["steps"]
             ]
             self.assertIn("result_window", actions)
-            # Result appearance is in General; engine installation and API
-            # precede it in the Translation chapter of the revised guide.
+            # Window behaviour belongs to Translation; font size remains in
+            # Application and is explained before the shortcut setup.
             self.assertLess(actions.index("translator"), actions.index("language_packages"))
-            self.assertLess(actions.index("settings_page_main"), actions.index("result_window"))
-            self.assertLess(actions.index("result_window"), actions.index("result_text"))
+            self.assertLess(actions.index("settings_page_updates"), actions.index("result_window"))
+            self.assertLess(actions.index("result_window"), actions.index("settings_page_main"))
+            self.assertLess(actions.index("settings_page_main"), actions.index("result_text"))
             self.assertLess(actions.index("result_text"), actions.index("hotkeys"))
 
     def test_setup_guide_finishes_with_shortcuts_and_a_real_translation(self):

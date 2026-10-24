@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QApplication, QLabel, QStyle, QStyleOptionComboBox
 
 import main
 from settings_window import OpticallyCenteredPushButton
+from settings_sections import VISUAL_PAGE_ORDER
 from qt_layout_test_support import ensure_layout_fonts
 
 
@@ -242,24 +243,26 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         round((navigation.left() + 12) * ratio),
                         round((navigation.top() + 1) * ratio),
                     ).name(), expected)
-                    settings._set_settings_page(1)
-                    self.settle()
                     rows = (
-                        (settings.copy_translated_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
-                        (settings.replace_select_all_checkbox, settings.translator_engine_label, settings.translator_combo),
+                        (1, settings.copy_translated_checkbox, settings.translator_engine_label, settings.translator_combo),
+                        (4, settings.keep_visible_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
                     )
-                    for checkbox, label, combo in rows:
+                    for page, checkbox, label, combo in rows:
+                        settings._set_settings_page(page)
+                        self.settle()
                         self.assertLessEqual(checkbox.sizeHint().width(), checkbox.width(), checkbox.text())
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         box_rect, label_rect, combo_rect = [self.rect_in(settings, w) for w in (checkbox, label, combo)]
-                        self.assertLess(box_rect.right(), label_rect.left())
                         self.assertLess(label_rect.right(), combo_rect.left())
-                        self.assertEqual(box_rect.center().y(), combo_rect.center().y())
+                        self.assertEqual(label_rect.center().y(), combo_rect.center().y())
+                        self.assertGreater(box_rect.top(), combo_rect.bottom())
+                    settings._set_settings_page(4)
+                    self.settle()
                     self.assertLess(
                         self.rect_in(settings, settings.copy_notification_checkbox).bottom(),
-                        self.rect_in(settings, settings.ocr_languages_btn).top(),
+                        self.rect_in(settings, settings.ocr_action_panel).top(),
                     )
-                    for page in range(3):
+                    for page in VISUAL_PAGE_ORDER:
                         settings._set_settings_page(page)
                         self.settle()
                         self.assertEqual(settings.settings_general_page.isVisible(), page == 0)
@@ -345,7 +348,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             self.settle()
             self.assertGreater(active_contrast, text_contrast(tabs[0], theme == "Темная") + 20)
             self.assertEqual(positions, [tab.geometry() for tab in tabs])
-        self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False])
+        self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False, False])
 
     def test_main_action_captions_use_full_words(self):
         self.window.current_interface_language = 'ru'

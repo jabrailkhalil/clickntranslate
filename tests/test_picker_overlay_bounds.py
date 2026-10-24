@@ -3,6 +3,7 @@ import pytest
 from PyQt5 import QtCore
 
 import main
+from settings_sections import VISUAL_PAGE_ORDER
 from test_desktop_ux import app, window
 from ui_scaling import widget_global_rect
 
@@ -55,8 +56,9 @@ def test_picker_owns_continuous_side_and_bottom_edges(window, app, dark):
     window.show_interface_language_menu()
     settle(app)
     picker = window._interface_language_picker
-    for page in range(picker.pages.count()):
-        picker.set_page(page)
+    scrollbar = picker.scroll.verticalScrollBar()
+    for position in (scrollbar.minimum(), scrollbar.maximum()):
+        scrollbar.setValue(position)
         settle(app)
         image = picker.grab().toImage()
         width, height = image.width(), image.height()
@@ -65,9 +67,9 @@ def test_picker_owns_continuous_side_and_bottom_edges(window, app, dark):
                              ((width//2, height-1), (width//2, height-5))):
             edge = image.pixelColor(*outer)
             fill = image.pixelColor(*inner)
-            assert edge.alpha() >= 240, (dark, page, outer, edge.getRgb())
+            assert edge.alpha() >= 240, (dark, position, outer, edge.getRgb())
             contrast = sum(abs(a-b) for a, b in zip(edge.getRgb()[:3], fill.getRgb()[:3]))
-            assert contrast >= 12, (dark, page, outer, edge.getRgb(), fill.getRgb())
+            assert contrast >= 12, (dark, position, outer, edge.getRgb(), fill.getRgb())
 
 
 def test_live_language_changes_do_not_expand_before_home_layout_settles(window, app):
@@ -76,7 +78,7 @@ def test_live_language_changes_do_not_expand_before_home_layout_settles(window, 
     picker = window._interface_language_picker
     for code in ('es', 'ar', 'hi', 'id', 'en', 'ru'):
         previous = QtCore.QRect(picker.geometry())
-        picker.set_page(list(main.INTERFACE_LANGUAGE_BY_CODE).index(code)//picker.PAGE_SIZE)
+        picker.scroll.ensureWidgetVisible(picker.buttons[code], 0, 0)
         picker.buttons[code].click()
         # Relabeling can briefly create an unlaid 640x480 QWidget. Retain the
         # last valid overlay rectangle until the actual layout is settled.
@@ -99,7 +101,7 @@ def test_open_picker_tracks_native_window_movement_and_scale_changes(window, app
         assert_home_cover(window, picker)
 
 
-@pytest.mark.parametrize('page', [0, 1, 2, 3])
+@pytest.mark.parametrize('page', VISUAL_PAGE_ORDER)
 def test_settings_picker_is_a_stable_top_excerpt_without_replacing_the_page(window, app, page):
     settle(app)
     remembered_height = window.main_text_section.height()
@@ -114,7 +116,7 @@ def test_settings_picker_is_a_stable_top_excerpt_without_replacing_the_page(wind
     settle(app)
     picker = window._interface_language_picker
     for locale in ('ar', 'hi', 'pt', 'tr', 'en', 'ru'):
-        picker.set_page(list(main.INTERFACE_LANGUAGE_BY_CODE).index(locale)//picker.PAGE_SIZE)
+        picker.scroll.ensureWidgetVisible(picker.buttons[locale], 0, 0)
         picker.buttons[locale].click()
         settle(app)
         active = settings.settings_pages.currentWidget()
@@ -159,7 +161,7 @@ def test_unlaid_hidden_home_widget_cannot_expand_settings_picker(window, app):
     assert picker.geometry() == QtCore.QRect(settings.x(), settings.y(), settings.width(), remembered_height)
 
 
-def test_connected_surface_does_not_paint_over_the_flag_icon(window, app):
+def test_flat_picker_keeps_the_pressed_flag_and_icon_visible(window, app):
     window.set_interface_language('ru')
     settle(app)
     rect = mapped_rect(window.flag_button, window.ui_root)
@@ -174,4 +176,5 @@ def test_connected_surface_does_not_paint_over_the_flag_icon(window, app):
     assert before > 20
     window.show_interface_language_menu()
     settle(app)
+    assert window.flag_button.isChecked()
     assert icon_pixels() >= before*.9

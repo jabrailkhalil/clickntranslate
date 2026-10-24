@@ -33,14 +33,14 @@ def test_named_result_font_steps_and_live_preview_fit_every_locale(window, app, 
         assert settings.settings_general_page.rect().contains(
             QtCore.QRect(preview.mapTo(settings.settings_general_page, QtCore.QPoint()), preview.size()))
         assert settings.translation_font_label.buddy() is control
-    ordered = (settings.result_window_control, settings.ui_scale_control, control, preview)
+    ordered = (settings.ui_scale_control, control, preview)
     for above, below in zip(ordered, ordered[1:]):
         assert above.geometry().bottom() < below.geometry().top()
     assert settings.ui_scale_field.size() == control.size()
 
 
 @pytest.mark.parametrize('light', [False, True])
-def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
+def test_settings_fields_share_painted_borders_and_heights_across_sections(window, app, light):
     if light:
         window.toggle_theme()
     window.show_settings()
@@ -53,7 +53,8 @@ def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
     border = '#d7cde7' if window.current_theme == 'Светлая' else '#3d3948'
     boxes = []
     for field in fields:
-        settings._set_settings_page(1 if field in (settings.ocr_engine_combo, settings.translator_combo) else 0)
+        settings._set_settings_page(4 if field is settings.ocr_engine_combo else
+                                    1 if field in (settings.translator_combo, settings.result_window_control) else 0)
         app.processEvents()
         field.clearFocus()
         field.setAttribute(QtCore.Qt.WA_UnderMouse, False)
@@ -62,9 +63,11 @@ def test_all_five_settings_fields_have_the_same_painted_box(window, app, light):
                   if image.pixelColor(x, y).name() == border]
         assert pixels, field.objectName()
         boxes.append((min(x for x, y in pixels), min(y for x, y in pixels),
-                      max(x for x, y in pixels), max(y for x, y in pixels)))
+                      field.width()-1-max(x for x, y in pixels),
+                      field.height()-1-max(y for x, y in pixels)))
     # Proxy rasterization may round a fractional scene origin by one pixel.
-    assert len({field.width() for field in fields}) == 1
+    assert {field.width() for field in fields[:3]} == {270}
+    assert {field.width() for field in fields[3:]} == {180}
     assert max(field.height() for field in fields) - min(field.height() for field in fields) <= 1
     for edge in zip(*boxes):
         assert max(edge) - min(edge) <= 1, boxes

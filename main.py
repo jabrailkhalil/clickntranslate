@@ -99,6 +99,7 @@ except Exception:
 from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
                         configure_qt_platform, widget_global_point, widget_global_rect, widget_popup_geometry,
                         prepare_native_popup)
+from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_OCR, PAGE_DYNAMIC
 from header_icons import header_icon
 from control_hints import control_hint
 configure_qt_platform()
@@ -4308,6 +4309,9 @@ def guide_text(lang):
                    "game_show_original_text": "game_show_original"}.get(action, action)
             title = settings_text(language, key)
             steps.append((action, title, setting_body(language, action)))
+        elif action == 'language_packages':
+            from settings_sections import section_text
+            steps.append((action, section_text(language, 'offline'), section_text(language, 'offline_hint')))
         elif action in existing:
             steps.append(existing[action])
         elif action in extras:
@@ -12278,20 +12282,20 @@ class DarkThemeApp(QMainWindow):
         if action == "result_behavior":
             return getattr(settings_window, "close_result_on_outside_click_checkbox", None)
         if action == "api_connections":
-            return getattr(settings_window, "ocr_languages_btn", None)
+            return getattr(settings_window, "translation_api_button", None)
         if action == "selection_behavior":
             return getattr(settings_window, "hotkeys_button", None)
         if action == "language_packages":
-            return getattr(settings_window, "ocr_languages_btn", None)
+            return getattr(settings_window, "translation_offline_button", None)
         if action == "hotkeys":
             return getattr(settings_window, "hotkeys_button", None)
         if action == "actions_panel":
-            return getattr(settings_window, "settings_action_panel", None)
+            return getattr(settings_window, "maintenance_action_panel", None)
         if action == "settings_page_updates":
             dots = getattr(settings_window, "settings_page_dots", ())
             return dots[1] if len(dots) > 1 else None
         if action == "ocr_behavior":
-            return getattr(settings_window, "settings_updates_page", None)
+            return getattr(settings_window, "settings_ocr_page", None)
         if action == "export_settings":
             return getattr(settings_window, "export_settings_btn", None)
         if action == "import_settings":
@@ -12326,14 +12330,19 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"ocr_engine", "translator", "language_packages", "api_connections", "result_behavior"}:
-                    page = 1
-                elif action in {"hotkeys", "result_window", "result_text", "selection_behavior"}:
-                    page = 0
+                if action in {"translator", "language_packages", "api_connections", "result_behavior", "result_window"}:
+                    page = PAGE_TRANSLATION
+                elif action in {"ocr_engine", "ocr_behavior"}:
+                    page = PAGE_OCR
+                elif action in {"hotkeys", "result_text", "selection_behavior"}:
+                    page = PAGE_APPLICATION
                 elif action == "game_controls":
-                    page = 2
+                    page = PAGE_DYNAMIC
                 if page is not None and settings._settings_page_index != page:
                     settings._set_settings_page(page)
+                    changed = True
+                if action in {"actions_panel", "export_settings", "import_settings", "bug_report"}:
+                    settings.show_maintenance_view()
                     changed = True
             if not main_action and settings is not None:
                 target = self._guide_target_widget(action)
@@ -12365,7 +12374,8 @@ class DarkThemeApp(QMainWindow):
         elif action == "back_home":
             self.show_main_screen()
         elif action.startswith("settings_page_"):
-            page = {"settings_page_main": 0, "settings_page_updates": 1, "settings_page_game": 2}[action]
+            page = {"settings_page_main": PAGE_APPLICATION, "settings_page_updates": PAGE_TRANSLATION,
+                    "settings_page_game": PAGE_DYNAMIC}[action]
             self.settings_window._set_settings_page(page)
 
     def _apply_guide_step(self):
@@ -12623,14 +12633,9 @@ class DarkThemeApp(QMainWindow):
                     return super().eventFilter(watched, event)
                 in_panel = widget_global_rect(picker).contains(point)
                 in_flag = widget_global_rect(self.flag_button).contains(point)
-                connection = getattr(self, '_interface_language_connection', None)
-                in_connection = connection is not None and connection.contains_global(point)
-                if not (in_panel or in_flag or in_connection):
+                if not (in_panel or in_flag):
                     # Let the same click reach its original target once.
                     self._close_interface_language_picker(restore_focus=False)
-                elif in_connection and not (in_panel or in_flag):
-                    picker._set_keyboard_mode(False)
-                    return True  # The joining stem is part of the open surface.
         return super().eventFilter(watched, event)
 
     def nativeEvent(self, eventType, message):
@@ -13212,9 +13217,6 @@ class DarkThemeApp(QMainWindow):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is not None:
             picker.set_theme(is_dark)
-            connection = getattr(self, '_interface_language_connection', None)
-            if connection is not None:
-                connection.set_theme(is_dark)
         controller = getattr(self, '_ui_scale_controller', None)
         if controller is not None:
             controller.apply_theme(style_sheet, theme['background'])
@@ -13509,15 +13511,6 @@ class DarkThemeApp(QMainWindow):
         self.flag_button.setChecked(expanded)
         self.flag_button.setProperty('languagePickerExpanded', expanded)
         style = styled_transparent_button_qss(self.current_theme != 'Светлая')
-        if expanded:
-            # The joined surface owns the pressed chrome; the button paints
-            # its sharp icon above it without a second rectangular focus frame.
-            style += '''QPushButton[languagePickerExpanded="true"],
-                QPushButton[languagePickerExpanded="true"]:hover,
-                QPushButton[languagePickerExpanded="true"]:pressed,
-                QPushButton[languagePickerExpanded="true"]:checked,
-                QPushButton[languagePickerExpanded="true"][keyboardFocus="true"]:focus {
-                    background:transparent; border:0; }'''
         self.flag_button.setStyleSheet(style)
         label = (PICKER_TEXT[self.current_interface_language][3] if expanded
                  else ui_text(self.current_interface_language, "choose_interface_language"))
@@ -13571,19 +13564,18 @@ class DarkThemeApp(QMainWindow):
             # old language until the user advanced to the next step.
             QTimer.singleShot(0, self._show_guide_step)
 
-    def show_interface_language_menu(self):
+    def show_interface_language_menu(self, *, restore_to='flag'):
         if getattr(self, '_interface_language_picker', None) is not None:
             self._close_interface_language_picker()
             return
-        from interface_language_picker import InterfaceLanguagePicker, LanguagePickerConnection
+        from interface_language_picker import InterfaceLanguagePicker
         picker = InterfaceLanguagePicker(INTERFACE_LANGUAGE_OPTIONS, self.current_interface_language,
                                          resource_path, self.central_widget,
                                          dark=self.current_theme != 'Светлая')
         self._interface_language_picker = picker
+        self._interface_language_return_target = restore_to
         navigator = getattr(QApplication.instance(), '_keyboard_navigation', None)
         keyboard = bool(navigator is not None and navigator.keyboard)
-        self._interface_language_connection = LanguagePickerConnection(self.ui_root,
-                                            dark=self.current_theme != 'Светлая')
         QApplication.instance().installEventFilter(self)
         self.update_interface_language_button()
         picker.languageSelected.connect(self.set_interface_language)
@@ -13629,13 +13621,6 @@ class DarkThemeApp(QMainWindow):
                     rect = QtCore.QRect(area.topLeft(), QtCore.QSize(area.width(), min(height, area.height())))
         picker.setGeometry(rect)
         picker.raise_()
-        connection = getattr(self, '_interface_language_connection', None)
-        if connection is not None:
-            body = QtCore.QRect(picker.mapTo(self.ui_root, QtCore.QPoint()), picker.size())
-            flag = QtCore.QRect(self.flag_button.mapTo(self.ui_root, QtCore.QPoint()), self.flag_button.size())
-            connection.set_areas(flag, body)
-            connection.show()
-            connection.raise_()
         self.flag_button.raise_()
 
     def _close_interface_language_picker(self, restore_focus=True):
@@ -13644,17 +13629,19 @@ class DarkThemeApp(QMainWindow):
             return
         self._interface_language_picker = None
         QApplication.instance().removeEventFilter(self)
-        connection = getattr(self, '_interface_language_connection', None)
-        self._interface_language_connection = None
-        if connection is not None:
-            connection.hide()
-            connection.deleteLater()
         self.update_interface_language_button()
         picker.hide()
         picker.deleteLater()
         if restore_focus:
             navigator = getattr(QApplication.instance(), '_keyboard_navigation', None)
-            self.flag_button.setFocus(Qt.TabFocusReason if navigator is not None and navigator.keyboard else Qt.OtherFocusReason)
+            target = self.flag_button
+            if getattr(self, '_interface_language_return_target', 'flag') == 'settings':
+                settings = getattr(self, 'settings_window', None)
+                control = getattr(settings, 'interface_language_button', None)
+                if control is not None and control.isVisible():
+                    target = control
+            target.setFocus(Qt.TabFocusReason if navigator is not None and navigator.keyboard else Qt.OtherFocusReason)
+        self._interface_language_return_target = None
         self._complete_guide_step('language')
 
     def set_interface_language(self, language_code):

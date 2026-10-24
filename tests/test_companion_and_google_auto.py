@@ -11,14 +11,15 @@ import document_translation
 from assistant_art import APPEARANCES, companion_art
 from assistant_settings import assistant_preferences
 from languages import AUTO_LANGUAGE_NAMES, language_code_from_name, language_display_name
+from settings_sections import VISUAL_PAGE_ORDER
 from test_desktop_ux import app, window
 
 
-def test_companion_tab_is_visually_third_and_focus_is_keyboard_only(window, app):
+def test_companion_tab_follows_the_five_section_order_and_focus_is_keyboard_only(window, app):
     window.show_assistant_settings()
     app.processEvents()
     tabs = window.settings_window.settings_page_tabs
-    assert sorted(range(4), key=lambda i: tabs[i].x()) == [0, 1, 3, 2]
+    assert tuple(sorted(range(len(tabs)), key=lambda i: tabs[i].x())) == VISUAL_PAGE_ORDER
     page = window.settings_window.settings_assistant_page
     toggle = page.toggle
     assert isinstance(toggle, QtWidgets.QCheckBox)
@@ -145,7 +146,7 @@ def test_builtin_art_is_valid_with_transparent_background(app, appearance):
     assert pixmap.toImage().pixelColor(0, 0).alpha() == 0
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'de', 'es', 'fr', 'zh', 'pt', 'it'])
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 @pytest.mark.parametrize('selected_appearance', ['portrait', 'animated'])
 def test_companion_settings_and_menu_fit(window, app, language, selected_appearance):
     from qt_layout_test_support import ensure_layout_fonts
@@ -163,10 +164,15 @@ def test_companion_settings_and_menu_fit(window, app, language, selected_appeara
         window.set_ui_scale_percent(percent)
         for _ in range(4):
             app.processEvents()
-        assert not page.findChildren(QtWidgets.QScrollArea)
+        scroll = settings.assistant_settings_scroll
+        assert page.findChildren(QtWidgets.QScrollArea) == [scroll]
+        assert scroll.horizontalScrollBar().maximum() == 0
+        assert not scroll.widget().isAncestorOf(settings.assistant_action_panel)
         for button in (*page.appearance_buttons.values(), *page.values.values(),
                        page.mode_combo):
             if button.isVisible():
+                scroll.ensureWidgetVisible(button, 0, 0)
+                app.processEvents()
                 bounds = QtCore.QRect(button.mapTo(page, QtCore.QPoint()), button.size())
                 assert page.rect().contains(bounds), (language, percent, bounds)
                 assert button.visibleRegion().contains(button.rect()), (language, percent, button.objectName(), bounds)

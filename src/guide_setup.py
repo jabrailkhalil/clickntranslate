@@ -5,6 +5,7 @@ real settings controls. Opening or skipping a step never changes a setting.
 """
 
 from button_styles import button_qss, standard_buttons
+from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_OCR, PAGE_DYNAMIC
 from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy,
@@ -147,26 +148,26 @@ GUIDE_LINUX_BODIES = {
 
 # config key: (settings widget, page index, recommended value)
 GUIDE_SETTING_STEPS = {
-    "autostart": ("autostart_checkbox", 0, True),
-    "start_minimized": ("start_minimized_checkbox", 0, True),
-    "copy_translated_text": ("copy_translated_checkbox", 1, True),
-    "history": ("history_checkbox", 0, True),
-    "copy_history": ("copy_history_checkbox", 0, True),
-    "keep_visible_on_ocr": ("keep_visible_checkbox", 1, False),
-    "freeze_screen_on_ocr": ("freeze_screen_checkbox", 1, True),
-    "dim_screen_during_ocr": ("dim_screen_during_ocr_checkbox", 1, True),
-    "restore_clipboard_after_selection": ("restore_clipboard_checkbox", 1, True),
-    "notifications": ("copy_notification_checkbox", 1, True),
-    "update_check_on_launch": ("update_check_on_launch_checkbox", 0, True),
-    "game_pause_when_inactive": ("game_pause_inactive_checkbox", 2, True),
+    "autostart": ("autostart_checkbox", PAGE_APPLICATION, True),
+    "start_minimized": ("start_minimized_checkbox", PAGE_APPLICATION, True),
+    "copy_translated_text": ("copy_translated_checkbox", PAGE_TRANSLATION, True),
+    "history": ("history_checkbox", PAGE_APPLICATION, True),
+    "copy_history": ("copy_history_checkbox", PAGE_APPLICATION, True),
+    "keep_visible_on_ocr": ("keep_visible_checkbox", PAGE_OCR, False),
+    "freeze_screen_on_ocr": ("freeze_screen_checkbox", PAGE_OCR, True),
+    "dim_screen_during_ocr": ("dim_screen_during_ocr_checkbox", PAGE_OCR, True),
+    "restore_clipboard_after_selection": ("restore_clipboard_checkbox", PAGE_TRANSLATION, True),
+    "notifications": ("copy_notification_checkbox", PAGE_OCR, True),
+    "update_check_on_launch": ("update_check_on_launch_checkbox", PAGE_APPLICATION, True),
+    "game_pause_when_inactive": ("game_pause_inactive_checkbox", PAGE_DYNAMIC, True),
 }
 
 GUIDE_SETUP_CHAPTERS = (
     ("startup", ("settings", "autostart", "start_minimized", "history", "copy_history", "update_check_on_launch")),
-    ("translation", ("settings_page_updates", "ocr_engine", "translator", "copy_translated_text", "language_packages", "api_connections")),
-    ("capture", ("keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "restore_clipboard_after_selection", "notifications", "result_behavior")),
+    ("translation", ("settings_page_updates", "translator", "copy_translated_text", "restore_clipboard_after_selection", "result_window", "result_behavior", "language_packages", "api_connections")),
+    ("capture", ("ocr_engine", "keep_visible_on_ocr", "freeze_screen_on_ocr", "dim_screen_during_ocr", "notifications")),
     ("dynamic", ("settings_page_game", "game_controls", "game_pause_when_inactive")),
-    ("finish", ("settings_page_main", "result_window", "result_text", "selection_behavior", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
+    ("finish", ("settings_page_main", "result_text", "selection_behavior", "hotkeys", "back_home", "shortcut_overview", "shortcut_toggle", "shortcut_selection", "shortcut_replace", "main_translate")),
 )
 GUIDE_SETUP_ORDER = tuple(action for _chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions)
 GUIDE_CHAPTER_BY_ACTION = {action: chapter for chapter, actions in GUIDE_SETUP_CHAPTERS for action in actions}

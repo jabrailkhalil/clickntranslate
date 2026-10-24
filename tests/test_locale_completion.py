@@ -132,7 +132,7 @@ def test_new_locale_pages_render_offscreen(window,app,locale):
     for theme in ('Темная','Светлая'):
         if window.current_theme!=theme:window.toggle_theme()
         window.show_settings();settings=window.settings_window
-        for index,name in ((0,'general'),(1,'translation'),(2,'mascot'),(3,'dynamic')):
+        for index,name in ((0,'general'),(1,'translation'),(4,'ocr'),(2,'dynamic'),(3,'companion')):
             settings._set_settings_page(index);app.processEvents()
             assert settings.settings_pages.currentIndex()==index
             if folder:assert window.grab().save(str(folder/f'{name}-{theme}.png'))

@@ -195,17 +195,15 @@ class CheckBoxIndicatorTest(unittest.TestCase):
             for language in ("ru", "en", "de", "fr", "es", "zh", "pt", "it"):
                 parent.current_interface_language = language
                 settings.update_language()
-                settings._set_settings_page(1)
-                self.app.processEvents()
-
-                for box in (
-                    settings.keep_visible_checkbox,
-                    settings.freeze_screen_checkbox,
-                    settings.dim_screen_during_ocr_checkbox,
-                    settings.restore_clipboard_checkbox,
-                    settings.copy_notification_checkbox,
-                    settings.update_check_on_launch_checkbox,
+                for page, box in (
+                    (4, settings.keep_visible_checkbox),
+                    (4, settings.freeze_screen_checkbox),
+                    (4, settings.dim_screen_during_ocr_checkbox),
+                    (1, settings.restore_clipboard_checkbox),
+                    (4, settings.copy_notification_checkbox),
+                    (0, settings.update_check_on_launch_checkbox),
                 ):
+                    settings._set_settings_page(page)
                     box.setChecked(True)
                     self.app.processEvents()
                     option = QStyleOptionButton()
@@ -294,6 +292,8 @@ class DropDownPlacementTest(unittest.TestCase):
         try:
             for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
                 combo = getattr(settings, name)
+                settings._set_settings_page(4 if name == 'ocr_engine_combo' else 1)
+                self.app.processEvents()
                 combo.showPopup()
                 self.app.processEvents()
                 popup = combo.view().window()

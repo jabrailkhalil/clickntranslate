@@ -6,6 +6,7 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtTest import QTest
 
 import keyboard_navigation as keyboard
+from settings_sections import VISUAL_PAGE_ORDER, PAGE_OCR, PAGE_COMPANION
 from test_desktop_ux import app, window
 from test_capture_region_memory import capture
 from test_dynamic_workspace import isolated, make_overlay
@@ -115,7 +116,7 @@ def test_all_main_and_settings_controls_are_reachable_in_each_locale(window, app
     window.set_interface_language(locale)
     window.show_main_screen()
     root = window.ui_root
-    for page in (None, 0, 1, 3, 2):
+    for page in (None, *VISUAL_PAGE_ORDER):
         if page is not None:
             if window.settings_window is None:
                 window.show_settings()
@@ -141,15 +142,15 @@ def test_settings_shortcuts_back_and_secondary_history_return(window, app):
     QTest.keyClick(window.text_input, QtCore.Qt.Key_Comma, QtCore.Qt.ControlModifier)
     settings = window.settings_window
     assert settings is not None and settings._settings_page_index == 0
-    for page in (1, 3, 2, 0):
+    for page in (*VISUAL_PAGE_ORDER[1:], VISUAL_PAGE_ORDER[0]):
         QTest.keyClick(focused(root), QtCore.Qt.Key_Tab, QtCore.Qt.ControlModifier)
         assert settings._settings_page_index == page
     QTest.keyClick(focused(root), QtCore.Qt.Key_Backtab, QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier)
-    assert settings._settings_page_index == 2
+    assert settings._settings_page_index == PAGE_COMPANION
     settings.show_history_view()
     app.processEvents()
     QTest.keyClick(root, QtCore.Qt.Key_Left, QtCore.Qt.AltModifier)
-    assert not settings._secondary_view_kind and settings._settings_page_index == 2
+    assert not settings._secondary_view_kind and settings._settings_page_index == PAGE_COMPANION
     QTest.keyClick(window.settings_button, QtCore.Qt.Key_Escape)
     assert window.settings_window is None
 
@@ -173,7 +174,7 @@ def test_settings_tab_arrows_follow_visual_order(window, app):
     settings = window.settings_window
     app.processEvents()
     keyboard.focus_control(settings.settings_page_tabs[0])
-    for page in (1, 3, 2, 0):
+    for page in (*VISUAL_PAGE_ORDER[1:], VISUAL_PAGE_ORDER[0]):
         QTest.keyClick(focused(window.ui_root), QtCore.Qt.Key_Right)
         assert settings._settings_page_index == page
 
@@ -181,7 +182,7 @@ def test_settings_tab_arrows_follow_visual_order(window, app):
 def test_enter_opens_combo_and_escape_only_closes_its_popup(window, app):
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
+    settings._set_settings_page(PAGE_OCR)
     combo = settings.ocr_engine_combo
     keyboard.focus_control(combo)
     QTest.keyClick(combo, QtCore.Qt.Key_Return)
@@ -189,6 +190,29 @@ def test_enter_opens_combo_and_escape_only_closes_its_popup(window, app):
     QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
     assert not combo.view().isVisible()
     assert window.settings_window is settings
+
+
+def test_application_language_button_restores_focus_after_live_language_change(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    app.processEvents()
+    keyboard.focus_control(settings.interface_language_button)
+    QTest.keyClick(settings.interface_language_button, QtCore.Qt.Key_Return)
+    app.processEvents()
+    picker = window._interface_language_picker
+    assert picker is not None and window.flag_button.isChecked()
+    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Home)
+    for _ in range(2):
+        QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Down)
+    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Return)
+    for _ in range(4):
+        app.processEvents()
+    assert window.current_interface_language == 'ar'
+    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_Escape)
+    app.processEvents()
+    assert window._interface_language_picker is None
+    assert settings._settings_page_index == 0
+    assert settings.interface_language_button.hasFocus()
 
 
 def test_result_window_modes_support_arrow_selection_and_space_toggle(window, app):

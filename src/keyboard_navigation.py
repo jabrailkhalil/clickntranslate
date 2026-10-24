@@ -273,9 +273,10 @@ class KeyboardNavigation(QtCore.QObject):
         settings = getattr(owner, 'settings_window', None)
         if settings is None or getattr(settings, '_secondary_view_kind', None):
             return False
-        order = [0, 1, 3, 2]
+        from settings_sections import VISUAL_PAGE_ORDER
+        order = VISUAL_PAGE_ORDER
         current = getattr(settings, '_settings_page_index', 0)
-        # The inline updater adds a status page outside the four settings tabs.
+        # The inline updater adds a status page outside the settings tabs.
         # Its progress/result must not be interpreted as an index in this order.
         if current not in order or getattr(settings, '_update_in_progress', False):
             return False

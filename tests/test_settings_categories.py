@@ -28,7 +28,7 @@ def window():
         app.processEvents()
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar'])
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 def test_translation_controls_fit_all_languages_and_scales(window, language, theme):
     if window.current_theme != theme:
@@ -36,26 +36,36 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
     window.set_interface_language(language)
     window.show_settings()
     settings = window.settings_window
-    for scale in (80, 100, 120, 150):
+    for scale in (80, 100, 125, 150, 200):
         window._ui_scale_controller.set_percent(scale)
         settings._set_settings_page(1)
         QApplication.processEvents()
         scroll = settings.translation_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
-        for control in (settings.ocr_engine_combo, settings.translator_combo,
-                        settings.close_result_on_outside_click_checkbox,
-                        settings.ocr_join_paragraphs_checkbox,
-                        settings.copy_notification_checkbox):
+        for control in (settings.translator_combo, settings.result_window_control,
+                        settings.close_result_on_outside_click_checkbox):
+            scroll.ensureWidgetVisible(control, 0, 0)
+            QApplication.processEvents()
             rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
             assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         for flag in (settings.copy_translated_checkbox, settings.restore_clipboard_checkbox,
-                     settings.ocr_join_paragraphs_checkbox,
                      settings.close_result_on_outside_click_checkbox):
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
+        settings._set_settings_page(4)
+        QApplication.processEvents()
+        scroll = settings.ocr_settings_scroll
+        assert scroll.horizontalScrollBar().maximum() == 0
+        for control in (settings.ocr_engine_combo, settings.ocr_join_paragraphs_checkbox,
+                        settings.freeze_screen_checkbox, settings.keep_visible_checkbox,
+                        settings.copy_notification_checkbox):
+            scroll.ensureWidgetVisible(control, 0, 0)
+            QApplication.processEvents()
+            rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
+            assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         settings._set_settings_page(0)
         QApplication.processEvents()
         page = settings.settings_general_page
-        for control in (settings.result_window_control, settings.translation_font_control,
+        for control in (settings.interface_language_button, settings.translation_font_control,
                         settings.translation_font_preview, settings.ui_scale_control,
                         settings.copy_history_checkbox, settings.history_checkbox):
             rect = QRect(control.mapTo(page, QPoint()), control.size())
@@ -66,12 +76,12 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
 def test_flags_persist_and_ocr_options_are_reachable(window):
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
-    for key, flag in (
-        ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
-        ('ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
-        ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
+    for page, key, flag in (
+        (1, 'close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
+        (4, 'ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
+        (4, 'freeze_screen_on_ocr', settings.freeze_screen_checkbox),
     ):
+        settings._set_settings_page(page)
         flag.setChecked(False)
         flag.click()
         assert window.config[key] is True
@@ -79,7 +89,8 @@ def test_flags_persist_and_ocr_options_are_reachable(window):
     assert settings.keep_visible_checkbox.isVisible()
     assert not hasattr(settings, 'ocr_options_button')
     assert not hasattr(settings, 'selection_quick_translate_checkbox')
-    settings.translation_settings_scroll.ensureWidgetVisible(settings.copy_notification_checkbox)
+    settings._set_settings_page(4)
+    settings.ocr_settings_scroll.ensureWidgetVisible(settings.copy_notification_checkbox)
     QApplication.processEvents()
     assert not settings.copy_notification_checkbox.visibleRegion().isEmpty()
     settings.show_hotkeys_screen()
@@ -174,9 +185,10 @@ def test_api_editor_lives_in_packages_and_fits(window, language):
 def test_translation_footer_matches_general_button_rows(window):
     window.show_settings()
     settings=window.settings_window
-    for button in (settings.ocr_languages_btn,settings.copy_history_btn,settings.translation_history_btn):
-        assert button.height() == settings.clear_cache_btn.height()
-        assert button.font().pixelSize() == settings.clear_cache_btn.font().pixelSize()
+    for button in (settings.ocr_languages_btn, settings.translation_offline_button,
+                   settings.translation_api_button, settings.ocr_api_button):
+        assert button.height() == settings.hotkeys_button.height()
+        assert button.font().pixelSize() == settings.hotkeys_button.font().pixelSize()
         assert 'padding:0 6px' in button.styleSheet()
 
 

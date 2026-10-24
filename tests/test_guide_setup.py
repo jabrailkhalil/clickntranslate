@@ -105,7 +105,8 @@ class GuideSetupTest(unittest.TestCase):
         self.assertEqual(self.window._guide_current_action(), "copy_translated_text")
         target.click()
         self.assertTrue(self.window.config["copy_translated_text"])
-        self.assertEqual(self.window._guide_current_action(), "language_packages")
+        next_step = GUIDE_SETUP_ORDER[GUIDE_SETUP_ORDER.index('copy_translated_text') + 1]
+        self.assertEqual(self.window._guide_current_action(), next_step)
 
     def test_result_window_applies_every_mode(self):
         self.window.config["result_window_hidden_modes"] = main.RESULT_WINDOW_MODES
@@ -113,7 +114,25 @@ class GuideSetupTest(unittest.TestCase):
         self.window._guide_primary_btn.click()
         self.assertEqual(set(target.checked_modes()), set(main.RESULT_WINDOW_MODES))
         self.assertFalse(main.result_window_hidden_modes(self.window.config))
-        self.assertEqual(self.window._guide_current_action(), "result_text")
+        next_step = GUIDE_SETUP_ORDER[GUIDE_SETUP_ORDER.index('result_window') + 1]
+        self.assertEqual(self.window._guide_current_action(), next_step)
+
+    def test_guide_reveals_the_actual_section_after_the_ocr_split(self):
+        for action, expected_page in (
+            ('ocr_engine', 4), ('language_packages', 1),
+            ('keep_visible_on_ocr', 4), ('freeze_screen_on_ocr', 4),
+            ('dim_screen_during_ocr', 4), ('notifications', 4),
+            ('copy_translated_text', 1), ('restore_clipboard_after_selection', 1),
+            ('result_window', 1), ('result_text', 0), ('autostart', 0),
+        ):
+            with self.subTest(action=action):
+                target = self.show_step(action)
+                settings = self.window.settings_window
+                self.assertEqual(settings._settings_page_index, expected_page)
+                self.assertTrue(settings.settings_pages.currentWidget().isAncestorOf(target))
+                self.assertTrue(target.isVisible())
+                if action == 'language_packages':
+                    self.assertIs(target, settings.translation_offline_button)
 
     def test_full_primary_flow_configures_all_recommendations(self):
         self.show_step("settings")
