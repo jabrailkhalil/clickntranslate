@@ -11721,13 +11721,25 @@ class SettingsWindow(QWidget):
         field.setToolTip("")
         return hotkey
 
+    def _hotkey_registration_enabled(self):
+        return (not platform_support.IS_LINUX and bool(getattr(
+            self.parent, '_hotkey_services_enabled', getattr(self.parent, '_background_services', True))))
+
+    def _hotkey_is_unchanged_and_active(self, key, value):
+        if self.parent.config.get(key, '') != value:
+            return False
+        if not value or not self._hotkey_registration_enabled():
+            return True
+        listener = getattr(self.parent, key + '_thread', None)
+        return listener is not None and listener.is_alive()
+
     def save_copy_hotkey(self):
         hotkey_str = self._checked_hotkey("copy_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('copy_hotkey', hotkey_str):
             return
         self.parent.config["copy_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         # Перезапуск слушателя горячих клавиш для копирования
         if hasattr(self.parent, "copy_hotkey_thread") and self.parent.copy_hotkey_thread is not None:
@@ -11745,11 +11757,11 @@ class SettingsWindow(QWidget):
 
     def save_translate_hotkey(self):
         hotkey_str = self._checked_hotkey("translate_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('translate_hotkey', hotkey_str):
             return
         self.parent.config["translate_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         if hasattr(self.parent, "translate_hotkey_thread") and self.parent.translate_hotkey_thread is not None:
             try:
@@ -11764,11 +11776,11 @@ class SettingsWindow(QWidget):
 
     def save_fullscreen_translate_hotkey(self):
         hotkey_str = self._checked_hotkey("fullscreen_translate_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('fullscreen_translate_hotkey', hotkey_str):
             return
         self.parent.config["fullscreen_translate_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         if hasattr(self.parent, "fullscreen_translate_hotkey_thread") and self.parent.fullscreen_translate_hotkey_thread is not None:
             try:
@@ -11783,11 +11795,11 @@ class SettingsWindow(QWidget):
 
     def save_translate_selection_hotkey(self):
         hotkey_str = self._checked_hotkey("translate_selection_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('translate_selection_hotkey', hotkey_str):
             return
         self.parent.config["translate_selection_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         if hasattr(self.parent, "translate_selection_hotkey_thread") and self.parent.translate_selection_hotkey_thread is not None:
             try:
@@ -11802,11 +11814,11 @@ class SettingsWindow(QWidget):
 
     def save_translate_replace_selection_hotkey(self):
         hotkey_str = self._checked_hotkey("translate_replace_selection_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('translate_replace_selection_hotkey', hotkey_str):
             return
         self.parent.config["translate_replace_selection_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         thread = getattr(self.parent, "translate_replace_selection_hotkey_thread", None)
         if thread is not None:
@@ -11826,11 +11838,11 @@ class SettingsWindow(QWidget):
 
     def save_toggle_window_hotkey(self):
         hotkey_str = self._checked_hotkey("toggle_window_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('toggle_window_hotkey', hotkey_str):
             return
         self.parent.config["toggle_window_hotkey"] = hotkey_str
         self.parent.save_config()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         thread = getattr(self.parent, "toggle_window_hotkey_thread", None)
         if thread is not None:
@@ -11850,13 +11862,13 @@ class SettingsWindow(QWidget):
 
     def save_game_translate_hotkey(self):
         hotkey_str = self._checked_hotkey("game_translate_hotkey")
-        if hotkey_str is None:
+        if hotkey_str is None or self._hotkey_is_unchanged_and_active('game_translate_hotkey', hotkey_str):
             return
         self.parent.config["game_translate_hotkey"] = hotkey_str
         self.parent.save_config()
         if hasattr(self.parent, "refresh_interface_language_ui"):
             self.parent.refresh_interface_language_ui()
-        if platform_support.IS_LINUX:
+        if not self._hotkey_registration_enabled():
             return
         thread = getattr(self.parent, "game_translate_hotkey_thread", None)
         if thread is not None:
@@ -11971,6 +11983,7 @@ class SettingsWindow(QWidget):
         record_index,
         copy_mode,
         field_name,
+        record_snapshot,
         translated=False,
     ):
         lang = self.parent.current_interface_language
@@ -12007,13 +12020,18 @@ class SettingsWindow(QWidget):
         delete_button.setCursor(Qt.PointingHandCursor)
         delete_button.setMinimumHeight(28)
         delete_button.clicked.connect(
-            lambda _checked=False, index=record_index, mode=copy_mode: self._delete_history_record(mode, index)
+            lambda _checked=False, index=record_index, mode=copy_mode, snapshot=record_snapshot:
+                self._delete_history_record(mode, index, snapshot)
         )
         action_row.addWidget(copy_button)
         action_row.addWidget(delete_button)
         card_layout.addLayout(action_row)
 
     def _add_history_record_card(self, cards_layout, record, record_index, copy_mode=False):
+        from copy import deepcopy
+        # A writer may evict an old record while this card remains on screen.
+        # Bind its content now, rather than resolving a stale index on click.
+        record_snapshot = deepcopy(record)
         if not isinstance(record, dict):
             record = {"text": str(record or "")}
         lang = self.parent.current_interface_language
@@ -12049,6 +12067,7 @@ class SettingsWindow(QWidget):
                 record_index,
                 True,
                 "text",
+                record_snapshot,
             )
         elif "original" in record or "translated" in record:
             self._add_history_field(
@@ -12059,6 +12078,7 @@ class SettingsWindow(QWidget):
                 record_index,
                 False,
                 "original",
+                record_snapshot,
             )
             self._add_history_field(
                 card_layout,
@@ -12068,6 +12088,7 @@ class SettingsWindow(QWidget):
                 record_index,
                 False,
                 "translated",
+                record_snapshot,
                 translated=True,
             )
         else:
@@ -12079,6 +12100,7 @@ class SettingsWindow(QWidget):
                 record_index,
                 False,
                 "text",
+                record_snapshot,
             )
         cards_layout.addWidget(card)
         return card
@@ -12114,30 +12136,22 @@ class SettingsWindow(QWidget):
 
     @staticmethod
     def _write_history_records(history_file, records):
-        target = Path(history_file)
-        temporary = target.with_name(target.name + ".tmp")
-        try:
-            temporary.write_text(
-                json.dumps(records, ensure_ascii=False, indent=4),
-                encoding="utf-8",
-            )
-            os.replace(str(temporary), str(target))
-        finally:
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
+        from history_storage import update_records
+        update_records(history_file, lambda _current: records)
 
-    def _delete_history_record(self, copy_mode, record_index):
-        history_file = get_data_file("copy_history.json" if copy_mode else "translation_history.json")
-        ensure_json_file(history_file, [])
+    def _delete_history_record(self, copy_mode, record_index, record_snapshot):
         try:
-            with open(history_file, "r", encoding="utf-8") as stream:
-                records = json.load(stream)
-            records = records if isinstance(records, list) else []
-            if 0 <= int(record_index) < len(records):
-                records.pop(int(record_index))
-                self._write_history_records(history_file, records)
+            history_file = get_data_file("copy_history.json" if copy_mode else "translation_history.json")
+            from history_storage import update_records
+            def delete_displayed(records):
+                index = int(record_index)
+                if not (0 <= index < len(records) and records[index] == record_snapshot):
+                    index = next((candidate for candidate in range(len(records) - 1, -1, -1)
+                                  if records[candidate] == record_snapshot), -1)
+                if index < 0:
+                    return None
+                return records[:index] + records[index + 1:]
+            update_records(history_file, delete_displayed)
             if copy_mode:
                 self.load_copy_history_embedded()
             else:
@@ -12154,13 +12168,10 @@ class SettingsWindow(QWidget):
             )
 
     def load_history_embedded(self):
-        history_file = get_data_file("translation_history.json")
-        ensure_json_file(history_file, [])
         lang = self.parent.current_interface_language
         try:
-            with open(history_file, "r", encoding="utf-8") as f:
-                history = json.load(f)
-            history = history if isinstance(history, list) else []
+            from history_storage import read_records
+            history = read_records(get_data_file("translation_history.json"))
             self._populate_history_cards(history)
         except Exception:
             self.history_count_label.setText("!")
@@ -12172,9 +12183,8 @@ class SettingsWindow(QWidget):
             self.history_cards_layout.addStretch(1)
 
     def clear_history(self):
-        history_file = get_data_file("translation_history.json")
-        ensure_json_file(history_file, [])
         try:
+            history_file = get_data_file("translation_history.json")
             self._write_history_records(history_file, [])
             self.load_history_embedded()
         except Exception:
@@ -12247,13 +12257,10 @@ class SettingsWindow(QWidget):
         self._refresh_secondary_view_theme()
 
     def load_copy_history_embedded(self):
-        history_file = get_data_file("copy_history.json")
-        ensure_json_file(history_file, [])
         lang = self.parent.current_interface_language
         try:
-            with open(history_file, "r", encoding="utf-8") as f:
-                history = json.load(f)
-            history = history if isinstance(history, list) else []
+            from history_storage import read_records
+            history = read_records(get_data_file("copy_history.json"))
             self._populate_history_cards(history, copy_mode=True)
         except Exception:
             self.copy_history_count_label.setText("!")
@@ -12265,9 +12272,8 @@ class SettingsWindow(QWidget):
             self.copy_history_cards_layout.addStretch(1)
 
     def clear_copy_history(self):
-        history_file = get_data_file("copy_history.json")
-        ensure_json_file(history_file, [])
         try:
+            history_file = get_data_file("copy_history.json")
             self._write_history_records(history_file, [])
             self.load_copy_history_embedded()
         except Exception:

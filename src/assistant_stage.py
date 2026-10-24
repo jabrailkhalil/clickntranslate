@@ -44,6 +44,7 @@ class MascotStage(QtWidgets.QWidget):
             button.setFixedSize(36, 36)
             button.setCursor(QtCore.Qt.PointingHandCursor)
             button.setFocusPolicy(QtCore.Qt.StrongFocus)
+            button.setProperty('keyboardArrowControl', True)
             button.setAccessibleName(assistant_text(language, key))
             button.setToolTip(assistant_text(language, key))
             button.installEventFilter(self)

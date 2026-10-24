@@ -1,4 +1,5 @@
 import html
+import codecs
 import os
 import re
 import zipfile
@@ -134,13 +135,113 @@ def _read_html_file(path):
 
 
 def _read_rtf_file(path):
-    text = _read_text_file(path)
-    text = re.sub(r"\\'[0-9a-fA-F]{2}", lambda m: bytes.fromhex(m.group(0)[2:]).decode("latin-1", "ignore"), text)
-    text = re.sub(r"\\par[d]?", "\n", text)
-    text = re.sub(r"\\tab", "\t", text)
-    text = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", text)
-    text = text.replace("{", "").replace("}", "")
-    return text
+    # RTF has its own byte encoding. Decoding the entire file as UTF-8/CP1251
+    # first loses both \ansicpg and multibyte sequences represented by \'hh.
+    with open(path, "rb") as stream:
+        text = stream.read().decode("latin-1")
+    tokens = re.compile(
+        r"\\([a-zA-Z]+)(-?\d+)? ?|\\'([0-9a-fA-F]{2})|\\([^a-zA-Z])|([{}])|([\r\n])|([^\\{}\r\n]+)"
+    )
+    destinations = {
+        "fonttbl", "colortbl", "stylesheet", "info", "pict", "object",
+        "header", "headerl", "headerr", "footer", "footerl", "footerr",
+        "filetbl", "listtable", "listoverridetable", "rsidtbl", "generator",
+        "xmlnstbl", "datastore", "themedata", "colorschememapping", "fldinst",
+    }
+    charsets = {
+        128: "cp932", 129: "cp949", 130: "johab", 134: "gbk", 136: "big5",
+        161: "cp1253", 162: "cp1254", 163: "cp1258", 177: "cp1255",
+        178: "cp1256", 186: "cp1257", 204: "cp1251", 222: "cp874",
+        238: "cp1250", 254: "cp437", 255: "cp850",
+    }
+    characters = {
+        "par": "\n", "line": "\n", "tab": "\t", "cell": "\t", "row": "\n",
+        "emdash": "—", "endash": "–", "bullet": "•", "lquote": "‘",
+        "rquote": "’", "ldblquote": "“", "rdblquote": "”",
+    }
+    output, pending_bytes, stack = [], bytearray(), []
+    encoding = default_encoding = "cp1252"
+    unicode_fallback = 1
+    skip_fallback = 0
+    ignored = in_font_table = False
+    font = None
+    font_encodings = {}
+
+    def flush_bytes():
+        if pending_bytes:
+            output.append(pending_bytes.decode(encoding, errors="replace"))
+            pending_bytes.clear()
+
+    def codepage(value):
+        candidate = "cp" + str(value)
+        try:
+            return codecs.lookup(candidate).name
+        except LookupError:
+            return default_encoding
+
+    position = 0
+    while position < len(text):
+        token = tokens.match(text, position)
+        if token is None:
+            position += 1
+            continue
+        position = token.end()
+        word, parameter, hex_byte, symbol, brace, newline, literal = token.groups()
+        if literal is not None or hex_byte is not None:
+            value = bytes.fromhex(hex_byte) if hex_byte else literal.encode("latin-1")
+            skip = min(skip_fallback, len(value))
+            skip_fallback -= skip
+            if not ignored:
+                pending_bytes.extend(value[skip:])
+            continue
+        if newline:
+            continue  # Physical source wrapping is not an RTF paragraph break.
+        flush_bytes()
+        if brace:
+            skip_fallback = 0
+            if brace == "{":
+                stack.append((encoding, unicode_fallback, ignored, in_font_table, font))
+            elif stack:
+                encoding, unicode_fallback, ignored, in_font_table, font = stack.pop()
+            continue
+        if skip_fallback:
+            skip_fallback -= 1
+            continue
+        if symbol:
+            if symbol == "*":
+                ignored = True
+            elif not ignored:
+                output.append({"~": "\u00a0", "_": "‑", "-": "\u00ad"}.get(symbol, symbol))
+            continue
+        number = int(parameter) if parameter is not None else None
+        if word == "bin" and number is not None:
+            position += max(0, number)  # Binary objects can contain braces/backslashes.
+        elif word in destinations:
+            ignored = True
+            in_font_table = in_font_table or word == "fonttbl"
+        elif word in {"ansicpg", "cpg"} and number is not None:
+            encoding = codepage(number)
+            if in_font_table and font is not None:
+                font_encodings[font] = encoding
+            elif word == "ansicpg":
+                default_encoding = encoding
+        elif word == "f" and number is not None:
+            font = number
+            if not in_font_table:
+                encoding = font_encodings.get(font, default_encoding)
+        elif word == "fcharset" and in_font_table and font is not None:
+            font_encodings[font] = charsets.get(number, default_encoding)
+        elif word == "uc" and number is not None:
+            unicode_fallback = max(0, number)
+        elif word == "u" and number is not None:
+            if not ignored:
+                output.append(chr(number & 0xFFFF))
+            skip_fallback = unicode_fallback
+        elif not ignored and word in characters:
+            output.append(characters[word])
+    flush_bytes()
+    # RTF's signed \uN values are UTF-16 code units, including surrogate pairs.
+    return "".join(output).encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
 
 
 def _read_docx_file(path):

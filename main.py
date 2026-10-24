@@ -1248,16 +1248,13 @@ def ensure_data_dir_and_files():
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
     file_path = os.path.join(data_dir, filename)
     # Автоматически создаём нужные json-файлы с дефолтным содержимым
     if filename == "config.json":
         ensure_json_file(file_path, DEFAULT_CONFIG)
-    elif filename == "copy_history.json":
-        ensure_json_file(file_path, [])
-    elif filename == "translation_history.json":
-        ensure_json_file(file_path, [])
+    # History writers initialize their files while holding the shared lock.
+    # Creating [] here could erase another thread's first completed result.
     elif filename == "settings.json":
         ensure_json_file(file_path, {})
     return file_path
@@ -1272,74 +1269,13 @@ def _save_copy_history_sync(text):
         return
 
     record = {"timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "text": text}
-    history_file = get_data_file("copy_history.json")
-
-    history = []
     try:
-        if sys.platform == "win32":
-            import msvcrt
-            with open(history_file, "r+", encoding="utf-8") as f:
-                try:
-                    f.seek(0, 2)
-                    file_size = f.tell()
-                    f.seek(0)
-                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, max(file_size, 1))
-                except Exception:
-                    pass
-                try:
-                    content = f.read()
-                    if content.strip():
-                        history = json.loads(content)
-                except (json.JSONDecodeError, ValueError):
-                    history = []
-                # Deduplicate consecutive + limit
-                if history and history[-1].get("text") == record["text"]:
-                    pass  # skip duplicate
-                else:
-                    history.append(record)
-                if len(history) > 500:
-                    history = history[-500:]
-                f.seek(0)
-                f.truncate()
-                json.dump(history, f, ensure_ascii=False, indent=4)
-                try:
-                    f.seek(0, 2)
-                    file_size = f.tell()
-                    f.seek(0)
-                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, max(file_size, 1))
-                except Exception:
-                    pass
-        else:
-            import fcntl
-            with open(history_file, "r+", encoding="utf-8") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                try:
-                    content = f.read()
-                    if content.strip():
-                        history = json.loads(content)
-                except (json.JSONDecodeError, ValueError):
-                    history = []
-                history.append(record)
-                f.seek(0)
-                f.truncate()
-                json.dump(history, f, ensure_ascii=False, indent=4)
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    except Exception as e:
-        # Fallback без блокировки
-        try:
-            with open(history_file, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        except Exception:
-            history = []
-        if not (history and history[-1].get("text") == record["text"]):
-            history.append(record)
-        if len(history) > 500:
-            history = history[-500:]
-        try:
-            with open(history_file, "w", encoding="utf-8") as f:
-                json.dump(history, f, ensure_ascii=False, indent=4)
-        except Exception:
-            pass
+        history_file = get_data_file("copy_history.json")
+        from history_storage import append_record
+        append_record(history_file, record, deduplicate_field="text")
+    except Exception as error:
+        # Refuse to replace an unreadable history; it may still be recoverable.
+        logging.error("Copy history save refused; existing data preserved (%s)", type(error).__name__)
 
 def notify_copy_completed(config=None):
     """Queue the optional copy notification on the main Qt thread."""
@@ -1444,12 +1380,9 @@ class HotkeyListenerThread(threading.Thread):
             from macos_hotkeys import registry
             registry().unregister(self._mac_registration)
             self._mac_registration = None
-        if self._registered:
-            try:
-                ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id)
-                self._registered = False
-            except Exception:
-                pass
+        # A thread-owned Windows hotkey must be unregistered by its listener,
+        # not by the GUI thread calling stop(). The short wait in run() wakes
+        # within 50 ms and releases it in finally before join() returns.
 
     def _invoke(self):
         if self._stop_event.is_set():
@@ -1542,6 +1475,8 @@ class HotkeyListenerThread(threading.Thread):
         return modifiers, vk
 
     def run(self):
+        if self._stop_event.is_set():
+            return
         if self.vk is None:
             print("VK is None, aborting hotkey registration.")
             hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
@@ -1563,31 +1498,29 @@ class HotkeyListenerThread(threading.Thread):
         msg = wintypes.MSG()
         # Используем MsgWaitForMultipleObjects для эффективного ожидания без busy-wait
         QS_ALLINPUT = 0x04FF
-        WAIT_TIMEOUT = 258
-        INFINITE = 0xFFFFFFFF
 
-        while not self._stop_event.is_set():
-            # Ждём сообщения с таймаутом 50ms для проверки stop_event
-            result = ctypes.windll.user32.MsgWaitForMultipleObjects(0, None, False, 50, QS_ALLINPUT)
-
-            # Обрабатываем все доступные сообщения
-            while ctypes.windll.user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 0x0001):  # PM_REMOVE
-                if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
-                    try:
-                        print(f"Hotkey pressed: {self.hotkey_str}")
+        try:
+            while not self._stop_event.is_set():
+                ctypes.windll.user32.MsgWaitForMultipleObjects(0, None, False, 50, QS_ALLINPUT)
+                while not self._stop_event.is_set() and ctypes.windll.user32.PeekMessageW(
+                        ctypes.byref(msg), None, 0, 0, 0x0001):  # PM_REMOVE
+                    if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
                         hotkey_dispatcher.triggered.emit(self._invoke)
-                    except Exception as e:
-                        print(f"Error handling hotkey press: {e}")
-                ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
-                ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
-
-        # Отменяем регистрацию при выходе
-        if self._registered:
-            try:
-                ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id)
-                self._registered = False
-            except Exception:
-                pass
+                    ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
+                    ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
+        except Exception:
+            logging.exception("Hotkey listener stopped unexpectedly: %s", self.hotkey_str)
+            if not self._stop_event.is_set():
+                hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+        finally:
+            if self._registered:
+                try:
+                    if not ctypes.windll.user32.UnregisterHotKey(None, self.hotkey_id):
+                        logging.warning("Could not unregister hotkey: %s", self.hotkey_str)
+                except Exception:
+                    logging.exception("Could not unregister hotkey: %s", self.hotkey_str)
+                finally:
+                    self._registered = False
 
 LANGUAGES = {
     code: language_names(code)
@@ -10743,6 +10676,7 @@ class DarkThemeApp(QMainWindow):
         if not self._background_services:
             self.tray_available = False
         services = self._background_services and not LAYOUT_EDITOR_MODE
+        self._hotkey_services_enabled = services and not platform_support.IS_LINUX
         self._launch_update_signal.connect(self._on_launch_update_found)
         self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
@@ -13089,8 +13023,12 @@ class DarkThemeApp(QMainWindow):
             print(f"Error showing translation dialog: {e}")
 
     def restart_hotkey_listener(self):
-        if platform_support.IS_LINUX:
+        if not self._hotkey_services_enabled:
             return  # shortcuts are bound in the desktop environment, not here
+        old = getattr(self, 'hotkey_thread', None)
+        if old is not None:
+            old.stop()
+            old.join(timeout=0.5)
         self.hotkey_thread = HotkeyListenerThread(self.config.get("ocr_hotkeys", "Ctrl+O"), self.launch_ocr)
         self.hotkey_thread.start()
 
@@ -13114,7 +13052,7 @@ class DarkThemeApp(QMainWindow):
                 except Exception:
                     logging.exception("Could not stop hotkey listener %s", attribute)
             setattr(self, attribute, None)
-        if platform_support.IS_LINUX:
+        if not self._hotkey_services_enabled:
             return
         listener_class = getattr(self, "HotkeyListenerThread", HotkeyListenerThread)
         for attribute, key, callback, hotkey_id in bindings:
@@ -13995,6 +13933,7 @@ class DarkThemeApp(QMainWindow):
         preview = getattr(self, 'assistant_preview', None)
         if preview is not None:
             pairs.append(preview.button)
+        row_heights = []
         for pair in pairs:
             try:
                 pair.setStyleSheet(f"""
@@ -14010,12 +13949,23 @@ class DarkThemeApp(QMainWindow):
                 pair.value_label.setStyleSheet(
                     f"font-size: 12px; font-weight:bold; color:{shortcut}; background:transparent; border:none; padding:0; margin:0;"
                 )
-                row_height = max(pair.caption_label.sizeHint().height(), pair.value_label.sizeHint().height())
+                # Measure text rows first. A mascot thumbnail must fit that
+                # height rather than enlarging the final row of the legend.
+                row_heights.append(max(pair.caption_label.sizeHint().height(),
+                    pair.value_label.fontMetrics().height() if preview is not None and pair is preview.button
+                    else pair.value_label.sizeHint().height()))
+            except RuntimeError:
+                continue
+
+        if row_heights:
+            row_height = max(row_heights)
+            for pair in pairs:
                 for label in (pair.caption_label, pair.value_label):
                     label.setFixedHeight(row_height)
                 pair.setFixedHeight(row_height + 1)
-            except RuntimeError:
-                continue
+            if preview is not None:
+                preview.setFixedHeight(row_height + 1)
+                preview._update_thumbnail()
 
         if isinstance(area, QFrame) and area.layout() is not None:
             area.ensurePolished()
@@ -15234,7 +15184,8 @@ class DarkThemeApp(QMainWindow):
             super().dropEvent(event)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_O and event.modifiers() & Qt.ControlModifier:
+        from keyboard_navigation import matches_control_shortcut
+        if matches_control_shortcut(event, Qt.Key_O):
             self._choose_document_from_main()
             event.accept()
             return

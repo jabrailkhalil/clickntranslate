@@ -228,11 +228,46 @@ def test_capture_memory_controls_fit_and_have_hints_in_every_locale(capture, loc
     value._preview_rect = QtCore.QRect(100, 300, 300, 100)
     value._update_memory_actions()
     value.update_combo_position()
-    assert value.rect().contains(value.memory_panel.geometry())
+    assert value.rect().contains(value.capture_toolbar.geometry())
+    assert value.capture_toolbar.rect().contains(value.memory_panel.geometry())
     assert value.rect().contains(value.memory_hint.geometry())
     box = value.remember_area_checkbox
     assert box.width() >= box.sizeHint().width()
     assert box.toolTip() and value.repeat_area_button.toolTip()
+
+
+@pytest.mark.parametrize('locale', LANGUAGES)
+@pytest.mark.parametrize('dpi', [96, 144, 192])
+def test_unified_toolbar_wraps_without_clipping_on_narrow_secondary_monitor(capture, app, monkeypatch, locale, dpi):
+    config, _, _, create = capture
+    config['interface_language'] = locale
+    desktop = QtCore.QRect(-700, -100, 640, 720)
+    monkeypatch.setattr(QtGui.QScreen, 'geometry', lambda self: QtCore.QRect(desktop))
+    monkeypatch.setattr(QtGui.QScreen, 'availableGeometry', lambda self: QtCore.QRect(desktop))
+    monkeypatch.setattr(QtGui.QScreen, 'logicalDotsPerInch', lambda self: dpi)
+    value = create()
+    value._preview_rect = QtCore.QRect(100, 300, 300, 100)
+    value._update_memory_actions()
+    value.update_combo_position()
+    app.processEvents()
+    assert value.rect().contains(value.capture_toolbar.geometry())
+    controls = (value.lang_combo, value.translate_arrow_label, value.target_lang_combo,
+                value.remember_area_checkbox, value.repeat_area_button, value.capture_close_button)
+    rectangles = []
+    for control in controls:
+        bounds = QtCore.QRect(control.mapTo(value.capture_toolbar, QtCore.QPoint()), control.size())
+        assert value.capture_toolbar.rect().contains(bounds)
+        assert all(not previous.intersects(bounds) for previous in rectangles)
+        rectangles.append(bounds)
+    assert value.lang_combo.height() == value.remember_area_checkbox.height()
+    assert value.capture_close_button.toolTip().endswith('Esc')
+
+
+def test_clicking_blank_toolbar_does_not_select_screen(capture, app):
+    _, _, captures, create = capture
+    value = create()
+    QTest.mouseClick(value.capture_toolbar, QtCore.Qt.LeftButton, pos=QtCore.QPoint(3, 3))
+    assert value.start_point is None and not captures
 
 
 def test_corrupt_config_is_not_replaced_when_saving_an_area(tmp_path, monkeypatch):

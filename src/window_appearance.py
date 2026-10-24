@@ -482,6 +482,10 @@ def style_capture_controls(overlay, config, controls):
     # may wrap to a second row. Never shrink the full-screen capture surface.
     row_width = sum(112 if isinstance(w, QtWidgets.QComboBox) else 36
                     for w in controls if isinstance(w, (QtWidgets.QComboBox, QtWidgets.QToolButton)))
+    if hasattr(overlay, 'capture_toolbar'):
+        # The close button stays beside the language fields when memory actions
+        # wrap below. Reserve its width and the toolbar padding at high DPI.
+        row_width += 52
     screen = getattr(overlay, '_screen', None) or getattr(overlay, 'screen', None)
     screen = screen() if callable(screen) else screen
     screen = screen or QtWidgets.QApplication.primaryScreen()

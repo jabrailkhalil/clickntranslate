@@ -12,6 +12,17 @@ def preview_art(mascot):
     return QtGui.QPixmap(art_path(f'{mascot_id(mascot)}/preview.png'))
 
 
+@lru_cache(maxsize=6)
+def preview_portrait(mascot):
+    # Remove the empty space in the small static asset, without decoding an
+    # animation atlas. The actual character can fill its larger shortcut.
+    pixmap = preview_art(mascot)
+    if pixmap.isNull():
+        return pixmap
+    bounds = QtGui.QRegion(pixmap.mask()).boundingRect()
+    return pixmap.copy(bounds) if not bounds.isEmpty() else pixmap
+
+
 class AssistantPreview(QtWidgets.QWidget):
     settings_requested = QtCore.pyqtSignal()
     dismiss_requested = QtCore.pyqtSignal()
@@ -27,7 +38,8 @@ class AssistantPreview(QtWidgets.QWidget):
         self.button = activity_owner._create_main_hotkey_pair(
             assistant_text(language, 'companion_section'), '', compact=True)
         self.button.setMinimumWidth(0)
-        self.button.value_label.setFixedWidth(28)
+        self.button.setFixedHeight(22)
+        self.button.value_label.setFixedSize(36, 20)
         self.button.clicked.connect(self.settings_requested)
         row = QtWidgets.QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
@@ -55,8 +67,9 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def _update_thumbnail(self):
         if self.art is not None:
-            self.button.value_label.setPixmap(self.art.scaled(
-                18, 18, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            self.button.value_label.setPixmap(preview_portrait(self.mascot).scaled(
+                32, max(1, self.button.value_label.height()),
+                QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
         else:
             self.button.value_label.clear()
 

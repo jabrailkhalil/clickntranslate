@@ -9,6 +9,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest
 
 from assistant_text import ASSISTANT_TEXT, assistant_text
+from assistant_settings import ASSISTANT_ACTIONS
 from desktop_assistant import (DesktopAssistant, AssistantMenu, ACTION_METHODS,
                                clamp_position, normalized_position)
 import mode_coordinator
@@ -224,7 +225,7 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
                 required = label.heightForWidth(label.width())
                 assert required <= label.height(), (language, key, label.text(), required, label.height())
             assert button.width() > 0
-        assert set(menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'settings', 'hide'}
+        assert set(menu.buttons) == set(ASSISTANT_ACTIONS) | {'settings', 'hide'}
         assert not menu.findChildren(QtWidgets.QScrollArea)
         assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()

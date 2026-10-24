@@ -19,6 +19,26 @@ def test_frame_cadence_and_clockwise_cardinal_selection():
     assert [look_index(a) for a in (0, 90, 180, 270, 360, -90)] == [0, 4, 8, 12, 0, 12]
 
 
+def test_idle_has_long_rest_but_clicks_and_translation_react_immediately():
+    from assistant_motion import IDLE_REST_SECONDS
+    from assistant_sprites import ROWS
+    pet = PetMotion('click')
+    for _ in range(39):
+        pet.advance(.25)
+        assert pet.seconds(pet.action()) == 0
+    pet.time = IDLE_REST_SECONDS + .35
+    assert frame_index(ROWS['idle'][1], pet.seconds('idle')) == 1
+    pet.greet()
+    assert pet.action() == 'wave' and pet.seconds('wave') == 0
+    pet.advance(.15)
+    assert pet.seconds('wave') == pytest.approx(.15)
+    pet.set_activity('busy')
+    assert pet.action() == 'work' and pet.seconds('work') == 0
+    pet.set_activity('idle')
+    pet.time = IDLE_REST_SECONDS + sum(ROWS['idle'][1])/1000 + .5
+    assert pet.seconds('idle') == 0
+
+
 @pytest.mark.parametrize('extent', [60, 84, 150])
 @pytest.mark.parametrize('speed', [20, 40, 100])
 def test_legacy_speed_and_size_never_move_the_pet(extent, speed):

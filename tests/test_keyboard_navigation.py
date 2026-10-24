@@ -373,8 +373,10 @@ def test_ocr_memory_is_inline_to_the_right_of_languages_on_a_wide_screen(capture
     config, _, _, create = capture
     value = create(mode)
     languages = [value.lang_combo] + ([value.target_lang_combo] if mode == 'translate' else [])
-    assert value.memory_panel.x() > max(combo.geometry().right() for combo in languages)
-    assert abs(value.memory_panel.geometry().center().y()-value.lang_combo.geometry().center().y()) <= 1
+    def bounds(widget):
+        return QtCore.QRect(widget.mapTo(value, QtCore.QPoint()), widget.size())
+    assert bounds(value.memory_panel).left() > max(bounds(combo).right() for combo in languages)
+    assert abs(bounds(value.memory_panel).center().y()-bounds(value.lang_combo).center().y()) <= 1
 
 
 def test_ocr_area_can_be_created_moved_resized_and_confirmed_without_mouse(capture, app):

@@ -7,6 +7,7 @@ from assistant_sprites import atlas, frame_index, paint_sprite, ROWS, STATIONARY
 
 WALK_FRAME_DURATIONS = ROWS['running-right'][1]
 WALK_FRAME_NAMES = tuple(f'{index:02}' for index in range(len(WALK_FRAME_DURATIONS)))
+IDLE_REST_SECONDS = 10.
 
 
 def walk_frame_index(phase):
@@ -82,6 +83,13 @@ class PetMotion:
             return self.status_age
         if action == 'review' and self.status == 'success':
             return max(0., self.status_age - .84)
+        if action == 'idle':
+            # Hold the clean resting pose between natural, single-cycle idle
+            # movements. Explicit clicks and translation reactions keep their
+            # native timing instead of being slowed down with the idle loop.
+            cycle = sum(ROWS['idle'][1]) / 1000
+            elapsed = self.time % (IDLE_REST_SECONDS + cycle)
+            return max(0., elapsed - IDLE_REST_SECONDS)
         return self.time
 
     def advance(self, dt, speed=0., extent=0., locomotion=False):

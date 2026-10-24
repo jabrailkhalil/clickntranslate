@@ -590,7 +590,10 @@ _OCR_LOGGER = logging.getLogger("clickntranslate.ocr")
 def _setup_ocr_diagnostics_logging():
     global _debug_log_path
     root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
+    # Global DEBUG also enables HTTP libraries, whose request URLs can contain
+    # source text. Keep detailed diagnostics scoped to our named OCR logger.
+    root.setLevel(logging.INFO)
+    _OCR_LOGGER.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
         "%(asctime)s.%(msecs)03d [%(levelname)s] [%(threadName)s] "
         "%(name)s:%(lineno)d - %(message)s",
@@ -763,10 +766,21 @@ def _screen_to_text(screen):
         return f"<screen describe failed: {e}>"
 
 def _text_preview(text, limit=180):
-    text = str(text or "").replace("\r", "\\r").replace("\n", "\\n")
+    text = str(text or "")
+    if not _ocr_debug_artifacts_enabled():
+        return f"<redacted; {len(text)} chars>"
+    text = text.replace("\r", "\\r").replace("\n", "\\n")
     if len(text) > limit:
         return text[:limit] + "..."
     return text
+
+def _log_ocr_exception(context, error):
+    """Keep provider/source text out of persistent diagnostics by default."""
+    if _ocr_debug_artifacts_enabled():
+        logging.error("%s: %s", context, error,
+                      exc_info=(type(error), error, error.__traceback__))
+    else:
+        logging.error("%s: %s", context, type(error).__name__)
 
 def _score_recognized_text(text):
     text = str(text or "").strip()
@@ -1087,7 +1101,7 @@ def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, s
                 best_text = text
                 best_score = score
         except Exception as e:
-            logging.exception(f"[OCR:{session_id}] Tesseract {context} failed with psm={psm}: {e}")
+            _log_ocr_exception(f"[OCR:{session_id}] Tesseract {context} failed with psm={psm}", e)
     if best_text:
         logging.info(
             f"[OCR:{session_id}] Tesseract {context} selected best result; "
@@ -1583,7 +1597,7 @@ def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check
                 join_paragraphs=join_paragraphs,
             )
         except Exception as exc:
-            logging.exception(f"[OCR:{session_id}] RapidOCR worker failed: {exc}")
+            _log_ocr_exception(f"[OCR:{session_id}] RapidOCR worker failed", exc)
             return "", "rapidocr_unavailable"
     engine = _get_rapidocr_engine()
     if engine is None:
@@ -1624,7 +1638,7 @@ def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check
                 best_reason = candidate.reject_reason
         except Exception as exc:
             best_reason = "rapidocr_error"
-            logging.exception(f"[OCR:{session_id}] RapidOCR variant={label}; context={context} failed: {exc}")
+            _log_ocr_exception(f"[OCR:{session_id}] RapidOCR variant={label}; context={context} failed", exc)
 
     selected, selector_reason = _select_best_auto_ocr_candidate(
         auto_candidates,
@@ -1853,7 +1867,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
                 join_paragraphs=join_paragraphs,
             )
         except Exception as exc:
-            logging.exception(f"[OCR:{session_id}] EasyOCR worker failed: {exc}")
+            _log_ocr_exception(f"[OCR:{session_id}] EasyOCR worker failed", exc)
             return "", "easyocr_unavailable"
     if status_callback:
         language_codes = ", ".join(easyocr_language_codes(language_code))
@@ -1899,7 +1913,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
                 best_reason = candidate.reject_reason
         except Exception as exc:
             best_reason = "easyocr_error"
-            logging.exception(f"[OCR:{session_id}] EasyOCR variant={label}; context={context} failed: {exc}")
+            _log_ocr_exception(f"[OCR:{session_id}] EasyOCR variant={label}; context={context} failed", exc)
 
     selected, selector_reason = _select_best_auto_ocr_candidate(
         auto_candidates,
@@ -1915,7 +1929,7 @@ def _recognize_easyocr_variants(pil_variants, language_code, context, session_id
 
 def _ocr_debug_artifacts_enabled():
     try:
-        return bool(get_cached_ocr_config().get("debug_ocr_artifacts", False))
+        return get_cached_ocr_config().get("debug_ocr_artifacts", False) is True
     except Exception:
         return False
 
@@ -2316,89 +2330,17 @@ def _save_translation_history_sync(original_text, translated_text, language):
         return
     if not config.get("history", False):
         return
-    history_file = get_data_file("translation_history.json")
-    if not os.path.exists(history_file):
-        with open(history_file, "w", encoding="utf-8") as f:
-            json.dump([], f, ensure_ascii=False, indent=4)
-
-    history = []
     try:
-        if sys.platform == "win32":
-            import msvcrt
-            with open(history_file, "r+", encoding="utf-8") as f:
-                try:
-                    f.seek(0, 2)
-                    file_size = f.tell()
-                    f.seek(0)
-                    msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, max(file_size, 1))
-                except Exception:
-                    pass
-                try:
-                    content = f.read()
-                    if content.strip():
-                        history = json.loads(content)
-                except (json.JSONDecodeError, ValueError):
-                    history = []
-                history.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "language": language,
-                    "original": original_text,
-                    "translated": translated_text
-                })
-                if len(history) > 500:
-                    history = history[-500:]
-                f.seek(0)
-                f.truncate()
-                json.dump(history, f, ensure_ascii=False, indent=4)
-                try:
-                    f.seek(0, 2)
-                    file_size = f.tell()
-                    f.seek(0)
-                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, max(file_size, 1))
-                except Exception:
-                    pass
-        else:
-            import fcntl
-            with open(history_file, "r+", encoding="utf-8") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                try:
-                    content = f.read()
-                    if content.strip():
-                        history = json.loads(content)
-                except (json.JSONDecodeError, ValueError):
-                    history = []
-                history.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "language": language,
-                    "original": original_text,
-                    "translated": translated_text
-                })
-                if len(history) > 500:
-                    history = history[-500:]
-                f.seek(0)
-                f.truncate()
-                json.dump(history, f, ensure_ascii=False, indent=4)
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    except Exception:
-        # Fallback без блокировки
-        try:
-            with open(history_file, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        except Exception:
-            history = []
-        history.append({
+        history_file = get_data_file("translation_history.json")
+        from history_storage import append_record
+        append_record(history_file, {
             "timestamp": datetime.now().isoformat(),
             "language": language,
             "original": original_text,
             "translated": translated_text
         })
-        if len(history) > 500:
-            history = history[-500:]
-        try:
-            with open(history_file, "w", encoding="utf-8") as f:
-                json.dump(history, f, ensure_ascii=False, indent=4)
-        except Exception:
-            pass
+    except Exception as error:
+        logging.error("Translation history save refused; existing data preserved (%s)", type(error).__name__)
 
 def save_translation_history(original_text, translated_text, language):
     """Асинхронно сохранить перевод в историю (не блокирует UI)."""
@@ -2407,8 +2349,7 @@ def save_translation_history(original_text, translated_text, language):
 
 async def run_ocr_with_engine(bitmap, engine):
     debug_log("run_ocr_with_engine called")
-    debug_log(f"bitmap = {bitmap}")
-    debug_log(f"engine = {engine}")
+    debug_log(f"bitmap_present={bitmap is not None}, engine_type={type(engine).__name__}")
     try:
         # Ensure the bitmap is valid
         if bitmap is None:
@@ -2417,32 +2358,31 @@ async def run_ocr_with_engine(bitmap, engine):
 
         debug_log("Calling engine.recognize_async...")
         result = await engine.recognize_async(bitmap)
-        debug_log(f"recognize_async returned: {result}")
+        debug_log(f"recognize_async returned; result_present={result is not None}")
 
         if result:
-            debug_log(f"Result object: {result}")
             # Проверяем lines через try/except (hasattr вызывает ошибку импорта collections)
             try:
                 lines = result.lines
                 line_count = len(lines) if lines else 0
                 debug_log(f"Lines count: {line_count}")
-                if line_count > 0:
+                if line_count > 0 and _ocr_debug_artifacts_enabled():
                     for i, line in enumerate(lines):
-                        debug_log(f"Line {i}: {line.text}")
+                        if i >= 3:
+                            break
+                        debug_log(f"Line {i}: {_text_preview(line.text)}")
                 return result
             except AttributeError:
                 debug_log("ERROR: Result has no 'lines' attribute")
                 return None
             except Exception as e:
-                debug_log(f"ERROR accessing lines: {e}")
+                _log_ocr_exception("Error accessing OCR lines", e)
                 return result  # Возвращаем result даже если не можем получить lines
         else:
             debug_log("ERROR: recognize_async returned None")
             return None
     except Exception as e:
-        debug_log(f"EXCEPTION in run_ocr_with_engine: {e}")
-        import traceback
-        debug_log(traceback.format_exc())
+        _log_ocr_exception("run_ocr_with_engine failed", e)
         return None
 
 def usable_ocr_engine(engine):
@@ -2787,7 +2727,7 @@ def _windows_ocr_result_to_text(recognized, *, join_paragraphs=False):
         debug_log("ERROR: recognized has no 'lines' attribute")
         return ""
     except Exception as e:
-        debug_log(f"ERROR accessing recognized.lines: {e}")
+        _log_ocr_exception("Error accessing recognized OCR lines", e)
         return ""
 
     if not lines:
@@ -3253,9 +3193,9 @@ def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_
                             )
                         )
                     except Exception as e:
-                        logging.exception(
+                        _log_ocr_exception(
                             f"[OCR:{session_id}] Windows OCR AUTO candidate failed; "
-                            f"lang={code}, tag={tag}, attempt={attempt_label}: {e}"
+                            f"lang={code}, tag={tag}, attempt={attempt_label}", e
                         )
         else:
             logging.warning(
@@ -3294,11 +3234,11 @@ def _recognize_with_windows_auto(attempts_or_bitmap, cancel_check=None, session_
                                 )
                             )
                         except Exception as e:
-                            logging.exception(
-                                f"[OCR:{session_id}] Windows OCR AUTO universal failed; attempt={attempt_label}: {e}"
+                            _log_ocr_exception(
+                                f"[OCR:{session_id}] Windows OCR AUTO universal failed; attempt={attempt_label}", e
                             )
             except Exception as e:
-                logging.exception(f"[OCR:{session_id}] Windows OCR AUTO universal setup failed: {e}")
+                _log_ocr_exception(f"[OCR:{session_id}] Windows OCR AUTO universal setup failed", e)
 
         selected, reason = _select_best_auto_ocr_candidate(
             auto_candidates,
@@ -3377,12 +3317,12 @@ class OCRWorker(QtCore.QThread):
         except AttributeError:
             debug_log("ERROR: recognized has no 'lines' attribute")
         except Exception as e:
-            debug_log(f"ERROR accessing recognized.lines: {e}")
+            _log_ocr_exception("Error accessing recognized OCR lines", e)
         return recognized_text
 
     def run(self):
         debug_log("OCRWorker.run() started")
-        debug_log(f"self.bitmap = {self.bitmap}")
+        debug_log(f"bitmap_present={self.bitmap is not None}")
         debug_log(f"self.language_code = {self.language_code}")
         debug_log(f"self.use_universal = {self.use_universal}")
         debug_log(f"self.attempts = {[label for label, _bitmap in self.attempts]}")
@@ -3441,7 +3381,7 @@ class OCRWorker(QtCore.QThread):
                             recognized_text = ""
                         elif selected is not None:
                             recognized_text = selected.text
-                debug_log(f"Emitting AUTO result: '{recognized_text[:50]}...' (len={len(recognized_text)})")
+                debug_log(f"Emitting AUTO result: {_text_preview(recognized_text)} (len={len(recognized_text)})")
                 if not recognized_text and not self._is_cancelled():
                     self.failure_reason = "auto_low_confidence_or_empty"
                 if not self._is_cancelled():
@@ -3502,7 +3442,7 @@ class OCRWorker(QtCore.QThread):
                     if self._is_cancelled():
                         logging.info(f"[OCR:{self.session_id}] OCR worker interrupted after attempt={attempt_label}")
                         break
-                    debug_log(f"recognized[{attempt_label}] = {recognized}")
+                    debug_log(f"recognized[{attempt_label}]; result_present={recognized is not None}")
                     if not recognized:
                         logging.warning(
                             f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label} returned None; "
@@ -3521,11 +3461,11 @@ class OCRWorker(QtCore.QThread):
                         best_score = attempt_score
                         best_label = attempt_label
                 except Exception as e:
-                    logging.exception(f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label} failed: {e}")
+                    _log_ocr_exception(f"[OCR:{self.session_id}] Windows OCR attempt={attempt_label} failed", e)
 
             recognized_text = best_text
             if recognized_text:
-                debug_log(f"recognized_text = '{recognized_text[:100]}...' (length={len(recognized_text)})")
+                debug_log(f"recognized_text = {_text_preview(recognized_text)} (length={len(recognized_text)})")
                 logging.info(
                     f"[OCR:{self.session_id}] Windows OCR selected attempt={best_label}; "
                     f"chars={len(recognized_text)}, score={best_score:.1f}"
@@ -3571,8 +3511,8 @@ class OCRWorker(QtCore.QThread):
                                     universal_best_score = attempt_score
                                     universal_best_label = attempt_label
                             except Exception as e:
-                                logging.exception(
-                                    f"[OCR:{self.session_id}] Universal Windows OCR attempt={attempt_label} failed: {e}"
+                                _log_ocr_exception(
+                                    f"[OCR:{self.session_id}] Universal Windows OCR attempt={attempt_label} failed", e
                                 )
                         if universal_best_text:
                             recognized_text = universal_best_text
@@ -3581,7 +3521,7 @@ class OCRWorker(QtCore.QThread):
                                 f"chars={len(recognized_text)}, score={universal_best_score:.1f}"
                             )
                 except Exception as e:
-                    logging.exception(f"[OCR:{self.session_id}] Universal Windows OCR retry failed: {e}")
+                    _log_ocr_exception(f"[OCR:{self.session_id}] Universal Windows OCR retry failed", e)
 
             if (
                 not recognized_text
@@ -3608,9 +3548,7 @@ class OCRWorker(QtCore.QThread):
                 ) or ""
 
         except Exception as e:
-            debug_log(f"EXCEPTION in OCRWorker.run(): {e}")
-            import traceback
-            debug_log(traceback.format_exc())
+            _log_ocr_exception(f"[OCR:{self.session_id}] OCRWorker failed", e)
             recognized_text = ""
         finally:
             try:
@@ -3622,7 +3560,7 @@ class OCRWorker(QtCore.QThread):
         if self._is_cancelled():
             logging.info(f"[OCR:{self.session_id}] OCR worker result suppressed after interruption")
             return
-        debug_log(f"Emitting result: '{recognized_text[:50]}...' (len={len(recognized_text)})")
+        debug_log(f"Emitting result: {_text_preview(recognized_text)} (len={len(recognized_text)})")
         self.result_ready.emit(recognized_text)
 
 class TesseractOCRWorker(QtCore.QThread):
@@ -3692,7 +3630,7 @@ class TesseractOCRWorker(QtCore.QThread):
                         text = selected.text
         except Exception as e:
             self.failure_reason = "tesseract_error"
-            logging.exception(f"[OCR:{self.session_id}] TesseractOCRWorker failed: {e}")
+            _log_ocr_exception(f"[OCR:{self.session_id}] TesseractOCRWorker failed", e)
 
         if self._is_cancelled():
             logging.info(f"[OCR:{self.session_id}] Tesseract worker result suppressed after interruption")
@@ -3744,7 +3682,7 @@ class RapidOCRWorker(QtCore.QThread):
                 self.failure_reason = failure_reason or None
         except Exception as e:
             self.failure_reason = "rapidocr_error"
-            logging.exception(f"[OCR:{self.session_id}] RapidOCRWorker failed: {e}")
+            _log_ocr_exception(f"[OCR:{self.session_id}] RapidOCRWorker failed", e)
 
         if self._is_cancelled():
             logging.info(f"[OCR:{self.session_id}] RapidOCR worker result suppressed after interruption")
@@ -3779,9 +3717,9 @@ class AppleVisionOCRWorker(RapidOCRWorker):
                 candidates, session_id=self.session_id, context="Apple Vision")
             text = selected.text if selected else ""
             self.failure_reason = None if text else reason or "apple_vision_empty"
-        except Exception:
+        except Exception as error:
             self.failure_reason = "apple_vision_error"
-            logging.exception("Apple Vision recognition failed")
+            _log_ocr_exception("Apple Vision recognition failed", error)
         if not self._is_cancelled():
             self.result_ready.emit(text)
 
@@ -3830,7 +3768,7 @@ class EasyOCRWorker(QtCore.QThread):
                 self.failure_reason = failure_reason or None
         except Exception as e:
             self.failure_reason = "easyocr_error"
-            logging.exception(f"[OCR:{self.session_id}] EasyOCRWorker failed: {e}")
+            _log_ocr_exception(f"[OCR:{self.session_id}] EasyOCRWorker failed", e)
 
         if self._is_cancelled():
             logging.info(f"[OCR:{self.session_id}] EasyOCR worker result suppressed after interruption")
@@ -3840,6 +3778,49 @@ class EasyOCRWorker(QtCore.QThread):
             f"text_len={len(text or '')}, failure={self.failure_reason or '-'}, preview={_text_preview(text)}"
         )
         self.result_ready.emit(text)
+
+
+_AREA_TRANSLATION_PENDING = object()
+
+
+class _AreaTranslationJob(QtCore.QObject):
+    """Run a captured paragraph off the GUI thread; cancellation never waits."""
+
+    completed = QtCore.pyqtSignal(object, object, object)
+
+    def __init__(self, parent, text, source_code, target_code, engine, session_id):
+        super().__init__(parent)
+        self.text = text
+        self.source_code = source_code
+        self.target_code = target_code
+        self.engine = engine
+        self.session_id = session_id
+        self.cancelled = threading.Event()
+        cancel_event = self.cancelled
+        parent.destroyed.connect(lambda *_args: cancel_event.set())
+
+    def start(self):
+        def run():
+            try:
+                from translater import translate_text
+                translated = translate_text(
+                    self.text, self.source_code, self.target_code,
+                    engine=self.engine, cancel_callback=self.cancelled.is_set,
+                )
+                result, error = str(translated or ""), None
+            except Exception as exc:
+                result, error = "", exc
+            if not self.cancelled.is_set():
+                try:
+                    self.completed.emit(self, result, error)
+                except RuntimeError:
+                    pass  # The owning overlay was deleted while the request finished.
+
+        self._thread = threading.Thread(target=run, name="area-translation", daemon=True)
+        self._thread.start()
+
+    def cancel(self):
+        self.cancelled.set()
 
 
 class ScreenCaptureOverlay(QWidget):
@@ -3977,7 +3958,22 @@ class ScreenCaptureOverlay(QWidget):
             self.target_lang_combo.currentIndexChanged.connect(self.on_language_changed)
 
         from capture_regions import CaptureMemoryPanel
-        self.memory_panel = CaptureMemoryPanel(self)
+        self.capture_toolbar = CaptureMemoryPanel(self)
+        self.capture_toolbar.setObjectName('captureToolbar')
+        self.capture_toolbar.setAttribute(QtCore.Qt.WA_StyledBackground)
+        self.capture_toolbar.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.capture_toolbar_grid = QtWidgets.QGridLayout(self.capture_toolbar)
+        self.capture_languages = QtWidgets.QWidget(self.capture_toolbar)
+        language_row = QtWidgets.QHBoxLayout(self.capture_languages)
+        language_row.setContentsMargins(0, 0, 0, 0)
+        language_row.setSpacing(6)
+        for control in (self.lang_combo, self.translate_arrow_label, self.target_lang_combo):
+            if control is not None:
+                language_row.addWidget(control)
+        self.capture_separator = QtWidgets.QFrame(self.capture_toolbar)
+        self.capture_separator.setObjectName('captureSeparator')
+        self.capture_separator.setFixedWidth(1)
+        self.memory_panel = CaptureMemoryPanel(self.capture_toolbar)
         self.memory_panel.setCursor(QtCore.Qt.ArrowCursor)
         self.memory_panel.setObjectName('captureMemoryPanel')
         self.memory_grid = QtWidgets.QGridLayout(self.memory_panel)
@@ -3986,6 +3982,9 @@ class ScreenCaptureOverlay(QWidget):
         self.repeat_area_button.setAutoDefault(False)
         self.memory_grid.addWidget(self.remember_area_checkbox, 0, 0)
         self.memory_grid.addWidget(self.repeat_area_button, 0, 1)
+        self.capture_close_button = QtWidgets.QToolButton(self.capture_toolbar)
+        self.capture_close_button.setText('×')
+        self.capture_close_button.clicked.connect(self.close)
         self.memory_hint = QtWidgets.QLabel(self)
         self.memory_hint.setWordWrap(True)
         self.memory_hint.setAlignment(QtCore.Qt.AlignCenter)
@@ -3993,6 +3992,7 @@ class ScreenCaptureOverlay(QWidget):
         self.remember_area_checkbox.toggled.connect(self._remember_area_changed)
         self.repeat_area_button.clicked.connect(self._repeat_area)
         self._refresh_memory_controls(config)
+        self.capture_toolbar.hide()
         self.memory_panel.hide()
         self.memory_hint.hide()
 
@@ -4014,17 +4014,39 @@ class ScreenCaptureOverlay(QWidget):
         dark = config.get('theme', 'Темная') != 'Светлая'
         from styled_dialogs import install_accent_controls
         from ui_scaling import desktop_control_scale
-        factor = min(1.5, desktop_control_scale(self._active_screen or self.screen))
-        self.memory_grid.setContentsMargins(round(9*factor), round(5*factor), round(9*factor), round(5*factor))
-        self.memory_grid.setSpacing(round(8*factor))
-        self.memory_panel.setStyleSheet(f'''
-            QFrame#captureMemoryPanel {{ background:{'#20212a' if dark else '#f1edf4'};
-                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:7px; }}
-            QCheckBox {{ color:{'#f1edf5' if dark else '#302837'}; background:transparent;
-                border:0; font-size:{round(13*factor)}px; padding:0; }}
+        factor = self.property('ui_effective_scale') or desktop_control_scale(self._active_screen or self.screen)
+        height = self.lang_combo.height()
+        self.capture_toolbar_grid.setContentsMargins(round(8*factor), round(8*factor), round(8*factor), round(8*factor))
+        self.capture_toolbar_grid.setHorizontalSpacing(round(8*factor))
+        self.capture_toolbar_grid.setVerticalSpacing(round(6*factor))
+        self.capture_languages.layout().setSpacing(round(6*factor))
+        self.memory_grid.setContentsMargins(0, 0, 0, 0)
+        self.memory_grid.setSpacing(round(6*factor))
+        ink, field, border, accent = (('#f5f0fc', '#211d29', '#544760', '#c3a5eb') if dark
+                                      else ('#302638', '#faf7fd', '#c8b9d7', '#765099'))
+        self.capture_toolbar.setStyleSheet(f'''
+            QFrame#captureToolbar {{ background:{'#121212' if dark else '#f0edf3'};
+                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:{round(10*factor)}px; }}
+            QWidget#captureMemoryPanel, QFrame#captureMemoryPanel {{background:transparent; border:0;}}
+            QFrame#captureSeparator {{ background:{border}; border:0; }}
+            QCheckBox {{ color:{ink}; background:{field}; border:1px solid {border};
+                border-radius:{round(6*factor)}px; font-size:{round(14*factor)}px;
+                spacing:{round(8*factor)}px; padding:0 {round(10*factor)}px; }}
+            QCheckBox:hover, QCheckBox:checked {{ border-color:{accent}; }}
         ''')
+        self.capture_separator.setFixedHeight(max(1, height-round(8*factor)))
+        self.remember_area_checkbox.setFixedHeight(height)
+        self.repeat_area_button.setFixedHeight(height)
+        self.capture_close_button.setFixedSize(height, height)
         install_accent_controls(self.memory_panel, dark=dark)
-        self.repeat_area_button.setStyleSheet(button_qss(dark, 'primary', compact=True))
+        from window_appearance import scaled_stylesheet
+        self.repeat_area_button.setStyleSheet(scaled_stylesheet(button_qss(dark, 'primary', compact=True), factor))
+        self.capture_close_button.setStyleSheet(scaled_stylesheet(button_qss(dark, 'close', 'QToolButton', icon=True), factor))
+        from dialog_text import dialog_action_text
+        self._dialog_language_code = locale
+        close_label = dialog_action_text(self, 'Cancel')
+        self.capture_close_button.setToolTip(close_label + ' · Esc')
+        self.capture_close_button.setAccessibleName(close_label)
         self.memory_hint.setStyleSheet(f'color:{"#f1edf5" if dark else "#302837"}; background:{"#20212a" if dark else "#f1edf4"}; border-radius:4px; padding:4px; font-size:{round(12*factor)}px;')
         self.memory_hint.clear()
         self._update_memory_actions()
@@ -4112,7 +4134,7 @@ class ScreenCaptureOverlay(QWidget):
         self._ocr_status_text = self._default_ocr_status_text()
         self.start_point = self.end_point = None
         self._selection_started_at = None
-        self.memory_panel.hide()
+        self.capture_toolbar.hide()
         self.memory_hint.hide()
         self.update()
         self._flush_selection_paint_before_capture()
@@ -4350,6 +4372,7 @@ class ScreenCaptureOverlay(QWidget):
 
     def show_overlay(self):
         try:
+            self._cancel_area_translation()
             self._session_id = _new_ocr_session_id(self.mode)
             self.start_point = None
             self.end_point = None
@@ -4414,9 +4437,10 @@ class ScreenCaptureOverlay(QWidget):
                 self.target_lang_combo.setVisible(True)
                 self.target_lang_combo.raise_()
             QApplication.processEvents()
-            self.update_combo_position()
             self.memory_panel.show()
-            self.memory_panel.raise_()
+            self.capture_toolbar.show()
+            self.update_combo_position()
+            self.capture_toolbar.raise_()
             self.setFocus(QtCore.Qt.OtherFocusReason)
 
             logging.info(
@@ -4469,61 +4493,54 @@ class ScreenCaptureOverlay(QWidget):
         super().resizeEvent(event)
 
     def update_combo_position(self):
-        if hasattr(self, 'lang_combo') and self.lang_combo:
-            # Держим позицию комбобокса на том же мониторе,
-            # где был запущен оверлей.
-            target_screen = self._active_screen or self._get_active_screen()
-            if not target_screen:
-                target_screen = QApplication.primaryScreen()
-
-            screen_geo = target_screen.geometry()
-
-            # Calculate position relative to the overlay's coordinate system
-            # The overlay covers the whole virtual desktop, so its (0,0) might be negative relative to primary screen
-            # We need to map screen coordinates to overlay coordinates
-
-            # Overlay local coordinates are relative to self.pos() (top-left of virtual desktop)
-            overlay_top_left = self.geometry().topLeft()
-
-            # Center on the target screen
-            screen_center_x = screen_geo.center().x()
-            controls = [self.lang_combo]
-            if self.translate_arrow_label is not None and self.target_lang_combo is not None:
-                controls.extend([self.translate_arrow_label, self.target_lang_combo])
-            spacing = 8 if len(controls) > 1 else 0
-            combo_width = sum(widget.width() for widget in controls) + spacing * (len(controls) - 1)
-
-            # X in overlay coordinates = Screen Center X - Overlay X - Half Combo Width
-            x = screen_center_x - overlay_top_left.x() - (combo_width // 2)
-
-            # Y is just a fixed offset from the top of that screen
-            y = screen_geo.top() - overlay_top_left.y() + 50 # 50px margin from top
-
-            bar_height = max(widget.height() for widget in controls)
-            if hasattr(self, 'memory_panel'):
-                maximum = max(80, self.width()-24)
-                needed = self.remember_area_checkbox.sizeHint().width() + self.repeat_area_button.sizeHint().width() + 40
-                self.memory_grid.removeWidget(self.repeat_area_button)
-                self.memory_grid.addWidget(self.repeat_area_button, 1 if needed > maximum else 0, 0 if needed > maximum else 1)
-                self.memory_panel.setFixedWidth(min(maximum, self.memory_panel.sizeHint().width()))
-                self.memory_panel.adjustSize()
-                combined = combo_width + 12 + self.memory_panel.width()
-                inline = combined <= maximum
-                if inline:
-                    x = screen_center_x-overlay_top_left.x()-combined//2
-                    bar_height = max(bar_height, self.memory_panel.height())
-                    self.memory_panel.move(x+combo_width+12, y+(bar_height-self.memory_panel.height())//2)
-                else:
-                    self.memory_panel.move(max(12, (self.width()-self.memory_panel.width())//2), y+bar_height+8)
-                self.memory_hint.setFixedWidth(min(maximum, max(400, self.memory_panel.width())))
-                self.memory_hint.adjustSize()
-                bottom = max(y+bar_height, self.memory_panel.geometry().bottom()+1)
-                self.memory_hint.move((self.width()-self.memory_hint.width())//2, bottom+6)
-            current_x = x
-            for widget in controls:
-                widget.move(current_x, y+(bar_height-widget.height())//2)
-                current_x += widget.width() + spacing
-            logging.info(f"Moved combo to {x}, {y} (Screen: {screen_geo})")
+        if not hasattr(self, 'capture_toolbar'):
+            return  # resizeEvent can arrive before capture controls exist.
+        screen = self._active_screen or self._get_active_screen() or QApplication.primaryScreen()
+        bounds = screen.geometry() if screen else self.geometry()
+        local = bounds.translated(-self.geometry().topLeft())
+        factor = self.property('ui_effective_scale') or 1.
+        grid = self.capture_toolbar_grid
+        margins = grid.contentsMargins()
+        maximum = max(80, min(self.width(), local.width()) - round(24*factor))
+        content_width = max(1, maximum-margins.left()-margins.right())
+        for control in (self.remember_area_checkbox, self.repeat_area_button):
+            control.ensurePolished()
+            control.setMinimumWidth(control.sizeHint().width())
+        self.memory_grid.removeWidget(self.repeat_area_button)
+        self.memory_grid.addWidget(self.repeat_area_button, 0, 1)
+        self.memory_grid.invalidate()
+        if self.memory_grid.sizeHint().width() > content_width:
+            self.memory_grid.removeWidget(self.repeat_area_button)
+            self.memory_grid.addWidget(self.repeat_area_button, 1, 0)
+        self.memory_grid.invalidate()
+        self.capture_languages.layout().invalidate()
+        inline_width = (self.capture_languages.sizeHint().width() + self.memory_panel.sizeHint().width()
+                        + self.capture_close_button.width() + 1 + 3*grid.horizontalSpacing())
+        for widget in (self.capture_languages, self.capture_separator, self.memory_panel, self.capture_close_button):
+            grid.removeWidget(widget)
+        for column in range(4):
+            grid.setColumnStretch(column, 0)
+        inline = inline_width <= content_width
+        self.capture_separator.setVisible(inline)
+        grid.addWidget(self.capture_languages, 0, 0, QtCore.Qt.AlignVCenter)
+        if inline:
+            grid.addWidget(self.capture_separator, 0, 1, QtCore.Qt.AlignVCenter)
+            grid.addWidget(self.memory_panel, 0, 2, QtCore.Qt.AlignVCenter)
+            grid.addWidget(self.capture_close_button, 0, 3, QtCore.Qt.AlignVCenter)
+        else:
+            grid.addWidget(self.capture_close_button, 0, 1, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            grid.addWidget(self.memory_panel, 1, 0, 1, 2)
+        grid.invalidate()
+        size = grid.sizeHint()
+        self.capture_toolbar.setFixedSize(min(maximum, size.width()), size.height())
+        grid.activate()
+        x = local.center().x()-self.capture_toolbar.width()//2
+        y = local.top()+round(16*factor)
+        self.capture_toolbar.move(x, y)
+        self.memory_hint.setFixedWidth(min(maximum, max(round(400*factor), self.capture_toolbar.width())))
+        self.memory_hint.adjustSize()
+        self.memory_hint.move(local.center().x()-self.memory_hint.width()//2,
+                              self.capture_toolbar.geometry().bottom()+round(6*factor))
 
     def _flush_selection_paint_before_capture(self):
         session_id = getattr(self, "_session_id", "unknown")
@@ -4560,6 +4577,7 @@ class ScreenCaptureOverlay(QWidget):
         except Exception:
             pass
         if not self._handling_ocr_result:
+            self._cancel_area_translation()
             self._ignore_ocr_results = True
             self._ocr_worker_session_id = None
             self._ocr_in_progress = False
@@ -5165,6 +5183,8 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.start()
 
     def _persist_failed_ocr_artifacts(self, reason):
+        if not _ocr_debug_artifacts_enabled():
+            return
         session_id = getattr(self, "_session_id", "unknown")
         saved = []
         try:
@@ -5235,6 +5255,23 @@ class ScreenCaptureOverlay(QWidget):
         if screenshot.isNull():
             logging.error(f"[OCR:{session_id}] Failed to grab screenshot (result is null)")
             self._ocr_in_progress = False
+            self._ocr_worker_session_id = None
+            self._ocr_status_text = ""
+            notify_current_activity('error', f'ocr:{id(self)}')
+            from capture_regions import screen_identity, text as capture_text
+            if self._active_screen is not None:
+                self._preview_rect = QtCore.QRect(rect)
+                self._preview_screen_identity = screen_identity(self._active_screen)
+            self.memory_hint.setText(capture_text(
+                get_cached_ocr_config().get("interface_language", "en"), "capture_error"))
+            self.capture_toolbar.show()
+            self.memory_panel.show()
+            for control in (self.lang_combo, self.translate_arrow_label, self.target_lang_combo):
+                if control is not None:
+                    control.show()
+            self._update_memory_actions()
+            self.update_combo_position()
+            self.update()
             return
 
         self._last_ocr_raw_capture = screenshot.copy()
@@ -5562,6 +5599,7 @@ class ScreenCaptureOverlay(QWidget):
         self.close()
 
     def handle_ocr_result(self, text, session_id=None):
+        handling = pending = False
         try:
             current_session = getattr(self, "_session_id", "unknown")
             expected_session = getattr(self, "_ocr_worker_session_id", None)
@@ -5577,110 +5615,159 @@ class ScreenCaptureOverlay(QWidget):
                     f"result_session={session_id}, expected={expected_session}"
                 )
                 return
+            if getattr(self, "_area_translation_worker", None) is not None:
+                return  # A duplicate OCR signal must not restart the translation.
+            handling = True
             self._handling_ocr_result = True
             logging.info(
                 f"[OCR:{getattr(self, '_session_id', 'unknown')}] handle_ocr_result; "
                 f"text_len={len(text or '')}, preview={_text_preview(text)}"
             )
             success = self._handle_ocr_result_inner(text)
-            notify_current_activity('success' if success else 'error', f'ocr:{id(self)}')
+            pending = success is _AREA_TRANSLATION_PENDING
+            if not pending:
+                notify_current_activity('success' if success else 'error', f'ocr:{id(self)}')
         except Exception as e:
             notify_current_activity('error', f'ocr:{id(self)}')
-            logging.exception(f"[OCR:{getattr(self, '_session_id', 'unknown')}] Critical error in handle_ocr_result: {e}")
+            _log_ocr_exception(f"[OCR:{getattr(self, '_session_id', 'unknown')}] Critical error in handle_ocr_result", e)
             # Гарантированно закрываем оверлей при любом краше
             try:
                 self.close()
             except Exception:
                 pass
         finally:
+            if handling:
+                self._handling_ocr_result = False
+                if not pending:
+                    self._ocr_in_progress = False
+                    self._ocr_worker_session_id = None
+                    self._ocr_status_text = ""
+
+    def _cancel_area_translation(self):
+        worker = getattr(self, "_area_translation_worker", None)
+        self._area_translation_worker = None
+        self._api_translation = None
+        if worker is not None:
+            worker.cancel()
+            worker.deleteLater()
+
+    def _start_area_translation(self, text, source_code, target_code):
+        self._cancel_area_translation()
+        config = get_cached_ocr_config()
+        worker = _AreaTranslationJob(
+            self, text, source_code, target_code,
+            config.get("translator_engine", "Google"),
+            getattr(self, "_session_id", "unknown"),
+        )
+        self._area_translation_worker = worker
+        self._ocr_in_progress = True
+        self._ocr_status_text = ocr_ui_text(config.get("interface_language", "en"), "translate") + "…"
+        self.update()
+        worker.completed.connect(self._on_area_translation_finished)
+        try:
+            worker.start()
+        except Exception:
+            self._area_translation_worker = None
+            worker.cancel()
+            worker.deleteLater()
+            raise
+        return _AREA_TRANSLATION_PENDING
+
+    @QtCore.pyqtSlot(object, object, object)
+    def _on_area_translation_finished(self, worker, translated_text, error):
+        if (worker is not getattr(self, "_area_translation_worker", None)
+                or self._ignore_ocr_results
+                or worker.session_id != getattr(self, "_session_id", None)):
+            return
+        self._area_translation_worker = None
+        self._handling_ocr_result = True
+        try:
+            if error is not None:
+                _log_ocr_exception(f"[OCR:{worker.session_id}] Translation error", error)
+                self.hide()
+                lang = get_cached_ocr_config().get("interface_language", "en")
+                QMessageBox.warning(None, ocr_ui_text(lang, "translation_failed"), str(error))
+                self.close()
+                success = False
+            else:
+                success = self._present_area_translation(
+                    worker.text, translated_text, worker.source_code, worker.target_code,
+                    engine=worker.engine,
+                )
+            notify_current_activity('success' if success else 'error', f'ocr:{id(self)}')
+        except Exception as exc:
+            _log_ocr_exception(f"[OCR:{worker.session_id}] Translation result handling failed", exc)
+            notify_current_activity('error', f'ocr:{id(self)}')
+            self.close()
+        finally:
             self._handling_ocr_result = False
             self._ocr_in_progress = False
             self._ocr_worker_session_id = None
             self._ocr_status_text = ""
+            worker.deleteLater()
+
+    def _present_area_translation(self, text, translated_text, source_code, target_code, *, engine=None):
+        """Present a completed response only on the GUI thread."""
+        session_id = getattr(self, "_session_id", "unknown")
+        if not translated_text:
+            logging.warning(f"[OCR:{session_id}] Translation returned empty result")
+            self.close()
+            return False
+        logging.info(
+            f"[OCR:{session_id}] Translation completed successfully; "
+            f"len={len(translated_text)}, preview={_text_preview(translated_text)}"
+        )
+        config = get_cached_ocr_config()
+        theme = config.get("theme", "Темная")
+        lang = config.get("interface_language", "ru")
+        auto_copy = config.get("copy_translated_text", False)
+        from main import result_window_hidden_for, show_translation_dialog, save_copy_history
+
+        if result_window_hidden_for(config, "area"):
+            platform_support.copy_text(translated_text)
+            save_copy_history(translated_text)
+            save_translation_history(text, translated_text, target_code)
+            self.close()
+            return True
+
+        self.hide()
+        dialog_parent = None
+        app = QApplication.instance()
+        if app:
+            for widget in app.topLevelWidgets():
+                if hasattr(widget, 'show_window_from_tray') and widget.windowTitle() == "Click'n'Translate":
+                    dialog_parent = widget
+                    break
+        result_dialog = show_translation_dialog(
+            dialog_parent, translated_text, auto_copy=auto_copy, lang=lang, theme=theme,
+            source_text=text, source_lang=source_code, target_lang=target_code,
+            result_mode="area",
+        )
+        if engine is not None:
+            result_dialog.set_window_engine(engine)
+            result_dialog._engine_override = True
+        save_translation_history(text, translated_text, target_code)
+        self.close()
+        return True
 
     def _handle_ocr_result_inner(self, text):
         session_id = getattr(self, "_session_id", "unknown")
         if text:
             if self.mode == "translate":
-                from translater import translate_text
                 source_code, target_code = self._current_translate_pair()
                 logging.info(
                     f"[OCR:{session_id}] Translating from {source_code.upper()} to {target_code.upper()}; "
                     f"source_len={len(text)}"
                 )
-                try:
-                    api_result = getattr(self, '_api_translation', None)
-                    if api_result is not None and api_result.source == text:
-                        translated_text = api_result.translation
-                        source_code, target_code = self._api_language_pair
-                        self._api_translation = None
-                    else:
-                        translated_text = translate_text(text, source_code, target_code)
-                    if translated_text:
-                        logging.info(
-                            f"[OCR:{session_id}] Translation completed successfully; "
-                            f"len={len(translated_text)}, preview={_text_preview(translated_text)}"
-                        )
-                    else:
-                        logging.warning(f"[OCR:{session_id}] Translation returned empty result")
-                except Exception as e:
-                    logging.exception(f"[OCR:{session_id}] Translation error: {e}")
-                    self.hide()
-                    interface_language = get_cached_ocr_config().get("interface_language", "en")
-                    QMessageBox.warning(None, ocr_ui_text(interface_language, "translation_failed"), str(e))
-                    translated_text = ""
-                if translated_text:
-                    # Определяем тему и язык из кэша
-                    config = get_cached_ocr_config()
-                    theme = config.get("theme", "Темная")
-                    lang = config.get("interface_language", "ru")
-                    auto_copy = config.get("copy_translated_text", False)
-                    # Ленивый импорт для избежания циклического импорта
-                    from main import (
-                        result_window_hidden_for,
-                        show_translation_dialog,
-                        save_copy_history,
+                api_result = getattr(self, '_api_translation', None)
+                if api_result is not None and api_result.source == text:
+                    source_code, target_code = self._api_language_pair
+                    self._api_translation = None
+                    return self._present_area_translation(
+                        text, api_result.translation, source_code, target_code,
+                        engine=self._api_translation_engine,
                     )
-
-                    if result_window_hidden_for(config, "area"):
-                        platform_support.copy_text(translated_text)
-                        save_copy_history(translated_text)
-                        save_translation_history(text, translated_text, target_code)
-                        self.close()
-                        return True
-
-                    # Скрываем оверлей ПЕРЕД показом диалога, чтобы:
-                    # 1) Пользователь видел исходный контент за диалогом
-                    # 2) Не было z-order проблем (диалог поверх translucent overlay)
-                    self.hide()
-
-                    # Используем главное окно приложения как parent вместо overlay
-                    dialog_parent = None
-                    app = QApplication.instance()
-                    if app:
-                        for widget in app.topLevelWidgets():
-                            if hasattr(widget, 'show_window_from_tray') and widget.windowTitle() == "Click'n'Translate":
-                                dialog_parent = widget
-                                break
-
-                    result_dialog = show_translation_dialog(
-                        dialog_parent,
-                        translated_text,
-                        auto_copy=auto_copy,
-                        lang=lang,
-                        theme=theme,
-                        source_text=text,
-                        source_lang=source_code,
-                        target_lang=target_code,
-                        result_mode="area",
-                    )
-                    if api_result is not None:
-                        result_dialog.set_window_engine(self._api_translation_engine)
-                        result_dialog._engine_override = True
-                    # Сохраняем переводы в историю (исходный текст и перевод)
-                    save_translation_history(text, translated_text, target_code)
-                self.close()
-                return bool(translated_text)
+                return self._start_area_translation(text, source_code, target_code)
             else:
                 try:
                     # Ленивый импорт для избежания циклического импорта
@@ -5695,7 +5782,7 @@ class ScreenCaptureOverlay(QWidget):
                     self.close()
                     return True
                 except Exception as e:
-                    logging.exception(f"[OCR:{session_id}] OCR result handling error: {e}")
+                    _log_ocr_exception(f"[OCR:{session_id}] OCR result handling error", e)
         else:
             logging.info(f"[OCR:{session_id}] OCR did not recognize text.")
             self._persist_failed_ocr_artifacts("empty_result")
@@ -6173,16 +6260,14 @@ class FullScreenOCRWorker(QtCore.QThread):
             if self.isInterruptionRequested():
                 return
 
-            logging.info(f"FullScreenOCR: recognized={recognized}")
+            logging.info("FullScreenOCR: result_present=%s", recognized is not None)
             if recognized:
                 lines_data = _windows_ocr_lines_in_image(
                     recognized, self.bitmap.pixel_width, self.bitmap.pixel_height)
             logging.info(f"FullScreenOCR: found {len(lines_data)} text blocks")
         except Exception as e:
             self.error_message = str(e)
-            logging.error(f"FullScreenOCRWorker error: {e}")
-            import traceback
-            traceback.print_exc()
+            _log_ocr_exception("FullScreenOCRWorker error", e)
 
         if not self.isInterruptionRequested():
             self.result_ready.emit(lines_data)

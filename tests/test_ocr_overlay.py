@@ -1321,7 +1321,7 @@ class TestAreaTranslateResultWindow(unittest.TestCase):
     class _Overlay:
         mode = "translate"
         _session_id = "test"
-        _handle_ocr_result_inner = ocr.ScreenCaptureOverlay._handle_ocr_result_inner
+        _present_area_translation = ocr.ScreenCaptureOverlay._present_area_translation
 
         def __init__(self):
             self.closed = False
@@ -1346,12 +1346,11 @@ class TestAreaTranslateResultWindow(unittest.TestCase):
             "result_window_hidden_modes": hidden_modes,
         }
         with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
-                mock.patch("translater.translate_text", return_value="Привет мир"), \
                 mock.patch.object(platform_support, "copy_text") as copy, \
                 mock.patch.object(main, "show_translation_dialog") as dialog, \
                 mock.patch.object(main, "save_copy_history") as copy_history, \
                 mock.patch.object(ocr, "save_translation_history") as translation_history:
-            overlay._handle_ocr_result_inner("Hello world")
+            overlay._present_area_translation("Hello world", "Привет мир", "en", "ru")
         return overlay, copy, dialog, copy_history, translation_history
 
     def test_listing_area_copies_instead_of_opening_the_window(self):

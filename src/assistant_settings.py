@@ -5,6 +5,7 @@ from assistant_text import assistant_text
 from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASCOT, mascot_id
 from header_icons import header_icon
 from control_hints import control_hint
+from styled_dialogs import CenteredFramelessDialog
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ from number_controls import NumberStepper as AssistantNumberBox
 
 
 BEHAVIORS = ('idle',)
+ASSISTANT_ACTIONS = ('open', 'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'guide')
 ASSISTANT_DEFAULTS = {
     'main_assistant_visible': True,
     'desktop_assistant_behavior': 'idle',
@@ -23,7 +25,16 @@ ASSISTANT_DEFAULTS = {
     'desktop_assistant_mascot': DEFAULT_MASCOT,
     'desktop_assistant_reactions': True,
     'desktop_assistant_image': '',
+    'desktop_assistant_actions': list(ASSISTANT_ACTIONS),
 }
+
+
+def normalized_assistant_actions(value):
+    """Keep known IDs in one stable order; an empty selection is intentional."""
+    if not isinstance(value, (tuple, list)):
+        return list(ASSISTANT_ACTIONS)
+    selected = {item for item in value if isinstance(item, str) and item in ASSISTANT_ACTIONS}
+    return [action for action in ASSISTANT_ACTIONS if action in selected]
 
 
 def assistant_preferences(config):
@@ -48,7 +59,120 @@ def assistant_preferences(config):
         values['desktop_assistant_appearance'] = 'portrait'
     if not isinstance(values['desktop_assistant_image'], str):
         values['desktop_assistant_image'] = ''
+    values['desktop_assistant_actions'] = normalized_assistant_actions(values['desktop_assistant_actions'])
     return values
+
+
+class AssistantActionsDialog(CenteredFramelessDialog):
+    """Small, immediate preferences using the same shell as other dialogs."""
+    actions_changed = QtCore.pyqtSignal(list)
+
+    def __init__(self, owner):
+        super().__init__(owner, drag_height=52)
+        from assistant_text import assistant_action_text
+        from button_styles import button_qss, standard_buttons
+        from dialog_text import dialog_action_text
+        from rounded_windows import clip_rounded_window
+        from scrollbar_styles import scrollbar_stylesheet
+        from styled_dialogs import install_accent_controls, tooltip_text
+        from ui_scaling import interface_scale_factor
+        from window_appearance import scale_native_controls
+        from keyboard_navigation import install_keyboard_navigation
+        self.language = owner.current_interface_language
+        tr = lambda key: assistant_text(self.language, key)
+        dark = owner.current_theme != 'Светлая'
+        self.setWindowTitle(tr('menu_buttons').rstrip('…'))
+        self.setWindowModality(QtCore.Qt.WindowModal)
+        self.setLayoutDirection(QtCore.Qt.RightToLeft if self.language == 'ar' else QtCore.Qt.LeftToRight)
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        surface = QtWidgets.QFrame(self)
+        surface.setObjectName('assistantActionsSurface')
+        outer.addWidget(surface)
+        panel = QtWidgets.QVBoxLayout(surface)
+        panel.setContentsMargins(16, 14, 16, 14)
+        panel.setSpacing(10)
+        header = QtWidgets.QHBoxLayout()
+        title = QtWidgets.QLabel(self.windowTitle())
+        title.setObjectName('assistantActionsTitle')
+        title.setWordWrap(True)
+        header.addWidget(title, 1)
+        self.close_button = QtWidgets.QToolButton()
+        self.close_button.setText('×')
+        self.close_button.setAccessibleName(dialog_action_text(self, 'Close'))
+        self.close_button.setToolTip(self.close_button.accessibleName())
+        self.close_button.setFixedSize(26, 26)
+        self.close_button.setStyleSheet(button_qss(dark, 'close', 'QToolButton', icon=True))
+        self.close_button.clicked.connect(self.reject)
+        header.addWidget(self.close_button)
+        panel.addLayout(header)
+        description = QtWidgets.QLabel(tr('menu_buttons_hint'))
+        description.setWordWrap(True)
+        panel.addWidget(description)
+        self.scroll = QtWidgets.QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll.setMinimumHeight(0)
+        body = QtWidgets.QWidget()
+        choices = QtWidgets.QVBoxLayout(body)
+        choices.setContentsMargins(0, 0, 6, 0)
+        choices.setSpacing(4)
+        self.checkboxes = {}
+        selected = assistant_preferences(owner.config)['desktop_assistant_actions']
+        for action in ASSISTANT_ACTIONS:
+            label, hint = assistant_action_text(self.language, action)
+            checkbox = QtWidgets.QCheckBox(label)
+            checkbox.setAccessibleName(label)
+            checkbox.setAccessibleDescription(hint)
+            checkbox.setToolTip(tooltip_text(hint))
+            checkbox.setMinimumHeight(26)
+            checkbox.setChecked(action in selected)
+            checkbox.toggled.connect(self._emit_actions)
+            choices.addWidget(checkbox)
+            self.checkboxes[action] = checkbox
+        choices.addStretch(1)
+        self.scroll.setWidget(body)
+        panel.addWidget(self.scroll, 1)
+        self.note = QtWidgets.QLabel(tr('menu_buttons_note'))
+        self.note.setWordWrap(True)
+        self.note.setObjectName('assistantActionsNote')
+        panel.addWidget(self.note)
+        footer = QtWidgets.QHBoxLayout()
+        footer.addStretch(1)
+        self.done_button = QtWidgets.QPushButton(dialog_action_text(self, 'Close'))
+        self.done_button.setProperty('buttonRole', 'primary')
+        self.done_button.setMinimumHeight(30)
+        self.done_button.clicked.connect(self.accept)
+        footer.addWidget(self.done_button)
+        panel.addLayout(footer)
+        background, ink, border, muted = (('#121212', '#f1edf5', '#584963', '#bdb2ca') if dark
+                                         else ('#f0edf3', '#302837', '#bcaacb', '#70647e'))
+        self.setStyleSheet(f'''
+            QFrame#assistantActionsSurface {{ background:{background}; border:1px solid {border}; border-radius:8px; }}
+            QScrollArea, QScrollArea > QWidget > QWidget {{ background:transparent; border:0; }}
+            QLabel, QCheckBox {{ color:{ink}; background:transparent; border:0; font-size:14px; }}
+            QLabel#assistantActionsTitle {{ font-size:16px; font-weight:600; }}
+            QLabel#assistantActionsNote {{ color:{muted}; font-size:12px; }}
+            QCheckBox {{ spacing:8px; }}
+            QCheckBox::indicator {{ width:18px; height:18px; }}
+        ''' + standard_buttons(dark, compact=True) + scrollbar_stylesheet())
+        self.scroll.verticalScrollBar().setProperty('_cntScrollDark', dark)
+        install_accent_controls(self, dark)
+        clip_rounded_window(self, surface, 8)
+        bounds = owner.screen().availableGeometry()
+        factor = min(interface_scale_factor(widget=owner), max(.5, (bounds.width()-32)/420))
+        scale_native_controls(self, factor)
+        self.setMinimumWidth(round(360*factor))
+        self.resize(min(round(420*factor), bounds.width()-32), min(round(420*factor), bounds.height()-32))
+        install_keyboard_navigation()
+
+    def _emit_actions(self):
+        self.actions_changed.emit([action for action, checkbox in self.checkboxes.items() if checkbox.isChecked()])
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QtCore.QTimer.singleShot(0, lambda: self.checkboxes['open'].setFocus(QtCore.Qt.TabFocusReason))
 
 
 class AssistantSettingsPage(QtWidgets.QWidget):
@@ -121,6 +245,12 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             form.addWidget(label, row, 1, QtCore.Qt.AlignVCenter)
             form.addWidget(field, row, 2, QtCore.Qt.AlignVCenter)
             self.field_labels[name] = label
+        self.menu_buttons = QtWidgets.QPushButton(tr('menu_buttons'))
+        self.menu_buttons.setFixedSize(180, 28)
+        self.menu_buttons.setToolTip(tr('menu_buttons_hint'))
+        self.menu_buttons.setAccessibleName(tr('menu_buttons'))
+        self.menu_buttons.clicked.connect(self.configure_menu)
+        form.addWidget(self.menu_buttons, 3, 1, 1, 2, QtCore.Qt.AlignRight)
         root.addWidget(self.options)
         self.mascot_preview = MascotStage(self.owner, self)
         self.mascot_preview.step_requested.connect(self.cycle_mascot)
@@ -173,6 +303,21 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.main_visible.toggled.connect(self.owner.set_main_assistant_visible)
         self.topmost.toggled.connect(lambda checked: self.save('topmost', checked))
         self.refresh()
+
+    def configure_menu(self):
+        dialog = getattr(self, '_actions_dialog', None)
+        if dialog is not None and not sip.isdeleted(dialog):
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+        dialog = self._actions_dialog = AssistantActionsDialog(self.owner)
+        dialog.actions_changed.connect(lambda actions: self.save('actions', actions))
+        dialog.finished.connect(lambda _result: self._close_actions_dialog(dialog))
+        dialog.open()
+
+    def _close_actions_dialog(self, dialog):
+        self._actions_dialog = None
+        dialog.deleteLater()
 
     def choose_appearance(self, appearance):
         appearance = LEGACY_APPEARANCES.get(appearance, appearance)

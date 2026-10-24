@@ -59,6 +59,21 @@ def test_mascot_caption_and_real_prompt_navigate_only_after_accepting(window, ap
     assert not preview.timer.isActive()
 
 
+@pytest.mark.parametrize('mascot', ('click', 'orbit', 'pancake', 'mochi', 'bubu', 'momo'))
+def test_home_companion_is_recognizable_without_animation_or_full_atlas_cache(window, app, mascot):
+    preview = window.assistant_preview
+    preview.show()
+    preview.set_mascot(mascot)
+    app.processEvents()
+    thumbnail = preview.button.value_label.pixmap()
+    assert thumbnail is not None and not thumbnail.isNull()
+    assert max(thumbnail.width(), thumbnail.height()) >= 18
+    assert preview.button.height() == window.main_hotkey_references['game'].height()
+    assert preview.height() == preview.button.height()
+    assert preview.rect().contains(preview.button.geometry())
+    assert not preview.timer.isActive()
+
+
 def test_closing_mascot_prompt_keeps_the_main_window(window, app):
     original_exec = main.QMessageBox.exec_
 

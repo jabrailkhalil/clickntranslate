@@ -115,7 +115,11 @@ def test_ocr_translation_error_dialog_uses_selected_interface_language(isolated,
     try:
         with mock.patch('translater.translate_text', side_effect=RuntimeError('engine failed')):
             with mock.patch.object(ocr.QMessageBox, 'warning') as dialog:
-                assert not overlay._handle_ocr_result_inner('Hello')
+                overlay.handle_ocr_result('Hello')
+                for _ in range(100):
+                    if dialog.called:
+                        break
+                    QTest.qWait(10)
                 dialog.assert_called_once_with(None, ocr.ocr_ui_text(language, 'translation_failed'), 'engine failed')
     finally:
         overlay.close()

@@ -10,9 +10,9 @@ import weakref
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
-from assistant_text import assistant_text
+from assistant_text import assistant_text, assistant_action_text
 from button_styles import button_qss
-from assistant_settings import BEHAVIORS, assistant_preferences
+from assistant_settings import BEHAVIORS, assistant_preferences, normalized_assistant_actions
 from assistant_art import DEFAULT_MASCOT, companion_art, mascot_id
 from assistant_motion import PetMotion, paint_pet, play_reaction
 from ui_scaling import desktop_control_scale
@@ -247,7 +247,8 @@ class AssistantMenu(QtWidgets.QFrame):
     action_requested = QtCore.pyqtSignal(str)
     visibility_changed = QtCore.pyqtSignal(bool)
 
-    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='animated', mascot=DEFAULT_MASCOT):
+    def __init__(self, language, dark, factor=1.0, behavior='idle', appearance='animated', mascot=DEFAULT_MASCOT,
+                 actions=None):
         super().__init__(None, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
         self.language = language
         self.setObjectName('desktopAssistantMenu')
@@ -283,8 +284,8 @@ class AssistantMenu(QtWidgets.QFrame):
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         self.buttons = {}
-        for index, action in enumerate(('area', 'screen', 'text', 'copy', 'dynamic', 'documents')):
-            button = ActionButton(*assistant_text(language, action), dark)
+        for index, action in enumerate(normalized_assistant_actions(actions)):
+            button = ActionButton(*assistant_action_text(language, action), dark)
             button.setMinimumHeight(44)
             button.clicked.connect(lambda checked=False, key=action: self.action_requested.emit(key))
             grid.addWidget(button, index // 2, index % 2)
@@ -302,6 +303,8 @@ class AssistantMenu(QtWidgets.QFrame):
         self.set_activity('idle')
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
+        from keyboard_navigation import install_keyboard_navigation
+        install_keyboard_navigation()
 
     def set_activity(self, activity):
         self.activity_label.setText(assistant_text(self.language, 'activity_' + activity))
@@ -430,9 +433,11 @@ class DesktopAssistant(QtCore.QObject):
         menu_factor = min(factor, available.width()/360, available.height()/360)
         context = (self.owner.current_interface_language, self.owner.current_theme != 'Светлая', menu_factor,
                    preferences['desktop_assistant_behavior'], preferences['desktop_assistant_appearance'],
-                   preferences['desktop_assistant_mascot'])
+                   preferences['desktop_assistant_mascot'], tuple(preferences['desktop_assistant_actions']))
+        reopen_menu = False
         if context != self._context:
             if self.menu is not None:
+                reopen_menu = self.menu.isVisible()
                 self.menu.close()
                 self.menu.deleteLater()
                 self.menu = None
@@ -462,6 +467,9 @@ class DesktopAssistant(QtCore.QObject):
             self.anchor.move(clamp_position(self.anchor.pos(), self.anchor.size(), screen.availableGeometry()))
         self.refresh_visibility()
         self.anchor.update()
+        if (reopen_menu and self.anchor.isVisible()
+                and QtWidgets.QApplication.activeModalWidget() is None):
+            self._show_menu()
 
     def refresh_visibility(self):
         if self._closed:
@@ -483,12 +491,15 @@ class DesktopAssistant(QtCore.QObject):
         # Read the external target before Qt's popup can take focus.
         from game_mode import _foreground_window
         self._foreground = _foreground_window()
+        play_reaction(self.owner, 'waving', anchor=self.anchor)
+        self._show_menu()
+
+    def _show_menu(self):
         if self.menu is None:
             self.menu = AssistantMenu(*self._context)
             self.menu.action_requested.connect(self.request_action)
             self.menu.visibility_changed.connect(self._menu_visibility)
         screen = QtWidgets.QApplication.screenAt(self.anchor.geometry().center()) or self.anchor.screen()
-        play_reaction(self.owner, 'waving', anchor=self.anchor)
         self.menu.set_activity(getattr(self.owner, '_companion_activity', 'idle'))
         self.menu.open_beside(self.anchor.geometry(), screen.availableGeometry())
 
@@ -501,7 +512,7 @@ class DesktopAssistant(QtCore.QObject):
         if (self._closed or self._dispatching
                 or QtWidgets.QApplication.activeModalWidget() is not None):
             return
-        if action not in (*ACTION_METHODS, *BEHAVIORS, 'home', 'text', 'settings', 'hide'):
+        if action not in (*ACTION_METHODS, *BEHAVIORS, 'home', 'open', 'text', 'settings', 'hide'):
             return
         if action in BEHAVIORS and self.anchor.appearance not in ('animated', 'walking'):
             return
@@ -558,9 +569,11 @@ class DesktopAssistant(QtCore.QObject):
                 # A newer hotkey or a modal dialog takes precedence over a
                 # menu click still waiting for the compositor to settle.
                 return
-            if self._action in ('settings', 'guide'):
+            if self._action in ('open', 'settings', 'guide'):
                 self.owner.show_window_from_tray(force_show=True)
-            if self._action == 'text':
+            if self._action == 'open':
+                return
+            elif self._action == 'text':
                 self.owner.open_text_translation()
             elif self._action == 'settings':
                 show = getattr(self.owner, 'show_assistant_settings', self.owner.show_settings)

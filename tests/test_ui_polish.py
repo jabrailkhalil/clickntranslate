@@ -499,7 +499,7 @@ def test_main_screen_has_translation_heading_and_preview_in_shortcut_area(app, o
     assert len(window.main_text_section.findChildren(QtWidgets.QLabel, 'mainTextSectionTitle')) == 1
     assert title.text() == main.hotkey_language_text(window.current_interface_language, 'text_section')
     assert title.alignment() & QtCore.Qt.AlignCenter
-    assert window.assistant_preview.height() == 22
+    assert window.assistant_preview.height() == window.main_hotkey_references['game'].height()
     assert window.assistant_preview.parentWidget() is window.main_hotkey_area
     assert window.main_hotkey_area.rect().contains(window.assistant_preview.geometry())
     assert window.assistant_preview.button.width() >= 28

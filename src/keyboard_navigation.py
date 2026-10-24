@@ -1,5 +1,6 @@
 """Keyboard access for native dialogs and the scaled main-window canvas."""
 import weakref
+import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
@@ -37,6 +38,38 @@ def _inside(widget, property_name):
             return widget
         widget = widget.parentWidget()
     return None
+
+
+def matches_control_shortcut(event, key):
+    """Keep the two advertised app commands usable on non-Latin Windows layouts."""
+    if event.modifiers() != QtCore.Qt.ControlModifier:
+        return False
+    if event.key() == key:
+        return True
+    if sys.platform == 'win32':
+        # Qt reports Cyrillic/Arabic characters in key(), whereas these Windows
+        # virtual keys remain stable. Do not interpret native codes on macOS/X11.
+        virtual_key = {QtCore.Qt.Key_Comma: 0xBC, QtCore.Qt.Key_O: 0x4F}.get(key)
+        return virtual_key is not None and event.nativeVirtualKey() == virtual_key
+    return False
+
+
+def _has_embedded_popup(root):
+    # A QGraphicsProxyWidget popup is not QApplication.activePopupWidget().
+    # The native view still receives its keys, so inspect its small proxy tree
+    # instead of redirecting those keys to a control behind the open list.
+    proxy = root.graphicsProxyWidget()
+    pending = list(proxy.childItems()) if proxy is not None else []
+    while pending:
+        item = pending.pop()
+        if not item.isVisible():
+            continue
+        if isinstance(item, QtWidgets.QGraphicsProxyWidget):
+            popup = item.widget()
+            if popup is not None and popup.windowType() == QtCore.Qt.Popup:
+                return True
+        pending.extend(item.childItems())
+    return False
 
 
 _CONTROLS = (QtWidgets.QAbstractButton, QtWidgets.QComboBox, QtWidgets.QLineEdit,
@@ -242,6 +275,10 @@ class KeyboardNavigation(QtCore.QObject):
             return False
         order = [0, 1, 3, 2]
         current = getattr(settings, '_settings_page_index', 0)
+        # The inline updater adds a status page outside the four settings tabs.
+        # Its progress/result must not be interpreted as an index in this order.
+        if current not in order or getattr(settings, '_update_in_progress', False):
+            return False
         index = order[(order.index(current)+direction) % len(order)]
         settings._set_settings_page(index)
         focus_control(settings.settings_page_tabs[index])
@@ -270,7 +307,14 @@ class KeyboardNavigation(QtCore.QObject):
         config = getattr(owner or root, 'config', getattr(root, '_config', {}))
         if not isinstance(config, dict):
             config = {}
-        locale = config.get('interface_language', getattr(root, 'lang', getattr(root, '_language', 'en')))
+        locale = config.get('interface_language')
+        if not locale:
+            for attribute in ['lang', '_language', '_memory_locale', 'language', '_lang', '_dialog_language_code']:
+                value = getattr(root, attribute, None)
+                if isinstance(value, str) and value:
+                    locale = value
+                    break
+        locale = locale or 'en'
         message = text(locale, 'controls')
         if owner is not None:
             message += '\n\n'+text(locale, 'app')
@@ -339,7 +383,12 @@ class KeyboardNavigation(QtCore.QObject):
         root = _root(widget)
         # Native menu/search popups and the paged UI-language selector manage
         # their own keys. A key must never act on the window behind a popup.
-        if self.app.activePopupWidget() is not None or isinstance(root, QtWidgets.QMenu):
+        if root.windowType() == QtCore.Qt.Popup:
+            # A proxy can forward the closing Enter again after Qt hides its
+            # popup. Consume that stale delivery before it reopens the combo.
+            return not root.isVisible()
+        if (self.app.activePopupWidget() is not None or isinstance(root, QtWidgets.QMenu)
+                or _has_embedded_popup(root)):
             return False
         if _inside(widget, 'keyboardOwnNavigation') is not None:
             return False
@@ -362,7 +411,7 @@ class KeyboardNavigation(QtCore.QObject):
                 self._help(root)
             return True
         if owner is not None:
-            if ctrl and key == QtCore.Qt.Key_Comma:
+            if matches_control_shortcut(event, QtCore.Qt.Key_Comma):
                 owner.show_settings()
                 focus_control(owner.settings_window.settings_page_tabs[0])
                 return True
@@ -375,7 +424,12 @@ class KeyboardNavigation(QtCore.QObject):
         if key == QtCore.Qt.Key_F6 and root.property('keyboardCanvas'):
             controls = tab_stops(root)
             if focus is root and controls:
-                focus_control(controls[0])
+                source = getattr(root, 'lang_combo', None)
+                if (isinstance(source, QtWidgets.QWidget) and not sip.isdeleted(source)
+                        and source.isVisibleTo(root) and source.isEnabled()):
+                    focus_control(source)
+                else:
+                    focus_control(controls[0])
             else:
                 root.setFocus(QtCore.Qt.TabFocusReason)
                 self._hide_ring()

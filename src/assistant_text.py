@@ -310,6 +310,63 @@ for _language, _values in _PREFERENCES.items():
 
 
 _SECTIONS = {
+    'open': (
+        ('Open application', 'Return to the current Click’n’Translate window.'),
+        ('Открыть приложение', 'Вернуться к текущему окну Click’n’Translate.'),
+        ('Abrir aplicación', 'Volver a la ventana actual de Click’n’Translate.'),
+        ('Anwendung öffnen', 'Zum aktuellen Click’n’Translate-Fenster zurückkehren.'),
+        ('Ouvrir l’application', 'Revenir à la fenêtre actuelle de Click’n’Translate.'),
+        ('打开应用', '返回当前的 Click’n’Translate 窗口。'),
+        ('Abrir aplicativo', 'Volte à janela atual do Click’n’Translate.'),
+        ('Apri applicazione', 'Torna alla finestra corrente di Click’n’Translate.'),
+        ('فتح التطبيق', 'العودة إلى نافذة Click’n’Translate الحالية.'),
+        ('Uygulamayı aç', 'Geçerli Click’n’Translate penceresine dönün.'),
+        ('ऐप खोलें', 'Click’n’Translate की मौजूदा विंडो पर लौटें।'),
+        ('Buka aplikasi', 'Kembali ke jendela Click’n’Translate saat ini.'),
+    ),
+    'menu_buttons': ('Menu buttons…', 'Кнопки меню…', 'Botones del menú…', 'Menütasten…', 'Boutons du menu…', '菜单按钮…', 'Botões do menu…', 'Pulsanti del menu…', 'أزرار القائمة…', 'Menü düğmeleri…', 'मेनू बटन…', 'Tombol menu…'),
+    'menu_buttons_hint': (
+        'Choose the actions shown when you click the mascot. Changes apply immediately.',
+        'Выберите действия при нажатии на маскота. Изменения применяются сразу.',
+        'Elige las acciones que aparecen al pulsar la mascota. Los cambios se aplican al instante.',
+        'Aktionen beim Klick auf das Maskottchen wählen. Änderungen werden sofort übernommen.',
+        'Choisissez les actions affichées au clic sur la mascotte. Les changements sont immédiats.',
+        '选择点击伙伴时显示的操作。更改立即生效。',
+        'Escolha as ações exibidas ao clicar no mascote. As alterações são imediatas.',
+        'Scegli le azioni mostrate facendo clic sulla mascotte. Le modifiche sono immediate.',
+        'اختر الإجراءات التي تظهر عند النقر على الرفيق. تُطبّق التغييرات فورًا.',
+        'Maskota tıklandığında gösterilecek işlemleri seçin. Değişiklikler anında uygulanır.',
+        'मास्कॉट पर क्लिक करने पर दिखने वाली क्रियाएँ चुनें। बदलाव तुरंत लागू होते हैं।',
+        'Pilih tindakan yang muncul saat maskot diklik. Perubahan langsung diterapkan.',
+    ),
+    'menu_buttons_note': (
+        'Settings and Hide assistant are always available.',
+        '«Настройки» и «Скрыть помощника» всегда доступны.',
+        'Ajustes y Ocultar asistente siempre están disponibles.',
+        'Einstellungen und Assistent ausblenden sind immer verfügbar.',
+        'Réglages et Masquer l’assistant restent toujours disponibles.',
+        '“设置”和“隐藏助手”始终可用。',
+        'Configurações e Ocultar assistente ficam sempre disponíveis.',
+        'Impostazioni e Nascondi assistente sono sempre disponibili.',
+        'يبقى زرا الإعدادات وإخفاء المساعد متاحين دائمًا.',
+        'Ayarlar ve Yardımcıyı gizle her zaman kullanılabilir.',
+        'सेटिंग्स और सहायक छिपाएँ हमेशा उपलब्ध रहते हैं।',
+        'Pengaturan dan Sembunyikan asisten selalu tersedia.',
+    ),
+    'guide_hint': (
+        'Review the main features and keyboard shortcuts.',
+        'Посмотрите основные возможности и горячие клавиши.',
+        'Repasa las funciones principales y los atajos de teclado.',
+        'Die wichtigsten Funktionen und Tastenkürzel ansehen.',
+        'Revoir les fonctions principales et les raccourcis clavier.',
+        '查看主要功能和键盘快捷键。',
+        'Veja os principais recursos e atalhos do teclado.',
+        'Rivedi le funzioni principali e le scorciatoie da tastiera.',
+        'استعرض الميزات الأساسية واختصارات لوحة المفاتيح.',
+        'Temel özellikleri ve klavye kısayollarını inceleyin.',
+        'मुख्य सुविधाएँ और कीबोर्ड शॉर्टकट देखें।',
+        'Lihat fitur utama dan pintasan papan ketik.',
+    ),
     'change_image': ('Replace…', 'Заменить…', 'Cambiar…', 'Ersetzen…', 'Remplacer…', '更换…', 'Substitua…', 'Sostituisci…', 'استبدال…', 'Değiştir…', 'बदलें…', 'Ganti…'),
     'image_failed': ('Could not load “{name}”.\n\n{reason}', 'Не удалось загрузить «{name}».\n\n{reason}', 'No se pudo cargar «{name}».\n\n{reason}', '„{name}“ konnte nicht geladen werden.\n\n{reason}', 'Impossible de charger « {name} ».\n\n{reason}', '无法加载“{name}”。\n\n{reason}', 'Não foi possível carregar “{name}”.\n\n{reason}', 'Impossibile caricare "{name}".\n\n{reason}', 'تعذّر تحميل «{name}».\n\n{reason}', '“{name}” yüklenemedi.\n\n{reason}', '“{name}” लोड नहीं हो सका।\n\n{reason}', 'Tidak dapat memuat “{name}”.\n\n{reason}'),
     'image_missing': ('The file was moved or deleted. Click Replace to choose an image.', 'Файл перемещён или удалён. Нажмите «Заменить…» и выберите картинку.', 'El archivo se movió o eliminó. Pulsa Cambiar para elegir una imagen.', 'Die Datei wurde verschoben oder gelöscht. Mit Ersetzen ein Bild wählen.', 'Le fichier a été déplacé ou supprimé. Choisissez une image avec Remplacer.', '文件已移动或删除。请点击更换选择图片。', 'O arquivo foi movido ou excluído. Clique em Substituir para escolher uma imagem.', "Il file è stato spostato o eliminato. Fare clic su Sostituisci per scegliere un'immagine.", 'نُقل الملف أو حُذف. اضغط «استبدال» لاختيار صورة.', "Dosya taşınmış veya silinmiş. Görüntü seçmek için Değiştir'e tıklayın.", 'फ़ाइल हटा दी गई या खिसका दी गई। इमेज चुनने के लिए बदलें दबाएँ।', 'Berkas dipindah atau dihapus. Klik Ganti untuk memilih gambar.'),
@@ -410,3 +467,9 @@ for _key, _values in _SECTIONS.items():
 
 def assistant_text(language, key):
     return ASSISTANT_TEXT.get(language, ASSISTANT_TEXT['en']).get(key, ASSISTANT_TEXT['en'].get(key, key))
+
+
+def assistant_action_text(language, action):
+    """One localized title/description pair for menus and their preferences."""
+    label = assistant_text(language, action)
+    return label if isinstance(label, tuple) else (label, assistant_text(language, action + '_hint'))
