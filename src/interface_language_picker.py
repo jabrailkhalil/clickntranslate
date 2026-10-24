@@ -52,6 +52,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
     def __init__(self, options, current, resource_path, parent=None, *, dark=True):
         super().__init__(parent)
         self.setObjectName('interfaceLanguagePicker')
+        self.setProperty('keyboardOwnNavigation', True)
         self.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.buttons, self.name_labels, self.ticks = {}, {}, {}

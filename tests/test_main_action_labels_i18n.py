@@ -37,7 +37,12 @@ def test_main_close_and_home_actions_keep_distinct_localized_hints(window, app, 
     for button, key in ((window.flag_button, 'choose_interface_language'),
                         (window.theme_button, 'theme'), (window.minimize_button, 'minimize'),
                         (window.help_button, 'help')):
-        assert tooltip(button) == button.accessibleName() == main.ui_text(lang, key)
+        assert button.accessibleName() == main.ui_text(lang, key)
+        if button is window.help_button:
+            assert tooltip(button).splitlines()[0] == main.ui_text(lang, key)
+            assert 'F1' in tooltip(button)
+        else:
+            assert tooltip(button) == main.ui_text(lang, key)
     for button in (window.main_language_swap, window.hotkey_language_swap):
         assert tooltip(button) == button.accessibleName() == main.hotkey_language_text(lang, 'swap')
 

@@ -105,6 +105,8 @@ def _install_keyboard_focus_tracking():
     from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip, QWidget
 
     app = QApplication.instance()
+    from keyboard_navigation import install_keyboard_navigation
+    install_keyboard_navigation(app)
     if app is None or hasattr(app, "_button_focus_filter"):
         return
 

@@ -3890,6 +3890,7 @@ class ScreenCaptureOverlay(QWidget):
         self._grab_screen = self.screen  # сохраняем для capture
         self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.setProperty('keyboardCanvas', True)
         self._session_id = _new_ocr_session_id(self.mode)
         self._selection_started_at = None
         self._move_event_count = 0
@@ -4416,6 +4417,7 @@ class ScreenCaptureOverlay(QWidget):
             self.update_combo_position()
             self.memory_panel.show()
             self.memory_panel.raise_()
+            self.setFocus(QtCore.Qt.OtherFocusReason)
 
             logging.info(
                 f"[OCR:{self._session_id}] Controls: source_geom=({_rect_to_text(self.lang_combo.geometry())}), "
@@ -4497,10 +4499,7 @@ class ScreenCaptureOverlay(QWidget):
             # Y is just a fixed offset from the top of that screen
             y = screen_geo.top() - overlay_top_left.y() + 50 # 50px margin from top
 
-            current_x = x
-            for widget in controls:
-                widget.move(current_x, y)
-                current_x += widget.width() + spacing
+            bar_height = max(widget.height() for widget in controls)
             if hasattr(self, 'memory_panel'):
                 maximum = max(80, self.width()-24)
                 needed = self.remember_area_checkbox.sizeHint().width() + self.repeat_area_button.sizeHint().width() + 40
@@ -4508,11 +4507,22 @@ class ScreenCaptureOverlay(QWidget):
                 self.memory_grid.addWidget(self.repeat_area_button, 1 if needed > maximum else 0, 0 if needed > maximum else 1)
                 self.memory_panel.setFixedWidth(min(maximum, self.memory_panel.sizeHint().width()))
                 self.memory_panel.adjustSize()
-                memory_y = y + max(widget.height() for widget in controls) + 8
-                self.memory_panel.move(max(12, (self.width()-self.memory_panel.width())//2), memory_y)
+                combined = combo_width + 12 + self.memory_panel.width()
+                inline = combined <= maximum
+                if inline:
+                    x = screen_center_x-overlay_top_left.x()-combined//2
+                    bar_height = max(bar_height, self.memory_panel.height())
+                    self.memory_panel.move(x+combo_width+12, y+(bar_height-self.memory_panel.height())//2)
+                else:
+                    self.memory_panel.move(max(12, (self.width()-self.memory_panel.width())//2), y+bar_height+8)
                 self.memory_hint.setFixedWidth(min(maximum, max(400, self.memory_panel.width())))
                 self.memory_hint.adjustSize()
-                self.memory_hint.move((self.width()-self.memory_hint.width())//2, self.memory_panel.geometry().bottom()+6)
+                bottom = max(y+bar_height, self.memory_panel.geometry().bottom()+1)
+                self.memory_hint.move((self.width()-self.memory_hint.width())//2, bottom+6)
+            current_x = x
+            for widget in controls:
+                widget.move(current_x, y+(bar_height-widget.height())//2)
+                current_x += widget.width() + spacing
             logging.info(f"Moved combo to {x}, {y} (Screen: {screen_geo})")
 
     def _flush_selection_paint_before_capture(self):
@@ -4822,6 +4832,16 @@ class ScreenCaptureOverlay(QWidget):
             self.close()
         elif event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             self._repeat_area()
+            event.accept()
+        elif event.key() in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down) and not self._ocr_in_progress:
+            from keyboard_navigation import edit_area, text as keyboard_text
+            from capture_regions import screen_identity
+            self._preview_rect = edit_area(self._preview_rect, self.rect(), event.key(), event.modifiers())
+            self._preview_screen_identity = screen_identity(self._active_screen)
+            self.memory_hint.setText(keyboard_text(self._memory_locale, 'area'))
+            self._update_memory_actions()
+            self.update_combo_position()
+            self.update()
             event.accept()
         else:
             super().keyPressEvent(event)

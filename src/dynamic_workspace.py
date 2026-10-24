@@ -31,6 +31,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self._loading_template = False
         self.store = store or TemplateStore()
         super().__init__(target_window)
+        self.setProperty('keyboardCanvas', True)
+        self.setProperty('keyboardPairedAreas', True)
         self._screens = QtWidgets.QApplication.screens()
         bounds = QtCore.QRect()
         for screen in self._screens:
@@ -96,6 +98,7 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self._layout_controls()
         self._update_selection_controls()
         self.toolbar.show()
+        self.setFocus(QtCore.Qt.OtherFocusReason)
 
     def _layout_controls(self):
         if not hasattr(self, 'toolbar'):
@@ -305,6 +308,51 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
                 self._styles.append(output_style(opacity=int(self._config.get('game_overlay_opacity', 88))))
         self._update_selection_controls()
 
+    def _new_keyboard_area(self):
+        if len(self._regions) >= 16 or (self._outputs and self._outputs[-1] is None):
+            return
+        from keyboard_navigation import edit_area
+        bounds = self._screen.geometry().translated(-self.geometry().topLeft())
+        rect = edit_area(None, bounds, 0, minimum=(60, 24))
+        self._regions.append(rect)
+        self._outputs.append(None if self._manual_output else QtCore.QRect(rect))
+        self._styles.append(output_style(opacity=int(self._config.get('game_overlay_opacity', 88))))
+        self._selected_region = len(self._regions)-1
+        self._selected_hit = (self._selected_region, 'source')
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        arrows = (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down)
+        if key not in arrows+(QtCore.Qt.Key_N, QtCore.Qt.Key_Insert, QtCore.Qt.Key_Space, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown):
+            return super().keyPressEvent(event)
+        if event.modifiers() & (QtCore.Qt.AltModifier | QtCore.Qt.MetaModifier):
+            return super().keyPressEvent(event)
+        if key in (QtCore.Qt.Key_N, QtCore.Qt.Key_Insert) or not self._regions:
+            self._new_keyboard_area()
+        if not self._regions:
+            return
+        index, kind = self._selected_hit or (len(self._regions)-1, 'source')
+        if key in (QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown):
+            index = (index+(-1 if key == QtCore.Qt.Key_PageUp else 1)) % len(self._regions)
+            kind = 'source'
+        elif key == QtCore.Qt.Key_Space:
+            kind = 'output' if kind == 'source' else 'source'
+            if kind == 'output' and self._outputs[index] is None:
+                self._outputs[index] = QtCore.QRect(self._regions[index])
+        elif key in arrows:
+            from keyboard_navigation import edit_area
+            current = (self._outputs if kind == 'output' else self._regions)[index]
+            bounds = self._screen_local_bounds(current.center())
+            edited = edit_area(current, bounds, key, event.modifiers(), minimum=(60, 24))
+            (self._outputs if kind == 'output' else self._regions)[index] = edited
+            if kind == 'output' and edited != self._regions[index]:
+                self._manual_output = True
+            elif kind == 'source' and not self._manual_output:
+                self._outputs[index] = QtCore.QRect(edited)
+        self._selected_region, self._selected_hit = index, (index, kind)
+        self._update_selection_controls()
+        event.accept()
+
     def _start_selected_regions(self):
         if not self._complete() or not self.start_button.isEnabled():
             return
@@ -363,6 +411,9 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             painter.setPen(QtGui.QPen(color, 2))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawRect(rect)
+            if self.hasFocus() and self._selected_hit == (index, kind):
+                painter.setPen(QtGui.QPen(QtGui.QColor('#f5ecff'), 1, QtCore.Qt.DashLine))
+                painter.drawRect(rect.adjusted(3, 3, -3, -3))
             if index >= 0:
                 label = f'{index+1} · {text(self._language, "read" if kind == "source" else "write")}'
                 badge = QtCore.QRect(rect.x()+4, rect.y()+4, min(rect.width()-36, painter.fontMetrics().horizontalAdvance(label)+12), 20)
@@ -807,6 +858,15 @@ class OutputControls(QtWidgets.QFrame):
             self._cancel_gesture()
         if watched not in (self.move_button, self.resize_button) or self.overlay.output_style['locked']:
             return super().eventFilter(watched, event)
+        if event.type() == QtCore.QEvent.KeyPress and event.key() in (
+                QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down):
+            from keyboard_navigation import edit_area
+            rect = self.overlay.output_rect
+            screen = QtWidgets.QApplication.screenAt(rect.center()) or QtWidgets.QApplication.primaryScreen()
+            modifiers = event.modifiers() | (QtCore.Qt.ShiftModifier if watched is self.resize_button else QtCore.Qt.NoModifier)
+            self.overlay.set_output_geometry(edit_area(rect, screen.geometry(), event.key(), modifiers, minimum=(60, 24)))
+            event.accept()
+            return True
         if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
             self._gesture = (watched, event.globalPos(), QtCore.QRect(self.overlay.output_rect))
             watched.setDown(True)

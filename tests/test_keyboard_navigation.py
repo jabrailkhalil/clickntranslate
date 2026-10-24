@@ -1,0 +1,303 @@
+"""Operate real widgets without clipboard changes, global hooks or mouse input."""
+from unittest import mock
+
+import pytest
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtTest import QTest
+
+import keyboard_navigation as keyboard
+from test_desktop_ux import app, window
+from test_capture_region_memory import capture
+from test_dynamic_workspace import isolated, make_overlay
+
+
+@pytest.fixture(autouse=True)
+def restore_application_keyboard_state(app):
+    direction = app.layoutDirection()
+    yield
+    app.setLayoutDirection(direction)
+    navigation = getattr(app, '_keyboard_navigation', None)
+    if navigation is not None:
+        navigation.keyboard = False
+        navigation._hide_ring()
+
+
+def focused(root):
+    return root.focusWidget()
+
+
+def test_tab_uses_visible_reading_order_and_skips_disabled_and_internal_controls(app):
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    last = QtWidgets.QPushButton('Last', dialog)  # Created out of reading order.
+    first = QtWidgets.QCheckBox('First', dialog)
+    editor = QtWidgets.QPlainTextEdit(dialog)
+    number = QtWidgets.QSpinBox(dialog)
+    hidden = QtWidgets.QPushButton('Hidden', dialog)
+    disabled = QtWidgets.QPushButton('Disabled', dialog)
+    disabled.setEnabled(False)
+    for widget in (first, editor, number, disabled, hidden, last):
+        layout.addWidget(widget)
+    hidden.hide()
+    dialog.show()
+    app.processEvents()
+    try:
+        controls = keyboard.tab_stops(dialog)
+        assert controls == [first, editor, number, last]
+        keyboard.focus_control(first)
+        for widget in (editor, number, last, first):
+            QTest.keyClick(focused(dialog), QtCore.Qt.Key_Tab)
+            assert focused(dialog) is widget
+        QTest.keyClick(first, QtCore.Qt.Key_Backtab)
+        assert focused(dialog) is last
+        QTest.keyClick(last, QtCore.Qt.Key_Return)
+        QTest.keyClick(first, QtCore.Qt.Key_Return)
+        assert first.isChecked()
+        assert editor.toPlainText() == ''
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_keyboard_focus_ring_disappears_on_mouse_input(app):
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    button = QtWidgets.QPushButton('Action')
+    layout.addWidget(button)
+    dialog.show()
+    app.processEvents()
+    try:
+        keyboard.focus_control(button)
+        QTest.keyClick(button, QtCore.Qt.Key_Tab)
+        assert dialog._keyboard_focus_ring.isVisible()
+        QTest.mouseClick(button, QtCore.Qt.LeftButton)
+        assert not dialog._keyboard_focus_ring.isVisible()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_radio_group_has_one_tab_stop_and_arrows_select_the_other_option(app):
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    first = QtWidgets.QRadioButton('First')
+    second = QtWidgets.QRadioButton('Second')
+    after = QtWidgets.QPushButton('Next')
+    for widget in (first, second, after):
+        layout.addWidget(widget)
+    first.setChecked(True)
+    dialog.show()
+    app.processEvents()
+    try:
+        assert keyboard.tab_stops(dialog) == [first, after]
+        keyboard.focus_control(first)
+        QTest.keyClick(first, QtCore.Qt.Key_Down)
+        assert second.isChecked()
+        assert keyboard.tab_stops(dialog) == [second, after]
+        QTest.keyClick(second, QtCore.Qt.Key_Tab)
+        assert focused(dialog) is after
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+@pytest.mark.parametrize('locale', keyboard.LANGUAGES)
+def test_all_main_and_settings_controls_are_reachable_in_each_locale(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_main_screen()
+    root = window.ui_root
+    for page in (None, 0, 1, 3, 2):
+        if page is not None:
+            if window.settings_window is None:
+                window.show_settings()
+            window.settings_window._set_settings_page(page)
+        app.processEvents()
+        controls = keyboard.tab_stops(root)
+        assert window.flag_button in controls
+        assert window.settings_button in controls
+        assert window.close_button in controls
+        assert len(controls) >= 12
+        keyboard.focus_control(controls[0])
+        visited = []
+        for _ in controls:
+            visited.append(focused(root))
+            QTest.keyClick(focused(root), QtCore.Qt.Key_Tab)
+        assert visited == controls, (locale, page)
+        assert focused(root) is controls[0]
+
+
+def test_settings_shortcuts_back_and_secondary_history_return(window, app):
+    root = window.ui_root
+    keyboard.focus_control(window.text_input)
+    QTest.keyClick(window.text_input, QtCore.Qt.Key_Comma, QtCore.Qt.ControlModifier)
+    settings = window.settings_window
+    assert settings is not None and settings._settings_page_index == 0
+    for page in (1, 3, 2, 0):
+        QTest.keyClick(focused(root), QtCore.Qt.Key_Tab, QtCore.Qt.ControlModifier)
+        assert settings._settings_page_index == page
+    QTest.keyClick(focused(root), QtCore.Qt.Key_Backtab, QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier)
+    assert settings._settings_page_index == 2
+    settings.show_history_view()
+    app.processEvents()
+    QTest.keyClick(root, QtCore.Qt.Key_Left, QtCore.Qt.AltModifier)
+    assert not settings._secondary_view_kind and settings._settings_page_index == 2
+    QTest.keyClick(window.settings_button, QtCore.Qt.Key_Escape)
+    assert window.settings_window is None
+
+
+def test_scaled_window_routes_native_view_keys_to_the_current_control(window, app):
+    root = window.ui_root
+    view = window._ui_scale_controller.view
+    keyboard.focus_control(window.flag_button)
+    controls = keyboard.tab_stops(root)
+    expected = controls[(controls.index(window.flag_button)+1) % len(controls)]
+    QTest.keyClick(view, QtCore.Qt.Key_Tab)
+    assert focused(root) is expected
+    QTest.keyClick(view, QtCore.Qt.Key_Comma, QtCore.Qt.ControlModifier)
+    assert window.settings_window is not None
+    QTest.keyClick(view, QtCore.Qt.Key_Tab, QtCore.Qt.ControlModifier)
+    assert window.settings_window._settings_page_index == 1
+
+
+def test_settings_tab_arrows_follow_visual_order(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    app.processEvents()
+    keyboard.focus_control(settings.settings_page_tabs[0])
+    for page in (1, 3, 2, 0):
+        QTest.keyClick(focused(window.ui_root), QtCore.Qt.Key_Right)
+        assert settings._settings_page_index == page
+
+
+def test_enter_opens_combo_and_escape_only_closes_its_popup(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    settings._set_settings_page(1)
+    combo = settings.ocr_engine_combo
+    keyboard.focus_control(combo)
+    QTest.keyClick(combo, QtCore.Qt.Key_Return)
+    assert combo.view().isVisible()
+    QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
+    assert not combo.view().isVisible()
+    assert window.settings_window is settings
+
+
+def test_result_window_modes_support_arrow_selection_and_space_toggle(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    settings._set_settings_page(1)
+    combo = settings.result_window_control
+    keyboard.focus_control(combo)
+    QTest.keyClick(combo, QtCore.Qt.Key_Return)
+    assert combo.view().isVisible()
+    QTest.keyClick(combo.view(), QtCore.Qt.Key_Home)
+    mode = combo.itemData(combo.view().currentIndex().row())
+    before = combo.is_mode_checked(mode)
+    QTest.keyClick(combo.view(), QtCore.Qt.Key_Space)
+    assert combo.is_mode_checked(mode) is not before
+    assert combo.view().isVisible()
+    QTest.keyClick(combo.view(), QtCore.Qt.Key_Escape)
+    assert not combo.view().isVisible()
+
+
+def test_shortcut_recording_keeps_keyboard_commands_for_the_editor(window, app):
+    from settings_window import ClearableKeySequenceEdit
+    window.show_settings()
+    settings = window.settings_window
+    settings.show_hotkeys_screen()
+    app.processEvents()
+    editor = settings.findChild(ClearableKeySequenceEdit)
+    keyboard.focus_control(editor)
+    QTest.keyClick(editor, QtCore.Qt.Key_Comma, QtCore.Qt.ControlModifier)
+    assert settings._secondary_view_kind == 'hotkeys'
+    assert 'Ctrl' in editor.hotkeyText()
+    controls = keyboard.tab_stops(window.ui_root)
+    next_control = controls[(controls.index(editor)+1) % len(controls)]
+    QTest.keyClick(editor, QtCore.Qt.Key_Tab)
+    assert focused(window.ui_root) is next_control
+
+
+def test_help_is_localized_and_opens_from_the_active_window(window):
+    window.set_interface_language('ar')
+    with mock.patch.object(QtWidgets.QMessageBox, 'information') as help_box:
+        QTest.keyClick(window.flag_button, QtCore.Qt.Key_F1)
+        parent, title, message = help_box.call_args.args
+    assert parent is window
+    assert title == keyboard.text('ar', 'title')
+    assert 'Ctrl+Tab' in message
+
+
+@pytest.mark.parametrize('mode', ['copy', 'translate'])
+def test_ocr_memory_is_inline_to_the_right_of_languages_on_a_wide_screen(capture, mode):
+    config, _, _, create = capture
+    value = create(mode)
+    languages = [value.lang_combo] + ([value.target_lang_combo] if mode == 'translate' else [])
+    assert value.memory_panel.x() > max(combo.geometry().right() for combo in languages)
+    assert abs(value.memory_panel.geometry().center().y()-value.lang_combo.geometry().center().y()) <= 1
+
+
+def test_ocr_area_can_be_created_moved_resized_and_confirmed_without_mouse(capture, app):
+    _, _, captures, create = capture
+    value = create()
+    QTest.keyClick(value, QtCore.Qt.Key_Right)
+    original = QtCore.QRect(value._preview_rect)
+    assert original.isValid() and value.rect().contains(original)
+    QTest.keyClick(value, QtCore.Qt.Key_Down, QtCore.Qt.ControlModifier)
+    assert value._preview_rect == original.translated(0, 10)
+    QTest.keyClick(value, QtCore.Qt.Key_Right, QtCore.Qt.ShiftModifier)
+    assert value._preview_rect.width() == original.width()+1
+    QTest.keyClick(value, QtCore.Qt.Key_F6)
+    assert focused(value) is value.lang_combo
+    QTest.keyClick(value.lang_combo, QtCore.Qt.Key_F6)
+    assert value.hasFocus()
+    QTest.keyClick(value, QtCore.Qt.Key_Return)
+    assert len(captures) == 1
+
+
+def test_dynamic_regions_support_keyboard_source_output_multiple_areas_and_cancel(isolated):
+    import dynamic_workspace
+    config, _ = isolated
+    config['game_manual_output'] = True
+    selector = dynamic_workspace.PairedRegionSelector()
+    try:
+        QTest.keyClick(selector, QtCore.Qt.Key_Insert)
+        source = QtCore.QRect(selector._regions[0])
+        assert selector._outputs == [None]
+        assert not selector.start_button.isEnabled()
+        QTest.keyClick(selector, QtCore.Qt.Key_Space)
+        assert selector._outputs[0] == source and selector.start_button.isEnabled()
+        QTest.keyClick(selector, QtCore.Qt.Key_Right, QtCore.Qt.ControlModifier)
+        assert selector._outputs[0] == source.translated(10, 0)
+        assert selector._regions[0] == source
+        QTest.keyClick(selector, QtCore.Qt.Key_N)
+        assert len(selector._regions) == 2
+        QTest.keyClick(selector, QtCore.Qt.Key_PageUp)
+        assert selector._selected_region == 0
+        QTest.keyClick(selector, QtCore.Qt.Key_Delete)
+        assert len(selector._regions) == 1
+        QTest.keyClick(selector, QtCore.Qt.Key_Escape)
+        assert not selector.isVisible()
+    finally:
+        selector.close()
+
+
+def test_dynamic_output_move_and_resize_buttons_support_arrows_and_lock(isolated):
+    overlay = make_overlay(QtCore.QRect(40, 300, 240, 80), 'en', 'ru',
+                           output_region=QtCore.QRect(400, 400, 300, 100), style={'locked': False})
+    try:
+        controls = overlay.controls
+        controls.gear.click()
+        keyboard.focus_control(controls.move_button)
+        QTest.keyClick(controls.move_button, QtCore.Qt.Key_Right)
+        assert overlay.output_rect.x() == 401
+        keyboard.focus_control(controls.resize_button)
+        QTest.keyClick(controls.resize_button, QtCore.Qt.Key_Down)
+        assert overlay.output_rect.height() == 101
+        controls.locked.setChecked(True)
+        QTest.keyClick(controls.move_button, QtCore.Qt.Key_Right)
+        assert overlay.output_rect.x() == 401
+    finally:
+        overlay.close()

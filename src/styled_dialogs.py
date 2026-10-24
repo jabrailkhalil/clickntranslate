@@ -675,6 +675,11 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
     )
 
     def drawPrimitive(self, element, option, painter, widget=None):
+        if (element == QtWidgets.QStyle.PE_FrameFocusRect and isinstance(widget, QtWidgets.QAbstractButton)
+                and hasattr(QtWidgets.QApplication.instance(), '_keyboard_navigation')):
+            # KeyboardNavigation paints one accent outline. The native dotted
+            # rectangle can otherwise remain around a mouse-clicked checkbox.
+            return
         if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
             self._draw_chevron(option, painter)
             return

@@ -11948,7 +11948,10 @@ class DarkThemeApp(QMainWindow):
 
         # Кнопка помощи (FAQ)
         self.help_button = ScaledIconButton(self.ui_root)
-        self.help_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "help")))
+        from keyboard_navigation import text as keyboard_text
+        self.help_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "help")
+                                                + '\nF1 — ' + keyboard_text(self.current_interface_language, 'title')))
+        self.help_button.setAccessibleDescription('F1 — ' + keyboard_text(self.current_interface_language, 'title'))
         self.help_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
         self.help_button.clicked.connect(self.show_help_dialog)
         self.update_help_icon()
@@ -13560,8 +13563,10 @@ class DarkThemeApp(QMainWindow):
             self.minimize_button.setToolTip(tooltip_text(ui_text(lang, "minimize")))
             self.minimize_button.setAccessibleName(ui_text(lang, "minimize"))
         if hasattr(self, "help_button"):
-            self.help_button.setToolTip(tooltip_text(ui_text(lang, "help")))
+            from keyboard_navigation import text as keyboard_text
+            self.help_button.setToolTip(tooltip_text(ui_text(lang, "help") + '\nF1 — ' + keyboard_text(lang, 'title')))
             self.help_button.setAccessibleName(ui_text(lang, "help"))
+            self.help_button.setAccessibleDescription('F1 — ' + keyboard_text(lang, 'title'))
         document_button = getattr(self, "document_button", None)
         if isinstance(document_button, QPushButton):
             try:
@@ -14038,11 +14043,13 @@ class DarkThemeApp(QMainWindow):
     def show_dynamic_translation_help(self):
         from dynamic_templates import text
         from capture_regions import text as region_text
+        from keyboard_navigation import text as keyboard_text
         lang = self.current_interface_language
         box = QMessageBox(self)
         box.setWindowTitle(ui_text(lang, 'game_translate'))
         box.setText(text(lang, 'instructions').format(hotkey=self.config.get('game_translate_hotkey') or DEFAULT_GAME_HOTKEY)
-                    + '\n\n' + region_text(lang, 'dynamic_remember') + ': ' + region_text(lang, 'dynamic_hint'))
+                    + '\n\n' + region_text(lang, 'dynamic_remember') + ': ' + region_text(lang, 'dynamic_hint')
+                    + '\n\n' + keyboard_text(lang, 'area') + '\n' + keyboard_text(lang, 'pairs'))
         start = box.addButton(settings_text(lang, 'game_launch'), QMessageBox.AcceptRole)
         shortcut = box.addButton(text(lang, 'shortcuts'), QMessageBox.ActionRole)
         box.addButton(settings_text(lang, 'cancel'), QMessageBox.RejectRole)

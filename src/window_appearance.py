@@ -116,6 +116,8 @@ class DialogAppearance(QtCore.QObject):
         if (self._busy or event_type not in (QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.StyleChange)
                 or not isinstance(watched, QtWidgets.QWidget)):
             return False
+        if watched.property('_cntTransientChrome'):
+            return False
         window = watched.window()
         if not self._eligible(window):
             return False
@@ -243,7 +245,8 @@ class DialogAppearance(QtCore.QObject):
             maximum_percent = min(MAX_SCALE, math.floor(fitting_factor * BASE_SCALE))
             factor = min(self.window_percent(window) / BASE_SCALE,
                          maximum_percent / BASE_SCALE if maximum_percent >= MIN_SCALE else fitting_factor)
-            widgets = [window] + [w for w in window.findChildren(QtWidgets.QWidget) if w.window() is window]
+            widgets = [window] + [w for w in window.findChildren(QtWidgets.QWidget)
+                                  if w.window() is window and not w.property('_cntTransientChrome')]
             # Snapshot before changing any parent font or stylesheet.
             for widget in widgets:
                 record = self._baseline(widget, state['widgets'])

@@ -702,6 +702,14 @@ def modern_combo_style(dark, font_size=15):
     """
 
 
+class _ResultModeDelegate(QtWidgets.QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        view = self.parent()
+        if view.property('keyboardModeSelection') and view.currentIndex() == index:
+            option.state |= QtWidgets.QStyle.State_Selected
+        super().paint(painter, option, index)
+
+
 class ResultWindowModeCombo(DropDownCombo):
     """Drop-down that turns the result window on or off per action.
 
@@ -758,6 +766,33 @@ class ResultWindowModeCombo(DropDownCombo):
         # Toggle on press instead of letting the view "select" a row, so the
         # list stays open and no row ever looks like the chosen one.
         self.view().pressed.connect(self._toggle_pressed)
+        self.view().setItemDelegate(_ResultModeDelegate(self.view()))
+        self.view().installEventFilter(self)
+        self.view().viewport().installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if watched is self.view() and event.type() == QtCore.QEvent.KeyPress:
+            rows = [row for row in range(self.count()) if self.itemData(row) in self._modes]
+            key = event.key()
+            current = self.view().currentIndex().row()
+            if rows and key in (Qt.Key_Down, Qt.Key_Up, Qt.Key_Home, Qt.Key_End, Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter):
+                index = rows.index(current) if current in rows else -1
+                if key in (Qt.Key_Down, Qt.Key_Up):
+                    index = max(0, min(len(rows)-1, index+(1 if key == Qt.Key_Down else -1)))
+                elif key in (Qt.Key_Home, Qt.Key_End):
+                    index = 0 if key == Qt.Key_Home else len(rows)-1
+                index = max(0, index)
+                model_index = self.model().index(rows[index], self.modelColumn())
+                self.view().setCurrentIndex(model_index)
+                self.view().setProperty('keyboardModeSelection', True)
+                if key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter) and not event.isAutoRepeat():
+                    self._toggle_pressed(model_index)
+                self.view().viewport().update()
+                event.accept()
+                return True
+        elif watched is self.view().viewport() and event.type() == QtCore.QEvent.MouseMove:
+            self.view().setProperty('keyboardModeSelection', False)
+        return super().eventFilter(watched, event)
 
     # --- state ---------------------------------------------------------------
 
@@ -1393,6 +1428,11 @@ def _center_progress_dialog(dialog, owner):
             owner = owner()
     dialog.ensurePolished()
     dialog.adjustSize()
+    appearance = getattr(QApplication.instance(), '_dialog_appearance', None)
+    if appearance is not None:
+        # Font scaling can add a final height-for-width pixel after adjustSize.
+        # Settle it before choosing the center, rather than moving afterwards.
+        appearance.apply(dialog)
     center_window(dialog, owner=owner)
 
 
@@ -10889,6 +10929,7 @@ class SettingsWindow(QWidget):
         # Keep the old attribute aliases for guide/editor integrations.
         dark = self.parent.current_theme != "Светлая"
         self.settings_page_footer = SettingsPageNavigation(self, dark=dark)
+        self.settings_page_footer.setProperty('keyboardTabs', True)
         self.settings_page_navigation = self.settings_page_footer
         dots_layout = QGridLayout(self.settings_page_footer)
         dots_layout.setContentsMargins(8, 3, 8, 3)
