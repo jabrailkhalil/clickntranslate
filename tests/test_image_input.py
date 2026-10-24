@@ -57,6 +57,108 @@ def test_ctrl_v_pastes_image_without_touching_system_clipboard(app,isolated_clip
     editor.close();editor.deleteLater()
 
 
+@pytest.mark.parametrize('extension', sorted(main.SUPPORTED_EXTENSIONS | image_input.EXTENSIONS))
+def test_ctrl_v_routes_each_supported_file_instead_of_pasting_its_url(app, isolated_clipboard, tmp_path, extension):
+    editor = ImageInputTextEdit()
+    images, documents = [], []
+    editor.image_requested.connect(images.append)
+    editor.file_requested.connect(documents.append)
+    path = str(tmp_path/('copied file'+extension.upper()))
+    mime = QtCore.QMimeData()
+    mime.setUrls([QtCore.QUrl.fromLocalFile(path)])
+    isolated_clipboard.setMimeData(mime)
+    editor.show()
+    editor.setFocus()
+    QTest.keyClick(editor, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+    expected = ([Path(path)], []) if extension in image_input.EXTENSIONS else ([], [Path(path)])
+    assert ([Path(value) for value in images], [Path(value) for value in documents]) == expected
+    assert editor.toPlainText() == '' and isolated_clipboard.mimeData() is mime
+    editor.close()
+    editor.deleteLater()
+
+
+def test_paste_file_does_not_require_an_image_handler_and_read_only_editors_ignore_it(app, isolated_clipboard, tmp_path):
+    editor = ImageInputTextEdit()
+    received = []
+    editor.file_requested.connect(received.append)
+    path = str(tmp_path/'a.txt')
+    mime = QtCore.QMimeData()
+    mime.setUrls([QtCore.QUrl.fromLocalFile(path)])
+    isolated_clipboard.setMimeData(mime)
+    editor.setReadOnly(True)
+    QTest.keyClick(editor, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+    assert not received
+    editor.setReadOnly(False)
+    QTest.keyClick(editor, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+    assert [Path(value) for value in received] == [Path(path)]
+    editor.deleteLater()
+
+
+def test_browse_routes_documents_and_images_and_keeps_cancel_available(window, tmp_path):
+    for extension in ('.txt', '.pdf', '.docx', '.PNG'):
+        path = str(tmp_path/('picked'+extension))
+        with (mock.patch.object(main.QFileDialog, 'getOpenFileName', return_value=(path, '')) as choose,
+              mock.patch.object(window, '_import_main_image') as image,
+              mock.patch.object(window, 'open_document_translation') as document):
+            window.main_image_button.click()
+            filters = choose.call_args.args[-1].split(';;')
+            assert '*.png' in filters[0] and '*.pdf' in filters[0] and '*.docx' in filters[0]
+            assert ('*.png' in filters[1]) and ('*.docx' in filters[2])
+            if extension == '.PNG':
+                image.assert_called_once_with(path)
+                document.assert_not_called()
+            else:
+                document.assert_called_once_with(path)
+                image.assert_not_called()
+    with mock.patch.object(main.QFileDialog, 'getOpenFileName', return_value=('', '')):
+        window._choose_main_attachment()
+    window._image_importer.busy = True
+    with (mock.patch.object(window._image_importer, 'cancel') as cancel,
+          mock.patch.object(main.QFileDialog, 'getOpenFileName') as choose):
+        window._choose_main_attachment()
+        cancel.assert_called_once_with()
+        choose.assert_not_called()
+    window._image_importer.busy = False
+
+
+def test_result_window_browse_and_paste_files_use_the_document_workspace(window, app, tmp_path, isolated_clipboard):
+    dialog = main.TranslationResultDialog(window, '', auto_copy=False, lang='ru')
+    path = str(tmp_path/'book.pdf')
+    mime = QtCore.QMimeData()
+    mime.setUrls([QtCore.QUrl.fromLocalFile(path)])
+    isolated_clipboard.setMimeData(mime)
+    try:
+        with mock.patch.object(window, 'open_document_translation') as document:
+            QTest.keyClick(dialog.source_edit, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+            document.assert_called_once_with(mime.urls()[0].toLocalFile())
+        with (mock.patch.object(main.QFileDialog, 'getOpenFileName', return_value=(path, '')),
+              mock.patch.object(window, 'open_document_translation') as document):
+            dialog.image_button.click()
+            document.assert_called_once_with(path)
+        dialog.refresh_language('ar')
+        dialog.refresh_theme('Светлая')
+        assert dialog.image_button.text() == image_input.attachment_text('ar', 'browse')
+    finally:
+        dialog.reject()
+
+
+def test_main_canvas_accepts_pasted_files_without_an_editor_focus(window, app, tmp_path, isolated_clipboard):
+    mime = QtCore.QMimeData()
+    mime.setUrls([QtCore.QUrl.fromLocalFile(str(tmp_path/'file.pdf'))])
+    isolated_clipboard.setMimeData(mime)
+    with mock.patch.object(window, 'open_document_translation') as opened:
+        QTest.keyClick(window.ui_root, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+        opened.assert_called_once_with(mime.urls()[0].toLocalFile())
+        opened.reset_mock()
+        window.show_interface_language_menu()
+        QTest.keyClick(window.ui_root, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+        opened.assert_not_called()
+        window._close_interface_language_picker()
+        window.show_settings()
+        QTest.keyClick(window.ui_root, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+        opened.assert_not_called()
+
+
 def test_drag_hover_does_not_copy_full_resolution_pixels(app):
     editor=ImageInputTextEdit()
     mime=QtCore.QMimeData();mime.setImageData(photo())

@@ -28,7 +28,7 @@ def test_picker_preserves_home_draft_size_and_language_pair(window, app):
     assert window.flag_button.isChecked()
     assert window.flag_button.isCheckable()
     assert picker.parentWidget() == original.parentWidget()
-    assert picker.pager.isVisible() == (len(main.INTERFACE_LANGUAGE_OPTIONS) > 10)
+    assert picker.next_button.isVisible() == (len(main.INTERFACE_LANGUAGE_OPTIONS) > 10)
     window.show_interface_language_menu()  # Flag toggles the same view.
     settle(app)
     assert window._interface_language_picker is None
@@ -75,19 +75,19 @@ def test_picker_pages_open_on_current_language_and_have_bounded_arrows(app):
     try:
         assert picker.pages.count() == 3
         assert picker.pages.currentIndex() == 2
-        assert not picker.pager.increase.isEnabled()
-        picker.pager.decrease.click()
+        assert not picker.next_button.isEnabled()
+        picker.previous_button.click()
         assert picker.pages.currentIndex() == 1
-        picker.pager.decrease.click()
+        picker.previous_button.click()
         assert picker.pages.currentIndex() == 0
-        assert not picker.pager.decrease.isEnabled()
+        assert not picker.previous_button.isEnabled()
         assert len(picker.buttons) == 23
         received = QSignalSpy(picker.languageSelected)
         picker.buttons['1'].click()
         assert list(received) == [['1']]
-        QTest.keyClick(picker.pager.increase, QtCore.Qt.Key_End)
+        QTest.keyClick(picker.buttons['1'], QtCore.Qt.Key_End)
         assert picker.pages.currentIndex() == 2
-        QTest.keyClick(picker.pager.decrease, QtCore.Qt.Key_Home)
+        QTest.keyClick(picker.buttons['22'], QtCore.Qt.Key_Home)
         assert picker.pages.currentIndex() == 0
     finally:
         picker.close()
@@ -132,6 +132,103 @@ def test_navigating_away_closes_picker_cleanly(window, app):
     assert window.main_text_section.isVisible()
 
 
+@pytest.mark.parametrize('page', [None, 0, 1, 2, 3])
+def test_live_selection_never_uses_an_unlaid_out_home_panel_size(window, app, page):
+    if page is not None:
+        window.show_settings()
+        window.settings_window._set_settings_page(page)
+    settle(app)
+    window.show_interface_language_menu()
+    picker = window._interface_language_picker
+    before = QtCore.QRect(picker.geometry())
+    for locale in ('es', 'ar', 'pt', 'hi', 'en', 'ru'):
+        picker.buttons[locale].click()
+        # Check the first frame too, not just the eventual settled layout.
+        assert picker.geometry() == before
+        settle(app)
+        assert picker.geometry() == before
+        assert picker.height() == picker.PANEL_HEIGHT
+        assert picker.title.isVisible() and picker.close_button.isVisible()
+        assert picker.y() >= window.main_layout.contentsMargins().top()
+
+
+@pytest.mark.parametrize('locale', ['en', 'ar', 'hi'])
+def test_keyboard_navigation_applies_only_on_enter_and_keeps_focus_inside(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_interface_language_menu()
+    settle(app)
+    picker = window._interface_language_picker
+    assert picker.buttons[locale].hasFocus()
+    QTest.keyClick(picker.buttons[locale], QtCore.Qt.Key_Home)
+    assert picker.buttons['en'].hasFocus()
+    QTest.keyClick(picker.buttons['en'], QtCore.Qt.Key_Right)
+    assert picker.buttons['ru'].hasFocus()
+    assert window.current_interface_language == locale
+    QTest.keyClick(picker.buttons['ru'], QtCore.Qt.Key_Return)
+    settle(app)
+    assert window.current_interface_language == 'ru'
+    assert picker.buttons['ru'].hasFocus()
+    assert picker.buttons['ru'].property('keyboardFocus')
+    QTest.keyClick(picker.buttons['ru'], QtCore.Qt.Key_Down)
+    assert picker.buttons['pt'].hasFocus()
+    QTest.keyClick(picker.buttons['pt'], QtCore.Qt.Key_Up)
+    assert picker.buttons['ru'].hasFocus()
+    for _ in range(16):
+        focused = picker.focusWidget()
+        assert focused is not None and picker.isAncestorOf(focused)
+        QTest.keyClick(focused, QtCore.Qt.Key_Tab)
+    for _ in range(16):
+        focused = picker.focusWidget()
+        assert focused is not None and picker.isAncestorOf(focused)
+        QTest.keyClick(focused, QtCore.Qt.Key_Backtab)
+    QTest.keyClick(picker.focusWidget(), QtCore.Qt.Key_End)
+    assert picker.buttons['id'].hasFocus() and picker.pages.currentIndex() == 1
+    QTest.keyClick(picker.buttons['id'], QtCore.Qt.Key_Right)
+    assert picker.buttons['id'].hasFocus()  # No empty-cell or off-page focus.
+    QTest.keyClick(picker.buttons['id'], QtCore.Qt.Key_PageUp)
+    assert picker.buttons['ru'].hasFocus() and picker.pages.currentIndex() == 0
+    QTest.keyClick(picker.buttons['ru'], QtCore.Qt.Key_PageDown)
+    assert picker.buttons['id'].hasFocus() and picker.pages.currentIndex() == 1
+    QTest.keyClick(picker.buttons['id'], QtCore.Qt.Key_Escape)
+    settle(app)
+    assert window._interface_language_picker is None
+
+
+def test_arrows_cross_pages_at_visual_grid_edges_without_selecting(window, app):
+    window.show_interface_language_menu()
+    settle(app)
+    picker = window._interface_language_picker
+    initial = window.current_interface_language
+    QTest.keyClick(picker.buttons['fr'], QtCore.Qt.Key_Right)
+    assert picker.pages.currentIndex() == 1 and picker.buttons['hi'].hasFocus()
+    QTest.keyClick(picker.buttons['hi'], QtCore.Qt.Key_Left)
+    assert picker.pages.currentIndex() == 0 and picker.buttons['fr'].hasFocus()
+    assert window.current_interface_language == initial
+
+
+def test_real_proxy_mouse_release_leaves_language_ready_for_keyboard(window, app):
+    settle(app)
+    controller = window._ui_scale_controller
+    view = controller.view
+    QTest.mouseClick(view.viewport(), QtCore.Qt.LeftButton,
+                     pos=controller.map_widget_to_view(window.flag_button))
+    settle(app)
+    picker = window._interface_language_picker
+    assert picker.buttons[window.current_interface_language].hasFocus()
+    QTest.mouseClick(view.viewport(), QtCore.Qt.LeftButton,
+                     pos=controller.map_widget_to_view(picker.buttons['es']))
+    settle(app)
+    assert picker.buttons['es'].hasFocus()
+    # Dispatch at the real graphics view, rather than directly at a button.
+    QTest.keyClick(view.viewport(), QtCore.Qt.Key_Right)
+    settle(app)
+    assert picker.buttons['de'].hasFocus()
+    QTest.keyClick(view.viewport(), QtCore.Qt.Key_Return)
+    settle(app)
+    assert window.current_interface_language == 'de'
+    assert picker.height() == picker.PANEL_HEIGHT and picker.y() > 0
+
+
 @pytest.mark.parametrize('locale', list(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_picker_fits_at_all_interface_scales_in_both_themes(window, app, locale):
     window.set_interface_language(locale)
@@ -149,8 +246,8 @@ def test_picker_fits_at_all_interface_scales_in_both_themes(window, app, locale)
             assert picker.pages.currentIndex() == list(main.INTERFACE_LANGUAGE_BY_CODE).index(locale) // 10
             assert picker.buttons[locale].isVisible()
             assert picker.title.fontMetrics().horizontalAdvance(picker.title.text()) <= picker.title.width()
-            for page in ('0', '1'):
-                picker.pager.setValue(page)
+            for page in (0, 1):
+                picker.set_page(page)
                 settle(app)
                 for label in picker.name_labels.values():
                     if label.isVisible():

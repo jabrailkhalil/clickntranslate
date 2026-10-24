@@ -54,6 +54,41 @@ EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff', '.gif'}
 MAX_PIXELS = 16_000_000
 MAX_BYTES = 32 * 1024 * 1024
 
+ATTACHMENT_TEXT = {
+    'en': ('Browse', 'Choose a document or image. You can also drop a file here or paste it with Ctrl+V.', 'Supported files'),
+    'ru': ('Обзор', 'Выберите документ или изображение. Также можно перетащить файл сюда или вставить его через Ctrl+V.', 'Поддерживаемые файлы'),
+    'es': ('Examinar', 'Elige un documento o una imagen. También puedes arrastrar un archivo aquí o pegarlo con Ctrl+V.', 'Archivos compatibles'),
+    'de': ('Durchsuchen', 'Dokument oder Bild auswählen. Du kannst eine Datei auch hierher ziehen oder mit Ctrl+V einfügen.', 'Unterstützte Dateien'),
+    'fr': ('Parcourir', 'Choisissez un document ou une image. Vous pouvez aussi déposer un fichier ici ou le coller avec Ctrl+V.', 'Fichiers pris en charge'),
+    'zh': ('浏览', '选择文档或图片。也可以将文件拖到这里，或按 Ctrl+V 粘贴。', '支持的文件'),
+    'pt': ('Procurar', 'Escolha um documento ou uma imagem. Você também pode arrastar um arquivo aqui ou colá-lo com Ctrl+V.', 'Arquivos compatíveis'),
+    'it': ('Sfoglia', 'Scegli un documento o un’immagine. Puoi anche trascinare qui un file o incollarlo con Ctrl+V.', 'File supportati'),
+    'ar': ('استعراض', 'اختر مستندًا أو صورة. يمكنك أيضًا سحب ملف إلى هنا أو لصقه باستخدام Ctrl+V.', 'الملفات المدعومة'),
+    'tr': ('Gözat', 'Bir belge veya görüntü seçin. Dosyayı buraya sürükleyebilir veya Ctrl+V ile yapıştırabilirsiniz.', 'Desteklenen dosyalar'),
+    'hi': ('ब्राउज़ करें', 'दस्तावेज़ या इमेज चुनें। फ़ाइल यहाँ खींचकर छोड़ सकते हैं या Ctrl+V से चिपका सकते हैं।', 'समर्थित फ़ाइलें'),
+    'id': ('Telusuri', 'Pilih dokumen atau gambar. Anda juga dapat meletakkan berkas di sini atau menempelkannya dengan Ctrl+V.', 'Berkas yang didukung'),
+}
+
+
+def attachment_text(locale, key):
+    text = ATTACHMENT_TEXT.get(locale, ATTACHMENT_TEXT['en'])[('browse', 'hint', 'files').index(key)]
+    if key == 'hint' and QtWidgets.QApplication.instance() is not None:
+        text = text.replace('Ctrl+V', QtGui.QKeySequence(QtGui.QKeySequence.Paste).toString(QtGui.QKeySequence.NativeText))
+    return text
+
+
+def browse_icon(dark=True):
+    pixmap = QtGui.QPixmap(24, 24)
+    pixmap.fill(QtCore.Qt.transparent)
+    painter = QtGui.QPainter(pixmap)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing)
+    painter.setPen(QtGui.QPen(QtGui.QColor('#eeeaf2' if dark else '#332a3d'), 1.6,
+                              QtCore.Qt.SolidLine, QtCore.Qt.RoundCap))
+    painter.drawEllipse(QtCore.QRectF(3, 3, 12, 12))
+    painter.drawLine(QtCore.QPointF(13.5, 13.5), QtCore.QPointF(21, 21))
+    painter.end()
+    return QtGui.QIcon(pixmap)
+
 
 def image_text(locale, key):
     text = TEXT.get(locale, TEXT['en'])[key]
@@ -118,9 +153,9 @@ class ImageInputTextEdit(QtWidgets.QTextEdit):
         return has_image_mime(mime) or bool(self._document_path(mime)) or super().canInsertFromMimeData(mime)
 
     def keyPressEvent(self, event):
-        if event.matches(QtGui.QKeySequence.Paste) and self.receivers(self.image_requested) and not self.isReadOnly():
+        if event.matches(QtGui.QKeySequence.Paste) and not self.isReadOnly():
             mime = QtWidgets.QApplication.clipboard().mimeData()
-            if has_image_mime(mime):
+            if (self.receivers(self.image_requested) and has_image_mime(mime)) or self._document_path(mime):
                 self.insertFromMimeData(mime)
                 event.accept()
                 return

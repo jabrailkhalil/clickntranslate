@@ -2927,6 +2927,13 @@ def document_file_filter(lang="en"):
     return f"{doc_text(lang, 'documents_filter')} ({extensions});;{doc_text(lang, 'all_files_filter')} (*.*)"
 
 
+def attachment_file_filter(lang='en'):
+    from image_input import EXTENSIONS, attachment_text, image_filter
+    patterns = ' '.join('*'+extension for extension in sorted(SUPPORTED_EXTENSIONS | EXTENSIONS))
+    return (f"{attachment_text(lang, 'files')} ({patterns});;{image_filter(lang)};;"
+            + document_file_filter(lang))
+
+
 def translation_save_filter(lang="en"):
     return (
         f"{doc_text(lang, 'text_file_filter')} (*.txt);;"
@@ -6991,7 +6998,8 @@ def _translation_progress_message(label, done=0, total=0):
     return ''
 
 
-from image_input import ImageInputTextEdit, ImageImportController, image_text, image_filter, image_icon, image_from_mime, has_image_mime
+from image_input import (ImageInputTextEdit, ImageImportController, image_text,
+                         image_from_mime, has_image_mime, is_image_file, attachment_text, browse_icon)
 
 
 class TranslateOnEnterTextEdit(ImageInputTextEdit):
@@ -7066,8 +7074,8 @@ class _ResultWindowOutsideCloseFilter(QtCore.QObject):
         return False
 
 
-def _open_translation_packages(widget, engine, source='', target=''):
-    """Open the actual installer tab, including from standalone result windows."""
+def _translation_app_owner(widget):
+    """Find the app hosting a result, including standalone capture processes."""
     from PyQt5 import sip
     owner = widget
     while owner is not None and not callable(getattr(owner, 'show_settings', None)):
@@ -7084,6 +7092,12 @@ def _open_translation_packages(widget, engine, source='', target=''):
         owner.setAttribute(Qt.WA_DeleteOnClose, True)
         QApplication.instance()._translation_settings_host = owner
         widget._translation_settings_host = owner
+    return owner
+
+
+def _open_translation_packages(widget, engine, source='', target=''):
+    """Open the actual installer tab, including from standalone result windows."""
+    owner = _translation_app_owner(widget)
     owner.show()
     owner.show_settings()
     owner.settings_window.show_ocr_language_manager(engine, source, target)
@@ -7248,6 +7262,8 @@ class TranslationResultDialog(QDialog):
         self.image_importer.busy_changed.connect(self._image_busy_changed)
         self.source_edit.image_requested.connect(self._import_image)
         self.text_edit.image_requested.connect(self._import_image)
+        self.source_edit.file_requested.connect(self._open_attachment)
+        self.text_edit.file_requested.connect(self._open_attachment)
         self.source_text = self.source_edit.toPlainText()
         self.translated_text = self.text_edit.toPlainText()
         self.source_panel = self._editor_panel(self.text["source_tab"], self.source_combo, self.source_edit)
@@ -7285,11 +7301,11 @@ class TranslationResultDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
-        self.image_button = QPushButton(image_text(self.lang, 'open'))
-        self.image_button.setIcon(image_icon(theme != 'Светлая'))
-        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'hint')))
+        self.image_button = QPushButton(attachment_text(self.lang, 'browse'))
+        self.image_button.setIcon(browse_icon(theme != 'Светлая'))
+        self.image_button.setToolTip(tooltip_text(attachment_text(self.lang, 'hint')))
         self.image_button.setAutoDefault(False)
-        self.image_button.clicked.connect(self._choose_image)
+        self.image_button.clicked.connect(self._choose_attachment)
         buttons.addWidget(self.image_button)
         self.close_button = QPushButton(ui_text(self.lang, "close"))
         self.close_button.setObjectName("translationResultClose")
@@ -7599,14 +7615,22 @@ class TranslationResultDialog(QDialog):
         self._status_message = str(message)
         self._render_status()
 
-    def _choose_image(self):
+    def _choose_attachment(self):
         if self.image_importer.busy:
             self.image_importer.cancel()
             self._set_status(self.text['ready'])
             return
-        path, _ = QFileDialog.getOpenFileName(self, image_text(self.lang, 'open'), '', image_filter(self.lang))
+        path, _ = QFileDialog.getOpenFileName(self, attachment_text(self.lang, 'browse'), '', attachment_file_filter(self.lang))
         if path:
+            self._open_attachment(path)
+
+    def _open_attachment(self, path):
+        if self.image_importer.busy:
+            return
+        if is_image_file(path):
             self._import_image(path)
+        else:
+            _translation_app_owner(self).open_document_translation(path)
 
     def _import_image(self, payload):
         if self.image_importer.busy:
@@ -7620,8 +7644,8 @@ class TranslationResultDialog(QDialog):
         self.text_edit.setReadOnly(busy)
         for control in (self.source_combo, self.target_combo, self.engine_combo, self.swap_button):
             control.setEnabled(not busy)
-        self.image_button.setText(image_text(self.lang, 'cancel' if busy else 'open'))
-        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel' if busy else 'hint')))
+        self.image_button.setText(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'browse'))
+        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'hint')))
         self._update_actions()
         if busy:
             self.translate_button.setEnabled(False)
@@ -7706,8 +7730,8 @@ class TranslationResultDialog(QDialog):
         self.source_toggle.setToolTip(tooltip_text(toggle))
         self.source_toggle.setAccessibleName(toggle)
         busy = self.image_importer.busy
-        self.image_button.setText(image_text(self.lang, 'cancel' if busy else 'open'))
-        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel' if busy else 'hint')))
+        self.image_button.setText(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'browse'))
+        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'hint')))
         status = self._status_message
         for key, value in old_text.items():
             if value == status and key in self.text:
@@ -8076,7 +8100,7 @@ class TranslationResultDialog(QDialog):
             combo.set_popup_background(surface)
         self.copy_button.setIcon(clipboard_copy_icon(theme))
         self.copy_button.setIconSize(QSize(18, 18))
-        self.image_button.setIcon(image_icon(dark))
+        self.image_button.setIcon(browse_icon(dark))
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
@@ -13398,7 +13422,7 @@ class DarkThemeApp(QMainWindow):
             image_action = getattr(self, 'main_image_button', None)
             if isinstance(image_action, QPushButton):
                 image_action.setStyleSheet(button_qss(is_dark, 'quiet', icon=True) + tooltip_stylesheet(is_dark))
-                image_action.setIcon(image_icon(is_dark))
+                image_action.setIcon(browse_icon(is_dark))
                 image_action.setIconSize(QSize(24, 24))
             button.setStyleSheet(
                 button_qss(is_dark, "quiet", icon=True)
@@ -13579,7 +13603,10 @@ class DarkThemeApp(QMainWindow):
         self._position_interface_language_picker()
         picker.show()
         picker.raise_()
-        picker.setFocus(Qt.OtherFocusReason)
+        picker.focus_current_language()
+        # The graphics proxy finishes restoring mouse focus after clicked().
+        QtCore.QTimer.singleShot(0, lambda: picker.focus_current_language()
+                                if self._interface_language_picker is picker else None)
 
     def _position_interface_language_picker(self, *_args):
         picker = getattr(self, '_interface_language_picker', None)
@@ -13587,13 +13614,13 @@ class DarkThemeApp(QMainWindow):
             return
         # A child overlay stays in the same scaled canvas and never removes
         # settings, hides their contents or changes the layout's minimum size.
-        anchor = self.settings_window if self.settings_window is not None else self.main_text_section
-        origin = anchor.mapTo(self.central_widget, QtCore.QPoint())
-        height = max(140, self.main_text_section.height())
-        if self.settings_window is not None:
-            origin.setY(origin.y()+8)
-        available = self.central_widget.height()-origin.y()-14
-        picker.setGeometry(origin.x(), origin.y(), anchor.width(), min(height, available))
+        # New page widgets can still have QWidget's default 640x480 geometry.
+        # Anchor to the persistent canvas margins, independent of their layout.
+        margins = self.main_layout.contentsMargins()
+        top = margins.top() + (8 if self.settings_window is not None else 0)
+        picker.setGeometry(margins.left(), top,
+                           self.central_widget.width()-margins.left()-margins.right(),
+                           picker.PANEL_HEIGHT)
         picker.raise_()
 
     def _close_interface_language_picker(self, restore_focus=True):
@@ -14385,10 +14412,10 @@ class DarkThemeApp(QMainWindow):
         self.main_image_button = ScaledIconButton()
         self.main_image_button.setObjectName('mainImageButton')
         self.main_image_button.setFixedSize(28, 28)
-        self.main_image_button.setIcon(image_icon(self.current_theme != 'Светлая'))
-        self.main_image_button.setAccessibleName(image_text(self.current_interface_language, 'open'))
-        self.main_image_button.setToolTip(tooltip_text(image_text(self.current_interface_language, 'hint')))
-        self.main_image_button.clicked.connect(self._choose_main_image)
+        self.main_image_button.setIcon(browse_icon(self.current_theme != 'Светлая'))
+        self.main_image_button.setAccessibleName(attachment_text(self.current_interface_language, 'browse'))
+        self.main_image_button.setToolTip(tooltip_text(attachment_text(self.current_interface_language, 'hint')))
+        self.main_image_button.clicked.connect(self._choose_main_attachment)
         composer_actions_layout.addWidget(self.main_image_button, 0, Qt.AlignHCenter | Qt.AlignTop)
 
         composer_actions_layout.addStretch(1)
@@ -15040,8 +15067,6 @@ class DarkThemeApp(QMainWindow):
 
     def _add_document_context_actions(self, menu):
         lang = self.current_interface_language
-        image_action = menu.addAction(image_text(lang, 'open'))
-        image_action.triggered.connect(self._choose_main_image)
         file_action = menu.addAction(doc_text(lang, "context_translate_file"))
         file_action.triggered.connect(self._choose_document_from_main)
         folder_action = menu.addAction(doc_text(lang, "context_choose_folder"))
@@ -15079,10 +15104,10 @@ class DarkThemeApp(QMainWindow):
             self,
             doc_text(self.current_interface_language, "attach_file"),
             initial_dir or "",
-            document_file_filter(self.current_interface_language),
+            attachment_file_filter(self.current_interface_language),
         )
         if path:
-            self.open_document_translation(path)
+            self._open_main_attachment(path)
 
     def _ensure_image_importer(self):
         if getattr(self, '_image_importer', None) is None:
@@ -15091,15 +15116,21 @@ class DarkThemeApp(QMainWindow):
             self._image_importer.failed.connect(self._main_image_failed)
             self._image_importer.busy_changed.connect(self._main_image_busy_changed)
 
-    def _choose_main_image(self):
+    def _choose_main_attachment(self):
         self._ensure_image_importer()
         if self._image_importer.busy:
             self._image_importer.cancel()
             self._refresh_main_result_caption()
             return
-        path, _ = QFileDialog.getOpenFileName(self, image_text(self.current_interface_language, 'open'), '', image_filter(self.current_interface_language))
+        path, _ = QFileDialog.getOpenFileName(self, attachment_text(self.current_interface_language, 'browse'), '', attachment_file_filter(self.current_interface_language))
         if path:
+            self._open_main_attachment(path)
+
+    def _open_main_attachment(self, path):
+        if is_image_file(path):
             self._import_main_image(path)
+        else:
+            self.open_document_translation(path)
 
     def _import_main_image(self, payload):
         self._ensure_image_importer()
@@ -15116,7 +15147,10 @@ class DarkThemeApp(QMainWindow):
             self.text_input.setReadOnly(busy)
             for control in (self.source_lang, self.target_lang, self.main_language_swap):
                 control.setEnabled(not busy)
-            self.main_image_button.setToolTip(tooltip_text(image_text(self.current_interface_language, 'cancel' if busy else 'hint')))
+            self.main_image_button.setToolTip(tooltip_text(image_text(self.current_interface_language, 'cancel') if busy
+                                                         else attachment_text(self.current_interface_language, 'hint')))
+            self.main_image_button.setAccessibleName(image_text(self.current_interface_language, 'cancel') if busy
+                                                    else attachment_text(self.current_interface_language, 'browse'))
             self._update_main_translate_button()
             if busy:
                 self.translate_button.setEnabled(False)
@@ -15189,6 +15223,20 @@ class DarkThemeApp(QMainWindow):
             self._choose_document_from_main()
             event.accept()
             return
+        if (event.matches(QtGui.QKeySequence.Paste) and self.settings_window is None
+                and getattr(self, '_interface_language_picker', None) is None
+                and not getattr(getattr(self, '_image_importer', None), 'busy', False)):
+            mime = QApplication.clipboard().mimeData()
+            image = image_from_mime(mime)
+            if image is not None:
+                self._import_main_image(image)
+                event.accept()
+                return
+            path = next((url.toLocalFile() for url in mime.urls() if url.isLocalFile()), '')
+            if path:
+                self._open_main_attachment(path)
+                event.accept()
+                return
         super().keyPressEvent(event)
 
     def _main_mouse_global_position(self, event):

@@ -1,11 +1,9 @@
 """Paged language selection in the home panel, using the shared UI chrome."""
-import math
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from button_styles import button_palette, button_qss
-from number_controls import ChoiceStepper
 from styled_dialogs import tooltip_text
+from ui_scaling import ScaleArrowButton
 
 
 PICKER_TEXT = {
@@ -48,6 +46,8 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
     languageSelected = QtCore.pyqtSignal(str)
     dismissed = QtCore.pyqtSignal()
     PAGE_SIZE = 10
+    COLUMNS = 5
+    PANEL_HEIGHT = 144
 
     def __init__(self, options, current, resource_path, parent=None, *, dark=True):
         super().__init__(parent)
@@ -55,7 +55,10 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.buttons, self.name_labels, self.ticks = {}, {}, {}
-        self._dark = dark
+        self._codes = tuple(option['code'] for option in options)
+        self._current = current
+        self._button_indexes = {}
+        self.setFixedHeight(self.PANEL_HEIGHT)
         texts = PICKER_TEXT.get(current, PICKER_TEXT['en'])
         body = QtWidgets.QVBoxLayout(self)
         body.setContentsMargins(1, 1, 1, 1)
@@ -65,28 +68,14 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         row = QtWidgets.QHBoxLayout(header)
         row.setContentsMargins(6, 0, 6, 0)
         row.setSpacing(4)
-        count = max(1, math.ceil(len(options) / self.PAGE_SIZE))
         spacer = QtWidgets.QWidget(header)
-        spacer.setFixedWidth(120 if count > 1 else 22)
+        spacer.setFixedWidth(22)
         row.addWidget(spacer)
         self.title = QtWidgets.QLabel(texts[0], header)
         self.title.setObjectName('interfaceLanguageTitle')
         self.title.setAlignment(QtCore.Qt.AlignCenter)
         self.title.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
         row.addWidget(self.title, 1)
-        self.pager = ChoiceStepper([(str(i), f'{i+1} / {count}') for i in range(count)],
-                                   header, dark=dark, font_size=12)
-        page_width = self.pager.editor.fontMetrics().horizontalAdvance(f'{count} / {count}')
-        self.pager.setFixedSize(max(94, page_width+64), 22)
-        spacer.setFixedWidth(self.pager.width()+26 if count > 1 else 22)
-        self.pager.setVisible(count > 1)
-        self.pager.setAccessibleName(texts[0])
-        self.pager.editor.setAccessibleName(texts[0])
-        self.pager.editor.setToolTip(tooltip_text(texts[0]))
-        for button, label in ((self.pager.decrease, texts[1]), (self.pager.increase, texts[2])):
-            button.setToolTip(tooltip_text(label))
-            button.setAccessibleName(label)
-        row.addWidget(self.pager)
         self.close_button = QtWidgets.QToolButton(header)
         self.close_button.setText('×')
         self.close_button.setFixedSize(22, 22)
@@ -94,15 +83,34 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.close_button.setToolTip(tooltip_text(texts[3]))
         self.close_button.setAccessibleName(texts[3])
         self.close_button.clicked.connect(self.dismissed)
+        self.close_button.installEventFilter(self)
         row.addWidget(self.close_button)
         body.addWidget(header)
         self.choices = _RoundedChoices(self)
         self.choices.setObjectName('interfaceLanguageChoices')
-        self.pages = QtWidgets.QStackedLayout(self.choices)
+        choices_layout = QtWidgets.QHBoxLayout(self.choices)
+        choices_layout.setContentsMargins(2, 0, 2, 0)
+        choices_layout.setSpacing(0)
+        self.previous_button = ScaleArrowButton(self.choices)
+        self.next_button = ScaleArrowButton(self.choices)
+        for button, glyph, label in ((self.previous_button, '‹', texts[1]),
+                                     (self.next_button, '›', texts[2])):
+            button.setText(glyph)
+            button.setFixedSize(24, 32)
+            button.setFocusPolicy(QtCore.Qt.TabFocus)
+            button.setCursor(QtCore.Qt.PointingHandCursor)
+            button.setToolTip(tooltip_text(label))
+            button.setAccessibleName(label)
+            button.installEventFilter(self)
+        choices_layout.addWidget(self.previous_button, 0, QtCore.Qt.AlignVCenter)
+        pages_host = QtWidgets.QWidget(self.choices)
+        choices_layout.addWidget(pages_host, 1)
+        choices_layout.addWidget(self.next_button, 0, QtCore.Qt.AlignVCenter)
+        self.pages = QtWidgets.QStackedLayout(pages_host)
         self.pages.setContentsMargins(0, 0, 0, 0)
         selected_page = 0
         for offset in range(0, len(options), self.PAGE_SIZE):
-            page = QtWidgets.QWidget(self.choices)
+            page = QtWidgets.QWidget(pages_host)
             grid = QtWidgets.QGridLayout(page)
             grid.setContentsMargins(0, 0, 0, 0)
             grid.setSpacing(0)
@@ -117,14 +125,16 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                     option = options[offset+index]
                     code, name = option['code'], option['name']
                     cell = QtWidgets.QPushButton(page)
-                    cell.setFocusPolicy(QtCore.Qt.TabFocus)
+                    cell.setFocusPolicy(QtCore.Qt.StrongFocus)
                     cell.setCursor(QtCore.Qt.PointingHandCursor)
                     cell.setAccessibleName(name)
                     cell.setToolTip(tooltip_text(name))
                     cell.clicked.connect(lambda _checked=False, code=code: self.languageSelected.emit(code))
+                    cell.installEventFilter(self)
+                    self._button_indexes[cell] = offset+index
                     content = QtWidgets.QHBoxLayout(cell)
-                    content.setContentsMargins(9, 0, 7, 0)
-                    content.setSpacing(6)
+                    content.setContentsMargins(7, 0, 5, 0)
+                    content.setSpacing(5)
                     flag = QtWidgets.QLabel(cell)
                     flag.setFixedSize(18, 18)
                     flag.setAlignment(QtCore.Qt.AlignCenter)
@@ -155,13 +165,79 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                 cell.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Expanding)
                 grid.addWidget(cell, index // 5, index % 5)
             self.pages.addWidget(page)
-        self.pager.valueChanged.connect(lambda value: self.pages.setCurrentIndex(int(value)))
-        self.pager.setValue(str(selected_page))
+        self.previous_button.clicked.connect(lambda: self.set_page(self.pages.currentIndex()-1, focus=True))
+        self.next_button.clicked.connect(lambda: self.set_page(self.pages.currentIndex()+1, focus=True))
+        self.set_page(selected_page)
         body.addWidget(self.choices, 1)
         self.set_theme(dark)
         escape = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         escape.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         escape.activated.connect(self.dismissed)
+
+    def set_page(self, page, *, focus=False):
+        self.pages.setCurrentIndex(max(0, min(self.pages.count()-1, page)))
+        self.previous_button.setEnabled(self.pages.currentIndex() > 0)
+        self.next_button.setEnabled(self.pages.currentIndex() < self.pages.count()-1)
+        for button in (self.previous_button, self.next_button):
+            button.setVisible(self.pages.count() > 1)
+        if focus:
+            self._focus_index(self.pages.currentIndex()*self.PAGE_SIZE)
+
+    def _focus_index(self, index, reason=QtCore.Qt.TabFocusReason):
+        index = max(0, min(len(self._codes)-1, index))
+        self.set_page(index//self.PAGE_SIZE)
+        self.buttons[self._codes[index]].setFocus(reason)
+
+    def focus_current_language(self):
+        self._focus_index(self._codes.index(self._current), QtCore.Qt.OtherFocusReason)
+
+    def eventFilter(self, watched, event):
+        if event.type() != QtCore.QEvent.KeyPress:
+            return super().eventFilter(watched, event)
+        key = event.key()
+        if key in (QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab):
+            first = self.pages.currentIndex()*self.PAGE_SIZE
+            controls = [self.buttons[code] for code in self._codes[first:first+self.PAGE_SIZE]]
+            controls += [button for button in (self.previous_button, self.next_button, self.close_button)
+                         if button.isVisible() and button.isEnabled()]
+            backwards = key == QtCore.Qt.Key_Backtab or bool(event.modifiers() & QtCore.Qt.ShiftModifier)
+            index = controls.index(watched) if watched in controls else 0
+            controls[(index+(-1 if backwards else 1)) % len(controls)].setFocus(
+                QtCore.Qt.BacktabFocusReason if backwards else QtCore.Qt.TabFocusReason)
+        elif key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Space):
+            watched.click()
+        elif key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down,
+                     QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown, QtCore.Qt.Key_Home, QtCore.Qt.Key_End):
+            index = self._button_indexes.get(watched, self.pages.currentIndex()*self.PAGE_SIZE)
+            page, slot = divmod(index, self.PAGE_SIZE)
+            row, column = divmod(slot, self.COLUMNS)
+            target = index
+            if key in (QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown):
+                page += -1 if key == QtCore.Qt.Key_PageUp else 1
+                page = max(0, min(self.pages.count()-1, page))
+                target = min(page*self.PAGE_SIZE+slot, len(self._codes)-1)
+            elif key == QtCore.Qt.Key_Home:
+                target = 0
+            elif key == QtCore.Qt.Key_End:
+                target = len(self._codes)-1
+            elif key in (QtCore.Qt.Key_Up, QtCore.Qt.Key_Down):
+                candidate = index+(-self.COLUMNS if key == QtCore.Qt.Key_Up else self.COLUMNS)
+                if 0 <= candidate < len(self._codes) and candidate//self.PAGE_SIZE == page:
+                    target = candidate
+            elif key == QtCore.Qt.Key_Right:
+                if column < self.COLUMNS-1 and index+1 < min((page+1)*self.PAGE_SIZE, len(self._codes)):
+                    target = index+1
+                elif page < self.pages.count()-1:
+                    target = min((page+1)*self.PAGE_SIZE+row*self.COLUMNS, len(self._codes)-1)
+            elif column > 0:
+                target = index-1
+            elif page > 0:
+                target = (page-1)*self.PAGE_SIZE+row*self.COLUMNS+self.COLUMNS-1
+            self._focus_index(target)
+        else:
+            return super().eventFilter(watched, event)
+        event.accept()
+        return True
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
@@ -171,7 +247,6 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         super().keyPressEvent(event)
 
     def set_theme(self, dark):
-        self._dark = dark
         colors = button_palette(dark)
         ink, surface, edge, frame = (('#f2eff6', '#121116', '#433a4c', '#62566e') if dark
                                     else ('#27222d', '#f8f5fb', '#d7cde3', '#927cab'))
@@ -198,7 +273,9 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         for cell in self.choices.findChildren(QtWidgets.QWidget, 'interfaceLanguageCell'):
             cell.setStyleSheet(cell_style)
         self.close_button.setStyleSheet(button_qss(dark, 'quiet', selector='QToolButton', icon=True, radius=4))
-        self.pager.set_theme(dark)
+        for button in (self.previous_button, self.next_button):
+            button.setStyleSheet(button_qss(dark, 'quiet', selector='QToolButton', icon=True, radius=4)
+                                + 'QToolButton:disabled {background:transparent; border-color:transparent;}')
         check = QtGui.QPixmap(24, 28)
         check.setDevicePixelRatio(2)
         check.fill(QtCore.Qt.transparent)
@@ -214,11 +291,9 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
     def set_language(self, current):
         """Apply a choice immediately and keep the current language page open."""
         texts = PICKER_TEXT.get(current, PICKER_TEXT['en'])
+        self._current = current
         self.title.setText(texts[0])
-        self.pager.setAccessibleName(texts[0])
-        self.pager.editor.setAccessibleName(texts[0])
-        self.pager.editor.setToolTip(tooltip_text(texts[0]))
-        for button, label in ((self.pager.decrease, texts[1]), (self.pager.increase, texts[2]),
+        for button, label in ((self.previous_button, texts[1]), (self.next_button, texts[2]),
                               (self.close_button, texts[3])):
             button.setToolTip(tooltip_text(label))
             button.setAccessibleName(label)

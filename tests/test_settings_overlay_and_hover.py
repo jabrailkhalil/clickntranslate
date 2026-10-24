@@ -58,7 +58,7 @@ def test_language_changes_live_while_the_same_overlay_stays_open(window, app, pa
     window.show_interface_language_menu()
     picker = window._interface_language_picker
     for index, locale in enumerate(main.INTERFACE_LANGUAGE_BY_CODE):
-        picker.pager.setValue(str(index//10))
+        picker.set_page(index//10)
         picker.buttons[locale].click()
         settle(app)
         assert window.current_interface_language == locale
