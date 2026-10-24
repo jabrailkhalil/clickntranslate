@@ -87,7 +87,7 @@ Configure suas chaves OpenAI, Gemini, Claude, DeepL, LibreTranslate ou Custom AP
 
 O OCR local mantém as imagens no dispositivo. Serviços online recebem o texto; uma API de visão habilitada recebe também a imagem selecionada. Aplicam-se preços e limites do serviço. [Privacidade](../../PRIVACY.md).
 
-Nove idiomas de interface, incluindo português, italiano e árabe com layout da direita para a esquerda, com dicas e guia; temas claro e escuro; escala e tamanho do texto do resultado separados; atalhos personalizados; importação/exportação e históricos locais opcionais.
+Doze idiomas de interface, incluindo português, italiano e árabe com layout da direita para a esquerda, com dicas e guia; temas claro e escuro; escala e tamanho do texto do resultado separados; atalhos personalizados; importação/exportação e históricos locais opcionais.
 
 Python está incluído. Windows e Mac usam o certificado autoassinado jabrailkhalil: o SmartScreen pode avisar e o app Mac não é notarizado pela Apple. [Primeiro uso](../guides/setup.en.md). No Mac, conceda gravação de tela e acessibilidade às funções correspondentes. [Linux e atalhos](../LINUX.md).
 

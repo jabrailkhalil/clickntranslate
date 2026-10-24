@@ -87,6 +87,40 @@ TEXT = {
      'retry': 'ثم أعد المحاولة. أعد تشغيل التطبيق إذا طلب macOS ذلك.',
      'python': 'عند تشغيل نسخة Python، قد يعرض macOS اسم Python أو Terminal بدلًا من اسم التطبيق.',
      'vision_note': 'مدمج في macOS. يدير النظام اللغات، ولا يلزم تنزيل حزم.'},
+
+    'tr': {'title': 'macOS izni',
+     'open': 'Ayarları aç',
+     'later': 'Daha sonra',
+     'screen': "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı bölümünde Click’n’Translate'e "
+               'izin verin. Ekrandaki metni tanımak için gereklidir.',
+     'accessibility': 'Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik bölümünde '
+                      "Click’n’Translate'e izin verin. Diğer uygulamalardaki seçili metni kopyalayıp "
+                      'değiştirmek için gereklidir.',
+     'retry': 'Ardından işlemi tekrar deneyin. macOS isterse uygulamayı yeniden başlatın.',
+     'python': 'Python sürümünde macOS, uygulama yerine Python veya Terminal gösterebilir.',
+     'vision_note': "macOS'e yerleşiktir. Dilleri sistem yönetir; paket indirmeniz gerekmez."},
+    'hi': {'title': 'macOS अनुमति',
+     'open': 'सेटिंग्स खोलें',
+     'later': 'बाद में',
+     'screen': 'सिस्टम सेटिंग्स → गोपनीयता और सुरक्षा → स्क्रीन रिकॉर्डिंग में Click’n’Translate को '
+               'अनुमति दें। स्क्रीन का टेक्स्ट पढ़ने के लिए ज़रूरी है।',
+     'accessibility': 'सिस्टम सेटिंग्स → गोपनीयता और सुरक्षा → सुलभता में Click’n’Translate को अनुमति '
+                      'दें। दूसरे ऐप का चयन कॉपी करने और बदलने के लिए ज़रूरी है।',
+     'retry': 'फिर क्रिया आज़माएँ। macOS कहे तो ऐप फिर शुरू करें।',
+     'python': 'Python संस्करण चलाने पर macOS ऐप की जगह Python या Terminal दिखा सकता है।',
+     'vision_note': 'macOS में शामिल। भाषाएँ सिस्टम संभालता है; पैकेज डाउनलोड की ज़रूरत नहीं।'},
+    'id': {'title': 'Izin macOS',
+     'open': 'Buka Pengaturan',
+     'later': 'Nanti',
+     'screen': 'Izinkan Click’n’Translate di Pengaturan Sistem → Privasi & Keamanan → Perekaman Layar. '
+               'Ini diperlukan untuk mengenali teks di layar.',
+     'accessibility': 'Izinkan Click’n’Translate di Pengaturan Sistem → Privasi & Keamanan → '
+                      'Aksesibilitas. Ini diperlukan untuk menyalin dan mengganti teks pilihan di '
+                      'aplikasi lain.',
+     'retry': 'Lalu coba lagi tindakannya. Mulai ulang aplikasi jika diminta macOS.',
+     'python': 'Saat menjalankan versi Python, macOS mungkin menampilkan Python atau Terminal, bukan '
+               'aplikasi.',
+     'vision_note': 'Bawaan macOS. Bahasa dikelola sistem; tidak perlu mengunduh paket.'},
 }
 
 

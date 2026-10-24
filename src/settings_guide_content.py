@@ -152,6 +152,68 @@ COPY = {
   'يتعرف طلب واحد على نص الصورة ويترجمه باستخدام النموذج المختار. يستخدم «حفظ واختيار» الخدمة نفسها '
   'للنص العادي أيضًا. تبقى المفاتيح في مخزن النظام ولا تُصدَّر. قد تفرض الخدمة السحابية رسومًا على '
   'الطلبات.'),
+
+ 'tr': ('Çeviri ve sonuç ayarları',
+  'Genel: başlangıç, geçmiş, ipuçları, güncelleme denetimi, sonuç penceresi, arayüz ölçeği ve '
+  'önizlemeli sonuç metin boyutu.',
+  'Çeviri ve OCR: motorlar, yakalama, metni kopyalama ve değiştirme. OCR satırlarını paragraflarda '
+  'birleştir, çeviriden önce bağlantılı metindeki görsel satır sonlarını kaldırır.',
+  'Dil paketleri → API',
+  'Dil paketleri içindeki API sekmesinde hizmet seçip anahtar ve model kimliğini girin. Kaydet ve '
+  'seç çeviri için kullanır; tanıma modu OCR için de seçer. API hizmetleri isteğe bağlıdır.',
+  'Sonuç metni',
+  'Genel bölümündeki Sonuç metni okları çeviri yazı tipini değiştirir; önizleme hemen güncellenir. '
+  'Ölçek tüm arayüzü ayrı değiştirir.',
+  'Sonuçları kapatma',
+  'Dışarı tıklanınca sonucu kapat, Çeviri ve OCR bölümündedir. Başka uygulama kullanırken çeviri '
+  'penceresini kapatmak için açın. Varsayılan olarak kapalıdır.',
+  'Seçim çevirisini başlatma',
+  'Ana pencere → Seçim → dil ayarları veya Kısayolları ayarla → Seçim modu. Seçimden sonra, '
+  'kısayol, metnin yanındaki düğme veya anında çeviri seçilir. Hepsi aynı modu, dilleri ve '
+  'çevirmeni kullanır.',
+  'Tek istek seçili modelle görüntüyü tanır ve çevirir. Kaydet ve seç düz metin için de bu hizmeti '
+  'kullanır. Anahtarlar sistem kasasında kalır, dışa aktarılmaz. Bulut hizmeti ücret alabilir.'),
+ 'hi': ('अनुवाद और परिणाम सेटिंग्स',
+  'सामान्य: स्टार्टअप, इतिहास, संकेत, अपडेट जाँच, परिणाम विंडो, इंटरफ़ेस स्केल और उदाहरण सहित '
+  'परिणाम टेक्स्ट आकार।',
+  'अनुवाद और OCR: इंजन, कैप्चर, टेक्स्ट कॉपी और बदलना। OCR पंक्तियाँ अनुच्छेद में जोड़ें अनुवाद से '
+  'पहले जुड़े टेक्स्ट के दृश्य पंक्ति-विराम हटाता है।',
+  'भाषा पैकेज → API',
+  'भाषा पैकेज के API टैब में सेवा चुनकर कुंजी और मॉडल ID डालें। सहेजें और चुनें से अनुवाद में उपयोग '
+  'होगा; पहचान मोड उसे OCR में भी चुनता है। API सेवाएँ वैकल्पिक हैं।',
+  'परिणाम टेक्स्ट',
+  'सामान्य में परिणाम टेक्स्ट के तीर अनुवाद फ़ॉन्ट बदलते हैं और उदाहरण तुरंत बदलता है। स्केल पूरे '
+  'इंटरफ़ेस को अलग बदलता है।',
+  'परिणाम बंद करना',
+  'बाहर क्लिक पर परिणाम बंद करें अनुवाद और OCR में है। दूसरे ऐप पर क्लिक से अनुवाद विंडो बंद करने '
+  'के लिए चालू करें। डिफ़ॉल्ट में बंद है।',
+  'चयन अनुवाद शुरू करना',
+  'मुख्य विंडो → चयन → भाषा सेटिंग्स, या शॉर्टकट सेट करें → चयन मोड। चयन के बाद में शॉर्टकट, पास का '
+  'बटन या तुरंत अनुवाद चुनें। ये उसी मोड, भाषाओं और अनुवादक को शुरू करने के तरीके हैं।',
+  'एक अनुरोध चुने मॉडल से इमेज पहचानता और अनुवाद करता है। सहेजें और चुनें इसी सेवा को साधारण '
+  'टेक्स्ट के लिए भी लगाता है। कुंजियाँ सिस्टम भंडार में हैं, निर्यात नहीं होतीं। क्लाउड सेवा शुल्क '
+  'ले सकती है।'),
+ 'id': ('Pengaturan terjemahan dan hasil',
+  'Umum: mulai, riwayat, petunjuk, pemeriksaan pembaruan, jendela hasil, skala antarmuka, dan '
+  'ukuran teks hasil dengan pratinjau.',
+  'Terjemahan dan OCR: mesin, tangkapan, penyalinan dan penggantian teks. Gabung baris OCR menjadi '
+  'paragraf menghapus pembungkusan baris sebelum menerjemahkan.',
+  'Paket bahasa → API',
+  'Di tab API pada Paket bahasa, pilih layanan dan masukkan kunci serta ID model. Simpan dan pilih '
+  'memakainya untuk terjemahan; mode pengenalan juga memilihnya untuk OCR. Layanan API opsional.',
+  'Teks hasil',
+  'Di Umum, panah Teks hasil mengubah font terjemahan dan pratinjau langsung diperbarui. Skala '
+  'mengubah seluruh antarmuka secara terpisah.',
+  'Menutup hasil',
+  'Tutup hasil saat klik di luar ada di Terjemahan dan OCR. Aktifkan untuk menutup jendela saat '
+  'memakai aplikasi lain. Bawaan nonaktif.',
+  'Memulai terjemahan pilihan',
+  'Jendela utama → Pilihan → pengaturan bahasa, atau Atur pintasan → Mode pilihan. Setelah memilih '
+  'menentukan pintasan, tombol dekat teks, atau terjemahan langsung. Semuanya memicu mode, bahasa, '
+  'dan penerjemah yang sama.',
+  'Satu permintaan mengenali dan menerjemahkan gambar dengan model pilihan. Simpan dan pilih juga '
+  'memakai layanan ini untuk teks biasa. Kunci tetap di brankas sistem dan tidak diekspor. Layanan '
+  'cloud dapat mengenakan biaya.'),
 }
 
 

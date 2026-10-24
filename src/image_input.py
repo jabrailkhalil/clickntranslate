@@ -17,6 +17,38 @@ TEXT = {
     'pt': {'open': 'Abrir imagem', 'hint': 'Traduza uma foto ou captura de tela. Escolha um arquivo, arraste uma imagem aqui ou cole com Ctrl+V.', 'images': 'Imagens', 'reading': 'Reconhecendo imagem…', 'large': 'A imagem é muito grande. Use uma imagem de até 16 megapixels e um arquivo de até 32 MB.', 'invalid': 'Não foi possível ler a imagem. Escolha um arquivo PNG, JPEG, WebP, BMP, TIFF ou GIF.', 'empty': 'Nenhum texto encontrado. Verifique o mecanismo OCR e o idioma de origem ou tente uma imagem mais nítida.', 'error': 'Não foi possível reconhecer a imagem', 'cancel': 'Cancelar reconhecimento da imagem'},
     'it': {'open': 'Apri immagine', 'hint': 'Traduci una foto o schermata. Scegli un file, trascina qui un’immagine o incollala con Ctrl+V.', 'images': 'Immagini', 'reading': 'Riconoscimento immagine…', 'large': 'L’immagine è troppo grande. Usa un’immagine fino a 16 megapixel e un file fino a 32 MB.', 'invalid': 'Impossibile leggere l’immagine. Scegli un file PNG, JPEG, WebP, BMP, TIFF o GIF.', 'empty': 'Nessun testo trovato. Controlla il motore OCR e la lingua di origine o prova un’immagine più nitida.', 'error': 'Impossibile riconoscere l’immagine', 'cancel': 'Annulla riconoscimento immagine'},
     'ar': {'open': 'فتح صورة', 'hint': 'ترجم صورة أو لقطة شاشة. اختر ملفًا، أو اسحب صورة إلى هنا، أو الصقها باستخدام Ctrl+V.', 'images': 'الصور', 'reading': 'جارٍ التعرف على نص الصورة…', 'large': 'الصورة كبيرة جدًا. استخدم صورة لا تتجاوز 16 ميجابكسل وملفًا لا يتجاوز 32 ميجابايت.', 'invalid': 'تعذر قراءة الصورة. اختر ملف PNG أو JPEG أو WebP أو BMP أو TIFF أو GIF.', 'empty': 'لم يُعثر على نص. تحقق من محرك OCR ولغة المصدر أو جرّب صورة أوضح.', 'error': 'تعذر التعرف على نص الصورة', 'cancel': 'إلغاء التعرف على نص الصورة'},
+
+    'tr': {'open': 'Görüntü aç',
+     'hint': 'Fotoğraf veya ekran görüntüsünü çevirin. Dosya seçin, buraya görüntü bırakın veya Ctrl+V '
+             'ile yapıştırın.',
+     'images': 'Görüntüler',
+     'reading': 'Görüntü okunuyor…',
+     'large': 'Görüntü çok büyük. En fazla 16 megapiksel ve 32 MB dosya kullanın.',
+     'invalid': 'Görüntü okunamadı. PNG, JPEG, WebP, BMP, TIFF veya GIF seçin.',
+     'empty': 'Metin bulunamadı. OCR motoru ve kaynak dilini kontrol edin veya daha net görüntü '
+              'deneyin.',
+     'error': 'Görüntü tanınamadı',
+     'cancel': 'Görüntü tanımayı iptal et'},
+    'hi': {'open': 'इमेज खोलें',
+     'hint': 'फ़ोटो या स्क्रीनशॉट अनुवाद करें। फ़ाइल चुनें, इमेज यहाँ छोड़ें या Ctrl+V से चिपकाएँ।',
+     'images': 'इमेज',
+     'reading': 'इमेज पढ़ी जा रही है…',
+     'large': 'इमेज बहुत बड़ी है। अधिकतम 16 मेगापिक्सेल और 32 MB की फ़ाइल इस्तेमाल करें।',
+     'invalid': 'इमेज पढ़ नहीं सके। PNG, JPEG, WebP, BMP, TIFF या GIF चुनें।',
+     'empty': 'टेक्स्ट नहीं मिला। OCR इंजन और स्रोत भाषा जाँचें या साफ़ इमेज आज़माएँ।',
+     'error': 'इमेज पहचानी नहीं जा सकी',
+     'cancel': 'इमेज पहचान रद्द करें'},
+    'id': {'open': 'Buka gambar',
+     'hint': 'Terjemahkan foto atau tangkapan layar. Pilih berkas, letakkan gambar di sini, atau '
+             'tempel dengan Ctrl+V.',
+     'images': 'Gambar',
+     'reading': 'Membaca gambar…',
+     'large': 'Gambar terlalu besar. Gunakan gambar hingga 16 megapiksel dan berkas hingga 32 MB.',
+     'invalid': 'Gambar tidak dapat dibaca. Pilih PNG, JPEG, WebP, BMP, TIFF, atau GIF.',
+     'empty': 'Teks tidak ditemukan. Periksa mesin OCR dan bahasa sumber, atau coba gambar lebih '
+              'jelas.',
+     'error': 'Gambar tidak dapat dikenali',
+     'cancel': 'Batalkan pengenalan gambar'},
 }
 EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff', '.gif'}
 MAX_PIXELS = 16_000_000

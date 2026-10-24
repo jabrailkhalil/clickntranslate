@@ -63,7 +63,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
     def test_main_reference_text_fits_with_the_longest_provider_name(self):
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
-            for language in ("en", "ru", "de", "fr", "es", "zh", "pt", "it"):
+            for language in tuple(main.INTERFACE_LANGUAGE_BY_CODE):
                 with self.subTest(theme=theme, language=language):
                     self.window.current_interface_language = language
                     self.window.show_main_screen()
@@ -221,7 +221,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
         settings = self.window.settings_window
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
-            for language in ("en", "ru", "de", "fr", "es", "zh", "pt", "it"):
+            for language in tuple(main.INTERFACE_LANGUAGE_BY_CODE):
                 with self.subTest(theme=theme, language=language):
                     self.window.current_interface_language = language
                     settings.update_language()

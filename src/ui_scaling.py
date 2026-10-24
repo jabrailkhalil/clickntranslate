@@ -33,6 +33,16 @@ def configure_qt_platform():
 def configure_interface_style():
     """Keep the custom canvas geometry independent of native Aqua insets."""
     app = QApplication.instance()
+    if app is not None and not getattr(app, '_cnt_script_fonts_ready', False):
+        # A minimal Linux installation may have only Latin fonts. Ship a small
+        # Hindi fallback so selecting the new locale never requires a download.
+        if not QFontDatabase().families(QFontDatabase.Devanagari):
+            from project_paths import resource_root
+            for name in ('NotoSansDevanagari-Regular.ttf', 'NotoSansDevanagari-Bold.ttf'):
+                path = resource_root() / 'icons' / 'fonts' / name
+                if path.is_file():
+                    QFontDatabase.addApplicationFont(str(path))
+        app._cnt_script_fonts_ready = True
     if sys.platform.startswith('linux') and app is not None and not getattr(app, '_cnt_font_alias_ready', False):
         # QSS names Segoe UI throughout the fixed canvas. Its generic Linux
         # fallback is substantially wider; use the installed Arial-compatible

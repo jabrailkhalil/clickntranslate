@@ -34,6 +34,19 @@ GUIDE_SETUP_INTRO = {
      'ابدأ بالتشغيل التلقائي وأيقونة شريط النظام، ثم اضبط الترجمة والالتقاط والاختصارات. توضح كل خطوة '
      'فائدتها وتتيح تطبيق الإعداد. يمكنك تأجيل أي اقتراح.',
      'إعداد التطبيق'),
+
+    'tr': ('Çeviriyi kendinize göre ayarlayın',
+     'Otomatik başlangıç ve tepsiyle başlayın; sonra çeviri, yakalama ve kısayolları ayarlayın. Her '
+     'adım faydasını açıklar ve ayarı uygulamanızı sağlar. Önerileri erteleyebilirsiniz.',
+     'Uygulamayı ayarla'),
+    'hi': ('अनुवाद को अपने अनुकूल बनाएँ',
+     'अपने आप शुरू करने और ट्रे से शुरू करें, फिर अनुवाद, कैप्चर और शॉर्टकट सेट करें। हर कदम फ़ायदा '
+     'समझाकर सेटिंग लागू करने देता है। सुझाव बाद के लिए छोड़ सकते हैं।',
+     'ऐप सेट करें'),
+    'id': ('Sesuaikan terjemahan untuk Anda',
+     'Mulai dengan mulai otomatis dan baki sistem, lalu atur terjemahan, tangkapan, dan pintasan. '
+     'Setiap langkah menjelaskan manfaat dan menerapkan pengaturan. Semua rekomendasi boleh ditunda.',
+     'Siapkan aplikasi'),
 }
 
 GUIDE_LINUX_BODIES = {
@@ -103,6 +116,33 @@ GUIDE_LINUX_BODIES = {
                          'النص المحدد والصق النتيجة يدويًا.',
      'ocr_engine': 'يدعم Linux محركات Tesseract وEasyOCR وRapidOCR. ثبّت المحرك المختار وحزم لغاته قبل '
                    'التعرف على النص. Windows OCR غير متاح هنا.'},
+
+    'tr': {'hotkeys': "Linux'ta masaüstünün klavye ayarlarından kısayol atayın. İstediğiniz birleşimi "
+                'clickntranslate --ocr komutuna bağlayın. Uygulamadaki alanı değiştirmek sistem '
+                'kısayolu oluşturmaz.',
+     'shortcut_selection': 'Başka uygulamada metin seçin. Linux klavye ayarlarında clickntranslate '
+                           '--selection komutuna kısayol atayın.',
+     'shortcut_replace': "Otomatik seçim değiştirme yalnızca Windows'ta kullanılabilir. Linux'ta "
+                         'seçimi çevirip sonucu elle yapıştırın.',
+     'ocr_engine': 'Linux Tesseract, EasyOCR ve RapidOCR destekler. Tanımadan önce motoru ve dil '
+                   'paketlerini kurun. Windows OCR burada yoktur.'},
+    'hi': {'hotkeys': 'Linux में डेस्कटॉप की कीबोर्ड सेटिंग्स से शॉर्टकट बनाएँ। अपनी कुंजी जोड़ी '
+                'clickntranslate --ocr से जोड़ें। ऐप का बॉक्स बदलने से सिस्टम शॉर्टकट नहीं बनता।',
+     'shortcut_selection': 'दूसरे ऐप में टेक्स्ट चुनें। Linux की कीबोर्ड सेटिंग्स में clickntranslate '
+                           '--selection का शॉर्टकट बनाएँ।',
+     'shortcut_replace': 'चयन अपने आप बदलना अभी सिर्फ़ Windows पर है। Linux में चयन का अनुवाद करके '
+                         'परिणाम खुद चिपकाएँ।',
+     'ocr_engine': 'Linux में Tesseract, EasyOCR और RapidOCR हैं। पहचान से पहले इंजन और भाषा पैकेज '
+                   'इंस्टॉल करें। यहाँ Windows OCR नहीं है।'},
+    'id': {'hotkeys': 'Di Linux, atur pintasan pada pengaturan papan ketik desktop. Hubungkan kombinasi '
+                'pilihan ke clickntranslate --ocr. Mengedit kolom dalam aplikasi tidak mendaftarkan '
+                'pintasan sistem.',
+     'shortcut_selection': 'Pilih teks di aplikasi lain. Di pengaturan papan ketik Linux, tetapkan '
+                           'pintasan ke clickntranslate --selection untuk menerjemahkannya.',
+     'shortcut_replace': 'Penggantian pilihan otomatis saat ini hanya tersedia di Windows. Di Linux, '
+                         'terjemahkan pilihan lalu tempel hasil secara manual.',
+     'ocr_engine': 'Linux mendukung Tesseract, EasyOCR, dan RapidOCR. Pasang mesin dan paket bahasanya '
+                   'sebelum pengenalan. Windows OCR tidak tersedia di sini.'},
 }
 
 # config key: (settings widget, page index, recommended value)
@@ -239,6 +279,70 @@ GUIDE_SETUP_LABELS = {
      'done_body': 'اكتمل {ready} من أصل {total} إعدادًا مقترحًا. يمكنك تغيير الباقي لاحقًا وإعادة فتح '
                   'هذا الدليل من المساعدة.',
      'finish_button': 'بدء استخدام التطبيق'},
+
+    'tr': {'completed': 'Rehber tamamlandı',
+     'startup': 'Günlük kullanım',
+     'translation': 'Çeviri',
+     'capture': 'Ekran yakalama',
+     'dynamic': 'Dinamik çeviri',
+     'finish': 'Son dokunuşlar',
+     'enable': 'Aç ve ilerle',
+     'disable': 'Kapat ve ilerle',
+     'next': 'İleri',
+     'later': 'Daha sonra',
+     'open': 'Aç',
+     'close': 'Rehberi kapat',
+     'ready': 'Zaten ayarlandı',
+     'recommended': 'Önerilen: açık',
+     'recommended_off': 'Önerilen: kapalı',
+     'inspect': 'Ayarı kontrol edip devam edin',
+     'failed': 'Ayar uygulanmadı. Tekrar deneyin.',
+     'done': 'Çeviriye hazırsınız!',
+     'done_body': '{total} önerilen ayardan {ready} tanesi hazır. Kalanları sonra değiştirebilir, '
+                  "rehberi Yardım'dan yeniden açabilirsiniz.",
+     'finish_button': 'Uygulamayı kullanmaya başla'},
+    'hi': {'completed': 'गाइड पूरा हुआ',
+     'startup': 'रोज़मर्रा की सेटिंग्स',
+     'translation': 'अनुवाद',
+     'capture': 'स्क्रीन कैप्चर',
+     'dynamic': 'गतिशील अनुवाद',
+     'finish': 'अंतिम सेटिंग्स',
+     'enable': 'चालू करें और आगे बढ़ें',
+     'disable': 'बंद करें और आगे बढ़ें',
+     'next': 'अगला',
+     'later': 'बाद में',
+     'open': 'खोलें',
+     'close': 'गाइड बंद करें',
+     'ready': 'पहले से सेट है',
+     'recommended': 'सुझाव: चालू',
+     'recommended_off': 'सुझाव: बंद',
+     'inspect': 'सेटिंग जाँचकर आगे बढ़ें',
+     'failed': 'सेटिंग लागू नहीं हुई। फिर कोशिश करें।',
+     'done': 'अनुवाद के लिए तैयार!',
+     'done_body': '{total} सुझाई सेटिंग्स में से {ready} तैयार हैं। बाकी बाद में बदल सकते हैं और '
+                  'सहायता से गाइड फिर खोल सकते हैं।',
+     'finish_button': 'ऐप इस्तेमाल करें'},
+    'id': {'completed': 'Panduan selesai',
+     'startup': 'Pengaturan sehari-hari',
+     'translation': 'Terjemahan',
+     'capture': 'Tangkapan layar',
+     'dynamic': 'Terjemahan dinamis',
+     'finish': 'Sentuhan akhir',
+     'enable': 'Aktifkan dan lanjut',
+     'disable': 'Nonaktifkan dan lanjut',
+     'next': 'Berikutnya',
+     'later': 'Nanti',
+     'open': 'Buka',
+     'close': 'Tutup panduan',
+     'ready': 'Sudah diatur',
+     'recommended': 'Disarankan: aktif',
+     'recommended_off': 'Disarankan: nonaktif',
+     'inspect': 'Periksa pengaturan, lalu lanjutkan',
+     'failed': 'Pengaturan tidak diterapkan. Silakan coba lagi.',
+     'done': 'Siap menerjemahkan!',
+     'done_body': '{ready} dari {total} pengaturan yang disarankan siap. Ubah sisanya nanti dan buka '
+                  'kembali panduan dari Bantuan.',
+     'finish_button': 'Mulai gunakan aplikasi'},
 }
 
 # Bodies use the same setting order in every language; titles are read from
@@ -401,6 +505,57 @@ GUIDE_SETTING_BODIES = {
      'تحقق من وجود إصدار جديد عند بدء التشغيل واقترح التحديث عند توفر إصلاحات.',
      'أوقف التعرف على النص مؤقتًا أثناء استخدام تطبيق آخر. تُستأنف الترجمة المستمرة عند العودة.',
      'أظهر النص الأصلي فوق الترجمة للتحقق من الأسماء والمعنى. يمكنك تعطيله لاحقًا لعرض أكثر اختصارًا.'),
+
+    'tr': ('Çeviri ve kısayolların hazır olması için oturum açıldığında uygulamayı başlatın.',
+     'Masaüstünü kaplamak yerine tepside gizli başlayın. Kısayollar çalışır; tepsi simgesi pencereyi '
+     'geri getirir.',
+     'Her biten çeviriyi sohbet veya belgeye yapıştırmak üzere panoya kopyalayın.',
+     'Daha sonra geçmişte bulmak için kaynak metin ve çevirileri yerel kaydedin.',
+     'Pano değişse bile tanınan ve kopyalanan metni yerel geçmişte tutun.',
+     'Penceresi tanınacak metni kapatmasın diye ekran yakalarken uygulamayı gizleyin.',
+     'Alan seçerken görüntüyü dondurun. Video veya değişen pencerelerdeki metni yakalamayı '
+     'kolaylaştırır.',
+     'Seçili alanı belirginleştirmek için çevresini karartın. Yanındaki kaydırıcıyla gücünü ayarlayın.',
+     'Seçim çevirisinden sonra önceki panoyu geri yükleyin. Özellikle panoya istenen sonuçlar orada '
+     'kalır.',
+     'Kısa bildirim kopyalamayı onaylar; kısayolun çalıştığını anlarsınız.',
+     'Başlangıçta yeni sürümü denetleyip düzeltmeler geldiğinde güncelleme önerin.',
+     'Başka uygulama kullanırken tanımayı duraklatın. Geri dönünce dinamik çeviri sürer.',
+     'Adları ve anlamı kontrol etmek için özgün metni çevirinin üstünde gösterin. Küçük görünüm için '
+     'sonra kapatın.'),
+    'hi': ('साइन इन पर ऐप शुरू करें ताकि अनुवाद और शॉर्टकट हमेशा तैयार हों।',
+     'डेस्कटॉप ढकने की जगह ट्रे में छिपाकर शुरू करें। शॉर्टकट काम करते हैं; ट्रे आइकन विंडो वापस लाता '
+     'है।',
+     'हर पूरा अनुवाद क्लिपबोर्ड पर कॉपी करें, चैट या दस्तावेज़ में चिपकाने के लिए।',
+     'स्रोत और अनुवाद स्थानीय रूप से सहेजें ताकि इतिहास में फिर मिलें।',
+     'क्लिपबोर्ड बदलने के बाद भी पहचाना और कॉपी किया टेक्स्ट स्थानीय इतिहास में रखें।',
+     'कैप्चर करते समय ऐप छिपाएँ ताकि उसकी विंडो पढ़ने वाला टेक्स्ट न ढके।',
+     'क्षेत्र चुनते समय दृश्य स्थिर करें। वीडियो या बदलती विंडो का टेक्स्ट कैप्चर करना आसान होगा।',
+     'चुना क्षेत्र स्पष्ट करने के लिए आसपास मंद करें। पास के स्लाइडर से स्तर बदलें।',
+     'चयन अनुवाद के बाद पिछला क्लिपबोर्ड लौटाएँ। जिन्हें स्पष्ट रूप से कॉपी करने को कहा हो वे परिणाम '
+     'रहते हैं।',
+     'छोटी सूचना कॉपी की पुष्टि करती है, ताकि शॉर्टकट चलने का पता हो।',
+     'शुरू होते समय नया संस्करण जाँचें और सुधार उपलब्ध हों तो अपडेट सुझाएँ।',
+     'दूसरे ऐप में होने पर पहचान रोकें। लौटने पर गतिशील अनुवाद फिर शुरू होगा।',
+     'नाम और अर्थ जाँचने के लिए अनुवाद के ऊपर मूल दिखाएँ। छोटा दृश्य चाहिए तो बाद में बंद करें।'),
+    'id': ('Jalankan aplikasi saat masuk agar terjemahan dan pintasan selalu siap.',
+     'Mulai tersembunyi di baki sistem tanpa menutupi desktop. Pintasan tetap bekerja; ikon baki '
+     'mengembalikan jendela.',
+     'Salin setiap terjemahan selesai ke papan klip, siap ditempel ke obrolan atau dokumen.',
+     'Simpan teks sumber dan terjemahan secara lokal agar dapat ditemukan lagi dalam riwayat.',
+     'Simpan teks yang dikenali dan disalin dalam riwayat lokal meskipun papan klip berubah.',
+     'Sembunyikan aplikasi saat menangkap layar agar jendelanya tidak menutupi teks yang ingin '
+     'dikenali.',
+     'Bekukan gambar saat memilih area agar teks dalam video atau jendela berubah lebih mudah '
+     'ditangkap.',
+     'Redupkan sekeliling agar area pilihan jelas. Sesuaikan kekuatan dengan penggeser di sampingnya.',
+     'Pulihkan papan klip sebelumnya setelah menerjemahkan pilihan. Hasil yang diminta secara khusus '
+     'untuk disalin tetap ada.',
+     'Notifikasi singkat mengonfirmasi teks disalin agar Anda tahu pintasan bekerja.',
+     'Periksa versi baru saat mulai dan tawarkan pembaruan saat perbaikan tersedia.',
+     'Jeda pengenalan saat memakai aplikasi lain. Terjemahan dinamis dilanjutkan saat Anda kembali.',
+     'Tampilkan teks asli di atas terjemahan untuk memeriksa nama dan makna. Nonaktifkan nanti untuk '
+     'tampilan ringkas.'),
 }
 
 

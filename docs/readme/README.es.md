@@ -91,7 +91,7 @@ El OCR local mantiene las imágenes en el dispositivo. Los servicios en línea r
 
 ## A tu manera
 
-Nueve idiomas de interfaz, incluido el árabe con diseño de derecha a izquierda, temas claro y oscuro, escala de interfaz, tamaño independiente del texto del resultado, atajos configurables, importación/exportación e historiales locales opcionales. El compañero abre acciones con un clic y puede ocultarse.
+Doce idiomas de interfaz, incluido el árabe con diseño de derecha a izquierda, temas claro y oscuro, escala de interfaz, tamaño independiente del texto del resultado, atajos configurables, importación/exportación e historiales locales opcionales. El compañero abre acciones con un clic y puede ocultarse.
 
 Python viene incluido. Windows y Mac usan el certificado autofirmado jabrailkhalil; puede aparecer SmartScreen y la app de Mac no está notarizada. [Primer inicio](../guides/setup.es.md). En Mac, concede los permisos de grabación de pantalla y accesibilidad para las funciones correspondientes. [Linux y atajos](../LINUX.md).
 

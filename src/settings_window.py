@@ -275,6 +275,10 @@ def _provider_kind_text(kind, lang):
             'it': 'offline',
 
             'ar': 'دون اتصال',
+
+            'tr': 'çevrimdışı',
+            'hi': 'ऑफ़लाइन',
+            'id': 'luring',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -287,6 +291,10 @@ def _provider_kind_text(kind, lang):
         'it': 'online',
 
         'ar': 'عبر الإنترنت',
+
+        'tr': 'çevrimiçi',
+        'hi': 'ऑनलाइन',
+        'id': 'daring',
     }.get(lang, "online")
 
 
@@ -309,6 +317,10 @@ TRANSLATOR_GROUP_TEXT = {
     'it': {'online': 'Online', 'offline': 'Offline'},
 
     'ar': {'online': 'عبر الإنترنت', 'offline': 'دون اتصال'},
+
+    'tr': {'online': 'Çevrimiçi', 'offline': 'Çevrimdışı'},
+    'hi': {'online': 'ऑनलाइन', 'offline': 'ऑफ़लाइन'},
+    'id': {'online': 'Daring', 'offline': 'Luring'},
 }
 
 
@@ -1237,6 +1249,27 @@ OCR_DETAIL_TEXT = {
                  'والإنجليزية.',
      'easyocr': 'محرك تعرف عصبي محلي للصور الصعبة وأنظمة الكتابة المتعددة؛ يجب تثبيت نماذج اللغات '
                 'المختارة أولًا.'},
+
+    'tr': {'windows': "Windows'a yerleşiktir. Arayüz metninde hızlıdır; diller Dil paketleri bölümünden "
+                'kurulur.',
+     'tesseract': 'Yerel klasik OCR. Geniş dil desteği ve tutarlı çevrimdışı tanıma.',
+     'rapidocr': 'Metin blokları ve yönü için optimize yerel sinirsel OCR; paket modeli Çince ve '
+                 'İngilizceyi destekler.',
+     'easyocr': 'Zor görüntüler ve farklı alfabeler için yerel sinirsel OCR; önce seçili dil modelleri '
+                'kurulmalıdır.'},
+    'hi': {'windows': 'Windows में शामिल। सामान्य इंटरफ़ेस टेक्स्ट में तेज़; भाषाएँ भाषा पैकेज से इंस्टॉल '
+                'करें।',
+     'tesseract': 'स्थानीय पारंपरिक OCR। कई भाषाएँ और भरोसेमंद ऑफ़लाइन पहचान।',
+     'rapidocr': 'टेक्स्ट खंड और दिशा के लिए स्थानीय न्यूरल OCR; शामिल मॉडल चीनी और अंग्रेज़ी पढ़ता '
+                 'है।',
+     'easyocr': 'कठिन इमेज और कई लिपियों के लिए स्थानीय न्यूरल OCR; पहले चुनी भाषा के मॉडल इंस्टॉल '
+                'करें।'},
+    'id': {'windows': 'Bawaan Windows. Cepat untuk teks antarmuka biasa; bahasa dipasang di Paket bahasa.',
+     'tesseract': 'OCR klasik lokal. Dukungan bahasa luas dan pengenalan luring yang konsisten.',
+     'rapidocr': 'OCR neural lokal untuk blok teks dan orientasi; model bawaan mendukung Mandarin dan '
+                 'Inggris.',
+     'easyocr': 'OCR neural lokal untuk gambar sulit dan berbagai aksara; model bahasa pilihan harus '
+                'dipasang dahulu.'},
 }
 
 
@@ -1260,6 +1293,10 @@ TRANSLATOR_DETAIL_TEXT = {
     'it': {'google': 'veloce, preciso, necessita di internet', 'argos': 'traduzione locale, richiede pacchetti lingua installati', HYMT_ENGINE_KEY: 'modello LLM locale, installato separatamente', 'mymemory': 'API online con limite giornaliero', 'lingva': 'proxy online di Google', 'libretranslate': 'server LibreTranslate in linea'},
 
     'ar': {'google': 'سريع ودقيق، ويتطلب الإنترنت', 'argos': 'ترجمة محلية تتطلب تثبيت حزم اللغات', HYMT_ENGINE_KEY: 'نموذج لغوي محلي يُثبَّت بشكل منفصل', 'mymemory': 'API عبر الإنترنت بحد يومي', 'lingva': 'وسيط Google عبر الإنترنت', 'libretranslate': 'خادم LibreTranslate عبر الإنترنت'},
+
+    'tr': {'google': 'hızlı, doğru, internet gerekir', 'argos': 'yerel çeviri, dil paketleri gerekir', HYMT_ENGINE_KEY: 'yerel dil modeli, ayrıca kurulur', 'mymemory': 'günlük sınırlı çevrimiçi API', 'lingva': 'çevrimiçi Google vekili', 'libretranslate': 'çevrimiçi LibreTranslate sunucusu'},
+    'hi': {'google': 'तेज़, सटीक, इंटरनेट चाहिए', 'argos': 'स्थानीय अनुवाद, भाषा पैकेज चाहिए', HYMT_ENGINE_KEY: 'स्थानीय भाषा मॉडल, अलग इंस्टॉल होता है', 'mymemory': 'दैनिक सीमा वाली ऑनलाइन API', 'lingva': 'ऑनलाइन Google प्रॉक्सी', 'libretranslate': 'ऑनलाइन LibreTranslate सर्वर'},
+    'id': {'google': 'cepat, akurat, perlu internet', 'argos': 'terjemahan lokal, perlu paket bahasa', HYMT_ENGINE_KEY: 'model bahasa lokal, dipasang terpisah', 'mymemory': 'API daring dengan batas harian', 'lingva': 'proksi Google daring', 'libretranslate': 'server LibreTranslate daring'},
 }
 
 
@@ -3037,6 +3074,458 @@ SETTINGS_TEXT = {
      'clear_histories_title': 'مسح السجلات؟',
      'clear_histories_question': 'هل تريد مسح سجل الترجمات وسجل النسخ؟',
      'settings_reset_done': 'تمت إعادة ضبط الإعدادات'},
+
+    'tr': {'autostart': 'İşletim sistemiyle başlat',
+     'update_check_on_launch': 'Başlangıçta güncellemeleri denetle',
+     'dim_screen_during_ocr': 'OCR alanı seçerken ekranı karart',
+     'ocr_dim_strength_tooltip': 'OCR seçiminin dışının ne kadar kararacağını seçin.',
+     'restore_clipboard_after_selection': 'Seçili metin işlemlerinden sonra panoyu geri yükle',
+     'restore_clipboard_tooltip': 'Görünür seçim çevirisi veya başarılı değiştirmeden sonra önceki '
+                                  'panoyu geri getirir. Açık kopyalama işlemleri sonucu korur.',
+     'copy_notification': 'Metin kopyalanınca bildir',
+     'copy_notification_tooltip': 'Gölge modunda da sonuç kopyalanınca sessiz ekran onayı gösterir.',
+     'create_bug_report': 'Hata raporu',
+     'bug_report_tooltip': "Pano içeriği, geçmişler ve belge metni olmadan tanılama ZIP'i oluşturur.",
+     'export_settings': 'Dışa aktar',
+     'import_settings': 'İçe aktar',
+     'export_settings_tooltip': 'Tüm uygulama ayarlarını taşınabilir JSON dosyasına kaydeder.',
+     'import_settings_tooltip': "Click'n'Translate ayar JSON'unu yükleyip hemen uygular.",
+     'settings_exported': 'Ayarlar dışa aktarıldı.\n\n{path}',
+     'settings_imported': 'Ayarlar içe aktarıldı ve uygulandı.',
+     'settings_transfer_failed': 'Ayarlar aktarılamadı.\n\n{error}',
+     'settings_file_filter': "Click'n'Translate ayarları (*.json)",
+     'ocr_behavior_heading': 'OCR davranışı',
+     'updates_heading': 'Güncellemeler',
+     'settings_page_main': 'Genel ayarlar',
+     'settings_page_updates': 'Çeviri ve OCR',
+     'settings_page_game': 'Dinamik çeviri',
+     'game_settings_heading': 'Dinamik çeviri',
+     'game_intro': 'Ekrandaki metni seçin. Çeviri üstüne gelir ve otomatik güncellenir. Başka konum '
+                   'için ayrı çıktıyı açın.',
+     'game_launch': 'Ekrandaki metni seçin',
+     'game_languages': 'Diller:',
+     'game_swap_languages': 'Dinamik çeviri dillerini değiştir',
+     'game_scan_interval': 'Tarama aralığı:',
+     'game_overlay_opacity': 'Çeviri arka planı:',
+     'game_pause_inactive': 'Hedef uygulama etkin değilken duraklat',
+     'game_pause_inactive_tooltip': 'Mod başlarken etkin olan pencere küçültülür veya arka plana '
+                                    'geçerse OCR duraklar. Geri dönünce otomatik sürer.',
+     'game_show_original': 'Tanınan metni çeviriyle göster',
+     'game_workflow_note': 'Ekrandaki metni seçin. Çeviri üstüne gelir ve otomatik güncellenir. Başka '
+                           'konum için ayrı çıktıyı açın.',
+     'translation_mode': 'Metin çevirisi modu: {mode}',
+     'hotkeys': 'Kısayolları ayarla',
+     'save_and_back': 'Kaydet ve dön',
+     'copy_to_clipboard': 'Panoya kopyala',
+     'history': 'Çeviri geçmişini kaydet',
+     'button_hover_tips': 'Üzerine gelince ipuçları',
+     'replace_select_all': 'Değiştirmeden önce tümünü seç',
+     'replace_select_all_hint': 'Çevirip değiştir için: etkin girişteki tüm metni seçip çevirir ve '
+                                'değiştirir. Sohbetlerde yararlıdır. Kapalıyken yalnızca seçili metin '
+                                'değiştirilir. Mesajı göndermez.',
+     'test_ocr': 'OCR çevirisini dene',
+     'save': 'Kaydet',
+     'back': 'Geri',
+     'remove_hotkey': "Kısayolu silmek için ESC'ye basın",
+     'invalid_hotkey_format': "Tek bir tuş birleşimi kullanın. Çift basış kısayolları Windows'ta "
+                              'kullanılabilir.',
+     'history_view': 'Çeviri geçmişini görüntüle',
+     'start_minimized': 'Gölge modunda başlat',
+     'copy_history_view': 'Kopyalama geçmişini göster',
+     'copy_history': 'Kopyalama geçmişini kaydet',
+     'clear_copy_history': 'Kopyalama geçmişini temizle',
+     'clear_translation_history': 'Çeviri geçmişini temizle',
+     'history_title': 'Çeviri geçmişi',
+     'copy_history_title': 'Kopyalama geçmişi',
+     'history_empty': 'Geçmiş boş.',
+     'history_error': 'Geçmiş okunamadı.',
+     'error_title': 'Hata',
+     'clear_translation_history_error': 'Çeviri geçmişi temizlenemedi.',
+     'clear_copy_history_error': 'Kopyalama geçmişi temizlenemedi.',
+     'copy_translated_text': 'Çevrilen metni kopyala',
+     'freeze_screen_on_ocr': 'OCR sırasında ekranı dondur',
+     'fullscreen_translate_hotkey': 'Tam ekran çeviri kısayolu:',
+     'fullscreen_from': 'Kaynak:',
+     'fullscreen_to': 'Hedef:',
+     'translate_selection_hotkey': 'Seçim çevirisi kısayolu:',
+     'translator_label': 'Çeviri:',
+     'keep_visible_on_ocr': 'OCR sırasında pencereyi göster',
+     'clear_cache': 'Önbelleği temizle',
+     'reset': 'Sıfırla',
+     'update': 'Güncelle',
+     'translation_history_button': 'Çeviri geçmişi',
+     'copy_history_button': 'Kopyalama geçmişi',
+     'fullscreen_translate_label': 'Tam ekran çeviri:',
+     'game_translate_label': 'Dinamik:',
+     'selection_translate_label': 'Seçim çevirisi:',
+     'toggle_window_hotkey_label': 'Göster / gizle:',
+     'result_window_label': 'Pencereyi göster:',
+     'result_window_mode_selection': 'Metin',
+     'result_window_mode_area': 'Alan',
+     'result_window_mode_main': 'Ana',
+     'result_window_modes_header': 'Şundan sonra pencereyi göster:',
+     'result_window_row_selection': 'Seçili metin çevirisi',
+     'result_window_row_area': 'Ekran alanı çevirisi',
+     'result_window_row_main': "Çevir'e basma",
+     'result_window_summary_all': 'Tümü',
+     'result_window_summary_none': 'Hiçbir zaman',
+     'result_window_summary_on': 'görünür',
+     'result_window_summary_off': 'gizli',
+     'result_window_summary_count': '{count} / {total}',
+     'result_window_tooltip': 'Çeviri penceresini açacak işlemleri işaretleyin. Diğerleri çeviriyi '
+                              'doğrudan panoya kopyalar.',
+     'result_window_mode_selection_tooltip': 'Seçili metin çevrildikten sonra sonuç penceresini '
+                                             'göster.',
+     'result_window_mode_area_tooltip': 'Ekran alanı çevrildikten sonra sonuç penceresini göster.',
+     'result_window_mode_main_tooltip': 'Çeviriyi ana pencerede girişin yanında göster.',
+     'translation_result_font_label': 'Sonuç metni:',
+     'translation_result_font_sample': 'Örnek metin',
+     'translation_result_font_decrease': 'Sonuç metnini küçült',
+     'translation_result_font_increase': 'Sonuç metnini büyüt',
+     'translation_result_font_tooltip': 'Yalnızca ayrı sonuç penceresindeki kaynak ve çeviri metnini '
+                                        "değiştirir. Tüm arayüz için Ölçek'i kullanın.",
+     'translation_result_font_xsmall': 'Çok küçük',
+     'translation_result_font_small': 'Küçük',
+     'translation_result_font_medium': 'Orta',
+     'translation_result_font_large': 'Büyük',
+     'translation_result_font_xlarge': 'Çok büyük',
+     'replace_selection_translate_label': 'Seçimi çevirip değiştir:',
+     'replace_selection_unavailable': "Otomatik değiştirme Windows ve macOS'te kullanılabilir.",
+     'selection_quick_translate_enabled': 'Seçili metni hızlı çevir',
+     'selection_quick_translate_tooltip': 'Diğer uygulamalarda seçili metnin yanında çeviri düğmesi '
+                                          'gösterir veya hemen çevirir. Kısayollardaki Seçim dil '
+                                          "çiftini kullanır. macOS'te Erişilebilirlik gerekir; "
+                                          "Linux'ta PRIMARY seçimi kullanılır (bazı Wayland "
+                                          'kurulumlarında sınırlı). OCR ve dinamik çeviride duraklar.',
+     'selection_quick_translate_mode_button': 'Seçimden sonra düğme göster',
+     'selection_quick_translate_mode_automatic': 'Seçimden hemen sonra çevir',
+     'close_result_window_on_outside_click': 'Dışarı tıklanınca çeviri penceresini kapat',
+     'close_result_window_on_outside_click_tooltip': 'Başka uygulamaya veya dışarı tıkladığınızda '
+                                                     'çeviri penceresini kapatır; kapatma düğmesi '
+                                                     'gerekmez.',
+     'copy_hotkey_label': 'Seçimi kopyalama kısayolu:',
+     'translate_hotkey_label': 'Çeviri kısayolu:',
+     'remove_local_tesseract': "Yerel Tesseract'ı kaldır",
+     'remove_local_rapidocr': "Yerel RapidOCR'ı kaldır",
+     'remove_local_easyocr': "Yerel EasyOCR'ı kaldır",
+     'remove_local_hymt': "Yerel Hy-MT'yi kaldır",
+     'ocr_language_packs': 'Dil paketleri',
+     'manage_ocr_languages': 'OCR ve Argos dil paketlerini yönet',
+     'clearing': 'Temizleniyor...',
+     'cleared': '{size} temizlendi',
+     'yes': 'Evet',
+     'no': 'Hayır',
+     'cancel': 'İptal',
+     'minimize': 'Simge durumuna küçült',
+     'close': 'Kapat',
+     'open': 'Aç',
+     'install': 'Kur',
+     'later': 'Daha sonra',
+     'remove': 'Kaldır',
+     'reset_question': 'Tüm ayarları sıfırlamak istediğinize emin misiniz?',
+     'clear_histories_title': 'Geçmişler temizlensin mi?',
+     'clear_histories_question': 'Çeviri ve kopyalama geçmişi temizlensin mi?',
+     'settings_reset_done': 'Ayarlar sıfırlandı'},
+    'hi': {'autostart': 'सिस्टम के साथ शुरू करें',
+     'update_check_on_launch': 'शुरू होते समय अपडेट जाँचें',
+     'dim_screen_during_ocr': 'OCR क्षेत्र चुनते समय स्क्रीन मंद करें',
+     'ocr_dim_strength_tooltip': 'OCR चयन के बाहर का अँधेरा स्तर चुनें।',
+     'restore_clipboard_after_selection': 'चुने टेक्स्ट की क्रिया के बाद क्लिपबोर्ड बहाल करें',
+     'restore_clipboard_tooltip': 'दिखने वाले चयन अनुवाद या सफल बदलाव के बाद पुराना क्लिपबोर्ड लौटाएँ। '
+                                  'स्पष्ट कॉपी क्रियाएँ परिणाम रखती हैं।',
+     'copy_notification': 'टेक्स्ट कॉपी होने पर बताएँ',
+     'copy_notification_tooltip': 'छाया मोड में भी परिणाम कॉपी होने पर शांत पुष्टि दिखाएँ।',
+     'create_bug_report': 'बग रिपोर्ट',
+     'bug_report_tooltip': 'क्लिपबोर्ड, इतिहास या दस्तावेज़ टेक्स्ट के बिना निदान ZIP बनाएँ।',
+     'export_settings': 'निर्यात',
+     'import_settings': 'आयात',
+     'export_settings_tooltip': 'सभी ऐप सेटिंग्स पोर्टेबल JSON फ़ाइल में सहेजें।',
+     'import_settings_tooltip': "Click'n'Translate सेटिंग्स JSON लोड करके अभी लागू करें।",
+     'settings_exported': 'सेटिंग्स निर्यात हुईं।\n\n{path}',
+     'settings_imported': 'सेटिंग्स आयात और लागू हुईं।',
+     'settings_transfer_failed': 'सेटिंग्स स्थानांतरित नहीं हो सकीं।\n\n{error}',
+     'settings_file_filter': "Click'n'Translate सेटिंग्स (*.json)",
+     'ocr_behavior_heading': 'OCR का व्यवहार',
+     'updates_heading': 'अपडेट',
+     'settings_page_main': 'सामान्य सेटिंग्स',
+     'settings_page_updates': 'अनुवाद और OCR',
+     'settings_page_game': 'गतिशील अनुवाद',
+     'game_settings_heading': 'गतिशील अनुवाद',
+     'game_intro': 'स्क्रीन पर टेक्स्ट चुनें। अनुवाद उसे ढककर अपने आप अपडेट होगा। दूसरी जगह के लिए अलग '
+                   'परिणाम चालू करें।',
+     'game_launch': 'स्क्रीन पर टेक्स्ट चुनें',
+     'game_languages': 'भाषाएँ:',
+     'game_swap_languages': 'गतिशील अनुवाद की भाषाएँ अदलें',
+     'game_scan_interval': 'जाँच अंतराल:',
+     'game_overlay_opacity': 'अनुवाद पृष्ठभूमि:',
+     'game_pause_inactive': 'लक्ष्य ऐप निष्क्रिय हो तो विराम दें',
+     'game_pause_inactive_tooltip': 'मोड शुरू करते समय सक्रिय विंडो छोटी हो या पीछे जाए तो OCR रुकता '
+                                    'है। लौटने पर अपने आप जारी होता है।',
+     'game_show_original': 'अनुवाद के साथ पहचाना टेक्स्ट दिखाएँ',
+     'game_workflow_note': 'स्क्रीन पर टेक्स्ट चुनें। अनुवाद उसे ढककर अपने आप अपडेट होगा। दूसरी जगह के '
+                           'लिए अलग परिणाम चालू करें।',
+     'translation_mode': 'टेक्स्ट अनुवाद मोड: {mode}',
+     'hotkeys': 'शॉर्टकट सेट करें',
+     'save_and_back': 'सहेजें और लौटें',
+     'copy_to_clipboard': 'क्लिपबोर्ड पर कॉपी करें',
+     'history': 'अनुवाद इतिहास सहेजें',
+     'button_hover_tips': 'माउस रखने पर संकेत',
+     'replace_select_all': 'बदलने से पहले सब चुनें',
+     'replace_select_all_hint': 'अनुवाद से बदलें के लिए: सक्रिय बॉक्स का पूरा टेक्स्ट चुनकर अनुवाद और '
+                                'बदलाव करता है। चैट में उपयोगी। बंद हो तो सिर्फ़ चुना टेक्स्ट बदलेगा। '
+                                'संदेश नहीं भेजता।',
+     'test_ocr': 'OCR अनुवाद जाँचें',
+     'save': 'सहेजें',
+     'back': 'वापस',
+     'remove_hotkey': 'शॉर्टकट हटाने के लिए ESC दबाएँ',
+     'invalid_hotkey_format': 'एक कुंजी जोड़ी इस्तेमाल करें। दो बार दबाने वाले शॉर्टकट Windows पर हैं।',
+     'history_view': 'अनुवाद इतिहास देखें',
+     'start_minimized': 'छाया मोड में शुरू करें',
+     'copy_history_view': 'कॉपी इतिहास दिखाएँ',
+     'copy_history': 'कॉपी इतिहास सहेजें',
+     'clear_copy_history': 'कॉपी इतिहास साफ़ करें',
+     'clear_translation_history': 'अनुवाद इतिहास साफ़ करें',
+     'history_title': 'अनुवाद इतिहास',
+     'copy_history_title': 'कॉपी इतिहास',
+     'history_empty': 'इतिहास खाली है।',
+     'history_error': 'इतिहास पढ़ने में त्रुटि।',
+     'error_title': 'त्रुटि',
+     'clear_translation_history_error': 'अनुवाद इतिहास साफ़ नहीं हुआ।',
+     'clear_copy_history_error': 'कॉपी इतिहास साफ़ नहीं हुआ।',
+     'copy_translated_text': 'अनुवादित टेक्स्ट कॉपी करें',
+     'freeze_screen_on_ocr': 'OCR के दौरान स्क्रीन स्थिर करें',
+     'fullscreen_translate_hotkey': 'पूरी स्क्रीन अनुवाद शॉर्टकट:',
+     'fullscreen_from': 'से:',
+     'fullscreen_to': 'में:',
+     'translate_selection_hotkey': 'चयन अनुवाद शॉर्टकट:',
+     'translator_label': 'अनुवाद:',
+     'keep_visible_on_ocr': 'OCR के दौरान विंडो दिखाएँ',
+     'clear_cache': 'कैश साफ़ करें',
+     'reset': 'रीसेट',
+     'update': 'अपडेट',
+     'translation_history_button': 'अनुवाद इतिहास',
+     'copy_history_button': 'कॉपी इतिहास',
+     'fullscreen_translate_label': 'पूरी स्क्रीन अनुवाद:',
+     'game_translate_label': 'गतिशील:',
+     'selection_translate_label': 'चयन अनुवाद:',
+     'toggle_window_hotkey_label': 'दिखाएँ / छिपाएँ:',
+     'result_window_label': 'विंडो दिखाएँ:',
+     'result_window_mode_selection': 'टेक्स्ट',
+     'result_window_mode_area': 'क्षेत्र',
+     'result_window_mode_main': 'मुख्य',
+     'result_window_modes_header': 'इसके बाद विंडो दिखाएँ:',
+     'result_window_row_selection': 'चुना टेक्स्ट अनुवाद',
+     'result_window_row_area': 'स्क्रीन क्षेत्र अनुवाद',
+     'result_window_row_main': 'अनुवाद बटन दबाना',
+     'result_window_summary_all': 'सभी',
+     'result_window_summary_none': 'कभी नहीं',
+     'result_window_summary_on': 'दिख रहा है',
+     'result_window_summary_off': 'छिपा है',
+     'result_window_summary_count': '{total} में से {count}',
+     'result_window_tooltip': 'उन क्रियाओं पर टिक करें जिनसे अनुवाद विंडो खुलनी चाहिए। बाकी सीधे '
+                              'क्लिपबोर्ड पर कॉपी करती हैं।',
+     'result_window_mode_selection_tooltip': 'चुना टेक्स्ट अनुवाद होने पर परिणाम विंडो दिखाएँ।',
+     'result_window_mode_area_tooltip': 'स्क्रीन क्षेत्र अनुवाद होने पर परिणाम विंडो दिखाएँ।',
+     'result_window_mode_main_tooltip': 'मुख्य विंडो में इनपुट के पास अनुवाद दिखाएँ।',
+     'translation_result_font_label': 'परिणाम टेक्स्ट:',
+     'translation_result_font_sample': 'उदाहरण टेक्स्ट',
+     'translation_result_font_decrease': 'परिणाम टेक्स्ट छोटा करें',
+     'translation_result_font_increase': 'परिणाम टेक्स्ट बड़ा करें',
+     'translation_result_font_tooltip': 'सिर्फ़ अलग परिणाम विंडो का स्रोत और अनुवाद टेक्स्ट बदलता है। '
+                                        'पूरे इंटरफ़ेस के लिए स्केल इस्तेमाल करें।',
+     'translation_result_font_xsmall': 'बहुत छोटा',
+     'translation_result_font_small': 'छोटा',
+     'translation_result_font_medium': 'मध्यम',
+     'translation_result_font_large': 'बड़ा',
+     'translation_result_font_xlarge': 'बहुत बड़ा',
+     'replace_selection_translate_label': 'चयन का अनुवाद और बदलाव:',
+     'replace_selection_unavailable': 'अपने आप बदलाव Windows और macOS पर उपलब्ध है।',
+     'selection_quick_translate_enabled': 'चुने टेक्स्ट का त्वरित अनुवाद',
+     'selection_quick_translate_tooltip': 'दूसरे ऐप में चयन के पास अनुवाद बटन दिखाता है या तुरंत '
+                                          'अनुवाद करता है। शॉर्टकट की चयन भाषा जोड़ी लगती है। macOS '
+                                          'में सुलभता चाहिए; Linux में PRIMARY चयन है (कुछ Wayland '
+                                          'सेटअप पर सीमित)। OCR और गतिशील अनुवाद में रुकता है।',
+     'selection_quick_translate_mode_button': 'चयन के बाद बटन दिखाएँ',
+     'selection_quick_translate_mode_automatic': 'चयन के तुरंत बाद अनुवाद करें',
+     'close_result_window_on_outside_click': 'बाहर क्लिक पर अनुवाद विंडो बंद करें',
+     'close_result_window_on_outside_click_tooltip': 'दूसरे ऐप या बाहर क्लिक पर अनुवाद विंडो बंद करता '
+                                                     'है, इसलिए बंद करें बटन नहीं चाहिए।',
+     'copy_hotkey_label': 'चयन कॉपी शॉर्टकट:',
+     'translate_hotkey_label': 'अनुवाद शॉर्टकट:',
+     'remove_local_tesseract': 'स्थानीय Tesseract हटाएँ',
+     'remove_local_rapidocr': 'स्थानीय RapidOCR हटाएँ',
+     'remove_local_easyocr': 'स्थानीय EasyOCR हटाएँ',
+     'remove_local_hymt': 'स्थानीय Hy-MT हटाएँ',
+     'ocr_language_packs': 'भाषा पैकेज',
+     'manage_ocr_languages': 'OCR और Argos भाषा पैकेज सँभालें',
+     'clearing': 'साफ़ हो रहा है...',
+     'cleared': '{size} साफ़ हुआ',
+     'yes': 'हाँ',
+     'no': 'नहीं',
+     'cancel': 'रद्द करें',
+     'minimize': 'छोटा करें',
+     'close': 'बंद करें',
+     'open': 'खोलें',
+     'install': 'इंस्टॉल करें',
+     'later': 'बाद में',
+     'remove': 'हटाएँ',
+     'reset_question': 'सभी सेटिंग्स रीसेट करें?',
+     'clear_histories_title': 'इतिहास साफ़ करें?',
+     'clear_histories_question': 'अनुवाद और कॉपी इतिहास साफ़ करें?',
+     'settings_reset_done': 'सेटिंग्स रीसेट हुईं'},
+    'id': {'autostart': 'Mulai bersama OS',
+     'update_check_on_launch': 'Periksa pembaruan saat mulai',
+     'dim_screen_during_ocr': 'Redupkan layar saat memilih area OCR',
+     'ocr_dim_strength_tooltip': 'Pilih tingkat keredupan di luar area OCR.',
+     'restore_clipboard_after_selection': 'Pulihkan papan klip setelah tindakan teks pilihan',
+     'restore_clipboard_tooltip': 'Pulihkan isi papan klip setelah terjemahan pilihan terlihat atau '
+                                  'penggantian berhasil. Tindakan salin eksplisit tetap mempertahankan '
+                                  'hasil.',
+     'copy_notification': 'Beri tahu setelah teks disalin',
+     'copy_notification_tooltip': 'Tampilkan konfirmasi senyap saat hasil disalin, termasuk dalam mode '
+                                  'bayangan.',
+     'create_bug_report': 'Laporan bug',
+     'bug_report_tooltip': 'Buat ZIP diagnostik tanpa isi papan klip, riwayat, atau teks dokumen.',
+     'export_settings': 'Ekspor',
+     'import_settings': 'Impor',
+     'export_settings_tooltip': 'Simpan semua pengaturan aplikasi ke berkas JSON portabel.',
+     'import_settings_tooltip': "Muat JSON pengaturan Click'n'Translate dan terapkan sekarang.",
+     'settings_exported': 'Pengaturan diekspor.\n\n{path}',
+     'settings_imported': 'Pengaturan diimpor dan diterapkan.',
+     'settings_transfer_failed': 'Tidak dapat memindahkan pengaturan.\n\n{error}',
+     'settings_file_filter': "Pengaturan Click'n'Translate (*.json)",
+     'ocr_behavior_heading': 'Perilaku OCR',
+     'updates_heading': 'Pembaruan',
+     'settings_page_main': 'Pengaturan umum',
+     'settings_page_updates': 'Terjemahan dan OCR',
+     'settings_page_game': 'Terjemahan dinamis',
+     'game_settings_heading': 'Terjemahan dinamis',
+     'game_intro': 'Pilih teks di layar. Terjemahan menimpanya dan diperbarui otomatis. Aktifkan '
+                   'keluaran terpisah untuk area lain.',
+     'game_launch': 'Pilih teks di layar',
+     'game_languages': 'Bahasa:',
+     'game_swap_languages': 'Tukar bahasa terjemahan dinamis',
+     'game_scan_interval': 'Interval pemindaian:',
+     'game_overlay_opacity': 'Latar terjemahan:',
+     'game_pause_inactive': 'Jeda saat aplikasi tujuan tidak aktif',
+     'game_pause_inactive_tooltip': 'Jeda OCR saat jendela yang aktif ketika mode dimulai diminimalkan '
+                                    'atau tidak lagi di depan. Terjemahan dilanjutkan saat Anda '
+                                    'kembali.',
+     'game_show_original': 'Tampilkan teks dikenali bersama terjemahan',
+     'game_workflow_note': 'Pilih teks di layar. Terjemahan menimpanya dan diperbarui otomatis. '
+                           'Aktifkan keluaran terpisah untuk area lain.',
+     'translation_mode': 'Mode terjemahan teks: {mode}',
+     'hotkeys': 'Atur pintasan',
+     'save_and_back': 'Simpan dan kembali',
+     'copy_to_clipboard': 'Salin ke papan klip',
+     'history': 'Simpan riwayat terjemahan',
+     'button_hover_tips': 'Petunjuk saat diarahkan',
+     'replace_select_all': 'Pilih semua sebelum mengganti',
+     'replace_select_all_hint': 'Untuk Terjemahkan dan ganti: memilih semua teks di masukan aktif '
+                                'sebelum menerjemahkan dan mengganti. Berguna untuk pesan chat. Jika '
+                                'nonaktif, hanya teks pilihan diganti. Tidak mengirim pesan.',
+     'test_ocr': 'Uji terjemahan OCR',
+     'save': 'Simpan',
+     'back': 'Kembali',
+     'remove_hotkey': 'Tekan ESC untuk menghapus pintasan',
+     'invalid_hotkey_format': 'Gunakan satu kombinasi tombol. Pintasan ketuk dua kali tersedia di '
+                              'Windows.',
+     'history_view': 'Lihat riwayat terjemahan',
+     'start_minimized': 'Mulai dalam mode bayangan',
+     'copy_history_view': 'Tampilkan riwayat salinan',
+     'copy_history': 'Simpan riwayat salinan',
+     'clear_copy_history': 'Hapus riwayat salinan',
+     'clear_translation_history': 'Hapus riwayat terjemahan',
+     'history_title': 'Riwayat terjemahan',
+     'copy_history_title': 'Riwayat salinan',
+     'history_empty': 'Riwayat kosong.',
+     'history_error': 'Gagal membaca riwayat.',
+     'error_title': 'Kesalahan',
+     'clear_translation_history_error': 'Tidak dapat menghapus riwayat terjemahan.',
+     'clear_copy_history_error': 'Tidak dapat menghapus riwayat salinan.',
+     'copy_translated_text': 'Salin teks terjemahan',
+     'freeze_screen_on_ocr': 'Bekukan layar saat OCR',
+     'fullscreen_translate_hotkey': 'Pintasan terjemahan layar penuh:',
+     'fullscreen_from': 'Dari:',
+     'fullscreen_to': 'Ke:',
+     'translate_selection_hotkey': 'Pintasan terjemahan pilihan:',
+     'translator_label': 'Terjemahan:',
+     'keep_visible_on_ocr': 'Tetap tampilkan jendela saat OCR',
+     'clear_cache': 'Bersihkan cache',
+     'reset': 'Reset',
+     'update': 'Perbarui',
+     'translation_history_button': 'Riwayat terjemahan',
+     'copy_history_button': 'Riwayat salinan',
+     'fullscreen_translate_label': 'Terjemahan layar penuh:',
+     'game_translate_label': 'Dinamis:',
+     'selection_translate_label': 'Terjemahan pilihan:',
+     'toggle_window_hotkey_label': 'Tampilkan / sembunyikan:',
+     'result_window_label': 'Tampilkan jendela:',
+     'result_window_mode_selection': 'Teks',
+     'result_window_mode_area': 'Area',
+     'result_window_mode_main': 'Utama',
+     'result_window_modes_header': 'Tampilkan jendela setelah:',
+     'result_window_row_selection': 'Menerjemahkan teks pilihan',
+     'result_window_row_area': 'Menerjemahkan area layar',
+     'result_window_row_main': 'Menekan Terjemahkan',
+     'result_window_summary_all': 'Semua',
+     'result_window_summary_none': 'Tidak pernah',
+     'result_window_summary_on': 'ditampilkan',
+     'result_window_summary_off': 'tersembunyi',
+     'result_window_summary_count': '{count} dari {total}',
+     'result_window_tooltip': 'Centang tindakan yang membuka jendela terjemahan. Tindakan tanpa '
+                              'centang menyalin terjemahan langsung ke papan klip.',
+     'result_window_mode_selection_tooltip': 'Tampilkan jendela hasil setelah menerjemahkan teks '
+                                             'pilihan.',
+     'result_window_mode_area_tooltip': 'Tampilkan jendela hasil setelah menerjemahkan area layar.',
+     'result_window_mode_main_tooltip': 'Tampilkan terjemahan di sebelah masukan pada jendela utama.',
+     'translation_result_font_label': 'Teks hasil:',
+     'translation_result_font_sample': 'Contoh teks',
+     'translation_result_font_decrease': 'Perkecil teks hasil',
+     'translation_result_font_increase': 'Perbesar teks hasil',
+     'translation_result_font_tooltip': 'Hanya mengubah teks sumber dan terjemahan di jendela hasil '
+                                        'terpisah. Gunakan Skala untuk seluruh antarmuka.',
+     'translation_result_font_xsmall': 'Sangat kecil',
+     'translation_result_font_small': 'Kecil',
+     'translation_result_font_medium': 'Sedang',
+     'translation_result_font_large': 'Besar',
+     'translation_result_font_xlarge': 'Sangat besar',
+     'replace_selection_translate_label': 'Terjemahkan dan ganti pilihan:',
+     'replace_selection_unavailable': 'Penggantian otomatis tersedia di Windows dan macOS.',
+     'selection_quick_translate_enabled': 'Terjemahan cepat teks pilihan',
+     'selection_quick_translate_tooltip': 'Tampilkan tombol dekat teks pilihan di aplikasi lain atau '
+                                          'terjemahkan langsung. Memakai pasangan bahasa Pilihan untuk '
+                                          'pintasan. Perlu Aksesibilitas di macOS; Linux memakai '
+                                          'pilihan PRIMARY (terbatas pada beberapa Wayland). Dijeda '
+                                          'selama OCR dan terjemahan dinamis.',
+     'selection_quick_translate_mode_button': 'Tampilkan tombol setelah memilih',
+     'selection_quick_translate_mode_automatic': 'Terjemahkan langsung setelah memilih',
+     'close_result_window_on_outside_click': 'Tutup jendela terjemahan saat klik di luar',
+     'close_result_window_on_outside_click_tooltip': 'Tutup jendela terjemahan saat mengklik aplikasi '
+                                                     'lain atau di luarnya tanpa tombol tutup.',
+     'copy_hotkey_label': 'Pintasan salin pilihan:',
+     'translate_hotkey_label': 'Pintasan terjemahan:',
+     'remove_local_tesseract': 'Hapus Tesseract lokal',
+     'remove_local_rapidocr': 'Hapus RapidOCR lokal',
+     'remove_local_easyocr': 'Hapus EasyOCR lokal',
+     'remove_local_hymt': 'Hapus Hy-MT lokal',
+     'ocr_language_packs': 'Paket bahasa',
+     'manage_ocr_languages': 'Kelola paket bahasa OCR dan Argos',
+     'clearing': 'Membersihkan...',
+     'cleared': '{size} dibersihkan',
+     'yes': 'Ya',
+     'no': 'Tidak',
+     'cancel': 'Batal',
+     'minimize': 'Minimalkan',
+     'close': 'Tutup',
+     'open': 'Buka',
+     'install': 'Pasang',
+     'later': 'Nanti',
+     'remove': 'Hapus',
+     'reset_question': 'Yakin ingin mereset semua pengaturan?',
+     'clear_histories_title': 'Hapus riwayat?',
+     'clear_histories_question': 'Hapus riwayat terjemahan dan salinan?',
+     'settings_reset_done': 'Pengaturan direset'},
 }
 
 def settings_text(lang, key):
@@ -3067,6 +3556,20 @@ for _scale_lang, _scale_labels in {
      'تكبير النص والأيقونات وعناصر التحكم في جميع نوافذ التطبيق. تتكيف كل نافذة مع الشاشة المتاحة.',
      'تصغير الواجهة',
      'تكبير الواجهة'),
+
+    'tr': ('Arayüz ölçeği',
+     'Tüm pencerelerde metin, simge ve kontrolleri büyütür. Her pencere ekrana sığdırılır.',
+     'Ölçeği azalt',
+     'Ölçeği artır'),
+    'hi': ('इंटरफ़ेस स्केल',
+     'सभी ऐप विंडो में टेक्स्ट, आइकन और नियंत्रण बड़े करें। हर विंडो उपलब्ध स्क्रीन में फिट होगी।',
+     'स्केल घटाएँ',
+     'स्केल बढ़ाएँ'),
+    'id': ('Skala antarmuka',
+     'Perbesar teks, ikon, dan kontrol di semua jendela aplikasi. Setiap jendela disesuaikan dengan '
+     'layar.',
+     'Kurangi skala',
+     'Tambah skala'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale=_scale_labels[0], ui_scale_hint=_scale_labels[1],
                                     ui_scale_decrease=_scale_labels[2], ui_scale_increase=_scale_labels[3])
@@ -3089,6 +3592,14 @@ for _scale_lang, (_caption, _hint) in {
 
     'ar': ('مقياس الواجهة:',
      'أدخل نسبة مئوية واضغط Enter أو غادر الحقل. يلغي Escape التغيير. تغيّر الأسهم المقياس بنسبة 1%.'),
+
+    'tr': ('Ölçek:',
+     "Yüzde girip Enter'a basın veya alandan çıkın. Escape iptal eder. Oklar ölçeği %1 değiştirir."),
+    'hi': ('स्केल:',
+     'प्रतिशत लिखकर Enter दबाएँ या बॉक्स छोड़ें। Escape रद्द करता है। तीर स्केल 1% बदलते हैं।'),
+    'id': ('Skala:',
+     'Masukkan persentase lalu tekan Enter atau tinggalkan kolom. Escape membatalkan. Panah mengubah '
+     'skala sebesar 1%.'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
 
@@ -3135,6 +3646,10 @@ def _settings_import_error(error, lang):
             'it': 'File delle impostazioni non valido. Scegli un’esportazione JSON compatibile di ClicknTranslate.',
 
             'ar': 'ملف الإعدادات غير صالح. اختر ملف JSON متوافقًا ومصدّرًا من ClicknTranslate.',
+
+            'tr': 'Geçersiz ayar dosyası. Uyumlu bir ClicknTranslate JSON dışa aktarımı seçin.',
+            'hi': 'अमान्य सेटिंग्स फ़ाइल। अनुकूल ClicknTranslate JSON निर्यात चुनें।',
+            'id': 'Berkas pengaturan tidak valid. Pilih ekspor JSON ClicknTranslate yang kompatibel.',
         }
         return labels.get(lang,labels['en'])
     return str(error)
@@ -3226,6 +3741,10 @@ HISTORY_RECORD_TEXT = {
     'it': {'original': 'Originale', 'translated': 'Traduzione', 'copy': 'Copia', 'delete': 'Elimina'},
 
     'ar': {'original': 'الأصل', 'translated': 'الترجمة', 'copy': 'نسخ', 'delete': 'حذف'},
+
+    'tr': {'original': 'Özgün metin', 'translated': 'Çeviri', 'copy': 'Kopyala', 'delete': 'Sil'},
+    'hi': {'original': 'मूल टेक्स्ट', 'translated': 'अनुवाद', 'copy': 'कॉपी करें', 'delete': 'हटाएँ'},
+    'id': {'original': 'Asli', 'translated': 'Terjemahan', 'copy': 'Salin', 'delete': 'Hapus'},
 }
 
 
@@ -3508,6 +4027,116 @@ UPDATE_TEXT = {
      'launch_update': 'التحديث الآن',
      'launch_skip': 'تخطي هذا الإصدار',
      'launch_later': 'لاحقًا'},
+
+    'tr': {'store_updates': "Bu sürüm Microsoft Store üzerinden güncellenir. Microsoft Store Kitaplığı'nda "
+                      "Güncelleştirmeleri al'ı seçin.",
+     'dev_build': 'Otomatik güncelleme paketlenmiş uygulamada kullanılabilir. Python kaynak kodu '
+                  'ayrıca güncellenir.',
+     'checking_button': 'Denetleniyor...',
+     'checking': 'Güncellemeler denetleniyor...',
+     'downloading_word': 'İndiriliyor',
+     'downloading_button': 'İndiriliyor...',
+     'apply_wait': 'Güncelleme uygulanıyor.\nLütfen bekleyin...',
+     'apply_close': 'Güncelleme zaten uygulanıyor. Şu anda kapatılamaz.\nLütfen bekleyin.',
+     'canceling_button': 'İptal ediliyor...',
+     'canceling_clean': 'Güncelleme iptal ediliyor...\nGeçici dosyalar temizleniyor, lütfen bekleyin.',
+     'canceling_wait': 'Güncelleme iptal ediliyor...\nLütfen bekleyin.',
+     'check_failed': 'Güncelleme denetlenemedi:\n{error}',
+     'parse_failed': 'Güncelleme yanıtı çözümlenemedi.',
+     'check_cancelled': 'Güncelleme denetimi iptal edildi.',
+     'error_title': 'Güncelleme hatası',
+     'unknown_error': 'Bilinmeyen güncelleme hatası.',
+     'up_to_date': 'Zaten en güncel sürümdesiniz: V{version}',
+     'no_asset': 'Bu sürümde kurulumunuza uygun güncelleme paketi henüz yok. Daha sonra denetleyin.',
+     'invalid_url': 'Geçersiz güncelleme dosyası adresi.',
+     'available_title': 'Güncelleme mevcut',
+     'available_prompt': 'Yeni sürüm: V{latest}\nMevcut sürüm: V{current}\n\nŞimdi kurulsun mu?',
+     'preparing_download': 'İndirme hazırlanıyor...',
+     'stage_download': 'Güncelleme paketi indiriliyor...',
+     'stage_checksum': 'Sağlama toplamı indiriliyor...',
+     'stage_verify': 'Sağlama toplamı doğrulanıyor...',
+     'stage_prepare': 'Güncelleme hazırlanıyor...',
+     'cancelled': 'Güncelleme iptal edildi. Geçici dosyalar silindi.',
+     'install_failed': 'Güncelleme kurulamadı:\n{error}',
+     'restart_ready': 'V{version} güncellemesi hazır.\nUygulama yeniden başlatılıyor...',
+     'restarting': 'Yeniden başlatılıyor...',
+     'launch_title': 'Güncelleme mevcut',
+     'launch_prompt': 'V{latest} çıktı. Sizde V{current} var.',
+     'launch_update': 'Şimdi güncelle',
+     'launch_skip': 'Bu sürümü atla',
+     'launch_later': 'Daha sonra'},
+    'hi': {'store_updates': 'इस संस्करण के अपडेट Microsoft Store से आते हैं। Microsoft Store लाइब्रेरी में '
+                      'अपडेट पाएँ चुनें।',
+     'dev_build': 'अपने आप अपडेट पैकेज वाले ऐप में है। Python स्रोत अलग अपडेट होता है।',
+     'checking_button': 'जाँच हो रही है...',
+     'checking': 'अपडेट जाँचे जा रहे हैं...',
+     'downloading_word': 'डाउनलोड हो रहा है',
+     'downloading_button': 'डाउनलोड हो रहा है...',
+     'apply_wait': 'अपडेट लागू हो रहा है।\nप्रतीक्षा करें...',
+     'apply_close': 'अपडेट लागू हो रहा है। अभी बंद नहीं कर सकते।\nप्रतीक्षा करें।',
+     'canceling_button': 'रद्द हो रहा है...',
+     'canceling_clean': 'अपडेट रद्द हो रहा है...\nअस्थायी फ़ाइलें हट रही हैं, प्रतीक्षा करें।',
+     'canceling_wait': 'अपडेट रद्द हो रहा है...\nप्रतीक्षा करें।',
+     'check_failed': 'अपडेट जाँच विफल:\n{error}',
+     'parse_failed': 'अपडेट उत्तर पढ़ नहीं सके।',
+     'check_cancelled': 'अपडेट जाँच रद्द हुई।',
+     'error_title': 'अपडेट त्रुटि',
+     'unknown_error': 'अज्ञात अपडेट त्रुटि।',
+     'up_to_date': 'आपके पास नवीनतम संस्करण है: V{version}',
+     'no_asset': 'इस संस्करण में आपके इंस्टॉलेशन के अनुकूल अपडेट पैकेज अभी नहीं है। बाद में जाँचें।',
+     'invalid_url': 'अपडेट फ़ाइल का URL अमान्य है।',
+     'available_title': 'अपडेट उपलब्ध है',
+     'available_prompt': 'नया संस्करण: V{latest}\nमौजूदा संस्करण: V{current}\n\nअभी इंस्टॉल करें?',
+     'preparing_download': 'डाउनलोड तैयार हो रहा है...',
+     'stage_download': 'अपडेट पैकेज डाउनलोड हो रहा है...',
+     'stage_checksum': 'चेकसम डाउनलोड हो रहा है...',
+     'stage_verify': 'चेकसम जाँचा जा रहा है...',
+     'stage_prepare': 'अपडेट तैयार हो रहा है...',
+     'cancelled': 'अपडेट रद्द। अस्थायी फ़ाइलें हट गईं।',
+     'install_failed': 'अपडेट इंस्टॉल नहीं हुआ:\n{error}',
+     'restart_ready': 'अपडेट V{version} तैयार है।\nऐप फिर शुरू हो रहा है...',
+     'restarting': 'फिर शुरू हो रहा है...',
+     'launch_title': 'अपडेट उपलब्ध है',
+     'launch_prompt': 'V{latest} उपलब्ध है। आपके पास V{current} है।',
+     'launch_update': 'अभी अपडेट करें',
+     'launch_skip': 'यह संस्करण छोड़ें',
+     'launch_later': 'बाद में'},
+    'id': {'store_updates': 'Pembaruan versi ini disediakan Microsoft Store. Buka Pustaka Microsoft Store '
+                      'dan pilih Dapatkan pembaruan.',
+     'dev_build': 'Pembaruan otomatis tersedia pada aplikasi paket. Sumber Python diperbarui terpisah.',
+     'checking_button': 'Memeriksa...',
+     'checking': 'Memeriksa pembaruan...',
+     'downloading_word': 'Mengunduh',
+     'downloading_button': 'Mengunduh...',
+     'apply_wait': 'Pembaruan sedang diterapkan.\nHarap tunggu...',
+     'apply_close': 'Pembaruan sedang diterapkan. Penutupan dinonaktifkan saat ini.\nHarap tunggu.',
+     'canceling_button': 'Membatalkan...',
+     'canceling_clean': 'Membatalkan pembaruan...\nMembersihkan berkas sementara, harap tunggu.',
+     'canceling_wait': 'Membatalkan pembaruan...\nHarap tunggu.',
+     'check_failed': 'Gagal memeriksa pembaruan:\n{error}',
+     'parse_failed': 'Gagal membaca respons pembaruan.',
+     'check_cancelled': 'Pemeriksaan pembaruan dibatalkan.',
+     'error_title': 'Kesalahan pembaruan',
+     'unknown_error': 'Kesalahan pembaruan tidak dikenal.',
+     'up_to_date': 'Anda sudah memakai versi terbaru: V{version}',
+     'no_asset': 'Rilis ini belum memiliki paket pembaruan yang cocok. Coba periksa lagi nanti.',
+     'invalid_url': 'URL aset pembaruan tidak valid.',
+     'available_title': 'Pembaruan tersedia',
+     'available_prompt': 'Versi baru: V{latest}\nVersi saat ini: V{current}\n\nPasang sekarang?',
+     'preparing_download': 'Menyiapkan unduhan...',
+     'stage_download': 'Mengunduh paket pembaruan...',
+     'stage_checksum': 'Mengunduh checksum...',
+     'stage_verify': 'Memverifikasi checksum...',
+     'stage_prepare': 'Menyiapkan pembaruan...',
+     'cancelled': 'Pembaruan dibatalkan. Berkas sementara dihapus.',
+     'install_failed': 'Gagal memasang pembaruan:\n{error}',
+     'restart_ready': 'Pembaruan V{version} siap.\nMemulai ulang aplikasi...',
+     'restarting': 'Memulai ulang...',
+     'launch_title': 'Pembaruan tersedia',
+     'launch_prompt': 'V{latest} tersedia. Anda memakai V{current}.',
+     'launch_update': 'Perbarui sekarang',
+     'launch_skip': 'Lewati versi ini',
+     'launch_later': 'Nanti'},
 }
 
 
@@ -3787,6 +4416,150 @@ ENGINE_TEXT = {
      'hymt_extract': 'جارٍ استخراج بيئة تشغيل Hy-MT...',
      'hymt_model': 'جارٍ تنزيل نموذج Hy-MT...',
      'hymt_license': 'جارٍ حفظ ترخيص Hy-MT...'},
+
+    'tr': {'not_found': '{engine} bulunamadı',
+     'install': 'Kur',
+     'cancel': 'İptal',
+     'remove': 'Kaldır',
+     'tesseract_prompt': 'Tesseract-OCR bulunamadı. Yerel olarak indirilip kurulsun mu?',
+     'linux_tesseract_hint': 'Tesseract kurulu değil. Paket yöneticinizle kurun:\n\n{command}',
+     'manual_hymt_hint': "Hy-MT otomatik kurulumu Windows ve macOS'te mevcuttur.\n"
+                         '\n'
+                         '{model} modelini ve llama.cpp çalıştırıcısını ({runners}) şuraya koyun:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR yerel olarak kurulu değil. Sinirsel OCR motoru uygulama klasörüne '
+                       'kurulsun mu?\n'
+                       '\n'
+                       'İnternet ve yaklaşık 1 GB boş alan gerekir. Uygulama özel kurulum ortamını '
+                       'indirir; Python kurmanız gerekmez. Dil modelleri ilk tanımada indirilir. '
+                       'Paketler ocr\\easyocr konumuna kaydedilir.',
+     'rapidocr_prompt': 'RapidOCR yerel olarak kurulu değil. Sinirsel OCR motoru uygulama klasörüne '
+                        'kurulsun mu?\n'
+                        '\n'
+                        'İnternet gerekir. Uygulama özel kurulum ortamını indirir; Python kurmanız '
+                        'gerekmez. Paketler ocr\\rapidocr konumuna kaydedilir; modeller ilk tanımada '
+                        'orada önbelleğe alınır.',
+     'hymt_prompt': 'Yerel Hy-MT modeli kurulu değil. Çevrimdışı çeviri paketi indirilip kurulsun mu?\n'
+                    '\n'
+                    'Hy-MT modeli ve yerel llama.cpp ortamı için yaklaşık 1,2 GB indirilecek.',
+     'preparing': '{engine} kurulumu hazırlanıyor...',
+     'downloading_packages': '{engine} paketleri indirilip kuruluyor...',
+     'downloading_engine': '{engine} indiriliyor...',
+     'extracting_engine': '{engine} çıkarılıyor...',
+     'downloading_language': '{name} dil verisi indiriliyor...',
+     'applying': 'Kurulum uygulanıyor...',
+     'done': 'Tamam',
+     'canceling': 'Kurulum iptal ediliyor...',
+     'ready': '{engine} kuruldu ve hazır.',
+     'hymt_ready': 'Hy-MT kuruldu, çevrimdışı çeviriye hazır.',
+     'error_title': '{engine} hatası',
+     'install_failed': '{engine} kurulamadı:\n{error}',
+     'cancelled_title': 'İptal edildi',
+     'install_cancelled': '{engine} kurulumu iptal edildi. Geçici dosyalar silindi.',
+     'remove_title': '{engine} kaldır',
+     'remove_ocr_prompt': 'Yerel {engine} motoru uygulama klasöründen kaldırılsın mı?',
+     'remove_hymt_prompt': 'Yerel Hy-MT modeli ve çalışma ortamı uygulama klasöründen kaldırılsın mı?',
+     'removed': 'Yerel {engine} kaldırıldı.',
+     'remove_failed': '{engine} kaldırılamadı:\n{error}',
+     'hymt_runtime': 'Hy-MT çalışma ortamı indiriliyor...',
+     'hymt_extract': 'Hy-MT çalışma ortamı çıkarılıyor...',
+     'hymt_model': 'Hy-MT modeli indiriliyor...',
+     'hymt_license': 'Hy-MT lisansı kaydediliyor...'},
+    'hi': {'not_found': '{engine} नहीं मिला',
+     'install': 'इंस्टॉल करें',
+     'cancel': 'रद्द करें',
+     'remove': 'हटाएँ',
+     'tesseract_prompt': 'Tesseract-OCR नहीं मिला। स्थानीय रूप से डाउनलोड और इंस्टॉल करें?',
+     'linux_tesseract_hint': 'Tesseract इंस्टॉल नहीं है। पैकेज मैनेजर से इंस्टॉल करें:\n\n{command}',
+     'manual_hymt_hint': 'Hy-MT का अपने आप इंस्टॉलेशन Windows और macOS पर है।\n'
+                         '\n'
+                         '{model} मॉडल और llama.cpp रनर ({runners}) यहाँ रखें:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR स्थानीय रूप से इंस्टॉल नहीं है। न्यूरल OCR इंजन ऐप फ़ोल्डर में इंस्टॉल '
+                       'करें?\n'
+                       '\n'
+                       'इंटरनेट और लगभग 1 GB खाली जगह चाहिए। ऐप अपना निजी इंस्टॉलर डाउनलोड करता है; '
+                       'Python इंस्टॉल नहीं करना पड़ता। भाषा मॉडल पहली पहचान में डाउनलोड होते हैं। '
+                       'पैकेज ocr\\easyocr में रखे जाएँगे।',
+     'rapidocr_prompt': 'RapidOCR स्थानीय रूप से इंस्टॉल नहीं है। न्यूरल OCR इंजन ऐप फ़ोल्डर में '
+                        'इंस्टॉल करें?\n'
+                        '\n'
+                        'इंटरनेट चाहिए। ऐप अपना निजी इंस्टॉलर डाउनलोड करता है; Python इंस्टॉल नहीं '
+                        'करना पड़ता। पैकेज ocr\\rapidocr में सहेजे जाएँगे और पहली पहचान में मॉडल वहीं '
+                        'कैश होंगे।',
+     'hymt_prompt': 'स्थानीय Hy-MT मॉडल इंस्टॉल नहीं है। ऑफ़लाइन अनुवाद पैकेज डाउनलोड और इंस्टॉल '
+                    'करें?\n'
+                    '\n'
+                    'लगभग 1.2 GB डाउनलोड होगा: Hy-MT मॉडल और स्थानीय llama.cpp रनटाइम।',
+     'preparing': '{engine} इंस्टॉलेशन तैयार हो रहा है...',
+     'downloading_packages': '{engine} पैकेज डाउनलोड और इंस्टॉल हो रहे हैं...',
+     'downloading_engine': '{engine} डाउनलोड हो रहा है...',
+     'extracting_engine': '{engine} निकाला जा रहा है...',
+     'downloading_language': '{name} भाषा डेटा डाउनलोड हो रहा है...',
+     'applying': 'इंस्टॉलेशन लागू हो रहा है...',
+     'done': 'हो गया',
+     'canceling': 'इंस्टॉलेशन रद्द हो रहा है...',
+     'ready': '{engine} इंस्टॉल और तैयार है।',
+     'hymt_ready': 'Hy-MT इंस्टॉल है, ऑफ़लाइन अनुवाद के लिए तैयार।',
+     'error_title': '{engine} त्रुटि',
+     'install_failed': '{engine} इंस्टॉल नहीं हुआ:\n{error}',
+     'cancelled_title': 'रद्द हुआ',
+     'install_cancelled': '{engine} इंस्टॉलेशन रद्द। अस्थायी फ़ाइलें हट गईं।',
+     'remove_title': '{engine} हटाएँ',
+     'remove_ocr_prompt': 'स्थानीय {engine} इंजन ऐप फ़ोल्डर से हटाएँ?',
+     'remove_hymt_prompt': 'स्थानीय Hy-MT मॉडल और रनटाइम ऐप फ़ोल्डर से हटाएँ?',
+     'removed': 'स्थानीय {engine} हटा दिया गया।',
+     'remove_failed': '{engine} हट नहीं सका:\n{error}',
+     'hymt_runtime': 'Hy-MT रनटाइम डाउनलोड हो रहा है...',
+     'hymt_extract': 'Hy-MT रनटाइम निकाला जा रहा है...',
+     'hymt_model': 'Hy-MT मॉडल डाउनलोड हो रहा है...',
+     'hymt_license': 'Hy-MT लाइसेंस सहेजा जा रहा है...'},
+    'id': {'not_found': '{engine} tidak ditemukan',
+     'install': 'Pasang',
+     'cancel': 'Batal',
+     'remove': 'Hapus',
+     'tesseract_prompt': 'Tesseract-OCR tidak ditemukan. Unduh dan pasang secara lokal?',
+     'linux_tesseract_hint': 'Tesseract belum terpasang. Pasang dengan pengelola paket:\n\n{command}',
+     'manual_hymt_hint': 'Pemasangan otomatis Hy-MT tersedia di Windows dan macOS.\n'
+                         '\n'
+                         'Letakkan model {model} dan pelaksana llama.cpp ({runners}) di:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR belum terpasang lokal. Pasang mesin OCR neural ke folder aplikasi?\n'
+                       '\n'
+                       'Perlu internet dan sekitar 1 GB ruang kosong. Aplikasi mengunduh runtime '
+                       'pemasang privat; Anda tidak perlu memasang Python. Model bahasa diunduh saat '
+                       'pengenalan pertama. Paket disimpan di ocr\\easyocr.',
+     'rapidocr_prompt': 'RapidOCR belum terpasang lokal. Pasang mesin OCR neural ke folder aplikasi?\n'
+                        '\n'
+                        'Perlu internet. Aplikasi mengunduh runtime pemasang privat; Anda tidak perlu '
+                        'memasang Python. Paket disimpan di ocr\\rapidocr dan model dicache di sana '
+                        'saat pengenalan pertama.',
+     'hymt_prompt': 'Model Hy-MT lokal belum terpasang. Unduh dan pasang paket terjemahan luring?\n'
+                    '\n'
+                    'Sekitar 1,2 GB akan diunduh: model Hy-MT dan runtime llama.cpp lokal.',
+     'preparing': 'Menyiapkan pemasangan {engine}...',
+     'downloading_packages': 'Mengunduh dan memasang paket {engine}...',
+     'downloading_engine': 'Mengunduh {engine}...',
+     'extracting_engine': 'Mengekstrak {engine}...',
+     'downloading_language': 'Mengunduh data bahasa {name}...',
+     'applying': 'Menerapkan pemasangan...',
+     'done': 'Selesai',
+     'canceling': 'Membatalkan pemasangan...',
+     'ready': '{engine} terpasang dan siap.',
+     'hymt_ready': 'Hy-MT terpasang dan siap menerjemahkan luring.',
+     'error_title': 'Kesalahan {engine}',
+     'install_failed': 'Gagal memasang {engine}:\n{error}',
+     'cancelled_title': 'Dibatalkan',
+     'install_cancelled': 'Pemasangan {engine} dibatalkan. Berkas sementara dihapus.',
+     'remove_title': 'Hapus {engine}',
+     'remove_ocr_prompt': 'Hapus mesin {engine} lokal dari folder aplikasi?',
+     'remove_hymt_prompt': 'Hapus model Hy-MT dan runtime lokal dari folder aplikasi?',
+     'removed': '{engine} lokal dihapus.',
+     'remove_failed': 'Gagal menghapus {engine}:\n{error}',
+     'hymt_runtime': 'Mengunduh runtime Hy-MT...',
+     'hymt_extract': 'Mengekstrak runtime Hy-MT...',
+     'hymt_model': 'Mengunduh model Hy-MT...',
+     'hymt_license': 'Menyimpan lisensi Hy-MT...'},
 }
 
 
@@ -3952,6 +4725,8 @@ EASYOCR_MODEL_GROUP_BY_LANGUAGE = {
     "ko": "korean_g2",
     "ar": "arabic",
     "hi": "devanagari",
+
+    'id': 'english_g2',
 }
 
 EASYOCR_MODEL_FILE_VARIANTS = {
@@ -4438,6 +5213,253 @@ LANGUAGE_MANAGER_TEXT = {
      'remove_failed': 'تعذرت إزالة حزم اللغات:\n',
      'win_removing': 'Windows OCR: جارٍ إزالة {language} \u200f({current}/{total})…',
      'win_rolling_back': 'Windows OCR: جارٍ الإلغاء وإزالة الحزم غير المكتملة…'},
+
+    'tr': {'intro': 'OCR dillerini veya Argos çevrimdışı yönlerini buradan kurun. Paketler tanıma veya '
+              'çeviri sırasında değil, önceden indirilir.',
+     'refresh': 'Yenile',
+     'windows_note': "Windows'taki OCR dillerini gösterir. Klavye eklemeden yalnızca OCR "
+                     'kurabilirsiniz.',
+     'install_selected': 'Seçilenleri kur',
+     'windows_settings': 'Windows ayarları',
+     'tesseract_note': 'Yerel tessdata klasörüne indirilecek dilleri işaretleyin.',
+     'install_engine': 'Motoru kur',
+     'easyocr_note': 'EasyOCR modellerini önceden indirmek için dilleri işaretleyin. İngilizce yedek '
+                     'olarak eklenir.',
+     'remove_engine': 'Motoru kaldır',
+     'remove_engine_tooltip': 'Kurulu {engine} motorunu bu bilgisayardan siler.',
+     'hymt_note': 'Hy-MT dil başına paket değil, tek bir yerel çeviri modelidir. Buradan kurunca '
+                  'çevirmen listesinde görünür.',
+     'translation_engine': 'Çeviri motoru',
+     'local_model': 'Yerel model',
+     'rapidocr_note': "RapidOCR'ın ayrı dil paketleri yoktur. Yerel sinirsel motor tek Çince + "
+                      'İngilizce modeli içerir. Rusça için Windows OCR, Tesseract veya EasyOCR '
+                      'kullanın.',
+     'component': 'Bileşen',
+     'package': 'Paket',
+     'status': 'Durum',
+     'argos_note': 'Tüm mevcut Argos paketleri gösterilir. İngilizce dışındaki çiftler İngilizce '
+                   'üzerinden iki paket kullanır.',
+     'remove_highlighted': 'Vurgulananları kaldır',
+     'direction': 'Yön',
+     'search': 'Ara: Türkçe, tr, en→tr…',
+     'language': 'Dil',
+     'installed': 'Kurulu',
+     'missing': 'Eksik',
+     'can_download': 'İndirilebilir',
+     'engine_missing': '{engine} eksik',
+     'checking': 'Denetleniyor…',
+     'unavailable': 'Bu Windows sürümünde yok',
+     'first_use': "İlk OCR'da hazırlanır",
+     'engine_first': 'Önce motoru kurun',
+     'ocr_engine': 'OCR motoru',
+     'runtime': 'Sinir ağı ortamı',
+     'detector': 'Metin algılama + yön',
+     'recognition': 'Tanıma',
+     'loading': 'Paket listesi yükleniyor…',
+     'load_error': 'Paket listesi yüklenemedi: ',
+     'no_match': 'Aramanıza uygun paket yok',
+     'no_packages': 'Paket bulunamadı',
+     'no_selection': 'Kurmak için en az bir dil işaretleyin.',
+     'already': '{engine} zaten kurulu.',
+     'still': '{engine} hâlâ denetleniyor. Biraz bekleyin.',
+     'win_confirm': 'Seçili Windows OCR bileşenleri kurulsun mu?\n'
+                    '\n'
+                    'Yönetici izni istenir. Yalnızca OCR kurulur; klavye veya giriş düzeni eklenmez.',
+     'easy_prompt': 'Önce EasyOCR kurulmalıdır. Motor kurulumu başlatılsın mı?',
+     'argos_installed': 'Seçili Argos yönleri kuruldu.',
+     'highlight': 'Bir veya daha fazla kurulu satırı vurgulayın.',
+     'remove_confirm': 'Argos paketleri kaldırılsın mı: {packages}?\n'
+                       '\n'
+                       'Bu yönler artık çevrimdışı çalışmaz.',
+     'removed': 'Seçili Argos paketleri kaldırıldı.',
+     'preparing': 'Hazırlanıyor…',
+     'canceling': 'İptal ediliyor…',
+     'install_failed': 'Dil paketleri kurulamadı:\n',
+     'ready': 'Seçili dil paketleri hazır.',
+     'canceled': 'İptal edildi',
+     'tess_down': 'Tesseract: diller indiriliyor…',
+     'win_wait': 'Windows OCR: yönetici izni bekleniyor…',
+     'win_done': 'Windows OCR: tamamlandı',
+     'win_installing': 'Windows OCR: {language} kuruluyor ({current}/{total})…',
+     'win_checking': 'Windows OCR: {language} denetleniyor…',
+     'win_verifying': 'Windows OCR: {language} doğrulanıyor…',
+     'easy_down': 'EasyOCR: {language} modelleri indiriliyor…',
+     'easy_done': 'EasyOCR: tamamlandı',
+     'ocr_section': 'OCR',
+     'translation_section': 'Çeviri',
+     'engine_not_installed_title': '{engine} kurulu değil',
+     'engine_not_installed_body': 'Önce motoru kurun. Kurulumdan sonra dil paketleri burada görünür.',
+     'repair_needed': 'Onarım gerekli',
+     'remove_packages_confirm': 'Seçili {engine} paketleri kaldırılsın mı: {packages}?',
+     'easy_shared_removal': 'EasyOCR diller arasında model paylaşır. Bu paketin kaldırılması şunları '
+                            'etkiler: {packages}.',
+     'packages_removed': 'Seçili {engine} dil paketleri kaldırıldı.',
+     'remove_failed': 'Dil paketleri kaldırılamadı:\n',
+     'win_removing': 'Windows OCR: {language} kaldırılıyor ({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: iptal edilip eksik paketler kaldırılıyor…'},
+    'hi': {'intro': 'OCR भाषाएँ या Argos ऑफ़लाइन अनुवाद दिशाएँ यहाँ इंस्टॉल करें। पैकेज पहले डाउनलोड होते '
+              'हैं, पहचान या अनुवाद के दौरान नहीं।',
+     'refresh': 'ताज़ा करें',
+     'windows_note': 'Windows में उपलब्ध OCR भाषाएँ दिखाता है। कीबोर्ड जोड़े बिना सिर्फ़ OCR इंस्टॉल '
+                     'करें।',
+     'install_selected': 'चुने इंस्टॉल करें',
+     'windows_settings': 'Windows सेटिंग्स',
+     'tesseract_note': 'स्थानीय tessdata फ़ोल्डर में डाउनलोड की भाषाएँ चुनें।',
+     'install_engine': 'इंजन इंस्टॉल करें',
+     'easyocr_note': 'EasyOCR मॉडल पहले डाउनलोड करने के लिए भाषाएँ चुनें। अंग्रेज़ी बैकअप में जुड़ती '
+                     'है।',
+     'remove_engine': 'इंजन हटाएँ',
+     'remove_engine_tooltip': 'इस कंप्यूटर से इंस्टॉल {engine} इंजन हटाएँ।',
+     'hymt_note': 'Hy-MT अलग भाषा पैकेज नहीं, एक स्थानीय अनुवाद मॉडल है। यहाँ इंस्टॉल करें, फिर '
+                  'अनुवादक सूची में दिखेगा।',
+     'translation_engine': 'अनुवाद इंजन',
+     'local_model': 'स्थानीय मॉडल',
+     'rapidocr_note': 'RapidOCR के अलग भाषा पैकेज नहीं हैं। स्थानीय न्यूरल इंजन में एक चीनी + '
+                      'अंग्रेज़ी मॉडल है। रूसी के लिए Windows OCR, Tesseract या EasyOCR चुनें।',
+     'component': 'घटक',
+     'package': 'पैकेज',
+     'status': 'स्थिति',
+     'argos_note': 'सभी उपलब्ध Argos पैकेज दिखते हैं। अन्य भाषा जोड़ियाँ अंग्रेज़ी के रास्ते दो पैकेज '
+                   'उपयोग करती हैं।',
+     'remove_highlighted': 'चुनी पंक्तियाँ हटाएँ',
+     'direction': 'दिशा',
+     'search': 'खोजें: हिन्दी, hi, en→hi…',
+     'language': 'भाषा',
+     'installed': 'इंस्टॉल है',
+     'missing': 'उपलब्ध नहीं',
+     'can_download': 'डाउनलोड कर सकते हैं',
+     'engine_missing': '{engine} नहीं है',
+     'checking': 'जाँच हो रही है…',
+     'unavailable': 'इस Windows संस्करण में नहीं है',
+     'first_use': 'पहले OCR में तैयार होगा',
+     'engine_first': 'पहले इंजन इंस्टॉल करें',
+     'ocr_engine': 'OCR इंजन',
+     'runtime': 'न्यूरल रनटाइम',
+     'detector': 'टेक्स्ट खोज + दिशा',
+     'recognition': 'पहचान',
+     'loading': 'पैकेज सूची लोड हो रही है…',
+     'load_error': 'पैकेज सूची नहीं खुली: ',
+     'no_match': 'खोज से मेल खाते पैकेज नहीं हैं',
+     'no_packages': 'पैकेज नहीं मिले',
+     'no_selection': 'इंस्टॉल करने को कम से कम एक भाषा चुनें।',
+     'already': '{engine} पहले से इंस्टॉल है।',
+     'still': '{engine} की जाँच जारी है। थोड़ा रुकें।',
+     'win_confirm': 'चुने Windows OCR घटक इंस्टॉल करें?\n'
+                    '\n'
+                    'व्यवस्थापक अनुमति माँगी जाएगी। सिर्फ़ OCR इंस्टॉल होगा; कीबोर्ड या इनपुट लेआउट '
+                    'नहीं जुड़ेगा।',
+     'easy_prompt': 'पहले EasyOCR इंस्टॉल होना चाहिए। इंजन इंस्टॉल शुरू करें?',
+     'argos_installed': 'चुनी Argos दिशाएँ इंस्टॉल हुईं।',
+     'highlight': 'एक या अधिक इंस्टॉल पंक्तियाँ चुनें।',
+     'remove_confirm': 'Argos पैकेज हटाएँ: {packages}?\n\nये दिशाएँ ऑफ़लाइन नहीं चलेंगी।',
+     'removed': 'चुने Argos पैकेज हटा दिए गए।',
+     'preparing': 'तैयार हो रहा है…',
+     'canceling': 'रद्द हो रहा है…',
+     'install_failed': 'भाषा पैकेज इंस्टॉल नहीं हुए:\n',
+     'ready': 'चुने भाषा पैकेज तैयार हैं।',
+     'canceled': 'रद्द हुआ',
+     'tess_down': 'Tesseract: भाषाएँ डाउनलोड हो रही हैं…',
+     'win_wait': 'Windows OCR: व्यवस्थापक अनुमति की प्रतीक्षा…',
+     'win_done': 'Windows OCR: पूरा हुआ',
+     'win_installing': 'Windows OCR: {language} इंस्टॉल हो रहा है ({current}/{total})…',
+     'win_checking': 'Windows OCR: {language} जाँच हो रही है…',
+     'win_verifying': 'Windows OCR: {language} सत्यापन हो रहा है…',
+     'easy_down': 'EasyOCR: {language} मॉडल डाउनलोड हो रहे हैं…',
+     'easy_done': 'EasyOCR: पूरा हुआ',
+     'ocr_section': 'OCR',
+     'translation_section': 'अनुवाद',
+     'engine_not_installed_title': '{engine} इंस्टॉल नहीं है',
+     'engine_not_installed_body': 'पहले इंजन इंस्टॉल करें। उसके बाद भाषा पैकेज यहाँ दिखेंगे।',
+     'repair_needed': 'मरम्मत चाहिए',
+     'remove_packages_confirm': 'चुने {engine} पैकेज हटाएँ: {packages}?',
+     'easy_shared_removal': 'EasyOCR भाषाओं में मॉडल साझा करता है। यह पैकेज हटाने से प्रभावित होंगे: '
+                            '{packages}।',
+     'packages_removed': 'चुने {engine} भाषा पैकेज हटा दिए गए।',
+     'remove_failed': 'भाषा पैकेज हट नहीं सके:\n',
+     'win_removing': 'Windows OCR: {language} हट रहा है ({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: रद्द करके अधूरे पैकेज हटा रहा है…'},
+    'id': {'intro': 'Pasang bahasa OCR atau arah terjemahan luring Argos di sini. Paket diunduh sebelumnya, '
+              'bukan saat pengenalan atau terjemahan.',
+     'refresh': 'Segarkan',
+     'windows_note': 'Menampilkan bahasa OCR Windows. Pasang OCR saja tanpa menambah papan ketik.',
+     'install_selected': 'Pasang pilihan',
+     'windows_settings': 'Pengaturan Windows',
+     'tesseract_note': 'Centang bahasa untuk diunduh ke folder tessdata lokal.',
+     'install_engine': 'Pasang mesin',
+     'easyocr_note': 'Centang bahasa untuk mengunduh model EasyOCR sebelumnya. Inggris ditambahkan '
+                     'sebagai cadangan.',
+     'remove_engine': 'Hapus mesin',
+     'remove_engine_tooltip': 'Hapus mesin {engine} terpasang dari komputer ini.',
+     'hymt_note': 'Hy-MT adalah satu model terjemahan lokal, bukan paket per bahasa. Pasang di sini '
+                  'agar muncul di daftar penerjemah.',
+     'translation_engine': 'Mesin terjemahan',
+     'local_model': 'Model lokal',
+     'rapidocr_note': 'RapidOCR tidak memiliki paket bahasa terpisah. Mesin neural lokalnya berisi '
+                      'satu model Mandarin + Inggris. Untuk Rusia gunakan Windows OCR, Tesseract, atau '
+                      'EasyOCR.',
+     'component': 'Komponen',
+     'package': 'Paket',
+     'status': 'Status',
+     'argos_note': 'Semua paket Argos tersedia ditampilkan. Pasangan non-Inggris memakai dua paket '
+                   'melalui Inggris.',
+     'remove_highlighted': 'Hapus yang disorot',
+     'direction': 'Arah',
+     'search': 'Cari: Indonesia, id, en→id…',
+     'language': 'Bahasa',
+     'installed': 'Terpasang',
+     'missing': 'Belum ada',
+     'can_download': 'Dapat diunduh',
+     'engine_missing': '{engine} belum ada',
+     'checking': 'Memeriksa…',
+     'unavailable': 'Tidak tersedia di versi Windows ini',
+     'first_use': 'Disiapkan saat OCR pertama',
+     'engine_first': 'Pasang mesin terlebih dahulu',
+     'ocr_engine': 'Mesin OCR',
+     'runtime': 'Runtime neural',
+     'detector': 'Deteksi teks + orientasi',
+     'recognition': 'Pengenalan',
+     'loading': 'Memuat daftar paket…',
+     'load_error': 'Tidak dapat memuat daftar paket: ',
+     'no_match': 'Tidak ada paket cocok dengan pencarian',
+     'no_packages': 'Paket tidak ditemukan',
+     'no_selection': 'Centang setidaknya satu bahasa untuk dipasang.',
+     'already': '{engine} sudah terpasang.',
+     'still': '{engine} masih diperiksa. Harap tunggu sebentar.',
+     'win_confirm': 'Pasang komponen Windows OCR pilihan?\n'
+                    '\n'
+                    'Izin administrator akan diminta. Hanya OCR dipasang; tidak ada papan ketik atau '
+                    'tata masukan ditambahkan.',
+     'easy_prompt': 'EasyOCR harus dipasang dahulu. Mulai pemasangan mesin?',
+     'argos_installed': 'Arah Argos pilihan terpasang.',
+     'highlight': 'Sorot satu atau beberapa baris terpasang.',
+     'remove_confirm': 'Hapus paket Argos: {packages}?\n\nArah ini tidak lagi bekerja luring.',
+     'removed': 'Paket Argos pilihan dihapus.',
+     'preparing': 'Menyiapkan…',
+     'canceling': 'Membatalkan…',
+     'install_failed': 'Gagal memasang paket bahasa:\n',
+     'ready': 'Paket bahasa pilihan siap.',
+     'canceled': 'Dibatalkan',
+     'tess_down': 'Tesseract: mengunduh bahasa…',
+     'win_wait': 'Windows OCR: menunggu izin administrator…',
+     'win_done': 'Windows OCR: selesai',
+     'win_installing': 'Windows OCR: memasang {language} ({current}/{total})…',
+     'win_checking': 'Windows OCR: memeriksa {language}…',
+     'win_verifying': 'Windows OCR: memverifikasi {language}…',
+     'easy_down': 'EasyOCR: mengunduh model {language}…',
+     'easy_done': 'EasyOCR: selesai',
+     'ocr_section': 'OCR',
+     'translation_section': 'Terjemahan',
+     'engine_not_installed_title': '{engine} belum terpasang',
+     'engine_not_installed_body': 'Pasang mesin dahulu. Paket bahasa akan muncul di sini setelah '
+                                  'pemasangan.',
+     'repair_needed': 'Perlu perbaikan',
+     'remove_packages_confirm': 'Hapus paket {engine} pilihan: {packages}?',
+     'easy_shared_removal': 'EasyOCR berbagi model antarbahasa. Menghapus paket ini memengaruhi: '
+                            '{packages}.',
+     'packages_removed': 'Paket bahasa {engine} pilihan dihapus.',
+     'remove_failed': 'Gagal menghapus paket bahasa:\n',
+     'win_removing': 'Windows OCR: menghapus {language} ({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: membatalkan dan menghapus paket tidak lengkap…'},
 }
 
 
@@ -4716,6 +5738,121 @@ WINDOWS_OCR_RUNTIME_TEXT = {
                        'دقيقة ثم حاول مجددًا؛ لا حاجة إلى إعادة التشغيل.',
      'win_error_generic': 'تعذر على Windows إكمال عملية حزمة OCR. ثبّت تحديثات Windows المعلقة وأعد '
                           'تشغيل الكمبيوتر ثم حاول مجددًا.'},
+
+    'tr': {'continue_background': 'Arka planda devam et',
+     'show_progress': 'Göster',
+     'task_installing_short': 'Kuruluyor',
+     'task_packages_short': 'Paketler',
+     'task_busy_help': 'Başka paket işlemi sürüyor. Seçimleriniz korunuyor; ilerlemesini açın veya '
+                       'bitmesini bekleyin.',
+     'win_component_short': 'DISM %{percent}',
+     'win_stage': 'Adım {stage}/4 · Dil {current}/{total}',
+     'win_time_unknown': 'Kalan süreyi Windows Update belirler; kesin bitiş zamanı bilinemez.',
+     'win_activity_recent': 'Windows yanıt veriyor',
+     'win_background_info': "Windows dili Windows Update'ten indirir. Dil başına 5–20 dakika sürebilir "
+                            've yüzde birkaç dakika sabit kalabilir; bu normaldir. İşlem Windows '
+                            'hizmeti olarak çalışır, arka planda da sürer ve bu pencere sonucu '
+                            'bildirir.',
+     'win_download_stage': 'Windows Update: %{percent} indirildi',
+     'win_quiet': '{minutes} dakikadır ilerleme yok. Windows yanıt veriyor ama indirme durmuş '
+                  'olabilir. Arka planda bekleyebilir veya güvenle iptal edebilirsiniz.',
+     'win_installing_basic': 'Windows {language} hazırlıyor ({current}/{total}). Bu gerekli dil '
+                             'bileşeni birkaç dakika sürebilir.',
+     'win_installing': "Windows Update {language} OCR'ını indirip kuruyor ({current}/{total}). Birkaç "
+                       'dakika sürebilir.',
+     'win_cancel_pending': 'İptal istendi. Windows mevcut bileşeni güvenle tamamlıyor; birkaç dakika '
+                           'sürebilir.',
+     'win_still_working': 'Windows Update hâlâ çalışıyor. Bilgisayarı kapatmayın.',
+     'win_registering': 'Windows yeni OCR dilini kaydediyor. Biraz sürebilir…',
+     'win_installed_pending_restart': 'Windows OCR paketini kurdu. {languages} henüz uygulamada '
+                                      "görünmüyor — Click'n'Translate'i, hâlâ görünmezse Windows'u "
+                                      'yeniden başlatın.',
+     'win_error_policy': 'Windows Update ilkesi OCR paketini engelledi. Windows ayarlarını açın veya '
+                         'yöneticiye başvurun (0x800f0954).',
+     'win_error_source': "Windows OCR paketini indiremedi. Windows Update'i, interneti ve boş disk "
+                         'alanını denetleyip tekrar deneyin.',
+     'win_error_restart': "Bileşen kurulumu için Windows'un yeniden başlaması gerekli. Bilgisayarı "
+                          'yeniden başlatıp tekrar deneyin.',
+     'win_error_busy': 'Windows bileşen hizmeti meşgul; genellikle Windows Update veya başka kurulum '
+                       'çalışıyordur. Bir dakika bekleyip tekrar deneyin; yeniden başlatma gerekmez.',
+     'win_error_generic': 'Windows OCR işlemini tamamlayamadı. Bekleyen Windows güncellemelerini '
+                          'kurun, bilgisayarı yeniden başlatıp tekrar deneyin.'},
+    'hi': {'continue_background': 'पृष्ठभूमि में जारी रखें',
+     'show_progress': 'दिखाएँ',
+     'task_installing_short': 'इंस्टॉल हो रहा है',
+     'task_packages_short': 'पैकेज',
+     'task_busy_help': 'दूसरा पैकेज काम चल रहा है। आपके चयन सुरक्षित हैं; उसकी प्रगति खोलें या पूरा '
+                       'होने दें।',
+     'win_component_short': 'DISM {percent}%',
+     'win_stage': 'चरण {stage}/4 · भाषा {current}/{total}',
+     'win_time_unknown': 'बाकी समय Windows Update तय करता है; पूरा होने का सटीक समय उपलब्ध नहीं है।',
+     'win_activity_recent': 'Windows जवाब दे रहा है',
+     'win_background_info': 'Windows भाषा Windows Update से डाउनलोड करता है। हर भाषा में 5–20 मिनट लग '
+                            'सकते हैं और प्रतिशत कई मिनट स्थिर रह सकता है — यह सामान्य है। काम Windows '
+                            'सेवा में होता है, इसलिए पृष्ठभूमि में भी चलता रहता है और यह विंडो परिणाम '
+                            'बताती है।',
+     'win_download_stage': 'Windows Update: {percent}% डाउनलोड हुआ',
+     'win_quiet': '{minutes} मिनट से प्रगति नहीं। Windows जवाब दे रहा है, लेकिन डाउनलोड अटका हो सकता '
+                  'है। पृष्ठभूमि में प्रतीक्षा करें या सुरक्षित रद्द करें।',
+     'win_installing_basic': 'Windows {language} तैयार कर रहा है ({current}/{total})। इस ज़रूरी भाषा '
+                             'घटक में कुछ मिनट लग सकते हैं।',
+     'win_installing': 'Windows Update {language} का OCR डाउनलोड और इंस्टॉल कर रहा है '
+                       '({current}/{total})। कुछ मिनट लग सकते हैं।',
+     'win_cancel_pending': 'रद्द करने का अनुरोध हुआ। Windows मौजूदा घटक सुरक्षित पूरा कर रहा है; कुछ '
+                           'मिनट लग सकते हैं।',
+     'win_still_working': 'Windows Update अभी काम कर रहा है। कंप्यूटर बंद न करें।',
+     'win_registering': 'Windows नई OCR भाषा पंजीकृत कर रहा है। थोड़ा समय लग सकता है…',
+     'win_installed_pending_restart': 'Windows ने OCR पैकेज इंस्टॉल कर दिया। {languages} अभी ऐप में '
+                                      "उपलब्ध नहीं है — Click'n'Translate फिर शुरू करें; फिर भी न दिखे "
+                                      'तो Windows फिर शुरू करें।',
+     'win_error_policy': 'Windows Update नीति ने OCR पैकेज रोका। Windows सेटिंग्स खोलें या सिस्टम '
+                         'व्यवस्थापक से संपर्क करें (0x800f0954)।',
+     'win_error_source': 'Windows OCR पैकेज डाउनलोड नहीं कर सका। Windows Update, इंटरनेट और खाली डिस्क '
+                         'जगह जाँचकर फिर कोशिश करें।',
+     'win_error_restart': 'घटक इंस्टॉल करने से पहले Windows फिर शुरू होना चाहिए। कंप्यूटर फिर शुरू '
+                          'करके आज़माएँ।',
+     'win_error_busy': 'Windows घटक सेवा व्यस्त है — आमतौर पर Windows Update या दूसरा इंस्टॉलेशन चल '
+                       'रहा है। एक मिनट बाद फिर कोशिश करें; रीस्टार्ट ज़रूरी नहीं।',
+     'win_error_generic': 'Windows OCR पैकेज का काम पूरा नहीं कर सका। लंबित Windows अपडेट इंस्टॉल '
+                          'करें, कंप्यूटर फिर शुरू करके आज़माएँ।'},
+    'id': {'continue_background': 'Lanjutkan di latar belakang',
+     'show_progress': 'Tampilkan',
+     'task_installing_short': 'Memasang',
+     'task_packages_short': 'Paket',
+     'task_busy_help': 'Operasi paket lain sedang berjalan. Pilihan Anda dipertahankan; buka '
+                       'kemajuannya atau tunggu hingga selesai.',
+     'win_component_short': 'DISM {percent}%',
+     'win_stage': 'Langkah {stage}/4 · Bahasa {current}/{total}',
+     'win_time_unknown': 'Sisa waktu ditentukan Windows Update; waktu selesai pasti tidak tersedia.',
+     'win_activity_recent': 'Windows merespons',
+     'win_background_info': 'Windows mengunduh bahasa dari Windows Update. Perlu 5–20 menit per '
+                            'bahasa, dan persentase dapat diam beberapa menit — ini normal. Proses '
+                            'berjalan sebagai layanan Windows sehingga tetap berlanjut di latar '
+                            'belakang, dan jendela ini melaporkan hasilnya.',
+     'win_download_stage': 'Windows Update: {percent}% diunduh',
+     'win_quiet': 'Tidak ada kemajuan selama {minutes} menit. Windows masih merespons, tetapi unduhan '
+                  'mungkin macet. Tunggu di latar belakang atau batalkan dengan aman.',
+     'win_installing_basic': 'Windows menyiapkan {language} ({current}/{total}). Komponen bahasa wajib '
+                             'ini dapat memerlukan beberapa menit.',
+     'win_installing': 'Windows Update mengunduh dan memasang OCR untuk {language} '
+                       '({current}/{total}). Ini dapat memerlukan beberapa menit.',
+     'win_cancel_pending': 'Pembatalan diminta. Windows menyelesaikan komponen saat ini dengan aman; '
+                           'ini dapat memerlukan beberapa menit.',
+     'win_still_working': 'Windows Update masih bekerja. Jangan matikan PC.',
+     'win_registering': 'Windows mendaftarkan bahasa OCR baru. Ini dapat memerlukan waktu sebentar…',
+     'win_installed_pending_restart': 'Windows selesai memasang paket OCR. {languages} belum tersedia '
+                                      "di aplikasi — mulai ulang Click'n'Translate, atau Windows jika "
+                                      'masih belum muncul.',
+     'win_error_policy': 'Kebijakan Windows Update memblokir paket OCR ini. Buka pengaturan Windows '
+                         'atau hubungi administrator (0x800f0954).',
+     'win_error_source': 'Windows tidak dapat mengunduh paket OCR. Periksa Windows Update, koneksi '
+                         'internet, dan ruang disk, lalu coba lagi.',
+     'win_error_restart': 'Windows perlu dimulai ulang sebelum memasang komponen. Mulai ulang PC dan '
+                          'coba lagi.',
+     'win_error_busy': 'Layanan komponen Windows sibuk — biasanya Windows Update atau pemasangan lain '
+                       'berjalan. Tunggu sebentar dan coba lagi; tidak perlu memulai ulang.',
+     'win_error_generic': 'Windows tidak dapat menyelesaikan operasi paket OCR. Pasang pembaruan '
+                          'Windows tertunda, mulai ulang PC, lalu coba lagi.'},
 }
 for _runtime_lang, _runtime_values in WINDOWS_OCR_RUNTIME_TEXT.items():
     LANGUAGE_MANAGER_TEXT.setdefault(_runtime_lang, {}).update(_runtime_values)
@@ -5944,7 +7081,11 @@ class OcrLanguageManagerDialog(QDialog):
                         'it': 'Lingua non supportata da questo motore',
 
                      'ar': 'هذا المحرك لا يدعم اللغة',
-                 }.get(self.lang, 'Language not supported by this engine')
+
+                    'tr': 'Bu motor dili desteklemiyor',
+                    'hi': 'यह इंजन भाषा का समर्थन नहीं करता',
+                    'id': 'Bahasa tidak didukung mesin ini',
+                }.get(self.lang, 'Language not supported by this engine')
                     if not groups else
                     self._status_engine_missing(EASYOCR_ENGINE_DISPLAY)
                     if not engine_ready else
@@ -8577,6 +9718,10 @@ class SettingsWindow(QWidget):
                     'it': "Questo file delle impostazioni è troppo grande. Scegli un'esportazione ClicknTranslate.",
 
                     'ar': 'ملف الإعدادات كبير جدًا. اختر ملفًا مصدّرًا من ClicknTranslate.',
+
+                    'tr': 'Ayar dosyası çok büyük. ClicknTranslate dışa aktarımı seçin.',
+                    'hi': 'सेटिंग्स फ़ाइल बहुत बड़ी है। ClicknTranslate निर्यात चुनें।',
+                    'id': 'Berkas pengaturan terlalu besar. Pilih ekspor ClicknTranslate.',
                 }
                 raise ValueError(messages.get(lang, messages['en']))
             payload = json.loads(content.decode('utf-8-sig'))
@@ -8889,6 +10034,10 @@ class SettingsWindow(QWidget):
             'it': 'Scegli un motore OCR. I motori mancanti possono essere installati quando selezionati.',
 
             'ar': 'اختر محركًا للتعرف على النص. يمكن تثبيت المحركات الناقصة عند اختيارها.',
+
+            'tr': 'OCR motoru seçin. Eksik motorlar seçildiğinde kurulabilir.',
+            'hi': 'OCR इंजन चुनें। जो इंस्टॉल नहीं हैं उन्हें चुनकर इंस्टॉल करें।',
+            'id': 'Pilih mesin OCR. Mesin yang belum ada dapat dipasang saat dipilih.',
         }
         self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
         self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
@@ -8955,6 +10104,10 @@ class SettingsWindow(QWidget):
              'separatamente.'),
 
             'ar': 'تتطلب الخدمات عبر الإنترنت اتصالًا. تُعرض الخدمات المثبتة التي تعمل دون اتصال بشكل منفصل.',
+
+            'tr': 'Çevrimiçi sağlayıcılar internet gerektirir. Kurulu çevrimdışı sağlayıcılar ayrı listelenir.',
+            'hi': 'ऑनलाइन प्रदाता को इंटरनेट चाहिए। इंस्टॉल ऑफ़लाइन प्रदाता अलग दिखते हैं।',
+            'id': 'Penyedia daring memerlukan internet. Penyedia luring terpasang ditampilkan terpisah.',
         }
         picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
         self.translator_combo.setToolTip(tooltip_text(picker_help))
@@ -10392,6 +11545,10 @@ class SettingsWindow(QWidget):
             'it': 'Scorciatoia o doppio tocco (Maiusc → Maiusc). Esc per cancellare.',
 
             'ar': 'اختصار أو ضغط مزدوج (Shift → Shift). اضغط Esc للمسح.',
+
+            'tr': 'Kısayol veya çift basış (Shift → Shift). Silmek için Esc.',
+            'hi': 'शॉर्टकट या दो बार दबाएँ (Shift → Shift)। साफ़ करने को Esc।',
+            'id': 'Pintasan atau ketuk dua kali (Shift → Shift). Esc untuk menghapus.',
         }
         return hints.get(lang, hints['en'])
 
@@ -10438,6 +11595,10 @@ class SettingsWindow(QWidget):
                     'it': '{hotkey} è già utilizzato: {action}',
 
                     'ar': 'الاختصار {hotkey} مستخدم بالفعل: {action}',
+
+                    'tr': '{hotkey} zaten kullanılıyor: {action}',
+                    'hi': '{hotkey} पहले से उपयोग में है: {action}',
+                    'id': '{hotkey} sudah digunakan: {action}',
                 }
                 message = messages.get(lang, messages["en"]).format(
                     hotkey=hotkey, action=settings_text(lang, label).rstrip(":"))
@@ -12502,6 +13663,30 @@ finally {
                            'على طلب المسؤول ثم حاول مجددًا.',
              'generic': 'تعذر تثبيت التحديث. احتُفظ بالإصدار الحالي. أغلق النسخ الأخرى من التطبيق وحاول '
                         'التحديث مجددًا.'},
+
+            'tr': {'network': "İndirme kesildi. Bağlantıyı kontrol edip tekrar Güncelle'ye tıklayın; uygulama "
+                        'güvenle sürdürür.',
+             'checksum': "İndirilen güncelleme eksik veya bozuk. Kurulmadı; yeniden indirmek için Güncelle'ye "
+                         'tıklayın.',
+             'permission': "Windows uygulama klasörüne erişimi engelledi. Diğer Click'n'Translate kopyalarını "
+                           'kapatıp yönetici istemini onaylayın ve tekrar deneyin.',
+             'generic': "Güncelleme kurulamadı. Mevcut sürüm korundu. Diğer kopyaları kapatıp Güncelle'yi "
+                        'yeniden deneyin.'},
+            'hi': {'network': 'डाउनलोड रुक गया। कनेक्शन जाँचकर अपडेट फिर दबाएँ — ऐप सुरक्षित जारी रखेगा।',
+             'checksum': 'डाउनलोड हुआ अपडेट अधूरा या खराब था। इंस्टॉल नहीं हुआ; फिर डाउनलोड के लिए अपडेट '
+                         'दबाएँ।',
+             'permission': "Windows ने ऐप फ़ोल्डर की पहुँच रोकी। Click'n'Translate की दूसरी प्रतियाँ बंद करें, "
+                           'व्यवस्थापक अनुरोध स्वीकारें और फिर कोशिश करें।',
+             'generic': 'अपडेट इंस्टॉल नहीं हुआ। मौजूदा संस्करण सुरक्षित है। ऐप की दूसरी प्रतियाँ बंद करके '
+                        'अपडेट फिर आज़माएँ।'},
+            'id': {'network': 'Unduhan terputus. Periksa koneksi dan klik Perbarui lagi — aplikasi melanjutkan '
+                        'dengan aman.',
+             'checksum': 'Pembaruan yang diunduh tidak lengkap atau rusak. Tidak dipasang; klik Perbarui untuk '
+                         'mengunduh lagi.',
+             'permission': "Windows memblokir akses folder aplikasi. Tutup salinan Click'n'Translate lain dan "
+                           'setujui permintaan administrator, lalu coba lagi.',
+             'generic': 'Pembaruan tidak dapat dipasang. Versi saat ini dipertahankan. Tutup salinan aplikasi '
+                        'lain dan coba Perbarui lagi.'},
         }
         lowered = raw.lower()
         if not platform_support.IS_WINDOWS and any(token in lowered for token in (
@@ -12521,6 +13706,13 @@ finally {
 
                 'ar': ('لا يمكن الكتابة في مجلد التطبيق. انقل التطبيق إلى مجلد التطبيقات الخاص بك أو مجلدك الشخصي ثم '
                  'حاول مجددًا. احتُفظ بالإصدار الحالي.'),
+
+                'tr': ('Uygulama klasörüne yazılamıyor. Uygulamayı kendi Applications veya ev klasörünüze taşıyıp tekrar '
+                 'deneyin. Mevcut sürüm korundu.'),
+                'hi': ('ऐप फ़ोल्डर में लिख नहीं सकते। ऐप को अपने Applications या होम फ़ोल्डर में रखकर फिर आज़माएँ। '
+                 'मौजूदा संस्करण सुरक्षित है।'),
+                'id': ('Folder aplikasi tidak dapat ditulisi. Pindahkan ke folder Applications pribadi atau folder '
+                 'beranda dan coba lagi. Versi saat ini dipertahankan.'),
             }
             return locations.get(language, locations['en'])
         if any(token in lowered for token in ("incompleteread", "connection", "timeout", "interrupted repeatedly", "download")):

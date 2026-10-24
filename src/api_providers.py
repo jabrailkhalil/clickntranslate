@@ -88,6 +88,16 @@ def display_error(error, lang):
             'ar': ('استخدم عنوان API عبر HTTPS. يُسمح باستخدام HTTP على localhost فقط.',
              'استخدم العنوان الرسمي للخدمة، أو اختر API مخصصًا.',
              'استخدم العنوان الرسمي لخدمة DeepL Free أو Pro API.'),
+
+            'tr': ('HTTPS API adresi kullanın. HTTP yalnızca localhost için geçerlidir.',
+             'Resmî hizmet adresini kullanın veya Özel API seçin.',
+             'Resmî DeepL Free veya Pro API adresini kullanın.'),
+            'hi': ('HTTPS API पता इस्तेमाल करें। HTTP सिर्फ़ localhost के लिए है।',
+             'सेवा का आधिकारिक पता इस्तेमाल करें या कस्टम API चुनें।',
+             'आधिकारिक DeepL Free या Pro API पता इस्तेमाल करें।'),
+            'id': ('Gunakan alamat API HTTPS. HTTP hanya diizinkan untuk localhost.',
+             'Gunakan alamat resmi layanan, atau pilih API khusus.',
+             'Gunakan alamat API resmi DeepL Free atau Pro.'),
         }
         return labels.get(lang,labels['en'])[address_index]
     messages = {
@@ -152,6 +162,31 @@ def display_error(error, lang):
          'انتهت مهلة اتصال API أو تعذّر الاتصال. تحقق من العنوان والشبكة.',
          'فعّل إدخال الصور لهذا النموذج في اتصالات API.',
          'أرجع النموذج نتيجة غير مكتملة أو غير صالحة. جرب تحديد منطقة أصغر.'),
+
+        'tr': ('API isteği başarısız. Dil paketleri → API bölümünde bağlantıyı denetleyin.',
+         'Dil paketleri → API bölümüne API anahtarı ekleyin.',
+         'Dil paketleri → API bölümünde modeli belirleyin.',
+         'API anahtarı reddedildi. Kayıtlı anahtarı denetleyin.',
+         'API kotası veya hız sınırı aşıldı. Hizmet hesabınızı denetleyin.',
+         'API bağlantısı zaman aşımına uğradı veya başarısız. Adresi ve ağı denetleyin.',
+         'API bağlantılarında bu modelin görüntü girişini etkinleştirin.',
+         'Model eksik veya geçersiz sonuç döndürdü. Daha küçük alan deneyin.'),
+        'hi': ('API अनुरोध विफल। भाषा पैकेज → API में कनेक्शन जाँचें।',
+         'भाषा पैकेज → API में API कुंजी जोड़ें।',
+         'भाषा पैकेज → API में मॉडल सेट करें।',
+         'API कुंजी अस्वीकृत हुई। सहेजी कुंजी जाँचें।',
+         'API कोटा या दर सीमा पूरी हुई। सेवा खाता जाँचें।',
+         'API कनेक्शन विफल हुआ या समय समाप्त हुआ। पता और नेटवर्क जाँचें।',
+         'API कनेक्शन में इस मॉडल के लिए इमेज इनपुट चालू करें।',
+         'मॉडल ने अधूरा या अमान्य परिणाम दिया। छोटा क्षेत्र चुनें।'),
+        'id': ('Permintaan API gagal. Periksa koneksi di Paket bahasa → API.',
+         'Tambahkan kunci API di Paket bahasa → API.',
+         'Atur model di Paket bahasa → API.',
+         'Kunci API ditolak. Periksa kunci tersimpan.',
+         'Kuota atau batas laju API tercapai. Periksa akun layanan.',
+         'Koneksi API gagal atau habis waktu. Periksa alamat dan jaringan.',
+         'Aktifkan masukan gambar untuk model ini di koneksi API.',
+         'Model mengembalikan hasil tidak lengkap atau tidak valid. Coba area lebih kecil.'),
     }
     raw = str(error)
     checks = ('Add an API key', 'Set the model', 'API key rejected', 'API quota', 'API connection', 'Enable image input')

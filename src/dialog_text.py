@@ -4,29 +4,29 @@ import sys
 from PyQt5.QtWidgets import QApplication
 
 
-LANGUAGES = ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar')
+LANGUAGES = ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id')
 _ACTIONS = {
     'Swap languages': ('Swap languages', 'Поменять языки', 'Intercambiar idiomas', 'Sprachen tauschen',
-                       'Inverser les langues', '交换语言', 'Trocar idiomas', 'Scambia lingue', 'تبديل اللغتين'),
-    'OK': ('OK', 'ОК', 'Aceptar', 'OK', 'OK', '确定', 'OK', 'OK', 'موافق'),
-    'Save': ('Save', 'Сохранить', 'Guardar', 'Speichern', 'Enregistrer', '保存', 'Salvar', 'Salva', 'حفظ'),
-    'Save all': ('Save all', 'Сохранить всё', 'Guardar todo', 'Alles speichern', 'Tout enregistrer', '全部保存', 'Salvar tudo', 'Salva tutto', 'حفظ الكل'),
-    'Open': ('Open', 'Открыть', 'Abrir', 'Öffnen', 'Ouvrir', '打开', 'Abrir', 'Apri', 'فتح'),
-    'Yes': ('Yes', 'Да', 'Sí', 'Ja', 'Oui', '是', 'Sim', 'Sì', 'نعم'),
-    'Yes to all': ('Yes to all', 'Да для всех', 'Sí a todo', 'Ja, alle', 'Oui pour tout', '全部是', 'Sim para todos', 'Sì a tutti', 'نعم للكل'),
-    'No': ('No', 'Нет', 'No', 'Nein', 'Non', '否', 'Não', 'No', 'لا'),
-    'No to all': ('No to all', 'Нет для всех', 'No a todo', 'Nein, keine', 'Non pour tout', '全部否', 'Não para todos', 'No a tutti', 'لا للكل'),
-    'Abort': ('Abort', 'Прервать', 'Interrumpir', 'Abbrechen', 'Interrompre', '中止', 'Interromper', 'Interrompi', 'إيقاف'),
-    'Retry': ('Retry', 'Повторить', 'Reintentar', 'Erneut versuchen', 'Réessayer', '重试', 'Tentar novamente', 'Riprova', 'إعادة المحاولة'),
-    'Ignore': ('Ignore', 'Пропустить', 'Ignorar', 'Ignorieren', 'Ignorer', '忽略', 'Ignorar', 'Ignora', 'تجاهل'),
-    'Close': ('Close', 'Закрыть', 'Cerrar', 'Schließen', 'Fermer', '关闭', 'Fechar', 'Chiudi', 'إغلاق'),
-    'Cancel': ('Cancel', 'Отмена', 'Cancelar', 'Abbrechen', 'Annuler', '取消', 'Cancelar', 'Annulla', 'إلغاء'),
-    'Discard': ('Discard', 'Не сохранять', 'Descartar', 'Verwerfen', 'Ne pas enregistrer', '不保存', 'Descartar', 'Non salvare', 'عدم الحفظ'),
-    'Help': ('Help', 'Справка', 'Ayuda', 'Hilfe', 'Aide', '帮助', 'Ajuda', 'Aiuto', 'المساعدة'),
-    'Apply': ('Apply', 'Применить', 'Aplicar', 'Anwenden', 'Appliquer', '应用', 'Aplicar', 'Applica', 'تطبيق'),
-    'Reset': ('Reset', 'Сбросить', 'Restablecer', 'Zurücksetzen', 'Réinitialiser', '重置', 'Redefinir', 'Ripristina', 'إعادة الضبط'),
+                       'Inverser les langues', '交换语言', 'Trocar idiomas', 'Scambia lingue', 'تبديل اللغتين', 'Dilleri değiştir', 'भाषाएँ अदलें', 'Tukar bahasa'),
+    'OK': ('OK', 'ОК', 'Aceptar', 'OK', 'OK', '确定', 'OK', 'OK', 'موافق', 'OK', 'OK', 'OK'),
+    'Save': ('Save', 'Сохранить', 'Guardar', 'Speichern', 'Enregistrer', '保存', 'Salvar', 'Salva', 'حفظ', 'Kaydet', 'सहेजें', 'Simpan'),
+    'Save all': ('Save all', 'Сохранить всё', 'Guardar todo', 'Alles speichern', 'Tout enregistrer', '全部保存', 'Salvar tudo', 'Salva tutto', 'حفظ الكل', 'Tümünü kaydet', 'सभी सहेजें', 'Simpan semua'),
+    'Open': ('Open', 'Открыть', 'Abrir', 'Öffnen', 'Ouvrir', '打开', 'Abrir', 'Apri', 'فتح', 'Aç', 'खोलें', 'Buka'),
+    'Yes': ('Yes', 'Да', 'Sí', 'Ja', 'Oui', '是', 'Sim', 'Sì', 'نعم', 'Evet', 'हाँ', 'Ya'),
+    'Yes to all': ('Yes to all', 'Да для всех', 'Sí a todo', 'Ja, alle', 'Oui pour tout', '全部是', 'Sim para todos', 'Sì a tutti', 'نعم للكل', 'Tümüne evet', 'सभी के लिए हाँ', 'Ya untuk semua'),
+    'No': ('No', 'Нет', 'No', 'Nein', 'Non', '否', 'Não', 'No', 'لا', 'Hayır', 'नहीं', 'Tidak'),
+    'No to all': ('No to all', 'Нет для всех', 'No a todo', 'Nein, keine', 'Non pour tout', '全部否', 'Não para todos', 'No a tutti', 'لا للكل', 'Tümüne hayır', 'सभी के लिए नहीं', 'Tidak untuk semua'),
+    'Abort': ('Abort', 'Прервать', 'Interrumpir', 'Abbrechen', 'Interrompre', '中止', 'Interromper', 'Interrompi', 'إيقاف', 'Vazgeç', 'बंद करें', 'Batalkan'),
+    'Retry': ('Retry', 'Повторить', 'Reintentar', 'Erneut versuchen', 'Réessayer', '重试', 'Tentar novamente', 'Riprova', 'إعادة المحاولة', 'Yeniden dene', 'फिर कोशिश करें', 'Coba lagi'),
+    'Ignore': ('Ignore', 'Пропустить', 'Ignorar', 'Ignorieren', 'Ignorer', '忽略', 'Ignorar', 'Ignora', 'تجاهل', 'Yoksay', 'अनदेखा करें', 'Abaikan'),
+    'Close': ('Close', 'Закрыть', 'Cerrar', 'Schließen', 'Fermer', '关闭', 'Fechar', 'Chiudi', 'إغلاق', 'Kapat', 'बंद करें', 'Tutup'),
+    'Cancel': ('Cancel', 'Отмена', 'Cancelar', 'Abbrechen', 'Annuler', '取消', 'Cancelar', 'Annulla', 'إلغاء', 'İptal', 'रद्द करें', 'Batal'),
+    'Discard': ('Discard', 'Не сохранять', 'Descartar', 'Verwerfen', 'Ne pas enregistrer', '不保存', 'Descartar', 'Non salvare', 'عدم الحفظ', 'Değişiklikleri at', 'बदलाव छोड़ें', 'Buang'),
+    'Help': ('Help', 'Справка', 'Ayuda', 'Hilfe', 'Aide', '帮助', 'Ajuda', 'Aiuto', 'المساعدة', 'Yardım', 'सहायता', 'Bantuan'),
+    'Apply': ('Apply', 'Применить', 'Aplicar', 'Anwenden', 'Appliquer', '应用', 'Aplicar', 'Applica', 'تطبيق', 'Uygula', 'लागू करें', 'Terapkan'),
+    'Reset': ('Reset', 'Сбросить', 'Restablecer', 'Zurücksetzen', 'Réinitialiser', '重置', 'Redefinir', 'Ripristina', 'إعادة الضبط', 'Sıfırla', 'रीसेट', 'Reset'),
     'Restore defaults': ('Restore defaults', 'Восстановить по умолчанию', 'Restaurar valores predeterminados',
-                         'Standardeinstellungen wiederherstellen', 'Rétablir les valeurs par défaut', '恢复默认设置', 'Restaurar padrões', 'Ripristina le impostazioni predefinite', 'استعادة الافتراضيات'),
+                         'Standardeinstellungen wiederherstellen', 'Rétablir les valeurs par défaut', '恢复默认设置', 'Restaurar padrões', 'Ripristina le impostazioni predefinite', 'استعادة الافتراضيات', 'Varsayılanları yükle', 'डिफ़ॉल्ट लौटाएँ', 'Pulihkan bawaan'),
 }
 
 

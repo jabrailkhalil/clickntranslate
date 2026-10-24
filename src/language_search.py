@@ -69,7 +69,11 @@ def prepare_language_search(combo):
             'it': 'Trova una lingua...',
 
             'ar': 'ابحث عن لغة…',
-        }.get(lang, 'Find a language…'))
+
+        'tr': 'Dil bul…',
+        'hi': 'भाषा खोजें…',
+        'id': 'Cari bahasa…',
+    }.get(lang, 'Find a language…'))
         search.setAccessibleName(search.placeholderText())
         search.setClearButtonEnabled(True)
         popup.layout().insertWidget(0, search)

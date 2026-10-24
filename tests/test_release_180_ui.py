@@ -10,7 +10,7 @@ from number_controls import NumberStepper
 from test_desktop_ux import app, window
 
 
-@pytest.mark.parametrize('language', ['en', 'ru', 'de', 'es', 'fr', 'zh'])
+@pytest.mark.parametrize('language', list(main.INTERFACE_LANGUAGE_BY_CODE))
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 def test_result_actions_fit_canvas_at_every_scale_and_toggle(window, app, language, theme):
     window.current_interface_language = language

@@ -367,6 +367,173 @@ OCR_UI_TEXT = {
      'swap_languages': 'تبديل اللغتين',
      'source_language': 'لغة التعرف على النص',
      'target_language': 'لغة الترجمة'},
+
+    'tr': {'tess_download_data': 'Tesseract: {language} dil verisi indiriliyor...',
+     'tess_downloading': 'Tesseract: {language} indiriliyor... %{percent}',
+     'tess_ready': 'Tesseract: {language} dil verisi hazır',
+     'tess_retrying': 'Tesseract: {language} indirmesi yeniden deneniyor ({attempt}/{total})...',
+     'recognizing': 'Metin tanınıyor...',
+     'win_missing_title': 'Windows OCR paketi eksik',
+     'win_unavailable': 'Windows OCR şu anda kullanılamıyor.',
+     'win_components': 'Windows OCR bileşenleri yüklenemedi. Kuruluysa Tesseract ile devam edilebilir.',
+     'win_unsupported': 'Windows OCR desteklemiyor: {language} ({tag}).',
+     'win_pack': 'Windows OCR dil paketi muhtemelen kurulu değil. Windows dil ayarlarını açıp gerekli '
+                 'dili ekleyebilirsiniz.',
+     'win_continue': 'Tanıma şimdi Tesseract ile sürecek.',
+     'win_stopped': 'Tesseract bulunamadı; bu dilin tanıması durduruldu.',
+     'open_windows': 'Windows ayarlarını aç',
+     'continue_tesseract': 'Tesseract ile devam et',
+     'close': 'Kapat',
+     'recognition_failed': 'Tanıma başarısız',
+     'engine_unavailable': '{engine} kullanılamıyor',
+     'engine_unavailable_info': '{engine} kurulu değil veya yüklenemedi.\n'
+                                '\n'
+                                'Deneyin:\n'
+                                '• Ayarlardan {engine} seçip yerel paketi kurun\n'
+                                '• Ayarlardan başka OCR motoru seçin',
+     'engine_unreliable': '{engine} güvenilir metin bulamadı',
+     'engine_unreliable_info': '{engine} yeterli güvenle metin algılayamadı.\n'
+                               '\n'
+                               'Deneyin:\n'
+                               '• Seçili tanıma dilini kontrol edin\n'
+                               '• Daha dar ve yüksek kontrastlı alan seçin\n'
+                               '• Başka OCR motoruna geçin',
+     'auto_unreliable': 'Metin güvenilir biçimde tanınamadı',
+     'auto_unreliable_info': 'Gürültü çevirmene gönderilmesin diye zayıf sonuçlar elendi.\n'
+                             '\n'
+                             'Deneyin:\n'
+                             '• Kenarlık ve arka planı almadan metni daha dar seçin\n'
+                             '• Belirli kaynak dili seçin\n'
+                             '• Başka OCR motorunu deneyin veya Windows OCR dil paketini kurun',
+     'not_recognized': '😔 Metin tanınamadı',
+     'not_recognized_info': 'Deneyin:\n'
+                            '• Daha büyük yazılı alan seçin\n'
+                            '• Metin kontrastını kontrol edin\n'
+                            '• Ayarlardan başka OCR motoru seçin',
+     'translate': 'Çevir',
+     'ocr_init_failed': 'OCR başlatılamadı',
+     'screen_no_text': 'Ekranda metin tanınamadı',
+     'translation_failed': 'Çeviri başarısız',
+     'translating_screen': 'Ekran çevriliyor...',
+     'fullscreen_hint': 'Esc / Sağ tık — kapat',
+     'no_installed_languages': 'Kurulu OCR dili yok',
+     'no_installed_translation_pairs': 'Kurulu çeviri çifti yok',
+     'install_languages_first': 'Önce Ayarlar → Dil paketleri bölümünden dil kurun.',
+     'language_packages': 'Dil paketleri',
+     'swap_languages': 'Dilleri değiştir',
+     'source_language': 'Tanıma dili',
+     'target_language': 'Çeviri dili'},
+    'hi': {'tess_download_data': 'Tesseract: {language} भाषा डेटा डाउनलोड हो रहा है...',
+     'tess_downloading': 'Tesseract: {language} डाउनलोड हो रहा है... {percent}%',
+     'tess_ready': 'Tesseract: {language} भाषा डेटा तैयार है',
+     'tess_retrying': 'Tesseract: {language} डाउनलोड फिर आज़मा रहा है ({attempt}/{total})...',
+     'recognizing': 'टेक्स्ट पहचाना जा रहा है...',
+     'win_missing_title': 'Windows OCR पैकेज नहीं है',
+     'win_unavailable': 'Windows OCR अभी उपलब्ध नहीं है।',
+     'win_components': 'Windows OCR घटक लोड नहीं हुए। इंस्टॉल हो तो ऐप Tesseract से जारी रख सकता है।',
+     'win_unsupported': 'Windows OCR में समर्थित नहीं: {language} ({tag})।',
+     'win_pack': 'शायद Windows OCR भाषा पैकेज इंस्टॉल नहीं है। Windows भाषा सेटिंग्स खोलकर ज़रूरी भाषा '
+                 'जोड़ें।',
+     'win_continue': 'अब पहचान Tesseract से जारी रहेगी।',
+     'win_stopped': 'Tesseract नहीं मिला, इसलिए इस भाषा की पहचान रोक दी गई।',
+     'open_windows': 'Windows सेटिंग्स खोलें',
+     'continue_tesseract': 'Tesseract से जारी रखें',
+     'close': 'बंद करें',
+     'recognition_failed': 'पहचान विफल',
+     'engine_unavailable': '{engine} उपलब्ध नहीं है',
+     'engine_unavailable_info': '{engine} इंस्टॉल नहीं है या लोड नहीं हुआ।\n'
+                                '\n'
+                                'आज़माएँ:\n'
+                                '• सेटिंग्स में {engine} चुनकर स्थानीय पैकेज इंस्टॉल करें\n'
+                                '• सेटिंग्स में दूसरा OCR इंजन चुनें',
+     'engine_unreliable': '{engine} को विश्वसनीय टेक्स्ट नहीं मिला',
+     'engine_unreliable_info': '{engine} पर्याप्त विश्वास से टेक्स्ट नहीं पहचान सका।\n'
+                               '\n'
+                               'आज़माएँ:\n'
+                               '• चुनी पहचान भाषा जाँचें\n'
+                               '• छोटा, स्पष्ट क्षेत्र चुनें\n'
+                               '• दूसरा OCR इंजन चुनें',
+     'auto_unreliable': 'टेक्स्ट विश्वसनीय रूप से नहीं पहचाना गया',
+     'auto_unreliable_info': 'गलत टेक्स्ट अनुवादक को न जाए, इसलिए कमज़ोर परिणाम हटाए गए।\n'
+                             '\n'
+                             'आज़माएँ:\n'
+                             '• अतिरिक्त किनारों और पृष्ठभूमि के बिना टेक्स्ट चुनें\n'
+                             '• स्रोत भाषा तय करें\n'
+                             '• दूसरा OCR इंजन आज़माएँ या Windows OCR भाषा पैकेज इंस्टॉल करें',
+     'not_recognized': '😔 टेक्स्ट पहचाना नहीं गया',
+     'not_recognized_info': 'आज़माएँ:\n'
+                            '• बड़े टेक्स्ट वाला क्षेत्र चुनें\n'
+                            '• टेक्स्ट का कॉन्ट्रास्ट जाँचें\n'
+                            '• सेटिंग्स में दूसरा OCR इंजन चुनें',
+     'translate': 'अनुवाद करें',
+     'ocr_init_failed': 'OCR शुरू नहीं हुआ',
+     'screen_no_text': 'स्क्रीन पर टेक्स्ट नहीं मिला',
+     'translation_failed': 'अनुवाद विफल',
+     'translating_screen': 'स्क्रीन अनुवाद हो रहा है...',
+     'fullscreen_hint': 'Esc / दायाँ क्लिक — बंद करें',
+     'no_installed_languages': 'OCR भाषाएँ इंस्टॉल नहीं हैं',
+     'no_installed_translation_pairs': 'अनुवाद जोड़ियाँ इंस्टॉल नहीं हैं',
+     'install_languages_first': 'पहले सेटिंग्स → भाषा पैकेज में भाषा इंस्टॉल करें।',
+     'language_packages': 'भाषा पैकेज',
+     'swap_languages': 'भाषाएँ अदलें',
+     'source_language': 'पहचान की भाषा',
+     'target_language': 'अनुवाद की भाषा'},
+    'id': {'tess_download_data': 'Tesseract: mengunduh data bahasa {language}...',
+     'tess_downloading': 'Tesseract: mengunduh {language}... {percent}%',
+     'tess_ready': 'Tesseract: data bahasa {language} siap',
+     'tess_retrying': 'Tesseract: mencoba lagi unduhan {language} ({attempt}/{total})...',
+     'recognizing': 'Mengenali teks...',
+     'win_missing_title': 'Paket Windows OCR belum ada',
+     'win_unavailable': 'Windows OCR saat ini tidak tersedia.',
+     'win_components': 'Komponen Windows OCR gagal dimuat. Aplikasi dapat memakai Tesseract jika '
+                       'terpasang.',
+     'win_unsupported': 'Windows OCR tidak mendukung: {language} ({tag}).',
+     'win_pack': 'Paket bahasa Windows OCR mungkin belum terpasang. Buka pengaturan bahasa Windows dan '
+                 'tambahkan bahasa yang diperlukan.',
+     'win_continue': 'Pengenalan dilanjutkan dengan Tesseract.',
+     'win_stopped': 'Tesseract tidak ditemukan, jadi pengenalan bahasa ini dihentikan.',
+     'open_windows': 'Buka pengaturan Windows',
+     'continue_tesseract': 'Lanjut dengan Tesseract',
+     'close': 'Tutup',
+     'recognition_failed': 'Pengenalan gagal',
+     'engine_unavailable': '{engine} tidak tersedia',
+     'engine_unavailable_info': 'Mesin {engine} belum terpasang atau gagal dimuat.\n'
+                                '\n'
+                                'Coba:\n'
+                                '• Pilih {engine} di pengaturan dan pasang paket lokal\n'
+                                '• Pilih mesin OCR lain di pengaturan',
+     'engine_unreliable': '{engine} tidak menemukan teks yang meyakinkan',
+     'engine_unreliable_info': '{engine} tidak mendeteksi teks dengan keyakinan cukup.\n'
+                               '\n'
+                               'Coba:\n'
+                               '• Periksa bahasa pengenalan\n'
+                               '• Pilih area lebih rapat dengan kontras tinggi\n'
+                               '• Ganti mesin OCR',
+     'auto_unreliable': 'Teks tidak dikenali dengan meyakinkan',
+     'auto_unreliable_info': 'Hasil lemah disaring agar derau tidak dikirim ke penerjemah.\n'
+                             '\n'
+                             'Coba:\n'
+                             '• Pilih area teks lebih rapat tanpa bingkai atau latar ekstra\n'
+                             '• Pilih bahasa sumber tertentu\n'
+                             '• Coba mesin OCR lain atau pasang paket bahasa Windows OCR',
+     'not_recognized': '😔 Teks tidak dikenali',
+     'not_recognized_info': 'Coba:\n'
+                            '• Pilih area dengan teks lebih besar\n'
+                            '• Pastikan kontras teks baik\n'
+                            '• Pilih mesin OCR lain di pengaturan',
+     'translate': 'Terjemahkan',
+     'ocr_init_failed': 'Inisialisasi OCR gagal',
+     'screen_no_text': 'Tidak ada teks dikenali di layar',
+     'translation_failed': 'Terjemahan gagal',
+     'translating_screen': 'Menerjemahkan layar...',
+     'fullscreen_hint': 'Esc / Klik kanan — tutup',
+     'no_installed_languages': 'Tidak ada bahasa OCR terpasang',
+     'no_installed_translation_pairs': 'Tidak ada pasangan terjemahan terpasang',
+     'install_languages_first': 'Pasang bahasa terlebih dahulu di Pengaturan → Paket bahasa.',
+     'language_packages': 'Paket bahasa',
+     'swap_languages': 'Tukar bahasa',
+     'source_language': 'Bahasa pengenalan',
+     'target_language': 'Bahasa terjemahan'},
 }
 
 
@@ -1846,6 +2013,8 @@ _EASYOCR_MODEL_GROUP_BY_LANGUAGE = {
     "pt": "latin_g2", "pl": "latin_g2", "tr": "latin_g2", "nl": "latin_g2",
     "zh": "zh_sim_g2", "ch_sim": "zh_sim_g2", "ja": "japanese_g2",
     "ko": "korean_g2", "ar": "arabic", "hi": "devanagari",
+
+    'id': 'english_g2',
 }
 _EASYOCR_MODEL_FILE_VARIANTS = {
     "english_g2": ("english_g2.pth",),

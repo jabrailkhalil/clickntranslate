@@ -18,6 +18,10 @@ CAPTIONS = {
     'it': ('Traduzione e OCR', "Opzioni dell'OCR", 'Traduzione veloce'),
 
     'ar': ('الترجمة والتعرف على النص', 'خيارات التعرف على النص', 'الترجمة السريعة'),
+
+    'tr': ('Çeviri ve OCR', 'OCR seçenekleri', 'Hızlı çeviri'),
+    'hi': ('अनुवाद और OCR', 'OCR विकल्प', 'त्वरित अनुवाद'),
+    'id': ('Terjemahan dan OCR', 'Opsi OCR', 'Terjemahan cepat'),
 }
 
 COMPACT = {
@@ -49,6 +53,22 @@ COMPACT = {
      'الترجمة السريعة للنص المحدد',
      'إظهار زر',
      'الترجمة الآن'),
+
+    'tr': ('Panoyu geri yükle',
+     'Dışarı tıklanınca sonucu kapat',
+     'Hızlı seçim çevirisi',
+     'Düğme göster',
+     'Şimdi çevir'),
+    'hi': ('क्लिपबोर्ड बहाल करें',
+     'बाहर क्लिक पर परिणाम बंद करें',
+     'त्वरित चयन अनुवाद',
+     'बटन दिखाएँ',
+     'अभी अनुवाद करें'),
+    'id': ('Pulihkan papan klip',
+     'Tutup hasil saat klik di luar',
+     'Terjemahan pilihan cepat',
+     'Tampilkan tombol',
+     'Terjemahkan sekarang'),
 }
 
 
@@ -65,6 +85,16 @@ PARAGRAPH_TEXT = {
     'ar': ('دمج أسطر OCR في فقرات',
      'يدمج الأسطر الملتفة داخل الفقرة قبل ترجمة النص الملتقط. تبقى الفواصل المرئية والأعمدة وعناصر '
      'القوائم منفصلة. مفيد للكتب والحوارات؛ عطّله للحفاظ على توزيع الأسطر الأصلي.'),
+
+    'tr': ('OCR satırlarını paragraflarda birleştir',
+     'Yakalanan metni çevirmeden önce aynı paragraftaki satırları birleştirir. Boşluklar, sütunlar ve '
+     'liste öğeleri ayrı kalır. Kitap ve diyaloglar için yararlıdır; özgün satır düzeni için kapatın.'),
+    'hi': ('OCR पंक्तियाँ अनुच्छेद में जोड़ें',
+     'कैप्चर किए टेक्स्ट के अनुवाद से पहले अनुच्छेद की टूटी पंक्तियाँ जोड़ता है। खाली जगह, कॉलम और '
+     'सूची बिंदु अलग रहते हैं। किताबों और संवादों में उपयोगी; मूल पंक्तियाँ रखने के लिए बंद करें।'),
+    'id': ('Gabung baris OCR menjadi paragraf',
+     'Sebelum menerjemahkan, gabungkan baris terbungkus dalam satu paragraf. Jarak, kolom, dan butir '
+     'daftar tetap terpisah. Berguna untuk buku dan dialog; nonaktifkan untuk tata baris asli.'),
 }
 
 

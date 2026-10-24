@@ -47,6 +47,31 @@ _TEXT = {
      'استخدام المحدد',
      'عبر الإنترنت · يتطلب اتصالًا',
      'دون اتصال'),
+
+    'tr': ('Çevrimdışı çeviri hazır değil',
+     '{pair} için Argos paketi kurulu değil.',
+     'Hy-MT modeli veya yerel çalıştırıcısı eksik.',
+     'Kurulumu aç',
+     'Kullanılabilir çevirmenler',
+     'Seçileni kullan',
+     'Çevrimiçi · internet gerekir',
+     'Çevrimdışı'),
+    'hi': ('ऑफ़लाइन अनुवाद तैयार नहीं है',
+     '{pair} के लिए Argos पैकेज इंस्टॉल नहीं है।',
+     'Hy-MT मॉडल या स्थानीय रनर नहीं है।',
+     'इंस्टॉलेशन खोलें',
+     'उपलब्ध अनुवादक',
+     'चुना इस्तेमाल करें',
+     'ऑनलाइन · इंटरनेट चाहिए',
+     'ऑफ़लाइन'),
+    'id': ('Terjemahan luring belum siap',
+     'Paket Argos untuk {pair} belum terpasang.',
+     'Model Hy-MT atau pelaksana lokal belum ada.',
+     'Buka pemasangan',
+     'Penerjemah tersedia',
+     'Gunakan pilihan',
+     'Daring · perlu internet',
+     'Luring'),
 }
 _KEYS = ('title', 'argos', 'hymt', 'install', 'available', 'use', 'online', 'offline')
 _DOWNLOAD = {'en': 'Download now', 'ru': 'Скачать сейчас', 'es': 'Descargar ahora',
@@ -55,6 +80,10 @@ _DOWNLOAD = {'en': 'Download now', 'ru': 'Скачать сейчас', 'es': 'D
     'it': 'Scarica ora',
 
     'ar': 'التنزيل الآن',
+
+'tr': 'Şimdi indir',
+'hi': 'अभी डाउनलोड करें',
+'id': 'Unduh sekarang',
 }
 _RUNTIME = {
     'en': 'Argos could not start. Check its installation or choose another translator.',
@@ -68,6 +97,10 @@ _RUNTIME = {
     'it': 'Impossibile avviareArgos. Controlla la sua installazione o scegli un altro traduttore.',
 
     'ar': 'تعذر بدء Argos. تحقق من تثبيته أو اختر مترجمًا آخر.',
+
+    'tr': 'Argos başlatılamadı. Kurulumunu denetleyin veya başka çevirmen seçin.',
+    'hi': 'Argos शुरू नहीं हुआ। इंस्टॉलेशन जाँचें या दूसरा अनुवादक चुनें।',
+    'id': 'Argos tidak dapat dimulai. Periksa pemasangannya atau pilih penerjemah lain.',
 }
 
 

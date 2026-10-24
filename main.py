@@ -172,6 +172,9 @@ INTERFACE_LANGUAGE_OPTIONS = [
     {"code": "pt", "name": "Português", "icon": "icons/Portuguese_flag.png"},
     {"code": "it", "name": "Italiano", "icon": "icons/Italian_flag.png"},
     {"code": "ar", "name": "العربية", "icon": "icons/Arabic_flag.png"},
+    {"code": "tr", "name": "Türkçe", "icon": "icons/Turkish_flag.png"},
+    {"code": "hi", "name": "हिन्दी", "icon": "icons/Hindi_flag.png"},
+    {"code": "id", "name": "Indonesia", "icon": "icons/flags/id.png"},
 ]
 INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
@@ -2077,6 +2080,178 @@ INTERFACE_TEXT = {
      'argos_canceling': 'جارٍ إلغاء تثبيت حزمة Argos…',
      'argos_install_cancelled': 'أُلغي تثبيت حزمة Argos.',
      'install_argos_packages_hint': 'ثبّت اتجاه Argos المطلوب من الإعدادات ← حزم اللغات ← Argos.'},
+
+    'tr': {'title': "Click'n'Translate",
+     'select_language': 'Çeviri dillerini seçin',
+     'start': 'Başlat',
+     'translation_selected': 'Seçili çeviri: {src} → {tgt}',
+     'settings': 'Ayarlar',
+     'back': 'Ana ekrana dön',
+     'ocr': 'OCR',
+     'help': 'Yardım',
+     'choose_interface_language': 'Arayüz dilini seçin',
+     'theme': 'Temayı değiştir',
+     'minimize': 'Simge durumuna küçült',
+     'tray_open': 'Aç',
+     'tray_exit': 'Çıkış',
+     'tray_copy': 'Metni kopyala',
+     'tray_translate': 'Çevir',
+     'tray_translate_screen': 'Ekranı çevir',
+     'game_translate': 'Dinamik çeviri',
+     'tray_game_translate': 'Dinamik çeviri',
+     'input_placeholder': 'Çevrilecek metni girin',
+     'translate_button': 'Çevir',
+     'hotkey_copy': 'Kopyala',
+     'hotkey_ocr_translate': 'OCR çevirisi',
+     'hotkey_fullscreen': 'Tam ekran',
+     'hotkey_gaming': 'Dinamik',
+     'hotkey_selection': 'Seçim',
+     'hotkey_toggle': 'Pencere',
+     'hotkey_replace': 'Değiştir',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Yazılan metin',
+     'direction_shortcuts': 'Kısayollar',
+     'direction_hint': 'Yukarıdaki kutu yazdığınız metni çevirir.\n'
+                       'Kısayollar ekranı veya seçili metni çevirir ve her biri kendi\n'
+                       'çeviri yönünü saklar — aşağıdaki satırdan değiştirebilirsiniz.',
+     'translator': 'Çevirmen',
+     'shadow_mode': 'Gölge modu',
+     'copy': 'Kopyala',
+     'google': 'Google',
+     'close': 'Kapat',
+     'got_it': 'Anladım',
+     'no_text_selected': 'Metin seçilmedi',
+     'translating': 'Çevriliyor...',
+     'translation_error': 'Çeviri hatası',
+     'selection_replaced': 'Seçili metin değiştirildi',
+     'selection_replace_fallback': 'Seçim değişti. Çeviri bunun yerine kopyalandı.',
+     'installing_language_packages': 'Dil paketleri kuruluyor…',
+     'argos_package_missing_title': 'Argos dil paketi gerekli',
+     'argos_package_missing_prompt': '{pair} için Argos paketi kurulu değil. Şimdi indirilip kurulsun '
+                                     'mu?\n'
+                                     '\n'
+                                     'Boyutu dile bağlıdır ve birkaç yüz megabayt olabilir.',
+     'argos_preparing': 'Argos paketi {pair} hazırlanıyor…',
+     'argos_downloading': 'Argos paketi {pair} indiriliyor…',
+     'argos_installing': 'Argos paketi {pair} kuruluyor…',
+     'argos_canceling': 'Argos paketinin kurulumu iptal ediliyor…',
+     'argos_install_cancelled': 'Argos paketinin kurulumu iptal edildi.',
+     'install_argos_packages_hint': 'Gerekli Argos yönünü Ayarlar → Dil paketleri → Argos bölümünden '
+                                    'kurun.'},
+    'hi': {'title': "Click'n'Translate",
+     'select_language': 'अनुवाद की भाषाएँ चुनें',
+     'start': 'शुरू करें',
+     'translation_selected': 'चुना गया अनुवाद: {src} → {tgt}',
+     'settings': 'सेटिंग्स',
+     'back': 'मुख्य स्क्रीन पर लौटें',
+     'ocr': 'OCR',
+     'help': 'सहायता',
+     'choose_interface_language': 'इंटरफ़ेस की भाषा चुनें',
+     'theme': 'थीम बदलें',
+     'minimize': 'छोटा करें',
+     'tray_open': 'खोलें',
+     'tray_exit': 'बाहर निकलें',
+     'tray_copy': 'टेक्स्ट कॉपी करें',
+     'tray_translate': 'अनुवाद करें',
+     'tray_translate_screen': 'स्क्रीन का अनुवाद करें',
+     'game_translate': 'गतिशील अनुवाद',
+     'tray_game_translate': 'गतिशील अनुवाद',
+     'input_placeholder': 'अनुवाद के लिए टेक्स्ट लिखें',
+     'translate_button': 'अनुवाद करें',
+     'hotkey_copy': 'कॉपी करें',
+     'hotkey_ocr_translate': 'OCR अनुवाद',
+     'hotkey_fullscreen': 'पूरी स्क्रीन',
+     'hotkey_gaming': 'गतिशील',
+     'hotkey_selection': 'चयन',
+     'hotkey_toggle': 'विंडो',
+     'hotkey_replace': 'बदलें',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'लिखा गया टेक्स्ट',
+     'direction_shortcuts': 'शॉर्टकट',
+     'direction_hint': 'ऊपर का बॉक्स आपके लिखे टेक्स्ट का अनुवाद करता है।\n'
+                       'शॉर्टकट स्क्रीन या चुने हुए टेक्स्ट का अनुवाद करते हैं। हर शॉर्टकट\n'
+                       'अपनी भाषा जोड़ी रखता है — नीचे की पंक्ति में बदलें।',
+     'translator': 'अनुवादक',
+     'shadow_mode': 'छाया मोड',
+     'copy': 'कॉपी करें',
+     'google': 'Google',
+     'close': 'बंद करें',
+     'got_it': 'समझ गया',
+     'no_text_selected': 'कोई टेक्स्ट नहीं चुना गया',
+     'translating': 'अनुवाद हो रहा है...',
+     'translation_error': 'अनुवाद में त्रुटि',
+     'selection_replaced': 'चुना गया टेक्स्ट बदल दिया गया',
+     'selection_replace_fallback': 'चयन बदल गया। अनुवाद कॉपी कर दिया गया।',
+     'installing_language_packages': 'भाषा पैकेज इंस्टॉल हो रहे हैं…',
+     'argos_package_missing_title': 'Argos भाषा पैकेज चाहिए',
+     'argos_package_missing_prompt': '{pair} के लिए Argos पैकेज इंस्टॉल नहीं है। अभी डाउनलोड करके '
+                                     'इंस्टॉल करें?\n'
+                                     '\n'
+                                     'आकार भाषा पर निर्भर करता है और कई सौ मेगाबाइट हो सकता है।',
+     'argos_preparing': 'Argos पैकेज {pair} तैयार हो रहा है…',
+     'argos_downloading': 'Argos पैकेज {pair} डाउनलोड हो रहा है…',
+     'argos_installing': 'Argos पैकेज {pair} इंस्टॉल हो रहा है…',
+     'argos_canceling': 'Argos पैकेज का इंस्टॉलेशन रद्द हो रहा है…',
+     'argos_install_cancelled': 'Argos पैकेज का इंस्टॉलेशन रद्द कर दिया गया।',
+     'install_argos_packages_hint': 'सेटिंग्स → भाषा पैकेज → Argos में ज़रूरी भाषा जोड़ी इंस्टॉल करें।'},
+    'id': {'title': "Click'n'Translate",
+     'select_language': 'Pilih bahasa terjemahan',
+     'start': 'Mulai',
+     'translation_selected': 'Terjemahan pilihan: {src} → {tgt}',
+     'settings': 'Pengaturan',
+     'back': 'Kembali ke beranda',
+     'ocr': 'OCR',
+     'help': 'Bantuan',
+     'choose_interface_language': 'Pilih bahasa antarmuka',
+     'theme': 'Ganti tema',
+     'minimize': 'Minimalkan',
+     'tray_open': 'Buka',
+     'tray_exit': 'Keluar',
+     'tray_copy': 'Salin teks',
+     'tray_translate': 'Terjemahkan',
+     'tray_translate_screen': 'Terjemahkan layar',
+     'game_translate': 'Terjemahan dinamis',
+     'tray_game_translate': 'Terjemahan dinamis',
+     'input_placeholder': 'Masukkan teks yang akan diterjemahkan',
+     'translate_button': 'Terjemahkan',
+     'hotkey_copy': 'Salin',
+     'hotkey_ocr_translate': 'Terjemahan OCR',
+     'hotkey_fullscreen': 'Layar penuh',
+     'hotkey_gaming': 'Dinamis',
+     'hotkey_selection': 'Pilihan',
+     'hotkey_toggle': 'Jendela',
+     'hotkey_replace': 'Ganti',
+     'selection_pair_hint': '{hotkey}: {src} → {tgt}',
+     'direction_typed': 'Teks ketikan',
+     'direction_shortcuts': 'Pintasan',
+     'direction_hint': 'Kotak di atas menerjemahkan teks yang Anda ketik.\n'
+                       'Pintasan menerjemahkan layar atau teks pilihan. Masing-masing\n'
+                       'menyimpan arah bahasanya sendiri — ubah di baris bawah.',
+     'translator': 'Penerjemah',
+     'shadow_mode': 'Mode bayangan',
+     'copy': 'Salin',
+     'google': 'Google',
+     'close': 'Tutup',
+     'got_it': 'Mengerti',
+     'no_text_selected': 'Tidak ada teks yang dipilih',
+     'translating': 'Menerjemahkan...',
+     'translation_error': 'Kesalahan terjemahan',
+     'selection_replaced': 'Teks pilihan telah diganti',
+     'selection_replace_fallback': 'Pilihan berubah. Terjemahan disalin sebagai gantinya.',
+     'installing_language_packages': 'Memasang paket bahasa…',
+     'argos_package_missing_title': 'Paket bahasa Argos diperlukan',
+     'argos_package_missing_prompt': 'Paket Argos untuk {pair} belum terpasang. Unduh dan pasang '
+                                     'sekarang?\n'
+                                     '\n'
+                                     'Ukurannya bergantung pada bahasa dan bisa mencapai beberapa '
+                                     'ratus megabita.',
+     'argos_preparing': 'Menyiapkan paket Argos {pair}…',
+     'argos_downloading': 'Mengunduh paket Argos {pair}…',
+     'argos_installing': 'Memasang paket Argos {pair}…',
+     'argos_canceling': 'Membatalkan pemasangan paket Argos…',
+     'argos_install_cancelled': 'Pemasangan paket Argos dibatalkan.',
+     'install_argos_packages_hint': 'Pasang arah Argos yang diperlukan di Pengaturan → Paket bahasa → '
+                                    'Argos.'},
 }
 
 
@@ -2103,6 +2278,16 @@ HOTKEY_ERROR_TEXT = {
     'ar': {'title': 'الاختصار غير متاح',
      'message': 'تعذّر تسجيل الاختصار <b>{hotkey}</b>.<br><br>هذا الاختصار العام مستخدم بالفعل في '
                 'تطبيق آخر أو في النظام.<br><br>اختر اختصارًا آخر من الإعدادات.'},
+
+    'tr': {'title': 'Kısayol kullanılamıyor',
+     'message': '<b>{hotkey}</b> kaydedilemedi.<br><br>Bu genel kısayolu başka bir uygulama veya '
+                'sistem kullanıyor.<br><br>Ayarlardan farklı bir tuş birleşimi seçin.'},
+    'hi': {'title': 'शॉर्टकट उपलब्ध नहीं है',
+     'message': '<b>{hotkey}</b> पंजीकृत नहीं हो सका।<br><br>यह वैश्विक शॉर्टकट किसी दूसरे ऐप या '
+                'सिस्टम द्वारा उपयोग में है।<br><br>सेटिंग्स में दूसरी कुंजी जोड़ी चुनें।'},
+    'id': {'title': 'Pintasan tidak tersedia',
+     'message': 'Gagal mendaftarkan <b>{hotkey}</b>.<br><br>Kombinasi global ini sudah digunakan '
+                'aplikasi lain atau sistem.<br><br>Pilih kombinasi lain di pengaturan.'},
 }
 
 
@@ -2545,6 +2730,170 @@ DOCUMENT_TEXT = {
      'markdown_file_filter': 'ملف Markdown',
      'session_file_filter': 'ملف جلسة',
      'translation_sessions_filter': 'جلسات الترجمة'},
+
+    'tr': {'title': 'Belge çevirisi',
+     'main_file_tooltip': 'Enter çevirir  ·  Shift+Enter yeni satır açar\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Buraya dosya bırakın, Ctrl+O tuşlarına basın veya ana pencereye sağ '
+                          'tıklayın.',
+     'main_file_hint': 'Buraya belge bırakın veya sağ tıklayın',
+     'attach_file': 'Dosya ekle',
+     'remove_file': 'Dosyayı kaldır',
+     'translate_file': 'Metni çevir',
+     'translate_selected': 'Seçimi çevir',
+     'save_translation': 'Çeviriyi kaydet',
+     'open_session': 'Oturum aç',
+     'context_translate_file': 'Çevrilecek dosyayı seçin',
+     'context_choose_folder': 'Dosyanın klasörünü seçin',
+     'source': 'Kaynak',
+     'target': 'Hedef',
+     'auto_detect': 'Otomatik algıla',
+     'original': 'Özgün metin',
+     'translated': 'Çeviri',
+     'drop_hint': 'Buraya metin yazın, yapıştırın veya belge bırakın.',
+     'no_file': 'Metin girin veya dosya ekleyin.',
+     'loading': 'Dosya yükleniyor...',
+     'loaded': 'Yüklendi',
+     'translating': 'Çevriliyor',
+     'done': 'Çeviri tamamlandı',
+     'error': 'Belge çevirisi hatası',
+     'file': 'Dosya',
+     'size': 'Boyut',
+     'detected': 'Algılanan',
+     'provider': 'Sağlayıcı',
+     'status': 'Durum',
+     'chunks': 'Parçalar',
+     'no_selection': 'Önce özgün belgede metin seçin.',
+     'no_translation': 'Kaydedilecek çevrilmiş metin yok.',
+     'saved': 'Kaydedildi',
+     'session_loaded': 'Oturum yüklendi',
+     'translate_failed': 'Çeviri tamamlandı; bazı parçalar başarısız oldu',
+     'provider_unavailable_title': 'Seçilen sağlayıcı hazır değil',
+     'provider_unavailable_argos': 'Argos çevrimdışı çalışır, ancak bu dil çifti için yerel paket '
+                                   "kurulu değil. Ayarları açıp Argos'u seçerek gerekli dil paketini "
+                                   'kurun veya buradan başka sağlayıcı seçin.',
+     'provider_unavailable_hymt': 'Hy-MT çevrimdışı çalışır, ancak yerel Hy-MT paketi kurulu değil. '
+                                  "Ayarlardan Hy-MT'yi seçip çevrimdışı paketi indirin veya buradan "
+                                  'başka sağlayıcı seçin.',
+     'provider_unavailable_online': 'Bu çevrimiçi sağlayıcı çeviri döndürmedi. İnternet bağlantınızı '
+                                    'kontrol edin veya başka sağlayıcı seçin.',
+     'provider_unavailable_generic': 'Buradan başka sağlayıcı seçin veya Ayarları açıp seçili '
+                                     'sağlayıcının gerekli yerel paketini kurun.',
+     'technical_error': 'Teknik hata',
+     'documents_filter': 'Belgeler',
+     'all_files_filter': 'Tüm dosyalar',
+     'text_file_filter': 'Metin dosyası',
+     'markdown_file_filter': 'Markdown dosyası',
+     'session_file_filter': 'Oturum dosyası',
+     'translation_sessions_filter': 'Çeviri oturumları'},
+    'hi': {'title': 'दस्तावेज़ अनुवाद',
+     'main_file_tooltip': 'Enter से अनुवाद  ·  Shift+Enter से नई पंक्ति\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'फ़ाइल यहाँ छोड़ें, Ctrl+O दबाएँ या मुख्य विंडो पर दायाँ क्लिक करें।',
+     'main_file_hint': 'दस्तावेज़ यहाँ छोड़ें या दायाँ क्लिक करें',
+     'attach_file': 'फ़ाइल जोड़ें',
+     'remove_file': 'फ़ाइल हटाएँ',
+     'translate_file': 'टेक्स्ट का अनुवाद करें',
+     'translate_selected': 'चयन का अनुवाद करें',
+     'save_translation': 'अनुवाद सहेजें',
+     'open_session': 'सत्र खोलें',
+     'context_translate_file': 'अनुवाद के लिए फ़ाइल चुनें',
+     'context_choose_folder': 'फ़ाइल वाला फ़ोल्डर चुनें',
+     'source': 'स्रोत',
+     'target': 'लक्ष्य',
+     'auto_detect': 'अपने आप पहचानें',
+     'original': 'मूल टेक्स्ट',
+     'translated': 'अनुवादित',
+     'drop_hint': 'यहाँ टेक्स्ट लिखें, चिपकाएँ या दस्तावेज़ छोड़ें।',
+     'no_file': 'टेक्स्ट लिखें या फ़ाइल जोड़ें।',
+     'loading': 'फ़ाइल खुल रही है...',
+     'loaded': 'लोड हो गया',
+     'translating': 'अनुवाद हो रहा है',
+     'done': 'अनुवाद पूरा हुआ',
+     'error': 'दस्तावेज़ अनुवाद में त्रुटि',
+     'file': 'फ़ाइल',
+     'size': 'आकार',
+     'detected': 'पहचाना गया',
+     'provider': 'प्रदाता',
+     'status': 'स्थिति',
+     'chunks': 'खंड',
+     'no_selection': 'पहले मूल दस्तावेज़ में टेक्स्ट चुनें।',
+     'no_translation': 'सहेजने के लिए अनुवादित टेक्स्ट नहीं है।',
+     'saved': 'सहेजा गया',
+     'session_loaded': 'सत्र लोड हुआ',
+     'translate_failed': 'अनुवाद पूरा हुआ, कुछ खंड विफल रहे',
+     'provider_unavailable_title': 'चुना गया प्रदाता तैयार नहीं है',
+     'provider_unavailable_argos': 'Argos ऑफ़लाइन चलता है, लेकिन इस भाषा जोड़ी का स्थानीय पैकेज '
+                                   'इंस्टॉल नहीं है। सेटिंग्स में Argos चुनकर ज़रूरी भाषा पैकेज '
+                                   'इंस्टॉल करें, या यहाँ दूसरा प्रदाता चुनें।',
+     'provider_unavailable_hymt': 'Hy-MT ऑफ़लाइन चलता है, लेकिन स्थानीय Hy-MT पैकेज इंस्टॉल नहीं है। '
+                                  'सेटिंग्स में Hy-MT चुनकर ऑफ़लाइन पैकेज डाउनलोड करें, या यहाँ दूसरा '
+                                  'प्रदाता चुनें।',
+     'provider_unavailable_online': 'इस ऑनलाइन प्रदाता से अनुवाद नहीं मिला। इंटरनेट कनेक्शन जाँचें या '
+                                    'दूसरा प्रदाता चुनें।',
+     'provider_unavailable_generic': 'यहाँ दूसरा प्रदाता चुनें, या सेटिंग्स में चुने हुए प्रदाता का '
+                                     'ज़रूरी स्थानीय पैकेज इंस्टॉल करें।',
+     'technical_error': 'तकनीकी त्रुटि',
+     'documents_filter': 'दस्तावेज़',
+     'all_files_filter': 'सभी फ़ाइलें',
+     'text_file_filter': 'टेक्स्ट फ़ाइल',
+     'markdown_file_filter': 'Markdown फ़ाइल',
+     'session_file_filter': 'सत्र फ़ाइल',
+     'translation_sessions_filter': 'अनुवाद सत्र'},
+    'id': {'title': 'Terjemahan dokumen',
+     'main_file_tooltip': 'Enter menerjemahkan  ·  Shift+Enter membuat baris baru\n'
+                          '.txt  ·  .md  ·  .docx  ·  .pdf  ·  .html  ·  .rtf\n'
+                          'Letakkan berkas di sini, tekan Ctrl+O, atau klik kanan jendela utama.',
+     'main_file_hint': 'Letakkan dokumen di sini atau klik kanan',
+     'attach_file': 'Lampirkan berkas',
+     'remove_file': 'Hapus berkas',
+     'translate_file': 'Terjemahkan teks',
+     'translate_selected': 'Terjemahkan pilihan',
+     'save_translation': 'Simpan terjemahan',
+     'open_session': 'Buka sesi',
+     'context_translate_file': 'Pilih berkas yang akan diterjemahkan',
+     'context_choose_folder': 'Pilih folder berkas',
+     'source': 'Sumber',
+     'target': 'Tujuan',
+     'auto_detect': 'Deteksi otomatis',
+     'original': 'Asli',
+     'translated': 'Terjemahan',
+     'drop_hint': 'Ketik atau tempel teks di sini, atau letakkan dokumen.',
+     'no_file': 'Masukkan teks atau lampirkan berkas.',
+     'loading': 'Memuat berkas...',
+     'loaded': 'Dimuat',
+     'translating': 'Menerjemahkan',
+     'done': 'Terjemahan selesai',
+     'error': 'Kesalahan terjemahan dokumen',
+     'file': 'Berkas',
+     'size': 'Ukuran',
+     'detected': 'Terdeteksi',
+     'provider': 'Penyedia',
+     'status': 'Status',
+     'chunks': 'Bagian',
+     'no_selection': 'Pilih teks di dokumen asli terlebih dahulu.',
+     'no_translation': 'Tidak ada teks terjemahan untuk disimpan.',
+     'saved': 'Disimpan',
+     'session_loaded': 'Sesi dimuat',
+     'translate_failed': 'Terjemahan selesai dengan beberapa bagian gagal',
+     'provider_unavailable_title': 'Penyedia pilihan belum siap',
+     'provider_unavailable_argos': 'Argos bekerja luring, tetapi paket bahasa lokal untuk pasangan ini '
+                                   'belum terpasang. Buka Pengaturan, pilih Argos dan pasang paket '
+                                   'yang diperlukan, atau pilih penyedia lain di sini.',
+     'provider_unavailable_hymt': 'Hy-MT bekerja luring, tetapi paket lokal Hy-MT belum terpasang. '
+                                  'Buka Pengaturan, pilih Hy-MT dan unduh paket luring, atau pilih '
+                                  'penyedia lain di sini.',
+     'provider_unavailable_online': 'Penyedia daring ini tidak mengembalikan terjemahan. Periksa '
+                                    'koneksi internet atau pilih penyedia lain di sini.',
+     'provider_unavailable_generic': 'Pilih penyedia lain di sini, atau buka Pengaturan dan pasang '
+                                     'paket lokal yang diperlukan untuk penyedia pilihan.',
+     'technical_error': 'Kesalahan teknis',
+     'documents_filter': 'Dokumen',
+     'all_files_filter': 'Semua berkas',
+     'text_file_filter': 'Berkas teks',
+     'markdown_file_filter': 'Berkas Markdown',
+     'session_file_filter': 'Berkas sesi',
+     'translation_sessions_filter': 'Sesi terjemahan'},
 }
 
 
@@ -2560,6 +2909,10 @@ for _doc_language, _doc_cancel_text in {
     'it': ('Interrompi', 'Interruzione dopo la richiesta corrente…', 'La traduzione è stata interrotta'),
 
     'ar': ('إيقاف', 'سيتم الإيقاف بعد الطلب الحالي…', 'أُوقفت الترجمة'),
+
+    'tr': ('Durdur', 'Mevcut istekten sonra durduruluyor…', 'Çeviri durduruldu'),
+    'hi': ('रोकें', 'मौजूदा अनुरोध के बाद रुक रहा है…', 'अनुवाद रोका गया'),
+    'id': ('Hentikan', 'Berhenti setelah permintaan saat ini…', 'Terjemahan dihentikan'),
 }.items():
     DOCUMENT_TEXT[_doc_language].update(zip(('cancel_translation', 'canceling_translation', 'translation_canceled'), _doc_cancel_text))
 
@@ -2603,6 +2956,10 @@ PROVIDER_GROUP_TEXT = {
     'it': {'online': 'Online', 'offline': 'Offline'},
 
     'ar': {'online': 'عبر الإنترنت', 'offline': 'دون اتصال'},
+
+    'tr': {'online': 'Çevrimiçi', 'offline': 'Çevrimdışı'},
+    'hi': {'online': 'ऑनलाइन', 'offline': 'ऑफ़लाइन'},
+    'id': {'online': 'Daring', 'offline': 'Luring'},
 }
 
 
@@ -2619,6 +2976,10 @@ def provider_kind_text(kind, lang):
             'it': 'offline',
 
             'ar': 'دون اتصال',
+
+            'tr': 'çevrimdışı',
+            'hi': 'ऑफ़लाइन',
+            'id': 'luring',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -2631,6 +2992,10 @@ def provider_kind_text(kind, lang):
         'it': 'online',
 
         'ar': 'عبر الإنترنت',
+
+        'tr': 'çevrimiçi',
+        'hi': 'ऑनलाइन',
+        'id': 'daring',
     }.get(lang, "online")
 
 
@@ -2866,6 +3231,55 @@ WELCOME_TEXT = {
      'guide': 'عرّفني على التطبيق',
      'skip': 'تخطي',
      'close': 'ابدأ'},
+
+    'tr': {'window': 'Yenilikler',
+     'eyebrow': 'Taşınabilir ekran çevirmeni',
+     'title': "Click'n'Translate'e hoş geldiniz!",
+     'body': '{version} sürümü arayüz ve günlük kullanımda büyük yenilikler getiriyor. Desteğiniz için '
+             'teşekkürler — 3.000 indirmeye ulaştık!',
+     'feature_ocr': 'Ekran OCR',
+     'feature_translate': 'Çevrimiçi + çevrimdışı',
+     'feature_updates': '3.000 indirme',
+     'telegram': "Telegram'ı aç",
+     'github': "GitHub'da projeye yıldız verin",
+     'support': "Click'n'Translate ücretsiz bir projedir. Telegram'da bize katılıp GitHub'da yıldız "
+                'verirseniz seviniriz.',
+     'checkbox': 'Bu pencereyi bir daha gösterme',
+     'guide': 'Bana tanıt',
+     'skip': 'Atla',
+     'close': 'Başlat'},
+    'hi': {'window': 'नया क्या है',
+     'eyebrow': 'पोर्टेबल स्क्रीन अनुवादक',
+     'title': "Click'n'Translate में आपका स्वागत है!",
+     'body': 'संस्करण {version} में इंटरफ़ेस और रोज़मर्रा के कामों में बड़े सुधार हैं। आपके समर्थन के '
+             'लिए धन्यवाद — 3,000 डाउनलोड पूरे हुए!',
+     'feature_ocr': 'स्क्रीन OCR',
+     'feature_translate': 'ऑनलाइन + ऑफ़लाइन',
+     'feature_updates': '3,000 डाउनलोड',
+     'telegram': 'Telegram खोलें',
+     'github': 'GitHub पर प्रोजेक्ट को स्टार दें',
+     'support': "Click'n'Translate एक मुफ़्त प्रोजेक्ट है। Telegram पर जुड़कर और GitHub पर स्टार देकर "
+                'हमारा साथ दें।',
+     'checkbox': 'यह विंडो दोबारा न दिखाएँ',
+     'guide': 'ऐप का परिचय दें',
+     'skip': 'छोड़ें',
+     'close': 'शुरू करें'},
+    'id': {'window': 'Berita',
+     'eyebrow': 'Penerjemah layar portabel',
+     'title': "Selamat datang di Click'n'Translate!",
+     'body': 'Versi {version} membawa pembaruan besar pada antarmuka dan penggunaan sehari-hari. '
+             'Terima kasih atas dukungannya — sudah 3.000 unduhan!',
+     'feature_ocr': 'OCR layar',
+     'feature_translate': 'Daring + luring',
+     'feature_updates': '3.000 unduhan',
+     'telegram': 'Buka Telegram',
+     'github': 'Beri bintang proyek di GitHub',
+     'support': "Click'n'Translate adalah proyek gratis. Kami akan senang jika Anda bergabung di "
+                'Telegram dan memberi bintang di GitHub.',
+     'checkbox': 'Jangan tampilkan jendela ini lagi',
+     'guide': 'Tunjukkan panduan',
+     'skip': 'Lewati',
+     'close': 'Mulai'},
 }
 
 
@@ -2887,7 +3301,11 @@ STARTUP_NEWS_TEXT = {
             'it': 'Capito',
 
             'ar': 'فهمت',
-        }[language],
+
+        'tr': 'Anladım',
+        'hi': 'समझ गया',
+        'id': 'Mengerti',
+    }[language],
     }
     for language, copy in WELCOME_TEXT.items()
 }
@@ -2918,7 +3336,7 @@ GUIDE_TEXT = {
         "done_title": "Ready",
         "done_body": "You know the main controls now. The full FAQ stays under the info button.",
         "steps": [
-            ("language", "Interface language", "Flag changes app, settings, tray and help language."),
+            ("language", "Interface language", 'Flag changes app, settings, tray and help language. Choose a language in the panel. Arrows turn pages; × or Esc closes it. The flag stays highlighted while it is open.'),
             ("theme", "Theme", "Sun/moon switches dark and light themes."),
             ("help", "Help", "Info opens OCR, hotkeys and translator help."),
             ("shortcut_overview", "Your hotkeys", "These are your current hotkeys. Hover any one on the main screen for its full description. The mode row above sets a separate language pair for each translation action."),
@@ -2936,7 +3354,7 @@ GUIDE_TEXT = {
             ("result_window", "Result window", "Choose which translation actions open the result window. Unticked actions copy the result instead."),
             ("language_packages", "Language packages", "Install OCR languages and Argos directions here first. Only ready languages appear in selectors."),
             ("hotkeys", "Configure hotkeys", "If a shortcut is inconvenient, open Configure hotkeys. Click its field and press a new combination; press Esc to clear it. Changes apply immediately."),
-            ("back_home", "Back home", "Home returns to the main screen. The top pair translates typed text; each shortcut mode below keeps its own language pair."),
+            ("back_home", "Back home", 'Home returns to the main screen. The top pair translates typed text; each shortcut mode below keeps its own language pair. Use the flag to choose the interface language. Arrows turn language pages; × or Esc closes the panel.'),
         ],
     },
     "ru": {
@@ -2948,7 +3366,7 @@ GUIDE_TEXT = {
         "done_title": "Готово",
         "done_body": "Готово. Полная справка - под кнопкой информации.",
         "steps": [
-            ("language", "Язык интерфейса", "Флаг меняет язык окна, настроек, трея и справки."),
+            ("language", "Язык интерфейса", 'Флаг меняет язык окна, настроек, трея и справки. Выберите язык на панели. Стрелки листают страницы; × или Esc закрывают выбор. Пока панель открыта, флаг подсвечен.'),
             ("theme", "Тема", "Солнце/луна переключает темную и светлую тему."),
             ("help", "Помощь", "Информация: OCR, хоткеи и переводчики."),
             ("shortcut_overview", "Ваши горячие клавиши", "Здесь показаны ваши текущие сочетания. Наведите курсор на любое из них — появится полное описание. В строке режимов выше для каждого действия задаётся своя пара языков."),
@@ -2966,7 +3384,7 @@ GUIDE_TEXT = {
             ("result_window", "Окно результата", "Выберите, после каких действий открывать окно результата. Для отключённых действий перевод копируется в буфер."),
             ("language_packages", "Языковые пакеты", "Здесь заранее ставятся языки OCR и направления Argos. В списках видны только готовые языки."),
             ("hotkeys", "Настроить клавиши", "Если сочетание неудобно, откройте «Настроить горячие клавиши». Нажмите его поле и введите новое сочетание; Esc очищает поле. Изменения применяются сразу."),
-            ("back_home", "Назад домой", "Домик возвращает на главный экран. Верхняя пара переводит введённый текст, а для каждого режима горячих клавиш ниже хранится своя пара языков."),
+            ("back_home", "Назад домой", 'Домик возвращает на главный экран. Верхняя пара переводит введённый текст, а для каждого режима горячих клавиш ниже хранится своя пара языков. Нажмите флаг для выбора языка интерфейса. Стрелки листают языки; × или Esc закрывают панель.'),
         ],
     },
     "es": {
@@ -2978,7 +3396,7 @@ GUIDE_TEXT = {
         "done_title": "Listo",
         "done_body": "Ya conoces los controles principales. La guía completa está en el botón de información.",
         "steps": [
-            ("language", "Idioma", "Bandera: ventana, ajustes, bandeja y ayuda."),
+            ("language", "Idioma", 'Bandera: ventana, ajustes, bandeja y ayuda. Elige un idioma en el panel. Las flechas cambian de página; × o Esc lo cierran. La bandera queda resaltada mientras está abierto.'),
             ("theme", "Tema", "Sol/luna cambia entre tema oscuro y claro."),
             ("help", "Ayuda", "Info: OCR, atajos y traductores."),
             ("shortcut_overview", "Tus atajos", "Aquí aparecen tus combinaciones actuales. Pasa el ratón por cualquiera para ver su descripción completa. La fila de modos guarda un par de idiomas independiente para cada acción."),
@@ -2996,7 +3414,7 @@ GUIDE_TEXT = {
             ("result_window", "Ventana de resultado", "Elige qué acciones abren la ventana de resultado. Las desmarcadas copian la traducción."),
             ("language_packages", "Paquetes de idioma", "Instala aquí idiomas OCR y direcciones Argos. Los selectores muestran solo los que están listos."),
             ("hotkeys", "Configurar atajos", "Si un atajo no te resulta cómodo, abre Configurar atajos. Pulsa su campo e introduce otra combinación; Esc lo borra. El cambio se aplica al instante."),
-            ("back_home", "Volver", "Vuelve a la pantalla principal. El par superior traduce el texto escrito; cada modo de atajo inferior conserva su propio par de idiomas."),
+            ("back_home", "Volver", 'Vuelve a la pantalla principal. El par superior traduce el texto escrito; cada modo de atajo inferior conserva su propio par de idiomas. Pulsa la bandera para elegir el idioma de la interfaz. Las flechas cambian de página; × o Esc cierra el panel.'),
         ],
     },
     "de": {
@@ -3008,7 +3426,7 @@ GUIDE_TEXT = {
         "done_title": "Fertig",
         "done_body": "Die wichtigsten Bedienelemente sind bekannt. Die komplette Hilfe bleibt im Info-Button.",
         "steps": [
-            ("language", "Sprache", "Flagge: Sprache für App, Tray und Hilfe."),
+            ("language", "Sprache", 'Flagge: Sprache für App, Tray und Hilfe. Sprache im Bereich wählen. Pfeile blättern; × oder Esc schließt ihn. Die Flagge bleibt hervorgehoben, solange er geöffnet ist.'),
             ("theme", "Design", "Sonne/Mond wechselt dunkel und hell."),
             ("help", "Hilfe", "Info: OCR, Hotkeys und Übersetzer."),
             ("shortcut_overview", "Ihre Hotkeys", "Hier stehen Ihre aktuellen Kombinationen. Zeigen Sie auf eine davon, um die vollständige Erklärung zu sehen. Die Moduszeile speichert für jede Übersetzungsaktion ein eigenes Sprachpaar."),
@@ -3026,7 +3444,7 @@ GUIDE_TEXT = {
             ("result_window", "Ergebnisfenster", "Wählen Sie, welche Aktionen das Ergebnisfenster öffnen. Nicht markierte Aktionen kopieren die Übersetzung."),
             ("language_packages", "Sprachpakete", "OCR-Sprachen und Argos-Richtungen hier vorab installieren. Nur fertige Sprachen erscheinen in Listen."),
             ("hotkeys", "Hotkeys konfigurieren", "Ist ein Kürzel unpraktisch, öffnen Sie Hotkeys konfigurieren. Feld anklicken und neue Kombination drücken; Esc löscht sie. Änderungen gelten sofort."),
-            ("back_home", "Zurück", "Zurück zum Hauptbildschirm. Das obere Paar übersetzt eingegebenen Text; jedes Übersetzungs-Kürzel darunter behält sein eigenes Sprachpaar."),
+            ("back_home", "Zurück", 'Zurück zum Hauptbildschirm. Das obere Paar übersetzt eingegebenen Text; jedes Übersetzungs-Kürzel darunter behält sein eigenes Sprachpaar. Die Flagge öffnet die Sprachauswahl. Pfeile blättern; × oder Esc schließt den Bereich.'),
         ],
     },
     "fr": {
@@ -3038,7 +3456,7 @@ GUIDE_TEXT = {
         "done_title": "Prêt",
         "done_body": "Les contrôles principaux sont vus. L'aide complète reste dans le bouton info.",
         "steps": [
-            ("language", "Langue", "Drapeau: langue de l'app, réglages et aide."),
+            ("language", "Langue", "Drapeau: langue de l'app, réglages et aide. Choisissez une langue dans le panneau. Les flèches changent de page ; × ou Esc le ferme. Le drapeau reste surligné tant qu’il est ouvert."),
             ("theme", "Thème", "Soleil/lune alterne sombre et clair."),
             ("help", "Aide", "Info: OCR, raccourcis et traducteurs."),
             ("shortcut_overview", "Vos raccourcis", "Voici vos combinaisons actuelles. Survolez-en une pour lire sa description complète. La ligne des modes garde une paire de langues distincte pour chaque action de traduction."),
@@ -3056,7 +3474,7 @@ GUIDE_TEXT = {
             ("result_window", "Fenêtre de résultat", "Choisissez quelles actions ouvrent la fenêtre de résultat. Les actions décochées copient la traduction."),
             ("language_packages", "Modules de langue", "Installez ici les langues OCR et directions Argos. Seules les langues prêtes figurent dans les listes."),
             ("hotkeys", "Configurer les raccourcis", "Si un raccourci ne convient pas, ouvrez Configurer les raccourcis. Cliquez son champ et saisissez une autre combinaison ; Échap l’efface. Le changement est immédiat."),
-            ("back_home", "Retour", "Retour à l’écran principal. La paire supérieure traduit le texte saisi ; chaque mode de raccourci dessous conserve sa propre paire de langues."),
+            ("back_home", "Retour", 'Retour à l’écran principal. La paire supérieure traduit le texte saisi ; chaque mode de raccourci dessous conserve sa propre paire de langues. Le drapeau ouvre le choix de langue. Les flèches changent de page ; × ou Esc ferme le panneau.'),
         ],
     },
     "zh": {
@@ -3068,7 +3486,7 @@ GUIDE_TEXT = {
         "done_title": "完成",
         "done_body": "你已经看过主要控件。完整帮助在信息按钮里。",
         "steps": [
-            ("language", "界面语言", "点击旗帜。它会切换窗口、设置、托盘和帮助的语言。"),
+            ("language", "界面语言", '点击旗帜。它会切换窗口、设置、托盘和帮助的语言。 在面板中选择语言。用箭头翻页，按 × 或 Esc 关闭。面板打开时，旗帜按钮保持高亮。'),
             ("theme", "主题", "点击太阳/月亮。这里切换深色和浅色主题。"),
             ("help", "帮助", "点击信息按钮。这里有 OCR、快捷键和翻译器说明。"),
             ("shortcut_overview", "你的快捷键", "这里显示当前组合键。将鼠标悬停在任意一项上可查看完整说明。上方模式栏会为每个翻译操作保存独立的语言对。"),
@@ -3086,7 +3504,7 @@ GUIDE_TEXT = {
             ("result_window", "结果窗口", "选择哪些翻译操作显示结果窗口。未勾选的操作会复制译文。"),
             ("language_packages", "语言包", "请先在这里安装 OCR 语言和 Argos 翻译方向。下拉列表只显示已就绪的语言。"),
             ("hotkeys", "设置快捷键", "如果组合键不方便，请打开“设置快捷键”。点击对应输入框并按下新组合；按 Esc 可清除。更改会立即生效。"),
-            ("back_home", "返回主页", "返回主界面。上方语言对用于输入文本；下方每个快捷键模式都会保存自己独立的语言对。"),
+            ("back_home", "返回主页", '返回主界面。上方语言对用于输入文本；下方每个快捷键模式都会保存自己独立的语言对。 点击旗帜选择界面语言。用箭头翻页，按 × 或 Esc 关闭面板。'),
         ],
     },
 
@@ -3100,8 +3518,7 @@ GUIDE_TEXT = {
                   'informações.',
      'steps': [('language',
                 'Idioma da interface',
-                'A bandeira altera o idioma do aplicativo, das configurações, do menu da bandeja e da '
-                'ajuda.'),
+                'A bandeira altera o idioma do aplicativo, das configurações, do menu da bandeja e da ajuda. Escolha um idioma no painel. As setas mudam a página; × ou Esc fecha o painel. A bandeira fica destacada enquanto ele está aberto.'),
                ('theme', 'Tema', 'Sol/lua alterna temas claros e escuros.'),
                ('help',
                 'Ajuda',
@@ -3166,8 +3583,7 @@ GUIDE_TEXT = {
                 'imediatamente.'),
                ('back_home',
                 'Voltar ao início',
-                'Home retorna à tela principal. O par superior traduz o texto digitado; cada modo de '
-                'atalho abaixo mantém seu próprio par de idiomas.')]},
+                'Home retorna à tela principal. O par superior traduz o texto digitado; cada modo de atalho abaixo mantém seu próprio par de idiomas. A bandeira abre a escolha do idioma. As setas mudam a página; × ou Esc fecha o painel.')]},
     'it': {'progress': '{current}/{total}',
      'click_hint': 'Fare clic sul controllo evidenziato',
      'read_hint': 'Passa il mouse per i dettagli · Avanti',
@@ -3178,8 +3594,7 @@ GUIDE_TEXT = {
                   'sotto il pulsante informazioni.',
      'steps': [('language',
                 'Lingua dell’interfaccia',
-                'La bandiera cambia la lingua dell’app, delle impostazioni, del menu nell’area di '
-                'notifica e della guida.'),
+                'La bandiera cambia la lingua dell’app, delle impostazioni, del menu nell’area di notifica e della guida. Scegli una lingua nel pannello. Le frecce cambiano pagina; × o Esc lo chiude. La bandiera resta evidenziata finché è aperto.'),
                ('theme', 'Tema', 'Sole/Luna alterna i temi chiaro e scuro.'),
                ('help',
                 'Aiuto',
@@ -3247,9 +3662,7 @@ GUIDE_TEXT = {
                 'applicano immediatamente.'),
                ('back_home',
                 'Torna alla schermata principale',
-                'L’icona Home torna alla schermata principale. La coppia superiore traduce il testo '
-                'digitato; ciascuna modalità di scorciatoia riportata di seguito mantiene la propria '
-                'coppia linguistica.')]},
+                'L’icona Home torna alla schermata principale. La coppia superiore traduce il testo digitato; ciascuna modalità di scorciatoia riportata di seguito mantiene la propria coppia linguistica. La bandiera apre la scelta della lingua. Le frecce cambiano pagina; × o Esc chiude il pannello.')]},
 
     'ar': {'progress': '{current}/{total}',
      'click_hint': 'انقر على العنصر المميز',
@@ -3260,7 +3673,7 @@ GUIDE_TEXT = {
      'done_body': 'تعرفت الآن على العناصر الرئيسية. يمكنك الرجوع إلى الأسئلة الشائعة من زر المعلومات.',
      'steps': [('language',
                 'لغة الواجهة',
-                'يغيّر العلم لغة التطبيق والإعدادات وقائمة علبة النظام والمساعدة.'),
+                'يغيّر العلم لغة التطبيق والإعدادات وقائمة علبة النظام والمساعدة. اختر لغة من اللوحة. تنقّل بالأسهم بين الصفحات، وأغلقها بزر × أو Esc. يظل زر العلم مميزًا أثناء فتحها.'),
                ('theme', 'المظهر', 'تبدّل أيقونة الشمس والقمر بين المظهرين الداكن والفاتح.'),
                ('help',
                 'المساعدة',
@@ -3321,8 +3734,221 @@ GUIDE_TEXT = {
                 'جديدة، أو اضغط Esc لمسحه. تُطبق التغييرات فورًا.'),
                ('back_home',
                 'العودة للرئيسية',
-                'يعيدك زر الرئيسية إلى الشاشة الرئيسية. اللغتان في الأعلى تخصان النص المُدخل، ولكل وضع '
-                'من الاختصارات أدناه لغتا ترجمة مستقلتان.')]},
+                'يعيدك زر الرئيسية إلى الشاشة الرئيسية. اللغتان في الأعلى تخصان النص المُدخل، ولكل وضع من الاختصارات أدناه لغتا ترجمة مستقلتان. اضغط العلم لاختيار لغة الواجهة. تنقّل بالأسهم بين صفحات اللغات، وأغلق اللوحة بزر × أو Esc.')]},
+
+    'tr': {'progress': '{current}/{total}',
+     'click_hint': 'Vurgulanan kontrole tıklayın',
+     'read_hint': 'Ayrıntılar için üzerine gelin · İleri',
+     'document_hint': 'Simgeyi açın · İleri',
+     'skip': 'İleri',
+     'done_title': 'Hazır',
+     'done_body': "Artık temel kontrolleri biliyorsunuz. Tüm SSS'lere bilgi düğmesinden "
+                  'ulaşabilirsiniz.',
+     'steps': [('language',
+                'Arayüz dili',
+                'Bayrak; uygulama, ayarlar, tepsi ve yardım dilini değiştirir. Panelden dil seçin. Oklar sayfaları değiştirir; × veya Esc kapatır. Panel açıkken bayrak vurgulanır.'),
+               ('theme', 'Tema', 'Güneş/ay simgesi koyu ve açık temalar arasında geçiş yapar.'),
+               ('help', 'Yardım', 'Bilgi düğmesi OCR, kısayol ve çevirmen yardımını açar.'),
+               ('shortcut_overview',
+                'Kısayollarınız',
+                'Bunlar mevcut kısayollarınızdır. Tam açıklama için ana ekranda üzerlerine gelin. '
+                'Üstteki mod satırı, her çeviri işlemi için ayrı dil çifti belirler.'),
+               ('shortcut_copy',
+                'Kopyala',
+                'Bir ekran alanı seçin. OCR metni tanır ve çevirmeden panoya kopyalar.'),
+               ('shortcut_ocr',
+                'OCR çevirisi',
+                'Bir ekran alanı seçin. OCR metni tanır ve OCR modu için kaydedilen dil çiftiyle '
+                'çevirir.'),
+               ('shortcut_fullscreen',
+                'Tam ekran',
+                'Tüm ekranı yakalar ve Ekran modunun dil çiftiyle çevirileri görünen metin bloklarının '
+                'üzerine yerleştirir.'),
+               ('shortcut_game',
+                'Dinamik',
+                "Ctrl+Alt+G'ye basın, bir veya daha fazla metin alanı seçip Başlat'a tıklayın. "
+                'Çeviriler yerinde güncellenir; durdurmak için kısayola tekrar basın.'),
+               ('shortcut_selection',
+                'Seçim',
+                "Başka bir uygulamada metin seçip Ayarlar'da atadığınız kısayola basın. Bu mod özgün "
+                'seçimi değiştirmeden çevirir.'),
+               ('shortcut_replace',
+                'Değiştir',
+                'Başka bir uygulamada düzenlenebilir metin seçip atanan kısayola basın. Seçim '
+                'çevirisiyle değiştirilir; odak değişmişse sonuç yalnızca kopyalanır.'),
+               ('shortcut_toggle',
+                'Pencere',
+                'Uygulamayı önceki konumuna gizler veya tepsiden ya da görev çubuğundan geri getirir. '
+                'Gizliyken çeviri kısayolları çalışmaya devam eder.'),
+               ('document_translation',
+                'Belge çevirisi',
+                'Uzun metin veya dosya için belge simgesini açın. Belgeyi yapıştırın, bırakın ya da '
+                'ekleyin; tümünü veya seçili kısmı çevirin. Ana alandaki uzun metin de genişletme '
+                'simgesini gösterir.'),
+               ('settings',
+                'Ayarlar',
+                'Dişli; motorları, geçmişi, güncellemeleri ve kısayolları açar.'),
+               ('ocr_engine',
+                'OCR motoru',
+                'Windows, Tesseract, EasyOCR veya RapidOCR seçin. Tanımadan önce motoru ve dillerini '
+                'kurun.'),
+               ('translator', 'Çevirmen', 'Çevirmen: Google çevrimiçi; Argos ve Hy-MT çevrimdışı.'),
+               ('result_window',
+                'Sonuç penceresi',
+                'Hangi çeviri işlemlerinin sonuç penceresini açacağını seçin. İşaretlenmeyenler sonucu '
+                'kopyalar.'),
+               ('language_packages',
+                'Dil paketleri',
+                'Önce buradan OCR dillerini ve Argos yönlerini kurun. Seçicilerde yalnızca hazır '
+                'diller görünür.'),
+               ('hotkeys',
+                'Kısayolları ayarla',
+                "Bir kısayol uygun değilse Kısayolları ayarla'yı açın. Alanına tıklayıp yeni tuşlara "
+                "basın; silmek için Esc'ye basın. Değişiklikler hemen uygulanır."),
+               ('back_home',
+                'Ana ekrana dön',
+                'Ana ekran düğmesi ana ekrana döner. Üstteki çift yazılan metni çevirir; aşağıdaki her kısayol modu kendi dil çiftini saklar. Arayüz dili için bayrağa tıklayın. Oklar dil sayfalarını değiştirir; × veya Esc paneli kapatır.')]},
+    'hi': {'progress': '{current}/{total}',
+     'click_hint': 'हाइलाइट किए नियंत्रण पर क्लिक करें',
+     'read_hint': 'जानकारी के लिए माउस रखें · अगला',
+     'document_hint': 'आइकन खोलें · अगला',
+     'skip': 'अगला',
+     'done_title': 'तैयार',
+     'done_body': 'अब आप मुख्य नियंत्रण जान गए हैं। पूरे सवाल-जवाब जानकारी बटन में मिलेंगे।',
+     'steps': [('language',
+                'इंटरफ़ेस की भाषा',
+                'झंडे से ऐप, सेटिंग्स, ट्रे और सहायता की भाषा बदलती है। पैनल में भाषा चुनें। तीरों से पेज बदलें; × या Esc से बंद करें। पैनल खुला हो तो झंडा हाइलाइट रहता है।'),
+               ('theme', 'थीम', 'सूरज/चाँद से हल्की और गहरी थीम बदलें।'),
+               ('help', 'सहायता', 'जानकारी बटन OCR, शॉर्टकट और अनुवादक की सहायता खोलता है।'),
+               ('shortcut_overview',
+                'आपके शॉर्टकट',
+                'ये आपके मौजूदा शॉर्टकट हैं। पूरा विवरण देखने के लिए मुख्य स्क्रीन पर उन पर माउस रखें। '
+                'ऊपर की मोड पंक्ति हर अनुवाद क्रिया की अलग भाषा जोड़ी तय करती है।'),
+               ('shortcut_copy',
+                'कॉपी करें',
+                'स्क्रीन का क्षेत्र चुनें। OCR टेक्स्ट पहचानकर बिना अनुवाद किए क्लिपबोर्ड पर कॉपी करता '
+                'है।'),
+               ('shortcut_ocr',
+                'OCR अनुवाद',
+                'स्क्रीन का क्षेत्र चुनें। OCR उसे पहचानकर OCR मोड में सहेजी भाषा जोड़ी से अनुवाद करता '
+                'है।'),
+               ('shortcut_fullscreen',
+                'पूरी स्क्रीन',
+                'पूरी स्क्रीन कैप्चर करके स्क्रीन मोड की सहेजी भाषा जोड़ी से अनुवाद दिखाई देने वाले '
+                'टेक्स्ट खंडों पर रखता है।'),
+               ('shortcut_game',
+                'गतिशील',
+                'Ctrl+Alt+G दबाएँ, एक या अधिक टेक्स्ट क्षेत्र चुनें, फिर शुरू करें दबाएँ। अनुवाद वहीं '
+                'अपडेट होते रहेंगे; रोकने के लिए शॉर्टकट दोबारा दबाएँ।'),
+               ('shortcut_selection',
+                'चयन',
+                'दूसरे ऐप में टेक्स्ट चुनें और सेटिंग्स में तय शॉर्टकट दबाएँ। यह मोड मूल चयन बदले बिना '
+                'अनुवाद करता है।'),
+               ('shortcut_replace',
+                'बदलें',
+                'दूसरे ऐप में संपादन योग्य टेक्स्ट चुनें और उसका शॉर्टकट दबाएँ। चयन अनुवाद से बदल जाता '
+                'है; फ़ोकस बदल गया हो तो परिणाम सिर्फ़ कॉपी होता है।'),
+               ('shortcut_toggle',
+                'विंडो',
+                'ऐप को पिछली जगह छिपाता है या ट्रे/टास्कबार से वापस लाता है। छिपे होने पर भी अनुवाद '
+                'शॉर्टकट काम करते हैं।'),
+               ('document_translation',
+                'दस्तावेज़ अनुवाद',
+                'लंबे टेक्स्ट या फ़ाइल के लिए दस्तावेज़ आइकन खोलें। दस्तावेज़ चिपकाएँ, छोड़ें या '
+                'जोड़ें, फिर पूरा या चुना भाग अनुवाद करें। मुख्य बॉक्स में लंबा टेक्स्ट होने पर '
+                'विस्तार आइकन भी दिखता है।'),
+               ('settings', 'सेटिंग्स', 'गियर से इंजन, इतिहास, अपडेट और शॉर्टकट खोलें।'),
+               ('ocr_engine',
+                'OCR इंजन',
+                'Windows, Tesseract, EasyOCR या RapidOCR चुनें। पहचान से पहले इंजन और उसकी भाषाएँ '
+                'इंस्टॉल करें।'),
+               ('translator', 'अनुवादक', 'अनुवादक: Google ऑनलाइन; Argos और Hy-MT ऑफ़लाइन।'),
+               ('result_window',
+                'परिणाम विंडो',
+                'चुनें किन अनुवाद क्रियाओं पर परिणाम विंडो खुले। बिना टिक वाली क्रियाएँ परिणाम कॉपी '
+                'करेंगी।'),
+               ('language_packages',
+                'भाषा पैकेज',
+                'पहले यहाँ OCR भाषाएँ और Argos की भाषा जोड़ियाँ इंस्टॉल करें। चयन सूचियों में सिर्फ़ '
+                'तैयार भाषाएँ दिखती हैं।'),
+               ('hotkeys',
+                'शॉर्टकट सेट करें',
+                'शॉर्टकट सुविधाजनक न हो तो शॉर्टकट सेट करें खोलें। उसके बॉक्स में क्लिक करके नई '
+                'कुंजियाँ दबाएँ; हटाने के लिए Esc दबाएँ। बदलाव तुरंत लागू होंगे।'),
+               ('back_home',
+                'मुख्य स्क्रीन पर लौटें',
+                'होम से मुख्य स्क्रीन पर लौटें। ऊपर की भाषा जोड़ी लिखे टेक्स्ट के लिए है; नीचे हर शॉर्टकट मोड अपनी भाषा जोड़ी रखता है। इंटरफ़ेस की भाषा चुनने के लिए झंडा दबाएँ। तीरों से भाषा पेज बदलें; × या Esc से पैनल बंद करें।')]},
+    'id': {'progress': '{current}/{total}',
+     'click_hint': 'Klik kontrol yang disorot',
+     'read_hint': 'Arahkan untuk detail · Berikutnya',
+     'document_hint': 'Buka ikon · Berikutnya',
+     'skip': 'Berikutnya',
+     'done_title': 'Siap',
+     'done_body': 'Kini Anda mengenal kontrol utama. FAQ lengkap tetap tersedia melalui tombol info.',
+     'steps': [('language',
+                'Bahasa antarmuka',
+                'Bendera mengganti bahasa aplikasi, pengaturan, baki sistem, dan bantuan. Pilih bahasa di panel. Panah mengganti halaman; × atau Esc menutupnya. Bendera tetap disorot selama panel terbuka.'),
+               ('theme', 'Tema', 'Matahari/bulan beralih antara tema gelap dan terang.'),
+               ('help', 'Bantuan', 'Info membuka bantuan OCR, pintasan, dan penerjemah.'),
+               ('shortcut_overview',
+                'Pintasan Anda',
+                'Ini adalah pintasan Anda saat ini. Arahkan kursor ke pintasan di beranda untuk '
+                'deskripsi lengkap. Baris mode di atas mengatur pasangan bahasa terpisah untuk setiap '
+                'tindakan terjemahan.'),
+               ('shortcut_copy',
+                'Salin',
+                'Pilih area layar. OCR mengenali teksnya dan menyalinnya ke papan klip tanpa '
+                'menerjemahkan.'),
+               ('shortcut_ocr',
+                'Terjemahan OCR',
+                'Pilih area layar. OCR mengenali lalu menerjemahkannya dengan pasangan bahasa yang '
+                'disimpan untuk mode OCR.'),
+               ('shortcut_fullscreen',
+                'Layar penuh',
+                'Menangkap seluruh layar dan menempatkan terjemahan di atas blok teks dengan pasangan '
+                'bahasa mode Layar.'),
+               ('shortcut_game',
+                'Dinamis',
+                'Tekan Ctrl+Alt+G, pilih satu atau beberapa area teks, lalu Mulai. Terjemahan '
+                'diperbarui di tempat; tekan pintasan lagi untuk berhenti.'),
+               ('shortcut_selection',
+                'Pilihan',
+                'Pilih teks di aplikasi lain dan tekan pintasan yang diatur di Pengaturan. Mode ini '
+                'menerjemahkan tanpa mengubah teks asli.'),
+               ('shortcut_replace',
+                'Ganti',
+                'Pilih teks yang dapat diedit di aplikasi lain dan tekan pintasannya. Pilihan diganti '
+                'dengan terjemahan; jika fokus berubah, hasil hanya disalin.'),
+               ('shortcut_toggle',
+                'Jendela',
+                'Menyembunyikan aplikasi ke tujuan sebelumnya atau memulihkannya dari baki sistem atau '
+                'bilah tugas. Pintasan terjemahan tetap bekerja saat tersembunyi.'),
+               ('document_translation',
+                'Terjemahan dokumen',
+                'Buka ikon dokumen untuk teks panjang atau berkas. Tempel, letakkan, atau lampirkan '
+                'dokumen, lalu terjemahkan semuanya atau bagian pilihan. Teks panjang di kolom utama '
+                'juga menampilkan ikon perluas.'),
+               ('settings', 'Pengaturan', 'Roda gigi membuka mesin, riwayat, pembaruan, dan pintasan.'),
+               ('ocr_engine',
+                'Mesin OCR',
+                'Pilih Windows, Tesseract, EasyOCR, atau RapidOCR. Pasang mesin dan bahasanya sebelum '
+                'pengenalan.'),
+               ('translator', 'Penerjemah', 'Penerjemah: Google daring; Argos dan Hy-MT luring.'),
+               ('result_window',
+                'Jendela hasil',
+                'Pilih tindakan terjemahan yang membuka jendela hasil. Tindakan yang tidak dicentang '
+                'menyalin hasil.'),
+               ('language_packages',
+                'Paket bahasa',
+                'Pasang bahasa OCR dan arah Argos di sini terlebih dahulu. Hanya bahasa yang siap '
+                'muncul di pemilih.'),
+               ('hotkeys',
+                'Atur pintasan',
+                'Jika pintasan tidak nyaman, buka Atur pintasan. Klik kolomnya dan tekan kombinasi '
+                'baru; tekan Esc untuk menghapus. Perubahan langsung berlaku.'),
+               ('back_home',
+                'Kembali ke beranda',
+                'Beranda kembali ke layar utama. Pasangan di atas menerjemahkan teks ketikan; setiap mode pintasan di bawah menyimpan pasangan bahasanya sendiri. Klik bendera untuk memilih bahasa antarmuka. Panah mengganti halaman bahasa; × atau Esc menutup panel.')]},
 }
 
 
@@ -3539,6 +4165,118 @@ GUIDE_TOUR_EXTRAS = {
      'settings_page_main': ('الإعدادات العامة',
                             'افتح تبويب الإعدادات العامة للعودة إلى المحركات وخيارات بدء التشغيل '
                             'والسجل.')},
+
+    'tr': {'main_translate': ('Çeviriye gönder',
+                        'Ok, ana alandaki metni mesajlaşma uygulamasındaki gönder düğmesi gibi '
+                        'çeviriye gönderir.'),
+     'shadow_mode': ('Gölge modu',
+                     'Alttaki bu düğme tam pencereyi gizler ve küçük çevirmeni kullanılabilir '
+                     'bırakır.'),
+     'autostart': ('Windows ile başlat',
+                   "Oturum açtığınızda Click'n'Translate'in hazır olması için etkinleştirin."),
+     'start_minimized': ('Gölge modunda başlat',
+                         'Otomatik başlangıçta tam pencere yerine küçük gölge görünümünü açar.'),
+     'actions_panel': ('Ayar işlemleri',
+                       'Önbelleği temizle geçici dosyaları siler; Sıfırla arayüz dilini koruyarak '
+                       'davranış ayarlarını geri yükler; Güncelle sürümleri denetler. İkinci satır dil '
+                       'paketlerini ve iki geçmişi açar; son satır kısayolları açar.'),
+     'settings_page_updates': ('Diğer ayarlar',
+                               'Motorlar, seçili metin çevirisi ve sonuç penceresi davranışı için '
+                               "Çeviri ve OCR'ı açın."),
+     'ocr_behavior': ('OCR davranışı',
+                      'Pencere görünürlüğünü, dondurulmuş veya karartılmış yakalamayı, panoyu geri '
+                      'yüklemeyi ve sessiz bildirimleri buradan ayarlayın.'),
+     'export_settings': ('Ayarları dışa aktar',
+                         'Yedekleme veya başka bilgisayar için tüm yapılandırmanızı JSON dosyasına '
+                         'kaydedin.'),
+     'import_settings': ('Ayarları içe aktar',
+                         'Bir yapılandırma dosyasını geri yükleyin. Ardından ilk ayarlar sayfası '
+                         'açılır.'),
+     'bug_report': ('Hata raporu',
+                    "Güvenli bir tanılama klasörü oluşturup açar. Sorunu açıklayıp ZIP'i Telegram veya "
+                    'GitHub üzerinden geliştiriciye gönderin.'),
+     'settings_page_game': ('Dinamik çeviri ayarları',
+                            'Değişen ekran alanlarının çevirisini ayarlayıp başlatmak için Dinamik '
+                            'çeviri sekmesini açın.'),
+     'game_controls': ('Dinamik mod',
+                       'Dil çiftini, yenileme aralığını ve katman opaklığını seçin. Bağlı uygulama '
+                       'etkin değilken duraklatılabilir ve özgün metin isteğe bağlı gösterilebilir.'),
+     'settings_page_main': ('Genel ayarlar',
+                            'Motorlara, başlangıç seçeneklerine ve geçmişe dönmek için Genel ayarlar '
+                            'sekmesini açın.')},
+    'hi': {'main_translate': ('अनुवाद के लिए भेजें',
+                        'तीर मुख्य बॉक्स का टेक्स्ट अनुवाद के लिए भेजता है, जैसे चैट ऐप का भेजें बटन।'),
+     'shadow_mode': ('छाया मोड', 'नीचे का यह बटन पूरी विंडो छिपाकर छोटा अनुवादक उपलब्ध रखता है।'),
+     'autostart': ('Windows के साथ शुरू करें',
+                   "इसे चालू करें ताकि साइन इन करते ही Click'n'Translate तैयार मिले।"),
+     'start_minimized': ('छाया मोड में शुरू करें',
+                         'चालू करने पर अपने आप शुरू होते समय पूरी विंडो की जगह छोटा छाया दृश्य '
+                         'खुलेगा।'),
+     'actions_panel': ('सेटिंग्स क्रियाएँ',
+                       'कैश साफ़ करें अस्थायी फ़ाइलें हटाता है; रीसेट इंटरफ़ेस की भाषा बदले बिना '
+                       'व्यवहार सेटिंग्स लौटाता है; अपडेट नए संस्करण जाँचता है। दूसरी पंक्ति भाषा '
+                       'पैकेज और दोनों इतिहास खोलती है; आखिरी पंक्ति शॉर्टकट खोलती है।'),
+     'settings_page_updates': ('अन्य सेटिंग्स',
+                               'इंजन, चुने टेक्स्ट के अनुवाद और परिणाम विंडो के व्यवहार के लिए अनुवाद '
+                               'और OCR खोलें।'),
+     'ocr_behavior': ('OCR का व्यवहार',
+                      'यहाँ विंडो की दृश्यता, स्थिर या मंद कैप्चर, क्लिपबोर्ड बहाली और शांत सूचनाएँ तय '
+                      'करें।'),
+     'export_settings': ('सेटिंग्स निर्यात करें',
+                         'बैकअप या दूसरे कंप्यूटर के लिए पूरी सेटिंग्स JSON फ़ाइल में सहेजें।'),
+     'import_settings': ('सेटिंग्स आयात करें',
+                         'सेटिंग्स फ़ाइल बहाल करें। इसके बाद सेटिंग्स का पहला पेज खुलेगा।'),
+     'bug_report': ('बग रिपोर्ट',
+                    'सुरक्षित निदान फ़ोल्डर बनाकर खोलता है। समस्या लिखकर ZIP डेवलपर को Telegram या '
+                    'GitHub से भेजें।'),
+     'settings_page_game': ('गतिशील अनुवाद की सेटिंग्स',
+                            'बदलते स्क्रीन क्षेत्रों का अनुवाद सेट करने और शुरू करने के लिए गतिशील '
+                            'अनुवाद टैब खोलें।'),
+     'game_controls': ('गतिशील मोड',
+                       'भाषा जोड़ी, अपडेट अंतराल और परत की अपारदर्शिता चुनें। जुड़ा ऐप निष्क्रिय होने '
+                       'पर रुक सकता है और मूल टेक्स्ट भी दिखा सकता है।'),
+     'settings_page_main': ('सामान्य सेटिंग्स',
+                            'इंजन, स्टार्टअप विकल्प और इतिहास पर लौटने के लिए सामान्य सेटिंग्स टैब '
+                            'खोलें।')},
+    'id': {'main_translate': ('Kirim untuk diterjemahkan',
+                        'Panah mengirim teks dari kolom utama untuk diterjemahkan, seperti tombol '
+                        'kirim di aplikasi pesan.'),
+     'shadow_mode': ('Mode bayangan',
+                     'Tombol bawah ini menyembunyikan jendela penuh dan membiarkan penerjemah ringkas '
+                     'tersedia.'),
+     'autostart': ('Mulai bersama Windows', "Aktifkan agar Click'n'Translate siap setelah Anda masuk."),
+     'start_minimized': ('Mulai dalam mode bayangan',
+                         'Aktifkan agar mulai otomatis membuka tampilan bayangan ringkas, bukan '
+                         'jendela penuh.'),
+     'actions_panel': ('Tindakan pengaturan',
+                       'Bersihkan cache menghapus berkas sementara; Reset memulihkan pengaturan '
+                       'perilaku tanpa mengubah bahasa antarmuka; Pembaruan memeriksa rilis. Baris '
+                       'kedua membuka paket bahasa dan kedua riwayat; baris terakhir membuka '
+                       'pintasan.'),
+     'settings_page_updates': ('Pengaturan lainnya',
+                               'Buka Terjemahan dan OCR untuk mesin, terjemahan teks pilihan, dan '
+                               'perilaku jendela hasil.'),
+     'ocr_behavior': ('Perilaku OCR',
+                      'Di sini Anda mengatur visibilitas jendela, tangkapan beku atau redup, pemulihan '
+                      'papan klip, dan notifikasi senyap.'),
+     'export_settings': ('Ekspor pengaturan',
+                         'Simpan seluruh konfigurasi ke berkas JSON untuk cadangan atau komputer '
+                         'lain.'),
+     'import_settings': ('Impor pengaturan',
+                         'Pulihkan berkas konfigurasi. Antarmuka kembali ke halaman pengaturan pertama '
+                         'setelahnya.'),
+     'bug_report': ('Laporan bug',
+                    'Membuat folder diagnostik aman dan membukanya. Jelaskan masalah dan kirim ZIP ke '
+                    'pengembang melalui Telegram atau GitHub.'),
+     'settings_page_game': ('Pengaturan terjemahan dinamis',
+                            'Buka tab Terjemahan dinamis untuk mengatur dan memulai terjemahan area '
+                            'layar yang berubah.'),
+     'game_controls': ('Mode dinamis',
+                       'Pilih pasangan bahasa, interval penyegaran, dan opasitas lapisan. Mode dapat '
+                       'dijeda saat aplikasi terkait tidak aktif dan dapat menampilkan teks asli.'),
+     'settings_page_main': ('Pengaturan umum',
+                            'Buka tab Pengaturan umum untuk kembali ke mesin, opsi mulai, dan '
+                            'riwayat.')},
 }
 
 
@@ -3579,6 +4317,21 @@ for _guide_lang, _bodies in {
      'اختر محركات التعرف والترجمة واتصالات API وسلوك التحديد وحزم اللغات.',
      'امسح الذاكرة المؤقتة أو أعد ضبط التطبيق أو حدّثه؛ وصدّر الإعدادات أو استوردها، أو أنشئ تقرير '
      'مشكلة، أو اضبط الاختصارات.'),
+
+    'tr': ('Başlangıç, geçmiş, ipuçları, güncellemeler, sonuç penceresi davranışı, arayüz ölçeği ve sonuç '
+     'metin boyutu.',
+     'OCR ve çeviri motorlarını, API bağlantılarını, seçim davranışını ve dil paketlerini seçin.',
+     'Önbelleği temizleyin, sıfırlayın veya güncelleyin; ayarları dışa/içe aktarın, hata raporu '
+     'oluşturun veya kısayolları ayarlayın.'),
+    'hi': ('स्टार्टअप, इतिहास, संकेत, अपडेट, परिणाम विंडो व्यवहार, इंटरफ़ेस स्केल और परिणाम टेक्स्ट का आकार।',
+     'OCR और अनुवाद इंजन, API कनेक्शन, चयन व्यवहार और भाषा पैकेज चुनें।',
+     'कैश साफ़ करें, रीसेट या अपडेट करें; सेटिंग्स आयात/निर्यात करें, बग रिपोर्ट बनाएँ या शॉर्टकट सेट '
+     'करें।'),
+    'id': ('Mulai, riwayat, petunjuk, pembaruan, perilaku jendela hasil, skala antarmuka, dan ukuran teks '
+     'hasil.',
+     'Pilih mesin OCR dan terjemahan, koneksi API, perilaku pilihan, dan paket bahasa.',
+     'Bersihkan cache, reset atau perbarui aplikasi; ekspor/impor pengaturan, buat laporan bug, atau '
+     'atur pintasan.'),
 }.items():
     for _key, _body in zip(('settings_page_main', 'settings_page_updates', 'actions_panel'), _bodies):
         _title = GUIDE_TOUR_EXTRAS[_guide_lang][_key][0]
@@ -4479,6 +5232,246 @@ HELP_CONTENT = {
       ['يحفظ التطبيق الإعدادات والسجل والذاكرة المؤقتة والمحركات المحلية الاختيارية بجوار مجلد '
        'البرنامج.',
        'انقل المجلد إلى موقعه النهائي قبل تفعيل التشغيل التلقائي أو إنشاء الاختصارات.'])],
+
+    'tr': [('Hızlı başlangıç',
+      ['<b>1.</b> Kopyalama veya çeviri kısayoluna basın.',
+       '<b>2.</b> Metin içeren ekran alanını seçin.',
+       '<b>3.</b> Gerektiğinde bayrak seçicisinden OCR/kaynak dilini seçin.',
+       '<b>4.</b> Uygulama tanınan metni kopyalar veya çeviriyi gösterir.']),
+     ('Arayüz dili',
+      ['Arayüz dilini değiştirmek için başlık çubuğundaki bayrak düğmesini kullanın.',
+       'Ana pencere, ayarlar, kısayollar, geçmiş ekranları, tepsi menüsü ve bu SSS seçilen dili '
+       'kullanır.',
+       'OCR ve çeviri dili arayüz dilinden bağımsız seçilir.']),
+     ('Çevirmenler',
+      ["<span class='item-title'>Google</span> - hızlı çevrimiçi çeviri, varsayılan olarak önerilir.",
+       "<span class='item-title'>Argos</span> - çevrimdışı ve özel, yerel dil paketleri gerektirir.",
+       "<span class='item-title'>Hy-MT</span> - yerel dil modeli paketi, Ayarlardan ayrıca kurulur.",
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - alternatif çevrimiçi "
+       'sağlayıcılar.']),
+     ('OCR motorları',
+      ["<span class='item-title'>Windows</span> - Windows'a yerleşik ve hızlıdır; kurulu Windows dil "
+       'paketlerine bağlıdır.',
+       "<span class='item-title'>Tesseract</span> - çevrimdışı OCR; yerel taşınabilir paketi "
+       'Ayarlardan indirebilirsiniz.',
+       "<span class='item-title'>AUTO</span> OCR'dan önce dili bilemez. Windows OCR ile kurulu dilleri "
+       'deneyip en okunabilir sonucu seçer.',
+       'Gerekli Windows OCR dili yoksa Windows dil paketini kurun, belirli bir dil seçin veya '
+       'Tesseract kullanın.']),
+     ('Ayarlar: sağdaki üç liste',
+      ["<span class='item-title'>OCR</span> ekrandaki metni okuyan motoru seçer. Yalnızca kurulu "
+       "motorlar sunulur. Motorları <span class='item-title'>Dil paketleri</span> içindeki "
+       'sekmelerinden kurup kaldırabilirsiniz.',
+       "<span class='item-title'>Çeviri</span> sağlayıcıyı seçer. Çevrimiçi sağlayıcılar metni "
+       'sunucularına gönderir; Argos ve Hy-MT bu bilgisayarda tutar.',
+       "<span class='item-title'>Pencereyi göster</span> sonuç penceresini açan işlemleri seçer: "
+       'seçili metin, ekran alanı çevirisi ve Çevir düğmesi.',
+       'Bu üç seçenek bağımsızdır; istediğiniz birleşimi seçebilirsiniz. İşaretlenmeyen işlem de '
+       'çevirir &mdash; pencere açmak yerine sonucu doğrudan panoya kopyalar.',
+       'Kapalı alan etkin seçenekleri listeler; üçü aynıysa Tümü veya Hiçbiri yazar. Tam liste için '
+       'üzerine gelin.']),
+     ('Ayarlar: onay kutuları',
+      ["<span class='item-title'>İşletim sistemiyle başlat</span> Windows açıldığında uygulamayı "
+       'başlatır.',
+       "<span class='item-title'>Gölge modunda başlat</span> tepside gizli başlatır. Kısayollar "
+       'çalışır; tepsi simgesi pencereyi açar.',
+       "<span class='item-title'>Çevrilen metni kopyala</span> her çeviriyi hazır olur olmaz panoya "
+       'koyar.',
+       "<span class='item-title'>Kopyalama geçmişini kaydet</span> ve <span class='item-title'>Çeviri "
+       'geçmişini kaydet</span> kopyalanan ve çevrilen metinleri saklar. Kapalıyken diske yazılmaz.',
+       "<span class='item-title'>OCR sırasında pencereyi görünür tut</span> seçim yaparken ana "
+       'pencerenin gizlenmesini önler.',
+       "<span class='item-title'>OCR sırasında ekranı dondur</span> hareket eden veya kaybolan metni "
+       'yakalamak için görüntüyü sabitler.']),
+     ('Ayarlar: düğmeler',
+      ["<span class='item-title'>Önbelleği temizle</span> çeviri önbelleğini ve geçici dosyaları "
+       'siler. Kurulu motorlar ve dil paketleri kalır.',
+       "<span class='item-title'>Sıfırla</span> ayarları varsayılana döndürür. Hiçbir şey kaldırılmaz.",
+       "<span class='item-title'>Güncelle</span> yeni sürümü denetler ve taşınabilir klasörü yenisiyle "
+       'değiştirir.',
+       "<span class='item-title'>Dil paketleri</span> OCR dillerini ve Argos yönlerini önceden kurar.",
+       "<span class='item-title'>Kopyalama geçmişi</span> ve <span class='item-title'>Çeviri "
+       'geçmişi</span> kaydedilenleri açar. İlgili kutu kapalıyken boş kalırlar.',
+       "<span class='item-title'>Kısayolları ayarla</span> kopyalama, OCR, tam ekran, güvenli seçim "
+       'çevirisi, çevirip değiştirme ve göster/gizle kısayollarını belirler.']),
+     ('Kısayollar',
+      ['Açıklama için ana ekrandaki kısayolun üzerine gelin veya ilgili ayarı açmak için tuş etiketine '
+       'tıklayın. Mod satırı OCR, Tam ekran, Dinamik, Seçim ve Değiştir için ayrı dil çiftleri saklar.',
+       "<span class='item-title'>Kopyala</span> seçili alanı tanır ve metni kopyalar.",
+       "<span class='item-title'>OCR çevirisi</span> seçili alanı tanır ve çevirir.",
+       "<span class='item-title'>Tam ekran</span> ekrandaki görünür metin bloklarını çevirir.",
+       "<span class='item-title'>Dinamik</span> Ctrl+Alt+G ile başlar; bir veya daha fazla alan "
+       'seçmenizi sağlar ve çevirileri yerinde günceller. Durdurmak için kısayola tekrar basın.',
+       "<span class='item-title'>Seçim</span> başka uygulamadaki seçili metni çevirir.",
+       "<span class='item-title'>Seçimi çevirip değiştir</span> yalnızca aynı pencerede aynı metin "
+       'seçiliyse çeviriyi yazar. Aksi durumda çeviriyi güvenle kopyalar.',
+       "<span class='item-title'>Pencere</span> uygulamayı önceki yerine gizler veya tepsiden/görev "
+       'çubuğundan geri getirir.',
+       "Kısayol uygun değilse <span class='item-title'>Ayarlar → Kısayolları ayarla</span> bölümünde "
+       'alanına tıklayıp yeni birleşime basın. Esc alanı temizler; değişiklikler hemen uygulanır.']),
+     ('Taşınabilir uygulama',
+      ['Ayarlar, geçmiş, önbellek ve isteğe bağlı yerel motorlar program klasörünün yanında saklanır.',
+       'Otomatik başlatmayı veya kısayolları etkinleştirmeden önce klasörü kalıcı konumuna taşıyın.'])],
+    'hi': [('जल्दी शुरू करें',
+      ['<b>1.</b> कॉपी या अनुवाद शॉर्टकट दबाएँ।',
+       '<b>2.</b> टेक्स्ट वाला स्क्रीन क्षेत्र चुनें।',
+       '<b>3.</b> ज़रूरत हो तो झंडे वाले चयन से OCR/स्रोत भाषा चुनें।',
+       '<b>4.</b> ऐप पहचाना टेक्स्ट कॉपी करता है या अनुवाद दिखाता है।']),
+     ('इंटरफ़ेस की भाषा',
+      ['इंटरफ़ेस की भाषा बदलने के लिए शीर्षक पट्टी के झंडे का बटन दबाएँ।',
+       'मुख्य विंडो, सेटिंग्स, शॉर्टकट, इतिहास, ट्रे मेनू और ये सवाल-जवाब चुनी भाषा में दिखेंगे।',
+       'OCR और अनुवाद की भाषा इंटरफ़ेस की भाषा से अलग चुनी जाती है।']),
+     ('अनुवादक',
+      ["<span class='item-title'>Google</span> - तेज़ ऑनलाइन अनुवाद, सामान्य उपयोग के लिए सुझाया गया।",
+       "<span class='item-title'>Argos</span> - ऑफ़लाइन और निजी, स्थानीय भाषा पैकेज चाहिए।",
+       "<span class='item-title'>Hy-MT</span> - स्थानीय भाषा मॉडल पैकेज, सेटिंग्स से अलग इंस्टॉल करें।",
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - वैकल्पिक ऑनलाइन प्रदाता।"]),
+     ('OCR इंजन',
+      ["<span class='item-title'>Windows</span> - Windows में शामिल तेज़ इंजन; इंस्टॉल किए Windows "
+       'भाषा पैकेज पर निर्भर है।',
+       "<span class='item-title'>Tesseract</span> - ऑफ़लाइन OCR इंजन; सेटिंग्स से स्थानीय पोर्टेबल "
+       'पैकेज डाउनलोड करें।',
+       "<span class='item-title'>AUTO</span> OCR से पहले भाषा नहीं जानता। Windows OCR में इंस्टॉल "
+       'भाषाएँ आज़माकर सबसे पठनीय परिणाम चुनता है।',
+       'ज़रूरी Windows OCR भाषा न हो तो उसका Windows भाषा पैकेज इंस्टॉल करें, विशिष्ट भाषा चुनें या '
+       'Tesseract इस्तेमाल करें।']),
+     ('सेटिंग्स: दाईं ओर की तीन सूचियाँ',
+      ["<span class='item-title'>OCR</span> स्क्रीन का टेक्स्ट पढ़ने वाला इंजन चुनता है। सिर्फ़ "
+       "इंस्टॉल इंजन दिखते हैं। इन्हें <span class='item-title'>भाषा पैकेज</span> में उनके टैब से "
+       'इंस्टॉल या हटाएँ।',
+       "<span class='item-title'>अनुवाद</span> प्रदाता चुनता है। ऑनलाइन प्रदाता टेक्स्ट बाहर भेजते "
+       'हैं; Argos और Hy-MT इसे इसी कंप्यूटर पर रखते हैं।',
+       "<span class='item-title'>विंडो दिखाएँ</span> तय करता है किन क्रियाओं पर परिणाम खुले: चुने "
+       'टेक्स्ट का अनुवाद, स्क्रीन क्षेत्र का अनुवाद और अनुवाद बटन।',
+       'तीनों विकल्प स्वतंत्र हैं। बिना टिक वाली क्रिया भी अनुवाद करती है &mdash; विंडो खोलने के बजाय '
+       'परिणाम सीधे क्लिपबोर्ड पर कॉपी होता है।',
+       'बंद बॉक्स चालू विकल्प दिखाता है; तीनों एक जैसे हों तो सभी या कभी नहीं दिखता है। पूरी सूची के '
+       'लिए माउस रखें।']),
+     ('सेटिंग्स: चेकबॉक्स',
+      ["<span class='item-title'>सिस्टम के साथ शुरू करें</span> Windows शुरू होने पर ऐप चलाता है।",
+       "<span class='item-title'>छाया मोड में शुरू करें</span> ट्रे में छिपाकर शुरू करता है। शॉर्टकट "
+       'काम करते हैं; ट्रे आइकन से विंडो खोलें।',
+       "<span class='item-title'>अनुवादित टेक्स्ट कॉपी करें</span> हर तैयार अनुवाद क्लिपबोर्ड पर रखता "
+       'है।',
+       "<span class='item-title'>कॉपी इतिहास सहेजें</span> और <span class='item-title'>अनुवाद इतिहास "
+       'सहेजें</span> आपके टेक्स्ट रखते हैं। बंद रखने पर डिस्क पर कुछ नहीं लिखा जाता।',
+       "<span class='item-title'>OCR के दौरान विंडो दिखाएँ</span> क्षेत्र चुनते समय मुख्य विंडो को "
+       'छिपने से रोकता है।',
+       "<span class='item-title'>OCR के दौरान स्क्रीन स्थिर करें</span> हिलते या गायब होते टेक्स्ट को "
+       'कैप्चर करने के लिए दृश्य रोकता है।']),
+     ('सेटिंग्स: बटन',
+      ["<span class='item-title'>कैश साफ़ करें</span> पुराने कैश और अस्थायी फ़ाइलें हटाता है। इंस्टॉल "
+       'इंजन और भाषा पैकेज रहते हैं।',
+       "<span class='item-title'>रीसेट</span> सेटिंग्स डिफ़ॉल्ट पर लौटाता है। कुछ अनइंस्टॉल नहीं होता।",
+       "<span class='item-title'>अपडेट</span> नया संस्करण जाँचकर पोर्टेबल फ़ोल्डर बदलता है।",
+       "<span class='item-title'>भाषा पैकेज</span> से OCR भाषाएँ और Argos की भाषा जोड़ियाँ पहले "
+       'इंस्टॉल करें।',
+       "<span class='item-title'>कॉपी इतिहास</span> और <span class='item-title'>अनुवाद इतिहास</span> "
+       'सहेजा टेक्स्ट खोलते हैं। संबंधित विकल्प बंद हो तो खाली रहते हैं।',
+       "<span class='item-title'>शॉर्टकट सेट करें</span> से कॉपी, OCR, पूरी स्क्रीन, चयन अनुवाद, "
+       'अनुवाद से बदलें और दिखाएँ/छिपाएँ के शॉर्टकट तय करें।']),
+     ('शॉर्टकट',
+      ['विवरण के लिए मुख्य स्क्रीन पर शॉर्टकट पर माउस रखें या उसकी सेटिंग खोलने के लिए कुंजी बैज '
+       'दबाएँ। मोड पंक्ति OCR, पूरी स्क्रीन, गतिशील, चयन और बदलें के लिए अलग भाषा जोड़ी रखती है।',
+       "<span class='item-title'>कॉपी करें</span> चुना क्षेत्र पहचानकर टेक्स्ट कॉपी करता है।",
+       "<span class='item-title'>OCR अनुवाद</span> चुना क्षेत्र पहचानकर अनुवाद करता है।",
+       "<span class='item-title'>पूरी स्क्रीन</span> स्क्रीन पर दिखाई देने वाले टेक्स्ट खंडों का "
+       'अनुवाद करता है।',
+       "<span class='item-title'>गतिशील</span> Ctrl+Alt+G से शुरू होता है; एक या अधिक क्षेत्र चुनकर "
+       'उनके अनुवाद वहीं अपडेट रखें। रोकने के लिए शॉर्टकट दोबारा दबाएँ।',
+       "<span class='item-title'>चयन</span> दूसरे ऐप के चुने टेक्स्ट का अनुवाद करता है।",
+       "<span class='item-title'>चयन का अनुवाद करके बदलें</span> उसी विंडो में वही टेक्स्ट चुना हो तभी "
+       'लिखता है। अन्यथा अनुवाद सुरक्षित रूप से कॉपी होता है।',
+       "<span class='item-title'>विंडो</span> ऐप को पिछली जगह छिपाता है या ट्रे/टास्कबार से वापस लाता "
+       'है।',
+       "शॉर्टकट बदलने के लिए <span class='item-title'>सेटिंग्स → शॉर्टकट सेट करें</span> में उसका "
+       'बॉक्स क्लिक करके नई कुंजियाँ दबाएँ। Esc से साफ़ करें; बदलाव तुरंत लागू होते हैं।']),
+     ('पोर्टेबल ऐप',
+      ['सेटिंग्स, इतिहास, कैश और वैकल्पिक स्थानीय इंजन प्रोग्राम फ़ोल्डर के पास रखे जाते हैं।',
+       'अपने आप शुरू करना या शॉर्टकट बनाने से पहले फ़ोल्डर को अंतिम स्थान पर रखें।'])],
+    'id': [('Mulai cepat',
+      ['<b>1.</b> Tekan pintasan salin atau terjemahkan.',
+       '<b>2.</b> Pilih area layar yang berisi teks.',
+       '<b>3.</b> Pilih bahasa OCR/sumber dari pemilih bendera jika diperlukan.',
+       '<b>4.</b> Aplikasi menyalin teks yang dikenali atau menampilkan terjemahan.']),
+     ('Bahasa antarmuka',
+      ['Gunakan tombol bendera di bilah judul untuk mengganti bahasa antarmuka.',
+       'Jendela utama, pengaturan, pintasan, riwayat, menu baki sistem, dan FAQ ini mengikuti bahasa '
+       'pilihan.',
+       'Pilihan bahasa OCR dan terjemahan terpisah dari bahasa antarmuka.']),
+     ('Penerjemah',
+      ["<span class='item-title'>Google</span> - terjemahan daring cepat, disarankan secara bawaan.",
+       "<span class='item-title'>Argos</span> - luring dan privat, memerlukan paket bahasa lokal.",
+       "<span class='item-title'>Hy-MT</span> - paket model bahasa lokal, dipasang terpisah dari "
+       'Pengaturan.',
+       "<span class='item-title'>MyMemory, Lingva, LibreTranslate</span> - penyedia daring "
+       'alternatif.']),
+     ('Mesin OCR',
+      ["<span class='item-title'>Windows</span> - bawaan Windows, cepat, bergantung pada paket bahasa "
+       'Windows yang terpasang.',
+       "<span class='item-title'>Tesseract</span> - OCR luring; Pengaturan dapat mengunduh paket "
+       'portabel lokal.',
+       "<span class='item-title'>AUTO</span> tidak mengetahui bahasa sebelum OCR. Dengan Windows OCR, "
+       'mode ini mencoba bahasa terpasang dan memilih hasil paling terbaca.',
+       'Jika bahasa yang diperlukan belum ada di Windows OCR, pasang paket bahasanya, pilih bahasa '
+       'tertentu, atau gunakan Tesseract.']),
+     ('Pengaturan: tiga daftar di kanan',
+      ["<span class='item-title'>OCR</span> memilih mesin pembaca teks layar. Hanya mesin terpasang "
+       'yang ditawarkan. Pasang dan hapus mesin pada tab masing-masing di <span '
+       "class='item-title'>Paket bahasa</span>.",
+       "<span class='item-title'>Terjemahan</span> memilih penyedia. Penyedia daring mengirim teks ke "
+       'layanan mereka; Argos dan Hy-MT menyimpannya di komputer ini.',
+       "<span class='item-title'>Tampilkan jendela</span> memilih tindakan yang membuka hasil: teks "
+       'pilihan, area layar, dan tombol Terjemahkan.',
+       'Ketiganya terpisah dan dapat dikombinasikan. Tindakan tanpa centang tetap menerjemahkan '
+       '&mdash; hasil langsung disalin ke papan klip tanpa membuka jendela.',
+       'Kolom tertutup menampilkan opsi aktif, atau Semua dan Tidak pernah jika ketiganya sama. '
+       'Arahkan kursor untuk daftar lengkap.']),
+     ('Pengaturan: kotak centang',
+      ["<span class='item-title'>Mulai bersama OS</span> menjalankan aplikasi saat Windows dimulai.",
+       "<span class='item-title'>Mulai dalam mode bayangan</span> memulai tersembunyi di baki sistem. "
+       'Pintasan tetap bekerja, ikon baki membuka jendela.',
+       "<span class='item-title'>Salin teks terjemahan</span> menyalin setiap terjemahan ke papan klip "
+       'begitu siap.',
+       "<span class='item-title'>Simpan riwayat salinan</span> dan <span class='item-title'>Simpan "
+       'riwayat terjemahan</span> menyimpan teks Anda. Nonaktifkan agar tidak ditulis ke disk.',
+       "<span class='item-title'>Tetap tampilkan jendela saat OCR</span> mencegah jendela utama "
+       'tersembunyi saat memilih area.',
+       "<span class='item-title'>Bekukan layar saat OCR</span> menahan gambar agar teks bergerak atau "
+       'menghilang dapat ditangkap.']),
+     ('Pengaturan: tombol',
+      ["<span class='item-title'>Bersihkan cache</span> menghapus cache terjemahan dan berkas "
+       'sementara. Mesin dan paket bahasa tetap terpasang.',
+       "<span class='item-title'>Reset</span> mengembalikan pengaturan bawaan tanpa menghapus "
+       'instalasi apa pun.',
+       "<span class='item-title'>Pembaruan</span> memeriksa versi baru dan mengganti folder portabel.",
+       "<span class='item-title'>Paket bahasa</span> memasang bahasa OCR dan arah Argos terlebih "
+       'dahulu.',
+       "<span class='item-title'>Riwayat salinan</span> dan <span class='item-title'>Riwayat "
+       'terjemahan</span> membuka data tersimpan. Keduanya kosong jika kotak centang terkait nonaktif.',
+       "<span class='item-title'>Atur pintasan</span> mengatur salin, OCR, layar penuh, terjemahan "
+       'pilihan aman, terjemahkan dan ganti, serta tampilkan/sembunyikan.']),
+     ('Pintasan',
+      ['Arahkan kursor ke pintasan untuk deskripsi, atau klik lencana tombol untuk membuka '
+       'pengaturannya. Baris mode menyimpan pasangan bahasa terpisah untuk OCR, Layar penuh, Dinamis, '
+       'Pilihan, dan Ganti.',
+       "<span class='item-title'>Salin</span> mengenali area pilihan dan menyalin teks.",
+       "<span class='item-title'>Terjemahan OCR</span> mengenali dan menerjemahkan area pilihan.",
+       "<span class='item-title'>Layar penuh</span> menerjemahkan blok teks yang terlihat di layar.",
+       "<span class='item-title'>Dinamis</span> dimulai dengan Ctrl+Alt+G, memungkinkan pemilihan "
+       'beberapa area dan memperbarui terjemahan di tempat. Tekan lagi untuk berhenti.',
+       "<span class='item-title'>Pilihan</span> menerjemahkan teks pilihan dari aplikasi lain.",
+       "<span class='item-title'>Terjemahkan dan ganti pilihan</span> menulis hasil hanya jika teks "
+       'yang sama masih dipilih di jendela yang sama. Jika tidak, terjemahan disalin dengan aman.',
+       "<span class='item-title'>Jendela</span> menyembunyikan aplikasi ke tempat sebelumnya atau "
+       'memulihkannya dari baki/bilah tugas.',
+       "Jika kombinasi tidak nyaman, buka <span class='item-title'>Pengaturan → Atur pintasan</span>, "
+       'klik kolom dan tekan kombinasi baru. Esc mengosongkan kolom; perubahan langsung berlaku.']),
+     ('Aplikasi portabel',
+      ['Aplikasi menyimpan konfigurasi, riwayat, cache, dan mesin lokal opsional di samping folder '
+       'program.',
+       'Pindahkan folder ke lokasi akhirnya sebelum mengaktifkan mulai otomatis atau membuat '
+       'pintasan.'])],
 }
 
 
@@ -4518,6 +5511,15 @@ HELP_INTRO = {
     'ar': ("Click'n'Translate مساعد محمول للتعرف على نص الشاشة والترجمة السريعة والاختصارات، مع محركات "
      'اختيارية دون اتصال. استخدم هذه الأسئلة الشائعة كدليل، ويمكنك إعادة تشغيل الجولة التفاعلية من '
      'الزر أدناه.'),
+
+    'tr': ("Click'n'Translate; ekran OCR'ı, hızlı çeviri, kısayollar ve isteğe bağlı çevrimdışı motorlar "
+     'sunan taşınabilir bir yardımcıdır. Bu SSS yol haritanızdır; etkileşimli rehberi aşağıdan yeniden '
+     'başlatabilirsiniz.'),
+    'hi': ("Click'n'Translate स्क्रीन OCR, तेज़ अनुवाद, शॉर्टकट और वैकल्पिक ऑफ़लाइन इंजन वाला पोर्टेबल सहायक "
+     'है। इन सवाल-जवाब से मदद लें; नीचे के बटन से इंटरैक्टिव गाइड फिर शुरू करें।'),
+    'id': ("Click'n'Translate adalah asisten portabel untuk OCR layar, terjemahan cepat, pintasan, dan mesin "
+     'luring opsional. Gunakan FAQ ini sebagai panduan; panduan interaktif dapat dimulai lagi dari '
+     'tombol di bawah.'),
 }
 
 HELP_EXTRA_CONTENT = {
@@ -4736,6 +5738,79 @@ HELP_EXTRA_CONTENT = {
      ('الخصوصية',
       ['ترسل الخدمات المتصلة النصوص إلى خوادمها. استخدم Argos وHy-MT وTesseract للعمل محليًا فقط.',
        'سجلا الترجمة والنسخ اختياريان؛ عطّلهما إذا كنت لا تريد حفظ النصوص محليًا.'])],
+
+    'tr': [('Daha iyi OCR sonuçları',
+      ['Tüm pencere yerine yalnızca metin alanını seçin. Küçük yakalamalar daha hızlı ve temizdir.',
+       "Kaynak hareket ediyor veya kayboluyorsa <span class='item-title'>OCR sırasında ekranı "
+       'dondur</span> seçeneğini kullanın.',
+       "Windows OCR dili tanımıyorsa Tesseract'ı deneyin veya Windows dil paketini kurun."]),
+     ('Çevrimdışı paketler',
+      ["<span class='item-title'>Tesseract</span> çevrimdışı OCR ve birçok tanıma dili ekler.",
+       "<span class='item-title'>Argos</span> küçük dil paketleriyle çevrimdışı çevirir.",
+       "<span class='item-title'>Hy-MT</span> daha büyük yerel modeldir; yalnızca çevrimdışı kaliteye "
+       've yeterli disk alanına ihtiyacınız varsa kurun.']),
+     ('Güncellemeler ve taşınabilir mod',
+      ["Başlangıçta GitHub'daki son sürüm sessizce denetlenir. Güncelseniz bildirim olmaz; aksi halde "
+       "<span class='item-title'>Şimdi güncelle</span>, <span class='item-title'>Bu sürümü atla</span> "
+       "veya <span class='item-title'>Daha sonra</span> sunulur. Atlanan sürüm tekrar önerilmez.",
+       'Güncelle düğmesi sürüm arşivini indirir ve taşınabilir klasörü otomatik değiştirir.',
+       'Otomatik başlatmayı açmadan önce uygulamayı sabit bir klasöre koyun; yoksa Windows eski yolu '
+       'kullanabilir.',
+       'Ayarlar, önbellek, geçmiş ve yerel motorlar veri klasöründe tutulur; böylece uygulama tek '
+       'paket olarak taşınabilir.']),
+     ('Gizlilik',
+      ['Çevrimiçi sağlayıcılar metni hizmetlerine gönderir. Yalnızca yerel çalışma için Argos, Hy-MT '
+       've Tesseract kullanın.',
+       'Geçmişler isteğe bağlıdır; metnin yerel kaydedilmesini istemiyorsanız kapatın.'])],
+    'hi': [('बेहतर OCR परिणाम',
+      ['पूरी विंडो की बजाय सिर्फ़ टेक्स्ट क्षेत्र चुनें। छोटे कैप्चर तेज़ और साफ़ होते हैं।',
+       "स्रोत हिलता या गायब होता हो तो <span class='item-title'>OCR के दौरान स्क्रीन स्थिर करें</span> "
+       'इस्तेमाल करें।',
+       'Windows OCR भाषा न पढ़े तो Tesseract आज़माएँ या ज़रूरी Windows भाषा पैकेज इंस्टॉल करें।']),
+     ('ऑफ़लाइन पैकेज',
+      ["<span class='item-title'>Tesseract</span> ऑफ़लाइन OCR और कई पहचान भाषाएँ देता है।",
+       "<span class='item-title'>Argos</span> छोटे भाषा पैकेज से ऑफ़लाइन अनुवाद करता है।",
+       "<span class='item-title'>Hy-MT</span> बड़ा स्थानीय मॉडल है; बेहतर ऑफ़लाइन गुणवत्ता चाहिए और "
+       'डिस्क में जगह हो तभी इंस्टॉल करें।']),
+     ('अपडेट और पोर्टेबल मोड',
+      ['शुरू होते समय ऐप चुपचाप GitHub पर नया संस्करण जाँचता है। नया न हो तो कुछ नहीं दिखता; वरना '
+       "<span class='item-title'>अभी अपडेट करें</span>, <span class='item-title'>यह संस्करण "
+       "छोड़ें</span> या <span class='item-title'>बाद में</span> चुनें। छोड़ा संस्करण फिर नहीं सुझाया "
+       'जाता।',
+       'अपडेट बटन संस्करण का संग्रह डाउनलोड करके पोर्टेबल फ़ोल्डर अपने आप बदलता है।',
+       'अपने आप शुरू करना चालू करने से पहले ऐप को स्थायी फ़ोल्डर में रखें, वरना Windows पुराने पथ पर '
+       'जा सकता है।',
+       'सेटिंग्स, कैश, इतिहास और स्थानीय इंजन प्रोग्राम के डेटा फ़ोल्डर में हैं, ताकि ऐप एक पैकेज की '
+       'तरह ले जा सकें।']),
+     ('गोपनीयता',
+      ['ऑनलाइन प्रदाता टेक्स्ट अपनी सेवा को भेजते हैं। सिर्फ़ स्थानीय काम के लिए Argos, Hy-MT और '
+       'Tesseract इस्तेमाल करें।',
+       'अनुवाद और कॉपी इतिहास वैकल्पिक हैं; स्थानीय टेक्स्ट न रखना चाहें तो बंद करें।'])],
+    'id': [('Hasil OCR terbaik',
+      ['Pilih area teks saja, bukan seluruh jendela. Tangkapan kecil lebih cepat dan bersih.',
+       "Gunakan <span class='item-title'>Bekukan layar saat OCR</span> saat sumber bergerak, memudar, "
+       'atau menghilang.',
+       'Jika Windows OCR tidak mengenali bahasa, coba Tesseract atau pasang paket bahasa Windows.']),
+     ('Paket luring',
+      ["<span class='item-title'>Tesseract</span> menambah OCR luring dan banyak bahasa pengenalan.",
+       "<span class='item-title'>Argos</span> menyediakan terjemahan luring dengan paket bahasa kecil.",
+       "<span class='item-title'>Hy-MT</span> adalah model lokal lebih besar; pasang jika memerlukan "
+       'kualitas luring dan memiliki ruang disk.']),
+     ('Pembaruan dan mode portabel',
+      ['Saat mulai, aplikasi diam-diam memeriksa rilis terbaru di GitHub. Jika sudah terbaru, tidak '
+       "ada pemberitahuan; jika belum, pilih <span class='item-title'>Perbarui sekarang</span>, <span "
+       "class='item-title'>Lewati versi ini</span> atau <span class='item-title'>Nanti</span>. Versi "
+       'yang dilewati tidak ditawarkan lagi.',
+       'Tombol pembaruan mengunduh arsip rilis dan mengganti folder portabel secara otomatis.',
+       'Simpan aplikasi di folder tetap sebelum mengaktifkan mulai otomatis agar Windows tidak memakai '
+       'jalur lama.',
+       'Konfigurasi, cache, riwayat, dan mesin lokal berada di folder data program agar aplikasi dapat '
+       'dipindah sebagai satu paket.']),
+     ('Privasi',
+      ['Penyedia daring mengirim teks ke layanan mereka. Gunakan Argos, Hy-MT, dan Tesseract untuk '
+       'pemrosesan lokal saja.',
+       'Riwayat terjemahan dan salinan bersifat opsional; nonaktifkan jika tidak ingin teks tersimpan '
+       'lokal.'])],
 }
 
 from settings_guide_content import update_help as _update_settings_help
@@ -4799,6 +5874,28 @@ BUG_REPORT_HELP_CONTENT = {
        'الحافظة أو سجلات النصوص أو نصوص المستندات أو سجلات التعرف على النص.',
        "إذا تعذّر تشغيل التطبيق، فاستخدم <span class='item-title'>إنشاء تقرير مشكلة</span> من نافذة "
        'خطأ بدء التشغيل؛ فهو ينشئ تقرير بدء تشغيل آمنًا من النوع نفسه.'])],
+
+    'tr': [('Hata raporları',
+      ["Tanılama ZIP'i oluşturmak için <span class='item-title'>Yardım → Hata raporu</span> bölümünü "
+       "açın, ardından GitHub Issues veya Telegram'a ekleyin.",
+       'Rapor; sürüm, işletim sistemi, motor seçimi, dosya denetimleri ve güncelleme günlüklerini '
+       'içerir. Pano, geçmiş, belge metni ve OCR günlükleri dahil edilmez.',
+       "Uygulama açılmazsa başlangıç hata penceresindeki <span class='item-title'>Hata raporu "
+       'oluştur</span> düğmesini kullanın; aynı türde güvenli rapor oluşturur.'])],
+    'hi': [('बग रिपोर्ट',
+      ["निदान ZIP बनाने के लिए <span class='item-title'>सहायता → बग रिपोर्ट</span> खोलें, फिर GitHub "
+       'Issues या Telegram पर भेजें।',
+       'रिपोर्ट में संस्करण, सिस्टम, इंजन चयन, फ़ाइल जाँच और अपडेट लॉग हैं। क्लिपबोर्ड, इतिहास, '
+       'दस्तावेज़ टेक्स्ट और OCR लॉग शामिल नहीं हैं।',
+       "ऐप न खुले तो स्टार्टअप त्रुटि विंडो में <span class='item-title'>बग रिपोर्ट बनाएँ</span> "
+       'दबाएँ; वही सुरक्षित रिपोर्ट बनेगी।'])],
+    'id': [('Laporan bug',
+      ["Buka <span class='item-title'>Bantuan → Laporan bug</span> untuk membuat ZIP diagnostik, lalu "
+       'lampirkan ke GitHub Issues atau Telegram.',
+       'Laporan berisi versi, OS, pilihan mesin, pemeriksaan berkas, dan log pembaruan. Papan klip, '
+       'riwayat, teks dokumen, dan log OCR dikecualikan.',
+       "Jika aplikasi gagal dimulai, gunakan <span class='item-title'>Buat laporan bug</span> di "
+       'jendela kesalahan awal untuk membuat laporan aman yang sama.'])],
 }
 
 LANGUAGE_PACKAGE_HELP_CONTENT = {
@@ -4894,6 +5991,38 @@ LANGUAGE_PACKAGE_HELP_CONTENT = {
        'تعرض قوائم اللغات الحزم المثبتة والقابلة للاستخدام بالمحرك المختار فقط.',
        'لإزالة حزمة، حدد صفها المثبت واختر «إزالة المحدد». قد يخدم نموذج EasyOCR المشترك عدة لغات '
        'متقاربة.'])],
+
+    'tr': [('Dil paketleri',
+      ["OCR veya çevrimdışı çeviriden önce <span class='item-title'>Ayarlar → Dil paketleri</span> "
+       'bölümünden dilleri kurun. Tanıma ve çeviri bunları sessizce indirmez.',
+       'Windows, isteğe bağlı OCR bileşenlerini yönetici izniyle kurar ve gerçek ilerlemeyi gösterir. '
+       'Tesseract ve EasyOCR ayrı yerel modeller kullanır.',
+       'RapidOCR tek bir İngilizce + Çince paketi kullanır; Rusçayı desteklemez. Argos paketleri RU→EN '
+       'gibi yönlüdür; İngilizce dışındaki çiftler İngilizce üzerinden iki yön gerektirebilir.',
+       'Dil seçiciler yalnızca seçilen motorun kullanabildiği kurulu paketleri gösterir.',
+       "Paketi kaldırmak için kurulu satırını vurgulayıp Vurgulananı kaldır'a basın. Ortak EasyOCR "
+       'modelleri birden fazla yakın dili destekleyebilir.'])],
+    'hi': [('भाषा पैकेज',
+      ["OCR या ऑफ़लाइन अनुवाद से पहले <span class='item-title'>सेटिंग्स → भाषा पैकेज</span> से भाषाएँ "
+       'इंस्टॉल करें। पहचान और अनुवाद इन्हें चुपचाप डाउनलोड नहीं करते।',
+       'Windows वैकल्पिक OCR घटक व्यवस्थापक की अनुमति से इंस्टॉल करता है और वास्तविक प्रगति दिखाता है। '
+       'Tesseract और EasyOCR अलग स्थानीय भाषा मॉडल इस्तेमाल करते हैं।',
+       'RapidOCR का साझा अंग्रेज़ी + चीनी पैकेज है; रूसी समर्थित नहीं है। Argos पैकेज RU→EN जैसी दिशा '
+       'में होते हैं; दूसरी भाषाओं के लिए अंग्रेज़ी के रास्ते दो दिशाएँ लग सकती हैं।',
+       'भाषा सूचियों में सिर्फ़ चुने इंजन के इंस्टॉल और उपयोग योग्य पैकेज दिखते हैं।',
+       'पैकेज हटाने के लिए उसकी इंस्टॉल पंक्ति चुनकर चुना हटाएँ दबाएँ। साझा EasyOCR मॉडल कई संबंधित '
+       'भाषाओं के लिए हो सकते हैं।'])],
+    'id': [('Paket bahasa',
+      ["Buka <span class='item-title'>Pengaturan → Paket bahasa</span> dan pasang bahasa sebelum OCR "
+       'atau terjemahan luring. Pengenalan dan terjemahan tidak mengunduhnya diam-diam.',
+       'Windows memasang komponen OCR opsional dengan izin administrator dan menampilkan kemajuan '
+       'nyata. Tesseract dan EasyOCR memakai model bahasa lokal terpisah.',
+       'RapidOCR memiliki satu paket Inggris + Mandarin; bahasa Rusia tidak didukung. Paket Argos '
+       'berarah, seperti RU→EN; pasangan non-Inggris mungkin memerlukan dua arah melalui bahasa '
+       'Inggris.',
+       'Pemilih bahasa hanya menampilkan paket terpasang yang dapat digunakan mesin pilihan.',
+       'Untuk menghapus paket, sorot baris yang terpasang dan pilih Hapus yang disorot. Model bersama '
+       'EasyOCR dapat melayani beberapa bahasa terkait.'])],
 }
 
 
@@ -4998,6 +6127,38 @@ DOCUMENT_HELP_CONTENT = {
        'تُقسم الملفات الطويلة إلى مقاطع مرتبة، وتظل المقاطع التي تعذّرت ترجمتها ظاهرة في النتيجة.',
        'يمكن حفظ الترجمات محليًا بصيغة .txt أو .md أو كجلسة يمكن فتحها مجددًا في مجلد بيانات '
        'البرنامج.'])],
+
+    'tr': [('Belge çevirisi',
+      ['Başlık çubuğundaki belge simgesini istediğiniz zaman açın. Ana girişte metin iki görsel satırı '
+       'aşınca genişletme simgesi belirir ve metni belge alanına aktarır.',
+       'Metin yapıştırın; .txt, .md, .docx, .pdf, .html veya .rtf dosyası bırakın ya da ekleyin; ana '
+       "pencereden Ctrl+O'ya da basabilirsiniz.",
+       'Kaynak dil, hedef dil ve sağlayıcıyı açıkça seçin. Argos yalnızca paketleri kurulu yönleri '
+       'gösterir.',
+       "Belgenin tümünü çevirin veya soldaki alanda metin seçip Seçimi çevir'i kullanın.",
+       'Uzun dosyalar sıralı parçalara bölünür; başarısız parçalar sonuçta görünür kalır.',
+       'Çeviriler veri klasöründe .txt, .md veya yeniden açılabilen oturum olarak kaydedilebilir.'])],
+    'hi': [('दस्तावेज़ अनुवाद',
+      ['शीर्षक पट्टी का दस्तावेज़ आइकन कभी भी खोलें। मुख्य बॉक्स में दो दृश्य पंक्तियों से लंबा '
+       'टेक्स्ट होने पर विस्तार आइकन दिखेगा और टेक्स्ट दस्तावेज़ कार्यक्षेत्र में जाएगा।',
+       'टेक्स्ट चिपकाएँ, .txt, .md, .docx, .pdf, .html या .rtf फ़ाइल छोड़ें या जोड़ें; मुख्य विंडो से '
+       'Ctrl+O भी दबा सकते हैं।',
+       'स्रोत भाषा, लक्ष्य भाषा और प्रदाता चुनें। Argos में सिर्फ़ इंस्टॉल पैकेज वाली दिशाएँ दिखती '
+       'हैं।',
+       'पूरा दस्तावेज़ अनुवाद करें या बाएँ बॉक्स में भाग चुनकर चयन का अनुवाद करें दबाएँ।',
+       'लंबी फ़ाइलें क्रमबद्ध खंडों में बँटती हैं; विफल खंड परिणाम में दिखाई देते रहते हैं।',
+       'अनुवाद डेटा फ़ोल्डर में .txt, .md या फिर खोलने योग्य सत्र में सहेज सकते हैं।'])],
+    'id': [('Terjemahan dokumen',
+      ['Buka ikon dokumen di bilah judul kapan saja. Teks utama lebih dari dua baris visual '
+       'menampilkan ikon perluas yang memindahkannya ke ruang dokumen.',
+       'Tempel teks, letakkan atau lampirkan berkas .txt, .md, .docx, .pdf, .html atau .rtf, atau '
+       'tekan Ctrl+O dari jendela utama.',
+       'Pilih bahasa sumber, tujuan, dan penyedia secara eksplisit. Argos hanya menampilkan arah '
+       'dengan paket terpasang.',
+       'Terjemahkan seluruh dokumen, atau pilih bagian di kolom kiri lalu pilih Terjemahkan pilihan.',
+       'Berkas panjang dibagi menjadi bagian berurutan; bagian gagal tetap terlihat dalam hasil.',
+       'Terjemahan dapat disimpan lokal sebagai .txt, .md, atau sesi yang dapat dibuka kembali di '
+       'folder data program.'])],
 }
 
 
@@ -5055,6 +6216,52 @@ HELP_ACTION_TEXT = {
                      '{file}',
      'report_failed': 'تعذّر إنشاء تقرير التشخيص.\n\n{error}',
      'close': 'فهمت'},
+
+    'tr': {'title': 'FAQ',
+     'guide': 'Etkileşimli rehberi başlat',
+     'github': 'GitHub projesi',
+     'telegram': 'Telegram',
+     'report': 'Hata raporu',
+     'report_ready': "Rapor klasörü hazır. ZIP'i GitHub veya Telegram'a gönderin; ne yaptığınızı, ne "
+                     'beklediğinizi ve ne olduğunu açıklayın.\n'
+                     '\n'
+                     'Klasör:\n'
+                     '{directory}\n'
+                     '\n'
+                     'Gönderilecek dosya:\n'
+                     '{file}',
+     'report_failed': 'Tanılama raporu oluşturulamadı.\n\n{error}',
+     'close': 'Anladım'},
+    'hi': {'title': 'FAQ',
+     'guide': 'इंटरैक्टिव गाइड शुरू करें',
+     'github': 'GitHub प्रोजेक्ट',
+     'telegram': 'Telegram',
+     'report': 'बग रिपोर्ट',
+     'report_ready': 'रिपोर्ट फ़ोल्डर तैयार है। ZIP GitHub या Telegram पर भेजें और बताएँ आपने क्या '
+                     'किया, क्या अपेक्षा थी और क्या हुआ।\n'
+                     '\n'
+                     'फ़ोल्डर:\n'
+                     '{directory}\n'
+                     '\n'
+                     'भेजने की फ़ाइल:\n'
+                     '{file}',
+     'report_failed': 'निदान रिपोर्ट नहीं बन सकी।\n\n{error}',
+     'close': 'समझ गया'},
+    'id': {'title': 'FAQ',
+     'guide': 'Mulai panduan interaktif',
+     'github': 'Proyek GitHub',
+     'telegram': 'Telegram',
+     'report': 'Laporan bug',
+     'report_ready': 'Folder laporan siap. Kirim ZIP ke GitHub atau Telegram dan jelaskan tindakan, '
+                     'hasil yang diharapkan, dan yang terjadi.\n'
+                     '\n'
+                     'Folder:\n'
+                     '{directory}\n'
+                     '\n'
+                     'Berkas untuk dikirim:\n'
+                     '{file}',
+     'report_failed': 'Laporan diagnostik tidak dapat dibuat.\n\n{error}',
+     'close': 'Mengerti'},
 }
 
 
@@ -5203,6 +6410,32 @@ ARGOS_PACKAGE_DIALOG_TEXT = {
                'الميغابايت.',
      'install': 'تنزيل وتثبيت',
      'cancel': 'ليس الآن'},
+
+    'tr': {'title': 'Argos dil paketi indirilsin mi?',
+     'eyebrow': 'ARGOS · ÇEVRİMDIŞI ÇEVİRİ',
+     'direction': 'ÇEVİRİ YÖNÜ',
+     'body': 'Bu yön henüz kurulu değil. Bir kez indirildikten sonra çeviri tamamen çevrimdışı '
+             'çalışır.',
+     'detail': 'Argos doğrudan paketi veya İngilizce üzerinden yolu otomatik seçer. İndirme birkaç yüz '
+               'megabayt olabilir.',
+     'install': 'İndir ve kur',
+     'cancel': 'Şimdi değil'},
+    'hi': {'title': 'Argos भाषा पैकेज डाउनलोड करें?',
+     'eyebrow': 'ARGOS · ऑफ़लाइन अनुवाद',
+     'direction': 'अनुवाद की दिशा',
+     'body': 'यह दिशा अभी इंस्टॉल नहीं है। एक बार डाउनलोड करने पर अनुवाद पूरी तरह ऑफ़लाइन चलेगा।',
+     'detail': 'Argos सीधा पैकेज या अंग्रेज़ी के रास्ते का चयन अपने आप करता है। डाउनलोड कई सौ मेगाबाइट '
+               'हो सकता है।',
+     'install': 'डाउनलोड और इंस्टॉल करें',
+     'cancel': 'अभी नहीं'},
+    'id': {'title': 'Unduh paket bahasa Argos?',
+     'eyebrow': 'ARGOS · TERJEMAHAN LURING',
+     'direction': 'ARAH TERJEMAHAN',
+     'body': 'Arah ini belum terpasang. Setelah sekali diunduh, terjemahan bekerja sepenuhnya luring.',
+     'detail': 'Argos otomatis memilih paket langsung atau jalur melalui Inggris. Unduhan dapat '
+               'mencapai beberapa ratus megabita.',
+     'install': 'Unduh dan pasang',
+     'cancel': 'Tidak sekarang'},
 }
 
 
@@ -5392,6 +6625,31 @@ ARGOS_ERROR_DIALOG_TEXT = {
      'fallback': 'لم يُرجع Argos وصفًا للخطأ.',
      'close': 'إغلاق',
      'cancel': 'إلغاء'},
+
+    'tr': {'title': 'Çeviri başarısız',
+     'eyebrow': 'ARGOS · ÇEVRİMDIŞI ÇEVİRİ',
+     'body': 'Argos bu çeviriyi tamamlayamadı. Tekrar deneyin. Hata yinelenirse bu yönün paketlerini '
+             'yeniden kurun.',
+     'details': 'TEKNİK AYRINTILAR',
+     'fallback': 'Argos hata açıklaması döndürmedi.',
+     'close': 'Kapat',
+     'cancel': 'İptal'},
+    'hi': {'title': 'अनुवाद विफल',
+     'eyebrow': 'ARGOS · ऑफ़लाइन अनुवाद',
+     'body': 'Argos अनुवाद पूरा नहीं कर सका। फिर कोशिश करें। त्रुटि दोहराए तो इस दिशा के पैकेज फिर '
+             'इंस्टॉल करें।',
+     'details': 'तकनीकी विवरण',
+     'fallback': 'Argos ने त्रुटि विवरण नहीं दिया।',
+     'close': 'बंद करें',
+     'cancel': 'रद्द करें'},
+    'id': {'title': 'Terjemahan gagal',
+     'eyebrow': 'ARGOS · TERJEMAHAN LURING',
+     'body': 'Argos tidak dapat menyelesaikan terjemahan ini. Coba lagi. Jika berulang, pasang ulang '
+             'paket untuk arah ini.',
+     'details': 'DETAIL TEKNIS',
+     'fallback': 'Argos tidak mengembalikan deskripsi kesalahan.',
+     'close': 'Tutup',
+     'cancel': 'Batal'},
 }
 
 
@@ -5565,6 +6823,28 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
      'copied': 'نُسخت إلى الحافظة',
      'copy_again': 'نسخ مجددًا',
      'swap': 'تبديل اللغتين'},
+
+    'tr': {'eyebrow': 'ÇEVİRİ SONUCU',
+     'title': 'Çeviri hazır',
+     'auto_copied': 'Panoya otomatik kopyalandı',
+     'ready': 'Sonuç kopyalanmaya hazır',
+     'copied': 'Panoya kopyalandı',
+     'copy_again': 'Yeniden kopyala',
+     'swap': 'Dilleri değiştir'},
+    'hi': {'eyebrow': 'अनुवाद परिणाम',
+     'title': 'अनुवाद तैयार है',
+     'auto_copied': 'क्लिपबोर्ड पर अपने आप कॉपी हुआ',
+     'ready': 'परिणाम कॉपी करने के लिए तैयार है',
+     'copied': 'क्लिपबोर्ड पर कॉपी हुआ',
+     'copy_again': 'फिर कॉपी करें',
+     'swap': 'भाषाएँ अदलें'},
+    'id': {'eyebrow': 'HASIL TERJEMAHAN',
+     'title': 'Terjemahan siap',
+     'auto_copied': 'Disalin ke papan klip secara otomatis',
+     'ready': 'Hasil siap disalin',
+     'copied': 'Disalin ke papan klip',
+     'copy_again': 'Salin lagi',
+     'swap': 'Tukar bahasa'},
 }
 
 
@@ -5580,6 +6860,10 @@ for _lang, _edited in {
     'it': 'Testo modificato: pronto per la copia',
 
     'ar': 'عُدّل النص وأصبح جاهزًا للنسخ',
+
+    'tr': 'Metin düzenlendi — kopyalanmaya hazır',
+    'hi': 'टेक्स्ट बदला — कॉपी के लिए तैयार',
+    'id': 'Teks diedit — siap disalin',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]["edited"] = _edited
 
@@ -5596,6 +6880,10 @@ for _lang, _labels in {
     'it': ('Traduzione', 'Testo originale', 'Testo sorgente modificato: fai clic su Traduci'),
 
     'ar': ('الترجمة', 'النص الأصلي', 'عُدّل النص الأصلي؛ اضغط «ترجمة»'),
+
+    'tr': ('Çeviri', 'Kaynak metin', "Kaynak metin değişti — Çevir'e tıklayın"),
+    'hi': ('अनुवाद', 'स्रोत टेक्स्ट', 'स्रोत टेक्स्ट बदला — अनुवाद करें दबाएँ'),
+    'id': ('Terjemahan', 'Teks sumber', 'Teks sumber diedit — klik Terjemahkan'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(result_tab=_labels[0], source_tab=_labels[1], source_edited=_labels[2])
 
@@ -5615,6 +6903,10 @@ for _lang, _labels in {
      'Scambia lingue e testo'),
 
     'ar': ('المترجم', 'اكتب النص أو الصقه', 'تظهر ترجمتك هنا', 'تبديل اللغتين والنصين'),
+
+    'tr': ('Çevirmen', 'Metin yazın veya yapıştırın', 'Çeviriniz burada görünür', 'Dilleri ve metni değiştir'),
+    'hi': ('अनुवादक', 'टेक्स्ट लिखें या चिपकाएँ', 'आपका अनुवाद यहाँ दिखेगा', 'भाषाएँ और टेक्स्ट अदलें'),
+    'id': ('Penerjemah', 'Ketik atau tempel teks', 'Terjemahan Anda muncul di sini', 'Tukar bahasa dan teks'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("workspace_title", "source_placeholder", "result_placeholder", "swap_texts"), _labels))
@@ -5647,6 +6939,25 @@ for _lang, _labels in {
      'فتح الترجمة في نافذة مستقلة',
      'الترجمة السابقة',
      'تغيّر النص أو اللغتان. اضغط «ترجمة».'),
+
+    'tr': ('Giriş',
+     'Girişi gizle',
+     'Girişi göster',
+     'Çeviriyi ayrı pencerede aç',
+     'Önceki çeviri',
+     "Giriş veya diller değişti. Çevir'e tıklayın."),
+    'hi': ('इनपुट',
+     'इनपुट छिपाएँ',
+     'इनपुट दिखाएँ',
+     'अनुवाद अलग विंडो में खोलें',
+     'पिछला अनुवाद',
+     'टेक्स्ट या भाषाएँ बदलीं। अनुवाद करें दबाएँ।'),
+    'id': ('Masukan',
+     'Sembunyikan masukan',
+     'Tampilkan masukan',
+     'Buka terjemahan di jendela terpisah',
+     'Terjemahan sebelumnya',
+     'Masukan atau bahasa berubah. Klik Terjemahkan.'),
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang].update(zip(
         ("input_tab", "hide_source", "show_source", "open_result", "previous_result", "result_needs_update"), _labels))
@@ -5664,6 +6975,10 @@ for _lang, _label in {
     'it': 'Traduzione in tempo reale',
 
     'ar': 'جارٍ الترجمة الفورية',
+
+    'tr': 'Gerçek zamanlı çevriliyor',
+    'hi': 'रीयल टाइम में अनुवाद',
+    'id': 'Menerjemahkan langsung',
 }.items():
     TRANSLATION_RESULT_DIALOG_TEXT[_lang]['live_translation'] = _label + '...'
 
@@ -6064,6 +7379,10 @@ class TranslationResultDialog(QDialog):
             'it': 'Provider solo per questa finestra. Le impostazioni globali rimangono invariate.',
 
             'ar': 'خدمة الترجمة لهذه النافذة فقط. لا تتغير الإعدادات العامة.',
+
+            'tr': 'Yalnızca bu pencerenin sağlayıcısı. Genel ayarlar değişmez.',
+            'hi': 'सिर्फ़ इस विंडो का प्रदाता। सामान्य सेटिंग्स नहीं बदलेंगी।',
+            'id': 'Penyedia hanya untuk jendela ini. Pengaturan global tidak berubah.',
         }
         self.engine_combo.setToolTip(tooltip_text(hints.get(self.lang, hints['en'])))
 
@@ -8692,6 +10011,68 @@ HOTKEY_LANGUAGE_TEXT = {
      'selection': 'التحديد',
      'replace': 'الاستبدال',
      'hint': '{mode} · {hotkey}: {src} ← {tgt}  ▾'},
+
+    'tr': {'mode_direction': 'Seçili modun dilleri',
+     'text_section': 'Metin çevirisi',
+     'hotkey_section': 'Klavye kısayolları',
+     'title': 'Kısayol dilleri',
+     'body': 'Her çeviri kısayolu kendi dil çiftini saklar.',
+     'bar_hint': 'Kısayol dilleri — önce modu, sonra yönünü seçin',
+     'bar_caption': 'Diller:',
+     'mode_language_heading': 'Moda göre çeviri dilleri',
+     'mode': 'İşlem',
+     'from': 'Kaynak',
+     'to': 'Hedef',
+     'swap': 'Dilleri değiştir',
+     'done': 'Tamam',
+     'no_pairs': 'Hazır dil çifti yok. Önce gerekli OCR veya Argos paketlerini kurun.',
+     'ocr': 'OCR',
+     'fullscreen': 'Ekran',
+     'game': 'Dinamik',
+     'selection': 'Seçim',
+     'replace': 'Değiştir',
+     'hint': '{mode} · {hotkey}: {src} → {tgt}  ▾'},
+    'hi': {'mode_direction': 'चुने मोड की भाषाएँ',
+     'text_section': 'टेक्स्ट अनुवाद',
+     'hotkey_section': 'कीबोर्ड शॉर्टकट',
+     'title': 'शॉर्टकट की भाषाएँ',
+     'body': 'हर अनुवाद शॉर्टकट अपनी भाषा जोड़ी रखता है।',
+     'bar_hint': 'शॉर्टकट भाषाएँ — पहले मोड, फिर दिशा चुनें',
+     'bar_caption': 'भाषाएँ:',
+     'mode_language_heading': 'मोड के अनुसार अनुवाद भाषाएँ',
+     'mode': 'क्रिया',
+     'from': 'से',
+     'to': 'में',
+     'swap': 'भाषाएँ अदलें',
+     'done': 'हो गया',
+     'no_pairs': 'कोई भाषा जोड़ी तैयार नहीं है। पहले ज़रूरी OCR या Argos पैकेज इंस्टॉल करें।',
+     'ocr': 'OCR',
+     'fullscreen': 'स्क्रीन',
+     'game': 'गतिशील',
+     'selection': 'चयन',
+     'replace': 'बदलें',
+     'hint': '{mode} · {hotkey}: {src} → {tgt}  ▾'},
+    'id': {'mode_direction': 'Bahasa untuk mode pilihan',
+     'text_section': 'Terjemahan teks',
+     'hotkey_section': 'Pintasan papan ketik',
+     'title': 'Bahasa pintasan',
+     'body': 'Setiap pintasan terjemahan menyimpan pasangan bahasanya sendiri.',
+     'bar_hint': 'Bahasa pintasan — pilih mode, lalu arahnya',
+     'bar_caption': 'Bahasa:',
+     'mode_language_heading': 'Bahasa terjemahan per mode',
+     'mode': 'Tindakan',
+     'from': 'Dari',
+     'to': 'Ke',
+     'swap': 'Tukar bahasa',
+     'done': 'Selesai',
+     'no_pairs': 'Tidak ada pasangan bahasa siap pakai. Pasang paket OCR atau Argos yang diperlukan '
+                 'terlebih dahulu.',
+     'ocr': 'OCR',
+     'fullscreen': 'Layar',
+     'game': 'Dinamis',
+     'selection': 'Pilihan',
+     'replace': 'Ganti',
+     'hint': '{mode} · {hotkey}: {src} → {tgt}  ▾'},
 }
 
 
@@ -8790,6 +10171,34 @@ MAIN_HOTKEY_TOOLTIPS = {
      'replace': 'حدد نصًا قابلًا للتحرير في تطبيق آخر ليُستبدل التحديد نفسه بترجمته؛ وإذا تغير '
                 'التركيز، تُنسخ النتيجة فقط.',
      'toggle': 'أخفِ التطبيق إلى وجهته السابقة أو استعده من علبة النظام أو شريط المهام.'},
+
+    'tr': {'copy': 'Ekran alanını seçin. OCR tanınan metni kopyalar.',
+     'ocr': 'Ekran alanını seçin. OCR bu modun dil çiftiyle çevirir.',
+     'fullscreen': 'Tüm ekrandaki görünür metni Ekran dil çiftiyle çevirir.',
+     'game': 'Okunacak metni seçin, canlı çevirinin konumunu belirleyin. Çıktıyı ayarlayıp şablon '
+             'kaydedin. Durdurmak için kısayola tekrar basın.',
+     'selection': 'Başka uygulamada metin seçip özgününü değiştirmeden çevirin.',
+     'replace': 'Başka uygulamada düzenlenebilir metin seçin. Aynı seçim çevirisiyle değiştirilir; '
+                'odak değişmişse sonuç yalnızca kopyalanır.',
+     'toggle': 'Uygulamayı önceki yerine gizler veya tepsiden/görev çubuğundan geri getirir.'},
+    'hi': {'copy': 'स्क्रीन का क्षेत्र चुनें। OCR पहचाना टेक्स्ट कॉपी करता है।',
+     'ocr': 'स्क्रीन का क्षेत्र चुनें। OCR इस मोड की भाषा जोड़ी से अनुवाद करता है।',
+     'fullscreen': 'पूरी स्क्रीन के दिखाई देते टेक्स्ट का स्क्रीन की भाषा जोड़ी से अनुवाद करें।',
+     'game': 'पढ़ने का टेक्स्ट चुनें, फिर उसके लाइव अनुवाद की जगह चुनें। परिणाम समायोजित करके टेम्पलेट '
+             'सहेजें। रोकने के लिए शॉर्टकट फिर दबाएँ।',
+     'selection': 'दूसरे ऐप में टेक्स्ट चुनें, फिर मूल बदले बिना अनुवाद करें।',
+     'replace': 'दूसरे ऐप में संपादन योग्य टेक्स्ट चुनें। वही चयन अनुवाद से बदलेगा; फ़ोकस बदल गया हो '
+                'तो परिणाम सिर्फ़ कॉपी होगा।',
+     'toggle': 'ऐप को पिछली जगह छिपाएँ या ट्रे/टास्कबार से लौटाएँ।'},
+    'id': {'copy': 'Pilih area layar. OCR menyalin teks yang dikenali.',
+     'ocr': 'Pilih area layar. OCR menerjemahkannya dengan pasangan bahasa mode ini.',
+     'fullscreen': 'Terjemahkan blok teks di seluruh layar dengan pasangan bahasa Layar.',
+     'game': 'Pilih teks lalu tentukan lokasi terjemahan langsung. Atur keluaran dan simpan templat. '
+             'Tekan pintasan lagi untuk berhenti.',
+     'selection': 'Pilih teks di aplikasi lain, lalu terjemahkan tanpa mengubah aslinya.',
+     'replace': 'Pilih teks yang dapat diedit di aplikasi lain. Pilihan yang sama diganti dengan '
+                'terjemahan; jika fokus berubah, hasil hanya disalin.',
+     'toggle': 'Sembunyikan aplikasi ke tempat sebelumnya atau pulihkan dari baki/bilah tugas.'},
 }
 
 
@@ -8867,6 +10276,25 @@ HOTKEY_SETTINGS_PROMPT_TEXT = {
      'change': 'هل تريد تغيير اختصار «{action}» ({hotkey}) في الإعدادات؟',
      'open': 'فتح الإعدادات',
      'cancel': 'إلغاء'},
+
+    'tr': {'title': 'Kısayol ayarları',
+     'edit_hint': 'Kısayolu ayarlamak için bu satıra tıklayın.',
+     'set': '“{action}” için Ayarlarda kısayol belirlensin mi?',
+     'change': '“{action}” kısayolu ({hotkey}) Ayarlardan değiştirilsin mi?',
+     'open': 'Ayarları aç',
+     'cancel': 'İptal'},
+    'hi': {'title': 'शॉर्टकट सेटिंग्स',
+     'edit_hint': 'शॉर्टकट सेट करने के लिए इस पंक्ति पर कहीं भी क्लिक करें।',
+     'set': 'सेटिंग्स में “{action}” का शॉर्टकट तय करें?',
+     'change': 'सेटिंग्स में “{action}” का शॉर्टकट ({hotkey}) बदलें?',
+     'open': 'सेटिंग्स खोलें',
+     'cancel': 'रद्द करें'},
+    'id': {'title': 'Pengaturan pintasan',
+     'edit_hint': 'Klik di mana saja pada baris ini untuk mengatur pintasan.',
+     'set': 'Atur pintasan untuk “{action}” di Pengaturan?',
+     'change': 'Ubah pintasan “{action}” ({hotkey}) di Pengaturan?',
+     'open': 'Buka pengaturan',
+     'cancel': 'Batal'},
 }
 
 # Full action names share a line with their shortcuts in two aligned columns.
@@ -8903,6 +10331,31 @@ MAIN_HOTKEY_COMPACT_CAPTIONS = {
      'toggle': 'إظهار النافذة أو إخفاؤها',
      'game': 'الترجمة المستمرة',
      'recognition': 'التعرف على النص'},
+
+    'tr': {'copy': 'Metni kopyala',
+     'ocr': 'Alanı çevir',
+     'fullscreen': 'Ekranı çevir',
+     'selection': 'Seçimi çevir',
+     'replace': 'Çeviriyle değiştir',
+     'toggle': 'Pencereyi göster veya gizle',
+     'game': 'Dinamik çeviri',
+     'recognition': 'Metin tanıma'},
+    'hi': {'copy': 'टेक्स्ट कॉपी करें',
+     'ocr': 'क्षेत्र का अनुवाद करें',
+     'fullscreen': 'स्क्रीन का अनुवाद करें',
+     'selection': 'चयन का अनुवाद करें',
+     'replace': 'अनुवाद से बदलें',
+     'toggle': 'विंडो दिखाएँ या छिपाएँ',
+     'game': 'गतिशील अनुवाद',
+     'recognition': 'टेक्स्ट पहचान'},
+    'id': {'copy': 'Salin teks',
+     'ocr': 'Terjemahkan area',
+     'fullscreen': 'Terjemahkan layar',
+     'selection': 'Terjemahkan pilihan',
+     'replace': 'Ganti dengan terjemahan',
+     'toggle': 'Tampilkan atau sembunyikan jendela',
+     'game': 'Terjemahan dinamis',
+     'recognition': 'Pengenalan teks'},
 }
 
 
@@ -11764,6 +13217,9 @@ class DarkThemeApp(QMainWindow):
             " min-height:28px; min-width:142px; }"
         )
         self.setStyleSheet(style_sheet)
+        picker = getattr(self, '_interface_language_picker', None)
+        if picker is not None:
+            picker.set_theme(is_dark)
         controller = getattr(self, '_ui_scale_controller', None)
         if controller is not None:
             controller.apply_theme(style_sheet, theme['background'])
@@ -12050,8 +13506,14 @@ class DarkThemeApp(QMainWindow):
         option = get_interface_language_option(self.current_interface_language)
         self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
         self.flag_button.setIconSize(QSize(20, 20))
-        self.flag_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "choose_interface_language")))
-        self.flag_button.setAccessibleName(ui_text(self.current_interface_language, "choose_interface_language"))
+        from interface_language_picker import PICKER_TEXT
+        expanded = getattr(self, '_interface_language_picker', None) is not None
+        self.flag_button.setCheckable(True)
+        self.flag_button.setChecked(expanded)
+        label = (PICKER_TEXT[self.current_interface_language][3] if expanded
+                 else ui_text(self.current_interface_language, "choose_interface_language"))
+        self.flag_button.setToolTip(tooltip_text(label))
+        self.flag_button.setAccessibleName(label)
 
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
@@ -12099,38 +13561,56 @@ class DarkThemeApp(QMainWindow):
             QTimer.singleShot(0, self._show_guide_step)
 
     def show_interface_language_menu(self):
-        menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #11151d;
-                color: #ffffff;
-                border: 1px solid #54617a;
-                border-radius: 8px;
-                padding: 6px;
-            }
-            QMenu::item {
-                padding: 7px 20px 7px 10px;
-                border-radius: 6px;
-            }
-            QMenu::item:selected {
-                background-color: #314968;
-            }
-            QMenu::indicator {
-                width: 0px;
-            }
-        """)
-        for option in INTERFACE_LANGUAGE_OPTIONS:
-            selected = option["code"] == self.current_interface_language
-            action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
-            action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_interface_language(code))
-        menu.ensurePolished()
-        position = widget_popup_geometry(self.flag_button, menu.sizeHint()).topLeft()
-        prepare_native_popup(menu, position)
-        menu.exec_(position)
-        menu.deleteLater()
-        self._complete_guide_step("language")
+        if getattr(self, '_interface_language_picker', None) is not None:
+            self._close_interface_language_picker()
+            return
+        from interface_language_picker import InterfaceLanguagePicker
+        original = self.settings_window if self.settings_window is not None else self.main_text_section
+        host = QWidget(original.parentWidget())
+        host.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        layout = QVBoxLayout(host)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        picker = InterfaceLanguagePicker(INTERFACE_LANGUAGE_OPTIONS, self.current_interface_language,
+                                         resource_path, host, dark=self.current_theme != 'Светлая')
+        layout.addWidget(picker, 1)
+        if self.settings_window is not None:
+            # Keep the current settings tab intact beneath this temporary view.
+            picker.setFixedHeight(max(140, self.main_text_section.height()))
+            layout.addStretch(1)
+        item = self.main_layout.replaceWidget(original, host)
+        del item
+        original.hide()
+        self._interface_language_picker = picker
+        self._interface_language_view = (original, host, QApplication.focusWidget())
+        self.update_interface_language_button()
+        picker.languageSelected.connect(self.set_interface_language)
+        picker.dismissed.connect(self._close_interface_language_picker)
+        host.show()
+        picker.setFocus(Qt.OtherFocusReason)
+
+    def _close_interface_language_picker(self, restore_focus=True):
+        if getattr(self, '_interface_language_picker', None) is None:
+            return
+        original, host, focus = self._interface_language_view
+        self._interface_language_picker = None
+        self._interface_language_view = None
+        self.update_interface_language_button()
+        item = self.main_layout.replaceWidget(host, original)
+        del item
+        host.hide()
+        original.show()
+        host.deleteLater()
+        if restore_focus:
+            from PyQt5 import sip
+            target = focus if focus is not None and not sip.isdeleted(focus) else self.flag_button
+            target.setFocus(Qt.OtherFocusReason)
+        self._complete_guide_step('language')
 
     def set_interface_language(self, language_code):
+        close_picker = getattr(self, '_close_interface_language_picker', None)
+        if callable(close_picker):
+            close_picker()
         language_code = normalize_interface_language(language_code)
         if language_code == self.current_interface_language:
             self.refresh_interface_language_ui()
@@ -12144,7 +13624,11 @@ class DarkThemeApp(QMainWindow):
         self.save_config()
         self.refresh_interface_language_ui()
         if self.settings_window is not None:
+            pages = getattr(self.settings_window, 'settings_pages', None)
+            index = pages.currentIndex() if pages is not None else 0
             self.settings_window.update_language()
+            if pages is not None:
+                self.settings_window._set_settings_page(index)
         else:
             self.show_main_screen()
         if self.document_dialog is not None and self.document_dialog.isVisible():
@@ -12624,6 +14108,7 @@ class DarkThemeApp(QMainWindow):
     @_atomic_page_change
     @measure('ui.home')
     def show_main_screen(self):
+        self._close_interface_language_picker(restore_focus=False)
         active_settings = getattr(self, "settings_window", None)
         if active_settings is not None:
             self._cached_settings_window = active_settings
@@ -13234,6 +14719,7 @@ class DarkThemeApp(QMainWindow):
     @_atomic_page_change
     @measure('ui.settings')
     def show_settings(self):
+        self._close_interface_language_picker(restore_focus=False)
         importer = getattr(self, '_image_importer', None)
         if importer is not None:
             importer.cancel()

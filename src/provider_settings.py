@@ -94,6 +94,60 @@ _TEXT = {
   'وتُستبعد من التصدير. قد تفرض الخدمة رسومًا على استخدام API.',
   'المفتاح محفوظ؛ اترك الحقل فارغًا للإبقاء عليه',
   'أدخل مفتاح API للخدمة'),
+
+ 'tr': ('API bağlantıları',
+  'Hizmet:',
+  'API adresi:',
+  'API anahtarı:',
+  'Model:',
+  'Model görüntü kabul eder',
+  'Tek istekte tanı ve çevir',
+  'Kaydet',
+  'Geri',
+  'Anahtarı sil',
+  'Kaydedildi',
+  'Bu oturum için kaydedildi. Sistem anahtar kasası kullanılamıyor; yeniden başlattıktan sonra '
+  'anahtarı tekrar girin.',
+  'Çeviri seçilen hizmeti kullanır. OCR için aynı hizmeti OCR listesinden seçin. Tek istek modu '
+  'görüntüyü bu modelle çevirir ve ayrı çevirmeni atlar. Anahtarlar sistem kasasında tutulur, dışa '
+  'aktarılmaz. API kullanımını hizmet ücretlendirebilir.',
+  'Anahtar kayıtlı; korumak için boş bırakın',
+  'Hizmetin API anahtarını girin'),
+ 'hi': ('API कनेक्शन',
+  'सेवा:',
+  'API पता:',
+  'API कुंजी:',
+  'मॉडल:',
+  'मॉडल इमेज स्वीकारता है',
+  'एक अनुरोध में पहचान और अनुवाद',
+  'सहेजें',
+  'वापस',
+  'कुंजी हटाएँ',
+  'सहेजा गया',
+  'इस सत्र के लिए सहेजा। सिस्टम कुंजी भंडार उपलब्ध नहीं है; दोबारा शुरू करने पर कुंजी फिर डालें।',
+  'अनुवाद चुनी सेवा से होता है। OCR के लिए इसी सेवा को OCR सूची में चुनें। एक-अनुरोध मोड इसी मॉडल '
+  'से इमेज का अनुवाद करता है और अलग अनुवादक छोड़ता है। कुंजियाँ सिस्टम भंडार में रहती हैं, निर्यात '
+  'में नहीं जातीं। सेवा API उपयोग का शुल्क ले सकती है।',
+  'कुंजी सहेजी है; रखने के लिए खाली छोड़ें',
+  'सेवा की API कुंजी डालें'),
+ 'id': ('Koneksi API',
+  'Layanan:',
+  'Alamat API:',
+  'Kunci API:',
+  'Model:',
+  'Model menerima gambar',
+  'Kenali dan terjemahkan dalam satu permintaan',
+  'Simpan',
+  'Kembali',
+  'Hapus kunci',
+  'Disimpan',
+  'Disimpan untuk sesi ini. Brankas kunci sistem tidak tersedia; masukkan kunci lagi setelah '
+  'memulai ulang.',
+  'Terjemahan memakai layanan pilihan. Untuk OCR, pilih layanan ini di daftar OCR. Mode satu '
+  'permintaan menerjemahkan gambar dengan model ini tanpa penerjemah terpisah. Kunci disimpan di '
+  'brankas sistem dan tidak diekspor. Layanan dapat mengenakan biaya API.',
+  'Kunci tersimpan; kosongkan untuk mempertahankan',
+  'Masukkan kunci API layanan'),
 }
 
 
@@ -130,6 +184,10 @@ def refresh_provider_routing(settings):
          'il testo semplice.'),
 
         'ar': 'الصور: {provider} · {model}. طلب واحد؛ يُستخدم المترجم المنفصل للنص العادي فقط.',
+
+        'tr': 'Görüntüler: {provider} · {model}. Tek istek; ayrı çevirmen yalnızca düz metin için kullanılır.',
+        'hi': 'इमेज: {provider} · {model}। एक अनुरोध; अलग अनुवादक सिर्फ़ साधारण टेक्स्ट के लिए है।',
+        'id': 'Gambar: {provider} · {model}. Satu permintaan; penerjemah terpisah hanya untuk teks biasa.',
     }
     description = text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else ''
     captions = {
@@ -141,6 +199,10 @@ def refresh_provider_routing(settings):
         'it': ("Un'API: ", 'API immagine: '),
 
         'ar': ('API واحد: ', 'API للصور: '),
+
+        'tr': ('Tek API: ', "Görüntü API'si: "),
+        'hi': ('एक API: ', 'इमेज API: '),
+        'id': ('Satu API: ', 'API gambar: '),
     }
     import html
     note.setText(captions.get(lang,captions['en'])[0 if shared else 1] +
@@ -193,6 +255,37 @@ EXTRA = {
   'تم اختيارها للترجمة.',
   'تم اختيارها للترجمة والتعرف على النص.',
   'أدخل معرّف النموذج في حقل النموذج.',
+  'API'),
+
+ 'tr': ('Kullanım:',
+  'Yalnızca metin çevirisi',
+  'Metin tanıma (OCR)',
+  'Tanıma ve çeviri',
+  'Kaydet ve seç',
+  'Hizmeti ayarlayıp çeviri ve OCR için seçin.',
+  'Çeviri için seçildi.',
+  'Çeviri ve OCR için seçildi.',
+  'Model alanına model kimliğini girin.',
+  'API'),
+ 'hi': ('उपयोग:',
+  'सिर्फ़ टेक्स्ट अनुवाद',
+  'टेक्स्ट पहचान (OCR)',
+  'पहचान और अनुवाद',
+  'सहेजें और चुनें',
+  'सेवा सेट करके अनुवाद और OCR के लिए चुनें।',
+  'अनुवाद के लिए चुना गया।',
+  'अनुवाद और OCR के लिए चुना गया।',
+  'मॉडल बॉक्स में मॉडल ID डालें।',
+  'API'),
+ 'id': ('Gunakan untuk:',
+  'Terjemahan teks saja',
+  'Pengenalan teks (OCR)',
+  'Pengenalan dan terjemahan',
+  'Simpan dan pilih',
+  'Atur layanan, lalu pilih untuk terjemahan dan OCR.',
+  'Dipilih untuk terjemahan.',
+  'Dipilih untuk terjemahan dan OCR.',
+  'Masukkan ID model di kolom Model.',
   'API'),
 }
 
@@ -257,6 +350,10 @@ class ProviderSettingsPage(QWidget):
             'fr': 'ID du modèle', 'zh': '模型 ID', 'pt': 'ID do modelo', 'it': 'ID del modello',
 
             'ar': 'معرّف النموذج',
+
+            'tr': 'Model kimliği',
+            'hi': 'मॉडल ID',
+            'id': 'ID model',
         }
         self.model.setPlaceholderText(model_placeholder.get(self.lang,model_placeholder['en']))
         self.labels = []

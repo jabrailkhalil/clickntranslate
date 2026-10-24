@@ -409,6 +409,9 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             "pt": "atalho",
             "it": "scorciatoia",
             "ar": "اختصار",
+            "tr": "kısayol",
+            "hi": "शॉर्टकट",
+            "id": "pintasan",
         }
         self.assertEqual(set(clues), set(main.GUIDE_TEXT))
         for language_code, clue in clues.items():

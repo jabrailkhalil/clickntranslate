@@ -31,6 +31,28 @@ TEXT = {
      'وضع التحديد',
      'حدد نصًا في تطبيق آخر. ابدأ الترجمة بالاختصار، أو بزر بجوار التحديد، أو تلقائيًا. يُستخدم '
      'المترجم المختار ولغتا وضع التحديد.'),
+
+    'tr': ('Seçimden sonra:',
+     'Kısayolu kullan',
+     'Çeviri düğmesini göster',
+     'Hemen çevir',
+     'Seçim modu',
+     'Başka uygulamada metin seçin. Kısayolla, yanındaki düğmeyle veya otomatik çevirin. Seçili '
+     'çevirmen ve Seçim dillerini kullanır.'),
+    'hi': ('चयन के बाद:',
+     'शॉर्टकट इस्तेमाल करें',
+     'अनुवाद बटन दिखाएँ',
+     'तुरंत अनुवाद करें',
+     'चयन मोड',
+     'दूसरे ऐप में टेक्स्ट चुनें। शॉर्टकट, चयन के पास बटन या अपने आप अनुवाद शुरू करें। चुना अनुवादक और '
+     'चयन की भाषाएँ उपयोग होती हैं।'),
+    'id': ('Setelah memilih:',
+     'Gunakan pintasan',
+     'Tampilkan tombol terjemahkan',
+     'Terjemahkan langsung',
+     'Mode pilihan',
+     'Pilih teks di aplikasi lain. Mulai dengan pintasan, tombol di dekat pilihan, atau otomatis. '
+     'Memakai penerjemah dan bahasa Pilihan yang dipilih.'),
 }
 
 

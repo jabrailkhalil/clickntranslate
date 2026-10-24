@@ -246,6 +246,10 @@ class SelectionQuickTranslateController(QtCore.QObject):
                 'it': "Abilita l'accessibilità per la traduzione rapida della selezione",
 
                 'ar': 'فعّل تسهيلات الاستخدام للترجمة السريعة للنص المحدد',
+
+                'tr': 'Hızlı seçim çevirisi için Erişilebilirliği açın',
+                'hi': 'त्वरित चयन अनुवाद के लिए सुलभता चालू करें',
+                'id': 'Aktifkan Aksesibilitas untuk terjemahan pilihan cepat',
             }
         }
         localized = messages.get(message_key, {})
