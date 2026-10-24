@@ -1,124 +1,70 @@
-# Product Hunt launch copy
+# Product Hunt launch draft
 
-This is a draft only. Product Hunt submission should point to a dedicated live
-product page once it exists, not to this file.
+Updated **25 October 2026**. Unsubmitted copy; confirm the current listing and
+account eligibility before posting. The live product is **1.8.2**. A further
+update is planned in about two weeks; choose the launch date after it is ready.
+Recheck current requirements in `platform-rules.md`.
 
-## Name
+## Listing fields
 
-Click'n'Translate
+**Name:** Click’n’Translate
 
-## Tagline
+**Tagline:** Screen translation for desktop and Android
 
-Translate any text on your screen with one hotkey
+**Description:** Free, open-source screen OCR and translation for Windows, macOS,
+Linux and Android. Translate game and app text, capture regions, read images,
+and choose online services or supported offline models.
 
-## Description (under 260 characters)
+**Product URL:** https://translate.clickn.dev/
 
-Free, open-source screen OCR and translation for Windows and Linux. Capture any
-area, translate selected text or documents, replace text in place, or keep
-multiple screen regions translated using online or offline engines.
+**Source:** https://github.com/jabrailkhalil/clickntranslate
 
-## Topics
+Suggested topics, if available: Productivity, Open Source, Languages.
+Select no more than three, using the current form’s categories.
 
-Suggested, subject to Product Hunt's available categories:
+## Maker-comment draft
 
-- Productivity
-- Open Source
-- Languages
-- Accessibility
-- Windows
-- Linux
+Hi Product Hunt — I’m Dzhabrail, the developer of Click’n’Translate.
 
-## Primary URL
+I built it for text that is visible but cannot easily be selected or understood:
+game dialogue, pictures, videos and application interfaces. On desktop, a shortcut
+or the companion opens the action you need: copy text, translate a region or the
+full screen, translate a selection, replace it, or follow changing regions.
+A document workspace keeps original and translation side by side.
 
-Preferred: the dedicated product landing page.
+Android has its own workflow: a floating screen button, region capture, text and
+photo translation, sharing and local text history. It runs on the phone without
+requiring the desktop app.
 
-Fallback: https://github.com/jabrailkhalil/clickntranslate
+The project is free and GPL-3.0. Local engines and downloaded offline models
+process on the device. Online services receive the requested text; a cloud OCR
+or image-capable API can receive the selected image when enabled. Service fees,
+models and supported languages depend on the provider.
 
-## First maker comment
+I would appreciate feedback on first launch, difficult OCR samples and which
+screen-translation workflow you actually use. Please include the platform and
+engine when reporting an issue. Thank you for trying it.
 
-Hi Product Hunt — I am Dzhabrail, the developer of Click'n'Translate.
+## Media and preparation
 
-I built it after getting tired of a very small but constant interruption: text
-was right in front of me, but I could not select or understand it without taking
-a screenshot and moving through several tools.
+Use real workflow recordings from `gifs/` and current desktop/Android screenshots
+from `../images/`. Some GIFs show older desktop windows; label them as workflow
+demonstrations. Do not use unused generated gallery/video mockups. Recheck current
+file-size, format and gallery requirements before upload.
 
-Click'n'Translate turns that into a hotkey. It can copy text from any screen
-area with OCR, translate a selected area or the full screen, translate or replace
-highlighted text, follow several changing regions, and open documents in a
-side-by-side workspace.
+Finalize the feature list against the actual public release, make downloads
+immediately available, attach the developer’s own profile and reserve time to
+answer. Do not solicit coordinated votes or post from another person’s account.
+GitHub actions use only `jabrailkhalil`.
 
-I did not want to force one engine on everyone. Users can choose between Windows
-OCR, Tesseract, RapidOCR, and EasyOCR. They can use convenient online
-translation, or install Argos Translate/Hy-MT packages for local translation.
-The privacy boundary is visible: online providers receive the text you ask them
-to translate; local engines keep it on the computer.
+## Short answers
 
-The project is GPL-3.0, has no account, ads, developer analytics, or paid tier,
-and has passed 1,000 downloads. I intend to keep it free.
+**Offline?** Desktop supports Argos Translate/Hy-MT; Android offers supported
+ML Kit models. Download necessary models first. Online services need a connection.
 
-Version 1.7.0 is the point where the app became a coherent set of workflows
-rather than a collection of OCR buttons: modes now stop each other cleanly,
-language pairs persist per mode, Dynamic translation supports several selected
-areas, settings can be transferred safely, and bug reports exclude user text.
+**Mac/Windows warnings?** Packages use the self-signed `jabrailkhalil` identity.
+The Mac app has no Apple Developer ID/notarization; Windows signing is not publicly
+trusted CA signing. Follow the setup guide and investigate antivirus detections.
 
-I would love feedback on two things:
-
-1. Which workflow is immediately clear from the page, and which still needs an
-   explanation?
-2. Which languages, fonts, games, or desktop environments should I test next?
-
-Thank you for taking a look. I will be here throughout the launch to answer
-questions and investigate reproducible problems.
-
-## Real GIF gallery order
-
-1. `gifs/01-game-translation.gif` — **Translate game text without leaving the game.**
-2. `gifs/02-area-ocr.gif` — **Copy text from any screen area with OCR.**
-3. `gifs/03-selected-text.gif` — **Translate selected text in any application.**
-4. `gifs/04-fullscreen-translation.gif` — **Translate the full screen with one hotkey.**
-5. `gifs/05-in-app-update.gif` — **Download and install updates inside the app.**
-
-These are real recordings already used by the project. Do not substitute the
-generated gallery cards or the synthetic video draft. Product Hunt currently
-documents a 3 MB limit for animated thumbnails; all five files fit that limit.
-The form requires at least two gallery items before the gallery becomes visible.
-
-## Launch-day replies
-
-**Does it work offline?**
-
-Yes, after installing the OCR data and an Argos Translate or Hy-MT package for
-the language direction you need. Online providers remain available when speed
-and convenience matter more.
-
-**What data leaves the computer?**
-
-OCR is local. With Argos/Hy-MT, translation is local too. If you select Google,
-MyMemory, Lingva, or LibreTranslate, the requested text is sent to that provider.
-Optional histories stay on the computer.
-
-**Why so many OCR engines?**
-
-Screen text varies enormously by script, font, scaling, background, and image
-quality. The fastest or most accurate choice for one screen can be poor for
-another, so the app lets users install only what they need.
-
-**Why does an antivirus sometimes warn?**
-
-The app uses global hotkeys, screen capture, clipboard integration, autostart,
-and update behavior, and the Windows build is currently unsigned. Those factors
-can trigger generic heuristic detections. Source and hashes are public, and
-samples are submitted to vendors; new detections are still investigated rather
-than automatically dismissed.
-
-## Final checklist
-
-- Personal Product Hunt account is eligible to post.
-- Dedicated product URL is live and downloads work without signup.
-- Tagline and description fit the current form limits.
-- Five real application GIFs reviewed and ordered.
-- No generated screenshots, mock UI, or synthetic video attached.
-- Maker profile is attached.
-- First comment is final and personal.
-- Privacy and antivirus answers match the repository.
-- No request for upvotes; invite honest feedback instead.
+**Next update?** Planned in about two weeks as of 25 October. It is not released;
+this draft does not promise a version, exact date or unverified feature.

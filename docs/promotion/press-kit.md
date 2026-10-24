@@ -1,119 +1,86 @@
 # Press kit copy
 
+Updated **25 October 2026**. Current published release: **1.8.2**. The next update
+is planned in about two weeks; announcement copy must distinguish that plan from
+features already available.
+
 ## Product facts
 
 | Field | Value |
 | --- | --- |
-| Name | Click'n'Translate |
+| Name | Click’n’Translate |
 | Developer | Dzhabrail Khalilov / Jabrail Digital |
-| Category | Screen OCR and translation desktop utility |
-| Platforms | Windows 10/11 x64; Linux x86_64 releases |
-| License | GPL-3.0-only |
-| Price | Free |
-| Account | Not required |
-| Current promoted version | 1.7.0 |
+| Category | Screen OCR and translation |
+| Windows | Windows 10/11 x64; EXE installer and portable ZIP |
+| macOS | macOS 13.4+; Apple Silicon and Intel DMGs |
+| Linux | x86_64 AppImage and portable tar.gz |
+| Android | Android 8.0+ ARM64 APK |
+| License / price | GPL-3.0-only / free |
+| Account | No required Click’n’Translate account |
+| Product website | https://translate.clickn.dev/ |
+| Author’s projects | https://clickn.dev/ |
 | Source | https://github.com/jabrailkhalil/clickntranslate |
 | Downloads | https://github.com/jabrailkhalil/clickntranslate/releases/latest |
 | Contact | jabrailkhalil@gmail.com / https://t.me/jabrail_digital |
 
-## Boilerplate — English
+## English boilerplate
 
-### 25 words
+### Short
 
-Click'n'Translate is a free open-source desktop app for extracting and
-translating text from screen regions, selections, and documents using online or
-offline engines.
+Click’n’Translate is a free, open-source screen translator and OCR app for Windows,
+macOS, Linux and Android, with online services and optional offline models.
 
-### 60 words
+### Extended
 
-Click'n'Translate turns any part of a Windows or Linux screen into usable text.
-Global hotkeys copy OCR results, translate areas or the full screen, translate
-or replace selected text, and monitor several changing regions. Users can choose
-between four local OCR engines and online or optional offline translation. The
-GPL-3.0 project requires no account and contains no ads.
+Click’n’Translate turns visible text into something you can read or copy. The desktop
+app translates a screen region, the full screen or selected text, replaces a selection,
+follows changing regions and opens common documents side by side. Android provides
+screen translation through a floating button, text and photo translation, Share actions
+and local text history. Users choose local engines, online services or their own API
+connections. Supported offline models are downloaded separately. Recognition and
+translation accuracy depend on the engine, language, font and source image.
 
-### 120 words
+## Описание на русском
 
-Click'n'Translate is a free, open-source screen OCR and translation application
-for Windows and Linux. It helps with text embedded in games, videos, images,
-remote desktops, applications, and documents. Users can copy a selected screen
-area, translate an area or the entire screen, translate highlighted text,
-replace a selection with its translation, or keep several chosen regions
-translated as their contents change. The app supports Windows OCR, Tesseract,
-RapidOCR, and EasyOCR, plus online providers and optional local translation via
-Argos Translate or Hy-MT. It requires no account, includes no advertising or
-developer-operated analytics, and keeps histories local and optional. Source,
-release builds, checksums, documentation, and issue tracking are public on
-GitHub under GPL-3.0.
-
-## Описание — русский
-
-### 25 слов
-
-Click'n'Translate — бесплатная программа с открытым кодом для распознавания и
-перевода текста с экрана, из выделения и документов через онлайн- или офлайн-
-движки.
-
-### 60 слов
-
-Click'n'Translate превращает любую область экрана Windows или Linux в доступный
-для работы текст. Горячие клавиши копируют OCR-результат, переводят область или
-весь экран, переводят и заменяют выделение, следят за несколькими меняющимися
-областями. Пользователь выбирает один из четырёх локальных OCR и онлайн- либо
-офлайн-перевод. Проект открыт по GPL-3.0, бесплатен и не требует аккаунта.
-
-## Founder quote
-
-**English**
-
-> I built Click'n'Translate to remove a tiny interruption that happens all day:
-> seeing useful text but being unable to select or understand it. The project is
-> now serious, open, and actively maintained, and I intend to keep it free.
-
-**Russian**
-
-> Я сделал Click'n'Translate, чтобы убрать маленькое, но постоянное препятствие:
-> текст уже перед глазами, а выделить или понять его нельзя. Теперь я всерьёз
-> занимаюсь проектом, развиваю его открыто и намерен сохранять бесплатным.
+Click’n’Translate — бесплатный переводчик экрана с открытым кодом для Windows,
+macOS, Linux и Android. На компьютере он переводит области экрана, выделенный
+текст и документы, заменяет выделение переводом и следит за меняющимся текстом.
+На Android есть плавающая кнопка поверх приложений, перевод текста и фотографий,
+меню «Поделиться» и локальная история. Доступны онлайн-сервисы, офлайн-модели и
+подключения со своими API-ключами. Набор языков зависит от выбранного движка.
 
 ## Feature bullets
 
-- Area OCR and clipboard extraction.
-- Area and full-screen translation.
-- Selected-text translation and in-place replacement.
-- Dynamic translation for multiple chosen regions.
-- Side-by-side document translation.
-- Configurable global hotkeys and per-mode language pairs.
-- Windows OCR, Tesseract, RapidOCR, and EasyOCR.
-- Online and optional offline translation.
-- Windows installer/portable and Linux AppImage/TAR.
-- Safe diagnostic reports and public source.
+- Desktop area OCR, full-screen overlays and copy-to-clipboard.
+- Desktop selected-text translation and replacement.
+- Desktop Dynamic translation of multiple chosen regions.
+- Desktop side-by-side TXT, Markdown, DOCX, text-based PDF, HTML and RTF workspaces.
+- Optional desktop companion, customizable shortcuts, themes and per-mode language pairs.
+- Android floating screen translation, text, photos, sharing and local text history.
+- Eight desktop UI languages and six Android UI languages.
+- 63 named desktop translation languages, subject to engine/model availability.
+- Native Windows OCR/Apple Vision, Tesseract, RapidOCR and optional EasyOCR on desktop.
+- Online services, optional offline models and user-configured API providers.
 
-## Approved visual assets
+## Media
 
-1. Square transparent application logo.
-2. `gifs/01-game-translation.gif`.
-3. `gifs/02-area-ocr.gif`.
-4. `gifs/03-selected-text.gif`.
-5. `gifs/04-fullscreen-translation.gif`.
-6. `gifs/05-in-app-update.gif`.
+Use current repository screenshots and real recordings. The desktop GIFs under
+`gifs/` demonstrate their stated workflows; some show an older window design.
+Current desktop and Android 1.8.2 screenshots are under `../images/`.
+Keep phone screenshots separate from desktop hotkey demos. The unused generated
+`gallery/` and `video/` drafts are not approved publication assets.
 
-The GIFs are real application recordings. Generated product mockups, synthetic
-screens, and the generated video draft are not approved for publication. If a
-platform requires a still, export it from one of these recordings after
-checking that the frame contains no personal desktop data.
+## Processing answer
 
-## Standard disclosure about processing
+Local OCR and installed offline models process on the device. Online services
+receive the requested text; a selected cloud OCR or image-capable API also receives
+the image. Desktop histories are optional and local; Android text history is local
+and can be cleared. See [desktop policy](../../PRIVACY.md), [Android guide](../ANDROID.md)
+and the separate [website policy](https://clickn.dev/en/privacy/).
 
-OCR is performed locally. Argos Translate and Hy-MT perform local translation
-after their models are installed. Google, MyMemory, Lingva, and LibreTranslate
-receive the text requested for translation when selected. Histories are local
-and optional.
+## First-launch answer
 
-## Standard disclosure about antivirus heuristics
-
-The unsigned Windows build combines global hotkeys, screen capture, clipboard
-integration, optional autostart, and update behavior. These legitimate functions
-can resemble patterns monitored by heuristic antivirus engines. Source and
-release hashes are public, false-positive samples are submitted to vendors, and
-new detections are investigated rather than dismissed automatically.
+Windows and macOS packages use the self-signed `jabrailkhalil` identity. They are
+not signed by a publicly trusted Windows CA or Apple Developer ID; the Mac app is
+not notarized. Follow the [official setup guide](../guides/setup.en.md). Investigate
+antivirus detections rather than treating them as automatically false positives.

@@ -1,94 +1,62 @@
 # Show HN draft
 
-## Submission title
+Updated **25 October 2026** for published **1.8.2**. This file is not a submission.
+Check for an existing story and the current Show HN guidelines. The next update
+is planned in about two weeks; present something people can actually try.
 
-Show HN: Click'n'Translate – open-source screen OCR and translation by hotkey
+## Title
+
+Show HN: Click’n’Translate — open-source screen OCR for desktop and Android
 
 ## Link
 
-Preferred: a dedicated page with an immediate download and source-code link.
+https://translate.clickn.dev/
 
-Fallback: https://github.com/jabrailkhalil/clickntranslate
+Source: https://github.com/jabrailkhalil/clickntranslate
 
-## First comment
+## First-comment draft
 
-Hi HN, I built Click'n'Translate, a GPL-3.0 desktop app for text that is visible
-but difficult to copy or understand: games, videos, images, remote desktops, and
-older interfaces.
+Hi HN, I built Click’n’Translate, a GPL-3.0 screen OCR and translation app for
+Windows, macOS, Linux and Android.
 
-The shortest workflow is: press a global hotkey, draw a region, and either copy
-the OCR result or translate it. The same app can translate the full screen,
-translate or replace selected text in another application, monitor several
-changing regions, and open documents side by side.
+On desktop, the shortest flow is a shortcut, a selected region, and either
+recognized text or a translation. The app also handles selected-text replacement,
+full-screen overlays, changing regions and common documents. Android uses a
+floating button over other apps and supports text, photos, sharing and local history.
 
-The part I underestimated was state rather than OCR. Screen selection, overlays,
-clipboard restoration, asynchronous OCR, translation, and persistent per-mode
-language pairs can all outlive the action that created them. I ended up adding a
-small UI-independent coordinator: only one interactive screen mode owns the
-desktop at a time, the same hotkey toggles that mode off, and a different hotkey
-stops the old owner before starting the new one. Worker results also carry a
-session identity so stale responses can be ignored.
+The desktop architecture separates capture, OCR workers, translation and overlay
+ownership. Mode/session identities prevent late worker results from updating a
+new interaction. Native Windows OCR and Apple Vision are available on their
+platforms, alongside Tesseract, RapidOCR and optional EasyOCR. Desktop offline
+translation uses Argos Translate/Hy-MT; Android has supported ML Kit models.
 
-The OCR layer is deliberately replaceable: Windows OCR, Tesseract, RapidOCR,
-and EasyOCR are supported. Translation can use an online provider or optional
-local Argos Translate/Hy-MT packages. I keep the distinction explicit: OCR is
-local; local translation stays on the machine; an online provider receives the
-text the user asks it to translate.
+Local engines process on the device; online translation sends text to the selected
+provider, while an enabled cloud OCR or image API can send the selected image.
+There is no required Click’n’Translate account. Model availability and capture
+restrictions differ by platform.
 
-The project has Windows and Linux downloads, no signup, and more than 700
-automated checks in the current repository. I am especially looking for feedback
-on the desktop architecture, difficult OCR inputs, Linux packaging, and the
-trade-off between a small base download and optional engine packages.
+I would value reproducible OCR samples and feedback on first launch, packaging,
+accessibility and Linux integration. Dated validation reports are in the repository;
+one platform check does not establish support for every environment.
 
-Source and downloads:
-https://github.com/jabrailkhalil/clickntranslate
+## Technical replies
 
-One known rough edge: Windows binaries are not code-signed yet, and generic
-heuristic antivirus warnings can occur because the app combines global hotkeys,
-screen capture, clipboard access, optional autostart, and updating. Hashes and
-source are public, and reports are investigated and submitted to vendors.
+**Why several engines?** Script, font, scaling, contrast and layout affect the
+result. Optional models and packages let users choose the trade-offs.
 
-## Likely technical questions
+**Why an app?** The text may be inside a native app, game, video or remote desktop.
+Desktop capture/shortcuts and Android’s consent-based floating workflow reach
+those contexts. Protected content can still block capture.
 
-**Why not use one OCR engine?**
+**Offline?** Install supported models first. Online providers need internet and
+receive the data required by the configured service.
 
-Because the input is uncontrolled. Script, font, antialiasing, scaling,
-background, and compression can change the best choice. Windows OCR is convenient
-and light, Tesseract has broad language data, and the neural engines cover other
-cases at the cost of heavier dependencies.
-
-**Why a desktop app instead of a browser extension?**
-
-The target text may be in any native application, game, video, or remote desktop.
-A system-wide capture/hotkey workflow is the common layer. It also makes local
-OCR and local translation packages possible without sending screenshots to a
-web service.
-
-**Why not continuously OCR the entire screen?**
-
-I tried the broad idea and found it visually unstable: unrelated labels compete,
-bounding boxes jump, and overlays can contaminate the next capture. The current
-Dynamic mode asks users to select one or several meaningful regions, skips
-unchanged frames, and updates only those overlays.
-
-**How do you prevent an old worker from overwriting a new mode?**
-
-Interactive modes have a single owner, and OCR work is associated with a session.
-When a mode ends or another starts, late results no longer match the current
-session and are discarded.
-
-**What is sent over the network?**
-
-Online translation sends the requested recognized/selected text to the chosen
-provider. OCR itself is local. Argos Translate and Hy-MT are local after the
-required model is installed. Update checks and requested package downloads also
-use the network.
+**Signatures?** Windows and macOS use the existing self-signed `jabrailkhalil`
+identity. The Mac app is not Apple-notarized. Setup guides explain first launch;
+source and checksums do not make antivirus detections automatically false positives.
 
 ## Posting notes
 
-- Submit the mature project, not “version 1.7.0 is released.”
-- Keep the repo/download immediately usable without registration.
-- Be available to answer questions for the next several hours.
-- Do not ask anyone to upvote or seed comments.
-- If a dedicated landing page contains only marketing, link directly to GitHub
-  instead; Show HN is for something people can try.
+Disclose the developer relationship, follow current Show HN rules and remain
+available to answer. Do not ask friends to vote or seed comments. The upcoming
+update is a plan, not an available download or fixed launch date.
