@@ -223,6 +223,29 @@ GAME_TEXT = {
      'translation_error': 'Traduzione fallita; la modalità riproverà',
      'wayland_error': "L'acquisizione continua non è disponibile tramite il portale screenshot di "
                       'Wayland. Utilizza una sessione X11.'},
+
+    'ar': {'title': 'الترجمة المستمرة',
+     'select': 'حدد منطقة أو أكثر لاستبدال النص فيها',
+     'select_hint': 'اسحب للنقل · × للحذف · Enter للبدء',
+     'start': 'ابدأ',
+     'stop': 'إيقاف',
+     'undo': 'تراجع',
+     'undo_hint': 'حذف آخر منطقة محددة',
+     'cancel_selection': 'إلغاء تحديد المناطق',
+     'selected_count': 'المناطق المحددة: {count}',
+     'waiting': 'بانتظار نص جديد…',
+     'scanning': 'جارٍ قراءة المنطقة المحددة…',
+     'translating': 'جارٍ الترجمة…',
+     'paused': 'متوقفة مؤقتًا لأن التطبيق المستهدف غير نشط',
+     'no_text': 'لم يظهر نص مقروء بعد',
+     'pause': 'إيقاف مؤقت',
+     'resume': 'استئناف',
+     'reselect': 'تحديد منطقة أخرى',
+     'close': 'إيقاف الترجمة المستمرة',
+     'capture_error': 'تعذر التقاط المنطقة المحددة',
+     'ocr_error': 'التعرف على النص غير متاح لهذا الوضع',
+     'translation_error': 'فشلت الترجمة؛ ستتم إعادة المحاولة',
+     'wayland_error': 'الالتقاط المستمر غير متاح عبر بوابة لقطات الشاشة في Wayland. استخدم جلسة X11.'},
 }
 
 

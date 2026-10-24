@@ -28,7 +28,7 @@ def window():
         app.processEvents()
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh', 'pt', 'it'])
+@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar'])
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 def test_translation_controls_fit_all_languages_and_scales(window, language, theme):
     if window.current_theme != theme:
@@ -140,7 +140,7 @@ def test_unavailable_update_stays_in_app_without_a_release_download_link(window,
         assert 'GitHub' not in panel.label.text()
 
 
-@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it'])
+@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it','ar'])
 def test_api_editor_lives_in_packages_and_fits(window, language):
     from provider_settings import show_provider_settings
     from api_providers import PROVIDERS

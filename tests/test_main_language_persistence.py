@@ -408,6 +408,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             "zh": "快捷键",
             "pt": "atalho",
             "it": "scorciatoia",
+            "ar": "اختصار",
         }
         self.assertEqual(set(clues), set(main.GUIDE_TEXT))
         for language_code, clue in clues.items():

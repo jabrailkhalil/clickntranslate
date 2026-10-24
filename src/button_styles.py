@@ -10,13 +10,16 @@ BUTTON_FONT_SIZE = 13
 
 def paint_down_arrow(painter, rect, font, color, factor=1.0):
     """The stepper's light › glyph, turned down and optically centered."""
-    from PyQt5.QtCore import QPointF
+    from PyQt5.QtCore import QPointF, Qt
     from PyQt5.QtGui import QFont, QFontMetricsF
     font = QFont(font)
     font.setPixelSize(max(1, round(15 * factor)))
     font.setWeight(QFont.Normal)
     bounds = QFontMetricsF(font).tightBoundingRect('›')
     painter.save()
+    # These are directional icons, not RTL text. Bidi mirroring would turn
+    # the down arrow upwards when the Arabic interface is selected.
+    painter.setLayoutDirection(Qt.LeftToRight)
     painter.setFont(font)
     painter.setPen(color)
     painter.translate(rect.center())

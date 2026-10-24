@@ -16,6 +16,8 @@ CAPTIONS = {
 
     'pt': ('Tradução e OCR', 'Opções de OCR', 'Tradução rápida'),
     'it': ('Traduzione e OCR', "Opzioni dell'OCR", 'Traduzione veloce'),
+
+    'ar': ('الترجمة والتعرف على النص', 'خيارات التعرف على النص', 'الترجمة السريعة'),
 }
 
 COMPACT = {
@@ -41,6 +43,12 @@ COMPACT = {
      'Traduzione di selezione rapida',
      'Mostra un pulsante',
      'Traduci adesso'),
+
+    'ar': ('استعادة الحافظة',
+     'إغلاق النتيجة بالنقر خارجها',
+     'الترجمة السريعة للنص المحدد',
+     'إظهار زر',
+     'الترجمة الآن'),
 }
 
 
@@ -53,6 +61,10 @@ PARAGRAPH_TEXT = {
     'zh': ('将 OCR 行合并为段落', '翻译屏幕文字前，合并段落内因排版产生的换行。保留可见的段落间距、分栏和列表项。适合书籍和对话；关闭后保留原始行布局。'),
     'pt': ('Unir linhas OCR em parágrafos', 'Antes de traduzir o texto capturado, une as linhas de cada parágrafo. Mantém separados os espaços visíveis entre blocos, as colunas e os itens de listas. Útil para livros e diálogos; desative para manter as linhas originais.'),
     'it': ('Unisci le righe OCR in paragrafi', 'Prima di tradurre il testo acquisito, unisce le righe di ogni paragrafo. Mantiene separati spazi visibili tra blocchi, colonne e voci degli elenchi. Utile per libri e dialoghi; disattiva per mantenere le righe originali.'),
+
+    'ar': ('دمج أسطر OCR في فقرات',
+     'يدمج الأسطر الملتفة داخل الفقرة قبل ترجمة النص الملتقط. تبقى الفواصل المرئية والأعمدة وعناصر '
+     'القوائم منفصلة. مفيد للكتب والحوارات؛ عطّله للحفاظ على توزيع الأسطر الأصلي.'),
 }
 
 

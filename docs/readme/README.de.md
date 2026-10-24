@@ -87,7 +87,7 @@ Eigene Schlüssel für OpenAI, Gemini, Claude, DeepL, LibreTranslate und Custom 
 
 Lokale OCR verarbeitet Bilder auf dem Gerät. Online-Dienste erhalten Text; eine aktivierte Vision-API erhält auch das ausgewählte Bild. Preise und Limits legt der Anbieter fest. [Datenschutz](../../PRIVACY.md).
 
-Acht Oberflächensprachen mit Hinweisen und Anleitung, helle und dunkle Themes, getrennte Skalierung und Ergebnis-Schriftgröße, anpassbare Tastenkürzel, Einstellungsimport/-export und optionale lokale Verläufe.
+Neun Oberflächensprachen, einschließlich Arabisch mit Rechts-nach-links-Layout, mit Hinweisen und Anleitung, helle und dunkle Themes, getrennte Skalierung und Ergebnis-Schriftgröße, anpassbare Tastenkürzel, Einstellungsimport/-export und optionale lokale Verläufe.
 
 Python ist enthalten. Windows und Mac nutzen das selbstsignierte jabrailkhalil-Zertifikat; SmartScreen kann warnen, die Mac-App ist nicht notarisiert. [Erster Start](../guides/setup.de.md). Für passende Mac-Funktionen sind Bildschirmaufnahme und Bedienungshilfen nötig. [Linux](../LINUX.md).
 

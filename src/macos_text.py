@@ -76,6 +76,17 @@ TEXT = {
                "anziché l'app.",
      'vision_note': 'Integrato in macOS. Le lingue sono gestite dal sistema; non è necessario '
                     'scaricare alcun pacchetto.'},
+
+    'ar': {'title': 'إذن macOS',
+     'open': 'فتح الإعدادات',
+     'later': 'لاحقًا',
+     'screen': 'اسمح لتطبيق Click’n’Translate في إعدادات النظام ← الخصوصية والأمان ← تسجيل الشاشة. هذا '
+               'الإذن مطلوب للتعرف على النص الظاهر على الشاشة.',
+     'accessibility': 'اسمح لتطبيق Click’n’Translate في إعدادات النظام ← الخصوصية والأمان ← تسهيلات '
+                      'الاستخدام. هذا الإذن مطلوب لنسخ النص المحدد واستبداله في التطبيقات الأخرى.',
+     'retry': 'ثم أعد المحاولة. أعد تشغيل التطبيق إذا طلب macOS ذلك.',
+     'python': 'عند تشغيل نسخة Python، قد يعرض macOS اسم Python أو Terminal بدلًا من اسم التطبيق.',
+     'vision_note': 'مدمج في macOS. يدير النظام اللغات، ولا يلزم تنزيل حزم.'},
 }
 
 

@@ -24,11 +24,13 @@ def isolated_clipboard(monkeypatch):
         def __init__(self):
             super().__init__()
             self._text = {}
+            self._mime = {}
 
         def text(self, mode=0):
             return self._text.get(mode, '')
 
         def setText(self, value, mode=0):
+            self._mime.pop(mode, None)
             self._text[mode] = str(value)
             self.changed.emit(mode)
             (self.selectionChanged if mode == self.Selection else self.dataChanged).emit()
@@ -40,12 +42,15 @@ def isolated_clipboard(monkeypatch):
             return True
 
         def mimeData(self, mode=0):
+            if mode in self._mime:
+                return self._mime[mode]
             data = QtCore.QMimeData()
             data.setText(self.text(mode))
             return data
 
         def setMimeData(self, data, mode=0):
             self.setText(data.text(), mode)
+            self._mime[mode] = data
 
     clipboard = MemoryClipboard()
     monkeypatch.setattr(pyperclip, 'copy', clipboard.setText)

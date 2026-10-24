@@ -6,7 +6,7 @@ import ocr
 import settings_window
 
 
-SUPPORTED_INTERFACES = ("en", "ru", "es", "de", "fr", "zh")
+SUPPORTED_INTERFACES = ("en", "ru", "es", "de", "fr", "zh", "pt", "it", "ar")
 
 
 def test_every_translation_dictionary_has_the_same_keys_for_all_interfaces():

@@ -115,7 +115,9 @@ Local OCR processes images on your device. Online services receive text; an enab
 
 ## Make it comfortable
 
-The desktop app has eight interface languages, light and dark themes, adjustable interface scale and a separate result-text size. Customize shortcuts and language pairs for each mode; keep optional local histories or export your settings. An optional desktop companion puts translation actions a click away.
+The desktop app has nine interface languages, including Arabic with a right-to-left layout, light and dark themes, adjustable interface scale and a separate result-text size. Customize shortcuts and language pairs for each mode; keep optional local histories or export your settings. An optional desktop companion puts translation actions a click away.
+
+To translate a photo or screenshot on desktop, use the image button, drop an image into the input, or paste it with **Ctrl+V**. Recognition uses your selected OCR engine and source language. Enable **Settings → Translation and OCR → Join OCR lines into paragraphs** to remove visual line wraps before translation while preserving separate paragraphs and columns.
 
 <details>
 <summary>Default desktop shortcuts</summary>

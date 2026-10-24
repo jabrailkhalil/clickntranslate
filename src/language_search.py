@@ -67,6 +67,8 @@ def prepare_language_search(combo):
                                    'fr': 'Rechercher une langue…', 'zh': '搜索语言…',
             'pt': 'Encontre um idioma…',
             'it': 'Trova una lingua...',
+
+            'ar': 'ابحث عن لغة…',
         }.get(lang, 'Find a language…'))
         search.setAccessibleName(search.placeholderText())
         search.setClearButtonEnabled(True)

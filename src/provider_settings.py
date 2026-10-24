@@ -76,6 +76,24 @@ _TEXT = {
      "esportazioni. L'utilizzo dell'API può essere fatturato dal servizio.",
      'Chiave salvata; lascia vuoto per conservarla',
      'Inserisci la chiave API del servizio'),
+
+ 'ar': ('اتصالات API',
+  'الخدمة:',
+  'عنوان API:',
+  'مفتاح API:',
+  'النموذج:',
+  'النموذج يدعم الصور',
+  'التعرف والترجمة في طلب واحد',
+  'حفظ',
+  'رجوع',
+  'حذف المفتاح',
+  'تم الحفظ',
+  'حُفظ لهذه الجلسة فقط. مخزن مفاتيح النظام غير متاح؛ أدخل المفتاح مجددًا بعد إعادة التشغيل.',
+  'تستخدم الترجمة الخدمة المختارة. للتعرف على النص، اختر الخدمة نفسها من قائمة OCR. يترجم وضع الطلب '
+  'الواحد الصورة المحددة بهذا النموذج ويتجاوز المترجم المنفصل. تبقى المفاتيح في مخزن النظام '
+  'وتُستبعد من التصدير. قد تفرض الخدمة رسومًا على استخدام API.',
+  'المفتاح محفوظ؛ اترك الحقل فارغًا للإبقاء عليه',
+  'أدخل مفتاح API للخدمة'),
 }
 
 
@@ -110,6 +128,8 @@ def refresh_provider_routing(settings):
         'pt': 'Imagens: {provider} · {model}. Um pedido; o tradutor separado é usado apenas para texto simples.',
         'it': ('Immagini: {provider} · {model}. Una richiesta; il traduttore separato viene utilizzato solo per '
          'il testo semplice.'),
+
+        'ar': 'الصور: {provider} · {model}. طلب واحد؛ يُستخدم المترجم المنفصل للنص العادي فقط.',
     }
     description = text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else ''
     captions = {
@@ -119,6 +139,8 @@ def refresh_provider_routing(settings):
 
         'pt': ('Uma API: ', 'API de imagem: '),
         'it': ("Un'API: ", 'API immagine: '),
+
+        'ar': ('API واحد: ', 'API للصور: '),
     }
     import html
     note.setText(captions.get(lang,captions['en'])[0 if shared else 1] +
@@ -161,6 +183,17 @@ EXTRA = {
      'Selezionato per traduzione e OCR.',
      'Immettere un ID modello nel campo Modello.',
      'API'),
+
+ 'ar': ('الاستخدام:',
+  'ترجمة النص فقط',
+  'التعرف على النص (OCR)',
+  'التعرف والترجمة',
+  'حفظ واختيار',
+  'اضبط خدمة ثم اخترها للترجمة والتعرف على النص.',
+  'تم اختيارها للترجمة.',
+  'تم اختيارها للترجمة والتعرف على النص.',
+  'أدخل معرّف النموذج في حقل النموذج.',
+  'API'),
 }
 
 
@@ -210,6 +243,9 @@ class ProviderSettingsPage(QWidget):
         for spec in PROVIDERS:
             self.service.addItem(spec.name, spec.key)
         self.address, self.key, self.model = (QLineEdit(content) for _ in range(3))
+        for technical_field in (self.address, self.key, self.model):
+            technical_field.setLayoutDirection(Qt.LeftToRight)
+            technical_field.setAlignment(Qt.AlignLeft)
         self.address.setMaxLength(2048)
         self.model.setMaxLength(200)
         self.key.setMaxLength(8192)
@@ -219,6 +255,8 @@ class ProviderSettingsPage(QWidget):
         model_placeholder = {
             'en': 'Model ID', 'ru': 'ID модели', 'es': 'ID del modelo', 'de': 'Modell-ID',
             'fr': 'ID du modèle', 'zh': '模型 ID', 'pt': 'ID do modelo', 'it': 'ID del modello',
+
+            'ar': 'معرّف النموذج',
         }
         self.model.setPlaceholderText(model_placeholder.get(self.lang,model_placeholder['en']))
         self.labels = []

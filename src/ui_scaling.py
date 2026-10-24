@@ -172,11 +172,13 @@ class ScaleArrowButton(QToolButton):
     def paintEvent(self, event):
         option = QStyleOptionToolButton()
         self.initStyleOption(option)
+        option.direction = Qt.LeftToRight
         if not self.property('keyboardFocus'):
             option.state &= ~QStyle.State_HasFocus
         if not self.property('pointerHover'):
             option.state &= ~QStyle.State_MouseOver
         painter = QStylePainter(self)
+        painter.setLayoutDirection(Qt.LeftToRight)
         painter.drawComplexControl(QStyle.CC_ToolButton, option)
 
     def mouseDoubleClickEvent(self, event):

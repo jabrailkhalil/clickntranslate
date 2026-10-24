@@ -331,7 +331,7 @@ def test_macos_engine_picker_has_vision_and_no_windows(mac, app):
 
 def test_macos_permission_copy_is_localized():
     from macos_text import TEXT
-    assert set(TEXT) == {'en', 'ru', 'de', 'es', 'fr', 'zh', 'pt', 'it'}
+    assert set(TEXT) == {'en', 'ru', 'de', 'es', 'fr', 'zh', 'pt', 'it', 'ar'}
     assert all(set(values) == set(TEXT['en']) and all(values.values()) for values in TEXT.values())
 
 

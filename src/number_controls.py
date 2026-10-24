@@ -64,6 +64,8 @@ class StepperFrame(QtWidgets.QFrame):
     def __init__(self, editor, parent=None, *, dark=True, font_size=15):
         super().__init__(parent)
         self.setProperty('numberStepper', True)
+        # Numeric arrows retain left=decrease, right=increase in RTL interfaces.
+        self.setLayoutDirection(QtCore.Qt.LeftToRight)
         self._editor_font_size = int(font_size)
         self.editor = editor
         self.decrease = ScaleArrowButton(self)

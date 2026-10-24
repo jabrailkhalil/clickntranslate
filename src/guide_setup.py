@@ -29,6 +29,11 @@ GUIDE_SETUP_INTRO = {
      'scorciatoie. Ogni passaggio spiega un’opzione e permette di applicarla. Puoi rimandare qualsiasi '
      'consiglio.',
      "Configura l'app"),
+
+    'ar': ('اضبط الترجمة بما يناسبك',
+     'ابدأ بالتشغيل التلقائي وأيقونة شريط النظام، ثم اضبط الترجمة والالتقاط والاختصارات. توضح كل خطوة '
+     'فائدتها وتتيح تطبيق الإعداد. يمكنك تأجيل أي اقتراح.',
+     'إعداد التطبيق'),
 }
 
 GUIDE_LINUX_BODIES = {
@@ -89,6 +94,15 @@ GUIDE_LINUX_BODIES = {
      'ocr_engine': 'Linux supporta Tesseract, EasyOCR e RapidOCR. Installare il motore scelto ed i '
                    'relativi pacchetti lingua prima del riconoscimento. Windows OCR non è disponibile '
                    'qui.'},
+
+    'ar': {'hotkeys': 'في Linux، عيّن الاختصارات في إعدادات لوحة المفاتيح لسطح المكتب. اربط الاختصار المطلوب '
+                'بالأمر clickntranslate --ocr. تعديل الحقل داخل التطبيق لا يسجّل اختصارًا في النظام.',
+     'shortcut_selection': 'حدد نصًا في تطبيق آخر. في إعدادات لوحة المفاتيح في Linux، عيّن اختصارًا '
+                           'للأمر clickntranslate --selection لترجمة هذا النص.',
+     'shortcut_replace': 'الاستبدال التلقائي للنص المحدد متاح حاليًا في Windows فقط. في Linux، ترجم '
+                         'النص المحدد والصق النتيجة يدويًا.',
+     'ocr_engine': 'يدعم Linux محركات Tesseract وEasyOCR وRapidOCR. ثبّت المحرك المختار وحزم لغاته قبل '
+                   'التعرف على النص. Windows OCR غير متاح هنا.'},
 }
 
 # config key: (settings widget, page index, recommended value)
@@ -203,6 +217,28 @@ GUIDE_SETUP_LABELS = {
      'done_body': '{ready} impostazioni consigliate su {total} sono pronte. Puoi modificare le altre '
                   'in seguito e riaprire questa guida da Aiuto.',
      'finish_button': "Inizia a utilizzare l'app"},
+
+    'ar': {'completed': 'اكتمل الدليل',
+     'startup': 'الإعداد اليومي',
+     'translation': 'الترجمة',
+     'capture': 'التقاط الشاشة',
+     'dynamic': 'الترجمة المستمرة',
+     'finish': 'اللمسات الأخيرة',
+     'enable': 'تفعيل ثم التالي',
+     'disable': 'تعطيل ثم التالي',
+     'next': 'التالي',
+     'later': 'لاحقًا',
+     'open': 'فتح',
+     'close': 'إغلاق الدليل',
+     'ready': 'تم إعداده بالفعل',
+     'recommended': 'المقترح: مفعّل',
+     'recommended_off': 'المقترح: معطّل',
+     'inspect': 'تحقق من الإعداد ثم تابع',
+     'failed': 'لم يُطبَّق الإعداد. حاول مرة أخرى.',
+     'done': 'كل شيء جاهز للترجمة!',
+     'done_body': 'اكتمل {ready} من أصل {total} إعدادًا مقترحًا. يمكنك تغيير الباقي لاحقًا وإعادة فتح '
+                  'هذا الدليل من المساعدة.',
+     'finish_button': 'بدء استخدام التطبيق'},
 }
 
 # Bodies use the same setting order in every language; titles are read from
@@ -349,6 +385,22 @@ GUIDE_SETTING_BODIES = {
      'ritorno.',
      "Mostra l'originale sopra la traduzione per verificare nomi e significato. Spegnilo più tardi per "
      'una visualizzazione compatta.'),
+
+    'ar': ('شغّل التطبيق عند تسجيل الدخول لتكون الترجمة والاختصارات جاهزة دائمًا.',
+     'ابدأ مخفيًا في شريط النظام بدلًا من تغطية سطح المكتب. تستمر الاختصارات في العمل، وتعيد أيقونة '
+     'شريط النظام إظهار النافذة.',
+     'انسخ كل ترجمة مكتملة إلى الحافظة لتكون جاهزة للصق في محادثة أو مستند.',
+     'احفظ النصوص الأصلية وترجماتها محليًا للعثور عليها مجددًا في سجل الترجمات.',
+     'احتفظ بالنصوص التي جرى التعرف عليها ونسخها في سجل محلي، حتى بعد تغير محتوى الحافظة.',
+     'أخفِ التطبيق أثناء التقاط الشاشة حتى لا تحجب نافذته النص المطلوب التعرف عليه.',
+     'جمّد الصورة أثناء تحديد المنطقة. يسهل ذلك التقاط النص في الفيديو والنوافذ المتغيرة.',
+     'عتّم ما يحيط بالمنطقة المحددة لتوضيحها. اضبط شدة التعتيم باستخدام شريط التمرير بجانب الإعداد.',
+     'استعد محتوى الحافظة السابق بعد ترجمة النص المحدد. تبقى النتائج التي طلبت نسخها إلى الحافظة '
+     'صراحةً فيها.',
+     'يؤكد إشعار قصير نسخ النص لتعرف أن الاختصار قد عمل.',
+     'تحقق من وجود إصدار جديد عند بدء التشغيل واقترح التحديث عند توفر إصلاحات.',
+     'أوقف التعرف على النص مؤقتًا أثناء استخدام تطبيق آخر. تُستأنف الترجمة المستمرة عند العودة.',
+     'أظهر النص الأصلي فوق الترجمة للتحقق من الأسماء والمعنى. يمكنك تعطيله لاحقًا لعرض أكثر اختصارًا.'),
 }
 
 

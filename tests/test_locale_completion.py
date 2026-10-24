@@ -1,4 +1,4 @@
-"""The two new UI languages must cover real workflows, not English fallbacks."""
+"""New UI languages cover real workflows, hints, guides and action labels."""
 import json
 import os
 from pathlib import Path
@@ -42,6 +42,7 @@ def test_queued_package_probe_cannot_run_after_dialog_destruction(window,app):
 @pytest.mark.parametrize('locale,close,resume,still',[
     ('pt','Fechar','Continuar','Sem animação'),
     ('it','Chiudi','Riprendi','Senza animazione'),
+    ('ar','إغلاق','استئناف','ثابت'),
 ])
 def test_guides_hints_actions_and_names_are_localized(locale,close,resume,still):
     from dialog_text import _ACTIONS
@@ -70,14 +71,14 @@ def test_guides_hints_actions_and_names_are_localized(locale,close,resume,still)
         assert (Path(main.__file__).parent/'src'/option['icon']).is_file()
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale',['pt','it','ar'])
 def test_new_interface_language_survives_export_import(locale):
     restored=validated_import_settings(settings_export_payload(dict(main.DEFAULT_CONFIG,
         interface_language=locale)),main.DEFAULT_CONFIG)
     assert main.normalize_interface_language(restored['interface_language'])==locale
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale',['pt','it','ar'])
 def test_invalid_api_settings_have_localized_feedback(window,app,locale):
     from provider_settings import show_provider_settings,connection_text
     window.set_interface_language(locale);window.show_settings()
@@ -109,7 +110,7 @@ def test_invalid_settings_import_has_localized_feedback(window,app,tmp_path,loca
     assert 'Expecting property' not in message
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale',['pt','it','ar'])
 def test_new_locale_pages_render_offscreen(window,app,locale):
     """Optional saved renders use the existing offscreen regression runner."""
     output=os.environ.get('CNT_LOCALE_SCREENSHOTS')

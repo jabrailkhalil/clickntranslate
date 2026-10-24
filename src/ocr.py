@@ -310,6 +310,63 @@ OCR_UI_TEXT = {
      'swap_languages': 'Scambiare le lingue',
      'source_language': 'Lingua di riconoscimento',
      'target_language': 'Lingua di traduzione'},
+
+    'ar': {'tess_download_data': 'Tesseract: جارٍ تنزيل بيانات اللغة {language}...',
+     'tess_downloading': 'Tesseract: جارٍ تنزيل {language}... {percent}%',
+     'tess_ready': 'Tesseract: بيانات اللغة {language} جاهزة',
+     'tess_retrying': 'Tesseract: إعادة محاولة تنزيل {language} \u200f({attempt}/{total})...',
+     'recognizing': 'جارٍ التعرف على النص...',
+     'win_missing_title': 'حزمة Windows OCR مفقودة',
+     'win_unavailable': 'Windows OCR غير متاح حاليًا.',
+     'win_components': 'تعذر تحميل مكونات Windows OCR. يمكن للتطبيق المتابعة باستخدام Tesseract إذا '
+                       'كان مثبتًا.',
+     'win_unsupported': 'لا يدعم Windows OCR اللغة: {language} \u200f({tag}).',
+     'win_pack': 'ربما لم تُثبّت حزمة لغة Windows OCR. يمكنك فتح إعدادات لغة Windows وإضافة اللغة '
+                 'المطلوبة.',
+     'win_continue': 'ستتم متابعة التعرف على النص باستخدام Tesseract الآن.',
+     'win_stopped': 'لم يُعثر على Tesseract، ولذلك توقف التعرف على النص لهذه اللغة.',
+     'open_windows': 'فتح إعدادات Windows',
+     'continue_tesseract': 'المتابعة باستخدام Tesseract',
+     'close': 'إغلاق',
+     'recognition_failed': 'فشل التعرف على النص',
+     'engine_unavailable': 'المحرك {engine} غير متاح',
+     'engine_unavailable_info': 'المحرك {engine} غير مثبت أو تعذر تحميله.\n'
+                                '\n'
+                                'جرّب:\n'
+                                '• اختيار {engine} في الإعدادات وتثبيت الحزمة المحلية\n'
+                                '• اختيار محرك آخر للتعرف على النص في الإعدادات',
+     'engine_unreliable': 'لم يعثر {engine} على نص موثوق',
+     'engine_unreliable_info': 'لم يكتشف {engine} نصًا بدرجة ثقة كافية.\n'
+                               '\n'
+                               'جرّب:\n'
+                               '• التحقق من لغة التعرف المختارة\n'
+                               '• تحديد منطقة أدق وذات تباين أعلى\n'
+                               '• اختيار محرك آخر للتعرف على النص',
+     'auto_unreliable': 'لم يتم التعرف على النص بدقة كافية',
+     'auto_unreliable_info': 'تم استبعاد النتائج الضعيفة حتى لا تُرسل الضوضاء إلى المترجم.\n'
+                             '\n'
+                             'جرّب:\n'
+                             '• تحديد النص بدقة أكبر دون حدود أو خلفية إضافية\n'
+                             '• اختيار لغة المصدر المحددة\n'
+                             '• تجربة محرك آخر أو تثبيت حزمة لغة Windows OCR',
+     'not_recognized': '😔 لم يتم التعرف على النص',
+     'not_recognized_info': 'جرّب:\n'
+                            '• تحديد منطقة تحتوي نصًا أكبر\n'
+                            '• التأكد من وضوح التباين في النص\n'
+                            '• اختيار محرك آخر للتعرف على النص في الإعدادات',
+     'translate': 'ترجمة',
+     'ocr_init_failed': 'فشلت تهيئة التعرف على النص',
+     'screen_no_text': 'لم يتم التعرف على أي نص على الشاشة',
+     'translation_failed': 'تعذّرت الترجمة',
+     'translating_screen': 'جارٍ ترجمة الشاشة...',
+     'fullscreen_hint': 'Esc / زر الفأرة الأيمن — إغلاق',
+     'no_installed_languages': 'لا توجد لغات مثبتة للتعرف على النص',
+     'no_installed_translation_pairs': 'لا توجد أزواج ترجمة مثبتة',
+     'install_languages_first': 'ثبّت لغة أولًا من الإعدادات ← حزم اللغات.',
+     'language_packages': 'حزم اللغات',
+     'swap_languages': 'تبديل اللغتين',
+     'source_language': 'لغة التعرف على النص',
+     'target_language': 'لغة الترجمة'},
 }
 
 
@@ -5435,6 +5492,8 @@ def run_screen_capture(mode="ocr"):
             install_qt_exception_guard()
             from window_appearance import install_window_appearance
             appearance_config = get_cached_ocr_config()
+            from interface_direction import apply_interface_direction
+            apply_interface_direction(appearance_config.get('interface_language', 'en'), application=True)
             install_window_appearance(app, appearance_config.get('ui_scale_percent', 100),
                                       appearance_config.get('theme', 'Темная'))
             app._native_dialog_frame_filter = NativeDialogFrameFilter(app)

@@ -38,12 +38,23 @@ _TEXT = {
      'Usa selezionato',
      'Online · Internet richiesto',
      'Offline'),
+
+    'ar': ('الترجمة دون اتصال غير جاهزة',
+     'حزمة Argos للاتجاه {pair} غير مثبتة.',
+     'نموذج Hy-MT أو مشغّله المحلي مفقود.',
+     'فتح التثبيت',
+     'المترجمون المتاحون',
+     'استخدام المحدد',
+     'عبر الإنترنت · يتطلب اتصالًا',
+     'دون اتصال'),
 }
 _KEYS = ('title', 'argos', 'hymt', 'install', 'available', 'use', 'online', 'offline')
 _DOWNLOAD = {'en': 'Download now', 'ru': 'Скачать сейчас', 'es': 'Descargar ahora',
              'de': 'Jetzt herunterladen', 'fr': 'Télécharger', 'zh': '立即下载',
     'pt': 'Baixe agora',
     'it': 'Scarica ora',
+
+    'ar': 'التنزيل الآن',
 }
 _RUNTIME = {
     'en': 'Argos could not start. Check its installation or choose another translator.',
@@ -55,6 +66,8 @@ _RUNTIME = {
 
     'pt': 'Argos não pôde ser iniciado. Verifique sua instalação ou escolha outro tradutor.',
     'it': 'Impossibile avviareArgos. Controlla la sua installazione o scegli un altro traduttore.',
+
+    'ar': 'تعذر بدء Argos. تحقق من تثبيته أو اختر مترجمًا آخر.',
 }
 
 

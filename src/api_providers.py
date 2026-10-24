@@ -84,6 +84,10 @@ def display_error(error, lang):
             'it': ('Usa un indirizzo API HTTPS. HTTP è consentito solo per localhost.',
                    'Usa l’indirizzo ufficiale del servizio oppure scegli Custom API.',
                    'Usa l’indirizzo ufficiale dell’API DeepL Free o Pro.'),
+
+            'ar': ('استخدم عنوان API عبر HTTPS. يُسمح باستخدام HTTP على localhost فقط.',
+             'استخدم العنوان الرسمي للخدمة، أو اختر API مخصصًا.',
+             'استخدم العنوان الرسمي لخدمة DeepL Free أو Pro API.'),
         }
         return labels.get(lang,labels['en'])[address_index]
     messages = {
@@ -139,6 +143,15 @@ def display_error(error, lang):
          "La connessione API è scaduta o non è riuscita. Controlla l'indirizzo e la rete.",
          "Abilita l'input di immagini per questo modello nelle connessioni API.",
          'Il modello ha restituito un risultato incompleto o non valido. Prova una selezione più piccola.'),
+
+        'ar': ('تعذّر طلب API. تحقق من الاتصال في حزم اللغات ← API.',
+         'أضف مفتاح API في حزم اللغات ← API.',
+         'حدد النموذج في حزم اللغات ← API.',
+         'رُفض مفتاح API. تحقق من المفتاح المحفوظ.',
+         'بلغت حد الحصة أو معدل الطلبات. تحقق من حسابك لدى الخدمة.',
+         'انتهت مهلة اتصال API أو تعذّر الاتصال. تحقق من العنوان والشبكة.',
+         'فعّل إدخال الصور لهذا النموذج في اتصالات API.',
+         'أرجع النموذج نتيجة غير مكتملة أو غير صالحة. جرب تحديد منطقة أصغر.'),
     }
     raw = str(error)
     checks = ('Add an API key', 'Set the model', 'API key rejected', 'API quota', 'API connection', 'Enable image input')

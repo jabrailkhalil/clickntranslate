@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from string import Formatter
 
-LOCALES=('en','ru','es','de','fr','zh','pt','it')
+LOCALES=('en','ru','es','de','fr','zh','pt','it','ar')
 TUPLE_FILES={'assistant_text.py','control_hints.py','dialog_text.py','dynamic_templates.py'}
 
 
@@ -49,7 +49,7 @@ def audit(root):
                 try:valid=format_fields(value)==format_fields(translated[key])
                 except ValueError:valid=False
                 if not valid:issues.append(dict(table=table,locale=locale,key=key,problem='placeholders'))
-                if locale in ('pt','it') and re.findall(r'</?[A-Za-z][^>]*>',value)!=re.findall(r'</?[A-Za-z][^>]*>',translated[key]):
+                if locale in ('pt','it','ar') and re.findall(r'</?[A-Za-z][^>]*>',value)!=re.findall(r'</?[A-Za-z][^>]*>',translated[key]):
                     issues.append(dict(table=table,locale=locale,key=key,problem='markup'))
                 if re.search(r'ZXQ\d|\[CNT\d',translated[key]):
                     issues.append(dict(table=table,locale=locale,key=key,problem='authoring-token'))

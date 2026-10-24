@@ -273,6 +273,8 @@ def _provider_kind_text(kind, lang):
 
             'pt': 'offline',
             'it': 'offline',
+
+            'ar': 'دون اتصال',
         }.get(lang, "offline")
     return {
         "ru": "онлайн",
@@ -283,6 +285,8 @@ def _provider_kind_text(kind, lang):
 
         'pt': 'online',
         'it': 'online',
+
+        'ar': 'عبر الإنترنت',
     }.get(lang, "online")
 
 
@@ -303,6 +307,8 @@ TRANSLATOR_GROUP_TEXT = {
 
     'pt': {'online': 'Online', 'offline': 'Offline'},
     'it': {'online': 'Online', 'offline': 'Offline'},
+
+    'ar': {'online': 'عبر الإنترنت', 'offline': 'دون اتصال'},
 }
 
 
@@ -1224,6 +1230,13 @@ OCR_DETAIL_TEXT = {
                  'bundle supporta cinese e inglese.',
      'easyocr': 'OCR neurale locale per immagini difficili e script multipli; i modelli linguistici '
                 'selezionati devono essere installati per primi.'},
+
+    'ar': {'windows': 'مدمج في Windows. سريع للنص المعتاد في الواجهات؛ تُثبّت اللغات من حزم اللغات.',
+     'tesseract': 'محرك تعرف تقليدي محلي. يدعم لغات كثيرة ويعمل دون اتصال.',
+     'rapidocr': 'محرك تعرف عصبي محلي محسّن لكتل النص واتجاهه؛ يدعم النموذج المرفق الصينية '
+                 'والإنجليزية.',
+     'easyocr': 'محرك تعرف عصبي محلي للصور الصعبة وأنظمة الكتابة المتعددة؛ يجب تثبيت نماذج اللغات '
+                'المختارة أولًا.'},
 }
 
 
@@ -1245,6 +1258,8 @@ TRANSLATOR_DETAIL_TEXT = {
 
     'pt': {'google': 'rápido, preciso, precisa de internet', 'argos': 'tradução local, requer pacotes de idiomas instalados', HYMT_ENGINE_KEY: 'modelo LLM local, instalado separadamente', 'mymemory': 'API online com limite diário', 'lingva': 'proxy on-line do Google', 'libretranslate': 'servidor on-line LibreTranslate'},
     'it': {'google': 'veloce, preciso, necessita di internet', 'argos': 'traduzione locale, richiede pacchetti lingua installati', HYMT_ENGINE_KEY: 'modello LLM locale, installato separatamente', 'mymemory': 'API online con limite giornaliero', 'lingva': 'proxy online di Google', 'libretranslate': 'server LibreTranslate in linea'},
+
+    'ar': {'google': 'سريع ودقيق، ويتطلب الإنترنت', 'argos': 'ترجمة محلية تتطلب تثبيت حزم اللغات', HYMT_ENGINE_KEY: 'نموذج لغوي محلي يُثبَّت بشكل منفصل', 'mymemory': 'API عبر الإنترنت بحد يومي', 'lingva': 'وسيط Google عبر الإنترنت', 'libretranslate': 'خادم LibreTranslate عبر الإنترنت'},
 }
 
 
@@ -2873,6 +2888,155 @@ SETTINGS_TEXT = {
      'clear_histories_question': 'Cancellare la cronologia delle traduzioni e la cronologia delle '
                                  'copie?',
      'settings_reset_done': 'Le impostazioni sono state ripristinate'},
+
+    'ar': {'autostart': 'التشغيل مع النظام',
+     'update_check_on_launch': 'التحقق من التحديثات عند بدء التطبيق',
+     'dim_screen_during_ocr': 'تعتيم الشاشة أثناء تحديد منطقة OCR',
+     'ocr_dim_strength_tooltip': 'اختر شدة تعتيم المنطقة خارج تحديد OCR.',
+     'restore_clipboard_after_selection': 'استعادة الحافظة بعد إجراءات النص المحدد',
+     'restore_clipboard_tooltip': 'استعد محتوى الحافظة السابق بعد إظهار ترجمة النص المحدد أو استبداله '
+                                  'بنجاح. تبقى نتائج إجراءات النسخ الصريحة في الحافظة.',
+     'copy_notification': 'إشعاري بعد نسخ النص',
+     'copy_notification_tooltip': 'إظهار تأكيد هادئ على الشاشة عند نسخ النتيجة، بما في ذلك وضع الظل.',
+     'create_bug_report': 'تقرير مشكلة',
+     'bug_report_tooltip': 'إنشاء ملف ZIP تشخيصي دون محتوى الحافظة أو السجلات أو نصوص المستندات.',
+     'export_settings': 'تصدير',
+     'import_settings': 'استيراد',
+     'export_settings_tooltip': 'حفظ جميع إعدادات التطبيق في ملف JSON قابل للنقل.',
+     'import_settings_tooltip': "تحميل ملف إعدادات JSON خاص بتطبيق Click'n'Translate وتطبيقه الآن.",
+     'settings_exported': 'تم تصدير الإعدادات.\n\n{path}',
+     'settings_imported': 'تم استيراد الإعدادات وتطبيقها.',
+     'settings_transfer_failed': 'تعذر نقل الإعدادات.\n\n{error}',
+     'settings_file_filter': "إعدادات Click'n'Translate \u200f(*.json)",
+     'ocr_behavior_heading': 'سلوك التعرف على النص',
+     'updates_heading': 'التحديثات',
+     'settings_page_main': 'الإعدادات العامة',
+     'settings_page_updates': 'الترجمة والتعرف على النص',
+     'settings_page_game': 'الترجمة المستمرة',
+     'game_settings_heading': 'الترجمة المستمرة',
+     'game_intro': 'حدد نصًا على الشاشة. تظهر الترجمة فوقه وتُحدَّث تلقائيًا. فعّل الإخراج المنفصل '
+                   'لاختيار منطقة أخرى.',
+     'game_launch': 'تحديد نص على الشاشة',
+     'game_languages': 'اللغات:',
+     'game_swap_languages': 'تبديل لغتي الترجمة المستمرة',
+     'game_scan_interval': 'الفاصل بين عمليات الفحص:',
+     'game_overlay_opacity': 'خلفية الترجمة:',
+     'game_pause_inactive': 'إيقاف مؤقت عندما يكون التطبيق المستهدف غير نشط',
+     'game_pause_inactive_tooltip': 'يوقف OCR مؤقتًا عند تصغير النافذة التي كانت نشطة عند بدء الوضع أو '
+                                    'نقلها إلى الخلفية. تُستأنف الترجمة تلقائيًا عند العودة.',
+     'game_show_original': 'إظهار النص المتعرف عليه مع الترجمة',
+     'game_workflow_note': 'حدد نصًا على الشاشة. تظهر الترجمة فوقه وتُحدَّث تلقائيًا. فعّل الإخراج '
+                           'المنفصل لاختيار منطقة أخرى.',
+     'translation_mode': 'وضع ترجمة النص: {mode}',
+     'hotkeys': 'ضبط الاختصارات',
+     'save_and_back': 'حفظ ورجوع',
+     'copy_to_clipboard': 'نسخ إلى الحافظة',
+     'history': 'حفظ سجل الترجمات',
+     'button_hover_tips': 'تلميحات عند تمرير المؤشر',
+     'replace_select_all': 'تحديد الكل قبل الاستبدال',
+     'replace_select_all_hint': 'في وضع الترجمة والاستبدال: يحدد كل النص في حقل الإدخال النشط قبل '
+                                'ترجمته واستبداله. مفيد لرسائل المحادثة. عند تعطيله، يُستبدل النص '
+                                'المحدد فقط. لا يرسل الرسالة.',
+     'test_ocr': 'اختبار ترجمة OCR',
+     'save': 'حفظ',
+     'back': 'رجوع',
+     'remove_hotkey': 'اضغط ESC لإزالة الاختصار',
+     'invalid_hotkey_format': 'استخدم مجموعة مفاتيح واحدة. تتوفر اختصارات الضغط المزدوج في Windows.',
+     'history_view': 'عرض سجل الترجمات',
+     'start_minimized': 'البدء بالوضع المصغر',
+     'copy_history_view': 'عرض سجل النسخ',
+     'copy_history': 'حفظ سجل النسخ',
+     'clear_copy_history': 'مسح سجل النسخ',
+     'clear_translation_history': 'مسح سجل الترجمات',
+     'history_title': 'سجل الترجمات',
+     'copy_history_title': 'سجل النسخ',
+     'history_empty': 'السجل فارغ.',
+     'history_error': 'خطأ في قراءة السجل.',
+     'error_title': 'خطأ',
+     'clear_translation_history_error': 'تعذر مسح سجل الترجمات.',
+     'clear_copy_history_error': 'تعذر مسح سجل النسخ.',
+     'copy_translated_text': 'نسخ النص المترجم',
+     'freeze_screen_on_ocr': 'تجميد الشاشة أثناء OCR',
+     'fullscreen_translate_hotkey': 'اختصار ترجمة الشاشة كاملة:',
+     'fullscreen_from': 'من:',
+     'fullscreen_to': 'إلى:',
+     'translate_selection_hotkey': 'اختصار ترجمة التحديد:',
+     'translator_label': 'ترجمة:',
+     'keep_visible_on_ocr': 'إبقاء النافذة ظاهرة أثناء OCR',
+     'clear_cache': 'مسح التخزين المؤقت',
+     'reset': 'إعادة الضبط',
+     'update': 'تحديث',
+     'translation_history_button': 'سجل الترجمات',
+     'copy_history_button': 'سجل النسخ',
+     'fullscreen_translate_label': 'ترجمة الشاشة كاملة:',
+     'game_translate_label': 'المستمرة:',
+     'selection_translate_label': 'ترجمة التحديد:',
+     'toggle_window_hotkey_label': 'إظهار / إخفاء التطبيق:',
+     'result_window_label': 'إظهار النافذة:',
+     'result_window_mode_selection': 'نص',
+     'result_window_mode_area': 'منطقة',
+     'result_window_mode_main': 'الرئيسية',
+     'result_window_modes_header': 'إظهار النافذة بعد:',
+     'result_window_row_selection': 'ترجمة النص المحدد',
+     'result_window_row_area': 'ترجمة منطقة من الشاشة',
+     'result_window_row_main': 'الضغط على ترجمة',
+     'result_window_summary_all': 'الكل',
+     'result_window_summary_none': 'أبدًا',
+     'result_window_summary_on': 'ظاهرة',
+     'result_window_summary_off': 'مخفية',
+     'result_window_summary_count': '{count} من {total}',
+     'result_window_tooltip': 'حدد الإجراءات التي ينبغي أن تفتح نافذة الترجمة. تنسخ الإجراءات غير '
+                              'المحددة الترجمة مباشرةً إلى الحافظة.',
+     'result_window_mode_selection_tooltip': 'إظهار نافذة النتيجة بعد ترجمة النص المحدد.',
+     'result_window_mode_area_tooltip': 'إظهار نافذة النتيجة بعد ترجمة منطقة من الشاشة.',
+     'result_window_mode_main_tooltip': 'إظهار الترجمة بجوار الإدخال في النافذة الرئيسية.',
+     'translation_result_font_label': 'نص النتيجة:',
+     'translation_result_font_sample': 'نص للمعاينة',
+     'translation_result_font_decrease': 'تصغير نص النتيجة',
+     'translation_result_font_increase': 'تكبير نص النتيجة',
+     'translation_result_font_tooltip': 'يغيّر حجم النص الأصلي والمترجم في نافذة النتيجة المنفصلة فقط. '
+                                        'استخدم مقياس الواجهة لتغيير حجم الواجهة كاملة.',
+     'translation_result_font_xsmall': 'صغير جدًا',
+     'translation_result_font_small': 'صغير',
+     'translation_result_font_medium': 'متوسط',
+     'translation_result_font_large': 'كبير',
+     'translation_result_font_xlarge': 'كبير جدًا',
+     'replace_selection_translate_label': 'ترجمة التحديد واستبداله:',
+     'replace_selection_unavailable': 'الاستبدال التلقائي متاح في Windows وmacOS.',
+     'selection_quick_translate_enabled': 'الترجمة السريعة للنص المحدد',
+     'selection_quick_translate_tooltip': 'إظهار زر ترجمة قرب النص المحدد في التطبيقات الأخرى، أو '
+                                          'الترجمة فورًا. يستخدم زوج لغات التحديد المضبوط للاختصارات. '
+                                          'يتطلب تسهيلات الاستخدام في macOS؛ ويستخدم تحديد PRIMARY في '
+                                          'Linux مع قيود في بعض بيئات Wayland. يتوقف مؤقتًا أثناء OCR '
+                                          'والترجمة المستمرة.',
+     'selection_quick_translate_mode_button': 'إظهار زر بعد التحديد',
+     'selection_quick_translate_mode_automatic': 'الترجمة فور التحديد',
+     'close_result_window_on_outside_click': 'إغلاق نافذة الترجمة بالنقر خارجها',
+     'close_result_window_on_outside_click_tooltip': 'يغلق نافذة الترجمة عند النقر على تطبيق آخر أو في '
+                                                     'أي مكان خارجها، فلا تحتاج إلى زر الإغلاق.',
+     'copy_hotkey_label': 'اختصار نسخ التحديد:',
+     'translate_hotkey_label': 'اختصار الترجمة:',
+     'remove_local_tesseract': 'إزالة Tesseract المحلي',
+     'remove_local_rapidocr': 'إزالة RapidOCR المحلي',
+     'remove_local_easyocr': 'إزالة EasyOCR المحلي',
+     'remove_local_hymt': 'إزالة Hy-MT المحلي',
+     'ocr_language_packs': 'حزم اللغات',
+     'manage_ocr_languages': 'إدارة لغات OCR وحزم Argos',
+     'clearing': 'جارٍ المسح...',
+     'cleared': 'تم مسح {size}',
+     'yes': 'نعم',
+     'no': 'لا',
+     'cancel': 'إلغاء',
+     'minimize': 'تصغير',
+     'close': 'إغلاق',
+     'open': 'فتح',
+     'install': 'تثبيت',
+     'later': 'لاحقًا',
+     'remove': 'إزالة',
+     'reset_question': 'هل تريد بالتأكيد إعادة ضبط جميع الإعدادات؟',
+     'clear_histories_title': 'مسح السجلات؟',
+     'clear_histories_question': 'هل تريد مسح سجل الترجمات وسجل النسخ؟',
+     'settings_reset_done': 'تمت إعادة ضبط الإعدادات'},
 }
 
 def settings_text(lang, key):
@@ -2898,6 +3062,11 @@ for _scale_lang, _scale_labels in {
      'schermo disponibile.',
      'Riduci scala',
      'Aumenta scala'),
+
+    'ar': ('مقياس الواجهة',
+     'تكبير النص والأيقونات وعناصر التحكم في جميع نوافذ التطبيق. تتكيف كل نافذة مع الشاشة المتاحة.',
+     'تصغير الواجهة',
+     'تكبير الواجهة'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale=_scale_labels[0], ui_scale_hint=_scale_labels[1],
                                     ui_scale_decrease=_scale_labels[2], ui_scale_increase=_scale_labels[3])
@@ -2917,6 +3086,9 @@ for _scale_lang, (_caption, _hint) in {
     'it': ('Scala:',
      'Inserisci una percentuale e premi Invio o esci dal campo. Esc annulla. Le frecce regolano la '
      'scala dell’1%.'),
+
+    'ar': ('مقياس الواجهة:',
+     'أدخل نسبة مئوية واضغط Enter أو غادر الحقل. يلغي Escape التغيير. تغيّر الأسهم المقياس بنسبة 1%.'),
 }.items():
     SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
 
@@ -2961,6 +3133,8 @@ def _settings_import_error(error, lang):
             'zh': '设置文件无效。请选择兼容的 ClicknTranslate JSON 导出文件。',
             'pt': 'Arquivo de configurações inválido. Escolha um JSON compatível exportado pelo ClicknTranslate.',
             'it': 'File delle impostazioni non valido. Scegli un’esportazione JSON compatibile di ClicknTranslate.',
+
+            'ar': 'ملف الإعدادات غير صالح. اختر ملف JSON متوافقًا ومصدّرًا من ClicknTranslate.',
         }
         return labels.get(lang,labels['en'])
     return str(error)
@@ -3050,6 +3224,8 @@ HISTORY_RECORD_TEXT = {
 
     'pt': {'original': 'Original', 'translated': 'Tradução', 'copy': 'Copiar', 'delete': 'Excluir'},
     'it': {'original': 'Originale', 'translated': 'Traduzione', 'copy': 'Copia', 'delete': 'Elimina'},
+
+    'ar': {'original': 'الأصل', 'translated': 'الترجمة', 'copy': 'نسخ', 'delete': 'حذف'},
 }
 
 
@@ -3291,6 +3467,47 @@ UPDATE_TEXT = {
      'launch_update': 'Aggiorna ora',
      'launch_skip': 'Salta questa versione',
      'launch_later': 'Più tardi'},
+
+    'ar': {'store_updates': 'تصل تحديثات هذه النسخة عبر Microsoft Store. افتح مكتبة Microsoft Store واختر '
+                      'الحصول على التحديثات.',
+     'dev_build': 'التحديث التلقائي متاح في النسخة المجمّعة من التطبيق. تُحدَّث مصادر Python بشكل '
+                  'منفصل.',
+     'checking_button': 'جارٍ التحقق...',
+     'checking': 'جارٍ التحقق من التحديثات...',
+     'downloading_word': 'التنزيل',
+     'downloading_button': 'جارٍ التنزيل...',
+     'apply_wait': 'جارٍ تطبيق التحديث.\nيرجى الانتظار...',
+     'apply_close': 'التحديث قيد التطبيق بالفعل. الإغلاق معطّل حاليًا.\nيرجى الانتظار.',
+     'canceling_button': 'جارٍ الإلغاء...',
+     'canceling_clean': 'جارٍ إلغاء التحديث...\nيرجى الانتظار أثناء تنظيف الملفات المؤقتة.',
+     'canceling_wait': 'جارٍ إلغاء التحديث...\nيرجى الانتظار.',
+     'check_failed': 'تعذر التحقق من التحديثات:\n{error}',
+     'parse_failed': 'تعذر تحليل استجابة التحديث.',
+     'check_cancelled': 'أُلغي التحقق من التحديثات.',
+     'error_title': 'خطأ في التحديث',
+     'unknown_error': 'خطأ غير معروف في التحديث.',
+     'up_to_date': 'لديك أحدث إصدار بالفعل: V{version}',
+     'no_asset': 'لا يحتوي هذا الإصدار على حزمة تحديث متوافقة مع نسختك بعد. حاول التحقق لاحقًا.',
+     'invalid_url': 'رابط ملف التحديث غير صالح.',
+     'available_title': 'يتوفر تحديث',
+     'available_prompt': 'عُثر على إصدار جديد: V{latest}\n'
+                         'الإصدار الحالي: V{current}\n'
+                         '\n'
+                         'هل تريد التثبيت الآن؟',
+     'preparing_download': 'جارٍ تجهيز التنزيل...',
+     'stage_download': 'جارٍ تنزيل حزمة التحديث...',
+     'stage_checksum': 'جارٍ تنزيل المجموع الاختباري...',
+     'stage_verify': 'جارٍ التحقق من المجموع الاختباري...',
+     'stage_prepare': 'جارٍ تجهيز التحديث...',
+     'cancelled': 'أُلغي التحديث. حُذفت الملفات المؤقتة.',
+     'install_failed': 'تعذر تثبيت التحديث:\n{error}',
+     'restart_ready': 'التحديث V{version} جاهز.\nجارٍ إعادة تشغيل التطبيق...',
+     'restarting': 'جارٍ إعادة التشغيل...',
+     'launch_title': 'يتوفر تحديث',
+     'launch_prompt': 'الإصدار V{latest} متاح. لديك V{current}.',
+     'launch_update': 'التحديث الآن',
+     'launch_skip': 'تخطي هذا الإصدار',
+     'launch_later': 'لاحقًا'},
 }
 
 
@@ -3523,6 +3740,53 @@ ENGINE_TEXT = {
      'hymt_extract': 'Estrazione del runtime Hy-MT in corso...',
      'hymt_model': 'Download del modello Hy-MT...',
      'hymt_license': 'Salvataggio della licenza Hy-MT...'},
+
+    'ar': {'not_found': 'لم يُعثر على {engine}',
+     'install': 'تثبيت',
+     'cancel': 'إلغاء',
+     'remove': 'إزالة',
+     'tesseract_prompt': 'لم يُعثر على Tesseract-OCR. هل تريد تنزيله وتثبيته محليًا؟',
+     'linux_tesseract_hint': 'Tesseract غير مثبت. ثبّته باستخدام مدير الحزم:\n\n{command}',
+     'manual_hymt_hint': 'التثبيت التلقائي لـ Hy-MT متاح في Windows وmacOS.\n'
+                         '\n'
+                         'ضع النموذج {model} ومشغّل llama.cpp \u200f({runners}) في:\n'
+                         '{directory}',
+     'easyocr_prompt': 'EasyOCR غير مثبت محليًا. هل تريد تثبيت محرك التعرف العصبي في مجلد التطبيق؟\n'
+                       '\n'
+                       'يتطلب ذلك الإنترنت وحوالي 1 جيجابايت من المساحة الحرة. ينزّل التطبيق بيئة '
+                       'تثبيت خاصة به؛ لا تحتاج إلى تثبيت Python. تُنزَّل نماذج اللغات عند أول استخدام '
+                       'للتعرف على النص. ستُحفظ الحزم في ocr\\easyocr.',
+     'rapidocr_prompt': 'RapidOCR غير مثبت محليًا. هل تريد تثبيت محرك التعرف العصبي في مجلد التطبيق؟\n'
+                        '\n'
+                        'يتطلب ذلك الإنترنت. ينزّل التطبيق بيئة تثبيت خاصة به؛ لا تحتاج إلى تثبيت '
+                        'Python. ستُحفظ الحزم في ocr\\rapidocr، وتُخزَّن النماذج هناك عند أول استخدام '
+                        'للتعرف على النص.',
+     'hymt_prompt': 'نموذج Hy-MT المحلي غير مثبت. هل تريد تنزيل حزمة الترجمة دون اتصال وتثبيتها؟\n'
+                    '\n'
+                    'سيُنزَّل حوالي 1.2 جيجابايت: نموذج Hy-MT وبيئة تشغيل llama.cpp المحلية.',
+     'preparing': 'جارٍ تجهيز تثبيت {engine}...',
+     'downloading_packages': 'جارٍ تنزيل حزم {engine} وتثبيتها...',
+     'downloading_engine': 'جارٍ تنزيل {engine}...',
+     'extracting_engine': 'جارٍ استخراج {engine}...',
+     'downloading_language': 'جارٍ تنزيل بيانات اللغة {name}...',
+     'applying': 'جارٍ تطبيق التثبيت...',
+     'done': 'تم',
+     'canceling': 'جارٍ إلغاء التثبيت...',
+     'ready': 'تم تثبيت {engine} وهو جاهز.',
+     'hymt_ready': 'تم تثبيت Hy-MT وهو جاهز للترجمة دون اتصال.',
+     'error_title': 'خطأ في {engine}',
+     'install_failed': 'تعذر تثبيت {engine}:\n{error}',
+     'cancelled_title': 'أُلغي',
+     'install_cancelled': 'أُلغي تثبيت {engine}. حُذفت الملفات المؤقتة.',
+     'remove_title': 'إزالة {engine}',
+     'remove_ocr_prompt': 'هل تريد إزالة محرك {engine} المحلي من مجلد التطبيق؟',
+     'remove_hymt_prompt': 'هل تريد إزالة نموذج Hy-MT المحلي وبيئة تشغيله من مجلد التطبيق؟',
+     'removed': 'تمت إزالة {engine} المحلي.',
+     'remove_failed': 'تعذرت إزالة {engine}:\n{error}',
+     'hymt_runtime': 'جارٍ تنزيل بيئة تشغيل Hy-MT...',
+     'hymt_extract': 'جارٍ استخراج بيئة تشغيل Hy-MT...',
+     'hymt_model': 'جارٍ تنزيل نموذج Hy-MT...',
+     'hymt_license': 'جارٍ حفظ ترخيص Hy-MT...'},
 }
 
 
@@ -3549,6 +3813,7 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setLayoutDirection(Qt.LeftToRight)
         self._double_text = ''
         self._tap_down = set()
         self._tap_candidate = None
@@ -4093,6 +4358,86 @@ LANGUAGE_MANAGER_TEXT = {
      'remove_failed': 'Impossibile rimuovere i pacchetti di lingue:\n',
      'win_removing': 'Windows OCR: rimozione di {language} ({current}/{total})…',
      'win_rolling_back': 'Windows OCR: annullamento e rimozione pacchetti incompleti…'},
+
+    'ar': {'intro': 'ثبّت هنا لغات OCR أو اتجاهات الترجمة دون اتصال في Argos. تُنزَّل الحزم مسبقًا، وليس '
+              'أثناء التعرف على النص أو الترجمة.',
+     'refresh': 'تحديث القائمة',
+     'windows_note': 'يعرض لغات OCR المتاحة في Windows. يمكنك تثبيت OCR فقط دون إضافة لوحة مفاتيح.',
+     'install_selected': 'تثبيت المحدد',
+     'windows_settings': 'إعدادات Windows',
+     'tesseract_note': 'حدد اللغات لتنزيلها إلى مجلد tessdata المحلي.',
+     'install_engine': 'تثبيت المحرك',
+     'easyocr_note': 'حدد اللغات لتنزيل نماذج EasyOCR مسبقًا. تُضاف الإنجليزية كلغة احتياطية.',
+     'remove_engine': 'إزالة المحرك',
+     'remove_engine_tooltip': 'حذف محرك {engine} المثبت من هذا الكمبيوتر.',
+     'hymt_note': 'Hy-MT نموذج ترجمة محلي واحد، وليس حزمًا منفصلة لكل لغة. ثبّته هنا ليظهر في قائمة '
+                  'المترجمين.',
+     'translation_engine': 'محرك الترجمة',
+     'local_model': 'النموذج المحلي',
+     'rapidocr_note': 'لا توجد حزم لغات منفصلة لـ RapidOCR. يتضمن محركه العصبي المحلي نموذجًا واحدًا '
+                      'للصينية والإنجليزية. للروسية، استخدم Windows OCR أو Tesseract أو EasyOCR.',
+     'component': 'المكوّن',
+     'package': 'الحزمة',
+     'status': 'الحالة',
+     'argos_note': 'تُعرض جميع حزم Argos المتاحة. تستخدم أزواج اللغات غير الإنجليزية حزمتين عبر '
+                   'الإنجليزية.',
+     'remove_highlighted': 'إزالة الصفوف المحددة',
+     'direction': 'الاتجاه',
+     'search': 'ابحث: العربية، ar، en→ar…',
+     'language': 'اللغة',
+     'installed': 'مثبتة',
+     'missing': 'غير مثبتة',
+     'can_download': 'متاحة للتنزيل',
+     'engine_missing': 'المحرك {engine} غير مثبت',
+     'checking': 'جارٍ التحقق…',
+     'unavailable': 'غير متاحة في هذا الإصدار من Windows',
+     'first_use': 'تُجهَّز عند أول استخدام لـ OCR',
+     'engine_first': 'ثبّت المحرك أولًا',
+     'ocr_engine': 'محرك التعرف على النص',
+     'runtime': 'بيئة التشغيل العصبية',
+     'detector': 'اكتشاف النص واتجاهه',
+     'recognition': 'التعرف على النص',
+     'loading': 'جارٍ تحميل قائمة الحزم…',
+     'load_error': 'تعذر تحميل قائمة الحزم: ',
+     'no_match': 'لا توجد حزم تطابق البحث',
+     'no_packages': 'لم يُعثر على حزم',
+     'no_selection': 'حدد لغة واحدة على الأقل للتثبيت.',
+     'already': 'المحرك {engine} مثبت بالفعل.',
+     'still': 'لا يزال التحقق من {engine} جاريًا. انتظر قليلًا.',
+     'win_confirm': 'هل تريد تثبيت مكونات Windows OCR المحددة؟\n'
+                    '\n'
+                    'سيُطلب إذن المسؤول. يُثبَّت OCR فقط؛ لا تُضاف لوحة مفاتيح أو طريقة إدخال.',
+     'easy_prompt': 'يجب تثبيت EasyOCR أولًا. هل تريد بدء تثبيت المحرك؟',
+     'argos_installed': 'تم تثبيت اتجاهات Argos المحددة.',
+     'highlight': 'حدد صفًا مثبتًا واحدًا أو أكثر.',
+     'remove_confirm': 'هل تريد إزالة حزم Argos: {packages}؟\n'
+                       '\n'
+                       'لن تعمل هذه الاتجاهات دون اتصال بعد ذلك.',
+     'removed': 'تمت إزالة حزم Argos المحددة.',
+     'preparing': 'جارٍ التجهيز…',
+     'canceling': 'جارٍ الإلغاء…',
+     'install_failed': 'تعذر تثبيت حزم اللغات:\n',
+     'ready': 'حزم اللغات المحددة جاهزة.',
+     'canceled': 'أُلغي',
+     'tess_down': 'Tesseract: جارٍ تنزيل اللغات…',
+     'win_wait': 'Windows OCR: بانتظار إذن المسؤول…',
+     'win_done': 'Windows OCR: اكتمل',
+     'win_installing': 'Windows OCR: جارٍ تثبيت {language} \u200f({current}/{total})…',
+     'win_checking': 'Windows OCR: جارٍ فحص {language}…',
+     'win_verifying': 'Windows OCR: جارٍ التحقق من {language}…',
+     'easy_down': 'EasyOCR: جارٍ تنزيل نماذج {language}…',
+     'easy_done': 'EasyOCR: اكتمل',
+     'ocr_section': 'OCR',
+     'translation_section': 'الترجمة',
+     'engine_not_installed_title': 'المحرك {engine} غير مثبت',
+     'engine_not_installed_body': 'ثبّت المحرك أولًا. ستظهر حزم اللغات هنا بعد التثبيت.',
+     'repair_needed': 'تحتاج إلى إصلاح',
+     'remove_packages_confirm': 'هل تريد إزالة حزم {engine} المحددة: {packages}؟',
+     'easy_shared_removal': 'يشارك EasyOCR النماذج بين اللغات. تؤثر إزالة هذه الحزمة على: {packages}.',
+     'packages_removed': 'تمت إزالة حزم لغات {engine} المحددة.',
+     'remove_failed': 'تعذرت إزالة حزم اللغات:\n',
+     'win_removing': 'Windows OCR: جارٍ إزالة {language} \u200f({current}/{total})…',
+     'win_rolling_back': 'Windows OCR: جارٍ الإلغاء وإزالة الحزم غير المكتملة…'},
 }
 
 
@@ -4333,6 +4678,44 @@ WINDOWS_OCR_RUNTIME_TEXT = {
                        'necessario riavviare.',
      'win_error_generic': "Windows non è riuscito a completare l'operazione del pacchetto OCR. "
                           'Installa gli aggiornamenti Windows in sospeso, riavvia il PC e riprova.'},
+
+    'ar': {'continue_background': 'المتابعة في الخلفية',
+     'show_progress': 'إظهار',
+     'task_installing_short': 'جارٍ التثبيت',
+     'task_packages_short': 'الحزم',
+     'task_busy_help': 'هناك عملية أخرى للحزم قيد التشغيل. اختياراتك محفوظة؛ افتح نافذة تقدمها أو '
+                       'انتظر حتى تنتهي.',
+     'win_component_short': 'DISM \u200f{percent}%',
+     'win_stage': 'الخطوة {stage}/4 · اللغة {current}/{total}',
+     'win_time_unknown': 'يتحكم Windows Update في الوقت المتبقي؛ لا يمكن تحديد وقت الانتهاء بدقة.',
+     'win_activity_recent': 'Windows يستجيب',
+     'win_background_info': 'ينزّل Windows اللغة من Windows Update. توقع من 5 إلى 20 دقيقة لكل لغة، '
+                            'وقد تبقى النسبة ثابتة لعدة دقائق؛ هذا طبيعي ولا يعني توقف العملية. يعمل '
+                            'التثبيت كخدمة Windows ويستمر عند إرساله إلى الخلفية، وتعرض هذه النافذة '
+                            'النتيجة.',
+     'win_download_stage': 'Windows Update: تم تنزيل {percent}%',
+     'win_quiet': 'لم يحدث تقدم منذ {minutes} دقيقة. لا يزال Windows يستجيب، لكن التنزيل قد يكون '
+                  'متوقفًا. يمكنك الانتظار في الخلفية أو الإلغاء بأمان.',
+     'win_installing_basic': 'يجهّز Windows اللغة {language} \u200f({current}/{total}). قد يستغرق '
+                             'مكوّن اللغة المطلوب عدة دقائق.',
+     'win_installing': 'ينزّل Windows Update مكونات OCR للغة {language} ويثبّتها ({current}/{total}). '
+                       'قد يستغرق ذلك عدة دقائق.',
+     'win_cancel_pending': 'طُلب الإلغاء. يُنهي Windows المكوّن الحالي بأمان؛ قد يستغرق ذلك عدة دقائق.',
+     'win_still_working': 'لا يزال Windows Update يعمل. لا تُطفئ الكمبيوتر.',
+     'win_registering': 'يسجّل Windows لغة OCR الجديدة. قد يستغرق ذلك لحظة…',
+     'win_installed_pending_restart': 'انتهى Windows من تثبيت حزمة OCR. اللغة {languages} غير متاحة '
+                                      "للتطبيق بعد؛ أعد تشغيل Click'n'Translate، أو أعد تشغيل Windows "
+                                      'إذا لم تظهر.',
+     'win_error_policy': 'حظرت سياسة Windows Update حزمة OCR هذه. افتح إعدادات Windows أو تواصل مع '
+                         'مسؤول النظام (0x800f0954).',
+     'win_error_source': 'تعذر على Windows تنزيل حزمة OCR. تحقق من Windows Update والاتصال بالإنترنت '
+                         'والمساحة الحرة، ثم حاول مجددًا.',
+     'win_error_restart': 'يحتاج Windows إلى إعادة التشغيل قبل تثبيت المكونات. أعد تشغيل الكمبيوتر ثم '
+                          'حاول مجددًا.',
+     'win_error_busy': 'خدمة مكونات Windows مشغولة؛ غالبًا بسبب Windows Update أو تثبيت آخر. انتظر '
+                       'دقيقة ثم حاول مجددًا؛ لا حاجة إلى إعادة التشغيل.',
+     'win_error_generic': 'تعذر على Windows إكمال عملية حزمة OCR. ثبّت تحديثات Windows المعلقة وأعد '
+                          'تشغيل الكمبيوتر ثم حاول مجددًا.'},
 }
 for _runtime_lang, _runtime_values in WINDOWS_OCR_RUNTIME_TEXT.items():
     LANGUAGE_MANAGER_TEXT.setdefault(_runtime_lang, {}).update(_runtime_values)
@@ -5559,7 +5942,9 @@ class OcrLanguageManagerDialog(QDialog):
                      'fr': 'Langue non prise en charge par ce moteur', 'zh': '此引擎不支持该语言',
                         'pt': 'Idioma não suportado por este mecanismo',
                         'it': 'Lingua non supportata da questo motore',
-                    }.get(self.lang, 'Language not supported by this engine')
+
+                     'ar': 'هذا المحرك لا يدعم اللغة',
+                 }.get(self.lang, 'Language not supported by this engine')
                     if not groups else
                     self._status_engine_missing(EASYOCR_ENGINE_DISPLAY)
                     if not engine_ready else
@@ -8190,6 +8575,8 @@ class SettingsWindow(QWidget):
 
                     'pt': 'Este arquivo de configurações é muito grande. Escolha uma exportação ClicknTranslate.',
                     'it': "Questo file delle impostazioni è troppo grande. Scegli un'esportazione ClicknTranslate.",
+
+                    'ar': 'ملف الإعدادات كبير جدًا. اختر ملفًا مصدّرًا من ClicknTranslate.',
                 }
                 raise ValueError(messages.get(lang, messages['en']))
             payload = json.loads(content.decode('utf-8-sig'))
@@ -8500,6 +8887,8 @@ class SettingsWindow(QWidget):
 
             'pt': 'Escolha um mecanismo de OCR. Motores ausentes podem ser instalados quando selecionados.',
             'it': 'Scegli un motore OCR. I motori mancanti possono essere installati quando selezionati.',
+
+            'ar': 'اختر محركًا للتعرف على النص. يمكن تثبيت المحركات الناقصة عند اختيارها.',
         }
         self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
         self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
@@ -8564,6 +8953,8 @@ class SettingsWindow(QWidget):
              'separadamente.'),
             'it': ('I fornitori online hanno bisogno di Internet. I provider offline installati sono elencati '
              'separatamente.'),
+
+            'ar': 'تتطلب الخدمات عبر الإنترنت اتصالًا. تُعرض الخدمات المثبتة التي تعمل دون اتصال بشكل منفصل.',
         }
         picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
         self.translator_combo.setToolTip(tooltip_text(picker_help))
@@ -9999,6 +10390,8 @@ class SettingsWindow(QWidget):
 
             'pt': 'Atalho ou toque duplo (Shift → Shift). Esc para limpar.',
             'it': 'Scorciatoia o doppio tocco (Maiusc → Maiusc). Esc per cancellare.',
+
+            'ar': 'اختصار أو ضغط مزدوج (Shift → Shift). اضغط Esc للمسح.',
         }
         return hints.get(lang, hints['en'])
 
@@ -10043,6 +10436,8 @@ class SettingsWindow(QWidget):
 
                     'pt': '{hotkey} já está em uso: {action}',
                     'it': '{hotkey} è già utilizzato: {action}',
+
+                    'ar': 'الاختصار {hotkey} مستخدم بالفعل: {action}',
                 }
                 message = messages.get(lang, messages["en"]).format(
                     hotkey=hotkey, action=settings_text(lang, label).rstrip(":"))
@@ -12100,6 +12495,13 @@ finally {
                            'riprova.',
              'generic': "Impossibile installare l'aggiornamento. La tua versione attuale è stata mantenuta. "
                         "Chiudi le altre copie dell'app e riprova ad aggiornare."},
+
+            'ar': {'network': 'انقطع التنزيل. تحقق من الاتصال واضغط تحديث مجددًا؛ سيُستأنف التنزيل بأمان.',
+             'checksum': 'التحديث الذي تم تنزيله ناقص أو تالف. لم يُثبَّت؛ اضغط تحديث لتنزيله مجددًا.',
+             'permission': "حظر Windows الوصول إلى مجلد التطبيق. أغلق النسخ الأخرى من Click'n'Translate ووافق "
+                           'على طلب المسؤول ثم حاول مجددًا.',
+             'generic': 'تعذر تثبيت التحديث. احتُفظ بالإصدار الحالي. أغلق النسخ الأخرى من التطبيق وحاول '
+                        'التحديث مجددًا.'},
         }
         lowered = raw.lower()
         if not platform_support.IS_WINDOWS and any(token in lowered for token in (
@@ -12116,6 +12518,9 @@ finally {
                  'inicial e tente novamente. A versão atual foi mantida.'),
                 'it': ("La cartella dell'applicazione non è scrivibile. Sposta l'app nelle tue Applicazioni o nella "
                  'cartella Home e riprova. È stata mantenuta la versione attuale.'),
+
+                'ar': ('لا يمكن الكتابة في مجلد التطبيق. انقل التطبيق إلى مجلد التطبيقات الخاص بك أو مجلدك الشخصي ثم '
+                 'حاول مجددًا. احتُفظ بالإصدار الحالي.'),
             }
             return locations.get(language, locations['en'])
         if any(token in lowered for token in ("incompleteread", "connection", "timeout", "interrupted repeatedly", "download")):

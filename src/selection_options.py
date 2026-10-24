@@ -23,6 +23,14 @@ TEXT = {
      'Modalità di selezione',
      "Seleziona il testo in un'altra app. Avvia la traduzione con la scorciatoia, un pulsante accanto "
      'alla selezione o automaticamente. Utilizza il traduttore selezionato e le lingue di selezione.'),
+
+    'ar': ('بعد التحديد:',
+     'استخدام الاختصار',
+     'إظهار زر ترجمة',
+     'الترجمة فورًا',
+     'وضع التحديد',
+     'حدد نصًا في تطبيق آخر. ابدأ الترجمة بالاختصار، أو بزر بجوار التحديد، أو تلقائيًا. يُستخدم '
+     'المترجم المختار ولغتا وضع التحديد.'),
 }
 
 
