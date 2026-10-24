@@ -35,7 +35,7 @@ class WindowsAutoRecognitionTest(unittest.TestCase):
         with mock.patch.object(ocr, "_windows_auto_ocr_candidates", return_value=[("en", "en-US"), ("ru", "ru-RU")]):
             with mock.patch.object(ocr, "_get_windows_ocr_engine", side_effect=self._fake_engine_for):
                 with mock.patch.object(ocr, "run_ocr_with_engine", side_effect=fake_run):
-                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r: r.text):
+                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r, join_paragraphs=False: r.text):
                         text = ocr._recognize_with_windows_auto(object())
 
         self.assertEqual(text, "Hello world")
@@ -47,7 +47,7 @@ class WindowsAutoRecognitionTest(unittest.TestCase):
         with mock.patch.object(ocr, "_windows_auto_ocr_candidates", return_value=[]):
             with mock.patch.object(ocr, "_get_universal_ocr_engine", return_value="engine:universal"):
                 with mock.patch.object(ocr, "run_ocr_with_engine", side_effect=fake_run):
-                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r: r.text):
+                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r, join_paragraphs=False: r.text):
                         text = ocr._recognize_with_windows_auto(object())
 
         self.assertEqual(text, "universal text")
@@ -69,7 +69,7 @@ class WindowsAutoRecognitionTest(unittest.TestCase):
         with mock.patch.object(ocr, "_windows_auto_ocr_candidates", return_value=[("en", "en-US"), ("ru", "ru")]):
             with mock.patch.object(ocr, "_get_windows_ocr_engine", side_effect=self._fake_engine_for):
                 with mock.patch.object(ocr, "run_ocr_with_engine", side_effect=fake_run):
-                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r: r.text):
+                    with mock.patch.object(ocr, "_windows_ocr_result_to_text", side_effect=lambda r, join_paragraphs=False: r.text):
                         text = ocr._recognize_with_windows_auto(object())
 
         self.assertEqual(text, "Привет, мир! Как дела?")

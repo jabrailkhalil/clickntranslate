@@ -134,13 +134,14 @@ LANGUAGES = [
     LanguageInfo("hi", "Hindi", "Хинди", "HI", "Hindi_flag.png", "hi-IN", "hin"),
 ]
 
-from extended_languages import EXTRA_NAMES, EXTRA_OCR_CODES, EXTRA_WINDOWS_TAGS
+from extended_languages import EXTRA_NAMES, EXTRA_OCR_CODES, EXTRA_WINDOWS_TAGS, EXTRA_FLAG_COUNTRIES
 
 for _locale, _names in EXTRA_NAMES.items():
     LOCALIZED_LANGUAGE_NAMES[_locale].update(_names)
 for _code, _tesseract in EXTRA_OCR_CODES.items():
     LANGUAGES.append(LanguageInfo(_code, EXTRA_NAMES['en'][_code], EXTRA_NAMES['ru'][_code],
-                                  _code.upper(), '', EXTRA_WINDOWS_TAGS[_code], _tesseract,
+                                  _code.upper(), f'flags/{EXTRA_FLAG_COUNTRIES[_code]}.png',
+                                  EXTRA_WINDOWS_TAGS[_code], _tesseract,
                                   easyocr_code='no' if _code == 'nb' else ''))
 
 LANGUAGE_BY_CODE = {language.code: language for language in LANGUAGES}

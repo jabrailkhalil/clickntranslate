@@ -8417,7 +8417,9 @@ class SettingsWindow(QWidget):
         # --- ГРУППА ЧЕКБОКСОВ ---
         # The layout margin already supplies the intended 5px top inset.
 
-        fixed_height = 28
+        # One checkbox size across every page; nine OCR rows must also fit the
+        # fixed settings viewport without hiding the last option.
+        fixed_height = 25
         engine_combo_width = 180
         engine_control_height = 28
         # Three joined action rows must fit above the pager in the real
@@ -9825,6 +9827,7 @@ class SettingsWindow(QWidget):
             self.secondary_view_shell = None
 
     def show_hotkeys_screen(self):
+        self._remember_secondary_return_page()
         self.setup_new_layout()
         self.hotkeys_mode = True
         self._secondary_view_kind = "hotkeys"
@@ -10208,13 +10211,13 @@ class SettingsWindow(QWidget):
             self.parent.game_translate_hotkey_thread.start()
 
     def back_from_hotkeys(self):
-        self.init_ui()
-        self.apply_theme()
+        self._return_from_secondary_view()
         schedule = getattr(self.parent, "_schedule_guide_step", None)
         if callable(schedule):
             schedule(0)
 
     def show_history_view(self):
+        self._remember_secondary_return_page()
         self.setup_new_layout()
         self.hotkeys_mode = False
         self._secondary_view_kind = "history"
@@ -10519,10 +10522,31 @@ class SettingsWindow(QWidget):
             )
 
     def back_from_history(self):
+        self._return_from_secondary_view()
+
+    def _remember_secondary_return_page(self):
+        # Theme/language refreshes can rebuild an already open secondary view.
+        # Only entering from the real settings stack changes its destination.
+        if not getattr(self, '_secondary_view_kind', None):
+            self._secondary_return_page = getattr(self, '_settings_page_index', 0)
+            scroll = getattr(self, 'translation_settings_scroll', None)
+            self._secondary_return_scroll = scroll.verticalScrollBar().value() if scroll else 0
+
+    def _return_from_secondary_view(self):
+        page = getattr(self, '_secondary_return_page', 0)
+        position = getattr(self, '_secondary_return_scroll', 0)
         self.init_ui()
+        self._set_settings_page(page)
         self.apply_theme()
+        if page == 1:
+            scroll = self.translation_settings_scroll
+            def restore_scroll():
+                if getattr(self, 'translation_settings_scroll', None) is scroll:
+                    scroll.verticalScrollBar().setValue(position)
+            QtCore.QTimer.singleShot(0, restore_scroll)
 
     def show_copy_history_view(self):
+        self._remember_secondary_return_page()
         self.setup_new_layout()
         self.hotkeys_mode = False
         self._secondary_view_kind = "copy_history"
@@ -10591,8 +10615,7 @@ class SettingsWindow(QWidget):
             )
 
     def back_from_copy_history(self):
-        self.init_ui()
-        self.apply_theme()
+        self._return_from_secondary_view()
 
     def save_and_back(self):
         autostart_enabled = self._apply_startup_checkbox()

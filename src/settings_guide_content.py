@@ -3,7 +3,7 @@ COPY = {
  'ru': (
     'Настройки перевода и результата',
     'Основные настройки: запуск, история, подсказки, проверка обновлений, показ окна, масштаб и размер текста результата с примером.',
-    'Перевод и OCR: движки, копирование, замена выделения, восстановление буфера, закрытие результата кликом снаружи и параметры захвата. Все параметры OCR видны сразу.',
+    'Перевод и OCR: движки, захват, копирование и замена текста. «Объединять строки в абзацы» убирает переносы внутри связного текста перед переводом.',
     'Языковые пакеты → API',
     'Во вкладке API окна «Языковые пакеты» выберите сервис, введите ключ и ID модели. «Сохранить и выбрать» подключает его к переводу; режим распознавания также выбирает этот сервис для OCR. API необязателен.',
     'Текст результата',
@@ -17,7 +17,7 @@ COPY = {
  'en': (
     'Translation and result settings',
     'General: startup, history, tooltips, update checks, result window, interface scale and result text size with a preview.',
-    'Translation and OCR: engines, copying, replacing a selection, clipboard restoration, closing results on outside click and capture options. All OCR options are immediately visible.',
+    'Translation and OCR: engines, capture, copying and replacing text. Join OCR lines into paragraphs removes visual line wraps from connected text before translating.',
     'Language packages → API',
     'In the API tab of Language packages, choose a service and enter its key and model ID. Save and select uses it for translation; a recognition mode also selects it for OCR. API services are optional.',
     'Result text',
@@ -31,7 +31,7 @@ COPY = {
  'es': (
     'Ajustes de traducción y resultado',
     'General: inicio, historiales, ayudas, actualizaciones, ventana de resultado, escala y tamaño del texto con vista previa.',
-    'Traducción y OCR: motores, copia, reemplazo, portapapeles, cierre al pulsar fuera y captura. Las opciones OCR siempre están visibles.',
+    'Traducción y OCR: motores, captura, copia y reemplazo. Unir líneas OCR en párrafos elimina los saltos de línea dentro de un texto continuo antes de traducir.',
     'Paquetes de idioma → API',
     'En la pestaña API de Paquetes de idioma, elige un servicio, su clave y el ID del modelo. Guardar y elegir lo usa para traducir; un modo de reconocimiento también lo selecciona para OCR. La API es opcional.',
     'Texto del resultado',
@@ -45,7 +45,7 @@ COPY = {
  'de': (
     'Übersetzung und Ergebnis einstellen',
     'Allgemein: Start, Verlauf, Hinweise, Updates, Ergebnisfenster, Skalierung und Textgröße mit Vorschau.',
-    'Übersetzung und OCR: Dienste, Kopieren, Auswahl ersetzen, Zwischenablage, Außenklick und Aufnahme. Alle OCR-Optionen sind direkt sichtbar.',
+    'Übersetzung und OCR: Dienste, Aufnahme, Kopieren und Ersetzen. OCR-Zeilen zu Absätzen verbinden entfernt visuelle Zeilenumbrüche vor der Übersetzung.',
     'Sprachpakete → API',
     'Im API-Tab der Sprachpakete Dienst, Schlüssel und Modell-ID eingeben. Speichern und wählen verwendet den Dienst zur Übersetzung; ein Erkennungsmodus wählt ihn auch für OCR. API-Dienste sind optional.',
     'Ergebnistext',
@@ -59,7 +59,7 @@ COPY = {
  'fr': (
     'Réglages de traduction et de résultat',
     'Général : démarrage, historiques, aides, mises à jour, fenêtre de résultat, échelle et taille du texte avec aperçu.',
-    'Traduction et OCR : moteurs, copie, remplacement, presse-papiers, fermeture au clic extérieur et capture. Toutes les options OCR restent visibles.',
+    'Traduction et OCR : moteurs, capture, copie et remplacement. Réunir les lignes OCR en paragraphes supprime les retours à la ligne visuels avant la traduction.',
     'Modules de langue → API',
     'Dans l’onglet API des modules de langue, choisissez un service, sa clé et son identifiant de modèle. Enregistrer et choisir l’utilise pour traduire ; un mode de reconnaissance le choisit aussi pour l’OCR. L’API est facultative.',
     'Texte du résultat',
@@ -73,7 +73,7 @@ COPY = {
  'zh': (
     '翻译与结果设置',
     '常规设置：启动、历史、提示、更新、结果窗口、界面缩放和带预览的结果文字大小。',
-    '翻译与 OCR：引擎、复制、替换选中文字、恢复剪贴板、外部点击关闭结果和屏幕捕获。所有 OCR 选项均直接显示。',
+    '翻译与 OCR：引擎、捕获、复制和替换文字。“将 OCR 行合并为段落”可在翻译前去除段落内的视觉换行。',
     '语言包 → API',
     '在语言包窗口的 API 标签页中选择服务，输入密钥和模型 ID。“保存并选用”将其用于翻译；识别模式也将其用于 OCR。API 为可选功能。',
     '结果文字',
@@ -88,9 +88,8 @@ COPY = {
     'pt': ('Configurações de tradução e resultados',
      'Geral: inicialização, histórico, dicas de ferramentas, verificações de atualização, janela de '
      'resultados, escala de interface e tamanho do texto do resultado com visualização.',
-     'Tradução e OCR: motores, cópia, substituição de seleção, restauração da área de transferência, '
-     'fechamento do resultado ao clicar fora e opções de captura. Todas as opções de OCR ficam '
-     'visíveis.',
+     'Tradução e OCR: motores, captura, cópia e substituição. Unir linhas OCR em parágrafos remove '
+     'as quebras visuais dentro do texto antes de traduzir.',
      'Pacotes de idiomas → API',
      'Na aba API de Pacotes de idiomas, escolha um serviço e informe a chave e o ID do modelo. Salvar '
      'e selecionar ativa o serviço para tradução; os modos de reconhecimento também o ativam para OCR. '
@@ -111,8 +110,8 @@ COPY = {
     'it': ('Impostazioni di traduzione e risultati',
      'Generale: avvio, cronologia, descrizioni comandi, controlli degli aggiornamenti, finestra dei '
      "risultati, scala dell'interfaccia e dimensione del testo dei risultati con un'anteprima.",
-     'Traduzione e OCR: motori, copia, sostituzione della selezione, ripristino degli appunti, '
-     'chiusura con clic esterno e opzioni di acquisizione. Tutte le opzioni OCR sono subito visibili.',
+     'Traduzione e OCR: motori, acquisizione, copia e sostituzione. Unisci le righe OCR in paragrafi '
+     'rimuove gli a capo visivi nel testo prima della traduzione.',
      'Pacchetti lingua → API',
      'Nella scheda API di Pacchetti lingua, scegli un servizio e inserisci la chiave e l’ID del '
      'modello. Salva e seleziona lo attiva per la traduzione; le modalità di riconoscimento lo '

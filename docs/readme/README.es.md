@@ -4,6 +4,19 @@
 
 <h1 align="center">Click’n’Translate</h1>
 
+<a name="readme-languages"></a>
+
+<p align="center">
+  <a href="../../README.md">English</a> ·
+  <a href="README.ru.md">Русский</a> ·
+  <strong>Español</strong> ·
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.fr.md">Français</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.pt.md">Português</a> ·
+  <a href="README.it.md">Italiano</a>
+</p>
+
 <p align="center"><strong>Lee el texto de tu pantalla en tu idioma.</strong></p>
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
@@ -19,8 +32,6 @@
   <a href="https://translate.clickn.dev/en/">Sitio web</a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://t.me/jabrail_digital">Telegram</a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#readme-languages">Idiomas</a>
 </p>
 
 Traduce juegos, copia texto de imágenes, entiende documentos y sustituye mensajes por su traducción. Aplicación gratuita y de código abierto para **Windows, macOS y Linux**, con una edición independiente para **Android**.
@@ -105,12 +116,3 @@ Android tiene sus propias vistas de pantalla, texto, fotos e historial: [guía](
 ![Traducir toda la pantalla](../images/fullscreen-translation-demo-v2.gif)
 
 <sub>Grabaciones de la edición de escritorio; el diseño actual puede ser diferente.</sub>
-
-
----
-
-<a name="readme-languages"></a>
-
-Leer en otro idioma:
-
-[English](../../README.md) · [Русский](README.ru.md) · **Español** · [Deutsch](README.de.md) · [Français](README.fr.md) · [简体中文](README.zh-CN.md) · [Português](README.pt.md) · [Italiano](README.it.md)

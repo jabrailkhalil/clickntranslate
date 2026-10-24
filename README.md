@@ -4,6 +4,19 @@
 
 <h1 align="center">Click’n’Translate</h1>
 
+<a name="readme-languages"></a>
+
+<p align="center">
+  <strong>English</strong> ·
+  <a href="docs/readme/README.ru.md">Русский</a> ·
+  <a href="docs/readme/README.es.md">Español</a> ·
+  <a href="docs/readme/README.de.md">Deutsch</a> ·
+  <a href="docs/readme/README.fr.md">Français</a> ·
+  <a href="docs/readme/README.zh-CN.md">简体中文</a> ·
+  <a href="docs/readme/README.pt.md">Português</a> ·
+  <a href="docs/readme/README.it.md">Italiano</a>
+</p>
+
 <p align="center"><strong>Your screen. Your language.</strong></p>
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
@@ -19,8 +32,6 @@
   <a href="https://translate.clickn.dev/en/">Website</a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://t.me/jabrail_digital">Telegram</a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#readme-languages">Languages</a>
 </p>
 
 **Translate text from games, images and any app — without retyping it.** Capture an area, translate a selection, or follow changing text. Free and open source.
@@ -147,11 +158,3 @@ The small `.sha256` release files are used automatically by desktop updates to c
 The download badge counts release-file downloads, including update files; it does not count unique users.
 
 </details>
-
----
-
-<a name="readme-languages"></a>
-
-Read in your language:
-
-**English** · [Русский](docs/readme/README.ru.md) · [Español](docs/readme/README.es.md) · [Deutsch](docs/readme/README.de.md) · [Français](docs/readme/README.fr.md) · [简体中文](docs/readme/README.zh-CN.md) · [Português](docs/readme/README.pt.md) · [Italiano](docs/readme/README.it.md)

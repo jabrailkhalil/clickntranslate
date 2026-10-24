@@ -50,5 +50,8 @@ def order_ocr_items(items):
     return [item for line in ocr_lines(items) for item in line]
 
 
-def ocr_text_from_items(items):
+def ocr_text_from_items(items, *, join_paragraphs=False):
+    if join_paragraphs:
+        from ocr_paragraphs import boxes_from_items, paragraph_text
+        return paragraph_text(boxes_from_items(items))
     return '\n'.join(' '.join(item[1] for item in line) for line in ocr_lines(items)).strip()

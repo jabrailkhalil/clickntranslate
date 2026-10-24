@@ -44,10 +44,20 @@ def test_image_request_returns_source_and_translation_once(config):
 
 
 def test_copy_only_does_not_request_translation(config):
+    config['ocr_join_paragraphs'] = True
     with mock.patch.object(api, '_text_response', return_value='{"source":"Hello","translation":null}') as call:
         result = api.recognize('openai', Image.new('RGB',(60,30)), 'en', None, config)
     assert result.translation is None
     assert 'do not translate' in call.call_args.args[3]
+    assert 'Join visual line wraps' not in call.call_args.args[3]
+
+
+def test_paragraph_option_is_part_of_the_same_vision_request(config):
+    config['ocr_join_paragraphs'] = True
+    with mock.patch.object(api, '_text_response', return_value='{"source":"Hello there","translation":"مرحبا"}') as call:
+        api.recognize('openai', Image.new('RGB', (60, 30)), 'en', 'ar', config)
+    call.assert_called_once()
+    assert 'Join visual line wraps' in call.call_args.args[3]
 
 
 def test_positioned_one_request_result_preserves_mapping(config):

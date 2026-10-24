@@ -231,8 +231,11 @@ def game_text(language, key):
     return texts.get(key, GAME_TEXT["en"].get(key, key))
 
 
-def normalize_game_ocr_text(text):
-    """Collapse OCR whitespace without erasing punctuation used by dialogue."""
+def normalize_game_ocr_text(text, *, join_paragraphs=False):
+    """Normalize OCR spacing while retaining optional paragraph boundaries."""
+    if join_paragraphs:
+        from ocr_paragraphs import merge_text_lines
+        return merge_text_lines(text)
     lines = [re.sub(r"\s+", " ", line).strip() for line in str(text or "").splitlines()]
     return "\n".join(line for line in lines if line).strip()
 
@@ -1301,6 +1304,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             return
         self._ocr_busy = True
         self._workers.add(worker)
+        worker.join_paragraphs = self.config.get('ocr_join_paragraphs') is True
         worker.result_ready.connect(self._on_ocr_result)
         worker.finished.connect(self._ocr_finished)
         worker.finished.connect(worker.deleteLater)
@@ -1311,7 +1315,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if self._closed or self.paused or not self._target_is_active():
             return
         self._has_ocr_source = True
-        normalized = normalize_game_ocr_text(text)
+        normalized = normalize_game_ocr_text(text, join_paragraphs=self.config.get('ocr_join_paragraphs') is True)
         if not normalized:
             self._empty_ocr_frames += 1
             self._last_source_text = ''
@@ -1938,7 +1942,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
         if self._closed or self.paused or not self._target_is_active():
             return
-        grouped = _group_screen_ocr_lines(lines)
+        grouped = _group_screen_ocr_lines(lines, join_paragraphs=self.config.get('ocr_join_paragraphs') is True)
         viewport = QtCore.QRectF(0, 0, self.width() * self._ocr_scale_x, self.height() * self._ocr_scale_y)
         grouped = [(*item[:4], normalize_game_ocr_text(item[4])) for item in grouped
                    if len(normalize_game_ocr_text(item[4])) >= 2

@@ -44,10 +44,12 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
         assert scroll.horizontalScrollBar().maximum() == 0
         for control in (settings.ocr_engine_combo, settings.translator_combo,
                         settings.close_result_on_outside_click_checkbox,
+                        settings.ocr_join_paragraphs_checkbox,
                         settings.copy_notification_checkbox):
             rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
             assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         for flag in (settings.copy_translated_checkbox, settings.restore_clipboard_checkbox,
+                     settings.ocr_join_paragraphs_checkbox,
                      settings.close_result_on_outside_click_checkbox):
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
         settings._set_settings_page(0)
@@ -67,6 +69,7 @@ def test_flags_persist_and_ocr_options_are_reachable(window):
     settings._set_settings_page(1)
     for key, flag in (
         ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
+        ('ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
         ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
     ):
         flag.setChecked(False)

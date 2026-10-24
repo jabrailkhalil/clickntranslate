@@ -4,6 +4,19 @@
 
 <h1 align="center">Click’n’Translate</h1>
 
+<a name="readme-languages"></a>
+
+<p align="center">
+  <a href="../../README.md">English</a> ·
+  <a href="README.ru.md">Русский</a> ·
+  <a href="README.es.md">Español</a> ·
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.fr.md">Français</a> ·
+  <strong>简体中文</strong> ·
+  <a href="README.pt.md">Português</a> ·
+  <a href="README.it.md">Italiano</a>
+</p>
+
 <p align="center"><strong>用自己的语言，读懂屏幕上的文字。</strong></p>
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
@@ -19,8 +32,6 @@
   <a href="https://translate.clickn.dev/en/">网站</a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://t.me/jabrail_digital">Telegram</a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="#readme-languages">语言</a>
 </p>
 
 翻译游戏、提取图片文字、阅读文档，或将消息替换为译文。面向 **Windows、macOS 和 Linux** 的免费开源桌面应用，另有独立的 **Android** 版本。
@@ -105,12 +116,3 @@ Android 有独立的屏幕、文字、照片与历史界面：[移动版指南](
 ![翻译整个屏幕](../images/fullscreen-translation-demo-v2.gif)
 
 <sub>这些是桌面版工作流程的录像，当前窗口外观可能有所不同。</sub>
-
-
----
-
-<a name="readme-languages"></a>
-
-其他语言的 README:
-
-[English](../../README.md) · [Русский](README.ru.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · **简体中文** · [Português](README.pt.md) · [Italiano](README.it.md)
