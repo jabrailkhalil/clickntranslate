@@ -93,7 +93,7 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                 assert navigation.width() == sum(tab.sizeHint().width() for tab in tabs) + 6*(len(tabs)-1)
                 nav_global = rect_in(navigation, window.ui_root)
                 header_global = rect_in(window.title_bar, window.ui_root)
-                assert nav_global.top() - header_global.bottom() - 1 == 8, context
+                assert nav_global.top() - header_global.bottom() - 1 == 0, context
                 for tab in tabs:
                     assert tab.height() == 28 and tab.y() == 2, (context, tab.geometry())
                     assert navigation.rect().contains(tab.geometry())
@@ -108,6 +108,16 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     assert ink.height() <= area.height(), (context, tab.text(), ink, area)
                 for left, right in zip(tabs, tabs[1:]):
                     assert right.x() - (left.x() + left.width()) == 6, context
+
+                template = settings.game_template_combo
+                remember = settings.game_remember_template_checkbox
+                template_rect, remember_rect = rect_in(template, settings.settings_game_page), rect_in(remember, settings.settings_game_page)
+                assert not settings.game_template_label.isVisible(), context
+                assert template_rect.center().y() == remember_rect.center().y(), context
+                assert remember.sizeHint().width() <= remember.width(), context
+                assert template.width() == settings.game_interval_controls.width(), context
+                assert rect_in(row, settings.settings_game_page).bottom() < template_rect.top(), context
+                assert template_rect.bottom() < rect_in(settings.game_interval_controls, settings.settings_game_page).top(), context
 
 
 @pytest.mark.parametrize('dark', [True, False])

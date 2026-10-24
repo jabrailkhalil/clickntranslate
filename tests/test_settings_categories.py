@@ -10,6 +10,17 @@ import settings_window
 from qt_layout_test_support import ensure_layout_fonts
 
 
+def assert_label_near_field(label, control):
+    alignment = QStyle.visualAlignment(label.layoutDirection(), label.alignment())
+    ink = label.style().itemTextRect(label.fontMetrics(), label.contentsRect(),
+                                    alignment, label.isEnabled(), label.text())
+    ink.moveTopLeft(label.mapTo(control.parentWidget(), ink.topLeft()))
+    field = control.geometry()
+    gap = (ink.left() - field.right() - 1 if label.isRightToLeft()
+           else field.left() - ink.right() - 1)
+    assert 0 <= gap <= 18, (label.text(), gap, ink, field)
+
+
 @pytest.fixture
 def window():
     app = QApplication.instance() or QApplication([])
@@ -40,6 +51,9 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
         window._ui_scale_controller.set_percent(scale)
         settings._set_settings_page(1)
         QApplication.processEvents()
+        for label, control in ((settings.translator_engine_label, settings.translator_combo),
+                               (settings.result_window_label, settings.result_window_control)):
+            assert_label_near_field(label, control)
         scroll = settings.translation_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
         for control in (settings.translator_combo, settings.result_window_control,
@@ -53,6 +67,7 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
         settings._set_settings_page(4)
         QApplication.processEvents()
+        assert_label_near_field(settings.ocr_engine_label, settings.ocr_engine_combo)
         scroll = settings.ocr_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
         for control in (settings.ocr_engine_combo, settings.ocr_join_paragraphs_checkbox,

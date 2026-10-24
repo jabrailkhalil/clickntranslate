@@ -10042,8 +10042,8 @@ class SettingsWindow(QWidget):
         self.hotkeys_mode = False
         self._secondary_view_kind = None
         self.secondary_view_shell = None
-        # Keep navigation separate from the draggable title bar.
-        self.main_layout.setContentsMargins(5, 8, 5, 5)
+        # Navigation attaches to the title bar; only its own layout pads text.
+        self.main_layout.setContentsMargins(5, 0, 5, 5)
         # Five general rows must finish clearly above the fixed action panel.
         # An 8px gap plus 38px rows produced a 46px rhythm and let the final
         # checkbox run into the buttons in the real embedded viewport.
@@ -10833,8 +10833,8 @@ class SettingsWindow(QWidget):
         self.game_scan_interval_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         interval_row.addWidget(self.game_scan_interval_slider)
         interval_row.addWidget(self.game_scan_interval_value)
-        game_layout.addWidget(self.game_scan_interval_label, 2, 0)
-        game_layout.addWidget(self.game_interval_controls, 2, 1)
+        game_layout.addWidget(self.game_scan_interval_label, 3, 0)
+        game_layout.addWidget(self.game_interval_controls, 3, 1)
 
         self.game_overlay_opacity_label = game_row(
             settings_text(lang, "game_overlay_opacity")
@@ -10864,8 +10864,8 @@ class SettingsWindow(QWidget):
         self.game_overlay_opacity_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         opacity_row.addWidget(self.game_overlay_opacity_slider)
         opacity_row.addWidget(self.game_overlay_opacity_value)
-        game_layout.addWidget(self.game_overlay_opacity_label, 3, 0)
-        game_layout.addWidget(self.game_opacity_controls, 3, 1)
+        game_layout.addWidget(self.game_overlay_opacity_label, 4, 0)
+        game_layout.addWidget(self.game_opacity_controls, 4, 1)
 
         self.game_pause_inactive_checkbox = QCheckBox(
             settings_text(lang, "game_pause_inactive"), self.settings_game_page
@@ -10880,7 +10880,7 @@ class SettingsWindow(QWidget):
         self.game_pause_inactive_checkbox.setObjectName("settingsPageCheckbox")
         self.game_pause_inactive_checkbox.setStyleSheet("margin:0; padding:0;")
         game_layout.addWidget(
-            self.game_pause_inactive_checkbox, 4, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
+            self.game_pause_inactive_checkbox, 5, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter
         )
 
         self.game_show_original_checkbox = QCheckBox(
@@ -10903,8 +10903,8 @@ class SettingsWindow(QWidget):
         self.game_manual_output_checkbox = QCheckBox(dynamic_text(lang, 'manual_output'), self.settings_game_page)
         self.game_toolbar_checkbox = QCheckBox(dynamic_text(lang, 'show_toolbar'), self.settings_game_page)
         for row, checkbox, key, default in (
-                (5, self.game_manual_output_checkbox, 'game_manual_output', False),
-                (6, self.game_toolbar_checkbox, 'game_show_toolbar', True)):
+                (6, self.game_manual_output_checkbox, 'game_manual_output', False),
+                (7, self.game_toolbar_checkbox, 'game_show_toolbar', True)):
             checkbox.setChecked(bool(self.parent.config.get(key, default)))
             checkbox.setFixedHeight(page_checkbox_height)
             checkbox.setObjectName('settingsPageCheckbox')
@@ -10924,6 +10924,7 @@ class SettingsWindow(QWidget):
         self.game_template_combo.setMinimumWidth(0)
         self.game_template_combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.game_template_combo.setFixedHeight(28)
+        self.game_template_combo.setFixedWidth(340)
         self.game_template_combo.setMaxVisibleItems(7)
         self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
         remembered_name = self.parent.config.get('game_last_template', '')
@@ -10936,12 +10937,13 @@ class SettingsWindow(QWidget):
         self.game_template_label = QLabel(region_text(lang, 'template_label'), self.settings_game_page)
         self.game_template_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.game_template_label.setToolTip(self.game_template_combo.toolTip())
+        self.game_template_label.setBuddy(self.game_template_combo)
+        self.game_template_label.hide()
         self.game_remember_template_checkbox.toggled.connect(self._game_template_memory_changed)
         self.game_template_combo.activated.connect(lambda _index: self.auto_save_setting(
             'game_last_template', self.game_template_combo.currentData() or ''))
-        game_layout.addWidget(self.game_remember_template_checkbox, 7, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter)
-        game_layout.addWidget(self.game_template_label, 8, 0)
-        game_layout.addWidget(self.game_template_combo, 8, 1)
+        game_layout.addWidget(self.game_remember_template_checkbox, 2, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        game_layout.addWidget(self.game_template_combo, 2, 1)
 
         self.game_workflow_note = QLabel(
             settings_text(lang, "game_intro"), self.settings_game_page

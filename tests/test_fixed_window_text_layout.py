@@ -232,7 +232,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.assertLessEqual(abs(settings.width() - 672), 1)
                     self.assertEqual(settings.height(), 346)
                     navigation = self.rect_in(self.window, settings.settings_page_navigation)
-                    self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 9)
+                    self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 1)
                     self.assertLessEqual(abs(navigation.center().x() - self.window.ui_root.rect().center().x()), 1)
                     image = self.window.ui_root.grab().toImage()
                     ratio = image.devicePixelRatio()
@@ -315,26 +315,30 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                 settings.back_from_hotkeys()
                 self.settle()
             navigation = self.rect_in(self.window, settings.settings_page_navigation)
-            self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 9)
+            self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 1)
             self.window.show_main_screen()
             self.settle()
             self.assertEqual(self.rect_in(self.window, self.window.main_composer), original_composer)
             self.assertFalse(settings.settings_page_navigation.isVisible())
 
-    def test_tab_selection_changes_painted_text_contrast_without_moving_the_strip(self):
+    def test_tab_selection_changes_painted_text_accent_without_moving_the_strip(self):
         self.window.show_settings()
         settings = self.window.settings_window
 
-        def text_contrast(tab, dark):
+        def text_ink(tab):
             image = self.window.ui_root.grab().toImage()
             ratio = image.devicePixelRatio()
             area = tab._label_area().translated(tab.mapTo(self.window.ui_root, QPoint()))
-            levels = [
-                image.pixelColor(x, y).lightness()
+            surface = image.pixelColor(round(area.left() * ratio), round(area.top() * ratio)).getRgb()[:3]
+            colors = [
+                image.pixelColor(x, y).getRgb()[:3]
                 for x in range(round(area.left() * ratio), round((area.right() + 1) * ratio))
                 for y in range(round(area.top() * ratio), round((area.bottom() + 1) * ratio))
             ]
-            return max(levels) if dark else 255 - min(levels)
+            distance = lambda color: sum(abs(a-b) for a, b in zip(color, surface))
+            ink = max(colors, key=distance)
+            self.assertGreater(distance(ink), 150)
+            return ink
 
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
@@ -346,10 +350,13 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             tabs[0].click()
             tabs[0].clearFocus()
             self.settle()
-            active_contrast = text_contrast(tabs[0], theme == "Темная")
+            active_ink = text_ink(tabs[0])
             tabs[2].click()
             self.settle()
-            self.assertGreater(active_contrast, text_contrast(tabs[0], theme == "Темная") + 20)
+            inactive_ink = text_ink(tabs[0])
+            # The reference uses purple text plus an underline. In the light
+            # theme the active accent need not be darker than the grey label.
+            self.assertGreater(sum(abs(a-b) for a, b in zip(active_ink, inactive_ink)), 30)
             self.assertEqual(positions, [tab.geometry() for tab in tabs])
         self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False, False])
 

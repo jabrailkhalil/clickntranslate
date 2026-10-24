@@ -305,7 +305,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             (1, settings.result_window_label, settings.result_window_control)):
         label.setParent(content)
         control.setParent(content)
-        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         control.setFixedSize(270, 28)
         grid.addWidget(label, row, 0)
         grid.addWidget(control, row, 1)
@@ -359,7 +359,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     settings.ocr_settings_grid = grid
     settings.ocr_engine_label.setParent(content)
     settings.ocr_engine_label.setText(section_text(lang, 'recognition'))
-    settings.ocr_engine_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    settings.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
     settings.ocr_engine_combo.setParent(content)
     settings.ocr_engine_combo.setFixedSize(270, 28)
     grid.addWidget(settings.ocr_engine_label, 0, 0)
