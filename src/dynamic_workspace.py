@@ -681,6 +681,7 @@ class OutputControls(QtWidgets.QFrame):
         self.move_button = QtWidgets.QPushButton(text(self.language, 'move_short'))
         self.resize_button = QtWidgets.QPushButton(text(self.language, 'resize_short'))
         for button, key in ((self.move_button, 'move'), (self.resize_button, 'resize')):
+            button.setProperty('keyboardArrowControl', True)
             button.setToolTip(text(self.language, key))
             button.setAccessibleName(button.toolTip())
             button.setFixedHeight(28)

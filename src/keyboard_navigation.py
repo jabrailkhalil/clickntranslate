@@ -7,7 +7,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 LANGUAGES = ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id')
 TEXT = {
     'title': ('Keyboard controls', 'Управление с клавиатуры', 'Control con teclado', 'Tastatursteuerung', 'Commandes au clavier', '键盘操作', 'Controles do teclado', 'Comandi da tastiera', 'التحكم بلوحة المفاتيح', 'Klavye denetimleri', 'कीबोर्ड नियंत्रण', 'Kontrol papan ketik'),
-    'controls': ('Tab / Shift+Tab — next / previous control\nEnter / Space — activate a button or checkbox\nEnter / Alt+Down — open a list; arrows — choose\nEscape — close the list or dialog; go back in settings', 'Tab / Shift+Tab — следующий / предыдущий элемент\nEnter / Пробел — нажать кнопку или галочку\nEnter / Alt+↓ — открыть список; стрелки — выбрать\nEscape — закрыть список или диалог; вернуться из настроек', 'Tab / Mayús+Tab — control siguiente / anterior\nIntro / Espacio — activar un botón o casilla\nIntro / Alt+↓ — abrir una lista; flechas — elegir\nEsc — cerrar la lista o diálogo; volver desde ajustes', 'Tab / Umschalt+Tab — nächstes / voriges Element\nEingabe / Leertaste — Schaltfläche oder Kästchen betätigen\nEingabe / Alt+↓ — Liste öffnen; Pfeile — auswählen\nEscape — Liste oder Dialog schließen; in Einstellungen zurück', 'Tab / Maj+Tab — commande suivante / précédente\nEntrée / Espace — activer un bouton ou une case\nEntrée / Alt+↓ — ouvrir une liste ; flèches — choisir\nÉchap — fermer la liste ou le dialogue ; revenir des réglages', 'Tab / Shift+Tab — 下一个／上一个控件\nEnter / 空格 — 激活按钮或复选框\nEnter / Alt+↓ — 打开列表；方向键 — 选择\nEsc — 关闭列表或对话框；从设置返回', 'Tab / Shift+Tab — controle seguinte / anterior\nEnter / Espaço — acionar botão ou caixa\nEnter / Alt+↓ — abrir lista; setas — escolher\nEsc — fechar lista ou diálogo; voltar das configurações', 'Tab / Maiusc+Tab — controllo successivo / precedente\nInvio / Spazio — attivare un pulsante o una casella\nInvio / Alt+↓ — aprire elenco; frecce — scegliere\nEsc — chiudere elenco o finestra; tornare dalle impostazioni', 'Tab / Shift+Tab — العنصر التالي / السابق\nEnter / مسافة — تفعيل زر أو مربع اختيار\nEnter / Alt+↓ — فتح قائمة؛ الأسهم — اختيار\nEscape — إغلاق القائمة أو النافذة؛ الرجوع من الإعدادات', 'Tab / Shift+Tab — sonraki / önceki denetim\nEnter / Boşluk — düğmeyi veya kutuyu etkinleştir\nEnter / Alt+↓ — listeyi aç; oklar — seç\nEsc — listeyi veya pencereyi kapat; ayarlardan geri dön', 'Tab / Shift+Tab — अगला / पिछला नियंत्रण\nEnter / स्पेस — बटन या चेकबॉक्स चलाएँ\nEnter / Alt+↓ — सूची खोलें; तीर — चुनें\nEscape — सूची या संवाद बंद करें; सेटिंग्स से लौटें', 'Tab / Shift+Tab — kontrol berikutnya / sebelumnya\nEnter / Spasi — aktifkan tombol atau kotak centang\nEnter / Alt+↓ — buka daftar; panah — pilih\nEscape — tutup daftar atau dialog; kembali dari pengaturan'),
+    'controls': ('Arrows — move between controls\nTab / Shift+Tab — next / previous control\nEnter / Space — activate a button or checkbox\nEnter / Alt+Down — open a list; arrows — choose\nEscape — close the list or dialog; go back in settings', 'Стрелки — переход между элементами\nTab / Shift+Tab — следующий / предыдущий элемент\nEnter / Пробел — нажать кнопку или галочку\nEnter / Alt+↓ — открыть список; стрелки — выбрать\nEscape — закрыть список или диалог; вернуться из настроек', 'Flechas — moverse entre controles\nTab / Mayús+Tab — control siguiente / anterior\nIntro / Espacio — activar un botón o casilla\nIntro / Alt+↓ — abrir una lista; flechas — elegir\nEsc — cerrar la lista o diálogo; volver desde ajustes', 'Pfeile — zwischen Elementen wechseln\nTab / Umschalt+Tab — nächstes / voriges Element\nEingabe / Leertaste — Schaltfläche oder Kästchen betätigen\nEingabe / Alt+↓ — Liste öffnen; Pfeile — auswählen\nEscape — Liste oder Dialog schließen; in Einstellungen zurück', 'Flèches — passer entre les commandes\nTab / Maj+Tab — commande suivante / précédente\nEntrée / Espace — activer un bouton ou une case\nEntrée / Alt+↓ — ouvrir une liste ; flèches — choisir\nÉchap — fermer la liste ou le dialogue ; revenir des réglages', '方向键 — 在控件间移动\nTab / Shift+Tab — 下一个／上一个控件\nEnter / 空格 — 激活按钮或复选框\nEnter / Alt+↓ — 打开列表；方向键 — 选择\nEsc — 关闭列表或对话框；从设置返回', 'Setas — mover entre controles\nTab / Shift+Tab — controle seguinte / anterior\nEnter / Espaço — acionar botão ou caixa\nEnter / Alt+↓ — abrir lista; setas — escolher\nEsc — fechar lista ou diálogo; voltar das configurações', 'Frecce — spostarsi tra i controlli\nTab / Maiusc+Tab — controllo successivo / precedente\nInvio / Spazio — attivare un pulsante o una casella\nInvio / Alt+↓ — aprire elenco; frecce — scegliere\nEsc — chiudere elenco o finestra; tornare dalle impostazioni', 'الأسهم — الانتقال بين عناصر التحكم\nTab / Shift+Tab — العنصر التالي / السابق\nEnter / مسافة — تفعيل زر أو مربع اختيار\nEnter / Alt+↓ — فتح قائمة؛ الأسهم — اختيار\nEscape — إغلاق القائمة أو النافذة؛ الرجوع من الإعدادات', 'Oklar — denetimler arasında geçiş\nTab / Shift+Tab — sonraki / önceki denetim\nEnter / Boşluk — düğmeyi veya kutuyu etkinleştir\nEnter / Alt+↓ — listeyi aç; oklar — seç\nEsc — listeyi veya pencereyi kapat; ayarlardan geri dön', 'तीर — नियंत्रणों के बीच जाएँ\nTab / Shift+Tab — अगला / पिछला नियंत्रण\nEnter / स्पेस — बटन या चेकबॉक्स चलाएँ\nEnter / Alt+↓ — सूची खोलें; तीर — चुनें\nEscape — सूची या संवाद बंद करें; सेटिंग्स से लौटें', 'Panah — berpindah antar kontrol\nTab / Shift+Tab — kontrol berikutnya / sebelumnya\nEnter / Spasi — aktifkan tombol atau kotak centang\nEnter / Alt+↓ — buka daftar; panah — pilih\nEscape — tutup daftar atau dialog; kembali dari pengaturan'),
     'app': ('Ctrl+, — settings\nCtrl+Tab / Ctrl+Shift+Tab — next / previous settings tab\nAlt+Left — back\nCtrl+O — attach a file\nCtrl+Enter — translate from the text editor\nF1 — keyboard help', 'Ctrl+, — настройки\nCtrl+Tab / Ctrl+Shift+Tab — следующая / предыдущая вкладка настроек\nAlt+← — назад\nCtrl+O — прикрепить файл\nCtrl+Enter — перевести текст из редактора\nF1 — помощь по клавиатуре', 'Ctrl+, — ajustes\nCtrl+Tab / Ctrl+Mayús+Tab — pestaña siguiente / anterior\nAlt+← — volver\nCtrl+O — adjuntar archivo\nCtrl+Intro — traducir desde el editor\nF1 — ayuda del teclado', 'Strg+, — Einstellungen\nStrg+Tab / Strg+Umschalt+Tab — nächster / voriger Einstellungsreiter\nAlt+← — zurück\nStrg+O — Datei anhängen\nStrg+Eingabe — Text im Editor übersetzen\nF1 — Tastaturhilfe', 'Ctrl+, — réglages\nCtrl+Tab / Ctrl+Maj+Tab — onglet suivant / précédent\nAlt+← — retour\nCtrl+O — joindre un fichier\nCtrl+Entrée — traduire depuis l’éditeur\nF1 — aide du clavier', 'Ctrl+, — 设置\nCtrl+Tab / Ctrl+Shift+Tab — 下一个／上一个设置标签\nAlt+← — 返回\nCtrl+O — 附加文件\nCtrl+Enter — 翻译编辑器中的文本\nF1 — 键盘帮助', 'Ctrl+, — configurações\nCtrl+Tab / Ctrl+Shift+Tab — aba seguinte / anterior\nAlt+← — voltar\nCtrl+O — anexar arquivo\nCtrl+Enter — traduzir no editor\nF1 — ajuda do teclado', 'Ctrl+, — impostazioni\nCtrl+Tab / Ctrl+Maiusc+Tab — scheda successiva / precedente\nAlt+← — indietro\nCtrl+O — allegare un file\nCtrl+Invio — tradurre dall’editor\nF1 — guida della tastiera', 'Ctrl+, — الإعدادات\nCtrl+Tab / Ctrl+Shift+Tab — تبويب الإعدادات التالي / السابق\nAlt+← — رجوع\nCtrl+O — إرفاق ملف\nCtrl+Enter — ترجمة النص من المحرر\nF1 — مساعدة لوحة المفاتيح', 'Ctrl+, — ayarlar\nCtrl+Tab / Ctrl+Shift+Tab — sonraki / önceki ayar sekmesi\nAlt+← — geri\nCtrl+O — dosya ekle\nCtrl+Enter — düzenleyicideki metni çevir\nF1 — klavye yardımı', 'Ctrl+, — सेटिंग्स\nCtrl+Tab / Ctrl+Shift+Tab — अगला / पिछला सेटिंग्स टैब\nAlt+← — वापस\nCtrl+O — फ़ाइल संलग्न करें\nCtrl+Enter — संपादक से अनुवाद करें\nF1 — कीबोर्ड सहायता', 'Ctrl+, — pengaturan\nCtrl+Tab / Ctrl+Shift+Tab — tab pengaturan berikutnya / sebelumnya\nAlt+← — kembali\nCtrl+O — lampirkan berkas\nCtrl+Enter — terjemahkan dari editor\nF1 — bantuan papan ketik'),
     'area': ('F6 — switch between the area and its controls\nArrows — create or move the area; Shift+arrows — resize\nCtrl+arrows — move faster\nEnter — confirm; Escape — cancel', 'F6 — переключиться между областью и кнопками\nСтрелки — создать или двигать область; Shift+стрелки — размер\nCtrl+стрелки — двигать быстрее\nEnter — подтвердить; Escape — отменить', 'F6 — alternar entre zona y controles\nFlechas — crear o mover zona; Mayús+flechas — tamaño\nCtrl+flechas — mover más rápido\nIntro — confirmar; Esc — cancelar', 'F6 — zwischen Bereich und Bedienelementen wechseln\nPfeile — Bereich erstellen oder bewegen; Umschalt+Pfeile — Größe\nStrg+Pfeile — schneller bewegen\nEingabe — bestätigen; Escape — abbrechen', 'F6 — passer de la zone aux commandes\nFlèches — créer ou déplacer ; Maj+flèches — redimensionner\nCtrl+flèches — déplacer plus vite\nEntrée — confirmer ; Échap — annuler', 'F6 — 在区域与控件间切换\n方向键 — 创建或移动区域；Shift+方向键 — 调整大小\nCtrl+方向键 — 加速移动\nEnter — 确认；Esc — 取消', 'F6 — alternar entre área e controles\nSetas — criar ou mover área; Shift+setas — tamanho\nCtrl+setas — mover mais rápido\nEnter — confirmar; Esc — cancelar', 'F6 — passare dall’area ai controlli\nFrecce — creare o spostare l’area; Maiusc+frecce — dimensioni\nCtrl+frecce — spostare più velocemente\nInvio — confermare; Esc — annullare', 'F6 — التبديل بين المنطقة وعناصر التحكم\nالأسهم — إنشاء المنطقة أو نقلها؛ Shift+الأسهم — تغيير الحجم\nCtrl+الأسهم — نقل أسرع\nEnter — تأكيد؛ Escape — إلغاء', 'F6 — alan ve denetimler arasında geçiş\nOklar — alan oluştur veya taşı; Shift+oklar — boyutlandır\nCtrl+oklar — daha hızlı taşı\nEnter — onayla; Esc — iptal', 'F6 — क्षेत्र और नियंत्रणों के बीच बदलें\nतीर — क्षेत्र बनाएँ या खिसकाएँ; Shift+तीर — आकार बदलें\nCtrl+तीर — तेज़ खिसकाएँ\nEnter — पुष्टि; Escape — रद्द', 'F6 — beralih antara area dan kontrol\nPanah — buat atau pindahkan area; Shift+panah — ubah ukuran\nCtrl+panah — pindahkan lebih cepat\nEnter — konfirmasi; Escape — batal'),
     'pairs': ('Insert / N — add an area; Space — switch source / output\nPageUp / PageDown — previous / next area\nDelete — remove the selected area', 'Insert / N — добавить область; Пробел — источник / результат\nPageUp / PageDown — предыдущая / следующая область\nDelete — удалить выбранную область', 'Insert / N — añadir zona; Espacio — origen / resultado\nRePág / AvPág — zona anterior / siguiente\nSupr — eliminar zona seleccionada', 'Insert / N — Bereich hinzufügen; Leertaste — Quelle / Ausgabe\nBild↑ / Bild↓ — voriger / nächster Bereich\nEntf — ausgewählten Bereich entfernen', 'Insert / N — ajouter une zone ; Espace — source / résultat\nPage↑ / Page↓ — zone précédente / suivante\nSuppr — supprimer la zone sélectionnée', 'Insert / N — 添加区域；空格 — 切换源区域／结果区域\nPageUp / PageDown — 上一个／下一个区域\nDelete — 删除所选区域', 'Insert / N — adicionar área; Espaço — origem / resultado\nPageUp / PageDown — área anterior / seguinte\nDelete — remover área selecionada', 'Insert / N — aggiungere area; Spazio — origine / risultato\nPagSu / PagGiù — area precedente / successiva\nCanc — eliminare l’area selezionata', 'Insert / N — إضافة منطقة؛ مسافة — المصدر / النتيجة\nPageUp / PageDown — المنطقة السابقة / التالية\nDelete — حذف المنطقة المحددة', 'Insert / N — alan ekle; Boşluk — kaynak / sonuç\nPageUp / PageDown — önceki / sonraki alan\nDelete — seçili alanı sil', 'Insert / N — क्षेत्र जोड़ें; स्पेस — स्रोत / परिणाम\nPageUp / PageDown — पिछला / अगला क्षेत्र\nDelete — चयनित क्षेत्र हटाएँ', 'Insert / N — tambah area; Spasi — sumber / hasil\nPageUp / PageDown — area sebelumnya / berikutnya\nDelete — hapus area terpilih'),
@@ -100,6 +100,57 @@ def focus_control(widget, backwards=False):
     widget.setFocus(QtCore.Qt.BacktabFocusReason if backwards else QtCore.Qt.TabFocusReason)
 
 
+def _scroll_area(widget):
+    parent = widget.parentWidget()
+    while parent is not None:
+        if isinstance(parent, QtWidgets.QScrollArea):
+            return parent
+        parent = parent.parentWidget()
+    return None
+
+
+def spatial_target(root, current, key):
+    """Find the closest control in the requested visual direction."""
+    controls = tab_stops(root)
+    if current not in controls:
+        return controls[0] if controls else None
+    origin = QtCore.QRect(current.mapTo(root, QtCore.QPoint()), current.size())
+    center = QtCore.QPointF(origin.center())
+    horizontal = key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right)
+    sign = -1 if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Up) else 1
+    current_scroll = _scroll_area(current)
+    candidates = []
+    for widget in controls:
+        if widget is current or widget.isAncestorOf(current) or isinstance(widget, QtWidgets.QScrollArea):
+            continue
+        rect = QtCore.QRect(widget.mapTo(root, QtCore.QPoint()), widget.size())
+        scroll = _scroll_area(widget)
+        if scroll is not None and scroll is not current_scroll:
+            viewport = scroll.viewport()
+            visible = QtCore.QRect(viewport.mapTo(root, QtCore.QPoint()), viewport.size())
+            if not visible.intersects(rect):
+                continue
+        dx, dy = rect.center().x()-center.x(), rect.center().y()-center.y()
+        primary = (dx if horizontal else dy)*sign
+        if primary <= 1:
+            continue
+        cross = abs(dy if horizontal else dx)
+        cross_size = (rect.height()+origin.height() if horizontal else rect.width()+origin.width())/2
+        primary_size = (rect.width()+origin.width() if horizontal else rect.height()+origin.height())/2
+        cross_gap, gap = max(0, cross-cross_size), max(0, primary-primary_size)
+        candidates.append(((cross_gap > 0, gap+cross_gap*3, cross, primary), widget))
+    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
+def _uses_arrow_navigation(widget):
+    if _inside(widget, 'numberStepper') is not None or widget.property('keyboardArrowControl'):
+        return False
+    if isinstance(widget, QtWidgets.QRadioButton):
+        return False  # Native arrows select within the radio group.
+    return (isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QLabel))
+            or isinstance(widget, QtWidgets.QComboBox) and not widget.isEditable())
+
+
 def edit_area(rect, bounds, key, modifiers=QtCore.Qt.NoModifier, minimum=(8, 8)):
     """Move/resize in logical screen coordinates; no pointer warping."""
     if rect is None:
@@ -148,6 +199,8 @@ class KeyboardNavigation(QtCore.QObject):
         self.keyboard = False
         self._focused = lambda: None
         self._ring = lambda: None
+        self._help_dialog = None
+        self._help_pending = False
 
     def _hide_ring(self):
         ring = self._ring()
@@ -195,6 +248,24 @@ class KeyboardNavigation(QtCore.QObject):
         return True
 
     def _help(self, root):
+        if self._help_dialog is not None and not sip.isdeleted(self._help_dialog) and self._help_dialog.isVisible():
+            self._help_dialog.raise_()
+            self._help_dialog.activateWindow()
+            return
+        if self._help_pending:
+            return
+        self._help_pending = True
+        root_ref = weakref.ref(root)
+        focused = root.focusWidget()
+        focus_ref = weakref.ref(focused) if focused is not None else lambda: None
+        # Leave the native/graphics-proxy key dispatch before showing a window.
+        QtCore.QTimer.singleShot(0, lambda: self._open_help(root_ref, focus_ref))
+
+    def _open_help(self, root_ref, focus_ref):
+        self._help_pending = False
+        root = root_ref()
+        if root is None or sip.isdeleted(root) or not root.isVisible():
+            return
         owner = _owner(root)
         config = getattr(owner or root, 'config', getattr(root, '_config', {}))
         if not isinstance(config, dict):
@@ -207,7 +278,21 @@ class KeyboardNavigation(QtCore.QObject):
             message += '\n\n'+text(locale, 'area')
         if root.property('keyboardPairedAreas'):
             message += '\n\n'+text(locale, 'pairs')
-        QtWidgets.QMessageBox.information(owner or root, text(locale, 'title'), message)
+        from styled_dialogs import StyledMessageBox
+        box = StyledMessageBox(owner or root)
+        self._help_dialog = box
+        box.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        box.setWindowTitle(text(locale, 'title'))
+        box.setText(message)
+        box.setStandardButtons(StyledMessageBox.Ok)
+        def finished(_result):
+            if self._help_dialog is box:
+                self._help_dialog = None
+            previous = focus_ref()
+            if previous is not None and not sip.isdeleted(previous) and previous.isVisible() and previous.isEnabled():
+                focus_control(previous)
+        box.finished.connect(finished)
+        box.open()
 
     def eventFilter(self, widget, event):
         kind = event.type()
@@ -273,7 +358,8 @@ class KeyboardNavigation(QtCore.QObject):
         owner = _owner(root)
         self.keyboard = True
         if key == QtCore.Qt.Key_F1 and not modifiers:
-            self._help(root)
+            if not event.isAutoRepeat():
+                self._help(root)
             return True
         if owner is not None:
             if ctrl and key == QtCore.Qt.Key_Comma:
@@ -322,6 +408,14 @@ class KeyboardNavigation(QtCore.QObject):
                     buttons[target].click()
                     focus_control(buttons[target])
                     return True
+            navigate = (_uses_arrow_navigation(focus) or isinstance(focus, QtWidgets.QTabBar)
+                        and key in (QtCore.Qt.Key_Up, QtCore.Qt.Key_Down))
+            if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down) and navigate:
+                target = spatial_target(root, focus, key)
+                if target is not None:
+                    focus_control(target)
+                self._show_ring(target or focus)
+                return True
             if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter) and isinstance(focus, QtWidgets.QAbstractButton):
                 if not event.isAutoRepeat() and focus.isEnabled():
                     focus.click()

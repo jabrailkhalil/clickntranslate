@@ -18,6 +18,12 @@ def restore_application_keyboard_state(app):
     app.setLayoutDirection(direction)
     navigation = getattr(app, '_keyboard_navigation', None)
     if navigation is not None:
+        dialog = navigation._help_dialog
+        if dialog is not None:
+            from PyQt5 import sip
+            if not sip.isdeleted(dialog):
+                dialog.close()
+        navigation._help_dialog = None
         navigation.keyboard = False
         navigation._hide_ring()
 
@@ -220,14 +226,146 @@ def test_shortcut_recording_keeps_keyboard_commands_for_the_editor(window, app):
     assert focused(window.ui_root) is next_control
 
 
-def test_help_is_localized_and_opens_from_the_active_window(window):
+def test_help_is_localized_and_opens_from_the_active_window(window, app):
+    from styled_dialogs import StyledMessageBox
     window.set_interface_language('ar')
-    with mock.patch.object(QtWidgets.QMessageBox, 'information') as help_box:
+    with mock.patch.object(QtWidgets.QMessageBox, 'information', side_effect=AssertionError('Native message boxes must not be used')):
         QTest.keyClick(window.flag_button, QtCore.Qt.Key_F1)
-        parent, title, message = help_box.call_args.args
-    assert parent is window
-    assert title == keyboard.text('ar', 'title')
-    assert 'Ctrl+Tab' in message
+        app.processEvents()
+        box = app._keyboard_navigation._help_dialog
+        assert isinstance(box, StyledMessageBox)
+        assert not isinstance(box, QtWidgets.QMessageBox)
+        assert box.parentWidget() is window
+        assert box.isVisible() and box.graphicsProxyWidget() is None
+        assert box.windowTitle() == keyboard.text('ar', 'title')
+        assert 'Ctrl+Tab' in box.text()
+        QTest.keyClick(box, QtCore.Qt.Key_Escape)
+        app.processEvents()
+        assert app._keyboard_navigation._help_dialog is None
+        assert window.isVisible()
+
+
+@pytest.mark.parametrize('locale', keyboard.LANGUAGES)
+@pytest.mark.parametrize('dark', [True, False])
+def test_real_f1_help_can_be_opened_closed_and_reopened_without_nested_dialogs(window, app, locale, dark):
+    window.set_interface_language(locale)
+    if (window.current_theme != 'Светлая') != dark:
+        window.toggle_theme()
+    navigation = app._keyboard_navigation
+    for _ in range(2):
+        keyboard.focus_control(window.theme_button)
+        QTest.keyClick(window._ui_scale_controller.view, QtCore.Qt.Key_F1)
+        for _ in range(3):
+            app.processEvents()
+        box = navigation._help_dialog
+        assert box is not None and box.isVisible()
+        assert box.windowTitle() == keyboard.text(locale, 'title')
+        QTest.keyClick(box, QtCore.Qt.Key_F1)
+        app.processEvents()
+        assert navigation._help_dialog is box
+        assert len([widget for widget in app.topLevelWidgets()
+                    if widget.isVisible() and widget.objectName() == 'styledMessageBox']) == 1
+        QTest.keyClick(box, QtCore.Qt.Key_Escape)
+        app.processEvents()
+        assert navigation._help_dialog is None and window.isVisible()
+        assert focused(window.ui_root) is window.theme_button
+
+
+def test_arrow_keys_follow_the_grid_without_activating_buttons(app):
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QGridLayout(dialog)
+    buttons = [QtWidgets.QPushButton(name) for name in ('Top left', 'Top right', 'Bottom left', 'Bottom right')]
+    clicks = []
+    for index, button in enumerate(buttons):
+        layout.addWidget(button, index//2, index % 2)
+        button.clicked.connect(lambda checked, index=index: clicks.append(index))
+    dialog.show()
+    app.processEvents()
+    try:
+        keyboard.focus_control(buttons[0])
+        for key, index in ((QtCore.Qt.Key_Right, 1), (QtCore.Qt.Key_Down, 3),
+                           (QtCore.Qt.Key_Left, 2), (QtCore.Qt.Key_Up, 0)):
+            QTest.keyClick(focused(dialog), key)
+            assert focused(dialog) is buttons[index]
+        QTest.keyClick(buttons[0], QtCore.Qt.Key_Up)
+        assert focused(dialog) is buttons[0]
+        assert not clicks
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_arrows_from_closed_combos_navigate_without_changing_the_selected_engine(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    settings._set_settings_page(1)
+    app.processEvents()
+    combo = settings.ocr_engine_combo
+    before = combo.currentData()
+    keyboard.focus_control(combo)
+    target = keyboard.spatial_target(window.ui_root, combo, QtCore.Qt.Key_Down)
+    assert target is not None
+    QTest.keyClick(combo, QtCore.Qt.Key_Down)
+    assert focused(window.ui_root) is target
+    assert combo.currentData() == before and not combo.view().isVisible()
+
+
+def test_arrows_from_title_bar_navigate_through_the_scaled_native_view(window):
+    keyboard.focus_control(window.flag_button)
+    QTest.keyClick(window._ui_scale_controller.view, QtCore.Qt.Key_Right)
+    assert focused(window.ui_root) is window.theme_button
+
+
+@pytest.mark.parametrize('locale', keyboard.LANGUAGES)
+def test_settings_arrows_reach_nearby_controls_and_scroll_without_changing_values(window, app, locale):
+    import copy
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    settings._set_settings_page(1)
+    app.processEvents()
+    root = window.ui_root
+    controls = keyboard.tab_stops(root)
+    before = copy.deepcopy(window.config)
+    for control in controls:
+        if not keyboard._uses_arrow_navigation(control) or keyboard._inside(control, 'keyboardTabs') is not None:
+            continue
+        for key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right, QtCore.Qt.Key_Up, QtCore.Qt.Key_Down):
+            keyboard.focus_control(control)
+            target = keyboard.spatial_target(root, control, key)
+            QTest.keyClick(control, key)
+            assert focused(root) is (target or control), (locale, control.objectName(), key)
+    assert window.config == before
+
+
+def test_text_editing_and_value_arrows_keep_their_native_meaning(app):
+    from number_controls import ChoiceStepper
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    editor = QtWidgets.QLineEdit('abcd')
+    slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+    slider.setValue(30)
+    choices = ChoiceStepper([('small','Small'),('large','Large')])
+    for widget in (editor, slider, choices):
+        layout.addWidget(widget)
+    dialog.show()
+    app.processEvents()
+    try:
+        keyboard.focus_control(editor)
+        editor.setCursorPosition(2)
+        QTest.keyClick(editor, QtCore.Qt.Key_Left)
+        assert editor.cursorPosition() == 1 and focused(dialog) is editor
+        keyboard.focus_control(slider)
+        QTest.keyClick(slider, QtCore.Qt.Key_Right)
+        assert slider.value() == 31 and focused(dialog) is slider
+        keyboard.focus_control(choices.increase)
+        QTest.keyClick(choices.increase, QtCore.Qt.Key_Right)
+        assert choices.value() == 'large'
+    finally:
+        dialog.close()
+        dialog.deleteLater()
 
 
 @pytest.mark.parametrize('mode', ['copy', 'translate'])
