@@ -12290,7 +12290,7 @@ class DarkThemeApp(QMainWindow):
         if action == "hotkeys":
             return getattr(settings_window, "hotkeys_button", None)
         if action == "actions_panel":
-            return getattr(settings_window, "maintenance_action_panel", None)
+            return getattr(settings_window, "settings_action_panel", None)
         if action == "settings_page_updates":
             dots = getattr(settings_window, "settings_page_dots", ())
             return dots[1] if len(dots) > 1 else None
@@ -12342,7 +12342,7 @@ class DarkThemeApp(QMainWindow):
                     settings._set_settings_page(page)
                     changed = True
                 if action in {"actions_panel", "export_settings", "import_settings", "bug_report"}:
-                    settings.show_maintenance_view()
+                    settings._set_settings_page(PAGE_APPLICATION)
                     changed = True
             if not main_action and settings is not None:
                 target = self._guide_target_widget(action)

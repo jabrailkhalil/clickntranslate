@@ -232,13 +232,16 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.assertLessEqual(abs(settings.width() - 672), 1)
                     self.assertEqual(settings.height(), 346)
                     navigation = self.rect_in(self.window, settings.settings_page_navigation)
-                    self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 1)
+                    self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 9)
                     self.assertLessEqual(abs(navigation.center().x() - self.window.ui_root.rect().center().x()), 1)
                     image = self.window.ui_root.grab().toImage()
                     ratio = image.devicePixelRatio()
-                    # Just below the seam and above the tab buttons: this
-                    # must be the same surface as the title bar, with no gap.
-                    expected = main.window_header_color(theme != "Светлая")
+                    # The gap above the individual buttons stays transparent;
+                    # no title-bar shelf or shared rounded outline remains.
+                    expected = image.pixelColor(
+                        round((navigation.left() + 12) * ratio),
+                        round((navigation.bottom() + 3) * ratio),
+                    ).name()
                     self.assertEqual(image.pixelColor(
                         round((navigation.left() + 12) * ratio),
                         round((navigation.top() + 1) * ratio),
@@ -269,7 +272,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         current = settings.settings_pages.currentWidget()
                         page_rect = self.rect_in(settings, current)
                         footer = self.rect_in(settings, settings.settings_page_footer)
-                        self.assertGreaterEqual(page_rect.top() - footer.bottom() - 1, 12)
+                        self.assertGreaterEqual(page_rect.top() - footer.bottom() - 1, 8)
                         for tab in settings.settings_page_tabs:
                             self.assertTrue(tab.text())
                             font, area = tab.label_layout()
@@ -312,7 +315,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                 settings.back_from_hotkeys()
                 self.settle()
             navigation = self.rect_in(self.window, settings.settings_page_navigation)
-            self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 1)
+            self.assertEqual(navigation.top(), self.window.title_bar.geometry().bottom() + 9)
             self.window.show_main_screen()
             self.settle()
             self.assertEqual(self.rect_in(self.window, self.window.main_composer), original_composer)

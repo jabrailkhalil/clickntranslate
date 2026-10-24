@@ -1,11 +1,13 @@
 """Settings destinations stay reachable in the real fixed, scaled viewport."""
 from unittest import mock
+from contextlib import ExitStack
 
 import pytest
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtGui import QFontMetrics
 
 import main
+from settings_window import SettingsWindow
 from settings_sections import (
     PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR,
     PAGE_COUNT, PAGE_CAPTIONS, VISUAL_PAGE_ORDER, page_caption,
@@ -134,20 +136,82 @@ def test_five_pages_fit_every_theme_and_scale_and_overflow_is_reachable(window, 
                             assert control.fontMetrics().height() <= control.contentsRect().height(), (context, control.text())
 
 
-@pytest.mark.parametrize('origin', VISUAL_PAGE_ORDER)
-def test_maintenance_and_nested_updater_return_to_the_origin_after_relabeling(window, app, origin):
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_all_seven_program_tools_stay_visible_in_the_general_footer(window, app, locale):
+    window.set_interface_language(locale)
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(origin)
-    with mock.patch.object(settings, '_start_update_check'):
-        settings.show_maintenance_view()
-        settle(app)
-        assert settings._secondary_view_kind == 'maintenance'
-        for locale in ('ar', 'en'):
-            window.set_interface_language(locale)
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
             window.toggle_theme()
+        for scale in (80, 110, 125, 150, 200):
+            window.set_ui_scale_percent(scale)
+            settings._set_settings_page(PAGE_APPLICATION)
             settle(app)
-            assert settings._secondary_view_kind == 'maintenance'
+            page, panel = settings.settings_general_page, settings.settings_action_panel
+            assert panel is settings.application_action_panel
+            scroll = settings.application_settings_scroll
+            buttons = [getattr(settings, name) for name in (
+                'clear_cache_btn', 'reset_btn', 'update_btn', 'export_settings_btn',
+                'import_settings_btn', 'create_bug_report_btn', 'hotkeys_button')]
+            context = (locale, theme, scale)
+            assert panel.layout().rowCount() == 3 and panel.layout().columnCount() == 3
+            assert len(panel.findChildren(QtWidgets.QAbstractButton)) == 7
+            assert page.rect().contains(rect_in(panel, page)), context
+            assert not settings.application_settings_scroll.isAncestorOf(panel)
+            assert scroll.horizontalScrollBar().maximum() == 0, context
+            footer_position = rect_in(panel, page)
+            scroll.ensureWidgetVisible(settings.update_check_on_launch_checkbox, 0, 0)
+            settle(app)
+            assert scroll.viewport().rect().contains(rect_in(
+                settings.update_check_on_launch_checkbox, scroll.viewport())), context
+            assert rect_in(panel, page) == footer_position
+            for button in buttons:
+                assert button.isVisible(), (context, button.text())
+                assert panel.rect().contains(rect_in(button, panel)), (context, button.text())
+                font, area = button.label_layout()
+                metrics = QFontMetrics(font)
+                assert metrics.horizontalAdvance(button.text()) <= area.width(), (context, button.text())
+                assert metrics.height() <= area.height(), (context, button.text())
+            assert settings.settings_pages.count() == PAGE_COUNT
+            assert settings.findChild(QtWidgets.QWidget, 'maintenancePage') is None
+            assert not hasattr(settings, 'maintenance_button')
+
+
+def test_general_tool_buttons_keep_their_existing_connected_actions(window, app):
+    # Patch before the first Settings construction: existing Qt signal
+    # connections retain their callable even if the attribute is later patched.
+    assert getattr(window, '_cached_settings_window', None) is None
+    bindings = (
+        ('clear_cache_btn', 'clear_all_cache'), ('reset_btn', 'reset_settings'),
+        ('update_btn', 'check_for_updates'), ('export_settings_btn', 'export_settings'),
+        ('import_settings_btn', 'import_settings'), ('hotkeys_button', 'show_hotkeys_screen'),
+    )
+    with ExitStack() as stack:
+        callbacks = [(button, stack.enter_context(mock.patch.object(SettingsWindow, handler)))
+                     for button, handler in bindings]
+        report = stack.enter_context(mock.patch.object(window, '_create_bug_report'))
+        window.show_settings()
+        settle(app)
+        settings = window.settings_window
+        for name, callback in callbacks:
+            button = getattr(settings, name)
+            assert button.isVisible()
+            button.click()
+            callback.assert_called_once()
+        settings.create_bug_report_btn.click()
+        report.assert_called_once_with(settings)
+
+
+@pytest.mark.parametrize('locale', ['en', 'ar'])
+def test_inline_updater_returns_directly_to_general_without_an_extra_tools_page(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
+            window.toggle_theme()
+        settle(app)
         top_levels = set(app.topLevelWidgets())
         settings._show_update_progress('Checking')
         panel = settings._update_progress
@@ -155,12 +219,10 @@ def test_maintenance_and_nested_updater_return_to_the_origin_after_relabeling(wi
         settle(app)
         panel.secondary.click()
         settle(app)
-        assert settings._secondary_view_kind == 'maintenance'
         assert set(app.topLevelWidgets()) == top_levels
-        settings.maintenance_back_button.click()
-        settle(app)
         assert settings._secondary_view_kind is None
-        assert settings.settings_pages.currentIndex() == origin
+        assert settings.settings_pages.currentWidget() is settings.settings_general_page
+        assert settings.update_btn.isVisible() and settings.hotkeys_button.isVisible()
 
 
 @pytest.mark.parametrize('locale', ['ru', 'ar'])

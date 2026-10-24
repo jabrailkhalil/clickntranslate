@@ -304,11 +304,28 @@ LAYOUT_COPY = {
  ),
 }
 
+APPLICATION_SUMMARY = {
+ 'ru': 'Приложение: запуск, истории, подсказки, проверка обновлений, язык интерфейса, масштаб и размер текста результата. Кэш, сброс, обновление, экспорт, импорт, отчёт и горячие клавиши доступны кнопками внизу этой вкладки.',
+ 'en': 'Application: startup, histories, tooltips, update checks, interface language, scale and result text size. Cache, reset, update, export, import, bug report and hotkeys are buttons at the bottom of this page.',
+ 'es': 'Aplicación: inicio, historiales, ayudas, actualizaciones, idioma, escala y tamaño del resultado. Caché, restablecer, actualizar, exportar, importar, informes y atajos están en los botones inferiores de esta página.',
+ 'de': 'Anwendung: Start, Verläufe, Hinweise, Updateprüfung, Sprache, Skalierung und Ergebnistextgröße. Cache, Zurücksetzen, Update, Export, Import, Fehlerbericht und Tastenkürzel sind direkt unten auf dieser Seite verfügbar.',
+ 'fr': 'Application : démarrage, historiques, aides, mises à jour, langue, échelle et taille du résultat. Cache, réinitialisation, mise à jour, export, import, rapport et raccourcis sont accessibles en bas de cette page.',
+ 'zh': '程序：启动、历史记录、提示、更新检查、界面语言、缩放和译文大小。缓存、重置、更新、导出、导入、问题报告及快捷键按钮均位于此页面底部。',
+ 'pt': 'Aplicativo: inicialização, históricos, dicas, atualizações, idioma, escala e tamanho do resultado. Cache, redefinição, atualização, exportação, importação, relatório e atalhos ficam nos botões inferiores desta página.',
+ 'it': 'Applicazione: avvio, cronologie, suggerimenti, aggiornamenti, lingua, scala e dimensione del risultato. Cache, ripristino, aggiornamento, esportazione, importazione, rapporto e scorciatoie sono nei pulsanti in fondo alla pagina.',
+ 'ar': 'التطبيق: بدء التشغيل والسجلات والتلميحات والتحديثات ولغة الواجهة ومقياسها وحجم نص النتيجة. أزرار التخزين المؤقت وإعادة الضبط والتحديث والتصدير والاستيراد والتقرير والاختصارات أسفل الصفحة نفسها.',
+ 'tr': 'Uygulama: başlangıç, geçmişler, ipuçları, güncellemeler, arayüz dili, ölçek ve sonuç yazısı boyutu. Önbellek, sıfırlama, güncelleme, dışa ve içe aktarma, rapor ve kısayollar bu sayfanın altındaki düğmelerdedir.',
+ 'hi': 'ऐप: शुरुआत, इतिहास, संकेत, अपडेट जाँच, भाषा, स्केल और परिणाम टेक्स्ट आकार। कैश, रीसेट, अपडेट, निर्यात, आयात, रिपोर्ट और शॉर्टकट के बटन इसी पेज के नीचे हैं।',
+ 'id': 'Aplikasi: mulai, riwayat, petunjuk, pembaruan, bahasa, skala dan ukuran teks hasil. Tombol cache, reset, pembaruan, ekspor, impor, laporan dan pintasan ada langsung di bawah halaman ini.',
+}
+
+
 for _locale, _layout_copy in LAYOUT_COPY.items():
     _copy = list(COPY[_locale])
     for _index, _value in zip((1, 2, 6, 8), _layout_copy):
         _copy[_index] = _value
-    _copy.append(_layout_copy[4])
+    _copy[1] = APPLICATION_SUMMARY[_locale]
+    _copy.append(APPLICATION_SUMMARY[_locale])
     COPY[_locale] = tuple(_copy)
 
 
@@ -321,7 +338,7 @@ def guide_updates(language):
         'api_connections': (page_caption(language, PAGE_TRANSLATION) + ' → ' + section_text(language, 'api'), c[4]),
         'settings_page_main': (page_caption(language, PAGE_APPLICATION), c[1]),
         'settings_page_updates': (page_caption(language, PAGE_TRANSLATION), c[2]),
-        'actions_panel': (section_text(language, 'maintenance'), c[12]),
+        'actions_panel': (page_caption(language, PAGE_APPLICATION), c[12]),
     })
     return entries
 
@@ -338,6 +355,7 @@ def update_help(content):
         sections.append((c[5], [c[6]]))
         sections.append((c[7], [c[8]]))
         sections.append((c[9], [c[10], TEXT.get(lang, TEXT['en'])[5]]))
-        sections.append((section_text(lang, 'maintenance'), [c[12]]))
+        from settings_sections import PAGE_APPLICATION, page_caption
+        sections.append((page_caption(lang, PAGE_APPLICATION), [c[12]]))
         from image_input import image_text
         sections.append((image_text(lang, 'open'), [image_text(lang, 'hint')]))

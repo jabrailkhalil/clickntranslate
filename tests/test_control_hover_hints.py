@@ -34,9 +34,6 @@ def test_all_visible_main_settings_and_hotkey_controls_have_hover_help(window, a
     for index in range(5):
         settings._set_settings_page(index)
         assert_coverage()
-    settings.show_maintenance_view()
-    assert_coverage()
-    settings.maintenance_back_button.click()
     settings.show_hotkeys_screen()
     assert_coverage()
     for control in settings.findChildren(QtWidgets.QKeySequenceEdit):

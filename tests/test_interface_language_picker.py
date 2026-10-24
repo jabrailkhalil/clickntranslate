@@ -1,6 +1,8 @@
 """Language choices remain readable, searchable and bounded as the catalog grows."""
+import math
+
 import pytest
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QSignalSpy, QTest
 
 import main
@@ -205,9 +207,7 @@ def test_rtl_names_flags_check_and_theme_do_not_rearrange_catalog(make_picker, a
     picker.set_language('pt')
     settle(app)
     assert before == {code: button.geometry() for code, button in picker.buttons.items()}
-    area = picker.choices
-    assert not area.mask().contains(QtCore.QPoint(0, area.height()-1))
-    assert not area.mask().contains(QtCore.QPoint(area.width()-1, area.height()-1))
+    assert picker.choices.mask().isEmpty()  # Rounded clipping is antialiased, not a QRegion.
 
 
 def test_navigating_away_closes_picker_cleanly(window, app):
@@ -245,13 +245,85 @@ def test_actual_canvas_catalog_surface_matches_theme(window, app, dark):
     assert pixels.pixelColor(selected).name() != expected
 
 
+@pytest.mark.parametrize('dark', [True, False])
+def test_outer_contour_covers_corner_cell_fills_at_fractional_scales(window, app, dark, tmp_path):
+    from button_styles import set_pointer_hover
+    if (window.current_theme != 'Светлая') != dark:
+        window.toggle_theme()
+    window.set_interface_language('ar')
+    edge = QtGui.QColor('#62566e' if dark else '#927cab')
+    controller = window._ui_scale_controller
+    viewport = controller.view.viewport()
+    for percent in (80, 110, 125, 150, 200):
+        window.set_ui_scale_percent(percent)
+        settle(app)
+        before = viewport.grab().toImage()
+        window.show_interface_language_menu()
+        picker = window._interface_language_picker
+        picker._set_keyboard_mode(False)
+        for button in picker.buttons.values():
+            set_pointer_hover(button, False)
+        set_pointer_hover(picker.buttons['id'], True)
+        settle(app)
+        pixels = viewport.grab()
+        image = pixels.toImage()
+        image.save(str(tmp_path/f'language-contour-{dark}-{percent}.png'))
+        origin = picker.mapTo(window.ui_root, QtCore.QPoint())
+        def device_point(x, y):
+            point = controller.proxy.mapToScene(QtCore.QPointF(origin)+QtCore.QPointF(x, y))
+            return controller.view.viewportTransform().map(point)*pixels.devicePixelRatio()
+        assert picker.scroll.verticalScrollBar().maximum() == 0
+        catalog_viewport = picker.scroll.viewport()
+        for code in ('en', 'de', 'ar', 'id'):
+            button = picker.buttons[code]
+            assert catalog_viewport.rect().contains(
+                QtCore.QRect(button.mapTo(catalog_viewport, QtCore.QPoint()), button.size()))
+        # Selected and hover fills at the bottom must leave the outer tips
+        # exactly as the underlying application canvas painted them.
+        width, height = picker.width(), picker.height()
+        for x, y in ((0, 0), (width-.2, 0), (0, height-.2), (width-.2, height-.2)):
+            point = device_point(x, y)
+            point = QtCore.QPoint(math.floor(point.x()), math.floor(point.y()))
+            color, backdrop = image.pixelColor(point), before.pixelColor(point)
+            assert sum(abs(a-b) for a, b in zip(color.getRgb(), backdrop.getRgb())) <= 8, (
+                dark, percent, x, y, color.getRgb(), backdrop.getRgb())
+        # Trace all four corner arcs through their joins with the straight
+        # edges. Cell fills must never cover a section of the outline.
+        for cx, cy, sx, sy in ((10, 10, -1, -1), (width-10, 10, 1, -1),
+                               (10, height-10, -1, 1), (width-10, height-10, 1, 1)):
+            for degrees in range(0, 91, 10):
+                angle = math.radians(degrees)
+                point = device_point(cx+sx*9.5*math.cos(angle), cy+sy*9.5*math.sin(angle))
+                x, y = math.floor(point.x()), math.floor(point.y())
+                distance = min(sum(abs(a-b) for a, b in zip(image.pixelColor(px, py).getRgb()[:3], edge.getRgb()[:3]))
+                               for px in range(max(0, x-1), min(image.width(), x+2))
+                               for py in range(max(0, y-1), min(image.height(), y+2)))
+                # A 0.8-device-pixel stroke blends more strongly at a curve.
+                assert distance <= (100 if percent == 80 else 75), (dark, percent, cx, cy, degrees, distance)
+        # The outline must preserve the native proxy-rendered text exactly.
+        # No effect may rasterize the whole panel a second time.
+        label = picker.name_labels['en']
+        start = controller.map_widget_to_view(label, QtCore.QPoint())
+        end = controller.map_widget_to_view(label, QtCore.QPoint(label.width(), label.height()))
+        text_rect = QtCore.QRect(start*pixels.devicePixelRatio(), end*pixels.devicePixelRatio())
+        assert picker.graphicsEffect() is None
+        picker._outline.hide()
+        settle(app)
+        unclipped = viewport.grab().toImage()
+        assert image.copy(text_rect) == unclipped.copy(text_rect), (dark, percent)
+        picker._outline.show()
+        picker.close_button.click()
+        settle(app)
+
+
+
 @pytest.mark.parametrize('locale', list(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_picker_fits_at_all_interface_scales_in_both_themes(window, app, locale):
     window.set_interface_language(locale)
     for dark in (True, False):
         if (window.current_theme != 'Светлая') != dark:
             window.toggle_theme()
-        for scale in (80, 100, 125, 150, 200):
+        for scale in (80, 100, 110, 125, 150, 200):
             window.set_ui_scale_percent(scale)
             settle(app)
             before = window.size()
@@ -266,3 +338,48 @@ def test_picker_fits_at_all_interface_scales_in_both_themes(window, app, locale)
             picker.close_button.click()
             settle(app)
             assert not window.flag_button.isChecked() and window.size() == before
+
+
+@pytest.mark.parametrize('count', [20, 40])
+@pytest.mark.parametrize('dark', [True, False])
+def test_scrolled_intermediate_row_cannot_cover_bottom_outline(window, app, monkeypatch, count, dark):
+    from button_styles import set_pointer_hover
+    options = list(main.INTERFACE_LANGUAGE_OPTIONS)
+    options += [dict(code=f'lang_{i}', name=f'Language {i}', icon='icons/American_flag.png')
+                for i in range(12, count)]
+    monkeypatch.setattr(main, 'INTERFACE_LANGUAGE_OPTIONS', options)
+    if (window.current_theme != 'Светлая') != dark:
+        window.toggle_theme()
+    window.set_ui_scale_percent(125)
+    settle(app)
+    controller = window._ui_scale_controller
+    before = controller.view.viewport().grab().toImage()
+    window.show_interface_language_menu()
+    settle(app)  # Finish the opener's deferred focus before simulating a scroll.
+    picker = window._interface_language_picker
+    picker.set_language('lang_12')
+    for button in picker.buttons.values():
+        set_pointer_hover(button, False)
+    set_pointer_hover(picker.buttons['lang_15'], True)
+    picker.scroll.verticalScrollBar().setValue(13)
+    settle(app)
+    assert picker.scroll.verticalScrollBar().value() == 13
+    assert picker.buttons['lang_12'].height() == 38
+    image = controller.view.viewport().grab().toImage()
+    edge = QtGui.QColor('#62566e' if dark else '#927cab')
+    origin = picker.mapTo(window.ui_root, QtCore.QPoint())
+    def point_at(x, y):
+        point = controller.proxy.mapToScene(QtCore.QPointF(origin)+QtCore.QPointF(x, y))
+        return controller.view.viewportTransform().map(point)
+    for cx, sx in ((10, -1), (picker.width()-10, 1)):
+        for degrees in range(0, 91, 10):
+            angle = math.radians(degrees)
+            point = point_at(cx+sx*9.5*math.cos(angle), picker.height()-10+9.5*math.sin(angle))
+            x, y = math.floor(point.x()), math.floor(point.y())
+            distance = min(sum(abs(a-b) for a, b in zip(image.pixelColor(px, py).getRgb()[:3], edge.getRgb()[:3]))
+                           for px in range(x-1, x+2) for py in range(y-1, y+2))
+            assert distance <= 75, (count, dark, degrees, distance)
+    for x in (0, picker.width()-.2):
+        point = point_at(x, picker.height()-.2)
+        point = QtCore.QPoint(math.floor(point.x()), math.floor(point.y()))
+        assert image.pixelColor(point) == before.pixelColor(point)

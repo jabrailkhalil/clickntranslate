@@ -134,6 +134,25 @@ class GuideSetupTest(unittest.TestCase):
                 if action == 'language_packages':
                     self.assertIs(target, settings.translation_offline_button)
 
+    def test_program_tool_guide_targets_reveal_the_general_footer(self):
+        self.window.show_settings()
+        settings = self.window.settings_window
+        for action, attribute in (
+            ('actions_panel', 'settings_action_panel'),
+            ('export_settings', 'export_settings_btn'),
+            ('import_settings', 'import_settings_btn'),
+            ('bug_report', 'create_bug_report_btn'),
+        ):
+            with self.subTest(action=action):
+                settings._set_settings_page(4)
+                self.window._prepare_guide_settings_page(action)
+                self.settle()
+                self.assertEqual(settings._settings_page_index, 0)
+                target = self.window._guide_target_widget(action)
+                self.assertIs(target, getattr(settings, attribute))
+                self.assertTrue(settings.settings_general_page.isAncestorOf(target))
+                self.assertTrue(target.isVisible())
+
     def test_full_primary_flow_configures_all_recommendations(self):
         self.show_step("settings")
         for action in GUIDE_SETUP_ORDER:

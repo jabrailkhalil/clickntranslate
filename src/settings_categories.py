@@ -182,7 +182,7 @@ def _wrap_mode_pages(settings):
     # retain a single owner, including the optional custom-image row.
     page = settings.settings_game_page
     grid = page.layout()
-    for control in (settings.game_languages_label, settings.game_language_controls,
+    for control in (settings.game_languages_label, settings.game_language_row, settings.game_language_controls,
                     settings.game_source_combo, settings.game_target_combo,
                     settings.game_swap_button, settings.game_scan_interval_label,
                     settings.game_interval_controls, settings.game_overlay_opacity_label,
@@ -281,34 +281,14 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     settings.application_settings_scroll = _scroll(general, content, 'applicationSettingsScroll')
     general_layout.addWidget(settings.application_settings_scroll, 1)
 
-    # Maintenance is a nested page; keep its controls alive for inline updates.
+    # Program tools remain directly in this tab. Reuse the original controls
+    # and signals, with one grid owning all three rows and their dividers.
     old_panel = settings.settings_action_panel
-    settings.maintenance_page = QWidget(settings)
-    settings.maintenance_page.setObjectName('maintenancePage')
-    maintenance_root = QVBoxLayout(settings.maintenance_page)
-    maintenance_root.setContentsMargins(8, 4, 8, 0)
-    maintenance_root.setSpacing(12)
-    settings.maintenance_title = QLabel(section_text(lang, 'maintenance'))
-    settings.maintenance_title.setWordWrap(True)
-    maintenance_root.addWidget(settings.maintenance_title)
-    settings.maintenance_action_panel = _panel(settings, settings.maintenance_page, (
-        (settings.update_btn, settings.clear_cache_btn),
-        (settings.export_settings_btn, settings.import_settings_btn),
-        (settings.create_bug_report_btn, settings.reset_btn)))
-    maintenance_root.addWidget(settings.maintenance_action_panel)
-    maintenance_root.addStretch(1)
-    from settings_window import OpticallyCenteredPushButton
-    settings.maintenance_back_button = OpticallyCenteredPushButton(settings_text(lang, 'back'))
-    settings.maintenance_back_button.setToolTip(settings_text(lang, 'back'))
-    settings.maintenance_back_button.clicked.connect(settings._return_from_secondary_view)
-    settings.maintenance_footer = _panel(settings, settings.maintenance_page,
-                                       ((settings.maintenance_back_button,),))
-    maintenance_root.addWidget(settings.maintenance_footer)
-    settings.maintenance_page.hide()
-    settings.maintenance_button = _new_action(settings, 'maintenance', 'maintenance_hint',
-                                             settings.show_maintenance_view)
-    settings.application_action_panel = _panel(settings, general,
-        ((settings.hotkeys_button, settings.maintenance_button),))
+    settings.application_action_panel = _panel(settings, general, (
+        (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
+        (settings.export_settings_btn, settings.import_settings_btn,
+         settings.create_bug_report_btn),
+        (settings.hotkeys_button,)))
     settings.settings_action_panel = settings.application_action_panel
     general_layout.addWidget(settings.application_action_panel)
     old_panel.hide()

@@ -35,6 +35,9 @@ class _SettingsParent(QWidget):
 
     def __init__(self):
         super().__init__()
+        # This standalone host declares English; do not inherit a previous
+        # real-window test's application-wide Arabic layout direction.
+        self.setLayoutDirection(Qt.LeftToRight)
         self.current_interface_language = "en"
         self.current_theme = "Темная"
         self.config = {
@@ -236,12 +239,12 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             # while that area was a bordered divider with no arrow in it.
             self.assertEqual(ocr_section.width(), 24)
 
-            settings.show_maintenance_view()
+            settings._set_settings_page(0)
             self.app.processEvents()
             action_rows = (
-                (settings.update_btn, settings.clear_cache_btn),
-                (settings.export_settings_btn, settings.import_settings_btn),
-                (settings.create_bug_report_btn, settings.reset_btn),
+                (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
+                (settings.export_settings_btn, settings.import_settings_btn, settings.create_bug_report_btn),
+                (settings.hotkeys_button,),
             )
             action_rects = [
                 [self._rect_in_settings(settings, button) for button in row]
@@ -566,16 +569,13 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     footer = self._rect_in_settings(settings, settings.settings_page_footer)
                     self.assertLessEqual(footer[1] + footer[3], settings.height())
                 settings._set_settings_page(0)
-                settings.maintenance_button.click()
                 self.app.processEvents()
-                self.assertEqual(settings._secondary_view_kind, 'maintenance')
+                self.assertIsNone(settings._secondary_view_kind)
                 self.assertTrue(settings.update_btn.isVisible())
                 self.assertTrue(settings.export_settings_btn.isVisible())
                 self.assertTrue(settings.import_settings_btn.isVisible())
-                settings.maintenance_back_button.click()
-                self.app.processEvents()
                 self.assertTrue(settings.hotkeys_button.isVisible())
-                self.assertTrue(settings.maintenance_button.isVisible())
+                self.assertFalse(hasattr(settings, 'maintenance_button'))
             finally:
                 settings.close()
                 parent.close()
@@ -671,7 +671,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertFalse(parent.config["restore_clipboard_after_selection"])
             self.assertTrue(parent.config["notifications"])
 
-            settings.show_maintenance_view()
+            settings._set_settings_page(0)
             self.app.processEvents()
             settings.create_bug_report_btn.click()
             parent._create_bug_report.assert_called_once_with(settings)
@@ -707,7 +707,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     button.ensurePolished()
                     self.assertEqual(button.font().pixelSize(), 13)
                     self.assertEqual(button._label_offset_y, 0)
-            settings.show_maintenance_view()
+            settings._set_settings_page(0)
             self.app.processEvents()
             for button in (settings.clear_cache_btn, settings.reset_btn, settings.update_btn,
                            settings.export_settings_btn, settings.import_settings_btn,
@@ -721,7 +721,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.app.processEvents()
 
     def test_every_language_keeps_all_settings_pages_pixel_aligned(self):
-        """Translated captions may not reshape the maintenance grid or tab shelf."""
+        """Translated captions may not reshape the General tools or navigation."""
         parent = _SettingsParent()
         parent.setFixedSize(700, 400)
         settings = SettingsWindow(parent)
@@ -743,7 +743,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     navigation = self._rect_in_settings(settings, settings.settings_page_navigation)
                     self.assertAlmostEqual(navigation[0] + navigation[2] / 2,
                                            settings.width() / 2, delta=.5)
-                    settings.show_maintenance_view()
+                    settings._set_settings_page(0)
                     self.app.processEvents()
                     geometry = tuple(self._rect_in_settings(settings, getattr(settings, name))
                                      for name in action_names)
@@ -756,8 +756,6 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                         font = button.font()
                         self.assertLessEqual(QFontMetrics(font).horizontalAdvance(button.text()), area.width(),
                                              (theme, language, button.text()))
-                    settings.maintenance_back_button.click()
-                    self.app.processEvents()
                     self.assertTrue(settings.settings_general_page.isVisible())
         finally:
             settings.close()

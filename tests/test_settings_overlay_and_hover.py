@@ -119,8 +119,6 @@ def test_hover_recovers_without_an_enter_event_and_tracks_both_directions(window
     settle(app)
     settings = window.settings_window
     view = window._ui_scale_controller.view
-    settings.show_maintenance_view()
-    settle(app)
     buttons = [settings.clear_cache_btn, settings.reset_btn, settings.update_btn,
                settings.export_settings_btn, settings.import_settings_btn,
                settings.create_bug_report_btn]
@@ -147,7 +145,7 @@ def test_overlay_occludes_hover_only_where_it_covers_buttons(window, app):
     button = picker.buttons['en']
     move(view, window._ui_scale_controller.map_widget_to_view(button), app)
     assert button.property('pointerHover')
-    lower = window.settings_window.maintenance_button
+    lower = window.settings_window.reset_btn
     assert widget_global_rect(picker).bottom() < widget_global_rect(lower).top()
     move(view, window._ui_scale_controller.map_widget_to_view(lower), app)
     assert lower.property('pointerHover') and not button.property('pointerHover')
@@ -184,7 +182,7 @@ def test_language_overlay_keeps_secondary_screen_and_its_back_destination(window
 def test_hover_releases_when_target_is_disabled_or_covered_and_does_not_repolish_on_every_move(window, app):
     window.show_settings()
     settle(app)
-    button = window.settings_window.maintenance_button
+    button = window.settings_window.reset_btn
     view = window._ui_scale_controller.view
     point = window._ui_scale_controller.map_widget_to_view(button)
     move(view, point, app)

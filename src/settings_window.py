@@ -1113,9 +1113,21 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.setCheckable(True)
         self.setAutoExclusive(True)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(26)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.setFixedHeight(28)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.set_dark(dark)
+
+    def sizeHint(self):
+        font = QtGui.QFont(self.font())
+        font.setPixelSize(12)
+        font.setWeight(QtGui.QFont.DemiBold)
+        metrics = QtGui.QFontMetrics(font)
+        ink_width = max(metrics.horizontalAdvance(self.text()), metrics.boundingRect(self.text()).width())
+        return QtCore.QSize(ink_width + 22, 28)
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
 
     def _label_area(self):
         # QSS already pads these compact tabs. Keep one additional pixel per
@@ -1124,79 +1136,72 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
 
     def set_dark(self, dark):
         self._dark = bool(dark)
-        text = "#9b92a6" if dark else "#766d80"
-        active = "#f5efff" if dark else "#41275f"
+        colors = button_palette(dark)
+        text = "#aaa1b4" if dark else "#74697e"
+        active = colors['text']
         self.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{text};
-                border:1px solid transparent; border-radius:0;
-                padding:0 5px; font-size:12px; font-weight:600; }}
-            QPushButton:hover, QPushButton:checked, QPushButton:focus {{ color:{active}; }}
+                border:1px solid transparent; border-radius:4px;
+                padding:0 8px; font-size:12px; font-weight:600; }}
+            QPushButton:hover, QPushButton[pointerHover="true"] {{
+                color:{active}; }}
+            QPushButton[pointerHover="false"]:hover {{ color:{text}; }}
+            QPushButton:checked, QPushButton:checked:hover,
+            QPushButton:checked[pointerHover="false"]:hover {{
+                color:{colors['focus']}; }}
+            QPushButton[keyboardFocus="true"]:focus {{ border-color:{colors['focus']}; }}
+            QPushButton:disabled {{ color:{colors['disabled']}; background:transparent; }}
         """)
 
     def label_color(self, option):
         # The label is painted separately from Qt's button bevel. Select its
         # state colour explicitly; the base palette ignores :checked text.
-        if self.isChecked() or self.underMouse():
-            return QtGui.QColor("#f5efff" if self._dark else "#41275f")
-        if self.hasFocus():
-            return QtGui.QColor("#ccb6e7" if self._dark else "#624184")
-        return QtGui.QColor("#9b92a6" if self._dark else "#766d80")
+        colors = button_palette(self._dark)
+        if not self.isEnabled():
+            return QtGui.QColor(colors['disabled'])
+        hover = self.property('pointerHover')
+        if self.isChecked():
+            return QtGui.QColor(colors['focus'])
+        hovered = self.underMouse() if hover is None else bool(hover)
+        if hovered:
+            return QtGui.QColor(colors['text'])
+        return QtGui.QColor("#aaa1b4" if self._dark else "#74697e")
 
 
 class SettingsPageNavigation(QFrame):
-    """A compact shelf attached to the title bar, sized by its tab labels."""
+    """Flat destinations share a fine baseline and one active underline."""
 
     def __init__(self, parent=None, dark=True):
         super().__init__(parent)
         self.setObjectName("settingsPageNavigation")
         self.setFixedHeight(32)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.set_dark(dark)
 
     def set_dark(self, dark):
         self._dark = bool(dark)
-        background = window_header_color(dark)
-        border = "#3b3542" if dark else "#c5bacf"
         self.setStyleSheet(
             "QFrame#settingsPageNavigation {"
-            f"background:{background}; border:1px solid {border}; border-top:none;"
-            "border-bottom-left-radius:11px; border-bottom-right-radius:11px;"
+            "background:transparent; border:0;"
             "}"
         )
         self.update()
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        tabs = self.findChildren(SettingsPageTabButton, options=Qt.FindDirectChildrenOnly)
-        tabs.sort(key=lambda tab: tab.geometry().left())
-        selected = next((tab for tab in tabs if tab.isChecked()), None)
-        if selected is None:
-            return
-        # Selection belongs to the shelf's lower contour, not to a separate
-        # button surface. At either end it follows the same rounded corner.
+        colors = button_palette(self._dark)
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        pen = QtGui.QPen(QColor("#b99adb" if self._dark else "#8057a5"), 2)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        path = QtGui.QPainterPath()
-        edge = self.height() - 1.0
-        radius = 11.0
-        rect = selected.geometry()
-        if selected is tabs[0]:
-            path.moveTo(1.0, edge - radius)
-            path.quadTo(1.0, edge, radius, edge)
-        else:
-            path.moveTo(rect.left(), edge)
-        if selected is tabs[-1]:
-            right = self.width() - 1.0
-            path.lineTo(right - radius, edge)
-            path.quadTo(right, edge, right, edge - radius)
-        else:
-            path.lineTo(rect.right(), edge)
-        painter.drawPath(path)
-        painter.end()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(QtGui.QColor(colors['disabled_border']), 1))
+        painter.drawLine(QtCore.QPointF(0, self.height()-.5),
+                         QtCore.QPointF(self.width(), self.height()-.5))
+        selected = next((tab for tab in self.findChildren(SettingsPageTabButton,
+                         options=Qt.FindDirectChildrenOnly) if tab.isChecked()), None)
+        if selected is not None:
+            rect = selected.geometry()
+            painter.fillRect(QtCore.QRectF(rect.left()+8, self.height()-3,
+                                            max(0, rect.width()-16), 3),
+                             QtGui.QColor(colors['focus']))
 
 
 class SettingsPageDotButton(QToolButton):
@@ -9953,7 +9958,6 @@ class SettingsWindow(QWidget):
             "settings_game_page",
             "settings_assistant_page",
             "settings_ocr_page",
-            "maintenance_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -10010,7 +10014,6 @@ class SettingsWindow(QWidget):
             "settings_game_page",
             "settings_assistant_page",
             "settings_ocr_page",
-            "maintenance_page",
             "settings_action_panel",
             "settings_page_footer",
             "settings_pages",
@@ -10039,9 +10042,8 @@ class SettingsWindow(QWidget):
         self.hotkeys_mode = False
         self._secondary_view_kind = None
         self.secondary_view_shell = None
-        # The owner starts Settings at the title bar's lower edge. No top
-        # inset here: the navigation must touch that bar in either theme.
-        self.main_layout.setContentsMargins(5, 0, 5, 5)
+        # Keep navigation separate from the draggable title bar.
+        self.main_layout.setContentsMargins(5, 8, 5, 5)
         # Five general rows must finish clearly above the fixed action panel.
         # An 8px gap plus 38px rows produced a 46px rhythm and let the final
         # checkbox run into the buttons in the real embedded viewport.
@@ -10766,9 +10768,18 @@ class SettingsWindow(QWidget):
         self.game_languages_label = game_row(
             settings_text(lang, "game_languages")
         )
-        self.game_language_controls = QWidget(self.settings_game_page)
+        self.game_language_row = QWidget(self.settings_game_page)
+        self.game_language_row.setFixedHeight(32)
+        language_header = QHBoxLayout(self.game_language_row)
+        language_header.setContentsMargins(0, 0, 0, 0)
+        language_header.setSpacing(12)
+        language_header.addWidget(self.game_languages_label)
+        self.game_language_controls = QWidget(self.game_language_row)
         self.game_language_controls.setObjectName("gameLanguageControls")
-        self.game_language_controls.setFixedSize(340, 32)
+        self.game_language_controls.setFixedHeight(32)
+        self.game_language_controls.setMinimumWidth(0)
+        self.game_language_controls.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        language_header.addWidget(self.game_language_controls, 1)
         language_row = QHBoxLayout(self.game_language_controls)
         language_row.setContentsMargins(0, 0, 0, 0)
         language_row.setSpacing(6)
@@ -10779,18 +10790,20 @@ class SettingsWindow(QWidget):
             # it before showing the list, so clear()/repopulation cannot close
             # a one-row popup underneath the user's pointer.
             combo.aboutToShowPopup.connect(self._verify_game_language_controls)
-            combo.setFixedSize(147, 32)
+            combo.setFixedHeight(32)
+            combo.setMinimumWidth(0)
+            combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             self._apply_game_language_combo_style(combo)
         self.game_swap_button = LanguageSwapButton(self.settings_game_page)
         self.game_swap_button.setObjectName("gameLanguageSwap")
         self.game_swap_button.setFixedSize(34, 32)
         self.game_swap_button.setToolTip(tooltip_text(settings_text(lang, "game_swap_languages")))
         self.game_swap_button.setAccessibleName(settings_text(lang, "game_swap_languages"))
-        language_row.addWidget(self.game_source_combo)
+        language_row.addWidget(self.game_source_combo, 1)
         language_row.addWidget(self.game_swap_button)
-        language_row.addWidget(self.game_target_combo)
-        game_layout.addWidget(self.game_languages_label, 1, 0)
-        game_layout.addWidget(self.game_language_controls, 1, 1)
+        language_row.addWidget(self.game_target_combo, 1)
+        self.game_languages_label.setBuddy(self.game_source_combo)
+        game_layout.addWidget(self.game_language_row, 1, 0, 1, 2)
 
         self.game_scan_interval_label = game_row(
             settings_text(lang, "game_scan_interval")
@@ -10991,15 +11004,15 @@ class SettingsWindow(QWidget):
         self.settings_page_footer.setProperty('keyboardTabs', True)
         self.settings_page_navigation = self.settings_page_footer
         dots_layout = QGridLayout(self.settings_page_footer)
-        dots_layout.setContentsMargins(8, 3, 8, 3)
-        dots_layout.setSpacing(2)
+        dots_layout.setContentsMargins(0, 2, 0, 2)
+        dots_layout.setSpacing(6)
         self.settings_page_dots = []
         self.settings_page_tabs = self.settings_page_dots
         for index in range(PAGE_COUNT):
             caption = page_caption(lang, index)
             dot = SettingsPageTabButton(caption, self.settings_page_footer, dark=dark)
             dot.setMinimumWidth(0)
-            dot.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+            dot.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             dot.setAccessibleName(caption)
             dot.setToolTip(tooltip_text(caption))
             dot.clicked.connect(
@@ -11010,7 +11023,6 @@ class SettingsWindow(QWidget):
             )
             column = VISUAL_PAGE_ORDER.index(index)
             dots_layout.addWidget(dot, 0, column)
-            dots_layout.setColumnStretch(column, 1)
             self.settings_page_dots.append(dot)
         self.settings_page_footer.setFixedHeight(32)
 
@@ -11037,7 +11049,7 @@ class SettingsWindow(QWidget):
             self.settings_general_page, self.settings_updates_page, self.settings_game_page, self.settings_assistant_page
         ):
             self.settings_pages.addWidget(page)
-        self.main_layout.addWidget(self.settings_page_footer, 0)
+        self.main_layout.addWidget(self.settings_page_footer, 0, Qt.AlignHCenter)
         self.main_layout.addWidget(self.settings_pages, 1)
         # Apply shared styling only after every page has been recreated.
         # Earlier calls could reach deleted controls from the previous visit.
@@ -11147,7 +11159,7 @@ class SettingsWindow(QWidget):
             self._refresh_game_templates()
         footer = getattr(self, "settings_page_footer", None)
         if footer is not None:
-            footer.setVisible(getattr(self, '_secondary_view_kind', None) != 'maintenance')
+            footer.show()
             footer.raise_()
         for dot_index, dot in enumerate(getattr(self, "settings_page_dots", ())):
             dot.setChecked(dot_index == index)
@@ -11169,11 +11181,11 @@ class SettingsWindow(QWidget):
                 4,
                 min(
                     64,
-                    int(settings_draft.get("actions_footer_gap", 12)),
+                    int(settings_draft.get("actions_footer_gap", 8)),
                 ),
             )
         except (TypeError, ValueError):
-            fixed_gap = 12
+            fixed_gap = 8
         self.main_layout.setSpacing(fixed_gap)
         self.main_layout.activate()
 
@@ -11238,21 +11250,6 @@ class SettingsWindow(QWidget):
         detail = str(state.get("text") or "").strip()
         button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
         button.setAccessibleDescription(detail or help_text)
-
-    def show_maintenance_view(self):
-        """Open the nested tools page without destroying the inline updater's stack."""
-        if self._update_in_progress:
-            return
-        if getattr(self, 'maintenance_page', None) is None:
-            self.init_ui()
-            self.apply_theme()
-        self._remember_secondary_return_page()
-        page = self.maintenance_page
-        if self.settings_pages.indexOf(page) < 0:
-            self.settings_pages.addWidget(page)
-        self._secondary_view_kind = 'maintenance'
-        self._set_settings_page(self.settings_pages.indexOf(page))
-        self._apply_action_panel_style()
 
     def show_offline_translation_packages(self, _checked=False):
         engine = self.parent.config.get('translator_engine', 'argos')
@@ -11327,18 +11324,19 @@ class SettingsWindow(QWidget):
             combo.set_popup_background("#20212a" if dark else "#f1edf4")
 
     def _apply_game_language_combo_style(self, combo):
-        """Keep the two-letter language code visible in the compact pair."""
+        """Use the same readable field chrome without exceeding a 28px row."""
         if combo is None:
             return
         dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
         set_widget_stylesheet(combo,
-            modern_combo_style(dark, font_size=13)
+            modern_combo_style(dark, font_size=14)
             + """
                 QComboBox {
-                    margin: 2px 0px;
-                    padding: 3px 19px 3px 5px;
+                    margin:0;
+                    min-height:0;
+                    padding:0 27px 0 9px;
                 }
-                QComboBox::drop-down { width: 18px; }
+                QComboBox::drop-down { width:24px; }
             """
         )
         if isinstance(combo, DropDownCombo):
@@ -12453,10 +12451,7 @@ class SettingsWindow(QWidget):
             self._handle_update_progress_close_attempt()
             return
         self._set_parent_update_flow_active(False)
-        if getattr(self, '_secondary_view_kind', None) == 'maintenance':
-            self.show_maintenance_view()
-        else:
-            self._set_settings_page(PAGE_APPLICATION)
+        self._set_settings_page(PAGE_APPLICATION)
 
     def _show_update_progress(self, text, determinate=False, value=0):
         from inline_update import page
@@ -13984,8 +13979,7 @@ finally {
         dark = self.parent.current_theme != "Светлая"
         colors = button_palette(dark)
         panel_names = ('settings_action_panel', 'translation_action_panel',
-                       'ocr_action_panel', 'game_action_panel', 'assistant_action_panel',
-                       'maintenance_action_panel', 'maintenance_footer')
+                       'ocr_action_panel', 'game_action_panel', 'assistant_action_panel')
         for name, object_name in tuple((name, 'settingsActionPanel') for name in panel_names) + (
                                   ("settings_transfer_panel", "settingsTransferPanel"),):
             panel = getattr(self, name, None)
@@ -14271,13 +14265,7 @@ finally {
         position = area.verticalScrollBar().value() if area is not None and not sip.isdeleted(area) else 0
         rebuild = {'hotkeys': self.show_hotkeys_screen, 'history': self.show_history_view,
                    'copy_history': self.show_copy_history_view}.get(kind)
-        if kind == 'maintenance':
-            return_page = getattr(self, '_secondary_return_page', PAGE_APPLICATION)
-            return_scroll = getattr(self, '_secondary_return_scroll', 0)
-            self.update_language()
-            self.show_maintenance_view()
-            self._secondary_return_page, self._secondary_return_scroll = return_page, return_scroll
-        elif rebuild is not None:
+        if rebuild is not None:
             rebuild()
             self._ui_language = self.parent.current_interface_language
             self.apply_theme()

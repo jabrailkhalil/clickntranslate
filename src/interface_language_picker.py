@@ -33,19 +33,49 @@ def _search_key(value):
                    if not unicodedata.combining(char))
 
 
-class _RoundedChoices(QtWidgets.QFrame):
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w, h, r = float(self.width()), float(self.height()), 9.
-        path = QtGui.QPainterPath()
-        path.moveTo(0, 0)
-        path.lineTo(w, 0)
-        path.lineTo(w, h-r)
-        path.quadTo(w, h, w-r, h)
-        path.lineTo(r, h)
-        path.quadTo(0, h, 0, h-r)
-        path.closeSubpath()
-        self.setMask(QtGui.QRegion(path.toFillPolygon().toPolygon()))
+class _PickerOutline(QtWidgets.QWidget):
+    """Paint the one outer boundary after the catalog and its cell fills."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setObjectName('interfaceLanguageOutline')
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.color = QtGui.QColor()
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        # Paint the outside of each corner back to the parent background.
+        # Unlike a QWidget mask this is antialiased at the final proxy scale,
+        # and it also covers a partly scrolled cell, not only the last row.
+        owner = self.parentWidget()
+        backdrop = QtGui.QPixmap(self.size())
+        ancestors = []
+        parent = owner.parentWidget()
+        while parent is not None:
+            ancestors.append(parent)
+            parent = parent.parentWidget()
+        backdrop.fill((ancestors[-1] if ancestors else owner).palette().color(QtGui.QPalette.Window))
+        background = QtGui.QPainter(backdrop)
+        for ancestor in reversed(ancestors):
+            background.save()
+            background.translate(-owner.mapTo(ancestor, QtCore.QPoint()))
+            if ancestor.autoFillBackground():
+                background.fillRect(ancestor.rect(), ancestor.palette().brush(ancestor.backgroundRole()))
+            option = QtWidgets.QStyleOption()
+            option.initFrom(ancestor)
+            ancestor.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, option, background, ancestor)
+            background.restore()
+        background.end()
+        outside = QtGui.QPainterPath()
+        outside.addRect(QtCore.QRectF(self.rect()))
+        rounded = QtGui.QPainterPath()
+        rounded.addRoundedRect(QtCore.QRectF(self.rect()), 10, 10)
+        painter.fillPath(outside.subtracted(rounded), QtGui.QBrush(backdrop))
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(QtGui.QPen(self.color, 1.0))
+        painter.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 9.5, 9.5)
 
 
 class InterfaceLanguagePicker(QtWidgets.QFrame):
@@ -110,7 +140,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.close_button.installEventFilter(self)
         row.addWidget(self.close_button)
         body.addWidget(self.header)
-        self.choices = _RoundedChoices(self)
+        self.choices = QtWidgets.QFrame(self)
         self.choices.setObjectName('interfaceLanguageChoices')
         choices_layout = QtWidgets.QVBoxLayout(self.choices)
         choices_layout.setContentsMargins(1, 1, 1, 0)
@@ -180,6 +210,9 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.empty.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
         self.empty.hide()
         body.addWidget(self.choices, 1)
+        self._outline = _PickerOutline(self)
+        self._outline.setGeometry(self.rect())
+        self._outline.raise_()
         self.search.textChanged.connect(self._apply_filter)
         self._apply_filter()
         self.set_theme(dark)
@@ -361,6 +394,12 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         else:
             super().keyPressEvent(event)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_outline'):
+            self._outline.setGeometry(self.rect())
+            self._outline.raise_()
+
 
     def set_theme(self, dark):
         colors = button_palette(dark)
@@ -368,7 +407,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                                     else ('#27222d', '#f8f5fb', '#d7cde3', '#927cab'))
         self.setStyleSheet(f'''
             QFrame#interfaceLanguagePicker {{background:{'#1d1922' if dark else '#ffffff'};
-                border:1px solid {frame}; border-radius:10px;}}
+                border:1px solid transparent; border-radius:10px;}}
             QWidget {{background:transparent;}}
             QLabel#interfaceLanguageTitle {{color:{ink}; border:0; font-size:12px; font-weight:600;}}
             QFrame#interfaceLanguageChoices {{background:{surface}; border:0; border-top:1px solid {edge};}}
@@ -384,6 +423,9 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{background:transparent;}}
             QLabel#interfaceLanguageName {{color:{ink}; border:0; font-size:14px; font-weight:400;}}
         ''')
+        self._outline.color = QtGui.QColor(frame)
+        self._outline.update()
+        self._outline.raise_()
         # QScrollArea owns an opaque viewport; transparent cell backgrounds
         # must never expose the platform's default light Base brush.
         for widget in (self.scroll.viewport(), self.catalog):
