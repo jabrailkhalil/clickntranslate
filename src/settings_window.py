@@ -3530,7 +3530,8 @@ SETTINGS_TEXT = {
 
 def settings_text(lang, key):
     texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
-    return texts.get(key, SETTINGS_TEXT["en"].get(key, key))
+    from text_direction import ui_directional_text
+    return ui_directional_text(texts.get(key, SETTINGS_TEXT["en"].get(key, key)), lang)
 
 
 for _scale_lang, _scale_labels in {

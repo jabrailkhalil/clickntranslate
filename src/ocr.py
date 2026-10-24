@@ -6480,6 +6480,8 @@ class FullScreenTranslateOverlay(QWidget):
         # created tall side cards and overlapping fragments.  The replacement
         # may grow horizontally, but only through space where no other OCR line
         # or translated block exists.
+        from text_direction import directional_text_flags, single_line_text
+        text = single_line_text(text)
         pad = 2.0
         screen_margin = 8.0
         bounds = QtCore.QRectF(
@@ -6539,7 +6541,7 @@ class FullScreenTranslateOverlay(QWidget):
         )
         source_line_height = max(8.0, rect_f.height())
         start_font_size = max(7, min(30, int(source_line_height * 0.72)))
-        flags = QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter | QtCore.Qt.TextSingleLine
+        flags = directional_text_flags(text) | QtCore.Qt.AlignVCenter | QtCore.Qt.TextSingleLine
 
         chosen_font = QtGui.QFont("Segoe UI", 6)
         required_width = source_rect.width()
@@ -6602,6 +6604,9 @@ class FullScreenTranslateOverlay(QWidget):
             painter.setBrush(background)
             painter.drawRect(bg_rect)
         if draw_text:
+            from text_direction import text_option, single_line_text
+            text = single_line_text(text)
+            option = text_option(text)
             painter.setFont(font)
             painter.setPen(foreground)
             measured_width = painter.fontMetrics().horizontalAdvance(str(text or ""))
@@ -6620,10 +6625,10 @@ class FullScreenTranslateOverlay(QWidget):
                     draw_rect.width() / horizontal_scale,
                     draw_rect.height(),
                 )
-                painter.drawText(scaled_rect, flags, text)
+                painter.drawText(scaled_rect, text, option)
                 painter.restore()
             else:
-                painter.drawText(draw_rect, flags, text)
+                painter.drawText(draw_rect, text, option)
 
     def _replacement_palette(self, rect_f):
         """Estimate the source area's background and readable foreground.
