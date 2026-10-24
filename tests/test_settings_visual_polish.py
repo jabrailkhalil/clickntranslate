@@ -150,3 +150,34 @@ def test_active_section_uses_text_and_underline_without_a_filled_button(window, 
                        for y in range(first.y()+5, first.y()+first.height()-5)
                        for x in range(first.x()+10, first.x()+first.width()-10))
     assert changed_line > 20 and changed_text > 10
+
+
+@pytest.mark.parametrize('locale', ['ru', 'ar'])
+@pytest.mark.parametrize('dark', [True, False])
+def test_field_outlines_share_the_full_row_bounds(window, app, locale, dark):
+    """Equal widget heights must also give equal visible, uninset outlines."""
+    window.set_interface_language(locale)
+    if (window.current_theme != 'Светлая') != dark:
+        window.toggle_theme()
+    window.show_settings()
+    settings = window.settings_window
+    edges = ({'#3d3948', '#6f598d', '#9a7fc1', '#9b78c8'} if dark else
+             {'#d7cde7', '#ad97cb', '#8063a8', '#9b78c8'})
+    companion = settings.settings_assistant_page
+    for page, fields in (
+            (0, (settings.interface_language_button, settings.ui_scale_field,
+                 settings.translation_font_control)),
+            (1, (settings.translator_combo, settings.result_window_control)),
+            (4, (settings.ocr_engine_combo,)),
+            (2, (settings.game_source_combo, settings.game_target_combo,
+                 settings.game_template_combo)),
+            (3, (companion.mode_combo, *companion.values.values()))):
+        settings._set_settings_page(page)
+        settings.settings_page_tabs[page].setFocus()
+        settle(app)
+        for field in fields:
+            picture = field.grab().toImage()
+            w, h = picture.width(), picture.height()
+            for x, y in ((w//2, 0), (0, h//2), (w-1, h//2), (w//2, h-1)):
+                assert picture.pixelColor(x, y).name() in edges, (locale, dark, page,
+                    field.objectName(), x, y, picture.pixelColor(x, y).name())

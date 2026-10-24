@@ -9,7 +9,7 @@ from language_search import SEARCH_TEXT
 from languages import LANGUAGES, language_icon_path
 from project_paths import resource_root
 from settings_window import DropDownCombo
-from test_desktop_ux import app
+from test_desktop_ux import app, window
 
 
 @pytest.fixture
@@ -51,6 +51,70 @@ def test_single_template_uses_an_inset_card_without_explicit_popup_setup(app, sh
     assert picture.pixelColor(0, 0).alpha() < 100
     assert picture.pixelColor(picture.width()//2, 2).alpha() > 240
     assert (picture.pixelColor(picture.width()//2, 2).lightness() < 128) == dark
+
+
+def test_embedded_popup_corner_keeps_actual_owner_backdrop_instead_of_black(window, app):
+    from settings_sections import PAGE_OCR
+    from ui_scaling import widget_global_rect
+    window.set_interface_language('ar')
+    if window.current_theme != 'Светлая':
+        window.toggle_theme()
+    window.set_ui_scale_percent(125)
+    window.show_settings()
+    window.settings_window._set_settings_page(PAGE_OCR)
+    for _ in range(8):
+        app.processEvents()
+    backdrop = window.grab().toImage()
+    combo = window.settings_window.ocr_engine_combo
+    combo.showPopup()
+    for _ in range(8):
+        app.processEvents()
+    popup = combo.view().window()
+    assert popup.graphicsProxyWidget() is not None
+    picture = window.grab()
+    image = picture.toImage()
+    bounds = widget_global_rect(popup)
+    origin = window.mapFromGlobal(bounds.topLeft()) * picture.devicePixelRatio()
+    width = round(bounds.width()*picture.devicePixelRatio())
+    height = round(bounds.height()*picture.devicePixelRatio())
+    radius = round(10*bounds.width()/popup.width()*picture.devicePixelRatio())
+    black_holes = []
+    for left, top in ((origin.x(), origin.y()), (origin.x()+width-radius, origin.y()),
+                      (origin.x(), origin.y()+height-radius),
+                      (origin.x()+width-radius, origin.y()+height-radius)):
+        for x in range(left, min(image.width(), left+radius)):
+            for y in range(top, min(image.height(), top+radius)):
+                # These small corner patches contain chrome, never row text.
+                # popup.grab() alone misses Source-mode holes in the scene.
+                if backdrop.pixelColor(x, y).lightness() > 220 and image.pixelColor(x, y).lightness() < 50:
+                    black_holes.append((x, y, image.pixelColor(x, y).getRgb()))
+    combo.hidePopup()
+    assert not black_holes, black_holes[:10]
+
+
+@pytest.mark.parametrize('dark', [True, False])
+def test_nonembedded_popup_retains_transparent_corners_when_content_shrinks(app, show_picker, dark):
+    from settings_window import modern_combo_style
+    combo = DropDownCombo()
+    combo.setFixedSize(300, 28)
+    combo.setStyleSheet(modern_combo_style(dark, font_size=14))
+    combo.set_popup_background('#20212a' if dark else '#f1edf4')
+    combo.addItem('Initial choice')
+    view, popup = show_picker(combo)
+    assert popup.graphicsProxyWidget() is None
+    for count in (1, 5, 2):
+        combo.hidePopup()
+        combo.clear()
+        combo.addItems([f'Choice {row}' for row in range(count)])
+        combo.showPopup()
+        for _ in range(5):
+            app.processEvents()
+        image = popup.grab().toImage()
+        for point in (QtCore.QPoint(), QtCore.QPoint(image.width()-1, 0),
+                      QtCore.QPoint(0, image.height()-1), QtCore.QPoint(image.width()-1, image.height()-1)):
+            assert image.pixelColor(point).alpha() <= 8
+        surface = image.pixelColor(image.width()//2, 2)
+        assert surface.alpha() >= 240 and (surface.lightness() < 128) == dark
 
 
 @pytest.mark.parametrize('locale', SEARCH_TEXT)

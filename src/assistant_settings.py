@@ -219,7 +219,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.mode_combo.currentIndexChanged.connect(lambda: self.choose_appearance(self.mode_combo.currentData()))
         self.values = {}
         for key, low, high in (('size', 60, 180), ('opacity', 40, 100)):
-            field = AssistantNumberBox(dark=self.owner.current_theme != 'Светлая')
+            field = AssistantNumberBox(dark=self.owner.current_theme != 'Светлая', font_size=14)
             field.setRange(low, high)
             field.setSuffix('%')
             field.setKeyboardTracking(False)
@@ -232,7 +232,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             label = QtWidgets.QLabel(tr(name))
             label.setFixedHeight(28)
             label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-            label.setStyleSheet('margin:0; padding:0;')
+            label.setStyleSheet('margin:0; padding:0; font-size:14px;')
             label.setBuddy(field)
             label.setToolTip(field.toolTip())
             field.setAccessibleName(tr(name))
@@ -394,11 +394,11 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             helper.request_action(action)
 
     def refresh_custom_icon(self):
-        from settings_window import modern_combo_style
+        from settings_window import compact_combo_style
         from styled_dialogs import set_widget_stylesheet
         self.appearance_buttons['custom'].setIcon(header_icon('image_add', self.owner.current_theme))
         for combo in (self.mode_combo,):
-            set_widget_stylesheet(combo, modern_combo_style(self.owner.current_theme != 'Светлая', 14))
+            set_widget_stylesheet(combo, compact_combo_style(self.owner.current_theme != 'Светлая'))
 
     def refresh(self):
         values = assistant_preferences(self.owner.config)

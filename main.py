@@ -7121,7 +7121,6 @@ class TranslationResultDialog(QDialog):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMinimumSize(400, 330)
         self.resize(700, 420)
-        self.setSizeGripEnabled(True)
 
         outer = QVBoxLayout(self)
         # The stacked editors need more height than the two-column layout.
@@ -7147,6 +7146,8 @@ class TranslationResultDialog(QDialog):
         self.title_label = QLabel(self.text["workspace_title"])
         self.title_label.setObjectName("translationResultTitle")
         self.title_label.setMinimumWidth(0)
+        # QLabel's advance-based hint can miss the last bold glyph's bearing.
+        self.title_label.setMargin(2)
         header.addWidget(self.title_label, 0, 0)
         self.engine_combo = self._language_combo()
         self.engine_combo.setFixedWidth(150)
@@ -7270,6 +7271,11 @@ class TranslationResultDialog(QDialog):
             button.setAutoDefault(False)
         self.copy_button.setText("")
         self.copy_button.setFixedWidth(48)
+        # QDialog's automatic grip sits outside the inset rounded surface (and
+        # its window mask). Keep the resize affordance inside the footer.
+        self.resize_grip = QtWidgets.QSizeGrip(self.frame)
+        self.resize_grip.setFixedSize(16, 16)
+        buttons.addWidget(self.resize_grip, 0, Qt.AlignBottom)
         layout.addLayout(buttons)
         self.translate_shortcuts = []
         for key in ("Ctrl+Return", "Ctrl+Enter"):

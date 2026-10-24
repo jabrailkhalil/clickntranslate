@@ -88,13 +88,13 @@ class StepperFrame(QtWidgets.QFrame):
         self.setFocusProxy(editor)
         self.set_theme(dark)
 
-    def set_theme(self, dark):
+    def set_theme(self, dark, *, inset=True):
         from button_styles import button_qss
         background, border, ink = (('#17181d', '#3d3948', '#f4f6fb') if dark
                                    else ('#e9e4ed', '#d7cde7', '#202124'))
         self.setStyleSheet(f'''
             QFrame[numberStepper="true"] {{ background:{background}; border:1px solid {border};
-                border-radius:7px; margin:1px 3px; }}
+                border-radius:7px; margin:{'1px 3px' if inset else '0'}; }}
             QLineEdit, QSpinBox {{ color:{ink}; background:transparent; border:0;
                 padding:0; margin:0; min-height:0; font-size:{self._editor_font_size}px; font-weight:400; }}
             QLineEdit:disabled, QSpinBox:disabled {{ color:{'#7d7487' if dark else '#958b9f'}; }}
@@ -161,8 +161,8 @@ class ChoiceStepper(StepperFrame):
 class NumberStepper(StepperFrame):
     valueChanged = QtCore.pyqtSignal(int)
 
-    def __init__(self, parent=None, *, dark=True):
-        super().__init__(_NumberBox(), parent, dark=dark)
+    def __init__(self, parent=None, *, dark=True, font_size=15):
+        super().__init__(_NumberBox(), parent, dark=dark, font_size=font_size)
         self.decrease.clicked.connect(lambda: self.editor.stepBy(-1))
         self.increase.clicked.connect(lambda: self.editor.stepBy(1))
         self.editor.valueChanged.connect(self._value_changed)

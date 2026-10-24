@@ -582,8 +582,12 @@ class DropDownCombo(QComboBox):
                 from combo_popup import popup_scale
                 colors = self.popup_colors()
                 painter = QtGui.QPainter(watched)
-                painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
-                painter.fillRect(watched.rect(), Qt.transparent)
+                # A proxy paints into the owner's scene. Clearing it with
+                # Source also erases the page under the rounded corners.
+                # Only an independent native popup owns a transparent surface.
+                if watched.graphicsProxyWidget() is None:
+                    painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+                    painter.fillRect(watched.rect(), Qt.transparent)
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
                 painter.setRenderHint(QtGui.QPainter.Antialiasing)
                 painter.setPen(QtGui.QPen(QtGui.QColor(colors['border']), 1))
@@ -730,6 +734,14 @@ def modern_combo_style(dark, font_size=15):
             color: {text};
             background-color: {popup_bg};
         }}
+    """
+
+
+def compact_combo_style(dark):
+    """One full-height field outline for the 28px settings rows."""
+    return modern_combo_style(dark, font_size=14) + """
+        QComboBox { margin:0; min-height:0; padding:0 27px 0 9px; }
+        QComboBox::drop-down { width:24px; }
     """
 
 
@@ -11330,25 +11342,13 @@ class SettingsWindow(QWidget):
         if combo is None:
             return
         dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        set_widget_stylesheet(combo,
-            modern_combo_style(dark, font_size=14)
-            + """
-                QComboBox {
-                    margin:0;
-                    min-height:0;
-                    padding:0 27px 0 9px;
-                }
-                QComboBox::drop-down { width:24px; }
-            """
-        )
+        set_widget_stylesheet(combo, compact_combo_style(dark))
         if isinstance(combo, DropDownCombo):
             combo.set_popup_background("#20212a" if dark else "#f1edf4")
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        return modern_combo_style(is_dark, font_size=14) + '''
-            QComboBox { margin:1px 3px; padding:2px 28px 2px 10px; min-height:0; }
-        '''
+        return compact_combo_style(is_dark)
 
     def _secondary_palette(self):
         if self.parent.current_theme == "Темная":
@@ -14129,7 +14129,7 @@ finally {
             }}
             QLabel#gameSettingsLabel {{
                 color: {theme['text_color']};
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: 400;
             }}
             QLabel#gameSettingValue {{
@@ -14177,7 +14177,7 @@ finally {
         }}'''
         set_widget_stylesheet(self, style)
         for control in self.findChildren(StepperFrame):
-            control.set_theme(dark)
+            control.set_theme(dark, inset=False)
         assistant_page = getattr(self, 'settings_assistant_page', None)
         if assistant_page is not None:
             assistant_page.refresh_custom_icon()
@@ -14191,8 +14191,8 @@ finally {
                 pass
         language_button = getattr(self, 'interface_language_button', None)
         if language_button is not None and not sip.isdeleted(language_button):
-            field, ink, edge = (('#20212a', '#f4f6fb', '#4b4056') if dark
-                                else ('#f1edf4', '#241f2a', '#bcb2c7'))
+            field, ink, edge = (('#17181d', '#f4f6fb', '#3d3948') if dark
+                                else ('#e9e4ed', '#202124', '#d7cde7'))
             set_widget_stylesheet(language_button, f'''
                 QPushButton {{ background:{field}; color:{ink}; border:1px solid {edge};
                     border-radius:7px; padding:0 6px; font-size:14px; font-weight:400; }}

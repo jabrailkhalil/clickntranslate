@@ -14,7 +14,7 @@ import main  # noqa: E402
 import ocr  # noqa: E402
 import platform_support  # noqa: E402
 import translater  # noqa: E402
-from PyQt5.QtWidgets import QWidget  # noqa: E402
+from PyQt5.QtWidgets import QSizeGrip, QWidget  # noqa: E402
 
 
 def _immediate_thread(target=None, daemon=None, **_kwargs):
@@ -139,13 +139,16 @@ class TranslationResultUiTest(unittest.TestCase):
             self.assertEqual(dialog.title_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["workspace_title"])
             self.assertGreaterEqual(
                 dialog.title_label.contentsRect().width(),
-                dialog.title_label.fontMetrics().horizontalAdvance(dialog.title_label.text()),
+                dialog.title_label.fontMetrics().boundingRect(dialog.title_label.text()).width(),
                 lang,
             )
             self.assertGreater(dialog.title_label.width(), 0, lang)
             self.assertTrue(dialog.windowFlags() & main.Qt.FramelessWindowHint)
             self.assertTrue(dialog.windowFlags() & main.Qt.WindowStaysOnTopHint)
             self.assertTrue(dialog.testAttribute(main.Qt.WA_TranslucentBackground))
+            for grip in dialog.findChildren(QSizeGrip):
+                bounds = main.QtCore.QRect(grip.mapTo(dialog.frame, main.QtCore.QPoint()), grip.size())
+                self.assertTrue(dialog.frame.rect().contains(bounds), (lang, bounds))
             self.assertGreaterEqual(dialog.width(), dialog.minimumSizeHint().width())
             self.assertFalse(dialog.copy_button.autoDefault())
             self.assertFalse(dialog.translate_button.autoDefault())
