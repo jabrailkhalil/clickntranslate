@@ -72,9 +72,10 @@ def output_style(value=None, *, opacity=88):
 
 
 def encode_rect(rect, screens):
-    screen = next((screen for screen in screens if screen.geometry().contains(rect.center())), screens[0])
+    screen = next((screen for screen in screens if screen.geometry().contains(rect)), None)
+    if screen is None:
+        raise ValueError('Region must fit one available screen')
     bounds = screen.geometry()
-    rect = rect.intersected(bounds)
     if rect.isEmpty():
         raise ValueError('Region is outside its screen')
     return {'screen': screen.name(), 'rect': [(rect.x()-bounds.x())/bounds.width(),
@@ -82,7 +83,10 @@ def encode_rect(rect, screens):
 
 
 def decode_rect(value, screens):
-    screen = next((screen for screen in screens if screen.name() == value['screen']), screens[0])
+    matches = [screen for screen in screens if screen.name() == value['screen']]
+    if len(matches) != 1:
+        raise ValueError('Saved screen is unavailable or ambiguous')
+    screen = matches[0]
     bounds = screen.geometry()
     x, y, width, height = value['rect']
     width, height = min(bounds.width(), max(60, round(width*bounds.width()))), min(bounds.height(), max(24, round(height*bounds.height())))

@@ -2215,11 +2215,13 @@ def _write_ocr_config_updates(updates):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-        except Exception:
+        except FileNotFoundError:
             config = {}
+        if not isinstance(config, dict):
+            raise ValueError('Invalid config root')
         config.update(updates)
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=4)
+        from atomic_storage import write_json
+        write_json(config_path, config, indent=4)
         _ocr_config_cache = config
         try:
             _ocr_config_mtime = os.path.getmtime(config_path)
@@ -3850,6 +3852,9 @@ class ScreenCaptureOverlay(QWidget):
         self.start_point = None
         self.end_point = None
         self.last_rect = None
+        self._preview_rect = None
+        self._region_gesture = None
+        self._area_save_warning = False
         self._active_screen = None
         self._frozen_background = None
         self._frozen_background_rect = QtCore.QRect()
@@ -3970,9 +3975,147 @@ class ScreenCaptureOverlay(QWidget):
         if self.target_lang_combo is not None:
             self.target_lang_combo.currentIndexChanged.connect(self.on_language_changed)
 
+        from capture_regions import CaptureMemoryPanel
+        self.memory_panel = CaptureMemoryPanel(self)
+        self.memory_panel.setCursor(QtCore.Qt.ArrowCursor)
+        self.memory_panel.setObjectName('captureMemoryPanel')
+        self.memory_grid = QtWidgets.QGridLayout(self.memory_panel)
+        self.remember_area_checkbox = QtWidgets.QCheckBox(self.memory_panel)
+        self.repeat_area_button = QtWidgets.QPushButton(self.memory_panel)
+        self.repeat_area_button.setAutoDefault(False)
+        self.memory_grid.addWidget(self.remember_area_checkbox, 0, 0)
+        self.memory_grid.addWidget(self.repeat_area_button, 0, 1)
+        self.memory_hint = QtWidgets.QLabel(self)
+        self.memory_hint.setWordWrap(True)
+        self.memory_hint.setAlignment(QtCore.Qt.AlignCenter)
+        self.memory_hint.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        self.remember_area_checkbox.toggled.connect(self._remember_area_changed)
+        self.repeat_area_button.clicked.connect(self._repeat_area)
+        self._refresh_memory_controls(config)
+        self.memory_panel.hide()
+        self.memory_hint.hide()
+
         logging.info(f"[OCR:{self._session_id}] Screen capture overlay initialized; mode={self.mode}, defer_show={defer_show}")
         if not defer_show:
             self.show_overlay()
+
+    def _refresh_memory_controls(self, config):
+        from capture_regions import text, memory_keys
+        locale = config.get('interface_language', 'en')
+        self._memory_locale = locale
+        enabled_key, _ = memory_keys(self.mode)
+        with QtCore.QSignalBlocker(self.remember_area_checkbox):
+            self.remember_area_checkbox.setChecked(config.get(enabled_key) is True)
+        self.remember_area_checkbox.setText(text(locale, 'remember'))
+        self.remember_area_checkbox.setToolTip(text(locale, 'hint'))
+        self.repeat_area_button.setText(text(locale, 'repeat'))
+        self.repeat_area_button.setToolTip(text(locale, 'ready'))
+        dark = config.get('theme', 'Темная') != 'Светлая'
+        from styled_dialogs import install_accent_controls
+        from ui_scaling import desktop_control_scale
+        factor = min(1.5, desktop_control_scale(self._active_screen or self.screen))
+        self.memory_grid.setContentsMargins(round(9*factor), round(5*factor), round(9*factor), round(5*factor))
+        self.memory_grid.setSpacing(round(8*factor))
+        self.memory_panel.setStyleSheet(f'''
+            QFrame#captureMemoryPanel {{ background:{'#20212a' if dark else '#f1edf4'};
+                border:1px solid {'#584963' if dark else '#bcaacb'}; border-radius:7px; }}
+            QCheckBox {{ color:{'#f1edf5' if dark else '#302837'}; background:transparent;
+                border:0; font-size:{round(13*factor)}px; padding:0; }}
+        ''')
+        install_accent_controls(self.memory_panel, dark=dark)
+        self.repeat_area_button.setStyleSheet(button_qss(dark, 'primary', compact=True))
+        self.memory_hint.setStyleSheet(f'color:{"#f1edf5" if dark else "#302837"}; background:{"#20212a" if dark else "#f1edf4"}; border-radius:4px; padding:4px; font-size:{round(12*factor)}px;')
+        self.memory_hint.clear()
+        self._update_memory_actions()
+
+    def _restore_area(self, config):
+        from capture_regions import memory_keys, resolve_area, screen_identity, text
+        enabled_key, area_key = memory_keys(self.mode)
+        self._preview_rect = None
+        if config.get(enabled_key) is True and config.get(area_key) is not None:
+            rect = resolve_area(config.get(area_key), self._active_screen)
+            if rect is not None:
+                self._preview_rect = rect.translated(-self.geometry().topLeft())
+                self._preview_screen_identity = screen_identity(self._active_screen)
+                self.memory_hint.setText(text(self._memory_locale, 'ready'))
+            else:
+                self.memory_hint.setText(text(self._memory_locale, 'unavailable'))
+        self._update_memory_actions()
+
+    def _update_memory_actions(self):
+        available = self._preview_rect is not None and not self._ocr_in_progress
+        self.repeat_area_button.setVisible(available)
+        self.repeat_area_button.setEnabled(available and self._region_gesture is None)
+        self.memory_hint.setVisible(bool(self.memory_hint.text()) and not self._ocr_in_progress)
+
+    def _remember_area_changed(self, enabled):
+        from capture_regions import memory_keys, text
+        enabled_key, area_key = memory_keys(self.mode)
+        updates = {enabled_key: bool(enabled)}
+        if not enabled:
+            updates[area_key] = None
+        if not _write_ocr_config_updates(updates):
+            with QtCore.QSignalBlocker(self.remember_area_checkbox):
+                self.remember_area_checkbox.setChecked(not enabled)
+            self.memory_hint.setText(text(self._memory_locale, 'save_error'))
+        elif not enabled:
+            self._preview_rect = None
+            self.memory_hint.clear()
+        else:
+            self._restore_area(get_cached_ocr_config())
+        self._update_memory_actions()
+        self.update_combo_position()
+        self.update()
+
+    def _repeat_area(self):
+        if self._ocr_in_progress or self._region_gesture is not None or self._preview_rect is None:
+            return
+        if any(combo is not None and combo.view().isVisible() for combo in (self.lang_combo, self.target_lang_combo)):
+            return
+        # Recheck screen identity at confirmation, not only when opening.
+        from capture_regions import encode_area, screen_identity, text
+        try:
+            valid_screen = (self._active_screen in QApplication.screens()
+                            and screen_identity(self._active_screen) == self._preview_screen_identity
+                            and self.geometry() == self._active_screen.geometry())
+        except RuntimeError:
+            valid_screen = False
+        if not valid_screen or encode_area(self._preview_rect.translated(self.geometry().topLeft()), self._active_screen) is None:
+            self._preview_rect = None
+            self.memory_hint.setText(text(self._memory_locale, 'unavailable'))
+            self._update_memory_actions()
+            self.update()
+            return
+        self._accept_capture_region(QtCore.QRect(self._preview_rect))
+
+    def _accept_capture_region(self, rect):
+        if self._ocr_in_progress:
+            return
+        rect = QtCore.QRect(rect).normalized().intersected(self.rect())
+        if rect.width() < 8 or rect.height() < 8 or rect.width()*rect.height() < 180:
+            return
+        if self.lang_combo.currentData() is None or (self.mode == 'translate' and self.target_lang_combo.currentData() is None):
+            locale = get_cached_ocr_config().get('interface_language', 'en')
+            QMessageBox.information(self, ocr_ui_text(locale, 'language_packages'), ocr_ui_text(locale, 'install_languages_first'))
+            self.close()
+            return
+        if self.remember_area_checkbox.isChecked():
+            from capture_regions import encode_area, memory_keys
+            _, area_key = memory_keys(self.mode)
+            area = encode_area(rect.translated(self.geometry().topLeft()), self._active_screen)
+            if area is not None:
+                self._area_save_warning = not _write_ocr_config_updates({area_key: area})
+        self.last_rect = rect
+        self._preview_rect = None
+        self._ocr_in_progress = True
+        self._ocr_status_text = self._default_ocr_status_text()
+        self.start_point = self.end_point = None
+        self._selection_started_at = None
+        self.memory_panel.hide()
+        self.memory_hint.hide()
+        self.update()
+        self._flush_selection_paint_before_capture()
+        self.capture_and_copy(rect)
 
     def _populate_translate_target_combo(self, selected_target=None):
         if self.target_lang_combo is None:
@@ -4210,6 +4353,8 @@ class ScreenCaptureOverlay(QWidget):
             self.start_point = None
             self.end_point = None
             self.last_rect = None
+            self._preview_rect = None
+            self._region_gesture = None
             self._selection_started_at = None
             self._move_event_count = 0
             self._last_move_log_ts = 0.0
@@ -4223,7 +4368,6 @@ class ScreenCaptureOverlay(QWidget):
             self._last_ocr_capture_meta = {}
             logging.info(f"[OCR:{self._session_id}] Showing overlay; mode={self.mode}")
             config = get_cached_ocr_config()
-            style_capture_controls(self, config, (self.lang_combo, self.translate_arrow_label, self.target_lang_combo))
             self._freeze_screen_on_ocr = config.get("freeze_screen_on_ocr", False)
             self._dim_screen_during_ocr = bool(config.get("dim_screen_during_ocr", False))
             self._ocr_dim_strength = ocr_dim_strength(config)
@@ -4233,12 +4377,17 @@ class ScreenCaptureOverlay(QWidget):
             # Активный монитор — тот, где находится курсор в момент запуска OCR.
             # Оверлей и заморозка работают только на нем.
             self._active_screen = self._get_active_screen()
+            # Control DPI follows the same monitor as the selection surface.
+            self.screen = self._active_screen or QApplication.primaryScreen()
+            style_capture_controls(self, config, (self.lang_combo, self.translate_arrow_label, self.target_lang_combo))
+            self._refresh_memory_controls(config)
             if self._active_screen is not None:
                 overlay_rect = self._active_screen.geometry()
             else:
                 overlay_rect = QtCore.QRect(0, 0, 1, 1)
 
             self.setGeometry(overlay_rect)
+            self._restore_area(config)
             logging.info(
                 f"[OCR:{self._session_id}] Active screen: {_screen_to_text(self._active_screen)}; "
                 f"overlay_rect=({_rect_to_text(overlay_rect)}); freeze={self._freeze_screen_on_ocr}; "
@@ -4265,6 +4414,8 @@ class ScreenCaptureOverlay(QWidget):
                 self.target_lang_combo.raise_()
             QApplication.processEvents()
             self.update_combo_position()
+            self.memory_panel.show()
+            self.memory_panel.raise_()
 
             logging.info(
                 f"[OCR:{self._session_id}] Controls: source_geom=({_rect_to_text(self.lang_combo.geometry())}), "
@@ -4281,6 +4432,8 @@ class ScreenCaptureOverlay(QWidget):
     def _force_topmost(self):
         """Keep the selection overlay above regular and topmost app windows."""
         try:
+            if not self.isVisible():
+                return
             # Raising the parent while a native QComboBox popup is open steals
             # focus from that popup on Windows. The list remains visible, but
             # the clicked row is never committed. Delayed topmost retries run
@@ -4348,6 +4501,18 @@ class ScreenCaptureOverlay(QWidget):
             for widget in controls:
                 widget.move(current_x, y)
                 current_x += widget.width() + spacing
+            if hasattr(self, 'memory_panel'):
+                maximum = max(80, self.width()-24)
+                needed = self.remember_area_checkbox.sizeHint().width() + self.repeat_area_button.sizeHint().width() + 40
+                self.memory_grid.removeWidget(self.repeat_area_button)
+                self.memory_grid.addWidget(self.repeat_area_button, 1 if needed > maximum else 0, 0 if needed > maximum else 1)
+                self.memory_panel.setFixedWidth(min(maximum, self.memory_panel.sizeHint().width()))
+                self.memory_panel.adjustSize()
+                memory_y = y + max(widget.height() for widget in controls) + 8
+                self.memory_panel.move(max(12, (self.width()-self.memory_panel.width())//2), memory_y)
+                self.memory_hint.setFixedWidth(min(maximum, max(400, self.memory_panel.width())))
+                self.memory_hint.adjustSize()
+                self.memory_hint.move((self.width()-self.memory_hint.width())//2, self.memory_panel.geometry().bottom()+6)
             logging.info(f"Moved combo to {x}, {y} (Screen: {screen_geo})")
 
     def _flush_selection_paint_before_capture(self):
@@ -4409,6 +4574,10 @@ class ScreenCaptureOverlay(QWidget):
         except Exception:
             pass
         super().closeEvent(event)
+        if self._area_save_warning:
+            self._area_save_warning = False
+            from capture_regions import show_save_warning
+            QtCore.QTimer.singleShot(0, lambda: show_save_warning(self._memory_locale))
         # Подготавливаем новый оверлей ПОСЛЕ закрытия текущего (отложенно)
         mode = self.mode
         QtCore.QTimer.singleShot(100, lambda: _safe_prepare_overlay(mode))
@@ -4436,8 +4605,9 @@ class ScreenCaptureOverlay(QWidget):
             # Без этого окно полностью прозрачно и клики проваливаются сквозь него
             painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 5))
 
-        if self.start_point is not None and self.end_point is not None:
-            rect = QtCore.QRect(self.start_point, self.end_point).normalized()
+        rect = (QtCore.QRect(self.start_point, self.end_point).normalized()
+                if self.start_point is not None and self.end_point is not None else self._preview_rect)
+        if rect is not None:
 
             # Очищаем внутреннюю область (если было затемнение)
             if not no_dimming:
@@ -4469,6 +4639,10 @@ class ScreenCaptureOverlay(QWidget):
             inner_pen.setStyle(QtCore.Qt.SolidLine)
             painter.setPen(inner_pen)
             painter.drawRect(rect.adjusted(1, 1, -1, -1))
+            if self._preview_rect is not None and self.start_point is None:
+                painter.setBrush(QtGui.QColor(220, 235, 255))
+                for point in (rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight()):
+                    painter.drawRect(QtCore.QRect(point-QtCore.QPoint(3, 3), QtCore.QSize(6, 6)))
 
         if self._ocr_in_progress and getattr(self, "_ocr_status_text", ""):
             text = self._ocr_status_text
@@ -4499,6 +4673,18 @@ class ScreenCaptureOverlay(QWidget):
             if self._ocr_in_progress:
                 logging.info(f"[OCR:{self._session_id}] Mouse press ignored while OCR is already running")
                 return
+            if self._preview_rect is not None and self._preview_rect.adjusted(-6, -6, 6, 6).contains(event.pos()):
+                rect = self._preview_rect
+                edges = tuple(abs(value-target) <= 6 for value, target in (
+                    (event.x(), rect.left()), (event.x(), rect.right()),
+                    (event.y(), rect.top()), (event.y(), rect.bottom())))
+                self._region_gesture = (event.pos(), QtCore.QRect(rect), edges)
+                self._update_memory_actions()
+                event.accept()
+                return
+            self._preview_rect = None
+            self.memory_hint.clear()
+            self._update_memory_actions()
             self.start_point = event.pos()
             self.end_point = self.start_point
             self._selection_started_at = time.monotonic()
@@ -4517,6 +4703,32 @@ class ScreenCaptureOverlay(QWidget):
             self.close()
 
     def mouseMoveEvent(self, event):
+        if self._region_gesture is not None:
+            start, original, edges = self._region_gesture
+            delta = event.pos()-start
+            rect = QtCore.QRect(original)
+            if not any(edges):
+                rect.moveTopLeft(QtCore.QPoint(max(0, min(self.width()-rect.width(), rect.x()+delta.x())),
+                                              max(0, min(self.height()-rect.height(), rect.y()+delta.y()))))
+            else:
+                if edges[0]: rect.setLeft(max(0, min(rect.right()-7, original.left()+delta.x())))
+                if edges[1]: rect.setRight(min(self.width()-1, max(rect.left()+7, original.right()+delta.x())))
+                if edges[2]: rect.setTop(max(0, min(rect.bottom()-7, original.top()+delta.y())))
+                if edges[3]: rect.setBottom(min(self.height()-1, max(rect.top()+7, original.bottom()+delta.y())))
+            self._preview_rect = rect
+            self.update()
+            event.accept()
+            return
+        if self.start_point is None and self._preview_rect is not None:
+            rect = self._preview_rect
+            point = event.pos()
+            horizontal = abs(point.x()-rect.left()) <= 6 or abs(point.x()-rect.right()) <= 6
+            vertical = abs(point.y()-rect.top()) <= 6 or abs(point.y()-rect.bottom()) <= 6
+            if rect.adjusted(-6, -6, 6, 6).contains(point):
+                cursor = QtCore.Qt.SizeFDiagCursor if horizontal and vertical else QtCore.Qt.SizeHorCursor if horizontal else QtCore.Qt.SizeVerCursor if vertical else QtCore.Qt.SizeAllCursor
+            else:
+                cursor = QtCore.Qt.CrossCursor
+            self.setCursor(cursor)
         if self.start_point is not None:
             self.end_point = event.pos()
             self._move_event_count += 1
@@ -4532,6 +4744,12 @@ class ScreenCaptureOverlay(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton and self._region_gesture is not None:
+            self.mouseMoveEvent(event)
+            self._region_gesture = None
+            self._update_memory_actions()
+            event.accept()
+            return
         if event.button() == QtCore.Qt.LeftButton and self.start_point is not None and self.end_point is not None:
             self.end_point = event.pos()
             rect = QtCore.QRect(self.start_point, self.end_point).normalized()
@@ -4563,29 +4781,7 @@ class ScreenCaptureOverlay(QWidget):
                 self._selection_started_at = None
                 self.update()
                 return
-            if self.lang_combo.currentData() is None or (
-                self.mode == "translate"
-                and self.target_lang_combo is not None
-                and self.target_lang_combo.currentData() is None
-            ):
-                interface_language = get_cached_ocr_config().get("interface_language", "en")
-                QMessageBox.information(
-                    self,
-                    ocr_ui_text(interface_language, "language_packages"),
-                    ocr_ui_text(interface_language, "install_languages_first"),
-                )
-                self.close()
-                return
-            self.last_rect = rect
-            logging.info(f"[OCR:{self._session_id}] Selection accepted; rect=({_rect_to_text(rect)})")
-            self._ocr_in_progress = True
-            self._ocr_status_text = self._default_ocr_status_text()
-            self.start_point = None
-            self.end_point = None
-            self._selection_started_at = None
-            self.update()
-            self._flush_selection_paint_before_capture()
-            self.capture_and_copy(rect)
+            self._accept_capture_region(rect)
         elif event.button() == QtCore.Qt.LeftButton:
             logging.warning(
                 f"[OCR:{self._session_id}] Selection release ignored because start/end is missing; "
@@ -4624,6 +4820,11 @@ class ScreenCaptureOverlay(QWidget):
         if event.key() == QtCore.Qt.Key_Escape:
             logging.info("Нажата клавиша ESC, завершаем OCR.")
             self.close()
+        elif event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self._repeat_area()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     @staticmethod
     def get_ocr_engine():

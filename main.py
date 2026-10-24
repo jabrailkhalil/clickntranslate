@@ -271,6 +271,12 @@ DEFAULT_CONFIG = {
     "game_pause_when_inactive": True,
     "game_manual_output": False,
     "game_show_toolbar": True,
+    "game_remember_template": False,
+    "game_last_template": "",
+    "remember_copy_area": False,
+    "remember_translate_area": False,
+    "last_copy_area": None,
+    "last_translate_area": None,
     "game_show_original_text": False,
     "game_overlay_opacity": 88,
     "no_screen_dimming": False,
@@ -14031,10 +14037,12 @@ class DarkThemeApp(QMainWindow):
 
     def show_dynamic_translation_help(self):
         from dynamic_templates import text
+        from capture_regions import text as region_text
         lang = self.current_interface_language
         box = QMessageBox(self)
         box.setWindowTitle(ui_text(lang, 'game_translate'))
-        box.setText(text(lang, 'instructions').format(hotkey=self.config.get('game_translate_hotkey') or DEFAULT_GAME_HOTKEY))
+        box.setText(text(lang, 'instructions').format(hotkey=self.config.get('game_translate_hotkey') or DEFAULT_GAME_HOTKEY)
+                    + '\n\n' + region_text(lang, 'dynamic_remember') + ': ' + region_text(lang, 'dynamic_hint'))
         start = box.addButton(settings_text(lang, 'game_launch'), QMessageBox.AcceptRole)
         shortcut = box.addButton(text(lang, 'shortcuts'), QMessageBox.ActionRole)
         box.addButton(settings_text(lang, 'cancel'), QMessageBox.RejectRole)

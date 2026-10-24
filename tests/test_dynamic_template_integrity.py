@@ -58,6 +58,8 @@ def test_seeded_monitor_changes_keep_regions_inside_the_available_screen():
         encoded = encode_rect(region, [screen('original', bounds)])
         assert decode_rect(encoded, [screen('original', bounds)]) == region
         changed = QtCore.QRect(-1920, -1080, randomizer.randint(60, 3840), randomizer.randint(24, 2160))
-        restored = decode_rect(encoded, [screen('replacement', changed)])
+        with pytest.raises(ValueError, match='unavailable'):
+            decode_rect(encoded, [screen('replacement', changed)])
+        restored = decode_rect(encoded, [screen('original', changed)])
         assert changed.contains(restored)
         assert restored.width() >= 60 and restored.height() >= 24

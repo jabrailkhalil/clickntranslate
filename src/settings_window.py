@@ -3681,6 +3681,12 @@ def validated_import_settings(payload, defaults):
             from api_providers import clean_profiles
             accepted[key] = clean_profiles(value)
             continue
+        if key in ('last_copy_area', 'last_translate_area'):
+            from capture_regions import validated_area
+            area = validated_area(value)
+            if value is None or area is not None:
+                accepted[key] = area
+            continue
         if key == 'desktop_assistant_position':
             import math
             if value is None:
@@ -10795,6 +10801,35 @@ class SettingsWindow(QWidget):
             game_layout.addWidget(checkbox, row, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter)
         self.game_toolbar_checkbox.setToolTip(tooltip_text(dynamic_text(lang, 'toolbar_hint').format(
             hotkey=self.parent.config.get('game_translate_hotkey') or 'Ctrl+Alt+G')))
+        from capture_regions import text as region_text
+        self.game_remember_template_checkbox = QCheckBox(region_text(lang, 'dynamic_remember'), self.settings_game_page)
+        self.game_remember_template_checkbox.setObjectName('settingsPageCheckbox')
+        self.game_remember_template_checkbox.setFixedHeight(page_checkbox_height)
+        self.game_remember_template_checkbox.setStyleSheet('margin:0; padding:0;')
+        self.game_remember_template_checkbox.setToolTip(tooltip_text(region_text(lang, 'dynamic_hint')))
+        self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
+        self.game_template_combo = DropDownCombo(self.settings_game_page)
+        self.game_template_combo.setMinimumWidth(0)
+        self.game_template_combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.game_template_combo.setFixedHeight(28)
+        self.game_template_combo.setMaxVisibleItems(7)
+        self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
+        remembered_name = self.parent.config.get('game_last_template', '')
+        if isinstance(remembered_name, str) and remembered_name:
+            self.game_template_combo.addItem(remembered_name, remembered_name)
+            self.game_template_combo.setCurrentIndex(1)
+        self.game_template_combo.setEnabled(self.game_remember_template_checkbox.isChecked())
+        self.game_template_combo.setToolTip(tooltip_text(region_text(lang, 'dynamic_hint')))
+        self.game_template_combo.setAccessibleName(region_text(lang, 'template_label'))
+        self.game_template_label = QLabel(region_text(lang, 'template_label'), self.settings_game_page)
+        self.game_template_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.game_template_label.setToolTip(self.game_template_combo.toolTip())
+        self.game_remember_template_checkbox.toggled.connect(self._game_template_memory_changed)
+        self.game_template_combo.activated.connect(lambda _index: self.auto_save_setting(
+            'game_last_template', self.game_template_combo.currentData() or ''))
+        game_layout.addWidget(self.game_remember_template_checkbox, 7, 0, 1, 2, Qt.AlignLeft | Qt.AlignVCenter)
+        game_layout.addWidget(self.game_template_label, 8, 0)
+        game_layout.addWidget(self.game_template_combo, 8, 1)
 
         self.game_workflow_note = QLabel(
             settings_text(lang, "game_intro"), self.settings_game_page
@@ -10805,7 +10840,7 @@ class SettingsWindow(QWidget):
         self.game_workflow_note.setToolTip(tooltip_text(settings_text(lang, "game_workflow_note")))
         game_layout.addWidget(self.game_workflow_note, 0, 0, 1, 2)
         self.game_workflow_note.hide()
-        game_layout.setRowStretch(7, 1)
+        game_layout.setRowStretch(9, 1)
         self.game_launch_button = OpticallyCenteredPushButton(
             settings_text(lang, "game_launch"), self.settings_game_page
         )
@@ -10818,8 +10853,8 @@ class SettingsWindow(QWidget):
         self.game_help_button = OpticallyCenteredPushButton(dynamic_text(lang, 'help'), self.settings_game_page)
         self.game_help_button.setFixedHeight(32)
         self.game_help_button.clicked.connect(lambda: getattr(self.parent, 'show_dynamic_translation_help', lambda: None)())
-        game_layout.addWidget(self.game_help_button, 8, 0)
-        game_layout.addWidget(self.game_launch_button, 8, 1)
+        game_layout.addWidget(self.game_help_button, 10, 0)
+        game_layout.addWidget(self.game_launch_button, 10, 1)
 
         # Build the hidden page from the known application language catalog.
         # Probing EasyOCR/Tesseract packages before Settings has even painted
@@ -10947,6 +10982,36 @@ class SettingsWindow(QWidget):
         if callable(launch):
             launch()
 
+    def _game_template_memory_changed(self, enabled):
+        self.game_template_combo.setEnabled(bool(enabled))
+        self.auto_save_setting('game_remember_template', bool(enabled))
+
+    def _refresh_game_templates(self):
+        from dynamic_templates import TemplateStore, text as dynamic_text
+        from capture_regions import text as region_text
+        lang = self.parent.current_interface_language
+        name = self.parent.config.get('game_last_template', '')
+        try:
+            templates = TemplateStore().load()
+        except Exception:
+            templates = []
+        with QtCore.QSignalBlocker(self.game_template_combo):
+            self.game_template_combo.clear()
+            self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
+            for item in templates:
+                self.game_template_combo.addItem(item['name'], item['name'])
+            index = self.game_template_combo.findData(name)
+            missing = bool(name) and index < 0
+            if missing:
+                self.game_template_combo.addItem(str(name), str(name))
+                index = self.game_template_combo.count()-1
+                self.game_template_combo.model().item(index).setEnabled(False)
+            self.game_template_combo.setCurrentIndex(max(0, index))
+        self.game_template_combo.setToolTip(tooltip_text(region_text(lang, 'dynamic_missing' if missing else 'dynamic_hint')))
+        with QtCore.QSignalBlocker(self.game_remember_template_checkbox):
+            self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
+        self.game_template_combo.setEnabled(self.game_remember_template_checkbox.isChecked())
+
     def _set_settings_page(self, index):
         progress = getattr(self, '_update_progress', None)
         if self._update_in_progress and progress is not None:
@@ -10979,6 +11044,7 @@ class SettingsWindow(QWidget):
             # This widget is cached across visits. Both the pair and the
             # installed engines may have changed from another screen.
             self._refresh_game_language_controls()
+            self._refresh_game_templates()
         footer = getattr(self, "settings_page_footer", None)
         if footer is not None:
             footer.show()
@@ -13994,6 +14060,7 @@ finally {
             "selection_quick_translate_mode_combo",
             "game_source_combo",
             "game_target_combo",
+            "game_template_combo",
         ):
             combo = getattr(self, combo_name, None)
             if combo is not None:

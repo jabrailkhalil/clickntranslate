@@ -196,7 +196,9 @@ def test_template_coordinates_survive_negative_origin_resolution_change_and_miss
     rect = QtCore.QRect(-1728, 108, 960, 216)
     value = encode_rect(rect, [original])
     assert decode_rect(value, [screen('left', (-1280, 0, 1280, 720))]) == QtCore.QRect(-1152, 72, 640, 144)
-    moved = decode_rect(value, [screen('replacement', (0, 0, 800, 600))])
+    with pytest.raises(ValueError, match='unavailable'):
+        decode_rect(value, [screen('replacement', (0, 0, 800, 600))])
+    moved = decode_rect(value, [screen('left', (0, 0, 800, 600))])
     assert QtCore.QRect(0, 0, 800, 600).contains(moved)
 
 

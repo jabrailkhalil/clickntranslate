@@ -8,7 +8,7 @@ from collections import Counter
 from string import Formatter
 
 LOCALES=('en','ru','es','de','fr','zh','pt','it','ar','tr','hi','id')
-TUPLE_FILES={'assistant_text.py','control_hints.py','dialog_text.py','dynamic_templates.py'}
+TUPLE_FILES={'assistant_text.py','control_hints.py','dialog_text.py','dynamic_templates.py','capture_regions.py'}
 
 
 def format_fields(value):

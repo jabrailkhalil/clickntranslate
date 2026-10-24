@@ -27,6 +27,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self._styles = []
         self._drag_hit = None
         self._selected_hit = None
+        self._loaded_template_name = ''
+        self._loading_template = False
         self.store = store or TemplateStore()
         super().__init__(target_window)
         self._screens = QtWidgets.QApplication.screens()
@@ -90,6 +92,7 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         from styled_dialogs import install_accent_controls
         install_accent_controls(self.toolbar, dark=dark)
         self._refresh_templates()
+        self._restore_last_template()
         self._layout_controls()
         self._update_selection_controls()
         self.toolbar.show()
@@ -152,6 +155,8 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
     def _load_template(self, index):
         value = self.template_combo.itemData(index)
         if not value:
+            self.template_combo.setCurrentIndex(0)
+            self._loaded_template_name = ''
             self._manual_output = bool(self._config.get('game_manual_output', False))
             self._regions, self._outputs, self._styles = [], [], []
             self._selected_region = self._selected_hit = self._drag_hit = None
@@ -164,22 +169,58 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         if source_index < 0 or value['target_language'] not in targets:
             self.selection_note.setText(text(self._language, 'unavailable'))
             with QtCore.QSignalBlocker(self.template_combo):
-                self.template_combo.setCurrentIndex(0)
+                self.template_combo.setCurrentIndex(max(0, self.template_combo.findText(self._loaded_template_name)))
             self._layout_controls()
             return
+        # Resolve every source and output before changing the current layout.
+        # A missing monitor must never silently become the primary screen.
+        try:
+            origin = self.geometry().topLeft()
+            sources = [decode_rect(pair['source'], self._screens).translated(-origin) for pair in value['pairs']]
+            outputs = [decode_rect(pair['output'], self._screens).translated(-origin) for pair in value['pairs']]
+        except (ValueError, KeyError, TypeError):
+            from capture_regions import text as region_text
+            self.selection_note.setText(region_text(self._language, 'dynamic_missing'))
+            with QtCore.QSignalBlocker(self.template_combo):
+                self.template_combo.setCurrentIndex(max(0, self.template_combo.findText(self._loaded_template_name)))
+            self._layout_controls()
+            return False
         self.selection_note.setText(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
         self.template_combo.setCurrentIndex(index)
-        self.source_combo.setCurrentIndex(source_index)
-        self._fill_targets(value['target_language'])
-        origin = self.geometry().topLeft()
-        self._regions = [decode_rect(pair['source'], self._screens).translated(-origin) for pair in value['pairs']]
-        self._outputs = [decode_rect(pair['output'], self._screens).translated(-origin) for pair in value['pairs']]
+        self._loading_template = True
+        try:
+            self.source_combo.setCurrentIndex(source_index)
+            self._fill_targets(value['target_language'])
+        finally:
+            self._loading_template = False
+        self._loaded_template_name = value['name']
+        self._regions = sources
+        self._outputs = outputs
         self._manual_output = any(source != output for source, output in zip(self._regions, self._outputs))
         self.selection_note.setText(text(self._language, 'selection_hint' if self._manual_output else 'simple_selection_hint'))
         self._styles = [output_style(pair['style']) for pair in value['pairs']]
         self._selected_region = self._selected_hit = self._drag_hit = None
         self._start = self._end = None
         self._update_selection_controls()
+        return True
+
+    def _persist_pair(self):
+        # Restoring a preview, then cancelling, must not rewrite languages.
+        if not self._loading_template:
+            super()._persist_pair()
+
+    def _restore_last_template(self):
+        if self._config.get('game_remember_template') is not True:
+            return
+        name = self._config.get('game_last_template', '')
+        if not isinstance(name, str) or not name:
+            return
+        index = self.template_combo.findText(name, QtCore.Qt.MatchExactly)
+        if index > 0:
+            self._load_template(index)
+        else:
+            from capture_regions import text as region_text
+            self.selection_note.setText(region_text(self._language, 'dynamic_missing'))
 
     def _remove_region(self, index):
         if index is not None and 0 <= index < len(self._regions):
@@ -270,6 +311,15 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         origin = self.geometry().topLeft()
         sources = [rect.translated(origin) for rect in self._regions]
         outputs = [rect.translated(origin) for rect in self._outputs]
+        try:
+            screens = QtWidgets.QApplication.screens()
+            for rect in sources+outputs:
+                encode_rect(rect, screens)
+        except (ValueError, RuntimeError):
+            from capture_regions import text as region_text
+            self.selection_note.setText(region_text(self._language, 'dynamic_missing'))
+            self._layout_controls()
+            return
         target_window = self._target_window
         if platform_support.IS_MAC:
             try:
@@ -279,6 +329,10 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             except Exception:
                 logging.getLogger('clickntranslate.game').exception('Unable to bind selected source window')
         self._persist_pair()
+        if self._config.get('game_remember_template') is True:
+            from ocr import _write_ocr_config_updates
+            selected = self.template_combo.currentData()
+            _write_ocr_config_updates({'game_last_template': selected['name'] if selected else ''})
         self._starting_session = True
         self.close()
         if platform_support.IS_WINDOWS:
@@ -823,6 +877,11 @@ class OutputControls(QtWidgets.QFrame):
                     self.overlay.source_language, self.overlay.target_language))
                 self.notice.setText(text(self.language, 'saved'))
                 self._refresh_templates(name)
+                from ocr import get_cached_ocr_config, _write_ocr_config_updates
+                if get_cached_ocr_config().get('game_remember_template') is True:
+                    if not _write_ocr_config_updates({'game_last_template': name}):
+                        from capture_regions import text as region_text
+                        self.notice.setText(region_text(self.language, 'save_error'))
             except Exception:
                 logging.getLogger('clickntranslate.game').exception('Unable to save output layout')
                 self.notice.setText(text(self.language, 'save_error'))
@@ -837,6 +896,12 @@ class OutputControls(QtWidgets.QFrame):
             TemplateStore().delete(name)
             self._refresh_templates()
             self.notice.hide()
+            from ocr import get_cached_ocr_config, _write_ocr_config_updates
+            if get_cached_ocr_config().get('game_last_template') == name:
+                if not _write_ocr_config_updates({'game_last_template': ''}):
+                    from capture_regions import text as region_text
+                    self.notice.setText(region_text(self.language, 'save_error'))
+                    self.notice.show()
         except Exception:
             self.notice.setText(text(self.language, 'save_error'))
             self.notice.show()
