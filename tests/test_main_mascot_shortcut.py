@@ -68,6 +68,8 @@ def test_home_companion_is_recognizable_without_animation_or_full_atlas_cache(wi
     thumbnail = preview.button.value_label.pixmap()
     assert thumbnail is not None and not thumbnail.isNull()
     assert max(thumbnail.width(), thumbnail.height()) >= 18
+    assert thumbnail.devicePixelRatio() >= 2
+    assert thumbnail.height()/thumbnail.devicePixelRatio() <= preview.button.value_label.height()
     assert preview.button.height() == window.main_hotkey_references['game'].height()
     assert preview.height() == preview.button.height()
     assert preview.rect().contains(preview.button.geometry())

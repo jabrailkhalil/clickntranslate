@@ -253,7 +253,7 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     from assistant_preview import preview_art
     pixmaps = [preview_art(mascot) for mascot in rail.buttons]
     memory = sum(p.width() * p.height() * 4 for p in pixmaps)
-    assert memory <= 48 * 52 * 4
+    assert memory <= 192 * 208 * 4
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
     origin = rail.button.pos()

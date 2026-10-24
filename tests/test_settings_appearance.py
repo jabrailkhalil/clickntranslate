@@ -577,8 +577,10 @@ class PopupFrameTest(unittest.TestCase):
             self.app.processEvents()
             popup = combo.view().window()
 
-            self.assertIn("#20212a", popup.styleSheet())
-            self.assertTrue(popup.autoFillBackground())
+            image = popup.grab().toImage()
+            self.assertEqual(image.pixelColor(image.width()//2, 2).name(), '#20212a')
+            self.assertEqual(image.pixelColor(image.width()//2, 2).alpha(), 255)
+            self.assertEqual(image.pixelColor(0, 0).alpha(), 0)
             combo.hidePopup()
             self.app.processEvents()
         finally:

@@ -404,7 +404,7 @@ class DropDownCombo(QComboBox):
     clear of the border, is what every other drop-down in this window does.
     """
 
-    POPUP_GAP = 3
+    POPUP_GAP = 5
     GROUP_HEADER_ROLE = Qt.UserRole + 100
     aboutToShowPopup = QtCore.pyqtSignal()
 
@@ -447,6 +447,20 @@ class DropDownCombo(QComboBox):
         self._popup_layout_timer = QtCore.QTimer(self)
         self._popup_layout_timer.setSingleShot(True)
         self._popup_layout_timer.timeout.connect(self._layout_open_popup)
+        from combo_popup import PopupRowDelegate
+        self.setItemDelegate(PopupRowDelegate(self))
+        self.view().setMouseTracking(True)
+        self.view().setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.view().setTextElideMode(Qt.ElideRight)
+        self.view().setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.view().setUniformItemSizes(False)
+
+    def popup_colors(self):
+        from combo_popup import popup_palette
+        background = getattr(self, '_popup_background', '')
+        dark = (QtGui.QColor(background).lightness() < 128 if background
+                else self.palette().color(QtGui.QPalette.Text).lightness() > 128)
+        return popup_palette(dark, background or None)
 
     def set_popup_background(self, colour):
         """Colour for the frame Qt wraps the list in.
@@ -462,13 +476,12 @@ class DropDownCombo(QComboBox):
     def _paint_popup_frame(self):
         view = self.view()
         popup = view.window() if view is not None else None
-        if popup is None or not getattr(self, "_popup_background", ""):
+        if popup is None:
             return
-        background = self._popup_background
-        dark = QtGui.QColor(background).lightness() < 128
-        text = "#f4f6fb" if dark else "#202124"
-        hover = "#33313b" if dark else "#ddd6e4"
-        border = "#786989" if dark else "#897397"
+        colors = self.popup_colors()
+        background, text = colors['surface'], colors['text']
+        from combo_popup import popup_scale
+        factor = popup_scale(self)
         # Disabled section labels store their own ForegroundRole. A stylesheet
         # change alone leaves that brush in the previous theme (black on black
         # after the first light -> dark switch).
@@ -486,40 +499,23 @@ class DropDownCombo(QComboBox):
                 palette.setColor(role, QColor(colour))
             if widget.palette() != palette:
                 widget.setPalette(palette)
-        if popup.objectName() != "appComboPopup":
-            popup.setObjectName("appComboPopup")
-        set_widget_stylesheet(popup, f"QFrame#appComboPopup {{ background-color: {background}; border: 1px solid {border}; }}")
-        popup.setAutoFillBackground(True)
-        # The list is a top-level popup on Linux, so a parent selector such as
-        # ``QComboBox QAbstractItemView`` does not reliably reach it.  Style the
-        # view directly: otherwise the proxy popup falls back
-        # to the desktop's blue selection and native scrollbar.
-        set_widget_stylesheet(view, f"""
-            QAbstractItemView {{
-                background-color: {background};
-                color: {text};
-                border: none;
-                outline: none;
-                selection-background-color: #7A5FA1;
-                selection-color: #ffffff;
-            }}
-            QAbstractItemView::item {{
-                min-height: 24px;
-                padding: 3px 6px;
-            }}
-            QAbstractItemView::item:disabled {{
-                color: {text};
-                background-color: {background};
-            }}
-            QAbstractItemView::item:hover {{
-                background-color: {hover};
-                color: {text};
-            }}
-            QAbstractItemView::item:selected {{
-                background-color: #7A5FA1;
-                color: #ffffff;
-            }}
-        """)
+        popup.setObjectName('appComboPopup')
+        popup.setProperty('clickntranslateRoundedPopup', True)
+        popup.setWindowFlag(Qt.FramelessWindowHint, True)
+        popup.setAttribute(Qt.WA_TranslucentBackground, True)
+        popup.setAutoFillBackground(False)
+        set_widget_stylesheet(popup, 'QFrame#appComboPopup {background:transparent; border:0;}')
+        from scrollbar_styles import scrollbar_stylesheet
+        set_widget_stylesheet(view, f'''
+            QAbstractItemView {{ background:transparent; color:{text}; border:0; outline:none; padding:0; }}
+            QAbstractItemView::item {{ border:0; padding:0; }}
+        ''' + scrollbar_stylesheet())
+        view.viewport().setAutoFillBackground(False)
+        view.verticalScrollBar().setProperty('_cntScrollDark', QtGui.QColor(background).lightness() < 128)
+        if popup.layout() is not None:
+            inset = max(4, round(6*factor))
+            popup.layout().setContentsMargins(inset, inset, inset, inset)
+            popup.layout().setSpacing(max(3, round(4*factor)))
 
     def _prepare_popup(self):
         # Polish the list before QComboBox measures it for the first opening.
@@ -536,6 +532,7 @@ class DropDownCombo(QComboBox):
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         view.setMinimumSize(0, 0)
         view.setMaximumSize(16777215, 16777215)
+        view.setFrameShape(QtWidgets.QFrame.NoFrame)
         popup.setMinimumSize(0, 0)
         popup.setMaximumSize(16777215, 16777215)
         view.doItemsLayout()
@@ -552,10 +549,16 @@ class DropDownCombo(QComboBox):
 
     def showPopup(self):
         self.aboutToShowPopup.emit()
+        self.ensurePolished()
         from language_search import prepare_language_search
         prepare_language_search(self)
         self._prepare_popup()
-        super().showPopup()
+        animated = QtWidgets.QApplication.isEffectEnabled(Qt.UI_AnimateCombo)
+        try:
+            QtWidgets.QApplication.setEffectEnabled(Qt.UI_AnimateCombo, False)
+            super().showPopup()
+        finally:
+            QtWidgets.QApplication.setEffectEnabled(Qt.UI_AnimateCombo, animated)
         self._layout_open_popup()
         search = getattr(self, '_language_search', None)
         if search is not None:
@@ -571,7 +574,20 @@ class DropDownCombo(QComboBox):
     def eventFilter(self, watched, event):
         if (getattr(self, '_popup_layout_timer', None) is not None
                 and watched is self.view().window()):
-            if event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize, QtCore.QEvent.Show):
+            if event.type() == QtCore.QEvent.Paint:
+                from combo_popup import popup_scale
+                colors = self.popup_colors()
+                painter = QtGui.QPainter(watched)
+                painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+                painter.fillRect(watched.rect(), Qt.transparent)
+                painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
+                painter.setRenderHint(QtGui.QPainter.Antialiasing)
+                painter.setPen(QtGui.QPen(QtGui.QColor(colors['border']), 1))
+                painter.setBrush(QtGui.QColor(colors['surface']))
+                radius = round(8*popup_scale(self))
+                painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), radius, radius)
+                return True
+            elif event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize, QtCore.QEvent.Show):
                 self._queue_popup_layout()
             elif event.type() == QtCore.QEvent.Hide:
                 self._popup_layout_timer.stop()
@@ -586,13 +602,16 @@ class DropDownCombo(QComboBox):
         view.doItemsLayout()
         heights, widest = [], 0
         root = self.rootModelIndex()
+        option = QtWidgets.QStyleOptionViewItem()
+        option.initFrom(view)
         for row in range(self.model().rowCount(root)):
             if hasattr(view, 'isRowHidden') and view.isRowHidden(row):
                 continue
             index = self.model().index(row, self.modelColumn(), root)
             font = index.data(Qt.FontRole) or view.font()
             metrics = QtGui.QFontMetrics(font)
-            height = view.sizeHintForRow(row)
+            hint = self.itemDelegate().sizeHint(option, index)
+            height = max(view.sizeHintForRow(row), hint.height())
             heights.append(height if height > 0 else metrics.height() + 6)
             # SizeHintRole may specify only a row height (the checkbox picker).
             # Measure text and decoration as well, so localized labels fit.
@@ -600,14 +619,22 @@ class DropDownCombo(QComboBox):
             icon = index.data(Qt.DecorationRole)
             if icon is not None:
                 width += max(18, self.iconSize().width()) + 6
-            widest = max(widest, width)
+            widest = max(widest, width, hint.width())
         visible = max(1, min(len(heights), self.maxVisibleItems()))
         # Allow any scrolled group of rows, including taller section headers.
-        content_height = sum(sorted(heights, reverse=True)[:visible]) or view.fontMetrics().height()
-        chrome = max(2, view.window().height() - view.viewport().height())
-        scrollbar = view.verticalScrollBar().sizeHint().width()
-        width = max(self.width(), view.sizeHintForColumn(self.modelColumn()) + 16 + scrollbar,
-                    widest + 24 + scrollbar)
+        content_height = sum(sorted(heights, reverse=True)[:visible])
+        layout = view.window().layout()
+        margins = layout.contentsMargins()
+        extras = [layout.itemAt(i).widget() for i in range(layout.count())]
+        extras = [widget for widget in extras if widget is not None and widget is not view and not widget.isHidden()]
+        chrome = margins.top()+margins.bottom()+sum(
+            max(widget.minimumHeight(), min(widget.maximumHeight(), widget.sizeHint().height()))
+            for widget in extras)+len(extras)*layout.spacing()
+        scrollbar = view.verticalScrollBar().sizeHint().width() if len(heights)>visible else 0
+        from combo_popup import popup_scale
+        search = getattr(self, '_language_search', None)
+        search_width = round(240*popup_scale(self)) if search is not None and not search.isHidden() else 0
+        width = max(self.width(), search_width, widest + margins.left()+margins.right()+scrollbar)
         return QtCore.QSize(width, content_height + chrome)
 
     def _layout_open_popup(self):
@@ -702,9 +729,15 @@ def modern_combo_style(dark, font_size=15):
     """
 
 
-class _ResultModeDelegate(QtWidgets.QStyledItemDelegate):
+from combo_popup import PopupRowDelegate
+
+
+class _ResultModeDelegate(PopupRowDelegate):
+    def __init__(self, combo):
+        super().__init__(combo, mark_current=False)
+
     def paint(self, painter, option, index):
-        view = self.parent()
+        view = self.combo.view()
         if view.property('keyboardModeSelection') and view.currentIndex() == index:
             option.state |= QtWidgets.QStyle.State_Selected
         super().paint(painter, option, index)
@@ -766,7 +799,7 @@ class ResultWindowModeCombo(DropDownCombo):
         # Toggle on press instead of letting the view "select" a row, so the
         # list stays open and no row ever looks like the chosen one.
         self.view().pressed.connect(self._toggle_pressed)
-        self.view().setItemDelegate(_ResultModeDelegate(self.view()))
+        self.view().setItemDelegate(_ResultModeDelegate(self))
         self.view().installEventFilter(self)
         self.view().viewport().installEventFilter(self)
 

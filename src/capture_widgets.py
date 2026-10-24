@@ -5,57 +5,20 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from button_styles import paint_down_arrow
 from languages import language_display_name, language_short_label
 from settings_window import DropDownCombo
-from styled_dialogs import install_tooltip_style, set_widget_stylesheet
+from styled_dialogs import install_tooltip_style
+from combo_popup import PopupRowDelegate
 
 
-class _LanguageRow(QtWidgets.QStyledItemDelegate):
-    def __init__(self, combo):
-        super().__init__(combo)
-        self.combo = combo
-
+class _LanguageRow(PopupRowDelegate):
     def label(self, index):
         code = index.data(QtCore.Qt.UserRole)
         return (language_display_name(code, self.combo.interface_language)
                 if code else str(index.data(QtCore.Qt.DisplayRole) or ''))
 
     def sizeHint(self, option, index):
-        metrics = QtGui.QFontMetrics(self.combo.font())
-        s = self.combo.ui_factor
-        return QtCore.QSize(max(round(196*s), metrics.horizontalAdvance(self.label(index)) + round(70*s)), round(34*s))
-
-    def paint(self, painter, option, index):
-        s = self.combo.ui_factor
-        palette = self.combo.colors
-        chosen = index.row() == self.combo.currentIndex()
-        hover = bool(option.state & (QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected))
-        enabled = bool(index.flags() & QtCore.Qt.ItemIsEnabled)
-        rect = QtCore.QRectF(option.rect).adjusted(3, 2, -3, -2)
-        painter.save()
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        if chosen or hover:
-            painter.setPen(QtCore.Qt.NoPen)
-            painter.setBrush(QtGui.QColor(palette['selected'] if chosen else palette['hover']))
-            painter.drawRoundedRect(rect, 6, 6)
-        icon = index.data(QtCore.Qt.DecorationRole)
-        if isinstance(icon, QtGui.QIcon):
-            icon.paint(painter, QtCore.QRect(round(rect.left() + 9*s), round(rect.center().y() - 10*s), round(20*s), round(20*s)))
-        font = self.combo.font()
-        font.setWeight(QtGui.QFont.DemiBold if chosen else QtGui.QFont.Normal)
-        painter.setFont(font)
-        painter.setPen(QtGui.QColor(palette['text'] if enabled else palette['muted']))
-        label_rect = rect.adjusted(38*s, 0, -26*s, 0)
-        label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, int(label_rect.width()))
-        painter.drawText(label_rect, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft, label)
-        if chosen and enabled:
-            pen = QtGui.QPen(QtGui.QColor(palette['accent']), 1.8, QtCore.Qt.SolidLine,
-                            QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
-            painter.setPen(pen)
-            x, y = rect.right() - 14, rect.center().y()
-            path = QtGui.QPainterPath(QtCore.QPointF(x - 4, y))
-            path.lineTo(x - 1, y + 3)
-            path.lineTo(x + 5, y - 4)
-            painter.drawPath(path)
-        painter.restore()
+        hint = super().sizeHint(option, index)
+        hint.setWidth(max(round(224*self.combo.ui_factor), hint.width()))
+        return hint
 
 
 class CaptureLanguageCombo(DropDownCombo):
@@ -146,34 +109,8 @@ class CaptureLanguageCombo(DropDownCombo):
                          self.font(), QtGui.QColor(c['text']), s)
 
     def _paint_popup_frame(self):
-        if not getattr(self, 'colors', None):
-            return
-        c = self.colors
-        view, popup = self.view(), self.view().window()
-        popup.setObjectName('captureLanguagePopup')
-        popup.setProperty('clickntranslateRoundedPopup', True)
-        popup.setWindowFlag(QtCore.Qt.FramelessWindowHint, True)
-        popup.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        popup.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        popup.setAutoFillBackground(False)
-        set_widget_stylesheet(popup, f"""
-            QFrame#captureLanguagePopup {{ background:{c['surface']}; border:1px solid {c['border']};
-                border-radius:8px; padding:4px; }}
-        """)
-        set_widget_stylesheet(view, f"""
-            QAbstractItemView {{ background:transparent; color:{c['text']}; border:0; outline:none; }}
-        """)
-        view.viewport().setAutoFillBackground(False)
+        if getattr(self, 'colors', None):
+            super()._paint_popup_frame()
 
-    def eventFilter(self, watched, event):
-        if (event.type() == QtCore.QEvent.Paint and watched is self.view().window()
-                and getattr(self, 'colors', None)):
-            # QComboBox's private container omits its stylesheet background
-            # when translucent. Paint the card before Qt paints its children.
-            painter = QtGui.QPainter(watched)
-            painter.setRenderHint(QtGui.QPainter.Antialiasing)
-            painter.setPen(QtGui.QPen(QtGui.QColor(self.colors['border']), 1))
-            painter.setBrush(QtGui.QColor(self.colors['surface']))
-            painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), 8, 8)
-            return True
-        return super().eventFilter(watched, event)
+    def popup_colors(self):
+        return self.colors if getattr(self, 'colors', None) else super().popup_colors()

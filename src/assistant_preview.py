@@ -14,7 +14,7 @@ def preview_art(mascot):
 
 @lru_cache(maxsize=6)
 def preview_portrait(mascot):
-    # Remove the empty space in the small static asset, without decoding an
+    # Remove the empty space in the static resting pose, without decoding an
     # animation atlas. The actual character can fill its larger shortcut.
     pixmap = preview_art(mascot)
     if pixmap.isNull():
@@ -67,9 +67,15 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def _update_thumbnail(self):
         if self.art is not None:
-            self.button.value_label.setPixmap(preview_portrait(self.mascot).scaled(
-                32, max(1, self.button.value_label.height()),
-                QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            # QGraphicsView can magnify this row for both Windows DPI and the
+            # user's UI scale. Keep extra pixels instead of enlarging a 20px
+            # bitmap. DPR preserves exactly the same logical row height.
+            density = 4
+            pixmap = preview_portrait(self.mascot).scaled(
+                32*density, max(1, self.button.value_label.height())*density,
+                QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            pixmap.setDevicePixelRatio(density)
+            self.button.value_label.setPixmap(pixmap)
         else:
             self.button.value_label.clear()
 
