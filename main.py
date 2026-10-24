@@ -97,7 +97,7 @@ try:
 except Exception:
     _show_dependency_error()
 from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
-                        configure_qt_platform, widget_global_point, widget_popup_geometry,
+                        configure_qt_platform, widget_global_point, widget_global_rect, widget_popup_geometry,
                         prepare_native_popup)
 from header_icons import header_icon
 from control_hints import control_hint
@@ -12610,6 +12610,27 @@ class DarkThemeApp(QMainWindow):
             self._guide_bubble.hide()
 
     def eventFilter(self, watched, event):
+        picker = getattr(self, '_interface_language_picker', None)
+        if picker is not None:
+            if event.type() == QtCore.QEvent.WindowDeactivate and watched is self:
+                self._close_interface_language_picker(restore_focus=False)
+            elif event.type() == QtCore.QEvent.MouseButtonPress and isinstance(watched, QWidget):
+                if watched.window() is self.ui_root:
+                    point = widget_global_point(watched, event.pos())
+                elif watched.window() is self:
+                    point = event.globalPos()
+                else:
+                    return super().eventFilter(watched, event)
+                in_panel = widget_global_rect(picker).contains(point)
+                in_flag = widget_global_rect(self.flag_button).contains(point)
+                connection = getattr(self, '_interface_language_connection', None)
+                in_connection = connection is not None and connection.contains_global(point)
+                if not (in_panel or in_flag or in_connection):
+                    # Let the same click reach its original target once.
+                    self._close_interface_language_picker(restore_focus=False)
+                elif in_connection and not (in_panel or in_flag):
+                    picker._set_keyboard_mode(False)
+                    return True  # The joining stem is part of the open surface.
         return super().eventFilter(watched, event)
 
     def nativeEvent(self, eventType, message):
@@ -13191,6 +13212,9 @@ class DarkThemeApp(QMainWindow):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is not None:
             picker.set_theme(is_dark)
+            connection = getattr(self, '_interface_language_connection', None)
+            if connection is not None:
+                connection.set_theme(is_dark)
         controller = getattr(self, '_ui_scale_controller', None)
         if controller is not None:
             controller.apply_theme(style_sheet, theme['background'])
@@ -13215,6 +13239,8 @@ class DarkThemeApp(QMainWindow):
             control = getattr(self, name, None)
             if control is not None:
                 control.setStyleSheet(styled_transparent_button_qss(is_dark))
+        if picker is not None:
+            self.update_interface_language_button()
 
         if hasattr(self, "minimize_button") and hasattr(self, "close_button"):
             self.minimize_button.setStyleSheet(button_qss(is_dark, "quiet", icon=True))
@@ -13481,6 +13507,18 @@ class DarkThemeApp(QMainWindow):
         expanded = getattr(self, '_interface_language_picker', None) is not None
         self.flag_button.setCheckable(True)
         self.flag_button.setChecked(expanded)
+        self.flag_button.setProperty('languagePickerExpanded', expanded)
+        style = styled_transparent_button_qss(self.current_theme != 'Светлая')
+        if expanded:
+            # The joined surface owns the pressed chrome; the button paints
+            # its sharp icon above it without a second rectangular focus frame.
+            style += '''QPushButton[languagePickerExpanded="true"],
+                QPushButton[languagePickerExpanded="true"]:hover,
+                QPushButton[languagePickerExpanded="true"]:pressed,
+                QPushButton[languagePickerExpanded="true"]:checked,
+                QPushButton[languagePickerExpanded="true"][keyboardFocus="true"]:focus {
+                    background:transparent; border:0; }'''
+        self.flag_button.setStyleSheet(style)
         label = (PICKER_TEXT[self.current_interface_language][3] if expanded
                  else ui_text(self.current_interface_language, "choose_interface_language"))
         self.flag_button.setToolTip(tooltip_text(label))
@@ -13537,12 +13575,16 @@ class DarkThemeApp(QMainWindow):
         if getattr(self, '_interface_language_picker', None) is not None:
             self._close_interface_language_picker()
             return
-        from interface_language_picker import InterfaceLanguagePicker
+        from interface_language_picker import InterfaceLanguagePicker, LanguagePickerConnection
         picker = InterfaceLanguagePicker(INTERFACE_LANGUAGE_OPTIONS, self.current_interface_language,
                                          resource_path, self.central_widget,
                                          dark=self.current_theme != 'Светлая')
         self._interface_language_picker = picker
-        self._interface_language_focus = QApplication.focusWidget()
+        navigator = getattr(QApplication.instance(), '_keyboard_navigation', None)
+        keyboard = bool(navigator is not None and navigator.keyboard)
+        self._interface_language_connection = LanguagePickerConnection(self.ui_root,
+                                            dark=self.current_theme != 'Светлая')
+        QApplication.instance().installEventFilter(self)
         self.update_interface_language_button()
         picker.languageSelected.connect(self.set_interface_language)
         picker.dismissed.connect(self._close_interface_language_picker)
@@ -13551,41 +13593,68 @@ class DarkThemeApp(QMainWindow):
             self._language_picker_position_connected = True
         self._position_interface_language_picker()
         picker.show()
-        picker.raise_()
-        picker.focus_current_language()
+        self._position_interface_language_picker()
+        picker.focus_current_language(keyboard=keyboard)
         # The graphics proxy finishes restoring mouse focus after clicked().
         QtCore.QTimer.singleShot(0, lambda: picker.focus_current_language()
                                 if self._interface_language_picker is picker else None)
+
+    def _remember_interface_language_panel(self):
+        pane = getattr(self, 'main_text_section', None)
+        if pane is not None and self.settings_window is None and pane.isVisibleTo(self.central_widget):
+            self.main_layout.activate()
+            rect = QtCore.QRect(pane.mapTo(self.central_widget, QtCore.QPoint()), pane.size())
+            if self.central_widget.rect().contains(rect) and rect.height() >= 90:
+                self._interface_language_home_height = rect.height()
+                return rect
+        return None
 
     def _position_interface_language_picker(self, *_args):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is None:
             return
-        # A child overlay stays in the same scaled canvas and never removes
-        # settings, hides their contents or changes the layout's minimum size.
-        # New page widgets can still have QWidget's default 640x480 geometry.
-        # Anchor to the persistent canvas margins, independent of their layout.
+        # Settle the actual panel before measuring a newly relabelled page;
+        # a fresh hidden QWidget can otherwise still report 640x480.
+        self.main_layout.activate()
         margins = self.main_layout.contentsMargins()
-        top = margins.top() + (8 if self.settings_window is not None else 0)
-        picker.setGeometry(margins.left(), top,
-                           self.central_widget.width()-margins.left()-margins.right(),
-                           picker.PANEL_HEIGHT)
+        rect = self._remember_interface_language_panel()
+        if rect is None:
+            height = getattr(self, '_interface_language_home_height', picker.PANEL_HEIGHT)
+            rect = QtCore.QRect(margins.left(), margins.top(),
+                         self.central_widget.width()-margins.left()-margins.right(), height)
+            if self.settings_window is not None:
+                settings = self.settings_window
+                area = QtCore.QRect(settings.mapTo(self.central_widget, QtCore.QPoint()), settings.size())
+                if self.central_widget.rect().contains(area) and area.height() >= 90:
+                    rect = QtCore.QRect(area.topLeft(), QtCore.QSize(area.width(), min(height, area.height())))
+        picker.setGeometry(rect)
         picker.raise_()
+        connection = getattr(self, '_interface_language_connection', None)
+        if connection is not None:
+            body = QtCore.QRect(picker.mapTo(self.ui_root, QtCore.QPoint()), picker.size())
+            flag = QtCore.QRect(self.flag_button.mapTo(self.ui_root, QtCore.QPoint()), self.flag_button.size())
+            connection.set_areas(flag, body)
+            connection.show()
+            connection.raise_()
+        self.flag_button.raise_()
 
     def _close_interface_language_picker(self, restore_focus=True):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is None:
             return
-        focus = self._interface_language_focus
         self._interface_language_picker = None
-        self._interface_language_focus = None
+        QApplication.instance().removeEventFilter(self)
+        connection = getattr(self, '_interface_language_connection', None)
+        self._interface_language_connection = None
+        if connection is not None:
+            connection.hide()
+            connection.deleteLater()
         self.update_interface_language_button()
         picker.hide()
         picker.deleteLater()
         if restore_focus:
-            from PyQt5 import sip
-            target = focus if focus is not None and not sip.isdeleted(focus) else self.flag_button
-            target.setFocus(Qt.OtherFocusReason)
+            navigator = getattr(QApplication.instance(), '_keyboard_navigation', None)
+            self.flag_button.setFocus(Qt.TabFocusReason if navigator is not None and navigator.keyboard else Qt.OtherFocusReason)
         self._complete_guide_step('language')
 
     def set_interface_language(self, language_code):
@@ -14723,6 +14792,7 @@ class DarkThemeApp(QMainWindow):
     @_atomic_page_change
     @measure('ui.settings')
     def show_settings(self):
+        self._remember_interface_language_panel()
         self._close_interface_language_picker(restore_focus=False)
         importer = getattr(self, '_image_importer', None)
         if importer is not None:

@@ -42,12 +42,72 @@ class _RoundedChoices(QtWidgets.QFrame):
         self.setMask(QtGui.QRegion(path.toFillPolygon().toPolygon()))
 
 
+class LanguagePickerConnection(QtWidgets.QWidget):
+    """One outline joins the pressed flag to its panel without blocking input."""
+    def __init__(self, parent, *, dark=True):
+        super().__init__(parent)
+        self.setObjectName('interfaceLanguageConnection')
+        self.setProperty('_cntTransientChrome', True)
+        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._outline = QtGui.QPainterPath()
+        self._tab = QtGui.QPainterPath()
+        self.set_theme(dark)
+
+    def set_theme(self, dark):
+        self._surface = QtGui.QColor('#1d1922' if dark else '#ffffff')
+        self._edge = QtGui.QColor('#62566e' if dark else '#927cab')
+        self.update()
+
+    def set_areas(self, flag, panel):
+        bounds = flag.united(panel).adjusted(-1, -1, 1, 1)
+        self.setGeometry(bounds)
+        flag = QtCore.QRectF(flag.translated(-bounds.topLeft())).adjusted(.5, .5, -.5, -.5)
+        panel = QtCore.QRectF(panel.translated(-bounds.topLeft())).adjusted(.5, .5, -.5, -.5)
+        body = QtGui.QPainterPath()
+        body.addRoundedRect(panel, 10, 10)
+        tab = QtGui.QPainterPath()
+        tab.addRoundedRect(flag, 6, 6)
+        # Join along the panel's left edge; the adjacent theme button is clear.
+        left = max(panel.left(), flag.left())
+        right = min(panel.right(), flag.right())
+        if right > left and panel.top() >= flag.center().y():
+            stem = QtGui.QPainterPath()
+            stem.addRect(QtCore.QRectF(left, flag.center().y(), right-left,
+                                      panel.top()+10-flag.center().y()))
+            tab = tab.united(stem)
+        self._tab = tab
+        self._outline = body.united(tab)
+        self.update()
+
+    def contains_global(self, point):
+        from ui_scaling import widget_global_rect
+        rect = widget_global_rect(self)
+        if rect.isEmpty():
+            return False
+        local = QtCore.QPointF((point.x()-rect.left())*self.width()/rect.width(),
+                              (point.y()-rect.top())*self.height()/rect.height())
+        return self._outline.contains(local)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        # The body already paints its surface and children. Fill only the tab
+        # and seam, then draw the shared boundary above all cell backgrounds.
+        painter.fillPath(self._tab, self._surface)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(QtGui.QPen(self._edge, 1, QtCore.Qt.SolidLine,
+                                  QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(self._outline)
+
+
 class InterfaceLanguagePicker(QtWidgets.QFrame):
     languageSelected = QtCore.pyqtSignal(str)
     dismissed = QtCore.pyqtSignal()
     PAGE_SIZE = 10
     COLUMNS = 5
-    PANEL_HEIGHT = 144
+    PANEL_HEIGHT = 146
 
     def __init__(self, options, current, resource_path, parent=None, *, dark=True):
         super().__init__(parent)
@@ -58,11 +118,13 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         self.buttons, self.name_labels, self.ticks = {}, {}, {}
         self._codes = tuple(option['code'] for option in options)
         self._current = current
+        self.keyboard_mode = False
         self._button_indexes = {}
-        self.setFixedHeight(self.PANEL_HEIGHT)
+        self.setMinimumHeight(90)
+        self.resize(670, self.PANEL_HEIGHT)
         texts = PICKER_TEXT.get(current, PICKER_TEXT['en'])
         body = QtWidgets.QVBoxLayout(self)
-        body.setContentsMargins(1, 1, 1, 1)
+        body.setContentsMargins(2, 2, 2, 2)
         body.setSpacing(0)
         header = QtWidgets.QWidget(self)
         header.setFixedHeight(26)
@@ -137,10 +199,13 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                     content.setContentsMargins(7, 0, 5, 0)
                     content.setSpacing(5)
                     flag = QtWidgets.QLabel(cell)
+                    flag.setObjectName('interfaceLanguageFlag')
                     flag.setFixedSize(18, 18)
                     flag.setAlignment(QtCore.Qt.AlignCenter)
-                    flag.setPixmap(QtGui.QPixmap(resource_path(option['icon'])).scaled(
-                        flag.size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                    pixels = QtGui.QPixmap(resource_path(option['icon'])).scaled(
+                        flag.size()*4, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+                    pixels.setDevicePixelRatio(4)
+                    flag.setPixmap(pixels)
                     content.addWidget(flag)
                     label = QtWidgets.QLabel(name, cell)
                     label.setObjectName('interfaceLanguageName')
@@ -166,8 +231,10 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                 cell.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Expanding)
                 grid.addWidget(cell, index // 5, index % 5)
             self.pages.addWidget(page)
-        self.previous_button.clicked.connect(lambda: self.set_page(self.pages.currentIndex()-1, focus=True))
-        self.next_button.clicked.connect(lambda: self.set_page(self.pages.currentIndex()+1, focus=True))
+        self.previous_button.clicked.connect(lambda: self.set_page(
+            self.pages.currentIndex()-1, focus=True, keyboard=self.keyboard_mode))
+        self.next_button.clicked.connect(lambda: self.set_page(
+            self.pages.currentIndex()+1, focus=True, keyboard=self.keyboard_mode))
         self.set_page(selected_page)
         body.addWidget(self.choices, 1)
         self.set_theme(dark)
@@ -175,7 +242,24 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         escape.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         escape.activated.connect(self.dismissed)
 
-    def set_page(self, page, *, focus=False):
+    def _set_keyboard_mode(self, keyboard):
+        self.keyboard_mode = bool(keyboard)
+        navigation = getattr(QtWidgets.QApplication.instance(), '_keyboard_navigation', None)
+        if navigation is not None:
+            navigation.keyboard = self.keyboard_mode
+            if not self.keyboard_mode:
+                navigation._hide_ring()
+        if not self.keyboard_mode:
+            for control in (*self.buttons.values(), self.previous_button, self.next_button, self.close_button):
+                if control.property('keyboardFocus'):
+                    control.setProperty('keyboardFocus', False)
+                    control.style().unpolish(control)
+                    control.style().polish(control)
+                    control.update()
+
+    def set_page(self, page, *, focus=False, keyboard=None):
+        if keyboard is not None:
+            self._set_keyboard_mode(keyboard)
         self.pages.setCurrentIndex(max(0, min(self.pages.count()-1, page)))
         self.previous_button.setEnabled(self.pages.currentIndex() > 0)
         self.next_button.setEnabled(self.pages.currentIndex() < self.pages.count()-1)
@@ -184,17 +268,24 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         if focus:
             self._focus_index(self.pages.currentIndex()*self.PAGE_SIZE)
 
-    def _focus_index(self, index, reason=QtCore.Qt.TabFocusReason):
+    def _focus_index(self, index, reason=None):
         index = max(0, min(len(self._codes)-1, index))
         self.set_page(index//self.PAGE_SIZE)
+        if reason is None:
+            reason = QtCore.Qt.TabFocusReason if self.keyboard_mode else QtCore.Qt.OtherFocusReason
         self.buttons[self._codes[index]].setFocus(reason)
 
-    def focus_current_language(self):
-        self._focus_index(self._codes.index(self._current), QtCore.Qt.OtherFocusReason)
+    def focus_current_language(self, keyboard=None):
+        if keyboard is not None:
+            self._set_keyboard_mode(keyboard)
+        self._focus_index(self._codes.index(self._current))
 
     def eventFilter(self, watched, event):
+        if event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonDblClick):
+            self._set_keyboard_mode(False)
         if event.type() != QtCore.QEvent.KeyPress:
             return super().eventFilter(watched, event)
+        self._set_keyboard_mode(True)
         key = event.key()
         if key in (QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab):
             first = self.pages.currentIndex()*self.PAGE_SIZE
@@ -239,6 +330,10 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
             return super().eventFilter(watched, event)
         event.accept()
         return True
+
+    def mousePressEvent(self, event):
+        self._set_keyboard_mode(False)
+        super().mousePressEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
