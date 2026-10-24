@@ -235,7 +235,8 @@ def test_actual_canvas_catalog_surface_matches_theme(window, app, dark):
     settle(app)
     canvas = window.ui_root.grab()
     pixels = canvas.toImage()
-    expected = '#121116' if dark else '#f8f5fb'
+    from classic_style import classic_palette
+    expected = classic_palette(dark)['surface']
     for code in ('en', 'es', 'de', 'id'):
         point = picker.buttons[code].mapTo(window.ui_root, QtCore.QPoint(3, 3))
         point *= canvas.devicePixelRatio()
@@ -251,7 +252,8 @@ def test_outer_contour_covers_corner_cell_fills_at_fractional_scales(window, app
     if (window.current_theme != 'Светлая') != dark:
         window.toggle_theme()
     window.set_interface_language('ar')
-    edge = QtGui.QColor('#62566e' if dark else '#927cab')
+    from classic_style import classic_palette
+    edge = QtGui.QColor(classic_palette(dark)['border'])
     controller = window._ui_scale_controller
     viewport = controller.view.viewport()
     for percent in (80, 110, 125, 150, 200):
@@ -366,7 +368,8 @@ def test_scrolled_intermediate_row_cannot_cover_bottom_outline(window, app, monk
     assert picker.scroll.verticalScrollBar().value() == 13
     assert picker.buttons['lang_12'].height() == 38
     image = controller.view.viewport().grab().toImage()
-    edge = QtGui.QColor('#62566e' if dark else '#927cab')
+    from classic_style import classic_palette
+    edge = QtGui.QColor(classic_palette(dark)['border'])
     origin = picker.mapTo(window.ui_root, QtCore.QPoint())
     def point_at(x, y):
         point = controller.proxy.mapToScene(QtCore.QPointF(origin)+QtCore.QPointF(x, y))

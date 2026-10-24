@@ -222,6 +222,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
         settings = self.window.settings_window
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
+            self.window.apply_theme()
             for language in tuple(main.INTERFACE_LANGUAGE_BY_CODE):
                 with self.subTest(theme=theme, language=language):
                     self.window.current_interface_language = language
@@ -236,11 +237,10 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.assertLessEqual(abs(navigation.center().x() - self.window.ui_root.rect().center().x()), 1)
                     image = self.window.ui_root.grab().toImage()
                     ratio = image.devicePixelRatio()
-                    # The gap above the individual buttons stays transparent;
-                    # no title-bar shelf or shared rounded outline remains.
+                    # The restored shelf joins the title bar's surface.
                     expected = image.pixelColor(
-                        round((navigation.left() + 12) * ratio),
-                        round((navigation.bottom() + 3) * ratio),
+                        round(100 * ratio),
+                        round(self.window.title_bar.geometry().center().y() * ratio),
                     ).name()
                     self.assertEqual(image.pixelColor(
                         round((navigation.left() + 12) * ratio),
@@ -248,7 +248,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     ).name(), expected)
                     rows = (
                         (1, settings.copy_translated_checkbox, settings.translator_engine_label, settings.translator_combo),
-                        (4, settings.keep_visible_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
+                        (4, settings.ocr_join_paragraphs_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
                     )
                     for page, checkbox, label, combo in rows:
                         settings._set_settings_page(page)
@@ -258,7 +258,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         box_rect, label_rect, combo_rect = [self.rect_in(settings, w) for w in (checkbox, label, combo)]
                         self.assertLess(label_rect.right(), combo_rect.left())
                         self.assertEqual(label_rect.center().y(), combo_rect.center().y())
-                        self.assertGreater(box_rect.top(), combo_rect.bottom())
+                        self.assertAlmostEqual(box_rect.center().y(), combo_rect.center().y(), delta=1)
                     settings._set_settings_page(4)
                     self.settle()
                     self.assertLess(

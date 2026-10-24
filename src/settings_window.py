@@ -408,7 +408,7 @@ class DropDownCombo(QComboBox):
     clear of the border, is what every other drop-down in this window does.
     """
 
-    POPUP_GAP = 5
+    POPUP_GAP = 3
     GROUP_HEADER_ROLE = Qt.UserRole + 100
     aboutToShowPopup = QtCore.pyqtSignal()
 
@@ -517,9 +517,9 @@ class DropDownCombo(QComboBox):
         view.viewport().setAutoFillBackground(False)
         view.verticalScrollBar().setProperty('_cntScrollDark', QtGui.QColor(background).lightness() < 128)
         if popup.layout() is not None:
-            inset = max(4, round(6*factor))
+            inset = max(3, round(3*factor))
             popup.layout().setContentsMargins(inset, inset, inset, inset)
-            popup.layout().setSpacing(max(3, round(4*factor)))
+            popup.layout().setSpacing(max(2, round(2*factor)))
 
     def _prepare_popup(self):
         # Polish the list before QComboBox measures it for the first opening.
@@ -592,7 +592,7 @@ class DropDownCombo(QComboBox):
                 painter.setRenderHint(QtGui.QPainter.Antialiasing)
                 painter.setPen(QtGui.QPen(QtGui.QColor(colors['border']), 1))
                 painter.setBrush(QtGui.QColor(colors['surface']))
-                radius = round(8*popup_scale(self))
+                radius = round(5*popup_scale(self))
                 painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), radius, radius)
                 return True
             elif event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize, QtCore.QEvent.Show):
@@ -683,7 +683,7 @@ def modern_combo_style(dark, font_size=15):
     border = "#3d3948" if is_dark else "#d7cde7"
     border_hover = "#6f598d" if is_dark else "#ad97cb"
     accent = "#9A7FC1" if is_dark else "#8063a8"
-    popup_bg = "#20212a" if is_dark else "#f1edf4"
+    popup_bg = bg
     selection = "#5f4a88" if is_dark else "#cfc1df"
     return f"""
         QComboBox {{
@@ -1125,18 +1125,18 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.setCheckable(True)
         self.setAutoExclusive(True)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(28)
+        self.setFixedHeight(26)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.set_dark(dark)
 
     def sizeHint(self):
         font = QtGui.QFont(self.font())
-        font.setPixelSize(12)
-        font.setWeight(QtGui.QFont.DemiBold)
+        font.setPixelSize(13)
+        font.setWeight(QtGui.QFont.Medium)
         metrics = QtGui.QFontMetrics(font)
         ink_width = max(metrics.horizontalAdvance(self.text()), metrics.boundingRect(self.text()).width())
-        return QtCore.QSize(ink_width + 22, 28)
+        return QtCore.QSize(ink_width + 18, 26)
 
     def minimumSizeHint(self):
         return self.sizeHint()
@@ -1149,18 +1149,18 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
     def set_dark(self, dark):
         self._dark = bool(dark)
         colors = button_palette(dark)
-        text = "#aaa1b4" if dark else "#74697e"
-        active = colors['text']
+        text = "#9b92a6" if dark else "#766d80"
+        active = "#f5efff" if dark else "#41275f"
         self.setStyleSheet(f"""
             QPushButton {{ background:transparent; color:{text};
-                border:1px solid transparent; border-radius:4px;
-                padding:0 8px; font-size:12px; font-weight:600; }}
+                border:1px solid transparent; border-radius:0;
+                padding:0 3px; font-size:13px; font-weight:500; }}
             QPushButton:hover, QPushButton[pointerHover="true"] {{
                 color:{active}; }}
             QPushButton[pointerHover="false"]:hover {{ color:{text}; }}
             QPushButton:checked, QPushButton:checked:hover,
             QPushButton:checked[pointerHover="false"]:hover {{
-                color:{colors['focus']}; }}
+                color:{active}; }}
             QPushButton[keyboardFocus="true"]:focus {{ border-color:{colors['focus']}; }}
             QPushButton:disabled {{ color:{colors['disabled']}; background:transparent; }}
         """)
@@ -1173,15 +1173,15 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
             return QtGui.QColor(colors['disabled'])
         hover = self.property('pointerHover')
         if self.isChecked():
-            return QtGui.QColor(colors['focus'])
+            return QtGui.QColor("#f5efff" if self._dark else "#41275f")
         hovered = self.underMouse() if hover is None else bool(hover)
         if hovered:
             return QtGui.QColor(colors['text'])
-        return QtGui.QColor("#aaa1b4" if self._dark else "#74697e")
+        return QtGui.QColor("#9b92a6" if self._dark else "#766d80")
 
 
 class SettingsPageNavigation(QFrame):
-    """Flat destinations share a fine baseline and one active underline."""
+    """The original attached shelf, with five stable settings destinations."""
 
     def __init__(self, parent=None, dark=True):
         super().__init__(parent)
@@ -1192,28 +1192,43 @@ class SettingsPageNavigation(QFrame):
 
     def set_dark(self, dark):
         self._dark = bool(dark)
+        border = "#3b3542" if dark else "#c5bacf"
         self.setStyleSheet(
             "QFrame#settingsPageNavigation {"
-            "background:transparent; border:0;"
+            f"background:{window_header_color(dark)}; border:1px solid {border}; border-top:none;"
+            "border-bottom-left-radius:11px; border-bottom-right-radius:11px;"
             "}"
         )
         self.update()
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        colors = button_palette(self._dark)
+        tabs = sorted(self.findChildren(SettingsPageTabButton,
+                      options=Qt.FindDirectChildrenOnly), key=lambda tab: tab.geometry().left())
+        selected = next((tab for tab in tabs if tab.isChecked()), None)
+        if selected is None:
+            return
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtGui.QColor(colors['disabled_border']), 1))
-        painter.drawLine(QtCore.QPointF(0, self.height()-.5),
-                         QtCore.QPointF(self.width(), self.height()-.5))
-        selected = next((tab for tab in self.findChildren(SettingsPageTabButton,
-                         options=Qt.FindDirectChildrenOnly) if tab.isChecked()), None)
-        if selected is not None:
-            rect = selected.geometry()
-            painter.fillRect(QtCore.QRectF(rect.left()+8, self.height()-3,
-                                            max(0, rect.width()-16), 3),
-                             QtGui.QColor(colors['focus']))
+        pen = QtGui.QPen(QColor("#b99adb" if self._dark else "#8057a5"), 2)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        path = QtGui.QPainterPath()
+        edge, radius = self.height()-1.0, 11.0
+        rect = selected.geometry()
+        if selected is tabs[0]:
+            path.moveTo(1.0, edge-radius)
+            path.quadTo(1.0, edge, radius, edge)
+        else:
+            path.moveTo(rect.left(), edge)
+        if selected is tabs[-1]:
+            right = self.width()-1.0
+            path.lineTo(right-radius, edge)
+            path.quadTo(right, edge, right, edge-radius)
+        else:
+            path.lineTo(rect.right(), edge)
+        painter.drawPath(path)
 
 
 class SettingsPageDotButton(QToolButton):
@@ -6184,82 +6199,30 @@ class OcrLanguageManagerDialog(QDialog):
         return bool(theme) and theme not in {"светлая", "light", "white"}
 
     def _apply_style(self):
+        from classic_style import classic_palette
         dark = self._is_dark_theme()
-        title_background = "#090a0d" if dark else "#f2edf7"
-        title_border = "#302a3a" if dark else "#d7cde7"
-        title_text = "#f7f3ff" if dark else "#2b2333"
-        close_text = "#f4eefc" if dark else "#4b4057"
-        page_background = "#111216" if dark else "#f0edf3"
-        chrome_style = f"""
-            QTabWidget::pane, QTabWidget > QStackedWidget {{
-                background-color: {page_background};
-            }}
-            QTabWidget::pane {{
-                border: none;
-                border-top: 1px solid {'#494056' if dark else '#bcb2c7'};
-                top: 0px;
-            }}
-            QFrame#languageManagerTitleBar {{
-                background-color: {title_background};
-                border: none;
-                border-bottom: 1px solid {title_border};
-            }}
-            QLabel#languageManagerTitleIcon {{
-                background: transparent;
-                border: none;
-            }}
-            QLabel#languageManagerTitleLabel {{
-                background: transparent;
-                color: {title_text};
-                border: none;
-                font-size: 13px;
-                font-weight: 700;
-            }}
-
-        """ + tooltip_stylesheet(dark) + standard_buttons(self._is_dark_theme(), compact=False)
-        if dark:
-            self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #111216; color: #f4f6fb; border: 1px solid #302a3a; font-family: 'Segoe UI'; font-size: 13px; }
-                QWidget#languageManagerContent { background-color: #111216; }
-                QLabel { color: #f4f6fb; font-family: 'Segoe UI'; font-size: 13px; }
-                QTabBar::tab { background: #1d1d23; color: #f4f6fb; padding: 7px 12px; }
-                QTabBar::tab:selected { background: #7A5FA1; }
-                QTableWidget { background: #17181d; alternate-background-color: #20212a; color: #f4f6fb; gridline-color: #34313f; selection-background-color: #5f4a88; selection-color: #ffffff; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #34313f; border-radius: 0px; }
-                QTableWidget::item { color: #f4f6fb; background-color: #17181d; }
-                QTableWidget::item:alternate { background-color: #20212a; }
-                QTableWidget::item:disabled { color: #9ca0ad; }
-                QTableWidget::item:selected { background: #5f4a88; color: #ffffff; }
-                QTableWidget::item:selected:!active { background: #5f4a88; color: #ffffff; }
-                QTableCornerButton::section { background: #24212e; border: 0; }
-                QHeaderView::section { background: #24212e; color: #f4f6fb; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
-
-            QPushButton#languagePackageAction { min-height: 18px; }
-
-                QFrame#languagePackageEmptyState { background: #17181d; border: 1px solid #34313f; border-radius: 10px; }
-                QLabel#languagePackageEmptyTitle { color: #f4f6fb; font-size: 18px; font-weight: 700; }
-                QLabel#languagePackageEmptyBody { color: #aeb2bf; font-size: 13px; }
-                QLineEdit { background: #17181d; color: #f4f6fb; border: 1px solid #34313f; border-radius: 6px; padding: 6px 9px; }
-                QLineEdit:focus { border-color: #7A5FA1; }
-            """ + standard_buttons(self._is_dark_theme(), compact=False))
-        else:
-            self.setStyleSheet(chrome_style + """
-                QDialog#languageManagerDialog { background-color: #f0edf3; color: #241f2a; border: 1px solid #bcb2c7; font-family: 'Segoe UI'; font-size: 13px; }
-                QWidget#languageManagerContent { background-color: #f0edf3; }
-                QLabel { color: #202124; font-family: 'Segoe UI'; font-size: 13px; }
-                QTableWidget { background: #f3eff5; alternate-background-color: #e9e3ed; color: #241f2a; gridline-color: #c8bfce; selection-background-color: #cdbbdd; selection-color: #241f2a; font-family: 'Segoe UI'; font-size: 14px; border: 1px solid #bcb2c7; border-radius: 0px; }
-                QTableWidget::item:selected { background: #cdbbdd; color: #241f2a; }
-                QTableWidget::item:selected:!active { background: #cdbbdd; color: #241f2a; }
-                QHeaderView::section { background: #ddd7e2; color: #241f2a; border: 0; padding: 5px; font-family: 'Segoe UI'; font-size: 13px; font-weight: 700; }
-
-            QPushButton#languagePackageAction { min-height: 18px; }
-
-                QFrame#languagePackageEmptyState { background: #e9e3ed; border: 1px solid #bcb2c7; border-radius: 10px; }
-                QLabel#languagePackageEmptyTitle { color: #202124; font-size: 18px; font-weight: 700; }
-                QLabel#languagePackageEmptyBody { color: #6f6877; font-size: 13px; }
-                QLineEdit { background: #f3eff5; color: #241f2a; border: 1px solid #bcb2c7; border-radius: 6px; padding: 6px 9px; }
-                QLineEdit:focus { border-color: #7A5FA1; }
-            """ + standard_buttons(self._is_dark_theme(), compact=False))
-
+        c = classic_palette(dark)
+        self.setStyleSheet(f"""
+            QDialog#languageManagerDialog {{ background:{c['background']}; color:{c['text']}; border:1px solid {c['border']}; font-family:'Segoe UI'; font-size:13px; }}
+            QWidget#languageManagerContent {{ background:{c['background']}; }}
+            QLabel {{ color:{c['text']}; font-size:13px; }}
+            QFrame#languageManagerTitleBar {{ background:{c['header']}; border:0; border-bottom:1px solid {c['header_border']}; }}
+            QLabel#languageManagerTitleIcon, QLabel#languageManagerTitleLabel {{ background:transparent; border:0; }}
+            QLabel#languageManagerTitleLabel {{ font-size:13px; font-weight:600; }}
+            QTabWidget::pane, QTabWidget > QStackedWidget {{ background:{c['background']}; }}
+            QTabWidget::pane {{ border:0; border-top:1px solid {c['border']}; top:0; }}
+            QTableWidget {{ background:{c['field']}; alternate-background-color:{c['field']}; color:{c['text']}; gridline-color:{c['border']}; selection-background-color:{c['selected']}; selection-color:{c['text']}; font-family:'Segoe UI'; font-size:14px; border:1px solid {c['border']}; border-radius:0; }}
+            QTableWidget::item {{ color:{c['text']}; background:{c['field']}; }}
+            QTableWidget::item:disabled {{ color:{c['muted']}; }}
+            QTableWidget::item:selected, QTableWidget::item:selected:!active {{ background:{c['selected']}; color:{c['text']}; }}
+            QTableCornerButton::section, QHeaderView::section {{ background:{c['header']}; color:{c['text']}; border:0; padding:5px; font-size:13px; font-weight:600; }}
+            QPushButton#languagePackageAction {{ min-height:18px; }}
+            QFrame#languagePackageEmptyState {{ background:transparent; border:0; }}
+            QLabel#languagePackageEmptyTitle {{ color:{c['text']}; font-size:16px; font-weight:600; }}
+            QLabel#languagePackageEmptyBody {{ color:{c['muted']}; font-size:13px; }}
+            QLineEdit {{ background:{c['field']}; color:{c['text']}; border:1px solid {c['border']}; border-radius:7px; padding:4px 9px; font-size:14px; }}
+            QLineEdit:focus {{ border-color:{c['accent']}; }}
+        """ + tooltip_stylesheet(dark) + standard_buttons(dark, compact=True))
         install_accent_controls(self, dark)
         if self.api_page is not None:
             self.api_page.apply_theme()
@@ -6289,24 +6252,23 @@ class OcrLanguageManagerDialog(QDialog):
         # stylesheet font. Declaring the font only in the stylesheet left every
         # tab sized for a 6pt default and painted at 14px, so the labels ran
         # over each other. Set the font on the bar and the two agree.
-        self._apply_tab_bar_font(self.tabs.tabBar(), 14, bold=True)
+        self._apply_tab_bar_font(self.tabs.tabBar(), 13, bold=False)
         self.tabs.tabBar().setDrawBase(False)
         for inner in (self.ocr_tabs, self.translation_tabs):
-            self._apply_tab_bar_font(inner.tabBar(), 13, bold=True)
+            self._apply_tab_bar_font(inner.tabBar(), 13, bold=False)
             inner.tabBar().setDrawBase(False)
 
         self.tabs.tabBar().setStyleSheet(f"""
             QTabBar::tab {{
-                background: {base};
-                color: {text};
+                background: transparent;
+                color: {muted};
                 border: none;
-                border-top-left-radius: 7px;
-                border-top-right-radius: 7px;
-                padding: 7px 17px;
-                margin-right: 3px;
+                border-bottom:2px solid transparent;
+                padding: 6px 12px;
+                margin:0;
             }}
-            QTabBar::tab:selected {{ background: {selected}; color: #ffffff; }}
-            QTabBar::tab:hover:!selected {{ background: {'#292a32' if dark else '#e4ddec'}; }}
+            QTabBar::tab:selected {{ color:{text}; border-bottom:2px solid {selected}; }}
+            QTabBar::tab:hover:!selected {{ color:{text}; }}
         """)
         # Weight stays put between states: a bolder selected tab would be wider
         # than the space the bar measured for it, which is the same clipping in
@@ -6317,7 +6279,7 @@ class OcrLanguageManagerDialog(QDialog):
                 color: {muted};
                 border: none;
                 border-bottom: 2px solid transparent;
-                padding: 7px 12px 6px 12px;
+                padding: 6px 10px;
                 margin: 0px;
             }}
             QTabBar::tab:selected {{
@@ -6344,23 +6306,22 @@ class OcrLanguageManagerDialog(QDialog):
         if frame is None:
             return
         dark = self._is_dark_theme()
-        card = "#17181d" if dark else "#f7f6fb"
+        card = "#111111" if dark else "#f0ecf3"
         border = "#34313f" if dark else "#d8d2e2"
         text = "#f4f6fb" if dark else "#202124"
         muted = "#b7b0c2" if dark else "#675f72"
         frame.setStyleSheet(f"""
             QFrame#languagePackageEmptyState {{
                 background-color: {card};
-                border: 1px solid {border};
-                border-radius: 10px;
+                border: none;
             }}
             QLabel#languagePackageEmptyTitle {{
                 background: transparent;
                 color: {text};
                 border: none;
                 font-family: 'Segoe UI';
-                font-size: 18px;
-                font-weight: 700;
+                font-size: 16px;
+                font-weight: 600;
             }}
             QLabel#languagePackageEmptyBody {{
                 background: transparent;
@@ -11018,8 +10979,8 @@ class SettingsWindow(QWidget):
         self.settings_page_footer.setProperty('keyboardTabs', True)
         self.settings_page_navigation = self.settings_page_footer
         dots_layout = QGridLayout(self.settings_page_footer)
-        dots_layout.setContentsMargins(0, 2, 0, 2)
-        dots_layout.setSpacing(6)
+        dots_layout.setContentsMargins(8, 3, 8, 3)
+        dots_layout.setSpacing(2)
         self.settings_page_dots = []
         self.settings_page_tabs = self.settings_page_dots
         for index in range(PAGE_COUNT):
@@ -11335,7 +11296,7 @@ class SettingsWindow(QWidget):
         set_widget_stylesheet(combo, self._engine_combo_style())
         if isinstance(combo, DropDownCombo):
             dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-            combo.set_popup_background("#20212a" if dark else "#f1edf4")
+            combo.set_popup_background("#17181d" if dark else "#e9e4ed")
 
     def _apply_game_language_combo_style(self, combo):
         """Use the same readable field chrome without exceeding a 28px row."""
@@ -11344,52 +11305,22 @@ class SettingsWindow(QWidget):
         dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
         set_widget_stylesheet(combo, compact_combo_style(dark))
         if isinstance(combo, DropDownCombo):
-            combo.set_popup_background("#20212a" if dark else "#f1edf4")
+            combo.set_popup_background("#17181d" if dark else "#e9e4ed")
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
         return compact_combo_style(is_dark)
 
     def _secondary_palette(self):
-        if self.parent.current_theme == "Темная":
-            return {
-                "surface": "#111218",
-                "card": "#181820",
-                "field": "#0c0d13",
-                "field_alt": "#211a2b",
-                "text": "#f7f3ff",
-                "muted": "#aaa0b8",
-                "border": "#393243",
-                "soft_border": "#2b2733",
-                "accent": "#a98bd7",
-                "accent_hover": "#b99be8",
-                "danger": "#d85b64",
-                "danger_hover": "#e66b74",
-                "scroll": "#6f5a8c",
-            }
-        return {
-            "surface": "#ece7f0",
-            "card": "#f3eff5",
-            "field": "#e5dfe9",
-            "field_alt": "#ddd3e5",
-            "text": "#241d2d",
-            "muted": "#756b80",
-            "border": "#d5cae2",
-            "soft_border": "#e8e0ef",
-            "accent": "#76599d",
-            "accent_hover": "#8566ad",
-            "danger": "#c94e58",
-            "danger_hover": "#dc5d67",
-            "scroll": "#9b84b8",
-        }
+        from classic_style import classic_palette
+        return classic_palette(self.parent.current_theme != "Светлая")
 
     def _secondary_view_stylesheet(self):
         colors = self._secondary_palette()
         return f"""
             QFrame#secondaryViewShell {{
                 background-color: {colors['surface']};
-                border: 1px solid {colors['soft_border']};
-                border-radius: 12px;
+                border: none;
             }}
             QFrame#secondaryViewShell QLabel {{
                 background: transparent;
@@ -11398,26 +11329,24 @@ class SettingsWindow(QWidget):
             }}
             QLabel#secondaryTitle {{
                 color: {colors['text']};
-                font-size: 21px;
-                font-weight: 800;
+                font-size: 16px;
+                font-weight: 600;
             }}
             QLabel#secondaryHint {{
                 color: {colors['muted']};
                 font-size: 12px;
             }}
             QLabel#secondaryCount {{
-                color: {colors['accent']};
-                background-color: {colors['card']};
-                border: 1px solid {colors['border']};
-                border-radius: 10px;
-                padding: 3px 9px;
+                color: {colors['muted']};
+                background: transparent;
+                border: none;
+                padding: 0;
                 font-size: 12px;
                 font-weight: 700;
             }}
             QFrame#secondaryCard {{
-                background-color: {colors['card']};
-                border: 1px solid {colors['border']};
-                border-radius: 10px;
+                background: transparent;
+                border: none;
             }}
             QCheckBox#settingsPageCheckbox {{
                 color: {colors['text']};
@@ -11440,7 +11369,7 @@ class SettingsWindow(QWidget):
             QLabel#secondaryFieldLabel {{
                 color: {colors['text']};
                 font-size: 14px;
-                font-weight: 600;
+                font-weight: 400;
                 padding-left: 2px;
             }}
             QKeySequenceEdit#secondaryHotkeyInput {{
@@ -11452,10 +11381,10 @@ class SettingsWindow(QWidget):
                 background-color: {colors['field']};
                 color: {colors['text']};
                 border: 1px solid {colors['border']};
-                border-radius: 8px;
+                border-radius: 7px;
                 padding: 4px 10px;
                 font-size: 14px;
-                font-weight: 700;
+                font-weight: 400;
                 selection-background-color: {colors['accent']};
                 selection-color: #ffffff;
             }}
@@ -11472,7 +11401,7 @@ class SettingsWindow(QWidget):
             QFrame#historyRecordCard {{
                 background-color: {colors['card']};
                 border: 1px solid {colors['border']};
-                border-radius: 10px;
+                border-radius: 7px;
             }}
             QLabel#historyMeta {{
                 color: {colors['muted']};
@@ -11480,28 +11409,26 @@ class SettingsWindow(QWidget):
                 font-weight: 600;
             }}
             QLabel#historyLanguageBadge {{
-                color: {colors['accent']};
-                background-color: {colors['field']};
-                border: 1px solid {colors['soft_border']};
-                border-radius: 7px;
-                padding: 2px 7px;
+                color: {colors['muted']};
+                background: transparent;
+                border: none;
+                padding: 0;
                 font-size: 11px;
-                font-weight: 800;
+                font-weight: 400;
             }}
             QLabel#historySectionCaption {{
                 color: {colors['muted']};
-                font-size: 10px;
-                font-weight: 800;
+                font-size: 11px;
+                font-weight: 400;
                 padding-left: 2px;
             }}
             QFrame#historyTextBlock {{
-                background-color: {colors['field']};
-                border: 1px solid {colors['border']};
-                border-radius: 8px;
+                background: transparent;
+                border: none;
             }}
             QFrame#historyTextBlock[translated="true"] {{
-                background-color: {colors['field_alt']};
-                border: 1px solid {colors['accent']};
+                background: transparent;
+                border: none;
             }}
             QLabel#historyRecordOriginal,
             QLabel#historyRecordTranslated,
@@ -11511,10 +11438,10 @@ class SettingsWindow(QWidget):
                 border: none;
                 padding: 1px;
                 font-family: 'Segoe UI';
-                font-size: 15px;
+                font-size: 14px;
             }}
             QLabel#historyRecordTranslated {{
-                font-weight: 700;
+                font-weight: 400;
             }}
             QLabel#historyEmptyState {{
                 color: {colors['muted']};
@@ -11529,7 +11456,7 @@ class SettingsWindow(QWidget):
         shell.setObjectName("secondaryViewShell")
         shell.setStyleSheet(self._secondary_view_stylesheet())
         shell_layout = QVBoxLayout(shell)
-        shell_layout.setContentsMargins(14, 10, 14, 10)
+        shell_layout.setContentsMargins(4, 6, 4, 6)
         shell_layout.setSpacing(8)
 
         header = QHBoxLayout()
@@ -11552,7 +11479,7 @@ class SettingsWindow(QWidget):
     def _configure_secondary_button(button, object_name):
         button.setObjectName(object_name)
         button.setCursor(Qt.PointingHandCursor)
-        button.setFixedHeight(38)
+        button.setFixedHeight(30)
 
     def _refresh_secondary_view_theme(self):
         shell = getattr(self, "secondary_view_shell", None)

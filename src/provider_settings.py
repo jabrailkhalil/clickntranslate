@@ -316,8 +316,8 @@ class ProviderSettingsPage(QWidget):
         self.setObjectName('apiConnectionsPage')
         tr = lambda key: provider_text(self.lang, key)
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 10, 0, 0)
-        outer.setSpacing(8)
+        outer.setContentsMargins(0, 8, 0, 0)
+        outer.setSpacing(6)
         self.scroll = QScrollArea(self)
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -325,11 +325,12 @@ class ProviderSettingsPage(QWidget):
         content = QWidget()
         content.setObjectName('apiConnectionsContent')
         body = QVBoxLayout(content)
-        body.setContentsMargins(2, 0, 8, 0)
-        body.setSpacing(8)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(6)
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(8)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(6)
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.service = DropDownCombo(content)
@@ -358,7 +359,7 @@ class ProviderSettingsPage(QWidget):
         self.model.setPlaceholderText(model_placeholder.get(self.lang,model_placeholder['en']))
         self.labels = []
         for name, widget in (('service', self.service), ('address', self.address), ('key', self.key), ('model', self.model)):
-            widget.setMinimumHeight(32)
+            widget.setFixedHeight(28)
             widget.setMinimumWidth(0)
             widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             widget.setAccessibleName(tr(name).rstrip(':： '))
@@ -369,7 +370,7 @@ class ProviderSettingsPage(QWidget):
             self.labels.append(label)
             form.addRow(label, widget)
         self.usage = DropDownCombo(content)
-        self.usage.setMinimumHeight(32)
+        self.usage.setFixedHeight(28)
         self.usage.setAccessibleName(connection_text(self.lang, 0))
         self.usage.setToolTip(tooltip_text(tr('help')))
         label = QLabel(connection_text(self.lang, 0), content)
@@ -381,10 +382,16 @@ class ProviderSettingsPage(QWidget):
         self.note.setObjectName('apiConnectionHint')
         self.note.setWordWrap(True)
         self.note.setToolTip(tooltip_text(tr('help')))
-        body.addWidget(self.note)
+        # Keep the explanation available without repeating a paragraph below
+        # the five self-labelled fields on every visit.
+        explanation = self.note.text() + '\n\n' + tr('help')
+        self.note.hide()
+        self.usage.setToolTip(tooltip_text(explanation))
+        self.usage.setAccessibleDescription(explanation)
         self.status = QLabel('', content)
         self.status.setObjectName('apiConnectionStatus')
         self.status.setWordWrap(True)
+        self.status.hide()
         body.addWidget(self.status)
         body.addStretch(1)
         self.scroll.setWidget(content)
@@ -394,8 +401,9 @@ class ProviderSettingsPage(QWidget):
         self.delete = QPushButton(tr('delete'), self)
         self.save = QPushButton(tr('save'), self)
         self.use = QPushButton(connection_text(self.lang, 4), self)
-        for button in (self.delete, self.save, self.use):
-            button.setMinimumHeight(32)
+        for button, role in ((self.delete, 'danger'), (self.save, 'secondary'), (self.use, 'primary')):
+            button.setProperty('buttonRole', role)
+            button.setFixedHeight(29)
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             footer.addWidget(button, 1)
         outer.addLayout(footer)
@@ -408,35 +416,52 @@ class ProviderSettingsPage(QWidget):
         self.load_profile()
 
     def apply_theme(self):
+        from PyQt5.QtGui import QColor, QPalette
         from settings_window import modern_combo_style
         from styled_dialogs import install_accent_controls, set_widget_stylesheet
-        from button_styles import button_qss
+        from button_styles import standard_buttons
+        from classic_style import classic_palette
         dark = self.app.current_theme != 'Светлая'
-        field, text, border = ('#17181d', '#f4f6fb', '#34313f') if dark else ('#f3eff5', '#241f2a', '#bcb2c7')
-        muted = '#aaa0b8' if dark else '#71667d'
+        colors = classic_palette(dark)
+        field, text, border, muted = (colors[key] for key in ('field', 'text', 'border', 'muted'))
         set_widget_stylesheet(self, f"""
-            QWidget#apiConnectionsPage, QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
-            QLabel {{ color:{text}; font-size:13px; background:transparent; }}
+            QWidget#apiConnectionsPage {{ background:{colors['background']}; border:none; }}
+            QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
+            QLabel {{ color:{text}; font-size:14px; background:transparent; }}
             QLabel#apiConnectionHint, QLabel#apiConnectionStatus {{ color:{muted}; font-size:12px; }}
-            QLineEdit {{ color:{text}; background:{field}; border:1px solid {border}; border-radius:6px; padding:3px 8px; font-size:14px; }}
-            QLineEdit:focus {{ border-color:#9B78C8; }}
-        """)
+            QLineEdit {{ color:{text}; background:{field}; border:1px solid {border}; border-radius:6px; margin:0; padding:1px 8px; font-size:14px; }}
+            QLineEdit:focus {{ border-color:{colors['accent_text']}; }}
+        """ + standard_buttons(dark, compact=True))
         for combo in (self.service, self.usage):
-            set_widget_stylesheet(combo, modern_combo_style(dark, font_size=14))
+            set_widget_stylesheet(combo, modern_combo_style(dark, font_size=14) + f"""
+                QComboBox {{ background:{field}; color:{text}; border-color:{border};
+                    margin:0; padding:1px 26px 1px 8px; min-height:0; }}
+            """)
             combo.set_popup_background(field)
-        for button, role in ((self.delete, 'danger'), (self.save, 'secondary'), (self.use, 'primary')):
-            set_widget_stylesheet(button, button_qss(dark, role, compact=True))
+            # QSS min-height resets QComboBox's native minimum; keep the form
+            # row identical to its line edits after the style has been polished.
+            combo.ensurePolished()
+            combo.setFixedHeight(28)
+        for field_widget in (self.address, self.key, self.model):
+            palette = field_widget.palette()
+            palette.setColor(QPalette.PlaceholderText, QColor(muted))
+            field_widget.setPalette(palette)
         install_accent_controls(self, dark=dark)
         # Stylesheet fonts must also inform the form's label measurements.
         self.ensurePolished()
         for label in self.labels:
             label.ensurePolished()
-            label.setMinimumWidth(label.sizeHint().width())
+            ink_width = label.fontMetrics().boundingRect(label.text()).width()
+            label.setMinimumWidth(max(label.sizeHint().width(), ink_width + 4))
 
     def _capture(self):
         usage = self.usage.currentData()
         return dict(url=self.address.text().strip(), model=self.model.text().strip(),
                     vision=usage in ('ocr', 'direct'), direct=usage == 'direct', key=self.key.text())
+
+    def _set_status(self, text):
+        self.status.setText(text)
+        self.status.setVisible(bool(text))
 
     def load_profile(self, *_args):
         from provider_secrets import get_key
@@ -458,7 +483,7 @@ class ProviderSettingsPage(QWidget):
         usage = ('direct' if item['direct'] else 'ocr') if item['vision'] and spec.vision else 'text'
         self.usage.setCurrentIndex(max(0, self.usage.findData(usage)))
         self.usage.setEnabled(spec.vision)
-        self.status.clear()
+        self._set_status('')
 
     def save_profile(self):
         from provider_secrets import set_key, get_key
@@ -471,8 +496,8 @@ class ProviderSettingsPage(QWidget):
                 raise ProviderError(connection_text(self.lang, 8))
         except ProviderError as error:
             from api_providers import display_error
-            self.status.setText(str(error) if str(error) == connection_text(self.lang, 8)
-                                else display_error(error, self.lang))
+            self._set_status(str(error) if str(error) == connection_text(self.lang, 8)
+                             else display_error(error, self.lang))
             return False
         persisted = True
         if item['key']:
@@ -486,7 +511,7 @@ class ProviderSettingsPage(QWidget):
         self.key.clear()
         self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
         self.drafts[self.active] = item
-        self.status.setText(provider_text(self.lang, 'saved' if persisted else 'session'))
+        self._set_status(provider_text(self.lang, 'saved' if persisted else 'session'))
         return True
 
     def select_profile(self):
@@ -497,7 +522,7 @@ class ProviderSettingsPage(QWidget):
             validate(self.active, self.app.config)
         except ProviderError as error:
             from api_providers import display_error
-            self.status.setText(display_error(error, self.lang))
+            self._set_status(display_error(error, self.lang))
             return
         status = self.status.text()
         self.settings._set_translator_combo_silently(self.active)
@@ -507,7 +532,7 @@ class ProviderSettingsPage(QWidget):
             engine = next(name for name, key in VISION_ENGINES.items() if key == self.active)
             self.settings.ocr_engine_combo.setCurrentIndex(self.settings.ocr_engine_combo.findData(engine))
         refresh_provider_routing(self.settings)
-        self.status.setText(connection_text(self.lang, 7 if item['vision'] else 6) + ' ' + status)
+        self._set_status(connection_text(self.lang, 7 if item['vision'] else 6) + ' ' + status)
 
     def delete_key(self):
         from provider_secrets import set_key
@@ -515,4 +540,4 @@ class ProviderSettingsPage(QWidget):
         self.key.clear()
         self.drafts.pop(self.active, None)
         self.key.setPlaceholderText(provider_text(self.lang, 'empty'))
-        self.status.setText(provider_text(self.lang, 'saved' if persisted else 'session'))
+        self._set_status(provider_text(self.lang, 'saved' if persisted else 'session'))

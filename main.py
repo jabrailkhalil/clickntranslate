@@ -6466,32 +6466,9 @@ class ArgosPackageInstallDialog(QDialog):
         buttons.addWidget(self.install_button)
         layout.addLayout(buttons)
 
-        if theme == "Темная":
-            self.setStyleSheet("""
-                QDialog { background: #111216; color: #f5f2fb; }
-                QLabel#argosDialogIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
-                QLabel#argosDialogEyebrow { color: #a994d2; font-size: 11px; font-weight: 800; }
-                QLabel#argosDialogTitle { color: #ffffff; font-size: 19px; font-weight: 800; }
-                QFrame#argosRouteCard { background: #1b1a22; border: 1px solid #3a3547; border-radius: 10px; }
-                QLabel#argosRouteCaption { color: #9992a8; font-size: 10px; font-weight: 800; }
-                QLabel#argosRouteLabel { color: #ffffff; font-size: 21px; font-weight: 900; }
-                QLabel#argosDialogBody { color: #ece8f2; font-size: 13px; }
-                QLabel#argosDialogDetail { color: #aaa4b4; font-size: 12px; }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
-        else:
-            self.setStyleSheet("""
-                QDialog { background: #ece7f0; color: #24212a; }
-                QLabel#argosDialogIcon { background: #7A5FA1; color: #ffffff; border-radius: 12px; font-size: 22px; font-weight: 900; }
-                QLabel#argosDialogEyebrow { color: #725594; font-size: 11px; font-weight: 800; }
-                QLabel#argosDialogTitle { color: #24212a; font-size: 19px; font-weight: 800; }
-                QFrame#argosRouteCard { background: #e3dde7; border: 1px solid #bcb2c7; border-radius: 10px; }
-                QLabel#argosRouteCaption { color: #766e80; font-size: 10px; font-weight: 800; }
-                QLabel#argosRouteLabel { color: #24212a; font-size: 21px; font-weight: 900; }
-                QLabel#argosDialogBody { color: #35303d; font-size: 13px; }
-                QLabel#argosDialogDetail { color: #6f6877; font-size: 12px; }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
+        from classic_style import classic_feedback_style
+        self.setStyleSheet(classic_feedback_style(theme != "Светлая")
+                          + standard_buttons(theme != "Светлая", compact=True))
 
 
 ARGOS_ERROR_DIALOG_TEXT = {
@@ -6670,30 +6647,9 @@ class ArgosTranslationErrorDialog(QDialog):
         buttons.addWidget(self.close_button)
         layout.addLayout(buttons)
 
-        if theme == "Темная":
-            self.setStyleSheet("""
-                QDialog { background: #111216; color: #f5f2fb; }
-                QLabel#argosErrorIcon { background: #9f3341; color: #ffffff; border-radius: 12px; font-size: 25px; font-weight: 900; }
-                QLabel#argosErrorEyebrow { color: #a994d2; font-size: 11px; font-weight: 800; }
-                QLabel#argosErrorTitle { color: #ffffff; font-size: 19px; font-weight: 800; }
-                QLabel#argosErrorRoute { background: #1b1a22; color: #ffffff; border: 1px solid #3a3547; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 800; }
-                QLabel#argosErrorBody { color: #ece8f2; font-size: 13px; }
-                QLabel#argosErrorDetailsCaption { color: #9992a8; font-size: 10px; font-weight: 800; }
-                QTextEdit#argosErrorDetails { background: #19181e; color: #c9c3d0; border: 1px solid #3a3547; border-radius: 7px; padding: 5px 7px; selection-background-color: #7A5FA1; }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
-        else:
-            self.setStyleSheet("""
-                QDialog { background: #ece7f0; color: #24212a; }
-                QLabel#argosErrorIcon { background: #c43f50; color: #ffffff; border-radius: 12px; font-size: 25px; font-weight: 900; }
-                QLabel#argosErrorEyebrow { color: #725594; font-size: 11px; font-weight: 800; }
-                QLabel#argosErrorTitle { color: #24212a; font-size: 19px; font-weight: 800; }
-                QLabel#argosErrorRoute { background: #e3dde7; color: #24212a; border: 1px solid #bcb2c7; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 800; }
-                QLabel#argosErrorBody { color: #35303d; font-size: 13px; }
-                QLabel#argosErrorDetailsCaption { color: #766e80; font-size: 10px; font-weight: 800; }
-                QTextEdit#argosErrorDetails { background: #f1edf4; color: #4a4353; border: 1px solid #bcb2c7; border-radius: 7px; padding: 5px 7px; selection-background-color: #a98cca; }
-
-            """ + standard_buttons(theme != "Светлая", compact=False))
+        from classic_style import classic_feedback_style
+        self.setStyleSheet(classic_feedback_style(theme != "Светлая")
+                          + standard_buttons(theme != "Светлая", compact=True))
 
 TRANSLATION_RESULT_DIALOG_TEXT = {
     "en": {
@@ -7131,11 +7087,11 @@ class TranslationResultDialog(QDialog):
         self.frame = QFrame(self)
         self.frame.setObjectName("translationResultFrame")
         from rounded_windows import clip_rounded_window
-        clip_rounded_window(self, self.frame, 12)
+        clip_rounded_window(self, self.frame, 7)
         outer.addWidget(self.frame)
         layout = QVBoxLayout(self.frame)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
 
         header = QGridLayout()
         header.setSpacing(8)
@@ -7381,7 +7337,7 @@ class TranslationResultDialog(QDialog):
     def _language_combo(self):
         combo = DropDownCombo(self)
         combo.setObjectName("translationResultCombo")
-        combo.setMinimumHeight(34)
+        combo.setMinimumHeight(28)
         combo.setMinimumWidth(0)
         combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         combo.setMaxVisibleItems(9)
@@ -7405,8 +7361,8 @@ class TranslationResultDialog(QDialog):
         panel.setObjectName("translationEditorPanel")
         panel.setMinimumWidth(140)
         contents = QVBoxLayout(panel)
-        contents.setContentsMargins(10, 10, 10, 10)
-        contents.setSpacing(8)
+        contents.setContentsMargins(0, 0, 0, 0)
+        contents.setSpacing(6)
         label = QLabel(caption)
         label.setObjectName("translationEditorCaption")
         label.setMinimumHeight(24)
@@ -8026,19 +7982,21 @@ class TranslationResultDialog(QDialog):
     def refresh_theme(self, theme):
         self.theme = theme
         dark = theme != "Светлая"
-        background, surface = ("#111216", "#19181e") if dark else ("#ece7f0", "#faf8fc")
-        ink, muted, edge = ("#f1edf5", "#aaa4b4", "#494056") if dark else ("#302837", "#6f6877", "#bcb2c7")
+        from classic_style import classic_palette
+        colors = classic_palette(dark)
+        background, surface = colors['background'], colors['field']
+        ink, muted, edge = colors['text'], colors['muted'], colors['border']
         font_px = translation_result_font_px(self._current_config())
         self.setStyleSheet(f"""
             QDialog#translationResultRoot {{ background:transparent; }}
-            QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:12px; }}
-            QLabel#translationResultTitle {{ color:{ink}; font-size:18px; font-weight:700; }}
+            QFrame#translationResultFrame {{ background: {background}; border:1px solid {edge}; border-radius:7px; }}
+            QLabel#translationResultTitle {{ color:{ink}; font-size:16px; font-weight:600; }}
             QLabel#translationResultEngine, QLabel#translationResultStatus {{ color:{muted}; font-size:12px; }}
-            QFrame#translationEditorPanel {{ background:{surface}; border:1px solid {edge}; border-radius:8px; }}
-            QLabel#translationEditorCaption {{ color:{muted}; font-size:12px; font-weight:600; }}
-            QTextEdit#translationSourceText, QTextEdit#translationResultText {{ background:{surface}; color:{ink}; border:0; padding:4px; font-size:{font_px}px; selection-background-color:#7a5fa1; }}
-            QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:6px; padding:4px 9px; font-size:13px; font-weight:600; }}
-            QComboBox#translationResultCombo::drop-down {{ border:0; width:18px; }}
+            QFrame#translationEditorPanel {{ background:transparent; border:0; }}
+            QLabel#translationEditorCaption {{ color:{ink}; font-size:14px; font-weight:400; }}
+            QTextEdit#translationSourceText, QTextEdit#translationResultText {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:7px; padding:6px; font-size:{font_px}px; selection-background-color:#7a5fa1; }}
+            QComboBox#translationResultCombo {{ background:{surface}; color:{ink}; border:1px solid {edge}; border-radius:7px; padding:0 27px 0 9px; font-size:14px; font-weight:400; }}
+            QComboBox#translationResultCombo::drop-down {{ border:0; width:24px; }}
             QComboBox#translationResultCombo QAbstractItemView {{ background:{surface}; color:{ink}; border:1px solid {edge}; selection-background-color:#7a5fa1; outline:0; }}
         """ + standard_buttons(dark, compact=False))
         self.scale_control.set_theme(dark)
@@ -8165,109 +8123,110 @@ class WelcomeDialog(QDialog):
         self._stop_animations()
         self._clear_layout()
         text = welcome_text(self.lang)
+        from classic_style import classic_palette
+        dark = getattr(self.parent, 'current_theme', DEFAULT_CONFIG['theme']) != 'Светлая'
+        colors = classic_palette(dark)
         self.setWindowTitle(text["window"])
-        self.setStyleSheet("""
-            QDialog {
+        self.setStyleSheet(f"""
+            QDialog {{
                 background: transparent;
-            }
-            QFrame#welcomeCard {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #111827, stop:0.48 #15101f, stop:1 #241735);
-                border: 1px solid rgba(197, 179, 233, 120);
-                border-radius: 20px;
-            }
-            QLabel {
-                color: #f7f2ff;
+            }}
+            QFrame#welcomeCard {{
+                background: {colors['background']};
+                border: 1px solid {colors['border']};
+                border-radius: 7px;
+            }}
+            QLabel {{
+                color: {colors['text']};
                 background: transparent;
-            }
-            QLabel#welcomeLogo {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #c5b3e9, stop:1 #7a5fa1);
-                color: #111827;
-                border-radius: 15px;
-                font-size: 17px;
-                font-weight: 900;
-            }
-            QLabel#welcomeEyebrow {
-                color: #c5b3e9;
-                font-size: 12px;
-                font-weight: 700;
-                letter-spacing: 1px;
-                text-transform: uppercase;
-            }
-            QLabel#welcomeTitle {
-                color: #ffffff;
-                font-size: 27px;
-                font-weight: 900;
-            }
-            QLabel#welcomeBody, QLabel#welcomeSupport {
-                color: #d8d2e8;
                 font-size: 14px;
-                line-height: 1.45;
-            }
-            QLabel#welcomeVersion {
-                color: #a994d2;
-                font-size: 13px;
-                font-weight: 700;
-            }
-            QLabel#welcomeChip {
-                color: #efe8ff;
-                background: rgba(197, 179, 233, 30);
-                border: 1px solid rgba(197, 179, 233, 80);
-                border-radius: 12px;
-                padding: 7px 10px;
+                font-weight: 400;
+            }}
+            QLabel#welcomeLogo {{
+                background: {colors['field']};
+                color: {colors['accent_text']};
+                border: 1px solid {colors['border']};
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QLabel#welcomeEyebrow {{
+                color: {colors['muted']};
                 font-size: 12px;
-                font-weight: 700;
-            }
+                font-weight: 400;
+            }}
+            QLabel#welcomeTitle {{
+                color: {colors['text']};
+                font-size: 18px;
+                font-weight: 600;
+            }}
+            QLabel#welcomeBody, QLabel#welcomeSupport {{
+                color: {colors['text']};
+                font-size: 14px;
+                font-weight: 400;
+            }}
+            QLabel#welcomeVersion {{
+                color: {colors['muted']};
+                font-size: 12px;
+                font-weight: 400;
+            }}
+            QLabel#welcomeChip {{
+                color: {colors['muted']};
+                background: transparent;
+                border: none;
+                padding: 0;
+                font-size: 13px;
+                font-weight: 400;
+            }}
 
-            QCheckBox {
-                color: #bdb4d1;
+            QCheckBox {{
+                color: {colors['text']};
                 font-size: 13px;
                 spacing: 8px;
-            }
-            QCheckBox::indicator {
-                width: 17px;
-                height: 17px;
-                border-radius: 5px;
-                border: 1px solid #7a5fa1;
-                background: rgba(255,255,255,18);
-            }
-            QCheckBox::indicator:checked {
-                background: #c5b3e9;
-                border: 1px solid #c5b3e9;
-            }
-        """ + standard_buttons(True, compact=False))
+            }}
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 1px solid {colors['border']};
+                background: {colors['field']};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {colors['accent']};
+                border: 1px solid {colors['accent']};
+            }}
+        """ + tooltip_stylesheet(dark) + standard_buttons(dark, compact=True))
 
         if self.layout() is None:
             self.main_layout = QVBoxLayout(self)
         else:
             self.main_layout = self.layout()
-        self.main_layout.setContentsMargins(12, 12, 12, 12)
+        self.main_layout.setContentsMargins(8, 8, 8, 8)
         self.main_layout.setSpacing(0)
 
         card = QFrame(self)
         card.setObjectName("welcomeCard")
         from rounded_windows import clip_rounded_window
-        clip_rounded_window(self, card, 20)
+        clip_rounded_window(self, card, 7)
         self.main_layout.addWidget(card)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(24, 20, 24, 22)
-        card_layout.setSpacing(14)
+        card_layout.setContentsMargins(16, 14, 16, 14)
+        card_layout.setSpacing(10)
 
         top_row = QHBoxLayout()
         top_row.setSpacing(10)
 
         logo = QLabel("CT")
         logo.setObjectName("welcomeLogo")
-        logo.setFixedSize(42, 42)
+        logo.setFixedSize(32, 32)
         logo.setAlignment(Qt.AlignCenter)
         top_row.addWidget(logo)
 
         title_stack = QVBoxLayout()
         title_stack.setSpacing(0)
         app_name = QLabel("Click'n'Translate")
-        app_name.setStyleSheet("font-size: 17px; font-weight: 900; color: #ffffff;")
+        app_name.setStyleSheet(f"font-size:16px; font-weight:600; color:{colors['text']};")
         version = QLabel(f"v{APP_VERSION}")
         version.setObjectName("welcomeVersion")
         title_stack.addWidget(app_name)
@@ -8278,8 +8237,8 @@ class WelcomeDialog(QDialog):
         self.flag_button = QPushButton()
         self.flag_button.setObjectName("welcomeLang")
         self.flag_button.setIcon(QIcon(resource_path(get_interface_language_option(self.lang)["icon"])))
-        self.flag_button.setIconSize(QSize(24, 24))
-        self.flag_button.setFixedSize(46, 38)
+        self.flag_button.setIconSize(QSize(20, 20))
+        self.flag_button.setFixedSize(36, 32)
         self.flag_button.setAccessibleName(ui_text(self.lang, "choose_interface_language"))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.lang, "choose_interface_language")))
         self.flag_button.clicked.connect(self.show_language_menu)
@@ -8289,14 +8248,15 @@ class WelcomeDialog(QDialog):
         close_x.setObjectName("welcomeClose")
         close_x.setAccessibleName(ui_text(self.lang, "close"))
         close_x.setToolTip(tooltip_text(ui_text(self.lang, "close")))
-        close_x.setFixedSize(38, 38)
-        close_x.setStyleSheet("font-size: 22px; font-weight: 700;")
+        close_x.setFixedSize(32, 32)
+        close_x.setStyleSheet(button_qss(dark, 'close', icon=True)
+                             + "QPushButton { font-size:18px; font-weight:400; }")
         close_x.clicked.connect(self.skip_guide)
         top_row.addWidget(close_x)
         card_layout.addLayout(top_row)
 
         hero = QVBoxLayout()
-        hero.setSpacing(8)
+        hero.setSpacing(6)
         eyebrow = QLabel(text["eyebrow"])
         eyebrow.setObjectName("welcomeEyebrow")
         hero.addWidget(eyebrow)
@@ -8312,12 +8272,13 @@ class WelcomeDialog(QDialog):
         hero.addWidget(body)
         card_layout.addLayout(hero)
 
-        chips = QHBoxLayout()
-        chips.setSpacing(8)
+        chips = QVBoxLayout()
+        chips.setSpacing(3)
         for key in ("feature_ocr", "feature_translate", "feature_updates"):
             chip = QLabel(text[key])
             chip.setObjectName("welcomeChip")
-            chip.setAlignment(Qt.AlignCenter)
+            chip.setAlignment(Qt.AlignLeading | Qt.AlignVCenter)
+            chip.setWordWrap(True)
             chips.addWidget(chip)
         card_layout.addLayout(chips)
         support = QLabel(text["support"])
@@ -8345,19 +8306,19 @@ class WelcomeDialog(QDialog):
                                     (self.github_btn, 'github', text['github'])):
             button.setIcon(social_icon(kind, dark=None))
             button.setIconSize(QSize(20, 20))
-            button.setFixedSize(36, 36)
+            button.setFixedSize(32, 32)
             button.setAccessibleName(label)
             button.setToolTip(tooltip_text(label))
             button.setCursor(Qt.PointingHandCursor)
             button.setAutoDefault(False)
-            button.setStyleSheet(button_qss(True, 'quiet', icon=True))
+            button.setStyleSheet(button_qss(dark, 'quiet', icon=True))
             actions.addWidget(button)
         actions.addStretch()
 
         self.skip_btn = QPushButton(text["skip"])
         self.skip_btn.setObjectName("welcomeSkip")
-        self.skip_btn.setStyleSheet(button_qss(True, 'secondary'))
-        self.skip_btn.setMinimumSize(104, 36)
+        self.skip_btn.setStyleSheet(button_qss(dark, 'secondary', compact=True))
+        self.skip_btn.setMinimumSize(104, 32)
         self.skip_btn.setCursor(Qt.PointingHandCursor)
         self.skip_btn.setAutoDefault(False)
         self.skip_btn.clicked.connect(self.skip_guide)
@@ -8365,6 +8326,7 @@ class WelcomeDialog(QDialog):
 
         self.guide_btn = QPushButton(text["guide"])
         self.guide_btn.setObjectName("welcomeStart")
+        self.guide_btn.setMinimumHeight(32)
         self.guide_btn.clicked.connect(self.start_guide)
         actions.addWidget(self.guide_btn)
         card_layout.addLayout(actions)
@@ -8455,25 +8417,28 @@ class WelcomeDialog(QDialog):
         menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
         from rounded_windows import clip_rounded_window
         clip_rounded_window(menu, menu, 8)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #0f131c;
-                color: #ffffff;
-                border: 1px solid #6f5a99;
-                border-radius: 8px;
+        from classic_style import classic_palette
+        colors = classic_palette(getattr(self.parent, 'current_theme', DEFAULT_CONFIG['theme']) != 'Светлая')
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {colors['field']};
+                color: {colors['text']};
+                border: 1px solid {colors['border']};
+                border-radius: 7px;
                 padding: 5px;
-            }
-            QMenu::item {
+            }}
+            QMenu::item {{
                 padding: 7px 18px 7px 10px;
-                border-radius: 5px;
-                font-weight: 500;
-            }
-            QMenu::item:selected {
-                background-color: rgba(197, 179, 233, 64);
-            }
-            QMenu::indicator {
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 400;
+            }}
+            QMenu::item:selected {{
+                background-color: {colors['selected']};
+            }}
+            QMenu::indicator {{
                 width: 0px;
-            }
+            }}
         """)
         for option in INTERFACE_LANGUAGE_OPTIONS:
             selected = option["code"] == self.lang
@@ -8592,13 +8557,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def _build_ui(self):
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setContentsMargins(8, 8, 8, 8)
         root_layout.setSpacing(0)
 
         self.window_frame = QFrame(self)
         self.window_frame.setObjectName("docWindowFrame")
         from rounded_windows import clip_rounded_window
-        clip_rounded_window(self, self.window_frame, 12)
+        clip_rounded_window(self, self.window_frame, 7)
         self.window_frame.setAttribute(Qt.WA_StyledBackground, True)
         root_layout.addWidget(self.window_frame)
 
@@ -8613,14 +8578,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         header.setObjectName("docTopBar")
         header.setAttribute(Qt.WA_StyledBackground, True)
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(18, 12, 18, 16)
-        header_layout.setSpacing(14)
+        header_layout.setContentsMargins(14, 10, 14, 12)
+        header_layout.setSpacing(10)
 
         header_top = QHBoxLayout()
         header_top.setSpacing(12)
         self.doc_icon_label = QLabel()
         self.doc_icon_label.setObjectName("docHeaderIcon")
-        self.doc_icon_label.setFixedSize(38, 38)
+        self.doc_icon_label.setFixedSize(28, 28)
         self.doc_icon_label.setAlignment(Qt.AlignCenter)
         header_top.addWidget(self.doc_icon_label)
 
@@ -8654,7 +8619,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         header_layout.addLayout(header_top)
 
         control_row = QGridLayout()
-        control_row.setSpacing(10)
+        control_row.setSpacing(8)
         control_row.setColumnStretch(0, 2)
         control_row.setColumnStretch(2, 2)
         control_row.setColumnStretch(3, 1)
@@ -8668,7 +8633,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
         self.language_arrow = LanguageSwapButton()
         self.language_arrow.setObjectName("docLanguageSwap")
-        self.language_arrow.setFixedSize(34, 34)
+        self.language_arrow.setFixedSize(34, 28)
         self.language_arrow.setAccessibleName(hotkey_language_text(self.lang, "swap"))
         self.language_arrow.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
@@ -8717,7 +8682,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         actions_frame.setObjectName("docToolBar")
         actions_frame.setAttribute(Qt.WA_StyledBackground, True)
         toolbar = QHBoxLayout()
-        toolbar.setContentsMargins(18, 10, 18, 10)
+        toolbar.setContentsMargins(14, 8, 14, 8)
         toolbar.setSpacing(8)
         self.attach_button = QPushButton(doc_text(self.lang, "attach_file"))
         self.attach_button.setObjectName("docButton")
@@ -8741,7 +8706,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         footer = QFrame()
         footer.setObjectName("docFooter")
         footer_layout = QVBoxLayout(footer)
-        footer_layout.setContentsMargins(18, 0, 18, 14)
+        footer_layout.setContentsMargins(14, 0, 14, 12)
         footer_layout.setSpacing(8)
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
@@ -8778,7 +8743,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         content_frame.setObjectName("docContent")
         content_frame.setAttribute(Qt.WA_StyledBackground, True)
         content_layout = QVBoxLayout(content_frame)
-        content_layout.setContentsMargins(18, 6, 18, 10)
+        content_layout.setContentsMargins(14, 4, 14, 10)
         content_layout.setSpacing(0)
         splitter = QSplitter(Qt.Horizontal)
         self.document_splitter = splitter
@@ -8809,7 +8774,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         header.setObjectName("docPaneHeader")
         header.setAttribute(Qt.WA_StyledBackground, True)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(14, 10, 14, 8)
+        header_layout.setContentsMargins(10, 8, 10, 4)
         header_layout.setSpacing(8)
         label = QLabel(title)
         label.setObjectName("docPaneTitle")
@@ -8836,20 +8801,17 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def _apply_dialog_theme(self):
         is_dark = self.theme_name == "Темная"
-        bg = "#161319" if is_dark else "#f0edf3"
-        top = "#211d28" if is_dark else "#e9e4ed"
-        pane = "#211d28" if is_dark else "#f2edf6"
-        editor = "#1a171e" if is_dark else "#faf8fc"
-        control = "#211d28" if is_dark else "#faf8fc"
-        control_hover = "#302737" if is_dark else "#e7ddee"
-        border = "#584963" if is_dark else "#b3a5be"
-        soft_border = "#433a4c" if is_dark else "#bdb3c7"
-        fg = "#f1edf5" if is_dark else "#302639"
-        muted = "#b5acbf" if is_dark else "#655b70"
-        accent = "#a985d2" if is_dark else "#79569b"
-        accent_text = "#161319" if is_dark else "#FFFFFF"
+        from classic_style import classic_palette
+        colors = classic_palette(is_dark)
+        bg = top = colors['background']
+        pane = editor = control = colors['field']
+        control_hover = colors['hover']
+        border = colors['border']
+        soft_border = colors['soft_border']
+        fg, muted = colors['text'], colors['muted']
+        accent, accent_text = colors['accent'], '#ffffff'
         if hasattr(self, "doc_icon_label"):
-            self.doc_icon_label.setPixmap(document_translation_icon(self.theme_name).pixmap(30, 30))
+            self.doc_icon_label.setPixmap(document_translation_icon(self.theme_name).pixmap(24, 24))
         self.setStyleSheet(f"""
             QDialog#documentTranslationDialog {{
                 background: transparent;
@@ -8859,7 +8821,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             QFrame#docWindowFrame {{
                 background-color: {bg};
                 border: 1px solid {border};
-                border-radius: 12px;
+                border-radius: 7px;
             }}
             QLabel {{
                 color: {fg};
@@ -8868,8 +8830,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             QFrame#docTopBar {{
                 background-color: {top};
                 border-bottom: 1px solid {soft_border};
-                border-top-left-radius: 12px;
-                border-top-right-radius: 12px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
             }}
             QFrame#docToolBar {{
                 background: transparent;
@@ -8882,14 +8844,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             QFrame#docPane {{
                 background-color: {editor};
                 border: 1px solid {border};
-                border-radius: 8px;
+                border-radius: 7px;
             }}
             QFrame#docPaneHeader {{
-                background-color: {pane};
+                background-color: {editor};
                 border: none;
-                border-bottom: 1px solid {soft_border};
-                border-top-left-radius: 7px;
-                border-top-right-radius: 7px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
             }}
             QLabel#docHeaderIcon {{
                 background: transparent;
@@ -8897,8 +8858,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             }}
             QLabel#docTitle {{
                 color: {fg};
-                font-size: 18px;
-                font-weight: 700;
+                font-size: 16px;
+                font-weight: 600;
             }}
             QLabel#docProvider {{
                 color: {muted};
@@ -8909,20 +8870,20 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 color: {muted};
                 background: transparent;
                 border: none;
-                padding: 0 12px 0 0;
+                padding: 0;
                 font-size: 12px;
                 font-weight: 400;
             }}
 
             QLabel#docFieldLabel {{
-                color: {muted};
-                font-size: 12px;
-                font-weight: 600;
+                color: {fg};
+                font-size: 14px;
+                font-weight: 400;
             }}
             QLabel#docPaneTitle {{
                 color: {fg};
-                font-size: 13px;
-                font-weight: 700;
+                font-size: 14px;
+                font-weight: 400;
             }}
 
             QPushButton {{ min-height: 28px; }}
@@ -8931,10 +8892,11 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 background-color: {control};
                 color: {fg};
                 border: 1px solid {border};
-                border-radius: 5px;
-                padding: 5px 8px;
-                min-height: 22px;
-                font-size: 13px;
+                border-radius: 7px;
+                padding: 0 27px 0 9px;
+                min-height: 0;
+                font-size: 14px;
+                font-weight: 400;
             }}
             QComboBox::drop-down {{ border: none; background: transparent; width: 22px; }}
             QComboBox:hover {{
@@ -8953,8 +8915,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 border-radius: 0;
                 border-bottom-left-radius: 7px;
                 border-bottom-right-radius: 7px;
-                padding: 14px;
+                padding: 10px;
                 font-size: 14px;
+                font-weight: 400;
                 selection-background-color: {accent};
                 selection-color: {accent_text};
             }}
@@ -8977,11 +8940,16 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 background: transparent;
                 width: 14px;
             }}
-        """ + standard_buttons(is_dark, compact=False))
+        """ + standard_buttons(is_dark, compact=True))
 
         for combo in (self.source_combo, self.target_combo, self.provider_combo):
+            combo.setFixedHeight(28)
             combo.setMaxVisibleItems(9)
             combo.set_popup_background(pane)
+        for editor_widget in (self.original_view, self.translated_view):
+            palette = editor_widget.palette()
+            palette.setColor(QtGui.QPalette.PlaceholderText, QColor(muted))
+            editor_widget.setPalette(palette)
 
     def _apply_native_frame_theme(self):
         apply_windows_dark_frame(self, self.theme_name == "Темная")
@@ -10436,17 +10404,12 @@ class HotkeyLanguageDialog(QDialog):
         root = QFrame(self)
         root.setObjectName("hotkeyLanguageCard")
         from rounded_windows import clip_rounded_window
-        clip_rounded_window(self, root, 14)
+        clip_rounded_window(self, root, 7)
         root.setGeometry(self.rect())
-        shadow = QGraphicsDropShadowEffect(root)
-        shadow.setBlurRadius(24)
-        shadow.setOffset(0, 7)
-        shadow.setColor(QColor(0, 0, 0, 150))
-        root.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(9)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
 
         title_row = QHBoxLayout()
         title = QLabel(hotkey_language_text(self.lang, "title"))
@@ -10487,7 +10450,7 @@ class HotkeyLanguageDialog(QDialog):
         self.swap_button = LanguageSwapButton()
         self.swap_button.setObjectName("hotkeyLanguageSwap")
         self.swap_button.setAccessibleName(hotkey_language_text(self.lang, "swap"))
-        self.swap_button.setFixedSize(38, 38)
+        self.swap_button.setFixedSize(28, 28)
         self.swap_button.setToolTip(
             tooltip_text(hotkey_language_text(self.lang, "swap"))
         )
@@ -10523,21 +10486,20 @@ class HotkeyLanguageDialog(QDialog):
 
     def _apply_theme(self):
         dark = self.owner.current_theme != "Светлая"
-        card = "#121317" if dark else "#ece7f0"
-        text = "#f4f2f8" if dark else "#24212a"
-        muted = "#aaa3b3" if dark else "#716a79"
-        border = "#4b4258" if dark else "#cfc5da"
-        hover = "#302a39" if dark else "#eee8f3"
+        from classic_style import classic_palette
+        from settings_window import compact_combo_style
+        c = classic_palette(dark)
+        card, text, muted, border = (c[key] for key in ('background', 'text', 'muted', 'border'))
         self.setStyleSheet(f"""
-            QFrame#hotkeyLanguageCard {{ background: {card}; border: 1px solid {border}; border-radius: 14px; }}
-            QLabel#hotkeyLanguageTitle {{ color: {text}; font-size: 18px; font-weight: 800; border: none; }}
+            QFrame#hotkeyLanguageCard {{ background: {card}; border: 1px solid {border}; border-radius: 7px; }}
+            QLabel#hotkeyLanguageTitle {{ color: {text}; font-size: 16px; font-weight: 600; border: none; }}
             QLabel#hotkeyLanguageBody, QLabel#hotkeyLanguageStatus {{ color: {muted}; font-size: 12px; border: none; }}
 
         """ + standard_buttons(dark, compact=False))
-        combo_style = modern_combo_style(dark, font_size=14)
+        combo_style = compact_combo_style(dark)
         for combo in (self.mode_combo, self.source_combo, self.target_combo, self.selection_trigger.combo):
             combo.setStyleSheet(combo_style)
-            combo.setMinimumHeight(38)
+            combo.setFixedHeight(28)
 
     def current_mode(self):
         return str(self.mode_combo.currentData() or "selection")

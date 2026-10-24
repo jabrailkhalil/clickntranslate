@@ -172,7 +172,7 @@ def _form(content):
     grid = QGridLayout(content)
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(10)
-    grid.setVerticalSpacing(4)
+    grid.setVerticalSpacing(2)
     grid.setColumnStretch(0, 1)
     return grid
 
@@ -307,9 +307,9 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         control.setParent(content)
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         label.setStyleSheet('margin:0; padding:0; font-size:14px;')
-        control.setFixedSize(270, 28)
-        grid.addWidget(label, row, 0)
-        grid.addWidget(control, row, 1)
+        control.setFixedSize(180, 28)
+        grid.addWidget(label, row, 1)
+        grid.addWidget(control, row, 2)
     settings.restore_clipboard_checkbox.setText(compact[0])
     settings.close_result_on_outside_click_checkbox = QCheckBox(compact[1], content)
     close_flag = settings.close_result_on_outside_click_checkbox
@@ -319,9 +319,9 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         'close_result_window_on_outside_click', bool(checked)))
     for row, control in enumerate((settings.copy_translated_checkbox,
             settings.replace_select_all_checkbox, settings.restore_clipboard_checkbox,
-            close_flag), 2):
+            close_flag)):
         control.setParent(content)
-        grid.addWidget(_flag(control), row, 0, 1, 2, Qt.AlignLeft)
+        grid.addWidget(_flag(control), row, 0, 1, 1 if row < 2 else 3, Qt.AlignLeft)
     settings.provider_routing_note = QLabel(content)
     settings.provider_routing_note.setObjectName('assistantNote')
     settings.provider_routing_note.setFixedHeight(28)
@@ -331,8 +331,8 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         from provider_settings import show_provider_settings
         show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
     settings.provider_routing_note.linkActivated.connect(open_image_api)
-    grid.addWidget(settings.provider_routing_note, 6, 0, 1, 2)
-    grid.setRowStretch(7, 1)
+    grid.addWidget(settings.provider_routing_note, 4, 0, 1, 3)
+    grid.setRowStretch(5, 1)
     settings.translation_settings_content = content
     settings.translation_settings_scroll = _scroll(page, content, 'translationSettingsScroll')
     updates_layout.setSpacing(4)
@@ -359,13 +359,14 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     grid = _form(content)
     settings.ocr_settings_grid = grid
     settings.ocr_engine_label.setParent(content)
-    settings.ocr_engine_label.setText(section_text(lang, 'recognition'))
+    settings.ocr_engine_label.setText('OCR:')
+    settings.ocr_engine_label.setToolTip(section_text(lang, 'recognition').rstrip(':： '))
     settings.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
     settings.ocr_engine_label.setStyleSheet('margin:0; padding:0; font-size:14px;')
     settings.ocr_engine_combo.setParent(content)
-    settings.ocr_engine_combo.setFixedSize(270, 28)
-    grid.addWidget(settings.ocr_engine_label, 0, 0)
-    grid.addWidget(settings.ocr_engine_combo, 0, 1)
+    settings.ocr_engine_combo.setFixedSize(180, 28)
+    grid.addWidget(settings.ocr_engine_label, 0, 1)
+    grid.addWidget(settings.ocr_engine_combo, 0, 2)
     caption, hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
     settings.ocr_join_paragraphs_checkbox = QCheckBox(caption, content)
     paragraph_flag = settings.ocr_join_paragraphs_checkbox
@@ -374,11 +375,11 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     paragraph_flag.setAccessibleDescription(hint)
     paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))
     for row, control in enumerate((paragraph_flag, settings.keep_visible_checkbox,
-                                   settings.freeze_screen_checkbox), 1):
+                                   settings.freeze_screen_checkbox)):
         control.setParent(content)
-        grid.addWidget(_flag(control), row, 0, 1, 2, Qt.AlignLeft)
+        grid.addWidget(_flag(control), row, 0, 1, 1 if row == 0 else 3, Qt.AlignLeft)
     settings.dim_screen_during_ocr_checkbox.setParent(content)
-    grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 4, 0, Qt.AlignLeft)
+    grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 3, 0, Qt.AlignLeft)
     dim_controls = QWidget(content)
     dim_controls.setFixedHeight(28)
     slider_row = QHBoxLayout(dim_controls)
@@ -387,10 +388,10 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     slider_row.addStretch(1)
     slider_row.addWidget(settings.ocr_dim_strength_value)
     slider_row.addWidget(settings.ocr_dim_strength_slider)
-    grid.addWidget(dim_controls, 4, 1)
+    grid.addWidget(dim_controls, 3, 1, 1, 2)
     settings.copy_notification_checkbox.setParent(content)
-    grid.addWidget(_flag(settings.copy_notification_checkbox), 5, 0, 1, 2, Qt.AlignLeft)
-    grid.setRowStretch(6, 1)
+    grid.addWidget(_flag(settings.copy_notification_checkbox), 4, 0, 1, 3, Qt.AlignLeft)
+    grid.setRowStretch(5, 1)
     settings.ocr_settings_content = content
     settings.ocr_settings_scroll = _scroll(settings.settings_ocr_page, content, 'ocrSettingsScroll')
     root.addWidget(settings.ocr_settings_scroll, 1)

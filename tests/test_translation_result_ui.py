@@ -159,9 +159,9 @@ class TranslationResultUiTest(unittest.TestCase):
             for button in (dialog.copy_button, dialog.translate_button, dialog.close_button):
                 self.assertGreaterEqual(button.width(), button.sizeHint().width())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_copy_button_works_without_closing_the_result(self):

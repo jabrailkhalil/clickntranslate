@@ -43,9 +43,9 @@ def test_single_template_uses_an_inset_card_without_explicit_popup_setup(app, sh
     assert isinstance(combo.itemDelegate(), PopupRowDelegate)
     row = view.visualRect(combo.model().index(0, 0))
     bounds = QtCore.QRect(view.viewport().mapTo(popup, row.topLeft()), row.size())
-    assert bounds.top() >= 5 and bounds.left() >= 5
-    assert bounds.bottom() < popup.height()-5 and bounds.right() < popup.width()-5
-    assert row.height() >= combo.fontMetrics().height()+10
+    assert bounds.top() >= 3 and bounds.left() >= 3
+    assert bounds.bottom() < popup.height()-3 and bounds.right() < popup.width()-3
+    assert row.height() >= combo.fontMetrics().height()+8
     assert popup.width() == combo.width()
     picture = popup.grab().toImage()
     assert picture.pixelColor(0, 0).alpha() < 100

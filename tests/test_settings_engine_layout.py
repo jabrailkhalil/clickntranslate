@@ -207,8 +207,8 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertAlmostEqual(ocr_label[1] + ocr_label[3] / 2, ocr_combo[1] + ocr_combo[3] / 2, delta=.5)
             self.assertAlmostEqual(tr_label[1] + tr_label[3] / 2, tr_combo[1] + tr_combo[3] / 2, delta=.5)
             self.assertEqual(ocr_combo[0], tr_combo[0])
-            self.assertEqual(ocr_combo[2], 270)
-            self.assertEqual(tr_combo[2], 270)
+            self.assertEqual(ocr_combo[2], 180)
+            self.assertEqual(tr_combo[2], 180)
             self.assertTrue(settings.ocr_engine_label.alignment() & Qt.AlignVCenter)
             self.assertTrue(settings.translator_engine_label.alignment() & Qt.AlignVCenter)
             # Engines are removed from their own tab in Language packages now.
@@ -307,7 +307,11 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         self.assertTrue(settings.result_window_label.alignment() & Qt.AlignVCenter)
         self.assertTrue(settings.settings_updates_page.isAncestorOf(control))
         copy_translated = self._rect_in_settings(settings, settings.copy_translated_checkbox)
-        self.assertGreater(copy_translated[1], result[1] + result[3])
+        self.assertAlmostEqual(copy_translated[1] + copy_translated[3]/2,
+                               translator[1] + translator[3]/2, delta=.5)
+        replace_all = self._rect_in_settings(settings, settings.replace_select_all_checkbox)
+        self.assertAlmostEqual(replace_all[1] + replace_all[3]/2,
+                               result[1] + result[3]/2, delta=.5)
         settings.close()
         parent.close()
         self.app.processEvents()

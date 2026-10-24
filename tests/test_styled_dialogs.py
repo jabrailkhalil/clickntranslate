@@ -40,7 +40,7 @@ def test_external_message_style_cannot_remove_shared_chrome():
     box.setStyleSheet("QMessageBox { background-color: #ffffff; }")
 
     assert box._dark is False
-    assert "#efecf2" in box.styleSheet()
+    assert "#f0ecf3" in box.styleSheet()
     assert "QFrame#styledMessageTitleBar" in box.styleSheet()
 
 

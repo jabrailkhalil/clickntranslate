@@ -2,7 +2,8 @@
 import unicodedata
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from button_styles import button_palette, button_qss
+from button_styles import button_qss
+from classic_style import classic_palette
 from styled_dialogs import tooltip_text
 from languages import LANGUAGES, LOCALIZED_LANGUAGE_NAMES
 from language_search import SEARCH_TEXT
@@ -402,23 +403,23 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
 
 
     def set_theme(self, dark):
-        colors = button_palette(dark)
-        ink, surface, edge, frame = (('#f2eff6', '#121116', '#433a4c', '#62566e') if dark
-                                    else ('#27222d', '#f8f5fb', '#d7cde3', '#927cab'))
+        colors = classic_palette(dark)
+        ink, surface, edge, frame = (colors['text'], colors['surface'],
+                                    colors['border'], colors['border'])
         self.setStyleSheet(f'''
-            QFrame#interfaceLanguagePicker {{background:{'#1d1922' if dark else '#ffffff'};
+            QFrame#interfaceLanguagePicker {{background:{colors['field']};
                 border:1px solid transparent; border-radius:10px;}}
             QWidget {{background:transparent;}}
-            QLabel#interfaceLanguageTitle {{color:{ink}; border:0; font-size:12px; font-weight:600;}}
+            QLabel#interfaceLanguageTitle {{color:{ink}; border:0; font-size:12px; font-weight:400;}}
             QFrame#interfaceLanguageChoices {{background:{surface}; border:0; border-top:1px solid {edge};}}
             QScrollArea#interfaceLanguageScroll {{background:transparent; border:0;}}
             QWidget#interfaceLanguageViewport, QWidget#interfaceLanguageCatalog {{background:{surface}; border:0;}}
-            QLineEdit#interfaceLanguageSearch {{background:{surface}; color:{ink}; border:1px solid {edge};
+            QLineEdit#interfaceLanguageSearch {{background:{colors['field']}; color:{ink}; border:1px solid {edge};
                 border-radius:5px; padding:0 7px; font-size:12px; font-weight:400;}}
-            QLineEdit#interfaceLanguageSearch[keyboardFocus="true"]:focus {{border-color:{colors['focus']};}}
-            QLabel#interfaceLanguageEmpty {{color:{ink}; border:0; font-size:12px;}}
+            QLineEdit#interfaceLanguageSearch[keyboardFocus="true"]:focus {{border-color:{colors['accent_text']};}}
+            QLabel#interfaceLanguageEmpty {{color:{colors['muted']}; border:0; font-size:12px;}}
             QScrollBar:vertical {{background:transparent; width:7px; margin:2px 0;}}
-            QScrollBar::handle:vertical {{background:{frame}; min-height:18px; border-radius:3px;}}
+            QScrollBar::handle:vertical {{background:{colors['scroll']}; min-height:18px; border-radius:3px;}}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{height:0;}}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{background:transparent;}}
             QLabel#interfaceLanguageName {{color:{ink}; border:0; font-size:14px; font-weight:400;}}
@@ -443,9 +444,8 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
             QPushButton#interfaceLanguageCell:hover,
             QPushButton#interfaceLanguageCell[pointerHover="true"] {{background:{colors['hover']};}}
             QPushButton#interfaceLanguageCell[pointerHover="false"]:hover {{background:transparent;}}
-            QPushButton#interfaceLanguageCell[current="true"] {{background:{colors['hover']};}}
-            QPushButton#interfaceLanguageCell[current="true"] QLabel#interfaceLanguageName {{font-weight:600;}}
-            QPushButton#interfaceLanguageCell[keyboardFocus="true"]:focus {{border:1px solid {colors['focus']};}}
+            QPushButton#interfaceLanguageCell[current="true"] {{background:{colors['selected']};}}
+            QPushButton#interfaceLanguageCell[keyboardFocus="true"]:focus {{border:1px solid {colors['accent_text']};}}
         '''
         for cell in self.choices.findChildren(QtWidgets.QWidget, 'interfaceLanguageCell'):
             cell.setStyleSheet(cell_style)
@@ -455,7 +455,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
         check.fill(QtCore.Qt.transparent)
         painter = QtGui.QPainter(check)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtGui.QColor(colors['focus']), 1.6, QtCore.Qt.SolidLine,
+        painter.setPen(QtGui.QPen(QtGui.QColor(colors['accent_text']), 1.35, QtCore.Qt.SolidLine,
                                   QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
         painter.drawPolyline(QtGui.QPolygonF([QtCore.QPointF(1, 7), QtCore.QPointF(4.5, 10.5), QtCore.QPointF(11, 3.5)]))
         painter.end()

@@ -88,18 +88,18 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                 tabs = sorted(settings.settings_page_tabs, key=lambda tab: tab.geometry().left())
                 assert len(tabs) == len(VISUAL_PAGE_ORDER)
                 assert navigation.height() == 32
-                assert navigation.contentsRect() == navigation.rect()
+                assert navigation.contentsRect() == navigation.rect().adjusted(1, 0, -1, -1)
                 assert abs(rect_in(navigation, settings).center().x() - settings.rect().center().x()) <= 1
-                assert navigation.width() == sum(tab.sizeHint().width() for tab in tabs) + 6*(len(tabs)-1)
+                assert navigation.width() == sum(tab.sizeHint().width() for tab in tabs) + 18 + 2*(len(tabs)-1)
                 nav_global = rect_in(navigation, window.ui_root)
                 header_global = rect_in(window.title_bar, window.ui_root)
                 assert nav_global.top() - header_global.bottom() - 1 == 0, context
                 for tab in tabs:
-                    assert tab.height() == 28 and tab.y() == 2, (context, tab.geometry())
+                    assert tab.height() == 26 and tab.y() == 3, (context, tab.geometry())
                     assert navigation.rect().contains(tab.geometry())
                     font, area = tab.label_layout()
                     metrics = QtGui.QFontMetrics(font)
-                    assert font.pixelSize() == 12
+                    assert font.pixelSize() == 13
                     assert tab.width() == tab.sizeHint().width(), (context, tab.text(), tab.geometry())
                     assert metrics.horizontalAdvance(tab.text()) <= area.width(), (context, tab.text())
                     assert metrics.height() <= area.height(), (context, tab.text())
@@ -107,7 +107,7 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     assert ink.width() <= area.width(), (context, tab.text(), ink, area)
                     assert ink.height() <= area.height(), (context, tab.text(), ink, area)
                 for left, right in zip(tabs, tabs[1:]):
-                    assert right.x() - (left.x() + left.width()) == 6, context
+                    assert right.x() - (left.x() + left.width()) == 2, context
 
                 template = settings.game_template_combo
                 remember = settings.game_remember_template_checkbox

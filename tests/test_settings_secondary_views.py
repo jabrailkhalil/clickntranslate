@@ -458,7 +458,7 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.app.processEvents()
 
         style = self.settings.secondary_view_shell.styleSheet()
-        self.assertIn("#ece7f0", style)
+        self.assertIn("#f0ecf3", style)
         self.assertEqual(self.settings.history_count_label.text(), "2")
         rendered = "\n".join(
             label.text()

@@ -4,6 +4,8 @@ from functools import lru_cache
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from classic_style import classic_palette
+
 
 GROUP_HEADER_ROLE = QtCore.Qt.UserRole + 100
 
@@ -25,13 +27,11 @@ def popup_scale(combo):
 
 
 def popup_palette(dark, surface=None):
-    return dict(surface=surface or ('#211d29' if dark else '#faf7fd'),
-                text='#f5f0fc' if dark else '#302638',
-                muted='#b1a7bc' if dark else '#776c82',
-                border='#584963' if dark else '#c8b9d7',
-                hover='#302739' if dark else '#f0e9f7',
-                selected='#3e3050' if dark else '#e9ddf4',
-                accent='#c3a5eb' if dark else '#765099')
+    colors = classic_palette(dark)
+    return dict(surface=surface or colors['field'], text=colors['text'],
+                muted=colors['muted'], border=colors['border'],
+                hover=colors['hover'], selected=colors['selected'],
+                accent=colors['accent_text'])
 
 
 class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
@@ -63,7 +63,6 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         font = QtGui.QFont(self.combo.font())
         font.setWeight(QtGui.QFont.Normal)
         if index.data(GROUP_HEADER_ROLE):
-            font.setWeight(QtGui.QFont.DemiBold)
             font.setPixelSize(max(11, round(13*popup_scale(self.combo))))
         return font
 
@@ -71,14 +70,12 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         scale = popup_scale(self.combo)
         header = bool(index.data(GROUP_HEADER_ROLE))
         font = self._font(index)
-        # The selected label is slightly heavier; reserve its full width too.
-        font.setWeight(QtGui.QFont.DemiBold)
         metrics = QtGui.QFontMetrics(font)
         icon = self.icon(index)
         gutter = not header and (not icon.isNull() or getattr(self.combo, '_language_search', None) is not None)
-        decoration = 28*scale if gutter else 0
-        width = metrics.horizontalAdvance(self.label(index)) + round((24 if header else 48)*scale+decoration)
-        height = max(round((28 if header else 34)*scale), metrics.height()+round(10*scale))
+        decoration = 24*scale if gutter else 0
+        width = metrics.horizontalAdvance(self.label(index)) + round((18 if header else 38)*scale+decoration)
+        height = max(round((26 if header else 30)*scale), metrics.height()+round(8*scale))
         specified = index.data(QtCore.Qt.SizeHintRole)
         if isinstance(specified, QtCore.QSize):
             width, height = max(width, specified.width()), max(height, specified.height())
@@ -90,24 +87,22 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         enabled = bool(index.flags() & QtCore.Qt.ItemIsEnabled)
         chosen = self.mark_current and enabled and index.row() == self.combo.currentIndex()
         hover = enabled and bool(option.state & (QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected))
-        rect = QtCore.QRectF(option.rect).adjusted(scale, scale, -scale, -scale)
+        rect = QtCore.QRectF(option.rect)
         painter.save()
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
         if chosen or hover:
             painter.setPen(QtCore.Qt.NoPen)
             painter.setBrush(QtGui.QColor(colors['selected'] if chosen else colors['hover']))
-            painter.drawRoundedRect(rect, 5*scale, 5*scale)
+            painter.drawRect(rect)
         font = self._font(index)
-        if chosen:
-            font.setWeight(QtGui.QFont.DemiBold)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(colors['muted'] if header or not enabled else colors['text']))
-        content = rect.adjusted(10*scale, 0, -10*scale, 0)
+        content = rect.adjusted(8*scale, 0, -8*scale, 0)
         rtl = self.combo.layoutDirection() == QtCore.Qt.RightToLeft
         icon = self.icon(index)
         if isinstance(icon, QtGui.QIcon) and not icon.isNull() and not header:
-            size = round(20*scale)
+            size = round(18*scale)
             x = content.right()-size if rtl else content.left()
             pixels = icon.pixmap(QtCore.QSize(size*3, size*3),
                                  QtGui.QIcon.Normal if enabled else QtGui.QIcon.Disabled)
@@ -117,15 +112,15 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
                     content.center().y()-fitted.height()/2, fitted.width(), fitted.height())
                 painter.drawPixmap(target, pixels, QtCore.QRectF(pixels.rect()))
         if not header and (not icon.isNull() or getattr(self.combo, '_language_search', None) is not None):
-            content.adjust(0 if rtl else 28*scale, 0, -28*scale if rtl else 0, 0)
+            content.adjust(0 if rtl else 24*scale, 0, -24*scale if rtl else 0, 0)
         if not header:
-            content.adjust(24*scale if rtl else 0, 0, 0 if rtl else -24*scale, 0)
+            content.adjust(20*scale if rtl else 0, 0, 0 if rtl else -20*scale, 0)
         label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, max(0, round(content.width())))
         painter.drawText(content, QtCore.Qt.AlignVCenter | (QtCore.Qt.AlignRight if rtl else QtCore.Qt.AlignLeft), label)
         if chosen:
-            x = rect.left()+14*scale if rtl else rect.right()-14*scale
+            x = rect.left()+11*scale if rtl else rect.right()-11*scale
             y = rect.center().y()
-            painter.setPen(QtGui.QPen(QtGui.QColor(colors['accent']), 1.6*scale,
+            painter.setPen(QtGui.QPen(QtGui.QColor(colors['accent']), 1.35*scale,
                                      QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
             path = QtGui.QPainterPath(QtCore.QPointF(x-4*scale, y))
             path.lineTo(x-scale, y+3*scale)
