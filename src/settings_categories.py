@@ -1,7 +1,7 @@
 """Arrange program and translation preferences in the fixed settings viewport."""
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import (
-    QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout,
+    QBoxLayout, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout,
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 from settings_sections import PAGE_OCR, section_text
@@ -99,6 +99,23 @@ PARAGRAPH_TEXT = {
 }
 
 
+# The compact Dynamic column keeps full explanations in the existing hints.
+DYNAMIC_COMPACT = {
+    'en': ('Interval:', 'Opacity:', 'Pause when inactive', 'Pause / Stop toolbar'),
+    'ru': ('Интервал:', 'Непрозрачность:', 'Пауза, если окно неактивно', 'Панель паузы и остановки'),
+    'es': ('Intervalo:', 'Opacidad:', 'Pausa si la ventana está inactiva', 'Barra Pausa / Detener'),
+    'de': ('Intervall:', 'Deckkraft:', 'Pause bei inaktivem Fenster', 'Pause-/Stopp-Leiste'),
+    'fr': ('Intervalle :', 'Opacité :', 'Pause si fenêtre inactive', 'Barre Pause / Arrêt'),
+    'zh': ('检测间隔：', '背景不透明度：', '窗口未激活时暂停', '显示暂停/停止工具栏'),
+    'pt': ('Intervalo:', 'Opacidade:', 'Pausar com o app inativo', 'Barra Pausar / Parar'),
+    'it': ('Intervallo:', 'Opacità:', 'Pausa con l’app inattiva', 'Barra Pausa / Interrompi'),
+    'ar': ('الفاصل:', 'عتامة الخلفية:', 'إيقاف مؤقت عند عدم النشاط', 'شريط الإيقاف المؤقت والإيقاف'),
+    'tr': ('Aralık:', 'Opaklık:', 'Etkin değilken duraklat', 'Duraklat / Durdur çubuğu'),
+    'hi': ('जाँच अंतराल:', 'अपारदर्शिता:', 'ऐप निष्क्रिय हो तो विराम', 'विराम / रोकें टूलबार'),
+    'id': ('Interval:', 'Opasitas:', 'Jeda saat aplikasi tidak aktif', 'Bilah Jeda / Hentikan'),
+}
+
+
 def _empty(layout):
     while layout.count():
         layout.takeAt(0)
@@ -177,6 +194,40 @@ def _form(content):
     return grid
 
 
+def _fit_dynamic_flag(control, width):
+    """Keep long localized labels readable beside the compact options column."""
+    original = control.property('dynamicFlagLabel')
+    if original is None:
+        original = control.text()
+        control.setProperty('dynamicFlagLabel', original)
+    control.setText(original)
+    control.ensurePolished()
+    metrics = control.fontMetrics()
+    chrome = control.sizeHint().width() - metrics.horizontalAdvance(original)
+    available = max(1, width-chrome)
+    lines, line = [], ''
+    for word in original.split():
+        candidate = word if not line else line+' '+word
+        if line and metrics.horizontalAdvance(candidate) > available:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    control.setText('\n'.join(lines))
+    control.setAccessibleName(original)
+    control.setFixedHeight(max(28, control.sizeHint().height()+2))
+
+
+def fit_dynamic_flags(settings):
+    if not hasattr(settings, 'game_flags_panel'):
+        return
+    for control in (settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
+                    settings.game_toolbar_checkbox, settings.game_remember_template_checkbox):
+        _fit_dynamic_flag(control, 294)
+
+
 def _wrap_mode_pages(settings):
     # Transfer the existing layouts and controls intact: signals and values
     # retain a single owner, including the optional custom-image row.
@@ -202,34 +253,64 @@ def _wrap_mode_pages(settings):
         grid.setRowStretch(row, 0)
         grid.setRowMinimumHeight(row, 0)
     grid.setColumnStretch(0, 1)
-    grid.setVerticalSpacing(5)
-    # Preferences first, then one compact form. Captions stay beside their
-    # values, and all fields start at the same edge instead of forming cards.
+    grid.setHorizontalSpacing(18)
+    grid.setVerticalSpacing(0)
+    # Flags stay together; the whole options form starts at the same top edge
+    # in the trailing column, instead of continuing underneath them.
+    settings.game_flags_panel = QWidget(content)
+    flags = QVBoxLayout(settings.game_flags_panel)
+    flags.setContentsMargins(0, 0, 0, 0)
+    flags.setSpacing(5)
+    settings.game_flags_panel.setMinimumWidth(294)
+    from text_direction import ui_directional_text
+    language = settings.parent.current_interface_language
+    compact = [ui_directional_text(value, language) for value in
+               DYNAMIC_COMPACT.get(language, DYNAMIC_COMPACT['en'])]
+    settings.game_scan_interval_label.setText(compact[0])
+    settings.game_overlay_opacity_label.setText(compact[1])
+    settings.game_pause_inactive_checkbox.setText(compact[2])
+    settings.game_toolbar_checkbox.setText(compact[3])
+    for checkbox in (settings.game_pause_inactive_checkbox,
+            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
+            settings.game_remember_template_checkbox):
+        _fit_dynamic_flag(checkbox, 294)
+        flags.addWidget(checkbox)
+    grid.addWidget(settings.game_flags_panel, 0, 0, Qt.AlignTop)
+
+    settings.game_options_panel = QWidget(content)
+    settings.game_options_panel.setFixedWidth(350)
+    options = QVBoxLayout(settings.game_options_panel)
+    options.setContentsMargins(0, 0, 0, 0)
+    options.setSpacing(6)
+    grid.addWidget(settings.game_options_panel, 0, 1, Qt.AlignTop)
+    grid.setRowStretch(1, 1)
     header = settings.game_language_row.layout()
     _empty(header)
-    header.setSpacing(10)
+    # QBoxLayout mirrors LeftToRight automatically for an RTL parent. Forcing
+    # RightToLeft here would mirror this one row twice.
+    header.setDirection(QBoxLayout.LeftToRight)
+    header.setSpacing(8)
+    settings.game_language_row.setFixedHeight(28)
+    settings.game_language_controls.setFixedSize(214, 28)
+    settings.game_language_controls.layout().setSpacing(4)
+    for combo in (settings.game_source_combo, settings.game_target_combo):
+        combo.setFixedWidth(90)
+        combo.setIconSize(QSize(18, 18))
+    settings.game_swap_button.setFixedSize(26, 28)
     labels = (settings.game_languages_label, settings.game_scan_interval_label,
               settings.game_overlay_opacity_label, settings.game_template_label)
     for label in labels:
         label.setStyleSheet('font-size:14px; margin:0; padding:0;')
-        label.ensurePolished()
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-    label_width = max(label.fontMetrics().horizontalAdvance(label.text()) for label in labels) + 4
-    for label in labels:
-        label.setFixedSize(label_width, 28)
-    header.addStretch(1)
+        label.setFixedSize(128, 28)
     header.addWidget(settings.game_languages_label)
     header.addWidget(settings.game_language_controls)
-    for row, checkbox in enumerate((settings.game_pause_inactive_checkbox,
-            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
-            settings.game_remember_template_checkbox)):
-        grid.addWidget(checkbox, row, 0, Qt.AlignLeft)
-    grid.addWidget(settings.game_language_row, 4, 0)
+    options.addWidget(settings.game_language_row)
 
-    settings.game_numeric_options = QWidget(content)
+    settings.game_numeric_options = QWidget(settings.game_options_panel)
     numbers = QVBoxLayout(settings.game_numeric_options)
     numbers.setContentsMargins(0, 0, 0, 0)
-    numbers.setSpacing(5)
+    numbers.setSpacing(6)
     for label, control in (
             (settings.game_scan_interval_label, settings.game_interval_controls),
             (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
@@ -237,45 +318,32 @@ def _wrap_mode_pages(settings):
         group.setFixedHeight(28)
         line = QHBoxLayout(group)
         line.setContentsMargins(0, 0, 0, 0)
-        line.setSpacing(10)
-        line.addStretch(1)
-        label.setStyleSheet('font-size:14px; margin:0; padding:0;')
-        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        line.setSpacing(8)
         label.setBuddy(control)
         line.addWidget(label)
-        values = QWidget(group)
-        values.setFixedSize(406, 28)
-        value_row = QHBoxLayout(values)
-        value_row.setContentsMargins(0, 0, 0, 0)
-        value_row.setSpacing(0)
-        value_row.addWidget(control)
-        value_row.addStretch(1)
-        line.addWidget(values)
+        control.setFixedWidth(214)
+        line.addWidget(control)
         numbers.addWidget(group)
-    grid.addWidget(settings.game_numeric_options, 5, 0)
+    options.addWidget(settings.game_numeric_options)
 
-    settings.game_template_actions = QWidget(content)
+    settings.game_template_actions = QWidget(settings.game_options_panel)
+    settings.game_template_actions.setFixedHeight(28)
     template_row = QHBoxLayout(settings.game_template_actions)
     template_row.setContentsMargins(0, 0, 0, 0)
-    template_row.setSpacing(10)
-    template_row.addStretch(1)
+    template_row.setSpacing(8)
     settings.game_template_label.show()
-    settings.game_template_label.setFixedHeight(28)
-    settings.game_template_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
     template_row.addWidget(settings.game_template_label)
     template_fields = QWidget(settings.game_template_actions)
     settings.game_template_controls = template_fields
-    template_fields.setFixedSize(406, 28)
+    template_fields.setFixedSize(214, 28)
     fields = QHBoxLayout(template_fields)
     fields.setContentsMargins(0, 0, 0, 0)
     fields.setSpacing(6)
     settings.game_template_combo.setFixedWidth(180)
     fields.addWidget(settings.game_template_combo)
     fields.addWidget(settings.game_delete_template_button)
-    fields.addStretch(1)
     template_row.addWidget(template_fields)
-    grid.addWidget(settings.game_template_actions, 6, 0)
-    grid.setRowStretch(7, 1)
+    options.addWidget(settings.game_template_actions)
     settings.game_settings_content = content
     settings.game_settings_scroll = _scroll(page, content, 'dynamicSettingsScroll')
     root = QVBoxLayout(page)

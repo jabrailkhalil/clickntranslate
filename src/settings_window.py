@@ -466,7 +466,30 @@ class DropDownCombo(QComboBox):
                                            QtWidgets.QStyle.SC_ComboBoxArrow, self)
         option.subControls &= ~QtWidgets.QStyle.SC_ComboBoxArrow
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
-        painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
+        if not option.currentIcon.isNull():
+            # Paint both parts within one measured field. Native stylesheet
+            # icon labels can consume the text space inside a proxy widget.
+            field = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                                QtWidgets.QStyle.SC_ComboBoxEditField, self)
+            icon_size = option.iconSize.boundedTo(field.size())
+            rtl = option.direction == Qt.RightToLeft
+            icon_rect = QtCore.QRect(field.right()-icon_size.width()+1 if rtl else field.left(),
+                field.center().y()-icon_size.height()//2, icon_size.width(),icon_size.height())
+            text_rect = (field.adjusted(0,0,-icon_size.width()-6,0) if rtl
+                         else field.adjusted(icon_size.width()+6,0,0,0))
+            painter.save()
+            painter.setClipRect(field)
+            option.currentIcon.paint(painter,icon_rect,Qt.AlignCenter,
+                QIcon.Normal if self.isEnabled() else QIcon.Disabled)
+            painter.setFont(self.font())
+            painter.setPen(option.palette.color(QtGui.QPalette.Active if self.isEnabled()
+                                               else QtGui.QPalette.Disabled,QtGui.QPalette.Text))
+            value = self.fontMetrics().elidedText(option.currentText,Qt.ElideRight,max(0,text_rect.width()))
+            painter.drawText(text_rect,(Qt.AlignRight if rtl else Qt.AlignLeft)
+                             |Qt.AlignVCenter|Qt.AlignAbsolute,value)
+            painter.restore()
+        else:
+            painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
         dark = option.palette.color(QtGui.QPalette.Text).lightness() > 128
         color = QtGui.QColor(button_palette(dark)['text' if self.isEnabled() else 'disabled'])
         factor = float(self.window().property('ui_effective_scale') or 1)
@@ -801,6 +824,35 @@ class _ResultModeDelegate(PopupRowDelegate):
         if view.property('keyboardModeSelection') and view.currentIndex() == index:
             option.state |= QtWidgets.QStyle.State_Selected
         super().paint(painter, option, index)
+
+
+class CompactDynamicLanguageCombo(DropDownCombo):
+    """Flag and code in the field; full localized names in the shared popup."""
+
+    def initStyleOption(self, option):
+        super().initStyleOption(option)
+        if self.currentData():
+            from languages import language_short_label
+            option.currentText = language_short_label(self.currentData())
+            option.direction = Qt.LeftToRight
+        else:
+            option.currentText = '—'  # The localized unavailability reason remains in the tooltip.
+
+    def elided_value_tooltip(self):
+        hint = self.toolTip()
+        document = QtGui.QTextDocument()
+        document.setHtml(hint)
+        hint = document.toPlainText()
+        return tooltip_text('\n'.join(value for value in (self.currentText(), hint) if value))
+
+    def _paint_combo(self, painter, option):
+        option = QtWidgets.QStyleOptionComboBox(option)
+        field = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                            QtWidgets.QStyle.SC_ComboBoxEditField, self)
+        icon_width = option.iconSize.width()+6 if not option.currentIcon.isNull() else 0
+        option.currentText = self.fontMetrics().elidedText(option.currentText, Qt.ElideRight,
+                                                          max(0, field.width()-icon_width))
+        super()._paint_combo(painter, option)
 
 
 class TemplatePickerCombo(DropDownCombo):
@@ -9676,7 +9728,8 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available or language.code == source:
                     continue
-                target_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
+                target_combo.addItem(QIcon(resource_path(language_icon_path(language.code))),
+                    language.display_name(self.parent.current_interface_language), language.code)
             if target_combo.count() == 0:
                 from ocr import ocr_ui_text
                 target_combo.addItem(ocr_ui_text(
@@ -9738,7 +9791,8 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available:
                     continue
-                source_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
+                source_combo.addItem(QIcon(resource_path(language_icon_path(language.code))),
+                    language.display_name(self.parent.current_interface_language), language.code)
             if source_combo.count() == 0:
                 from ocr import ocr_ui_text
                 source_combo.addItem(ocr_ui_text(
@@ -10876,8 +10930,8 @@ class SettingsWindow(QWidget):
         language_row = QHBoxLayout(self.game_language_controls)
         language_row.setContentsMargins(0, 0, 0, 0)
         language_row.setSpacing(6)
-        self.game_source_combo = DropDownCombo(self.settings_game_page)
-        self.game_target_combo = DropDownCombo(self.settings_game_page)
+        self.game_source_combo = CompactDynamicLanguageCombo(self.settings_game_page)
+        self.game_target_combo = CompactDynamicLanguageCombo(self.settings_game_page)
         for combo in (self.game_source_combo, self.game_target_combo):
             # A click can beat the deferred installed-language probe. Finish
             # it before showing the list, so clear()/repopulation cannot close
@@ -11567,7 +11621,11 @@ class SettingsWindow(QWidget):
         if combo is None:
             return
         dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"
-        set_widget_stylesheet(combo, compact_combo_style(dark))
+        style = compact_combo_style(dark)
+        if isinstance(combo, CompactDynamicLanguageCombo):
+            style += '''QComboBox {padding:0 3px 0 7px;}
+                        QComboBox::drop-down {width:18px;}'''
+        set_widget_stylesheet(combo, style)
         if isinstance(combo, DropDownCombo):
             combo.set_popup_background("#17181d" if dark else "#e9e4ed")
         if combo is getattr(self, 'game_template_combo', None):
@@ -14312,6 +14370,8 @@ finally {
             assistant_page.refresh_custom_icon()
         self._apply_action_panel_style()
         install_accent_controls(self, dark=self.parent.current_theme != "Светлая")
+        from settings_categories import fit_dynamic_flags
+        fit_dynamic_flags(self)
         navigation = getattr(self, "settings_page_navigation", None)
         if navigation is not None:
             try:

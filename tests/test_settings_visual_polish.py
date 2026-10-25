@@ -30,6 +30,17 @@ def assert_language_text_fits(combo, context):
     # A long catalog entry must not widen one half of the fixed language pair.
     # The closed field can elide it; hover and the open list retain its full name.
     value = combo._closed_display_text()
+    from languages import language_short_label
+    assert value == language_short_label(combo.currentData()), context
+    assert not option.currentIcon.isNull(), context
+    assert combo.fontMetrics().horizontalAdvance(value) + icon_width <= field.width(), (context, value, field)
+    assert all(not combo.itemIcon(index).isNull() for index in range(combo.count())), context
+    for index in range(combo.count()):
+        code = language_short_label(combo.itemData(index))
+        assert combo.fontMetrics().horizontalAdvance(code)+icon_width <= field.width(), (context, code, field)
+    document = QtGui.QTextDocument()
+    document.setHtml(combo.elided_value_tooltip())
+    assert combo.currentText() in document.toPlainText(), context
     if combo.fontMetrics().horizontalAdvance(value) + icon_width > field.width():
         document = QtGui.QTextDocument()
         document.setHtml(combo.elided_value_tooltip())
@@ -134,14 +145,22 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                 assert remember.sizeHint().width() <= remember.width(), context
                 assert template.isVisible() and template.isEnabled(), context
                 assert settings.game_template_controls.width() == settings.game_language_controls.width(), context
-                assert template.width() == settings.game_interval_controls.width() == 180, context
+                assert template.width() == 180, context
+                assert settings.game_interval_controls.width() == settings.game_opacity_controls.width() == 214, context
                 flag_rects = [rect_in(flag, settings.settings_game_page) for flag in (
                     settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                     settings.game_toolbar_checkbox, remember)]
                 assert all(first.bottom() < second.top() for first, second in zip(flag_rects, flag_rects[1:])), context
-                assert max(rect.bottom() for rect in flag_rects) < min(
-                    template_rect.top(), rect_in(row, settings.settings_game_page).top(),
-                    rect_in(settings.game_numeric_options, settings.settings_game_page).top()), context
+                flags = rect_in(settings.game_flags_panel, settings.settings_game_page)
+                options = rect_in(settings.game_options_panel, settings.settings_game_page)
+                assert flags.top() == options.top(), context
+                assert not flags.intersects(options), context
+                assert options.width() == 350, context
+                if settings.layoutDirection() == QtCore.Qt.RightToLeft:
+                    assert options.right() < flags.left(), context
+                else:
+                    assert options.left() > flags.right(), context
+                assert scroll.viewport().rect().contains(rect_in(settings.game_options_panel,scroll.viewport())), context
                 language_fields = rect_in(settings.game_language_controls, settings.settings_game_page)
                 template_fields = rect_in(settings.game_template_controls, settings.settings_game_page)
                 assert language_fields == QtCore.QRect(template_fields.x(), language_fields.y(),
@@ -155,10 +174,10 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     assert abs(field.center().y()-caption.center().y()) <= 1, (context, caption, field)
                     assert label.fontMetrics().horizontalAdvance(label.text()) <= label.width(), context
                     if settings.layoutDirection() == QtCore.Qt.RightToLeft:
-                        assert caption.left() - field.right() - 1 == 10, (context, caption, field)
+                        assert caption.left() - field.right() - 1 == 8, (context, caption, field)
                         assert field.right() == language_fields.right(), context
                     else:
-                        assert field.left() - caption.right() - 1 == 10, (context, caption, field)
+                        assert field.left() - caption.right() - 1 == 8, (context, caption, field)
                         assert field.left() == language_fields.left(), context
                     previous = field
                 captions = [rect_in(label, settings.settings_game_page) for label in (
@@ -166,6 +185,7 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     settings.game_overlay_opacity_label, settings.game_template_label)]
                 assert len({rect.left() for rect in captions}) == 1, (context, captions)
                 assert len({rect.right() for rect in captions}) == 1, (context, captions)
+                assert all(options.contains(rect) for rect in captions), context
                 assert template_rect.top() > previous.bottom(), context
                 for container, children in (
                         (settings.game_template_actions, (settings.game_template_label, settings.game_template_controls)),

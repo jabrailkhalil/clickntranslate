@@ -147,6 +147,7 @@ from languages import (
     get_language,
     language_code_from_name,
     language_display_name,
+    language_icon_path,
     language_names,
     supports_auto_source,
     valid_translation_source,
@@ -3013,6 +3014,15 @@ def document_expand_icon(theme_name):
     painter.drawLine(19, 19, 19, 15)
     painter.end()
     return QIcon(pixmap)
+
+
+def _apply_language_flags(combo, interface_language):
+    """Decorate the existing rows without changing their text or selection."""
+    combo.setIconSize(QtCore.QSize(20, 20))
+    for index in range(combo.count()):
+        code = combo.itemData(index) or language_code_from_name(combo.itemText(index), interface_language)
+        path = language_icon_path(code)
+        combo.setItemIcon(index, QIcon(resource_path(path)) if path else QIcon())
 
 
 def clipboard_copy_icon(theme_name):
@@ -11312,6 +11322,8 @@ class DarkThemeApp(QMainWindow):
             self.target_lang.setCurrentText(
                 language_display_name(target_code, self.current_interface_language)
             )
+            _apply_language_flags(self.source_lang, self.current_interface_language)
+            _apply_language_flags(self.target_lang, self.current_interface_language)
         finally:
             self.source_lang.blockSignals(False)
             self.target_lang.blockSignals(False)
@@ -11424,6 +11436,7 @@ class DarkThemeApp(QMainWindow):
             target_combo.addItem(
                 language_display_name(code, self.current_interface_language), code
             )
+        _apply_language_flags(target_combo, self.current_interface_language)
         if preferred_target not in targets and targets:
             preferred_target = targets[0]
         target_combo.setCurrentIndex(
@@ -11459,6 +11472,7 @@ class DarkThemeApp(QMainWindow):
                 source_combo.addItem(
                     language_display_name(code, self.current_interface_language), code
                 )
+            _apply_language_flags(source_combo, self.current_interface_language)
             if source not in source_codes and source_codes:
                 source = source_codes[0]
             source_combo.setCurrentIndex(
@@ -14832,6 +14846,7 @@ class DarkThemeApp(QMainWindow):
         try:
             self.target_lang.clear()
             self.target_lang.addItems(available_targets)
+            _apply_language_flags(self.target_lang, self.current_interface_language)
             if target_name in available_targets:
                 self.target_lang.setCurrentText(target_name)
             elif available_targets:
