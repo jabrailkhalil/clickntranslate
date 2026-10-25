@@ -24,6 +24,64 @@ def assert_flags(window):
         assert combo.count() > 0
 
 
+def assert_pair_flags(dialog, locale):
+    for combo in (dialog.source_combo, dialog.target_combo):
+        assert combo.count() > 0
+        assert combo.iconSize() == QtCore.QSize(20, 20)
+        for row in range(combo.count()):
+            code = combo.itemData(row) or language_code_from_name(combo.itemText(row), locale)
+            if code == 'auto':
+                assert combo.itemIcon(row).isNull()
+            else:
+                assert not combo.itemIcon(row).isNull(), (locale, type(dialog).__name__, code)
+            assert combo.itemText(row) == language_display_name(code, locale)
+
+
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_result_document_and_pair_editor_keep_flags_after_repopulation(window, app, locale):
+    window.config['translator_engine'] = 'Google'
+    window.set_interface_language(locale)
+    result = main.TranslationResultDialog(window, 'Translation', auto_copy=False, lang=locale,
+                                         source_text='Source', source_lang='en', target_lang='ar')
+    document = main.DocumentTranslationDialog(window)
+    pair = main.HotkeyLanguageDialog(window)
+    try:
+        for theme in ('Темная', 'Светлая'):
+            if window.current_theme != theme:
+                window.toggle_theme()
+            result.refresh_theme(theme)
+            document.refresh_theme(theme)
+            pair._apply_theme()
+            with mock.patch.object(result, '_start_retranslate'):
+                result.source_combo.setCurrentIndex(result.source_combo.findData('ru'))
+                result._fill_target_combo('ar')
+            result.refresh_language(locale)
+            document.refresh_language(locale)
+            document._refresh_document_provider_languages()
+            for mode in main.HOTKEY_LANGUAGE_MODES:
+                pair.mode_combo.setCurrentIndex(pair.mode_combo.findData(mode))
+                pair._load_mode()
+                assert_pair_flags(pair, locale)
+            assert_pair_flags(result, locale)
+            assert_pair_flags(document, locale)
+        # Language changes clear and rebuild the document fields too.
+        other = 'ar' if locale != 'ar' else 'en'
+        result.refresh_language(other)
+        document.refresh_language(other)
+        assert_pair_flags(result, other)
+        assert_pair_flags(document, other)
+        result.show()
+        app.processEvents()
+        for combo in (result.source_combo, result.target_combo):
+            assert not combo.grab().isNull()
+    finally:
+        for dialog in (result, document, pair):
+            dialog.close()
+            dialog.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()
+
+
 @pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_main_flags_survive_pair_modes_themes_and_returning_from_settings(window, app, locale):
     with mock.patch('ocr.installed_ocr_language_codes',return_value=['en','ru']):

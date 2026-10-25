@@ -7189,6 +7189,7 @@ class TranslationResultDialog(QDialog):
             self.source_combo.addItem(language_display_name('auto', self.lang), 'auto')
         for language in APP_LANGUAGES:
             self.source_combo.addItem(language.display_name(self.lang), language.code)
+        _apply_language_flags(self.source_combo, self.lang)
         self.source_combo.setCurrentIndex(self.source_combo.findData(self.source_code))
         self.target_combo = self._language_combo()
         self._fill_target_combo(self.target_code)
@@ -7712,6 +7713,7 @@ class TranslationResultDialog(QDialog):
         self.target_combo.clear()
         for code in codes:
             self.target_combo.addItem(language_display_name(code, self.lang), code)
+        _apply_language_flags(self.target_combo, self.lang)
         self.target_combo.setCurrentIndex(max(0, self.target_combo.findData(preferred_code)))
         self.target_code = self.target_combo.currentData() or preferred_code
         del blocker
@@ -9044,12 +9046,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if source_code == 'auto' and supports_auto_source(self._provider_engine()):
             self.source_combo.insertItem(0, language_display_name('auto', self.lang), 'auto')
         self._set_combo_to_language_code(self.source_combo, source_code)
+        _apply_language_flags(self.source_combo, self.lang)
         self.source_combo.blockSignals(False)
 
         self.target_combo.blockSignals(True)
         self.target_combo.clear()
         self.target_combo.addItems(LANGUAGES[self.lang])
         self._set_combo_to_language_code(self.target_combo, target_code)
+        _apply_language_flags(self.target_combo, self.lang)
         self.target_combo.blockSignals(False)
 
         self.provider_field_label.setText(doc_text(self.lang, "provider"))
@@ -9505,6 +9509,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self.source_combo.clear()
             for code in source_codes:
                 self.source_combo.addItem(language_display_name(code, self.lang), code)
+            _apply_language_flags(self.source_combo, self.lang)
             if previous_source in source_codes:
                 source_code = previous_source
             elif configured_source in source_codes:
@@ -9530,6 +9535,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self.target_combo.clear()
             for code in target_codes:
                 self.target_combo.addItem(language_display_name(code, self.lang), code)
+            _apply_language_flags(self.target_combo, self.lang)
             if previous_target not in target_codes and target_codes:
                 previous_target = target_codes[0]
             target_index = self.target_combo.findData(previous_target)
@@ -10558,6 +10564,7 @@ class HotkeyLanguageDialog(QDialog):
             self.source_combo.clear()
             for code in source_codes:
                 self.source_combo.addItem(language_display_name(code, self.lang), code)
+            _apply_language_flags(self.source_combo, self.lang)
             if source not in source_codes and source_codes:
                 source = source_codes[0]
             self.source_combo.setCurrentIndex(
@@ -10592,6 +10599,7 @@ class HotkeyLanguageDialog(QDialog):
         self.target_combo.clear()
         for code in targets:
             self.target_combo.addItem(language_display_name(code, self.lang), code)
+        _apply_language_flags(self.target_combo, self.lang)
         if preferred not in targets and targets:
             preferred = targets[0]
         self.target_combo.setCurrentIndex(
