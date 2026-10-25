@@ -5,7 +5,6 @@ columns and visible paragraph gaps remain separate translation blocks.
 """
 import math
 import re
-import unicodedata
 
 
 _LIST_START = re.compile(r'^\s*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
@@ -84,32 +83,31 @@ def _union(rows, text):
 
 def _visual_rows(rows):
     """Join adjacent word fragments, leaving a column gutter untouched."""
-    groups = []
-    active = []
-    for row in sorted(rows, key=lambda r: (r[1], r[0])):
-        x, y, w, h, text = row
-        active = [entry for entry in active if entry[1][1]+entry[1][3]>=y]
-        for entry in reversed(active):
-            group, bounds = entry
-            left, top, width, height, _ = bounds
-            overlap = min(y+h, top+height)-max(y, top)
-            gap = max(0, max(left, x)-min(left+width, x+w))
-            if overlap >= .6*min(h, height) and gap <= .9*max(h, height):
-                group.append(row)
-                entry[1] = _union([bounds, row], '')
-                break
-        else:
-            group=[row]
-            groups.append(group)
-            active.append([group,row])
+    from ocr_text_layout import ocr_visual_lines, inline_reading_order
+    # Group baselines first, then traverse by x. Sorting by the tops of tilted
+    # word boxes used to leave two disconnected fragments when the bridging
+    # word arrived later, and the paragraph reader mistook them for columns.
+    items = [([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], text, row)
+             for row in rows for x,y,w,h,text in (row,)]
+    groups=[]
+    for visual_line in ocr_visual_lines(items):
+        current=[]
+        right=None
+        previous_height=0
+        for item in visual_line:
+            row=item[2]
+            x,y,w,h,_text=row
+            if current and x-right > .9*max(h,previous_height):
+                groups.append(current)
+                current=[]
+            current.append(row)
+            right=max(right if right is not None else x,x+w)
+            previous_height=h
+        if current:
+            groups.append(current)
     result=[]
     for group in groups:
-        ordered=sorted(group, key=lambda r:r[0])
-        # Most engines return whole lines in logical order. Only the order of
-        # separately detected word boxes needs adjustment for RTL source text.
-        directions=[unicodedata.bidirectional(c) for r in ordered for c in r[4]]
-        if sum(d in {'R','AL'} for d in directions) > directions.count('L'):
-            ordered.reverse()
+        ordered = inline_reading_order(group, position=lambda row: row[0], text=lambda row: row[4])
         text=' '.join(r[4] for r in ordered)
         result.append(_union(group,text))
     return sorted(result,key=lambda r:(r[1],r[0]))

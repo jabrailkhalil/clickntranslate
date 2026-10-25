@@ -49,6 +49,15 @@ def test_real_paragraph_gaps_and_two_book_pages_keep_their_reading_order():
     assert all(w<500 for x,y,w,h,text in blocks)
 
 
+def test_tilted_word_boxes_are_joined_before_the_column_reader_runs():
+    # The middle word arrives last when boxes are sorted by their top edge.
+    # It bridges both earlier fragments; neither fragment is a separate column.
+    rectangles = [(0,0,14,20,'A'), (40,0,14,20,'C'), (20,1,14,20,'B'),
+                  (0,28,14,20,'D'), (40,28,14,20,'F'), (20,29,14,20,'E')]
+    assert paragraph_text(rectangles) == 'A B C D E F'
+    assert ocr_text_from_items(items(rectangles), join_paragraphs=True) == 'A B C D E F'
+
+
 def test_list_items_and_blank_lines_are_not_flattened():
     assert merge_text_lines('A wrapped\nparagraph.\n\n1. First item\ncontinues\n2. Second item')==(
         'A wrapped paragraph.\n\n1. First item continues\n\n2. Second item')

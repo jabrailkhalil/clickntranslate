@@ -27,6 +27,8 @@ pyobjc-framework-CoreMedia==11.1
 pyobjc-framework-ScreenCaptureKit==11.1
 
 # Bundled in the isolated worker. This ONNX version has Intel AND arm64 wheels.
-rapidocr-onnxruntime==1.4.4
+rapidocr[rtl]==3.10.0
+# Newer Intel OpenCV wheels require macOS 14; retain the macOS 13 floor.
+opencv-python-headless==4.12.0.88
 onnxruntime==1.23.2
 keyring

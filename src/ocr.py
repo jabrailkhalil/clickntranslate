@@ -20,7 +20,7 @@ from settings_window import LanguageSwapButton
 from capture_widgets import CaptureLanguageCombo as DropDownCombo
 from assistant_motion import notify_current_activity
 from window_appearance import style_capture_controls
-from ocr_text_layout import order_ocr_items, ocr_text_from_items
+from ocr_text_layout import order_ocr_items, ocr_text_from_items, windows_line_text
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox
@@ -1341,6 +1341,7 @@ def _recognize_with_native_ocr_worker(
             "engine": engine,
             "root_dir": root_dir,
             "language_codes": language_codes,
+            "language_code": language_code,
             # Recognition must never trigger a model download. Optional OCR
             # packages are prepared explicitly from Settings > Language packages.
             "allow_download": False,
@@ -1509,9 +1510,9 @@ def rapidocr_importable():
 
 
 @_serialized_native_ocr_runtime
-def _get_rapidocr_engine():
-    global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR
-    if _RAPID_OCR_ENGINE is not None:
+def _get_rapidocr_engine(language_code='en'):
+    global _RAPID_OCR_ENGINE, _RAPID_OCR_IMPORT_ERROR, _RAPID_OCR_ENGINE_LANGUAGE
+    if _RAPID_OCR_ENGINE is not None and globals().get('_RAPID_OCR_ENGINE_LANGUAGE') == language_code:
         return _RAPID_OCR_ENGINE
 
     _ensure_rapidocr_local_paths()
@@ -1531,27 +1532,16 @@ def _get_rapidocr_engine():
         logging.error(f"RapidOCR is not available: {_RAPID_OCR_IMPORT_ERROR}")
         return None
 
-    init_attempts = (
-        {"text_score": 0.35, "print_verbose": False},
-        {"print_verbose": False},
-        {},
-    )
-    for kwargs in init_attempts:
-        try:
-            _RAPID_OCR_ENGINE = rapid_cls(**kwargs)
-            _RAPID_OCR_IMPORT_ERROR = None
-            logging.info(f"RapidOCR engine initialized with args={kwargs}")
-            return _RAPID_OCR_ENGINE
-        except TypeError:
-            continue
-        except Exception as exc:
-            _RAPID_OCR_IMPORT_ERROR = str(exc)
-            logging.exception(f"RapidOCR initialization failed with args={kwargs}: {exc}")
-            return None
-
-    _RAPID_OCR_IMPORT_ERROR = "RapidOCR constructor signature is unsupported"
-    logging.error(_RAPID_OCR_IMPORT_ERROR)
-    return None
+    try:
+        from rapidocr_models import create_engine
+        _RAPID_OCR_ENGINE = create_engine(rapid_cls, language_code, _rapidocr_local_root())
+        _RAPID_OCR_ENGINE_LANGUAGE = language_code
+        _RAPID_OCR_IMPORT_ERROR = None
+        return _RAPID_OCR_ENGINE
+    except Exception as exc:
+        _RAPID_OCR_IMPORT_ERROR = str(exc)
+        logging.exception('RapidOCR initialization failed for %s', language_code)
+        return None
 
 
 def rapidocr_available():
@@ -1618,17 +1608,18 @@ def _parse_rapidocr_output(output):
     return order_ocr_items(items)
 
 
-def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None, join_paragraphs=False):
+def _recognize_rapidocr_variants(pil_variants, context, session_id, cancel_check=None, join_paragraphs=False, language_code='en'):
     if _native_ocr_worker_enabled():
         try:
             return _recognize_with_native_ocr_worker(
                 "rapidocr", pil_variants, context, session_id,
                 join_paragraphs=join_paragraphs,
+                language_code=language_code,
             )
         except Exception as exc:
             _log_ocr_exception(f"[OCR:{session_id}] RapidOCR worker failed", exc)
             return "", "rapidocr_unavailable"
-    engine = _get_rapidocr_engine()
+    engine = _get_rapidocr_engine(language_code)
     if engine is None:
         return "", "rapidocr_unavailable"
     auto_candidates = []
@@ -2160,13 +2151,24 @@ def _easyocr_installed_language_codes():
 
 
 def _rapidocr_installed_language_codes():
+    from rapidocr_models import installed_languages
+    root = _rapidocr_local_root()
+    modern = installed_languages(root)
+    backend_present = _python_package_file_present(
+        _rapidocr_local_candidate_paths(root) + list(sys.path), ('rapidocr',))
+    bundled = getattr(sys, 'frozen', False) and os.path.isfile(_native_ocr_worker_path())
+    if modern and (backend_present or bundled):
+        return [code for code in modern if code in APP_LANGUAGE_CODES]
+    if backend_present or (bundled and os.path.isdir(os.path.join(str(getattr(sys, '_MEIPASS', '')), 'rapidocr'))):
+        # A modern backend without its explicit assets must be repaired; do not
+        # advertise its upstream default (which can change between versions).
+        return []
     if getattr(sys, "frozen", False):
         bundled_worker = _native_ocr_worker_path()
         if os.path.isfile(bundled_worker):
             # ClicknTranslate.spec embeds RapidOCR, ONNX Runtime and the shared
             # English/Chinese PP-OCR models in this isolated worker.
             return [code for code in ("en", "zh") if code in APP_LANGUAGE_CODES]
-    root = _rapidocr_local_root()
     if not _python_package_file_present(
         _rapidocr_local_candidate_paths(root),
         ("rapidocr", "rapidocr_onnxruntime"),
@@ -2780,8 +2782,7 @@ def _windows_ocr_result_to_text(recognized, *, join_paragraphs=False):
     positioned = []
     for line in lines:
         try:
-            words = list(line.words)
-            line_text = " ".join(str(word.text) for word in words if str(word.text).strip())
+            line_text = windows_line_text(line)
             if not line_text:
                 line_text = str(line.text or "")
         except Exception:
@@ -3344,11 +3345,7 @@ class OCRWorker(QtCore.QThread):
                 lines_text = []
                 for line in lines:
                     try:
-                        words = list(line.words)
-                        if words:
-                            line_text = " ".join(word.text for word in words)
-                        else:
-                            line_text = line.text
+                        line_text = windows_line_text(line)
                     except Exception:
                         line_text = line.text
                     lines_text.append(line_text)
@@ -3720,6 +3717,7 @@ class RapidOCRWorker(QtCore.QThread):
                     self.session_id,
                     cancel_check=self._is_cancelled,
                     join_paragraphs=getattr(self, 'join_paragraphs', False),
+                    language_code=getattr(self, 'language_code', 'en'),
                 )
                 self.failure_reason = failure_reason or None
         except Exception as e:
@@ -5238,12 +5236,13 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
         self.ocr_worker.start()
 
-    def _start_rapidocr_worker(self, pil_variants, context, session_id):
+    def _start_rapidocr_worker(self, pil_variants, context, session_id, language_code='en'):
         self.ocr_worker = RapidOCRWorker(
             pil_variants,
             context,
             session_id,
         )
+        self.ocr_worker.language_code = language_code
         self._ocr_worker_session_id = session_id
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
@@ -5610,7 +5609,7 @@ class ScreenCaptureOverlay(QWidget):
                 (label, image.convert("RGB") if image.mode != "RGB" else image)
                 for label, image in ocr_pil_variants
             ]
-            self._start_rapidocr_worker(rapid_variants, "primary", session_id)
+            self._start_rapidocr_worker(rapid_variants, "primary", session_id, language_code=language_code)
             return  # RapidOCR сам делает text detection + recognition и возвращает confidence
 
         if ocr_engine_type in {"easyocr", "easy", "apple vision"}:
@@ -6251,7 +6250,8 @@ def _recognize_image_layout(image, engine, language_code):
         response = _call_native_ocr_worker(
             {"engine": engine, "action": "recognize", "allow_download": False,
              "root_dir": _rapidocr_local_root() if engine == "rapidocr" else _easyocr_local_root(),
-             "language_codes": easyocr_language_codes(language_code) if engine == "easyocr" else []},
+             "language_codes": easyocr_language_codes(language_code) if engine == "easyocr" else [],
+             "language_code": language_code},
             pil_variants=[("fullscreen", image)])
         result = (response.get("results") or [{}])[0]
         if result.get("error"):
@@ -6291,7 +6291,7 @@ def _windows_ocr_lines_in_image(recognized, width, height):
         bounds = QtCore.QRectF(boxes[0])
         for box in boxes[1:]:
             bounds = bounds.united(box)
-        text = " ".join(word.text for word in words).strip()
+        text = windows_line_text(line).strip()
         if text:
             lines.append((*bounds.getRect(), text))
     logging.info("Windows OCR layout: angle=%.3f, image=%sx%s, lines=%s", angle, width, height, len(lines))

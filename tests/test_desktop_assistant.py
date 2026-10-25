@@ -230,13 +230,16 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
         assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()
         assert 'background:' in menu.buttons['text'].styleSheet()
-        if sys.platform != 'darwin':
-            assert not menu.mask().contains(QtCore.QPoint(0, 0))
-            assert menu.mask().contains(menu.rect().center())
-        else:
-            image = menu.grab().toImage()
-            assert image.pixelColor(0, 0).alpha() < 20
-            assert image.pixelColor(image.width()//2, image.height()//2).alpha() > 240
+        # Windows and Cocoa deliberately use alpha painting without a binary
+        # QRegion: a region clips antialiased borders at fractional DPI. Verify
+        # the rendered surface on every platform, including all four corners.
+        image = menu.grab().toImage()
+        width, height = image.width(), image.height()
+        for x, y in ((0, 0), (width-1, 0), (0, height-1), (width-1, height-1)):
+            assert image.pixelColor(x, y).alpha() < 20
+        assert image.pixelColor(width//2, height//2).alpha() > 240
+        for x, y in ((width//2, 0), (0, height//2), (width-1, height//2), (width//2, height-1)):
+            assert image.pixelColor(x, y).alpha() > 180
         requested = []
         menu.action_requested.connect(requested.append)
         menu.buttons['screen'].click()

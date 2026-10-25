@@ -154,9 +154,11 @@ def _stdlib_hiddenimports():
 # GUI startup path free of ONNX/OpenCV imports. EasyOCR remains an optional
 # runtime because its torch payload is substantially larger.
 ocr_worker_datas = collect_data_files(
-    'rapidocr_onnxruntime',
-    includes=['**/*.onnx', '**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
+    'rapidocr',
+    includes=['**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
 )
+from rapidocr_models import bundled_model_data
+ocr_worker_datas += bundled_model_data(_PROJECT_ROOT)
 ocr_worker_binaries = []
 ocr_worker_hiddenimports = [
     'timeit',
@@ -180,11 +182,14 @@ ocr_worker_hiddenimports = [
     'pstats',
     'configparser',
 ]
-ocr_worker_hiddenimports += collect_submodules('rapidocr_onnxruntime')
+ocr_worker_hiddenimports += collect_submodules('rapidocr', filter=lambda name:
+    not name.startswith(('rapidocr.inference_engine.pytorch', 'rapidocr.inference_engine.paddle',
+                         'rapidocr.inference_engine.tensorrt', 'rapidocr.inference_engine.openvino',
+                         'rapidocr.inference_engine.mnn')))
 ocr_worker_hiddenimports += [
     'PIL',
     'numpy',
-    'rapidocr_onnxruntime',
+    'rapidocr', 'omegaconf', 'colorlog', 'bidi.algorithm',
     'onnxruntime',
     'cv2',
     'pyclipper',

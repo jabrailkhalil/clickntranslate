@@ -1149,7 +1149,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             self.assertNotIn("zh", easy_codes)
 
             rapid_root = Path(root, "rapid")
-            rapid_package = rapid_root / "site-packages" / "rapidocr"
+            rapid_package = rapid_root / "site-packages" / "rapidocr_onnxruntime"
             rapid_package.mkdir(parents=True)
             rapid_package.joinpath("__init__.py").write_text("", encoding="utf-8")
             with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)):
@@ -1157,6 +1157,21 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                     ocr.installed_ocr_language_codes("RapidOCR", {}),
                     ["en", "zh"],
                 )
+                # The new package has per-script PP-OCRv5 assets. An importable
+                # backend alone must not advertise its upstream default model.
+                modern = rapid_package.parent / 'rapidocr'
+                modern.mkdir()
+                (modern / '__init__.py').write_text('', encoding='utf8')
+                self.assertEqual(ocr.installed_ocr_language_codes('RapidOCR', {}), [])
+                from rapidocr_models import MODEL_ASSETS
+                model_root = rapid_root / 'models' / 'ppocrv5'
+                model_root.mkdir(parents=True)
+                for relative, size, _sha in MODEL_ASSETS.values():
+                    with (model_root / Path(relative).name).open('wb') as output:
+                        output.truncate(size)
+                available = set(ocr.installed_ocr_language_codes('RapidOCR', {}))
+                self.assertTrue({'en','ru','ar','zh','de'} <= available)
+                self.assertNotIn('hi', available)
 
     def test_frozen_build_exposes_rapidocr_bundled_in_worker(self):
         with tempfile.TemporaryDirectory() as root:

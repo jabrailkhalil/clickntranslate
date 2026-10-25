@@ -29,6 +29,7 @@ import base64
 import importlib.util
 from pathlib import Path
 from package_installation import install_directory
+from rapidocr_models import RAPIDOCR_VERSION
 from urllib.parse import urlparse
 try:
     import winreg
@@ -148,7 +149,7 @@ HYMT_NOTICE_TEXT = (
 HYMT_ENGINE_KEY = "hymt"
 HYMT_ENGINE_DISPLAY = "Hy-MT"
 RAPIDOCR_ENGINE_DISPLAY = "RapidOCR"
-RAPIDOCR_PIP_PACKAGES = ("rapidocr-onnxruntime==1.4.4",)
+RAPIDOCR_PIP_PACKAGES = (f"rapidocr[rtl]=={RAPIDOCR_VERSION}",)
 EASYOCR_ENGINE_DISPLAY = "EasyOCR"
 EASYOCR_PYTHON_VERSION = "3.12.10"
 EASYOCR_PYTHON_ARCHIVE = f"python-{EASYOCR_PYTHON_VERSION}-embed-amd64.zip"
@@ -1432,81 +1433,75 @@ OCR_DETAIL_TEXT = {
     "en": {
         "windows": "Built into Windows. Fast for regular interface text; languages are installed in Language packages.",
         "tesseract": "Local classic OCR. Broad language support and predictable offline recognition.",
-        "rapidocr": "Local neural OCR optimized for text blocks and orientation; bundled model supports Chinese and English.",
+        "rapidocr": 'PP-OCRv5 runs locally. Installation includes English, Cyrillic, Arabic, Latin and Chinese models. The recognition language selects the model; no download starts during OCR.',
         "easyocr": "Local neural OCR for difficult images and multiple scripts; selected language models must be installed first.",
     },
     "ru": {
         "windows": "Встроен в Windows. Быстрый для обычного текста интерфейса; языки ставятся в разделе «Языковые пакеты».",
         "tesseract": "Классический локальный OCR. Много языков и предсказуемое офлайн-распознавание.",
-        "rapidocr": "Локальный нейросетевой OCR для блоков текста и ориентации; встроенная модель поддерживает китайский и английский.",
+        "rapidocr": 'PP-OCRv5 работает локально. Установка включает модели для английского, кириллицы, арабского, латиницы и китайского. Модель выбирается по языку распознавания; во время OCR ничего не скачивается.',
         "easyocr": "Локальный нейросетевой OCR для сложных изображений и разных письменностей; языковые модели ставятся заранее.",
     },
     "es": {
         "windows": "Integrado en Windows; rápido para texto normal. Los idiomas se instalan en Paquetes de idioma.",
         "tesseract": "OCR clásico local con muchos idiomas y funcionamiento sin conexión.",
-        "rapidocr": "OCR neuronal local para bloques y orientación; el modelo incluido admite chino e inglés.",
+        "rapidocr": 'PP-OCRv5 funciona localmente. La instalación incluye modelos para inglés y las escrituras cirílica, árabe, latina y china. El idioma de reconocimiento selecciona el modelo; no se descarga nada durante el OCR.',
         "easyocr": "OCR neuronal local para imágenes difíciles; instala antes los modelos de idioma.",
     },
     "de": {
         "windows": "In Windows integriert und schnell für normalen Text. Sprachen werden unter Sprachpakete installiert.",
         "tesseract": "Klassische lokale OCR mit vielen Sprachen und zuverlässigem Offline-Betrieb.",
-        "rapidocr": "Lokale neuronale OCR für Textblöcke und Ausrichtung; das Modell unterstützt Chinesisch und Englisch.",
+        "rapidocr": 'PP-OCRv5 arbeitet lokal. Die Installation enthält Modelle für Englisch, Kyrillisch, Arabisch, Lateinisch und Chinesisch. Die Erkennungssprache bestimmt das Modell; während der OCR wird nichts heruntergeladen.',
         "easyocr": "Lokale neuronale OCR für schwierige Bilder; Sprachmodelle müssen vorher installiert werden.",
     },
     "fr": {
         "windows": "Intégré à Windows et rapide pour le texte courant. Les langues s’installent dans Modules de langue.",
         "tesseract": "OCR local classique avec de nombreuses langues et un fonctionnement hors ligne fiable.",
-        "rapidocr": "OCR neuronal local pour les blocs et l’orientation ; le modèle inclus prend en charge le chinois et l’anglais.",
+        "rapidocr": 'PP-OCRv5 fonctionne localement. L’installation comprend des modèles anglais, cyrillique, arabe, latin et chinois. La langue de reconnaissance détermine le modèle ; aucun téléchargement ne démarre pendant l’OCR.',
         "easyocr": "OCR neuronal local pour les images difficiles ; installez d’abord les modèles de langue.",
     },
     "zh": {
         "windows": "Windows 内置，适合普通界面文字；语言可在“语言包”中安装。",
         "tesseract": "经典本地 OCR，支持多种语言，可离线稳定运行。",
-        "rapidocr": "用于文本块和方向检测的本地神经 OCR；内置模型支持中文和英文。",
+        "rapidocr": 'PP-OCRv5 在本地运行。安装时会下载英语、西里尔文、阿拉伯文、拉丁文和中文模型，并根据识别语言选择模型。识别过程中不会下载文件。',
         "easyocr": "适合复杂图像和多种文字的本地神经 OCR；需提前安装语言模型。",
     },
 
     'pt': {'windows': 'Integrado em Windows. Rápido para texto normal da interface; idiomas são instalados '
                 'em pacotes de idiomas.',
      'tesseract': 'OCR clássico local. Amplo suporte a idiomas e reconhecimento offline previsível.',
-     'rapidocr': 'OCR neural local otimizado para blocos de texto e orientação; o modelo incluído '
-                 'suporta chinês e inglês.',
+     'rapidocr': 'O PP-OCRv5 funciona localmente. A instalação inclui modelos para inglês e as escritas cirílica, árabe, latina e chinesa. O idioma de reconhecimento seleciona o modelo; nada é baixado durante o OCR.',
      'easyocr': 'OCR neural local para imagens difíceis e vários scripts; os modelos de idioma '
                 'selecionados devem ser instalados primeiro.'},
     'it': {'windows': "Integrato in Windows. Veloce per il testo dell'interfaccia normale; le lingue sono "
                 'installate nei pacchetti lingua.',
      'tesseract': 'OCR classico locale. Ampio supporto linguistico e riconoscimento offline '
                   'prevedibile.',
-     'rapidocr': 'OCR neurale locale ottimizzato per blocchi di testo e orientamento; il modello in '
-                 'bundle supporta cinese e inglese.',
+     'rapidocr': 'PP-OCRv5 funziona in locale. L’installazione include modelli per inglese e scritture cirillica, araba, latina e cinese. La lingua di riconoscimento seleziona il modello; durante l’OCR non viene scaricato nulla.',
      'easyocr': 'OCR neurale locale per immagini difficili e script multipli; i modelli linguistici '
                 'selezionati devono essere installati per primi.'},
 
     'ar': {'windows': 'مدمج في Windows. سريع للنص المعتاد في الواجهات؛ تُثبّت اللغات من حزم اللغات.',
      'tesseract': 'محرك تعرف تقليدي محلي. يدعم لغات كثيرة ويعمل دون اتصال.',
-     'rapidocr': 'محرك تعرف عصبي محلي محسّن لكتل النص واتجاهه؛ يدعم النموذج المرفق الصينية '
-                 'والإنجليزية.',
+     'rapidocr': 'يعمل PP-OCRv5 محليًا. يتضمن التثبيت نماذج للإنجليزية والسيريلية والعربية واللاتينية والصينية. تُختار النماذج وفق لغة التعرف؛ لا يبدأ تنزيل أثناء التعرف على النص.',
      'easyocr': 'محرك تعرف عصبي محلي للصور الصعبة وأنظمة الكتابة المتعددة؛ يجب تثبيت نماذج اللغات '
                 'المختارة أولًا.'},
 
     'tr': {'windows': "Windows'a yerleşiktir. Arayüz metninde hızlıdır; diller Dil paketleri bölümünden "
                 'kurulur.',
      'tesseract': 'Yerel klasik OCR. Geniş dil desteği ve tutarlı çevrimdışı tanıma.',
-     'rapidocr': 'Metin blokları ve yönü için optimize yerel sinirsel OCR; paket modeli Çince ve '
-                 'İngilizceyi destekler.',
+     'rapidocr': 'PP-OCRv5 yerel olarak çalışır. Kurulum İngilizce, Kiril, Arap, Latin ve Çin yazıları için modeller içerir. Model, tanıma diline göre seçilir; OCR sırasında indirme yapılmaz.',
      'easyocr': 'Zor görüntüler ve farklı alfabeler için yerel sinirsel OCR; önce seçili dil modelleri '
                 'kurulmalıdır.'},
     'hi': {'windows': 'Windows में शामिल। सामान्य इंटरफ़ेस टेक्स्ट में तेज़; भाषाएँ भाषा पैकेज से इंस्टॉल '
                 'करें।',
      'tesseract': 'स्थानीय पारंपरिक OCR। कई भाषाएँ और भरोसेमंद ऑफ़लाइन पहचान।',
-     'rapidocr': 'टेक्स्ट खंड और दिशा के लिए स्थानीय न्यूरल OCR; शामिल मॉडल चीनी और अंग्रेज़ी पढ़ता '
-                 'है।',
+     'rapidocr': 'PP-OCRv5 स्थानीय रूप से चलता है। स्थापना में अंग्रेज़ी, सिरिलिक, अरबी, लैटिन और चीनी मॉडल शामिल हैं। पहचान की भाषा के अनुसार मॉडल चुना जाता है; OCR के दौरान कुछ डाउनलोड नहीं होता।',
      'easyocr': 'कठिन इमेज और कई लिपियों के लिए स्थानीय न्यूरल OCR; पहले चुनी भाषा के मॉडल इंस्टॉल '
                 'करें।'},
     'id': {'windows': 'Bawaan Windows. Cepat untuk teks antarmuka biasa; bahasa dipasang di Paket bahasa.',
      'tesseract': 'OCR klasik lokal. Dukungan bahasa luas dan pengenalan luring yang konsisten.',
-     'rapidocr': 'OCR neural lokal untuk blok teks dan orientasi; model bawaan mendukung Mandarin dan '
-                 'Inggris.',
+     'rapidocr': 'PP-OCRv5 berjalan secara lokal. Instalasi mencakup model Inggris, Kiril, Arab, Latin, dan Mandarin. Model dipilih sesuai bahasa pengenalan; tidak ada unduhan selama OCR.',
      'easyocr': 'OCR neural lokal untuk gambar sulit dan berbagai aksara; model bahasa pilihan harus '
                 'dipasang dahulu.'},
 }
@@ -4441,7 +4436,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "Tesseract is not installed. Install it with your package manager:\n\n{command}",
         "manual_hymt_hint": "Automatic Hy-MT installation is available on Windows and macOS.\n\nPut the {model} model and a llama.cpp runner ({runners}) in:\n{directory}",
         "easyocr_prompt": "EasyOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet and about 1 GB of free disk space. The app downloads its own private installer runtime; you do not need to install Python. Language models are downloaded on first recognition. Packages will be saved to ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR is not installed locally. Install the neural OCR engine into the app folder?\n\nThis needs internet. The app downloads its own private installer runtime; you do not need to install Python. Packages will be saved to ocr\\rapidocr, and models will be cached there on first recognition.",
+        "rapidocr_prompt": 'Install RapidOCR and PP-OCRv5 models in the app folder? Internet is required for installation. Python does not need to be installed separately.',
         "hymt_prompt": "The local Hy-MT model is not installed. Download and install the offline translation package?\n\nAbout 1.2 GB will be downloaded: the Hy-MT model and local llama.cpp runtime.",
         "preparing": "Preparing {engine} install...", "downloading_packages": "Downloading and installing {engine} packages...",
         "downloading_engine": "Downloading {engine}...", "extracting_engine": "Extracting {engine}...",
@@ -4461,7 +4456,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "Tesseract не найден. Установите его через пакетный менеджер:\n\n{command}",
         "manual_hymt_hint": "Автоматическая установка Hy-MT доступна в Windows и macOS.\n\nПоложите модель {model} и исполняемый файл llama.cpp ({runners}) в папку:\n{directory}",
         "easyocr_prompt": "EasyOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет и около 1 ГБ свободного места. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Языковые модели загрузятся при первом распознавании. Пакеты будут сохранены в ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR не установлен локально. Установить нейросетевой OCR в папку программы?\n\nПонадобится интернет. Программа сама загрузит изолированную среду установки — отдельно ставить Python не нужно. Пакеты будут сохранены в ocr\\rapidocr, модели будут кешироваться там же при первом распознавании.",
+        "rapidocr_prompt": 'Установить RapidOCR и модели PP-OCRv5 в папку программы? Для установки потребуется интернет. Отдельно устанавливать Python не нужно.',
         "hymt_prompt": "Локальная модель Hy-MT не установлена. Скачать и установить офлайн-пакет перевода?\n\nБудет скачано около 1,2 ГБ: модель Hy-MT и локальный runtime llama.cpp.",
         "preparing": "Подготовка установки {engine}...", "downloading_packages": "Загрузка и установка пакетов {engine}...",
         "downloading_engine": "Загрузка {engine}...", "extracting_engine": "Распаковка {engine}...",
@@ -4481,7 +4476,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "Tesseract no está instalado. Instálalo con el gestor de paquetes:\n\n{command}",
         "manual_hymt_hint": "La instalación automática de Hy-MT está disponible en Windows y macOS.\n\nColoca el modelo {model} y un ejecutable de llama.cpp ({runners}) en:\n{directory}",
         "easyocr_prompt": "EasyOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet y aproximadamente 1 GB de espacio libre. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los modelos de idioma se descargan durante el primer reconocimiento. Los paquetes se guardarán en ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR no está instalado localmente. ¿Instalar el motor OCR neuronal en la carpeta de la aplicación?\n\nSe necesita internet. La aplicación descarga su propio entorno de instalación; no necesitas instalar Python. Los paquetes se guardarán en ocr\\rapidocr y los modelos se almacenarán allí durante el primer reconocimiento.",
+        "rapidocr_prompt": '¿Instalar RapidOCR y los modelos PP-OCRv5 en la carpeta de la aplicación? La instalación requiere internet. No es necesario instalar Python por separado.',
         "hymt_prompt": "El modelo local Hy-MT no está instalado. ¿Descargar e instalar el paquete de traducción sin conexión?\n\nSe descargarán aproximadamente 1,2 GB: el modelo Hy-MT y el runtime local de llama.cpp.",
         "preparing": "Preparando la instalación de {engine}...", "downloading_packages": "Descargando e instalando paquetes de {engine}...",
         "downloading_engine": "Descargando {engine}...", "extracting_engine": "Extrayendo {engine}...",
@@ -4501,7 +4496,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "Tesseract ist nicht installiert. Installieren Sie es mit Ihrer Paketverwaltung:\n\n{command}",
         "manual_hymt_hint": "Die automatische Installation von Hy-MT ist unter Windows und macOS verfügbar.\n\nLegen Sie das Modell {model} und eine ausführbare llama.cpp-Datei ({runners}) in diesem Ordner ab:\n{directory}",
         "easyocr_prompt": "EasyOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür werden Internet und etwa 1 GB freier Speicherplatz benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Sprachmodelle werden bei der ersten Erkennung geladen. Die Pakete werden unter ocr\\easyocr gespeichert.",
-        "rapidocr_prompt": "RapidOCR ist nicht lokal installiert. Die neuronale OCR-Engine im App-Ordner installieren?\n\nDafür wird Internet benötigt. Die App lädt eine eigene isolierte Installationsumgebung; Python muss nicht separat installiert werden. Die Pakete werden unter ocr\\rapidocr gespeichert; Modelle werden bei der ersten Erkennung dort zwischengespeichert.",
+        "rapidocr_prompt": 'RapidOCR und PP-OCRv5-Modelle im App-Ordner installieren? Die Installation benötigt Internet. Python muss nicht separat installiert werden.',
         "hymt_prompt": "Das lokale Hy-MT-Modell ist nicht installiert. Das Offline-Übersetzungspaket herunterladen und installieren?\n\nEtwa 1,2 GB werden geladen: das Hy-MT-Modell und die lokale llama.cpp-Laufzeit.",
         "preparing": "Installation von {engine} wird vorbereitet...", "downloading_packages": "Pakete für {engine} werden heruntergeladen und installiert...",
         "downloading_engine": "{engine} wird heruntergeladen...", "extracting_engine": "{engine} wird entpackt...",
@@ -4521,7 +4516,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "Tesseract n’est pas installé. Installez-le avec votre gestionnaire de paquets :\n\n{command}",
         "manual_hymt_hint": "L’installation automatique de Hy-MT est disponible sous Windows et macOS.\n\nPlacez le modèle {model} et un exécutable llama.cpp ({runners}) dans ce dossier :\n{directory}",
         "easyocr_prompt": "EasyOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet et environ 1 Go d’espace libre sont nécessaires. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les modèles de langue sont téléchargés lors de la première reconnaissance. Les paquets seront enregistrés dans ocr\\easyocr.",
-        "rapidocr_prompt": "RapidOCR n’est pas installé localement. Installer le moteur OCR neuronal dans le dossier de l’application ?\n\nUne connexion Internet est nécessaire. L’application télécharge son propre environnement d’installation isolé ; vous n’avez pas besoin d’installer Python. Les paquets seront enregistrés dans ocr\\rapidocr et les modèles y seront mis en cache lors de la première reconnaissance.",
+        "rapidocr_prompt": 'Installer RapidOCR et les modèles PP-OCRv5 dans le dossier de l’application ? L’installation nécessite Internet. Il n’est pas nécessaire d’installer Python séparément.',
         "hymt_prompt": "Le modèle Hy-MT local n’est pas installé. Télécharger et installer le paquet de traduction hors ligne ?\n\nEnviron 1,2 Go seront téléchargés : le modèle Hy-MT et le runtime local llama.cpp.",
         "preparing": "Préparation de l’installation de {engine}...", "downloading_packages": "Téléchargement et installation des paquets de {engine}...",
         "downloading_engine": "Téléchargement de {engine}...", "extracting_engine": "Extraction de {engine}...",
@@ -4541,7 +4536,7 @@ ENGINE_TEXT = {
         "linux_tesseract_hint": "尚未安装 Tesseract。请通过软件包管理器安装：\n\n{command}",
         "manual_hymt_hint": "Windows 和 macOS 支持自动安装 Hy-MT。\n\n请将 {model} 模型和 llama.cpp 可执行文件（{runners}）放入以下文件夹：\n{directory}",
         "easyocr_prompt": "EasyOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网并预留约 1 GB 可用空间。应用会自行下载独立的安装环境，无需另外安装 Python。语言模型会在首次识别时下载。软件包将保存到 ocr\\easyocr。",
-        "rapidocr_prompt": "RapidOCR 未在本地安装。是否将神经网络 OCR 引擎安装到应用文件夹？\n\n需要联网。应用会自行下载独立的安装环境，无需另外安装 Python。软件包将保存到 ocr\\rapidocr，模型会在首次识别时缓存在同一位置。",
+        "rapidocr_prompt": '将 RapidOCR 和 PP-OCRv5 模型安装到应用文件夹？安装时需要联网，无需单独安装 Python。',
         "hymt_prompt": "本地 Hy-MT 模型尚未安装。是否下载并安装离线翻译包？\n\n将下载约 1.2 GB：Hy-MT 模型和本地 llama.cpp 运行时。",
         "preparing": "正在准备安装 {engine}...", "downloading_packages": "正在下载并安装 {engine} 软件包...",
         "downloading_engine": "正在下载 {engine}...", "extracting_engine": "正在解压 {engine}...",
@@ -4575,13 +4570,7 @@ ENGINE_TEXT = {
                        'aplicativo baixa seu próprio tempo de execução do instalador privado; você não '
                        'precisa instalar o Python. Os modelos de linguagem são baixados no primeiro '
                        'reconhecimento. Os pacotes serão salvos em ocr\\easyocr.',
-     'rapidocr_prompt': 'RapidOCR não está instalado localmente. Instalar o mecanismo de OCR neural na '
-                        'pasta do aplicativo?\n'
-                        '\n'
-                        'Isso precisa de internet. O aplicativo baixa seu próprio tempo de execução do '
-                        'instalador privado; você não precisa instalar o Python. Os pacotes serão '
-                        'salvos em ocr\\rapidocr e os modelos serão armazenados em cache lá no '
-                        'primeiro reconhecimento.',
+     'rapidocr_prompt': 'Instalar o RapidOCR e os modelos PP-OCRv5 na pasta do aplicativo? A instalação requer internet. Não é necessário instalar o Python separadamente.',
      'hymt_prompt': 'O modelo Hy-MT local não está instalado. Baixar e instalar o pacote de tradução '
                     'offline?\n'
                     '\n'
@@ -4629,13 +4618,7 @@ ENGINE_TEXT = {
                        'proprio runtime di installazione privato; non è necessario installare Python. '
                        'I modelli linguistici vengono scaricati al primo riconoscimento. I pacchetti '
                        'verranno salvati in ocr\\easyocr.',
-     'rapidocr_prompt': 'RapidOCR non è installato localmente. Installare il motore OCR neurale nella '
-                        "cartella dell'app?\n"
-                        '\n'
-                        "Questo ha bisogno di Internet. L'app scarica il proprio runtime di "
-                        'installazione privato; non è necessario installare Python. I pacchetti '
-                        'verranno salvati in ocr\\rapidocr e i modelli verranno memorizzati nella '
-                        'cache al primo riconoscimento.',
+     'rapidocr_prompt': 'Installare RapidOCR e i modelli PP-OCRv5 nella cartella dell’applicazione? L’installazione richiede Internet. Non è necessario installare Python separatamente.',
      'hymt_prompt': 'Il modello Hy-MT locale non è installato. Scaricare e installare il pacchetto di '
                     'traduzione offline?\n'
                     '\n'
@@ -4679,11 +4662,7 @@ ENGINE_TEXT = {
                        'يتطلب ذلك الإنترنت وحوالي 1 جيجابايت من المساحة الحرة. ينزّل التطبيق بيئة '
                        'تثبيت خاصة به؛ لا تحتاج إلى تثبيت Python. تُنزَّل نماذج اللغات عند أول استخدام '
                        'للتعرف على النص. ستُحفظ الحزم في ocr\\easyocr.',
-     'rapidocr_prompt': 'RapidOCR غير مثبت محليًا. هل تريد تثبيت محرك التعرف العصبي في مجلد التطبيق؟\n'
-                        '\n'
-                        'يتطلب ذلك الإنترنت. ينزّل التطبيق بيئة تثبيت خاصة به؛ لا تحتاج إلى تثبيت '
-                        'Python. ستُحفظ الحزم في ocr\\rapidocr، وتُخزَّن النماذج هناك عند أول استخدام '
-                        'للتعرف على النص.',
+     'rapidocr_prompt': 'هل تريد تثبيت RapidOCR ونماذج PP-OCRv5 في مجلد التطبيق؟ يتطلب التثبيت اتصالًا بالإنترنت. لا حاجة إلى تثبيت Python بشكل منفصل.',
      'hymt_prompt': 'نموذج Hy-MT المحلي غير مثبت. هل تريد تنزيل حزمة الترجمة دون اتصال وتثبيتها؟\n'
                     '\n'
                     'سيُنزَّل حوالي 1.2 جيجابايت: نموذج Hy-MT وبيئة تشغيل llama.cpp المحلية.',
@@ -4727,12 +4706,7 @@ ENGINE_TEXT = {
                        'İnternet ve yaklaşık 1 GB boş alan gerekir. Uygulama özel kurulum ortamını '
                        'indirir; Python kurmanız gerekmez. Dil modelleri ilk tanımada indirilir. '
                        'Paketler ocr\\easyocr konumuna kaydedilir.',
-     'rapidocr_prompt': 'RapidOCR yerel olarak kurulu değil. Sinirsel OCR motoru uygulama klasörüne '
-                        'kurulsun mu?\n'
-                        '\n'
-                        'İnternet gerekir. Uygulama özel kurulum ortamını indirir; Python kurmanız '
-                        'gerekmez. Paketler ocr\\rapidocr konumuna kaydedilir; modeller ilk tanımada '
-                        'orada önbelleğe alınır.',
+     'rapidocr_prompt': 'RapidOCR ve PP-OCRv5 modelleri uygulama klasörüne kurulsun mu? Kurulum için internet gerekir. Python’ı ayrıca kurmanız gerekmez.',
      'hymt_prompt': 'Yerel Hy-MT modeli kurulu değil. Çevrimdışı çeviri paketi indirilip kurulsun mu?\n'
                     '\n'
                     'Hy-MT modeli ve yerel llama.cpp ortamı için yaklaşık 1,2 GB indirilecek.',
@@ -4775,12 +4749,7 @@ ENGINE_TEXT = {
                        'इंटरनेट और लगभग 1 GB खाली जगह चाहिए। ऐप अपना निजी इंस्टॉलर डाउनलोड करता है; '
                        'Python इंस्टॉल नहीं करना पड़ता। भाषा मॉडल पहली पहचान में डाउनलोड होते हैं। '
                        'पैकेज ocr\\easyocr में रखे जाएँगे।',
-     'rapidocr_prompt': 'RapidOCR स्थानीय रूप से इंस्टॉल नहीं है। न्यूरल OCR इंजन ऐप फ़ोल्डर में '
-                        'इंस्टॉल करें?\n'
-                        '\n'
-                        'इंटरनेट चाहिए। ऐप अपना निजी इंस्टॉलर डाउनलोड करता है; Python इंस्टॉल नहीं '
-                        'करना पड़ता। पैकेज ocr\\rapidocr में सहेजे जाएँगे और पहली पहचान में मॉडल वहीं '
-                        'कैश होंगे।',
+     'rapidocr_prompt': 'ऐप के फ़ोल्डर में RapidOCR और PP-OCRv5 मॉडल स्थापित करें? स्थापना के लिए इंटरनेट आवश्यक है। Python अलग से स्थापित करने की आवश्यकता नहीं है।',
      'hymt_prompt': 'स्थानीय Hy-MT मॉडल इंस्टॉल नहीं है। ऑफ़लाइन अनुवाद पैकेज डाउनलोड और इंस्टॉल '
                     'करें?\n'
                     '\n'
@@ -4823,11 +4792,7 @@ ENGINE_TEXT = {
                        'Perlu internet dan sekitar 1 GB ruang kosong. Aplikasi mengunduh runtime '
                        'pemasang privat; Anda tidak perlu memasang Python. Model bahasa diunduh saat '
                        'pengenalan pertama. Paket disimpan di ocr\\easyocr.',
-     'rapidocr_prompt': 'RapidOCR belum terpasang lokal. Pasang mesin OCR neural ke folder aplikasi?\n'
-                        '\n'
-                        'Perlu internet. Aplikasi mengunduh runtime pemasang privat; Anda tidak perlu '
-                        'memasang Python. Paket disimpan di ocr\\rapidocr dan model dicache di sana '
-                        'saat pengenalan pertama.',
+     'rapidocr_prompt': 'Pasang RapidOCR dan model PP-OCRv5 di folder aplikasi? Instalasi memerlukan internet. Python tidak perlu dipasang terpisah.',
      'hymt_prompt': 'Model Hy-MT lokal belum terpasang. Unduh dan pasang paket terjemahan luring?\n'
                     '\n'
                     'Sekitar 1,2 GB akan diunduh: model Hy-MT dan runtime llama.cpp lokal.',
@@ -5045,7 +5010,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Delete the installed {engine} engine from this computer.",
         "hymt_note": "Hy-MT is one local translation model, not per-language packages. Install it here and it appears in the translator list.",
         "translation_engine": "Translation engine", "local_model": "Local model",
-        "rapidocr_note": "RapidOCR has no separate language packages. Its local neural engine includes one Chinese + English model. For Russian use Windows OCR, Tesseract, or EasyOCR.",
+        "rapidocr_note": 'PP-OCRv5 runs locally. Installation includes English, Cyrillic, Arabic, Latin and Chinese models. The recognition language selects the model; no download starts during OCR.',
         "component": "Component", "package": "Package", "status": "Status", "argos_note": "All available Argos packages are shown. Non-English pairs use two packages through English.",
         "remove_highlighted": "Remove highlighted", "direction": "Direction", "search": "Search: Russian, ru, en→ru…", "language": "Language",
         "installed": "Installed", "missing": "Missing", "can_download": "Can download", "engine_missing": "{engine} missing", "checking": "Checking…",
@@ -5082,7 +5047,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Удалить установленный движок {engine} с этого компьютера.",
         "hymt_note": "Hy-MT — одна локальная модель перевода, а не пакеты по языкам. Установите её здесь, и она появится в списке переводчиков.",
         "translation_engine": "Движок перевода", "local_model": "Локальная модель",
-        "rapidocr_note": "Для RapidOCR не нужны отдельные языковые пакеты. Локальный нейросетевой движок включает одну модель для китайского и английского языков. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
+        "rapidocr_note": 'PP-OCRv5 работает локально. Установка включает модели для английского, кириллицы, арабского, латиницы и китайского. Модель выбирается по языку распознавания; во время OCR ничего не скачивается.',
         "component": "Компонент", "package": "Пакет", "status": "Статус", "argos_note": "Показаны все пакеты Argos. Неанглийские пары используют два пакета через английский.",
         "remove_highlighted": "Удалить выделенные", "direction": "Направление", "search": "Поиск: русский, ru, en→ru…", "language": "Язык",
         "installed": "Установлен", "missing": "Не установлен", "can_download": "Можно скачать", "engine_missing": "{engine} не установлен", "checking": "Проверка…",
@@ -5119,7 +5084,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Eliminar el motor {engine} instalado en este equipo.",
         "hymt_note": "Hy-MT es un único modelo local de traducción, no paquetes por idioma. Instálalo aquí y aparecerá en la lista de traductores.",
         "translation_engine": "Motor de traducción", "local_model": "Modelo local",
-        "rapidocr_note": "RapidOCR no usa paquetes de idioma separados. Su motor neuronal local incluye un modelo para chino e inglés. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
+        "rapidocr_note": 'PP-OCRv5 funciona localmente. La instalación incluye modelos para inglés y las escrituras cirílica, árabe, latina y china. El idioma de reconocimiento selecciona el modelo; no se descarga nada durante el OCR.',
         "component": "Componente", "package": "Paquete", "status": "Estado", "argos_note": "Se muestran todos los paquetes Argos. Los pares sin inglés usan dos paquetes a través del inglés.",
         "remove_highlighted": "Eliminar resaltados", "direction": "Dirección", "search": "Buscar: ruso, ru, en→ru…", "language": "Idioma",
         "installed": "Instalado", "missing": "No instalado", "can_download": "Disponible", "engine_missing": "Falta {engine}", "checking": "Comprobando…",
@@ -5156,7 +5121,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Die installierte {engine}-Engine von diesem Rechner löschen.",
         "hymt_note": "Hy-MT ist ein einzelnes lokales Übersetzungsmodell, keine Sprachpakete. Hier installieren, dann erscheint es in der Übersetzerliste.",
         "translation_engine": "Übersetzungs-Engine", "local_model": "Lokales Modell",
-        "rapidocr_note": "RapidOCR benötigt keine separaten Sprachpakete. Die lokale neuronale Engine enthält ein Modell für Chinesisch und Englisch. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
+        "rapidocr_note": 'PP-OCRv5 arbeitet lokal. Die Installation enthält Modelle für Englisch, Kyrillisch, Arabisch, Lateinisch und Chinesisch. Die Erkennungssprache bestimmt das Modell; während der OCR wird nichts heruntergeladen.',
         "component": "Komponente", "package": "Paket", "status": "Status", "argos_note": "Alle Argos-Pakete werden angezeigt. Nicht englische Paare verwenden zwei Pakete über Englisch.",
         "remove_highlighted": "Markierte entfernen", "direction": "Richtung", "search": "Suchen: Russisch, ru, en→ru…", "language": "Sprache",
         "installed": "Installiert", "missing": "Nicht installiert", "can_download": "Verfügbar", "engine_missing": "{engine} fehlt", "checking": "Prüfung…",
@@ -5193,7 +5158,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Supprimer le moteur {engine} installé sur cet ordinateur.",
         "hymt_note": "Hy-MT est un seul modèle de traduction local, pas des modules par langue. Installez-le ici et il apparaît dans la liste des traducteurs.",
         "translation_engine": "Moteur de traduction", "local_model": "Modèle local",
-        "rapidocr_note": "RapidOCR n’utilise pas de modules de langue séparés. Son moteur neuronal local inclut un modèle pour le chinois et l’anglais. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
+        "rapidocr_note": 'PP-OCRv5 fonctionne localement. L’installation comprend des modèles anglais, cyrillique, arabe, latin et chinois. La langue de reconnaissance détermine le modèle ; aucun téléchargement ne démarre pendant l’OCR.',
         "component": "Composant", "package": "Module", "status": "État", "argos_note": "Tous les modules Argos sont affichés. Les paires sans anglais utilisent deux modules via l’anglais.",
         "remove_highlighted": "Supprimer la sélection", "direction": "Direction", "search": "Rechercher : russe, ru, en→ru…", "language": "Langue",
         "installed": "Installé", "missing": "Non installé", "can_download": "Disponible", "engine_missing": "{engine} manquant", "checking": "Vérification…",
@@ -5230,7 +5195,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "从这台电脑上删除已安装的 {engine} 引擎。",
         "hymt_note": "Hy-MT 是一个本地翻译模型，而不是按语言划分的语言包。在这里安装后，它会出现在翻译器列表中。",
         "translation_engine": "翻译引擎", "local_model": "本地模型",
-        "rapidocr_note": "RapidOCR 不需要单独的语言包。本地神经引擎内置中文和英文模型；俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
+        "rapidocr_note": 'PP-OCRv5 在本地运行。安装时会下载英语、西里尔文、阿拉伯文、拉丁文和中文模型，并根据识别语言选择模型。识别过程中不会下载文件。',
         "component": "组件", "package": "语言包", "status": "状态", "argos_note": "显示所有 Argos 语言包。两个非英语语言之间需要通过英语使用两个语言包。",
         "remove_highlighted": "删除高亮项", "direction": "方向", "search": "搜索：俄语、ru、en→ru…", "language": "语言",
         "installed": "已安装", "missing": "未安装", "can_download": "可下载", "engine_missing": "未安装 {engine}", "checking": "正在检查…",
@@ -5276,8 +5241,7 @@ LANGUAGE_MANAGER_TEXT = {
                   'aparecerá na lista de tradutores.',
      'translation_engine': 'Mecanismo de tradução',
      'local_model': 'Modelo local',
-     'rapidocr_note': 'O RapidOCR não possui pacotes de idiomas separados. O motor local inclui um '
-                      'modelo de chinês e inglês. Para russo, use Windows OCR, Tesseract ou EasyOCR.',
+     'rapidocr_note': 'O PP-OCRv5 funciona localmente. A instalação inclui modelos para inglês e as escritas cirílica, árabe, latina e chinesa. O idioma de reconhecimento seleciona o modelo; nada é baixado durante o OCR.',
      'component': 'Componente',
      'package': 'Pacote',
      'status': 'Status',
@@ -5360,8 +5324,7 @@ LANGUAGE_MANAGER_TEXT = {
                   "apparirà nell'elenco dei traduttori.",
      'translation_engine': 'Motore di traduzione',
      'local_model': 'Modello locale',
-     'rapidocr_note': 'RapidOCR non ha pacchetti lingua separati. Il motore locale include un modello '
-                      'per cinese e inglese. Per il russo, usa Windows OCR, Tesseract o EasyOCR.',
+     'rapidocr_note': 'PP-OCRv5 funziona in locale. L’installazione include modelli per inglese e scritture cirillica, araba, latina e cinese. La lingua di riconoscimento seleziona il modello; durante l’OCR non viene scaricato nulla.',
      'component': 'Componente',
      'package': 'Pacchetto',
      'status': 'Stato',
@@ -5443,8 +5406,7 @@ LANGUAGE_MANAGER_TEXT = {
                   'المترجمين.',
      'translation_engine': 'محرك الترجمة',
      'local_model': 'النموذج المحلي',
-     'rapidocr_note': 'لا توجد حزم لغات منفصلة لـ RapidOCR. يتضمن محركه العصبي المحلي نموذجًا واحدًا '
-                      'للصينية والإنجليزية. للروسية، استخدم Windows OCR أو Tesseract أو EasyOCR.',
+     'rapidocr_note': 'يعمل PP-OCRv5 محليًا. يتضمن التثبيت نماذج للإنجليزية والسيريلية والعربية واللاتينية والصينية. تُختار النماذج وفق لغة التعرف؛ لا يبدأ تنزيل أثناء التعرف على النص.',
      'component': 'المكوّن',
      'package': 'الحزمة',
      'status': 'الحالة',
@@ -5525,9 +5487,7 @@ LANGUAGE_MANAGER_TEXT = {
                   'çevirmen listesinde görünür.',
      'translation_engine': 'Çeviri motoru',
      'local_model': 'Yerel model',
-     'rapidocr_note': "RapidOCR'ın ayrı dil paketleri yoktur. Yerel sinirsel motor tek Çince + "
-                      'İngilizce modeli içerir. Rusça için Windows OCR, Tesseract veya EasyOCR '
-                      'kullanın.',
+     'rapidocr_note': 'PP-OCRv5 yerel olarak çalışır. Kurulum İngilizce, Kiril, Arap, Latin ve Çin yazıları için modeller içerir. Model, tanıma diline göre seçilir; OCR sırasında indirme yapılmaz.',
      'component': 'Bileşen',
      'package': 'Paket',
      'status': 'Durum',
@@ -5608,8 +5568,7 @@ LANGUAGE_MANAGER_TEXT = {
                   'अनुवादक सूची में दिखेगा।',
      'translation_engine': 'अनुवाद इंजन',
      'local_model': 'स्थानीय मॉडल',
-     'rapidocr_note': 'RapidOCR के अलग भाषा पैकेज नहीं हैं। स्थानीय न्यूरल इंजन में एक चीनी + '
-                      'अंग्रेज़ी मॉडल है। रूसी के लिए Windows OCR, Tesseract या EasyOCR चुनें।',
+     'rapidocr_note': 'PP-OCRv5 स्थानीय रूप से चलता है। स्थापना में अंग्रेज़ी, सिरिलिक, अरबी, लैटिन और चीनी मॉडल शामिल हैं। पहचान की भाषा के अनुसार मॉडल चुना जाता है; OCR के दौरान कुछ डाउनलोड नहीं होता।',
      'component': 'घटक',
      'package': 'पैकेज',
      'status': 'स्थिति',
@@ -5688,9 +5647,7 @@ LANGUAGE_MANAGER_TEXT = {
                   'agar muncul di daftar penerjemah.',
      'translation_engine': 'Mesin terjemahan',
      'local_model': 'Model lokal',
-     'rapidocr_note': 'RapidOCR tidak memiliki paket bahasa terpisah. Mesin neural lokalnya berisi '
-                      'satu model Mandarin + Inggris. Untuk Rusia gunakan Windows OCR, Tesseract, atau '
-                      'EasyOCR.',
+     'rapidocr_note': 'PP-OCRv5 berjalan secara lokal. Instalasi mencakup model Inggris, Kiril, Arab, Latin, dan Mandarin. Model dipilih sesuai bahasa pengenalan; tidak ada unduhan selama OCR.',
      'component': 'Komponen',
      'package': 'Paket',
      'status': 'Status',
@@ -7347,6 +7304,10 @@ class OcrLanguageManagerDialog(QDialog):
         self._set_language_rows(table, rows)
 
     def _populate_rapidocr_table(self, table):
+        from rapidocr_models import installed_languages
+        locate = getattr(getattr(self, 'owner', None), '_local_rapidocr_dir', None)
+        modern_models = bool(installed_languages(locate() if callable(locate) else
+                             os.environ.get('CLICKNTRANSLATE_RAPIDOCR_DIR', '')))
         checking = self._rapidocr_status_cache is None
         engine_ready, _error = self._rapidocr_status_cache or (False, "")
         self._set_engine_missing_state(
@@ -7386,7 +7347,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "code": "rapidocr-detector",
                 "icon": "",
                 "name": language_manager_text(self.lang, "detector"),
-                "package": "PP-OCR detector",
+                "package": "PP-OCRv5 mobile" if modern_models else "PP-OCR detector",
                 "status": self._status_checking() if checking else installed if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
@@ -7396,7 +7357,8 @@ class OcrLanguageManagerDialog(QDialog):
                 "code": "rapidocr-recognition",
                 "icon": "",
                 "name": language_manager_text(self.lang, "recognition"),
-                "package": " + ".join(language_display_name(code, self.lang) for code in ('zh', 'en')),
+                "package": ("PP-OCRv5 mobile" if modern_models else
+                            " + ".join(language_display_name(code, self.lang) for code in ('zh', 'en'))),
                 "status": self._status_checking() if checking else installed if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
@@ -10836,9 +10798,13 @@ class SettingsWindow(QWidget):
         def set_copy_notifications(checked):
             self.auto_save_setting("notifications", bool(checked))
             if checked:
-                self.parent._preview_copy_notification()
+                preview = getattr(self.parent, '_preview_copy_notification', None)
+                if callable(preview):
+                    preview()
             else:
-                self.parent._copy_notice.hide()
+                notice = getattr(self.parent, '_copy_notice', None)
+                if notice is not None:
+                    notice.hide()
         self.copy_notification_checkbox.toggled.connect(set_copy_notifications)
         updates_layout.addWidget(
             self.copy_notification_checkbox, alignment=Qt.AlignLeft
@@ -15778,7 +15744,8 @@ finally {
                 "--target",
                 package_root,
                 *RAPIDOCR_PIP_PACKAGES,
-                *(["onnxruntime==1.23.2"] if platform_support.IS_MAC else []),
+                *(["onnxruntime==1.23.2", "opencv-python-headless==4.12.0.88"]
+                  if platform_support.IS_MAC else ["onnxruntime==1.30.0"]),
             ]
             create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             process = subprocess.Popen(
@@ -15816,6 +15783,17 @@ finally {
             if not self._rapidocr_package_present_under(package_root):
                 raise RuntimeError("RapidOCR packages were not found after pip install.")
 
+            from rapidocr_models import download_models, MODEL_ASSETS
+            model_text = engine_text(lang, 'preparing', engine='RapidOCR · PP-OCRv5')
+            self._emit_rapidocr_progress(model_text, 60)
+            def download_model(url, destination, **kwargs):
+                return self._download_file(url, destination,
+                    cancel_callback=lambda: self._rapidocr_cancel_requested.is_set(), **kwargs)
+            download_models(Path(package_root) / 'models' / 'ppocrv5', download_model,
+                check_cancel=self._check_rapidocr_cancel_requested,
+                progress=lambda index, done, total: self._emit_rapidocr_progress(
+                    model_text, 60 + int(30 * (index + (min(1, done / total) if total else 0)) / len(MODEL_ASSETS))))
+
             self._rapidocr_install_phase = "applying"
             self._emit_rapidocr_progress(engine_text(lang, "applying"), 92)
             def validate_rapidocr(_path):
@@ -15823,6 +15801,9 @@ finally {
                 importable, import_error = self._rapidocr_importable_status()
                 if not importable:
                     raise RuntimeError(f"RapidOCR was installed but could not be imported:\n{import_error}")
+                from ocr import _call_native_ocr_worker
+                _call_native_ocr_worker({'action': 'validate', 'engine': 'rapidocr',
+                                         'root_dir': _path, 'allow_download': False})
 
             install_directory(package_root, final_dir, validate_rapidocr,
                               check_cancel=self._check_rapidocr_cancel_requested)

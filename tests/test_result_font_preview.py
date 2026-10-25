@@ -66,8 +66,8 @@ def test_settings_fields_share_painted_borders_and_heights_across_sections(windo
                       field.width()-1-max(x for x, y in pixels),
                       field.height()-1-max(y for x, y in pixels)))
     # Proxy rasterization may round a fractional scene origin by one pixel.
-    assert {field.width() for field in fields[:3]} == {270}
-    assert {field.width() for field in fields[3:]} == {180}
+    # The approved compact layout gives selectors and steppers the same width.
+    assert {field.width() for field in fields} == {180}
     assert max(field.height() for field in fields) - min(field.height() for field in fields) <= 1
     for edge in zip(*boxes):
         assert max(edge) - min(edge) <= 1, boxes

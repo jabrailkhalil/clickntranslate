@@ -181,11 +181,14 @@ def _stdlib_hiddenimports():
 # what onnxruntime wheels they can install, and the app falls back to Tesseract.
 try:
     ocr_worker_datas = collect_data_files(
-        'rapidocr_onnxruntime',
-        includes=['**/*.onnx', '**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
+        'rapidocr',
+        includes=['**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
     )
-    ocr_worker_hiddenimports = collect_submodules('rapidocr_onnxruntime') + [
-        'rapidocr_onnxruntime',
+    ocr_worker_hiddenimports = collect_submodules('rapidocr', filter=lambda name:
+        not name.startswith(('rapidocr.inference_engine.pytorch', 'rapidocr.inference_engine.paddle',
+                             'rapidocr.inference_engine.tensorrt', 'rapidocr.inference_engine.openvino',
+                             'rapidocr.inference_engine.mnn'))) + [
+        'rapidocr', 'omegaconf', 'colorlog', 'bidi.algorithm',
         'onnxruntime',
         'cv2',
         'pyclipper',
@@ -201,6 +204,10 @@ except Exception as _exc:  # pragma: no cover - depends on the build environment
     ocr_worker_datas = []
     ocr_worker_hiddenimports = []
     _bundled_rapidocr = False
+
+if _bundled_rapidocr:
+    from rapidocr_models import bundled_model_data
+    ocr_worker_datas += bundled_model_data(_PROJECT_ROOT)
 
 ocr_worker_binaries = []
 ocr_worker_hiddenimports += _stdlib_hiddenimports()
@@ -290,7 +297,7 @@ ocr_worker_a = Analysis(
         'pytest',
         'IPython',
         'jupyter',
-    ] + ([] if _bundled_rapidocr else ['rapidocr_onnxruntime', 'onnxruntime', 'cv2']),
+    ] + ([] if _bundled_rapidocr else ['rapidocr', 'rapidocr_onnxruntime', 'onnxruntime', 'cv2']),
     noarchive=False,
     optimize=0,
 )

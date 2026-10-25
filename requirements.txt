@@ -16,7 +16,8 @@ argostranslate~=1.11.0
 # Verified Windows CPython 3.12 wheel; 0.2.2 crashed during the local build checks.
 sentencepiece==0.2.1
 pytesseract
-rapidocr-onnxruntime==1.4.4
+rapidocr[rtl]==3.10.0
+onnxruntime==1.30.0
 requests
 setuptools<81
 psutil

@@ -119,3 +119,4 @@ data/**/*.log
 *.dmg
 *.icns
 *.p12
+/assets/rapidocr_models/

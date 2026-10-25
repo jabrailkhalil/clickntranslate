@@ -42,12 +42,12 @@ for module in native_bridges:
 gui = Analysis([str(_PROJECT_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
                datas=[(str(_SOURCE_ROOT / 'icons'), 'icons')], binaries=[], hiddenimports=gui_hidden,
                excludes=[*common_excludes, *optional, 'argostranslate', 'ctranslate2',
-                         'sentencepiece', 'onnxruntime', 'rapidocr_onnxruntime', 'cv2'],
+                         'sentencepiece', 'onnxruntime', 'rapidocr', 'rapidocr_onnxruntime', 'cv2'],
                noarchive=False)
 argos = Analysis([str(_PROJECT_ROOT / 'src/argos_worker.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)], datas=[], binaries=[],
                  hiddenimports=['argostranslate.package', 'argostranslate.translate', 'filelock', 'sacremoses'],
                  excludes=[*common_excludes, *optional, *native_bridges, 'PyQt5',
-                           'onnxruntime', 'rapidocr_onnxruntime', 'cv2'], noarchive=False)
+                           'onnxruntime', 'rapidocr', 'rapidocr_onnxruntime', 'cv2'], noarchive=False)
 
 # Optional OCR packages load at runtime; include stdlib submodules used by their
 # wheels so an install doesn't fail later on e.g. unittest.mock or pickletools.
@@ -58,10 +58,17 @@ for module in sorted(sys.stdlib_module_names):
         continue
     stdlib.add(module)
     stdlib.update(collect_submodules(module, on_error='ignore'))
-ocr_hidden = list(stdlib) + collect_submodules('rapidocr_onnxruntime') + collect_submodules('PIL') + [
+ocr_hidden = list(stdlib) + collect_submodules('rapidocr', filter=lambda name:
+    not name.startswith(('rapidocr.inference_engine.pytorch', 'rapidocr.inference_engine.paddle',
+                         'rapidocr.inference_engine.tensorrt', 'rapidocr.inference_engine.openvino',
+                         'rapidocr.inference_engine.mnn'))) + collect_submodules('PIL') + [
+    'rapidocr', 'omegaconf', 'colorlog', 'bidi.algorithm',
     'onnxruntime', 'cv2', 'pyclipper', 'shapely', 'yaml', 'tqdm', 'six', 'numpy', 'PIL']
+from rapidocr_models import bundled_model_data
+ocr_data = collect_data_files('rapidocr', includes=['**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'])
+ocr_data += bundled_model_data(_PROJECT_ROOT)
 ocr = Analysis([str(_PROJECT_ROOT / 'src/ocr_worker.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)], binaries=[],
-               datas=collect_data_files('rapidocr_onnxruntime'), hiddenimports=ocr_hidden,
+               datas=ocr_data, hiddenimports=ocr_hidden,
                excludes=[*common_excludes, *optional, *native_bridges, 'PyQt5',
                          'argostranslate', 'ctranslate2', 'sentencepiece'], noarchive=False)
 

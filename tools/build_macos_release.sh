@@ -15,6 +15,7 @@ if [[ -z "${MACOS_CODESIGN_IDENTITY:-}" && "${CLICKNTRANSLATE_ALLOW_ADHOC:-0}" !
   LOCAL_SIGNING=1
 fi
 "$PYTHON" -c "from PIL import Image; Image.open('src/icons/icon.png').convert('RGBA').save('build/macos/icon.icns')"
+"$PYTHON" tools/prepare_rapidocr_models.py
 "$PYTHON" -m PyInstaller --noconfirm --clean --workpath build/macos/pyinstaller tools/packaging/ClicknTranslate-macos.spec
 APP="dist/ClicknTranslate.app"
 if [[ "$LOCAL_SIGNING" == "1" ]]; then

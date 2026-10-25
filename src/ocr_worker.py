@@ -8,7 +8,7 @@ import sys
 import time
 import traceback
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
 
@@ -86,19 +86,11 @@ def _rapidocr_class():
     raise RuntimeError("; ".join(errors))
 
 
-def _rapidocr_engine():
-    rapid_cls = _rapidocr_class()
-    last_type_error = None
-    for kwargs in (
-        {"text_score": 0.35, "print_verbose": False},
-        {"print_verbose": False},
-        {},
-    ):
-        try:
-            return rapid_cls(**kwargs)
-        except TypeError as exc:
-            last_type_error = exc
-    raise RuntimeError(f"RapidOCR constructor is unsupported: {last_type_error}")
+def _rapidocr_engine(request=None):
+    from rapidocr_models import create_engine
+    request = request or {}
+    return create_engine(_rapidocr_class(), request.get('language_code') or 'en',
+                         request.get('root_dir') or '')
 
 
 def _parse_rapidocr_output(output):
@@ -107,9 +99,12 @@ def _parse_rapidocr_output(output):
         return []
     items = []
     if hasattr(result, "txts"):
-        texts = list(getattr(result, "txts", None) or [])
-        scores = list(getattr(result, "scores", None) or [])
-        boxes = list(getattr(result, "boxes", None) or [])
+        texts = getattr(result, "txts", None)
+        scores = getattr(result, "scores", None)
+        boxes = getattr(result, "boxes", None)
+        texts = list(texts) if texts is not None else []
+        scores = list(scores) if scores is not None else []
+        boxes = list(boxes) if boxes is not None else []
         for index, text in enumerate(texts):
             items.append(
                 (
@@ -160,9 +155,15 @@ def _result_for_items(label, items, elapsed_ms):
 
 
 def _recognize_rapidocr(request):
-    engine = _rapidocr_engine()
+    engine = _rapidocr_engine(request)
     results = []
-    for image_request in request.get("images") or []:
+    images = request.get('images') or []
+    if not images:
+        # Availability probes must also exercise lazily loaded native models.
+        probe = Image.new('RGB', (96, 40), 'white')
+        engine(probe, use_det=False)
+        engine(probe)
+    for image_request in images:
         label = str(image_request.get("label") or "image")
         try:
             with Image.open(image_request["path"]) as opened:
@@ -221,6 +222,17 @@ def run_request(request):
         else:
             raise ValueError(f"Unknown OCR engine: {engine}")
         return {"available": True, "error": ""}
+    if action == 'validate' and engine == 'rapidocr':
+        # Exercise detector, orientation and every recognizer before committing
+        # an installation. RapidOCR 3 initializes models lazily, so importing or
+        # constructing the engine alone cannot verify its native dependencies.
+        probe = Image.new('RGB', (240, 64), 'white')
+        ImageDraw.Draw(probe).text((12, 12), 'OCR 123', fill='black', font_size=28)
+        for code in ('en', 'ru', 'ar', 'zh', 'es'):
+            instance = _rapidocr_engine(dict(request, language_code=code))
+            instance(probe, use_det=False)
+            instance(probe)
+        return {'available': True, 'error': ''}
     if engine == "rapidocr":
         return {"results": _recognize_rapidocr(request), "error": ""}
     if engine == "easyocr":
