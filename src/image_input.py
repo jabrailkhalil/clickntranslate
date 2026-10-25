@@ -237,7 +237,7 @@ def recognize_image(payload, config, source, target, cancelled):
     if source == 'auto' and getattr(worker, 'engine', '') == 'windows':
         from ocr import _recognize_with_windows_auto
         return _recognize_with_windows_auto(worker.bitmap, cancel_check=cancelled,
-            join_paragraphs=config.get('ocr_join_paragraphs') is True), None
+            join_paragraphs=config.get('ocr_join_paragraphs', True) is True), None
     rows = []
     worker.result_ready.connect(lambda value: rows.extend(value), QtCore.Qt.DirectConnection)
     worker.run()  # This function already runs outside the GUI thread.
@@ -245,7 +245,7 @@ def recognize_image(payload, config, source, target, cancelled):
         return '', None
     if getattr(worker, 'error_message', ''):
         raise RuntimeError(worker.error_message)
-    if config.get('ocr_join_paragraphs') is True:
+    if config.get('ocr_join_paragraphs', True) is True:
         from ocr_paragraphs import paragraph_text
         text = paragraph_text(rows)
     else:

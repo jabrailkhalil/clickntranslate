@@ -237,9 +237,9 @@ DEFAULT_CONFIG = {
     "hotkey_language_editor_mode": "selection",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
-    "notifications": False,
+    "notifications": True,
     "button_tooltips_enabled": True,
-    "history": False,
+    "history": True,
     "start_minimized": False,
     "show_update_info": True,  # Показывать Welcome окно при первом запуске
     "first_run_guide_completed": False,
@@ -248,12 +248,10 @@ DEFAULT_CONFIG = {
     "translator_engine": "Google",
     "api_providers": {},
     "allow_online_provider_fallback": False,
-    "copy_history": False,
+    "copy_history": True,
     "copy_translated_text": False,
-    # Ctrl+C/Ctrl+V are used internally for selected-text workflows. Restore
-    # the user's previous clipboard after a successful visible translation or
-    # replacement unless the result was explicitly requested in the clipboard.
-    "restore_clipboard_after_selection": True,
+    # Restoring the previous clipboard after selected-text workflows is opt-in.
+    "restore_clipboard_after_selection": False,
     "keep_visible_on_ocr": False,
     "freeze_screen_on_ocr": False,
     "dim_screen_during_ocr": False,
@@ -291,8 +289,8 @@ DEFAULT_CONFIG = {
     "replace_selection_select_all": False,
     "selection_quick_translate_enabled": False,
     "selection_quick_translate_mode": "button",
-    "close_result_window_on_outside_click": False,
-    "ocr_join_paragraphs": False,
+    "close_result_window_on_outside_click": True,
+    "ocr_join_paragraphs": True,
     "translation_result_font_size": "medium",
     "game_translate_hotkey": DEFAULT_GAME_HOTKEY,
     "toggle_window_hotkey": DEFAULT_TOGGLE_WINDOW_HOTKEY,
@@ -1268,7 +1266,7 @@ def _save_copy_history_sync(text):
     """Синхронная запись в историю копирований (выполняется в отдельном потоке)."""
     try:
         config = get_cached_config()
-        if not config.get("copy_history", False):
+        if not config.get("copy_history", True):
             return
     except Exception:
         return
@@ -1285,7 +1283,7 @@ def _save_copy_history_sync(text):
 def notify_copy_completed(config=None):
     """Queue the optional copy notification on the main Qt thread."""
     source = config if isinstance(config, dict) else get_cached_config()
-    if not bool(source.get("notifications", False)):
+    if not bool(source.get("notifications", True)):
         return False
     app = QApplication.instance()
     if app is None:
@@ -7933,7 +7931,7 @@ class TranslationResultDialog(QDialog):
         return super().event(event)
 
     def _outside_click_close_enabled(self):
-        return self._current_config().get("close_result_window_on_outside_click") is True
+        return self._current_config().get("close_result_window_on_outside_click", True) is True
 
     def _widget_belongs_to_result_window(self, widget):
         current = widget
@@ -12816,7 +12814,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _show_copy_notification(self, language_code="", force=False):
-        if not force and not bool(self.config.get("notifications", False)):
+        if not force and not bool(self.config.get("notifications", True)):
             return
         lang = normalize_interface_language(
             language_code or self.current_interface_language
@@ -12890,7 +12888,7 @@ class DarkThemeApp(QMainWindow):
 
             def restore_captured_clipboard(force=False):
                 restore_enabled = bool(
-                    self.config.get("restore_clipboard_after_selection", True)
+                    self.config.get("restore_clipboard_after_selection", False)
                 )
                 if (
                     (platform_support.IS_WINDOWS or platform_support.IS_MAC)

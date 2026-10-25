@@ -288,6 +288,7 @@ class TranslationResultUiTest(unittest.TestCase):
             # The ordinary selection result window is enabled. Replacement is
             # still a separate seamless mode and must not inherit that UI.
             "result_window_hidden_modes": [],
+            "restore_clipboard_after_selection": True,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
@@ -387,6 +388,7 @@ class TranslationResultUiTest(unittest.TestCase):
         harness = _SelectionHarness({
             "result_window_hidden_modes": [],
             "copy_translated_text": False,
+            "restore_clipboard_after_selection": True,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
@@ -407,11 +409,10 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Before")])
         self.assertEqual(len(harness.shown_dialogs), 1)
 
-    def test_clipboard_restore_setting_can_leave_the_captured_selection(self):
+    def test_absent_clipboard_restore_setting_leaves_the_captured_selection(self):
         harness = _SelectionHarness({
             "result_window_hidden_modes": [],
             "copy_translated_text": False,
-            "restore_clipboard_after_selection": False,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 

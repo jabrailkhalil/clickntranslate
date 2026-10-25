@@ -1410,7 +1410,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             return
         self._ocr_busy = True
         self._workers.add(worker)
-        worker.join_paragraphs = self.config.get('ocr_join_paragraphs') is True
+        worker.join_paragraphs = self.config.get('ocr_join_paragraphs', True) is True
         if not api_provider:
             worker.result_ready.connect(self._on_ocr_result)
         worker.finished.connect(self._ocr_finished)
@@ -1436,7 +1436,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if self._closed or self.paused or not self._target_is_active():
             return
         self._has_ocr_source = True
-        normalized = normalize_game_ocr_text(text, join_paragraphs=self.config.get('ocr_join_paragraphs') is True)
+        normalized = normalize_game_ocr_text(text, join_paragraphs=self.config.get('ocr_join_paragraphs', True) is True)
         if not normalized:
             self._empty_ocr_frames += 1
             self._last_source_text = ''
@@ -1549,7 +1549,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             self._set_status("waiting")
             logging.getLogger('clickntranslate.game').debug(
                 'Region translation displayed; window=%s, revision=%s', self.target_window, revision)
-            if bool(self.config.get("history", False)):
+            if bool(self.config.get("history", True)):
                 save_translation_history(source_text, translated, self.target_language)
             self._place_near_region()
 
@@ -2076,7 +2076,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         # Vision providers already return paragraph bounds and matching
         # translations; regrouping would invalidate that correspondence.
         grouped = (lines if direct_values is not None else _group_screen_ocr_lines(
-            lines, join_paragraphs=self.config.get('ocr_join_paragraphs') is True))
+            lines, join_paragraphs=self.config.get('ocr_join_paragraphs', True) is True))
         viewport = QtCore.QRectF(0, 0, self.width() * self._ocr_scale_x, self.height() * self._ocr_scale_y)
         grouped = [(*item[:4], normalize_game_ocr_text(item[4])) for item in grouped
                    if len(normalize_game_ocr_text(item[4])) >= 2
@@ -2109,7 +2109,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             if direct_pairs and blocks:
                 self._has_shown_translation = True
                 self._status_is_error = False
-                if (self.config.get('history') is True
+                if (self.config.get('history', True) is True
                         and [(item[4], item[5]) for item in blocks] != previous_text):
                     from ocr import save_translation_history
                     save_translation_history("\n".join(item[4] for item in blocks),
@@ -2235,7 +2235,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._status_is_error = False
         self.update()
         self._set_status("waiting")
-        if final and blocks and not was_cancelled and self._blocks and bool(self.config.get("history", False)):
+        if final and blocks and not was_cancelled and self._blocks and bool(self.config.get("history", True)):
             from ocr import save_translation_history
             source = "\n".join(block[4] for block in self._blocks)
             translated = "\n".join(block[5] for block in self._blocks)

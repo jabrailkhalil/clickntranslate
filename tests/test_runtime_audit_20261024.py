@@ -348,12 +348,20 @@ def test_combined_api_vision_response_is_not_translated_twice(area_overlay):
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "es", "de", "fr", "zh", "pt", "it", "ar", "tr", "hi", "id"])
-def test_null_screen_capture_restores_toolbar_and_allows_retry(area_overlay, monkeypatch, locale):
+@pytest.mark.parametrize("memory_modes", [None, [], ["translate"]], ids=["default-off", "explicit-off", "enabled"])
+def test_null_screen_capture_restores_toolbar_and_allows_retry(area_overlay, monkeypatch, locale, memory_modes):
     from capture_regions import text
 
     state = area_overlay
     overlay = state.overlay
     state.config["interface_language"] = locale
+    if memory_modes is None:
+        state.config.pop("capture_area_memory_modes", None)
+    else:
+        state.config["capture_area_memory_modes"] = memory_modes
+    overlay._refresh_memory_controls(state.config)
+    assert not overlay._capture_retry_pending
+    assert overlay.memory_hint.isHidden()
     screen = QApplication.primaryScreen()
     overlay._active_screen = screen
     overlay.setGeometry(screen.geometry())
@@ -375,9 +383,35 @@ def test_null_screen_capture_restores_toolbar_and_allows_retry(area_overlay, mon
     assert overlay.memory_hint.text() == text(locale, "capture_error")
     assert overlay._preview_rect == selected
     assert overlay.repeat_area_button.isEnabled()
-    with mock.patch.object(overlay, "capture_and_copy") as capture:
+    assert not overlay.repeat_area_button.isHidden()
+    assert overlay.remember_area_checkbox.isHidden() is (memory_modes != ["translate"])
+    with mock.patch.object(overlay, "capture_and_copy") as capture, \
+            mock.patch.object(ocr, "_write_ocr_config_updates") as write:
         overlay._repeat_area()
         capture.assert_called_once_with(selected)
+        write.assert_not_called()
+    assert not overlay._capture_retry_pending
+    assert overlay.memory_hint.isHidden()
+
+
+@pytest.mark.parametrize("memory_modes", [None, []], ids=["default-off", "explicit-off"])
+@pytest.mark.parametrize("hint_key", ["ready", "unavailable"])
+def test_disabled_area_memory_does_not_expose_ordinary_memory_hints(area_overlay, memory_modes, hint_key):
+    from capture_regions import text
+
+    state = area_overlay
+    if memory_modes is not None:
+        state.config["capture_area_memory_modes"] = memory_modes
+    overlay = state.overlay
+    overlay._refresh_memory_controls(state.config)
+    overlay._preview_rect = QtCore.QRect(50, 80, 120, 50)
+    overlay.memory_hint.setText(text("en", hint_key))
+    overlay._update_memory_actions()
+    overlay.update_combo_position()
+    assert overlay.memory_hint.isHidden()
+    assert overlay.memory_panel.isHidden()
+    assert overlay.remember_area_checkbox.isHidden()
+    assert overlay.repeat_area_button.isHidden()
 
 
 @pytest.mark.parametrize("content,expected", [

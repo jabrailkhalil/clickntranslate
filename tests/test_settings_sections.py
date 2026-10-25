@@ -8,6 +8,7 @@ from PyQt5.QtGui import QFontMetrics
 
 import main
 from settings_window import SettingsWindow
+from settings_metrics import SETTINGS_ROW_GAP, SETTINGS_ROW_HEIGHT
 from settings_sections import (
     PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR,
     PAGE_COUNT, PAGE_CAPTIONS, VISUAL_PAGE_ORDER, page_caption,
@@ -22,6 +23,32 @@ def settle(app):
 
 def rect_in(widget, parent):
     return QtCore.QRect(widget.mapTo(parent, QtCore.QPoint()), widget.size())
+
+
+def assert_standard_settings_rows(settings, page_id, context):
+    companion = settings.settings_assistant_page
+    controls = {
+        PAGE_APPLICATION: (settings.autostart_checkbox, settings.start_minimized_checkbox,
+                           settings.copy_history_checkbox, settings.history_checkbox,
+                           settings.button_tooltips_checkbox, settings.update_check_on_launch_checkbox),
+        PAGE_TRANSLATION: (settings.copy_translated_checkbox, settings.replace_select_all_checkbox,
+                           settings.restore_clipboard_checkbox, settings.close_result_on_outside_click_checkbox),
+        PAGE_OCR: (settings.ocr_join_paragraphs_checkbox, settings.keep_visible_checkbox,
+                   settings.freeze_screen_checkbox, settings.dim_screen_during_ocr_checkbox),
+        PAGE_DYNAMIC: (settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
+                       settings.game_toolbar_checkbox, settings.game_remember_template_checkbox),
+        PAGE_COMPANION: (companion.main_visible, companion.toggle, companion.topmost, companion.reactions),
+    }[page_id]
+    page = settings.settings_pages.currentWidget()
+    rectangles = [rect_in(control, page) for control in controls]
+    for control, rect in zip(controls, rectangles):
+        assert rect.height() == SETTINGS_ROW_HEIGHT, (context, control.text(), rect)
+    for first, second in zip(rectangles, rectangles[1:]):
+        assert second.top() - first.bottom() - 1 == SETTINGS_ROW_GAP, (context, rectangles)
+    if page_id == PAGE_DYNAMIC:
+        fields = (settings.game_language_row, settings.game_interval_controls,
+                  settings.game_opacity_controls, settings.game_template_actions)
+        assert [rect_in(field, page).top() for field in fields] == [rect.top() for rect in rectangles], context
 
 
 def test_legacy_destinations_have_a_separate_visual_order_and_complete_captions():
@@ -68,6 +95,53 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
 
 
 @pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_factory_preferences_have_matching_visible_checkboxes(window, app, locale):
+    from test_first_run_defaults import FACTORY_FLAGS
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    companion = settings.settings_assistant_page
+    pages = (
+        (PAGE_APPLICATION, (
+            ('autostart', settings.autostart_checkbox),
+            ('start_minimized', settings.start_minimized_checkbox),
+            ('copy_history', settings.copy_history_checkbox),
+            ('history', settings.history_checkbox),
+            ('button_tooltips_enabled', settings.button_tooltips_checkbox),
+            ('update_check_on_launch', settings.update_check_on_launch_checkbox))),
+        (PAGE_TRANSLATION, (
+            ('copy_translated_text', settings.copy_translated_checkbox),
+            ('replace_selection_select_all', settings.replace_select_all_checkbox),
+            ('restore_clipboard_after_selection', settings.restore_clipboard_checkbox),
+            ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox))),
+        (PAGE_OCR, (
+            ('ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
+            ('keep_visible_on_ocr', settings.keep_visible_checkbox),
+            ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
+            ('dim_screen_during_ocr', settings.dim_screen_during_ocr_checkbox),
+            ('notifications', settings.copy_notification_checkbox))),
+        (PAGE_DYNAMIC, (
+            ('game_pause_when_inactive', settings.game_pause_inactive_checkbox),
+            ('game_manual_output', settings.game_manual_output_checkbox),
+            ('game_show_toolbar', settings.game_toolbar_checkbox),
+            ('game_remember_template', settings.game_remember_template_checkbox))),
+        (PAGE_COMPANION, (
+            ('main_assistant_visible', companion.main_visible),
+            ('desktop_assistant_enabled', companion.toggle),
+            ('desktop_assistant_topmost', companion.topmost),
+            ('desktop_assistant_reactions', companion.reactions))),
+    )
+    for page_id, controls in pages:
+        settings._set_settings_page(page_id)
+        settle(app)
+        for key, control in controls:
+            assert control.isVisible(), (locale, key)
+            assert control.isChecked() is FACTORY_FLAGS.get(key, main.DEFAULT_CONFIG[key]), (locale, key)
+    settings._set_settings_page(PAGE_TRANSLATION)
+    assert settings.capture_memory_modes.checked_modes() == ()
+
+
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_five_pages_fit_every_theme_and_scale_and_overflow_is_reachable(window, app, locale):
     """One window per locale covers 600 page states without 600 app startups."""
     window.set_interface_language(locale)
@@ -86,6 +160,7 @@ def test_five_pages_fit_every_theme_and_scale_and_overflow_is_reachable(window, 
                 context = (locale, theme, scale, page_id)
                 assert settings.rect().contains(rect_in(page, settings)), context
                 assert settings.settings_pages.count() == PAGE_COUNT
+                assert_standard_settings_rows(settings, page_id, context)
                 for tab in settings.settings_page_tabs:
                     font, area = tab.label_layout()
                     assert QFontMetrics(font).horizontalAdvance(tab.text()) <= area.width(), (context, tab.text())

@@ -10462,14 +10462,14 @@ class SettingsWindow(QWidget):
 
         # Остальные чекбоксы
         self.copy_history_checkbox = QCheckBox(settings_text(lang, "copy_history"))
-        self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", False))
+        self.copy_history_checkbox.setChecked(self.parent.config.get("copy_history", True))
         self.copy_history_checkbox.toggled.connect(lambda state: self.auto_save_setting("copy_history", state))
         self.copy_history_checkbox.setStyleSheet("margin:0; padding:0;")
         self.copy_history_checkbox.setFixedHeight(fixed_height)
         form_grid.addWidget(self.copy_history_checkbox, 3, 0, alignment=Qt.AlignLeft)
 
         self.history_checkbox = QCheckBox(settings_text(lang, "history"))
-        self.history_checkbox.setChecked(self.parent.config.get("history", False))
+        self.history_checkbox.setChecked(self.parent.config.get("history", True))
         self.history_checkbox.toggled.connect(self.on_history_checkbox_toggled)
         self.history_checkbox.setStyleSheet("margin:0; padding:0;")
         self.history_checkbox.setFixedHeight(fixed_height)
@@ -10771,7 +10771,7 @@ class SettingsWindow(QWidget):
             self.settings_updates_page,
         )
         self.restore_clipboard_checkbox.setChecked(
-            bool(self.parent.config.get("restore_clipboard_after_selection", True))
+            bool(self.parent.config.get("restore_clipboard_after_selection", False))
         )
         self.restore_clipboard_checkbox.setToolTip(
             tooltip_text(settings_text(lang, "restore_clipboard_tooltip"))
@@ -10792,7 +10792,7 @@ class SettingsWindow(QWidget):
             settings_text(lang, "copy_notification"), self.settings_updates_page
         )
         self.copy_notification_checkbox.setChecked(
-            bool(self.parent.config.get("notifications", False))
+            bool(self.parent.config.get("notifications", True))
         )
         self.copy_notification_checkbox.setToolTip(
             tooltip_text(settings_text(lang, "copy_notification_tooltip"))

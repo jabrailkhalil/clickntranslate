@@ -6,6 +6,7 @@ from assistant_art import APPEARANCES, LEGACY_APPEARANCES, MASCOTS, DEFAULT_MASC
 from header_icons import header_icon
 from control_hints import control_hint
 from styled_dialogs import CenteredFramelessDialog
+from settings_metrics import SETTINGS_ROW_GAP, SETTINGS_ROW_HEIGHT
 from pathlib import Path
 
 
@@ -204,7 +205,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         form = QtWidgets.QGridLayout(self.options)
         form.setContentsMargins(0, 0, 0, 0)
         form.setHorizontalSpacing(8)
-        form.setVerticalSpacing(2)
+        form.setVerticalSpacing(SETTINGS_ROW_GAP)
         form.setColumnStretch(0, 1)
         self.form_grid = form
         self.main_visible = QtWidgets.QCheckBox(tr('main_visible_short'))
@@ -218,7 +219,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.reactions.setToolTip(tr('reactions_hint'))
         self.reactions.toggled.connect(lambda checked: self.save('reactions', checked))
         for row, checkbox in enumerate((self.main_visible, self.toggle, self.topmost, self.reactions)):
-            checkbox.setFixedHeight(28)
+            checkbox.setFixedHeight(SETTINGS_ROW_HEIGHT)
             checkbox.setStyleSheet('margin:0; padding:0;')
             form.addWidget(checkbox, row, 0)
 
@@ -241,7 +242,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         for row, (name, field) in enumerate((('display_mode', self.mode_combo),
                                               ('size', self.values['size']), ('opacity', self.values['opacity']))):
             label = QtWidgets.QLabel(tr(name))
-            label.setFixedHeight(28)
+            label.setFixedHeight(SETTINGS_ROW_HEIGHT)
             label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             label.setStyleSheet('margin:0; padding:0; font-size:14px;')
             label.setBuddy(field)
@@ -252,7 +253,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
                     hint = tr(name + '_' + direction)
                     button.setToolTip(hint)
                     button.setAccessibleName(hint)
-            field.setFixedSize(180, 28)
+            field.setFixedSize(180, SETTINGS_ROW_HEIGHT)
             form.addWidget(label, row, 1, QtCore.Qt.AlignVCenter)
             form.addWidget(field, row, 2, QtCore.Qt.AlignVCenter)
             self.field_labels[name] = label

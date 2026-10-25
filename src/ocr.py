@@ -2341,7 +2341,7 @@ def _save_translation_history_sync(original_text, translated_text, language):
         config = get_cached_ocr_config()
     except Exception:
         return
-    if not config.get("history", False):
+    if not config.get("history", True):
         return
     try:
         history_file = get_data_file("translation_history.json")
@@ -4017,6 +4017,7 @@ class ScreenCaptureOverlay(QWidget):
         from capture_regions import text, memory_keys, memory_controls_enabled
         locale = config.get('interface_language', 'en')
         self._memory_locale = locale
+        self._capture_retry_pending = False
         enabled_key, _ = memory_keys(self.mode)
         self._area_memory_available = memory_controls_enabled(config, self.mode)
         with QtCore.QSignalBlocker(self.remember_area_checkbox):
@@ -4081,11 +4082,15 @@ class ScreenCaptureOverlay(QWidget):
         self._update_memory_actions()
 
     def _update_memory_actions(self):
-        available = self._area_memory_available and self._preview_rect is not None and not self._ocr_in_progress
+        # A failed screenshot can be retried in this session even when the
+        # user has disabled persistent region memory. Keep its error visible
+        # without exposing the disabled memory checkbox or writing settings.
+        controls_available = self._area_memory_available or self._capture_retry_pending
+        available = controls_available and self._preview_rect is not None and not self._ocr_in_progress
         self.repeat_area_button.setVisible(available)
         self.repeat_area_button.setEnabled(available and self._region_gesture is None)
-        self.memory_panel.setVisible(self._area_memory_available and not self._ocr_in_progress)
-        self.memory_hint.setVisible(self._area_memory_available and bool(self.memory_hint.text()) and not self._ocr_in_progress)
+        self.memory_panel.setVisible(controls_available and not self._ocr_in_progress)
+        self.memory_hint.setVisible(controls_available and bool(self.memory_hint.text()) and not self._ocr_in_progress)
 
     def _remember_area_changed(self, enabled):
         from capture_regions import memory_keys, memory_control_modes, text
@@ -4155,6 +4160,7 @@ class ScreenCaptureOverlay(QWidget):
                 self._area_save_warning = not _write_ocr_config_updates({area_key: area})
         self.last_rect = rect
         self._preview_rect = None
+        self._capture_retry_pending = False
         self._ocr_in_progress = True
         self._ocr_status_text = self._default_ocr_status_text()
         self.start_point = self.end_point = None
@@ -4562,10 +4568,11 @@ class ScreenCaptureOverlay(QWidget):
         for column in range(4):
             grid.setColumnStretch(column, 0)
         inline = inline_width <= content_width
-        self.capture_separator.setVisible(self._area_memory_available and inline)
-        self.memory_panel.setVisible(self._area_memory_available and not self._ocr_in_progress)
+        controls_available = self._area_memory_available or self._capture_retry_pending
+        self.capture_separator.setVisible(controls_available and inline)
+        self.memory_panel.setVisible(controls_available and not self._ocr_in_progress)
         grid.addWidget(self.capture_languages, 0, 0, QtCore.Qt.AlignVCenter)
-        if not self._area_memory_available:
+        if not controls_available:
             grid.addWidget(self.capture_close_button, 0, 1, QtCore.Qt.AlignVCenter)
         elif inline:
             grid.addWidget(self.capture_separator, 0, 1, QtCore.Qt.AlignVCenter)
@@ -4758,6 +4765,7 @@ class ScreenCaptureOverlay(QWidget):
                 event.accept()
                 return
             self._preview_rect = None
+            self._capture_retry_pending = False
             self.memory_hint.clear()
             self._update_memory_actions()
             self.start_point = event.pos()
@@ -5198,7 +5206,7 @@ class ScreenCaptureOverlay(QWidget):
         self._ocr_worker_session_id = session_id
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
-        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
         self.ocr_worker.start()
 
     def _start_rapidocr_worker(self, pil_variants, context, session_id):
@@ -5211,7 +5219,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
-        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
         self.ocr_worker.start()
 
     def _start_easyocr_worker(self, pil_variants, language_code, context, session_id):
@@ -5226,7 +5234,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
-        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
         self.ocr_worker.start()
 
     def _persist_failed_ocr_artifacts(self, reason):
@@ -5304,6 +5312,7 @@ class ScreenCaptureOverlay(QWidget):
             self._ocr_in_progress = False
             self._ocr_worker_session_id = None
             self._ocr_status_text = ""
+            self._capture_retry_pending = True
             notify_current_activity('error', f'ocr:{id(self)}')
             from capture_regions import screen_identity, text as capture_text
             if self._active_screen is not None:
@@ -5371,7 +5380,7 @@ class ScreenCaptureOverlay(QWidget):
             self.ocr_worker.result_ready.connect(lambda result, sid=session_id: self._handle_api_ocr_result(result, sid))
             self.ocr_worker.failed.connect(lambda error, sid=session_id: self._handle_api_ocr_error(error, sid))
             self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
-            self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
+            self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
             self.ocr_worker.start()
             return
 
@@ -5625,7 +5634,7 @@ class ScreenCaptureOverlay(QWidget):
         self.ocr_worker.status_update.connect(self._set_ocr_status_text)
         self.ocr_worker.result_ready.connect(lambda text, sid=session_id: self.handle_ocr_result(text, sid))
         self.ocr_worker.finished.connect(self.ocr_worker.deleteLater)
-        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs') is True
+        self.ocr_worker.join_paragraphs = self.mode == 'translate' and get_cached_ocr_config().get('ocr_join_paragraphs', True) is True
         self.ocr_worker.start()
 
     def _handle_api_ocr_result(self, result, session_id):
@@ -5799,7 +5808,10 @@ class ScreenCaptureOverlay(QWidget):
 
     def _handle_ocr_result_inner(self, text):
         session_id = getattr(self, "_session_id", "unknown")
-        if text:
+        # An engine can return only layout whitespace for an empty region.
+        # Keep valid OCR text unchanged, but never replace the clipboard or
+        # announce successful copying for a result without visible content.
+        if text and text.strip():
             if self.mode == "translate":
                 source_code, target_code = self._current_translate_pair()
                 logging.info(
@@ -6660,7 +6672,7 @@ class FullScreenTranslateOverlay(QWidget):
 
         try:
             from api_providers import VisionLayout
-            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data, join_paragraphs=get_cached_ocr_config().get('ocr_join_paragraphs') is True)
+            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data, join_paragraphs=get_cached_ocr_config().get('ocr_join_paragraphs', True) is True)
             if not self._lines_data:
                 self._fail_translation(run_id, "screen_no_text")
                 return

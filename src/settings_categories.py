@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 from settings_sections import PAGE_OCR, section_text
+from settings_metrics import SETTINGS_ROW_GAP, SETTINGS_ROW_HEIGHT
 
 
 CAPTIONS = {
@@ -180,7 +181,7 @@ def _new_action(settings, key, hint, callback):
 
 def _flag(control):
     control.setObjectName('settingsPageCheckbox')
-    control.setFixedHeight(28)
+    control.setFixedHeight(SETTINGS_ROW_HEIGHT)
     control.setStyleSheet('margin:0; padding:0;')
     return control
 
@@ -189,7 +190,7 @@ def _form(content):
     grid = QGridLayout(content)
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setHorizontalSpacing(10)
-    grid.setVerticalSpacing(2)
+    grid.setVerticalSpacing(SETTINGS_ROW_GAP)
     grid.setColumnStretch(0, 1)
     return grid
 
@@ -217,7 +218,7 @@ def _fit_dynamic_flag(control, width):
         lines.append(line)
     control.setText('\n'.join(lines))
     control.setAccessibleName(original)
-    control.setFixedHeight(max(28, control.sizeHint().height()+2))
+    control.setFixedHeight(max(SETTINGS_ROW_HEIGHT, control.sizeHint().height()+2))
 
 
 def fit_dynamic_flags(settings):
@@ -238,7 +239,7 @@ def _wrap_mode_pages(settings):
                     settings.game_swap_button, settings.game_scan_interval_label,
                     settings.game_interval_controls, settings.game_overlay_opacity_label,
                     settings.game_opacity_controls):
-        control.setFixedHeight(28)
+        control.setFixedHeight(SETTINGS_ROW_HEIGHT)
     for control in (settings.game_pause_inactive_checkbox, settings.game_show_original_checkbox,
                     settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
                     settings.game_remember_template_checkbox):
@@ -260,7 +261,7 @@ def _wrap_mode_pages(settings):
     settings.game_flags_panel = QWidget(content)
     flags = QVBoxLayout(settings.game_flags_panel)
     flags.setContentsMargins(0, 0, 0, 0)
-    flags.setSpacing(5)
+    flags.setSpacing(SETTINGS_ROW_GAP)
     settings.game_flags_panel.setMinimumWidth(294)
     from text_direction import ui_directional_text
     language = settings.parent.current_interface_language
@@ -281,7 +282,7 @@ def _wrap_mode_pages(settings):
     settings.game_options_panel.setFixedWidth(350)
     options = QVBoxLayout(settings.game_options_panel)
     options.setContentsMargins(0, 0, 0, 0)
-    options.setSpacing(6)
+    options.setSpacing(SETTINGS_ROW_GAP)
     grid.addWidget(settings.game_options_panel, 0, 1, Qt.AlignTop)
     grid.setRowStretch(1, 1)
     header = settings.game_language_row.layout()
@@ -290,19 +291,19 @@ def _wrap_mode_pages(settings):
     # RightToLeft here would mirror this one row twice.
     header.setDirection(QBoxLayout.LeftToRight)
     header.setSpacing(8)
-    settings.game_language_row.setFixedHeight(28)
-    settings.game_language_controls.setFixedSize(214, 28)
+    settings.game_language_row.setFixedHeight(SETTINGS_ROW_HEIGHT)
+    settings.game_language_controls.setFixedSize(214, SETTINGS_ROW_HEIGHT)
     settings.game_language_controls.layout().setSpacing(4)
     for combo in (settings.game_source_combo, settings.game_target_combo):
         combo.setFixedWidth(90)
         combo.setIconSize(QSize(18, 18))
-    settings.game_swap_button.setFixedSize(26, 28)
+    settings.game_swap_button.setFixedSize(26, SETTINGS_ROW_HEIGHT)
     labels = (settings.game_languages_label, settings.game_scan_interval_label,
               settings.game_overlay_opacity_label, settings.game_template_label)
     for label in labels:
         label.setStyleSheet('font-size:14px; margin:0; padding:0;')
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        label.setFixedSize(128, 28)
+        label.setFixedSize(128, SETTINGS_ROW_HEIGHT)
     header.addWidget(settings.game_languages_label)
     header.addWidget(settings.game_language_controls)
     options.addWidget(settings.game_language_row)
@@ -310,12 +311,12 @@ def _wrap_mode_pages(settings):
     settings.game_numeric_options = QWidget(settings.game_options_panel)
     numbers = QVBoxLayout(settings.game_numeric_options)
     numbers.setContentsMargins(0, 0, 0, 0)
-    numbers.setSpacing(6)
+    numbers.setSpacing(SETTINGS_ROW_GAP)
     for label, control in (
             (settings.game_scan_interval_label, settings.game_interval_controls),
             (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
         group = QWidget(settings.game_numeric_options)
-        group.setFixedHeight(28)
+        group.setFixedHeight(SETTINGS_ROW_HEIGHT)
         line = QHBoxLayout(group)
         line.setContentsMargins(0, 0, 0, 0)
         line.setSpacing(8)
@@ -327,7 +328,7 @@ def _wrap_mode_pages(settings):
     options.addWidget(settings.game_numeric_options)
 
     settings.game_template_actions = QWidget(settings.game_options_panel)
-    settings.game_template_actions.setFixedHeight(28)
+    settings.game_template_actions.setFixedHeight(SETTINGS_ROW_HEIGHT)
     template_row = QHBoxLayout(settings.game_template_actions)
     template_row.setContentsMargins(0, 0, 0, 0)
     template_row.setSpacing(8)
@@ -335,7 +336,7 @@ def _wrap_mode_pages(settings):
     template_row.addWidget(settings.game_template_label)
     template_fields = QWidget(settings.game_template_actions)
     settings.game_template_controls = template_fields
-    template_fields.setFixedSize(214, 28)
+    template_fields.setFixedSize(214, SETTINGS_ROW_HEIGHT)
     fields = QHBoxLayout(template_fields)
     fields.setContentsMargins(0, 0, 0, 0)
     fields.setSpacing(6)
@@ -393,7 +394,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     general = settings.settings_general_page
     content = QWidget()
     content.setLayout(form)
-    form.setVerticalSpacing(2)
+    form.setVerticalSpacing(SETTINGS_ROW_GAP)
     for row, control in enumerate((settings.autostart_checkbox,
             settings.start_minimized_checkbox, settings.copy_history_checkbox,
             settings.history_checkbox, settings.button_tooltips_checkbox,
@@ -448,7 +449,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     settings.restore_clipboard_checkbox.setText(compact[0])
     settings.close_result_on_outside_click_checkbox = QCheckBox(compact[1], content)
     close_flag = settings.close_result_on_outside_click_checkbox
-    close_flag.setChecked(settings.parent.config.get('close_result_window_on_outside_click') is True)
+    close_flag.setChecked(settings.parent.config.get('close_result_window_on_outside_click', True) is True)
     close_flag.setToolTip(tooltip_text(settings_text(lang, 'close_result_window_on_outside_click_tooltip')))
     close_flag.toggled.connect(lambda checked: settings.auto_save_setting(
         'close_result_window_on_outside_click', bool(checked)))
@@ -515,7 +516,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     caption, hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
     settings.ocr_join_paragraphs_checkbox = QCheckBox(caption, content)
     paragraph_flag = settings.ocr_join_paragraphs_checkbox
-    paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs') is True)
+    paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs', True) is True)
     paragraph_flag.setToolTip(tooltip_text(hint))
     paragraph_flag.setAccessibleDescription(hint)
     paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))

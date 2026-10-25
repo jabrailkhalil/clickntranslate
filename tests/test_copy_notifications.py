@@ -74,7 +74,7 @@ def test_repeated_copy_extends_notice_instead_of_old_timeout_hiding_it():
         popup.close()
 
 
-def test_copy_notification_dispatch_is_opt_in_and_thread_safe_signal_based():
+def test_copy_notification_dispatch_respects_setting_and_uses_thread_safe_signal():
     app = _app()
     receiver = _Receiver()
     received = []
