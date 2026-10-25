@@ -1,5 +1,10 @@
 # Repository layout
 
+Desktop development lives in `main`. The Android application has its own Gradle
+project in the [android branch](https://github.com/jabrailkhalil/clickntranslate/tree/android);
+see the [Android guide](ANDROID.md) for installation and mobile features.
+Both editions publish downloads in the same GitHub Releases page.
+
 The repository has five top-level directories. Downloadable application packages
 are attached to GitHub Releases and retain their existing layout.
 
@@ -7,7 +12,7 @@ are attached to GitHub Releases and retain their existing layout.
 | --- | --- |
 | `.github/` | Workflows, contribution guide and security policy |
 | `src/` | Python implementation, isolated OCR/translation workers and `icons/` |
-| `docs/` | Guides, README translations, demos, research paper, website, store and promotion materials |
+| `docs/` | Guides, README translations, demos, research paper, historical website sources, store and promotion materials |
 | `tests/` | Automated tests |
 | `tools/` | Build, signing and QA tools; `packaging/`, `installer/` and native `launcher/` sources |
 
@@ -44,6 +49,14 @@ own directory. Build output is still under `build/` and `dist/`; staging and
 release tools retain their existing output locations. Local output, downloaded
 models, credentials and user data are excluded from Git.
 
+## Website
+
+The current product site is [translate.clickn.dev](https://translate.clickn.dev/).
+The author's project hub is [clickn.dev](https://clickn.dev/). The old
+`xynapse.online` addresses redirect to those sites. `docs/landing/` preserves
+the previous static site source; its historical hosting configuration describes
+the former deployment. See its [README](landing/README.md) before using it.
+
 ## Compatibility
 
 Keep the packaged executable names, Windows installer AppId, Mac bundle ID,
@@ -52,5 +65,5 @@ stable. Windows packages still include `ClicknTranslate.exe`,
 `app/ClicknTranslateApp.exe`, private workers, and `program-files.sha256`.
 
 Changing source organization does not replace an existing release asset, create
-a new release, or change `APP_VERSION`. The `v1.8.1` tag and its published files
-remain the historical build inputs and downloads for that version.
+a new release, or change `APP_VERSION`. Published tags and their files retain
+the build inputs and downloads for their respective versions.

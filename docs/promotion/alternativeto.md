@@ -1,154 +1,88 @@
-# AlternativeTo listing draft
+# AlternativeTo entry: update fields
 
-Submit through **Suggest new application** from a personal account with a
-verified email address. AlternativeTo reviews the entry; it does not host the
-download.
+Prepared **25 October 2026** for published **1.8.2**. The existing entry is
+**live**: https://alternativeto.net/software/click-n-translate/about/.
+It was added on 5 September. On 25 October, the owner submitted corrections to
+the site, Mac/Android platforms, UI languages, description and two real 1.8.2
+screenshots. The site confirmed receipt; **moderation is pending**, so public
+fields may still show the older information. Do not resubmit or create a second
+card. See the [promotion log](../PROMOTION_LOG.md) for the verified history.
+
+**OpenAlternative is a different service.** Its separate 3 August submission
+had no confirmed acceptance in the 22 October audit; do not infer its status from the
+live AlternativeTo page.
 
 ## Basic fields
 
-**Name**
+| Field | Value |
+| --- | --- |
+| Name | Click’n’Translate |
+| Official website | https://translate.clickn.dev/ |
+| Source | https://github.com/jabrailkhalil/clickntranslate |
+| Download | https://github.com/jabrailkhalil/clickntranslate/releases/latest |
+| Support / news | https://t.me/jabrail_digital |
+| Platforms | Windows; macOS; Linux; Android |
+| Pricing / license | Free; Open Source; GNU General Public License v3.0 |
+| Published version | 1.8.2 |
 
-Click'n'Translate
-
-**Official website**
-
-https://xynapse.online/clickntranslate/
-
-**Source code**
-
-https://github.com/jabrailkhalil/clickntranslate
-
-**Developer Telegram / support**
-
-https://t.me/jabrail_digital
-
-**Download page**
-
-https://github.com/jabrailkhalil/clickntranslate/releases/latest
-
-**Platforms**
-
-- Windows
-- Linux
-
-**Supported interface languages**
-
-- English
-- Russian
-- Spanish
-- German
-- French
-- Chinese
-
-**License / pricing**
-
-- Free
-- Open Source
-- GNU General Public License v3.0
-
-**Application types**
-
-- Translator
-- Screenshot Capture Tool
-- OCR / Image to Text
-
-Choose only types that exist in the current AlternativeTo form.
+Desktop UI: English, Russian, Spanish, German, French, Chinese, Portuguese and
+Italian. Android UI: English, Russian, German, French, Spanish and Chinese.
+Translation-language support is separate: the desktop catalog names 63 languages,
+with actual coverage determined by the selected provider, OCR and installed model.
 
 ## Short description
 
-Free open-source desktop app for OCR and translation of screen areas, selected
-text, and documents using hotkeys and online or offline engines.
+Free screen OCR and translation for Windows, macOS, Linux and Android, with
+online services and optional offline models.
 
 ## Full description
 
-Click'n'Translate is a desktop screen OCR and translation utility for text in
-games, images, videos, applications, remote desktops, and documents.
+Click’n’Translate recognizes and translates visible text in games, images, videos
+and applications. Desktop users can capture a region, translate the full screen,
+translate or replace selected text, follow changing screen regions with Dynamic
+translation, and edit common documents in a side-by-side workspace. Configurable
+shortcuts and an optional desktop companion provide quick access to these actions.
 
-Users can select any screen region and copy its recognized text, translate a
-region or the full screen, translate highlighted text, replace selected text
-with its translation, or keep one or several changing regions translated with
-Dynamic mode. A document workspace opens common text, Word, PDF, HTML, and RTF
-files with original and translated text side by side.
+Android provides a floating translation button over other apps, movable capture
+regions, text and photo translation, system Share actions and local text history.
+The mobile app works independently of the computer. Basic screen capture requires
+Android consent and overlay permission, but no root access.
 
-The application supports Windows OCR, Tesseract, RapidOCR, and EasyOCR. Online
-translation providers include Google, MyMemory, Lingva, and LibreTranslate.
-Optional Argos Translate and Hy-MT packages provide local translation after
-installation.
+Desktop OCR includes Windows OCR/Apple Vision where available, Tesseract,
+RapidOCR and optional EasyOCR. Desktop offline translation uses Argos Translate
+or Hy-MT after model installation. Android offers supported ML Kit offline
+translation models. Online and user-configured API services are also available.
+Engine and language availability differ by platform.
 
-Click'n'Translate requires no account and contains no ads or developer-operated
-analytics. Histories are optional and local. OCR runs locally; text is sent to a
-third party only when the user selects an online translation provider. The
-source is available under GPL-3.0.
+Local engines process on the device. Online translation sends text to the selected
+service; an enabled cloud OCR or image-capable API can send the selected image.
+Provider fees and limits apply. The application is free and open source under
+GPL-3.0, with no required Click’n’Translate account or app advertising.
 
-Developer updates and support: https://t.me/jabrail_digital
+## Categories, properties and tags
 
-## Suggested properties and features
+Choose only labels that actually exist in the current form and match the product:
+Translator; OCR / Image to Text; Screenshot Capture; Free; Open Source; Ad-free;
+Offline Translation; Online Translation; Real-time Translation; Dark Mode.
+Global Hotkeys, System Tray, Portable and Desktop Application describe the desktop
+edition. Floating screen translation and Android describe the mobile edition.
+Keep the online/image-processing distinction visible when selecting privacy labels.
 
-Select only labels available in the form and actually supported:
+Suggested tags: `screen-translator`, `ocr`, `image-to-text`, `offline-translation`,
+`game-translation`, `document-translation`, `android`, `windows`, `macos`, `linux`.
 
-- Open Source
-- Free
-- Ad-free
-- No Tracking
-- Works Offline
-- OCR
-- Image to Text
-- Screenshot OCR
-- Online Translation
-- Offline Translation
-- Real-time Translation
-- Global Hotkeys
-- Sits in the System Tray
-- Desktop Application
-- Dark Mode
-- Portable
+## Media
 
-The online-provider distinction must remain visible in the description when
-selecting “Privacy focused” and “Works Offline”.
+Use real app recordings from `gifs/` where animation is accepted, or current
+screenshots from `../images/`. Include both desktop and Android workflows. Avoid
+the unused generated gallery/video drafts. Check that no private text or keys are visible.
 
-## Tags
+## Submission/update note
 
-- screen-translator
-- ocr
-- image-to-text
-- screenshot-ocr
-- language-translation
-- offline-translation
-- hotkeys
-- game-translation
-- document-translation
+Reference wording for a future edit; the 25 October correction was already submitted.
 
-## Product capabilities
-
-Describe Click’n’Translate through its screen OCR, selected-text translation,
-document tools, configurable overlays and local/online engine choices.
-
-## Assets
-
-- Square application icon: `../../src/icons/icon.png` (1024 x 1024 PNG).
-- `gallery/01-overview.png` (1270 x 760 PNG).
-- `gallery/02-game-translation.png` (1270 x 760 PNG).
-- `gallery/03-area-ocr.png` (1270 x 760 PNG).
-- `gallery/04-selected-text.png` (1270 x 760 PNG).
-- `gallery/05-dynamic-regions.png` (1270 x 760 PNG).
-- `gallery/06-translate-replace.png` (1270 x 760 PNG).
-
-The gallery images are prepared from the real application workflows. If the
-form accepts animation, use the matching recordings from `gifs/`. Do not use
-generated product mockups or antivirus warning screens; address antivirus
-heuristics factually in support material.
-
-## Current release verification
-
-Checked on 2026-09-04: GitHub `releases/latest` resolves to public, non-prerelease
-version `v1.7.0`, with Windows installer and portable assets plus Linux AppImage
-and TAR assets. Keep the download field on the permanent `releases/latest` URL
-instead of hard-coding this version.
-
-## Submission note
-
-I am the developer of Click'n'Translate. This submission describes the public
-GPL-3.0 project and links to its official website, source code, and official
-Telegram channel (https://t.me/jabrail_digital). The website always points users
-to the current release. I am happy to correct categories or provide additional
-information if needed.
+I am the developer of Click’n’Translate. Please update the existing entry to show
+Windows, macOS, Linux and Android and the current website, https://translate.clickn.dev/.
+The public release is 1.8.2; a further update is planned in about two weeks and is
+not released yet. The project is free and GPL-3.0, and the website links to the
+current official downloads. I can provide additional details if needed.

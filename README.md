@@ -21,7 +21,7 @@
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
-  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
 </p>
@@ -52,7 +52,7 @@
 | **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
 | **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[All downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
+[All downloads](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 <a name="android"></a>
 
@@ -75,7 +75,7 @@
 
 You can also type or paste text, share text to **Clickn** from another app, or translate a photo or screenshot from your gallery. Copy or share results and revisit local text history. Google works without a key; ML Kit offers offline translation after downloading supported language models. Additional API services use your own credentials.
 
-**[Download APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android guide](docs/ANDROID.md) · [Android source](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+[Android guide](docs/ANDROID.md) · [Android source](https://github.com/jabrailkhalil/clickntranslate/tree/android)
 
 ## On desktop: translate where you already are
 
@@ -101,7 +101,6 @@ The desktop document workspace opens TXT, Markdown, DOCX, text-based PDF, HTML a
 ![Translate the full screen](docs/images/fullscreen-translation-demo-v2.gif)
 
 <sub>Desktop workflow recordings; the current window design may differ.</sub>
-
 
 ## Online, offline, or your own API
 
@@ -153,10 +152,8 @@ Desktop 1.8.2 downloads GitHub Releases updates inside the app. Mac/Linux 1.8.1 
 For troubleshooting, attach the ZIP from **Settings → Bug report**. It excludes clipboard contents, documents, histories and credentials. Source code is available under [GPL-3.0](LICENSE); Android development lives in the [android branch](https://github.com/jabrailkhalil/clickntranslate/tree/android).
 
 <details>
-<summary>Checksums, signatures and the download counter</summary>
+<summary>Checksums and signatures</summary>
 
 The small `.sha256` release files are used automatically by desktop updates to check downloaded packages. You do not need to download them yourself. The optional [verification archive](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-verification.zip) contains checksums, signatures and public certificates for manual verification. [Signing identities](docs/SIGNING_IDENTITIES.md).
-
-The download badge counts release-file downloads, including update files; it does not count unique users.
 
 </details>

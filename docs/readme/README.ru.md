@@ -21,7 +21,7 @@
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
-  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
 </p>
@@ -52,7 +52,7 @@
 | **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
 | **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[Все загрузки](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
+[Все загрузки](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 <a name="android"></a>
 
@@ -75,7 +75,7 @@
 
 Также можно напечатать или вставить текст, передать его через **«Поделиться → Clickn»**, перевести фото или скриншот из галереи. Результат можно скопировать, отправить или найти в локальной истории текста. Google работает без ключа; для офлайн-перевода ML Kit сначала скачайте модели поддерживаемых языков. Дополнительные API-сервисы используют ваши ключи.
 
-**[Скачать APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Инструкция для Android](../ANDROID.ru.md) · [Исходный код Android](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+[Инструкция для Android](../ANDROID.ru.md) · [Исходный код Android](https://github.com/jabrailkhalil/clickntranslate/tree/android)
 
 ## На компьютере: перевод там, где вы работаете
 
@@ -101,7 +101,6 @@
 ![Перевести весь экран](../images/fullscreen-translation-demo-v2.gif)
 
 <sub>Записи рабочих сценариев настольной версии; оформление окон могло измениться.</sub>
-
 
 ## Онлайн, офлайн или свой API
 
@@ -151,10 +150,8 @@
 Для диагностики приложите ZIP из **Настройки → Баг-репорт**. Содержимое буфера, документов, историй и ключи в отчёт не включаются. Код открыт под [GPL-3.0](../../LICENSE); Android разрабатывается в [отдельной ветке](https://github.com/jabrailkhalil/clickntranslate/tree/android).
 
 <details>
-<summary>Контрольные суммы, подписи и счётчик загрузок</summary>
+<summary>Контрольные суммы и подписи</summary>
 
 Маленькие файлы `.sha256` используются автообновлением для проверки скачанных сборок. Вручную загружать их не нужно. Необязательный [архив проверки](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-verification.zip) содержит контрольные суммы, подписи и публичные сертификаты. [Данные подписей](../SIGNING_IDENTITIES.md).
-
-Счётчик показывает скачивания файлов релизов, включая файлы обновлений, а не число уникальных пользователей.
 
 </details>

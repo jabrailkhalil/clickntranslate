@@ -1,6 +1,6 @@
 # Click’n’Translate on Android
 
-[Download APK 1.8.2](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) · [Русский](ANDROID.ru.md) · [Main README](../README.md#android)
+[Download APK 1.8.2](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) · [Website](https://translate.clickn.dev/en/#android) · [Русский](ANDROID.ru.md) · [Main README](../README.md#android)
 
 Translate games and other apps using a floating button, translate a photo from your gallery, or type, paste and share text. The Android app runs on the phone independently of the desktop app. Standard screen capture needs no root access.
 
@@ -36,7 +36,23 @@ If the floating button hides after inactivity, use **Show button** in the app or
 - **Your own API:** configure the chosen service in Settings. Credentials use the app’s protected storage. Availability, model capabilities, fees and rate limits depend on the provider.
 - **OCR:** the default bundled recognizers cover Latin, Chinese, Japanese and Korean scripts. Other scripts, including Cyrillic and Arabic, need a suitable alternative OCR engine/service. Choosing a translation target does not add OCR support for that script. Shared text bypasses OCR.
 
-The usual screen workflow is **capture → OCR → translation → overlay**. Local OCR keeps recognition on the device; online translation sends recognized text to the chosen service. A configured cloud OCR or image-capable API may receive the captured image. Offline translation remains local after its models are downloaded. See [Privacy](../PRIVACY.md).
+## Data and permissions
+
+The usual screen workflow is **capture → OCR → translation → overlay**. Local
+OCR keeps recognition on the device; online translation sends recognized text
+to the chosen service. A configured cloud OCR or image-capable API may receive
+the captured image. Offline translation remains local after its models are
+downloaded. Provider terms, request limits and fees apply to configured services.
+
+Screen translation requires Android's screen-capture consent and overlay
+permission. Text and gallery translation work without screen capture. Optional
+Accessibility actions require a separate permission. Stop the capture session
+from the app or its notification when finished. Protected content can remain
+unavailable for capture.
+
+Text history stores up to 50 entries on the device and can be cleared in
+History. API credentials use the app's protected storage. Do not include keys,
+private screen contents or personal history in public bug reports.
 
 ## Make it comfortable
 

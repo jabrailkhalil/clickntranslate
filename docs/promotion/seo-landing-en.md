@@ -1,50 +1,55 @@
 # English SEO landing page copy
 
+Updated 25 October 2026 for published 1.8.2. This is an editorial copy bank for
+the existing site, https://translate.clickn.dev/, rather than a new deployment.
+The next update is planned in about two weeks and is not released yet.
+
 ## Metadata
 
-**Suggested slug:** `/screen-translator/`
+**Published page:** `https://translate.clickn.dev/en/`
 
-**Title:** Free Screen Translator for Windows | Click'n'Translate
+**Title:** Free Screen Translator & OCR | Click'n'Translate
 
 **Meta description:** Copy or translate text from games, images, videos, apps,
 and documents. Free open-source screen OCR with hotkeys and online or offline
 engines.
 
-**Canonical:** `[PUBLIC_LANDING_URL]/screen-translator/`
+**Canonical:** `https://translate.clickn.dev/en/`
 
 **Open Graph title:** Translate any text on your screen with one hotkey
 
 **Open Graph description:** Free, open-source screen OCR and translation for
-Windows and Linux — including selected text, documents, full-screen, and live
-multi-area translation.
+Windows, macOS, Linux and Android. Desktop includes selected text, documents,
+full-screen and multi-area translation; Android has its own floating-button,
+text and photo workflows.
 
 ## Hero
 
 ### Eyebrow
 
-Free and open source · Windows and Linux · No account
+Free and open source · Windows · macOS · Linux · Android
 
 # Translate any text on your screen
 
-Copy text that cannot be selected. Translate a game, image, video, application,
+On desktop, copy text that cannot be selected. Translate a game, image, video, application,
 or document. Replace highlighted text in place or keep several screen regions
 translated as they change — all with configurable hotkeys.
 
-**Primary CTA:** Download for Windows
+**Primary CTA:** Download for your device
 
 **Secondary CTA:** View source on GitHub
 
-**Tertiary links:** Portable ZIP · Linux downloads · Release notes
+**Tertiary links:** Windows · macOS · Linux · Android APK · Release notes
 
 Microcopy below CTA:
 
-> Latest release: detected automatically from GitHub. Free under GPL-3.0. No account, ads, or
-> developer-operated analytics.
+> Latest release: detected automatically from GitHub. The app is free under
+> GPL-3.0, with no required Click’n’Translate account or app advertising.
 
 ## Demo caption
 
 Select one or several important regions. Click'n'Translate recognizes the text
-locally and updates translated overlays when it changes.
+with your chosen OCR engine and updates translated overlays when it changes.
 
 ## Problem section
 
@@ -90,7 +95,7 @@ Click'n'Translate does not lock you into one OCR or translation route.
 
 ### OCR on your computer
 
-- Windows OCR
+- Windows OCR / Apple Vision, on their respective platforms
 - Tesseract
 - RapidOCR
 - EasyOCR
@@ -114,10 +119,12 @@ package manager.
 
 ## Know where your text goes
 
-OCR runs locally. Argos Translate and Hy-MT also translate locally after their
-packages are installed. If you choose an online provider, the text you request
-to translate is sent to that provider. Copy and translation histories are local
-and optional.
+Local OCR processes on the device. Desktop Argos Translate and Hy-MT translate
+locally after model installation; Android offers supported ML Kit offline models.
+Online translation sends text to the selected service. If cloud OCR or an
+image-capable API is enabled, it can receive the selected image too. Desktop
+histories are local and optional; Android has clearable local text history.
+Website privacy has a separate scope: https://clickn.dev/en/privacy/.
 
 **CTA:** Read the privacy policy
 
@@ -125,7 +132,7 @@ and optional.
 
 ## Screen translation when you need it, a workspace when you do not
 
-Open `.txt`, `.md`, `.docx`, `.pdf`, `.html`, `.htm`, or `.rtf`. Work with the
+On desktop, open `.txt`, `.md`, `.docx`, text-based `.pdf`, `.html`, `.htm`, or `.rtf`. Work with the
 original and translation side by side, translate a selection or complete text,
 and save the result as text, Markdown, or a reopenable local session.
 
@@ -134,20 +141,19 @@ and save the result as text, Markdown, or a reopenable local session.
 ## Open code, visible trade-offs
 
 - GPL-3.0 source code and public issue tracker.
-- Versioned Windows and Linux downloads.
+- Versioned Windows, macOS, Linux and Android downloads.
 - SHA-256 hashes published with releases.
-- More than 700 automated checks in the current repository.
+- Dated validation reports with their actual checks and platform limitations.
 - Privacy-safe diagnostic reports that exclude clipboard contents, documents,
   histories, credentials, and OCR logs.
 
 ### A note about Windows antivirus warnings
 
-Click'n'Translate uses global hotkeys, screen capture, clipboard integration,
-optional autostart, and updating. The Windows executable is currently unsigned,
-so some heuristic scanners may show a generic warning. Release source and hashes
-are public, and reported samples are submitted to antivirus vendors. New
-detections are investigated; users should download only from the official
-repository and report unexpected warnings.
+Windows and macOS packages use the self-signed `jabrailkhalil` identity. This is
+not publicly trusted Windows CA signing or Apple Developer ID signing; the Mac
+app is not notarized. System warnings can appear on first launch. Follow the
+official setup guide and investigate antivirus detections instead of treating
+them as automatically false positives. Use only official downloads.
 
 ## FAQ
 
@@ -171,6 +177,13 @@ OCR engine.
 
 Yes. The release page provides an x86_64 AppImage and a portable TAR archive.
 Some desktop integration and capture behavior can depend on the Linux session.
+
+### What about Mac and Android?
+
+Mac packages support macOS 13.4+ with separate Apple Silicon and Intel downloads.
+Android 8.0+ ARM64 has its own floating button, text, photo, Share and history
+workflows. Basic capture needs Android screen-sharing consent and overlay
+permission, not root access. See https://translate.clickn.dev/en/#android.
 
 ### Can it replace selected text?
 
@@ -199,7 +212,7 @@ of screen text that gets in your way.
 
 ## Structured data draft
 
-Replace `[PUBLIC_LANDING_URL]` and verify every URL before deployment.
+Align these fields with the current visible page and actual release assets.
 
 ```json
 {
@@ -207,13 +220,13 @@ Replace `[PUBLIC_LANDING_URL]` and verify every URL before deployment.
   "@type": "SoftwareApplication",
   "name": "Click'n'Translate",
   "applicationCategory": "UtilitiesApplication",
-  "operatingSystem": "Windows 10, Windows 11, Linux",
+  "operatingSystem": "Windows 10, Windows 11, macOS 13.4+, Linux x86_64, Android 8.0+ ARM64",
   "isAccessibleForFree": true,
   "license": "https://github.com/jabrailkhalil/clickntranslate/blob/main/LICENSE",
-  "url": "[PUBLIC_LANDING_URL]/screen-translator/",
+  "url": "https://translate.clickn.dev/en/",
   "downloadUrl": "https://github.com/jabrailkhalil/clickntranslate/releases/latest",
   "codeRepository": "https://github.com/jabrailkhalil/clickntranslate",
-  "description": "Free open-source screen OCR and translation for Windows and Linux with configurable hotkeys and online or offline engines.",
+  "description": "Free open-source screen OCR and translation for Windows, macOS, Linux and Android, with online services and optional offline models.",
   "author": {
     "@type": "Person",
     "name": "Dzhabrail Khalilov"

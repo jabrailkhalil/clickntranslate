@@ -21,7 +21,7 @@
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
-  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
 </p>
@@ -52,7 +52,7 @@ Traduisez un jeu, copiez le texte d’une image, lisez un document ou remplacez 
 | **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
 | **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[Tous les téléchargements](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
+[Tous les téléchargements](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 <a name="android"></a>
 
@@ -75,7 +75,7 @@ Traduisez un jeu, copiez le texte d’une image, lisez un document ou remplacez 
 
 Vous pouvez aussi saisir ou coller du texte, le partager vers **Clickn** depuis une autre application et traduire une photo ou capture de la galerie. Copiez ou partagez les résultats et retrouvez l’historique local des textes. Google fonctionne sans clé ; ML Kit traduit hors ligne après téléchargement des modèles compatibles. Les services API supplémentaires utilisent vos propres identifiants.
 
-**[Télécharger l’APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Guide Android (anglais)](../ANDROID.md) · [Code Android](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+[Guide Android (anglais)](../ANDROID.md) · [Code Android](https://github.com/jabrailkhalil/clickntranslate/tree/android)
 
 ## Sur ordinateur : du texte au résultat
 
@@ -97,7 +97,7 @@ Python est inclus. Windows et Mac utilisent le certificat autosigné jabrailkhal
 
 La version de bureau 1.8.2 télécharge les mises à jour GitHub Releases dans l’app. Mac/Linux 1.8.1 et antérieurs nécessitent une première installation manuelle ; certains emplacements protégés exigent un remplacement manuel. Les éditions Microsoft Store passent par Store.
 
-Android propose ses propres vues écran, texte, photos et historique : [guide](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme). Le compteur mesure les téléchargements de fichiers, pas les utilisateurs uniques.
+Android propose ses propres vues écran, texte, photos et historique : [guide](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme).
 
 [Guide complet en anglais](../../README.md) · [Signaler un problème](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0](../../LICENSE)
 

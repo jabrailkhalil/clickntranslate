@@ -21,7 +21,7 @@
 <p align="center">Windows · macOS · Linux · <a href="#android">Android</a></p>
 
 <p align="center">
-  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
+  <a href="https://github.com/jabrailkhalil/clickntranslate/releases/latest"><img src="https://img.shields.io/github/v/release/jabrailkhalil/clickntranslate?style=flat&amp;label=release&amp;color=73529a" alt="Latest release"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/jabrailkhalil/clickntranslate/releases"><img src="https://img.shields.io/github/downloads/jabrailkhalil/clickntranslate/total?style=flat&amp;label=downloads&amp;color=73529a" alt="GitHub release downloads"></a>
 </p>
@@ -52,7 +52,7 @@
 | **Linux** · x86_64 | [AppImage](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.AppImage) | [tar.gz](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-linux-x86_64.tar.gz) |
 | **Android** 8.0+ · ARM64 | [APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk) | — |
 
-[全部下载](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2)
+[全部下载](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
 
 <a name="android"></a>
 
@@ -75,7 +75,7 @@
 
 还可以输入或粘贴文字，从其他应用分享文字到 **Clickn**，或者翻译图库中的照片和截图。结果可复制、分享，文字翻译会保存在本地历史记录中。Google 无需密钥；下载支持的语言模型后，可使用 ML Kit 离线翻译。其他 API 服务使用你自己的凭据。
 
-**[下载 APK](https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk)** · [Android 指南（英语）](../ANDROID.md) · [Android 源代码](https://github.com/jabrailkhalil/clickntranslate/tree/android)
+[Android 指南（英语）](../ANDROID.md) · [Android 源代码](https://github.com/jabrailkhalil/clickntranslate/tree/android)
 
 ## 桌面版：输入文字，获得翻译
 
@@ -97,7 +97,7 @@
 
 桌面 1.8.2 在应用内从 GitHub Releases 下载更新。Mac/Linux 1.8.1 及更早版本需要先手动安装本次升级；受保护的安装位置可能需要手动替换。Microsoft Store 版本通过商店更新。
 
-Android 有独立的屏幕、文字、照片与历史界面：[移动版指南](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme)。下载计数统计发布文件的下载次数，不是独立用户数。
+Android 有独立的屏幕、文字、照片与历史界面：[移动版指南](https://github.com/jabrailkhalil/clickntranslate/tree/android#readme)。
 
 [完整英文指南](../../README.md) · [反馈问题](https://github.com/jabrailkhalil/clickntranslate/issues) · [GPL-3.0](../../LICENSE)
 

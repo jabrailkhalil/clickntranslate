@@ -1,5 +1,9 @@
 # README demo — superseded draft
 
+Historical September 2026 concept. Current product facts are maintained in
+`positioning.md` and `press-kit.md`; the old platform cues below describe that
+unused concept, not the current four-platform release.
+
 Do not render or publish this generated-demo concept. The approved promotion
 media is the real application footage in `gifs/README.md`. This file is kept
 only as an unused historical draft.

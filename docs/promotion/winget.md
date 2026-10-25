@@ -1,126 +1,70 @@
-# WinGet package submission draft
+# WinGet package candidate
 
-This document prepares a future submission for the existing v1.7.0 installer.
-It does not submit anything to `microsoft/winget-pkgs`.
+Prepared **25 October 2026** for the existing **1.8.2** Windows installer.
+This is metadata preparation, not evidence of a submitted or accepted package.
+Check current `microsoft/winget-pkgs` rules and existing identifiers before a PR.
 
-## Recommended identity
+## Candidate identity
 
 | Field | Value |
 | --- | --- |
-| PackageIdentifier | `JabrailDigital.ClicknTranslate` |
-| PackageVersion | `1.7.0` |
+| PackageIdentifier | `JabrailDigital.ClicknTranslate` — confirm availability |
+| PackageVersion | `1.8.2` |
 | PackageLocale | `en-US` |
 | Publisher | `Jabrail Digital` |
 | PackageName | `Click'n'Translate` |
 | License | `GPL-3.0-only` |
-| LicenseUrl | `https://github.com/jabrailkhalil/clickntranslate/blob/v1.7.0/LICENSE` |
-| PublisherUrl | `https://github.com/jabrailkhalil` |
+| LicenseUrl | `https://github.com/jabrailkhalil/clickntranslate/blob/v1.8.2/LICENSE` |
+| PublisherUrl | `https://clickn.dev/` |
 | PublisherSupportUrl | `https://github.com/jabrailkhalil/clickntranslate/issues` |
-| PackageUrl | `https://github.com/jabrailkhalil/clickntranslate` |
-| ReleaseNotesUrl | `https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.7.0` |
-| InstallerType | `inno` |
-| Scope | `user` |
-| Architecture | `x64` |
+| PackageUrl | `https://translate.clickn.dev/` |
+| ReleaseNotesUrl | `https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2` |
+| InstallerType | Expected `inno`; confirm with WinGetCreate and the actual file |
+| Scope / architecture | Expected user / x64; verify installer behavior |
 
-Check that `JabrailDigital.ClicknTranslate` is still unused before submission.
-Package identifiers are permanent enough that changing the spelling later is
-undesirable.
+Installer URL:
 
-## Installer
+https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/Click-n-Translate-1.8.2-windows-x64-installer.exe
 
-**Stable URL**
+## Hash and manifest preparation
 
-https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/Click-n-Translate-1.7.0-windows-x64-installer.exe
+The obsolete 1.7.0 hash has been removed. Download the **exact current asset**,
+calculate SHA-256 and compare it with its published checksum before preparing a
+manifest. No hash is supplied here because this refresh did not download or
+install the Windows package.
 
-**SHA-256 published with v1.7.0**
+Use WinGetCreate to generate current-schema manifests, then review its detected
+installer fields. Keep the permanent package identifier after the first accepted
+submission. Use immutable versioned asset URLs; never replace an old binary in place.
 
-`d4e51ee46ff2222418ade8fd3934ea7dbe09fa8744ef4c7d874bf4660da2e8cd`
+Expected version directory:
 
-Re-download the asset and independently calculate its hash immediately before
-creating the PR. Do not copy the value into a manifest without verification.
+`manifests/j/JabrailDigital/ClicknTranslate/1.8.2/`
 
 ## English metadata
 
-**ShortDescription**
+**ShortDescription:** Extract and translate text from screen regions, selections and documents.
 
-Extract and translate text from any screen area, selection, or document.
+**Description:** Click’n’Translate is a free, open-source screen OCR and translation
+application. The Windows edition provides area/full-screen capture, selected-text
+translation and replacement, Dynamic translation, document workspaces, configurable
+shortcuts, an optional companion and online/offline engine choices. The broader
+project also provides macOS, Linux and Android editions.
 
-**Description**
+Suggested tags: `translation`, `ocr`, `screen-capture`, `offline`, `productivity`.
 
-Click'n'Translate is a free, open-source desktop screen OCR and translation
-application. It can copy text from a selected region, translate a region or full
-screen, translate or replace selected text, monitor multiple changing screen
-regions, and translate common document formats. It supports configurable global
-hotkeys, multiple OCR engines, and online or optional offline translation.
+## Before submitting
 
-**Tags**
+- Confirm the identifier is new or update the existing package rather than duplicating it.
+- Recheck the current repository policies and generated manifest schema.
+- Verify the downloaded asset, checksum, signature and detected installer metadata.
+- Install, launch and uninstall in a clean Windows environment; check silent flags,
+  installation path, AppId and preservation of user data.
+- Run the current WinGet manifest validation and required sandbox checks.
+- Investigate antivirus detections. A self-signed Authenticode certificate does not
+  guarantee trust or acceptance by the package repository.
+- Create a PR only through the owner’s authorized GitHub identity `jabrailkhalil`.
 
-- translation
-- translator
-- ocr
-- screen-capture
-- image-to-text
-- offline
-- productivity
-- accessibility
-
-## Candidate manifests
-
-Use WinGetCreate where possible so the current schema is generated instead of
-copying a stale template:
-
-```powershell
-winget install wingetcreate
-wingetcreate new "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/Click-n-Translate-1.7.0-windows-x64-installer.exe"
-```
-
-Expected file set under the identifier/version path:
-
-```text
-manifests/j/JabrailDigital/ClicknTranslate/1.7.0/
-  JabrailDigital.ClicknTranslate.yaml
-  JabrailDigital.ClicknTranslate.installer.yaml
-  JabrailDigital.ClicknTranslate.locale.en-US.yaml
-```
-
-Likely installer-manifest facts to verify from the generated output:
-
-```yaml
-PackageIdentifier: JabrailDigital.ClicknTranslate
-PackageVersion: 1.7.0
-InstallerType: inno
-Scope: user
-Installers:
-  - Architecture: x64
-    InstallerUrl: https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.7.0/Click-n-Translate-1.7.0-windows-x64-installer.exe
-    InstallerSha256: D4E51EE46FF2222418ADE8FD3934EA7DBE09FA8744EF4C7D874BF4660DA2E8CD
-ManifestType: installer
-```
-
-Do not paste this fragment as a complete manifest. WinGet schemas and required
-fields can change, and WinGetCreate should supply the current version.
-
-## Pre-submission checks
-
-1. Confirm the public GitHub asset downloads without authentication or a
-   short-lived URL.
-2. Calculate SHA-256 locally and compare it with the release notes.
-3. Install silently in a clean Windows Sandbox and confirm the main executable
-   exists at `%LOCALAPPDATA%\Programs\ClicknTranslate`.
-4. Launch the installed app, close it, and uninstall it.
-5. Confirm uninstall removes application files without removing unrelated user
-   data.
-6. Run `winget validate <manifest-directory>`.
-7. Run the `winget-pkgs` SandboxTest script against the manifest directory.
-8. Review current `winget-pkgs` policies, especially malware scanning and
-   installer behavior.
-9. Resolve or document antivirus detections before submission. A WinGet PR is
-   automatically scanned and may be rejected even when the software is benign.
-10. Submit through a fork/PR and respond to validation comments without changing
-    the binary behind the versioned URL.
-
-## Update process for later releases
-
-For each new version, keep the same `PackageIdentifier`, update versioned URLs
-and hashes, validate in Sandbox, and submit a new version directory. Never reuse
-or replace a release asset at an old immutable URL after its manifest is merged.
+For the next update, wait until its public immutable installer and checksum exist,
+then repeat the validation for that exact version. Do not create a future-version
+manifest from a private test build or assume the planned release date is fixed.

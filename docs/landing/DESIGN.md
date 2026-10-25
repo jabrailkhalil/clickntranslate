@@ -1,6 +1,10 @@
-# Landing page design
+# Previous landing page: design record
 
-Updated September 2026 for the Windows, macOS and Linux releases.
+Historical design record from September 2026, covering the former desktop-only
+site. The current product site is [translate.clickn.dev](https://translate.clickn.dev/)
+and includes Windows, macOS, Linux and Android. The parent site is
+[clickn.dev](https://clickn.dev/). See [README.md](README.md) for the status of
+this source snapshot.
 
 ## Implementation and font license
 
@@ -24,7 +28,7 @@ The six localized pages share one renderer and structured content. Font files,
 images and scripts are served by this site. The browser contacts GitHub's public
 API to resolve downloads; no new analytics or cookie service is included.
 
-The header uses the parent site's Xynapse logo and wordmark and links to
+The former header used the parent site's Xynapse logo and wordmark and linked to
 `https://xynapse.online/`. The product keeps its own icon in the page favicon
 and footer.
 The companion preview starts with the dark screenshot and can switch to light.

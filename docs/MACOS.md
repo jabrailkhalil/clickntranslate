@@ -1,25 +1,30 @@
-# Click'n'Translate on macOS — 1.8.1
+# Click'n'Translate on macOS — 1.8.2
 
 **Installing the downloaded DMG?** Follow the [Mac first-launch guide](guides/setup.en.md#macos) / [инструкцию на русском](guides/setup.ru.md#macos): Applications → Open Anyway → Screen Recording → Accessibility → restart. The technical notes below are for development and troubleshooting.
 
 The release includes separate **Apple Silicon (arm64)** and **Intel (x86_64)**
-DMG packages for macOS 13.4 or newer. Final signed bundles passed GUI/settings,
-Vision OCR, Carbon registration, RapidOCR and Argos helper checks. Intel was
-also built and checked on a native Intel runner, then re-signed with the same
-published identity and checked under Rosetta on macOS 14.3.
+DMG packages for macOS 13.4 or newer. The
+[1.8.2 QA report](RELEASE_QA_1.8.2.md) records native Apple Silicon checks,
+the Intel build and Rosetta checks, with their limits.
 
-Both architectures passed manual 1.8.0 → 1.8.1 replacement with retained
-preferences/model markers and a second startup. Mac updates currently open the
-download page; replacing the application is manual. Keep existing user data.
-The designated requirement and **jabrailkhalil** signing identity remain the
-same as the published 1.8.0 bundles.
+From **1.8.2**, the in-app updater downloads the ZIP for the Mac's architecture,
+checks its signature against the installed app, replaces the complete bundle
+and verifies the restarted application's version. A failed startup restores
+the previous application. The installed app and its parent directory must be
+writable; protected installations can require manual replacement.
+
+For **1.8.1 and earlier**, install the first upgrade manually: quit the app
+from its menu-bar icon, download the correct DMG and replace the application
+in Applications. Keep existing user data. The **jabrailkhalil** signing
+identity remains the same. See [update details](UPDATES_1.8.2_DEVELOPMENT.md).
 
 The app, embedded native code and DMG are self-signed. There is no Apple
 Developer ID or notarization yet, so Gatekeeper can block first launch.
 This signature does not establish Apple-verified publisher trust.
 
-[Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.1)
-· [Current QA and limitations](QA_1.8.1_2026-09-25.md)
+[Downloads](https://github.com/jabrailkhalil/clickntranslate/releases/latest)
+· [Website](https://translate.clickn.dev/)
+· [Current QA and limitations](RELEASE_QA_1.8.2.md)
 · [Earlier capture and permissions audit](QA_1.8.0_2026-09-25.md)
 · [Development handoff](MACOS_HANDOFF.md)
 
@@ -122,7 +127,7 @@ area, fullscreen and dynamic capture use the same themed control on all platform
 | Dock reopen | Handles the reopen Apple event without replacing Qt's delegate; native deminiaturization preserves the window position |
 | Single instance | Existing Unix command channel; Darwin peer PID validation |
 | Login startup | Per-user LaunchAgent, enabled only through the existing setting |
-| Updates | Opens the release page; does not modify a signed running bundle |
+| Updates | From 1.8.2, validates and replaces the complete signed bundle through a detached updater; older versions need a first manual upgrade |
 
 On macOS, **Shadow mode** and the main window's Close button leave the application
 in the top menu bar and remove it from the Dock. The status menu provides Open,

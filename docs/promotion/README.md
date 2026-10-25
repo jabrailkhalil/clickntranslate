@@ -1,57 +1,64 @@
-# Click'n'Translate promotion kit
+# Click’n’Translate promotion kit
 
-Status: draft materials for the latest public release. Nothing in this
-directory publishes a post, creates a release, or submits a package.
+Updated **25 October 2026** for the published **1.8.2** release. These are editable
+source materials; saving a draft does not publish or submit it. Confirmed live
+pages and submissions belong in [the promotion log](../PROMOTION_LOG.md).
+
+The next update is planned in about two weeks. Its version, exact date and final
+feature set are not announced here. Use current-release facts until it ships.
 
 ## Start here
 
-1. Read `positioning.md` and keep its terminology consistent across every
-   channel.
-2. Use the real application recordings from `gifs/` in their numbered order.
-3. Prepare the landing page from `seo-landing-en.md` and
-   `seo-landing-ru.md`. Use a dedicated product URL before submitting to
-   Product Hunt or Show HN.
-4. Submit the factual directory listings: AlternativeTo first, WinGet after
-   the installer and its permanent URL have been checked.
-5. Publish the Habr article after adding the author's own experience,
-   screenshots, and technical details. Do not publish the current editorial
-   scaffold verbatim; Habr restricts predominantly generated material.
-6. Stagger the Reddit posts. Use only a community whose rules permit the
-   selected format on the day of posting.
-7. Launch Product Hunt only after its real-product GIF gallery, landing page,
-   and first comment are ready. Post Show HN separately and stay available to
-   answer technical questions.
+1. Use [positioning.md](positioning.md) and [press-kit.md](press-kit.md) for the
+   product facts and wording shared by every channel.
+2. Update existing articles and directory entries before creating duplicates.
+   The [promotion log](../PROMOTION_LOG.md) distinguishes live pages, pending
+   moderation and unsubmitted drafts. AlternativeTo is live; OpenAlternative
+   is a separate submission with its own unconfirmed acceptance status.
+3. Use the current product website, https://translate.clickn.dev/, for a stable
+   public introduction. The author’s project hub is https://clickn.dev/.
+4. Match desktop and Android media to their actual workflows. Existing desktop
+   recordings remain useful, but can show an earlier window design.
+5. Follow [launch-plan.md](launch-plan.md) for preparation now and an announcement
+   after the update is actually available. Recheck each platform’s current rules.
+
+The Habr file is an AI-assisted reference scaffold, **not publishable article
+copy**. Current rules require an independently author-written technical article;
+lightly rewriting this draft does not satisfy them. See `platform-rules.md`.
 
 ## Files
 
 | File | Purpose | Language |
 | --- | --- | --- |
-| `positioning.md` | Approved facts, audience, claims, and reusable copy | EN + RU |
-| `launch-plan.md` | Recommended sequence and publication checklist | RU |
-| `gifs/` | Approved real application recordings, captions, and media order | EN + RU |
-| `readme-video-brief.md` | Superseded generated-demo concept; do not publish | EN |
-| `habr-draft.md` | Technical article scaffold in the author's voice | RU |
-| `reddit-posts.md` | Five non-identical Reddit drafts | EN |
-| `product-hunt.md` | Product Hunt listing and maker comment | EN |
-| `show-hn.md` | Show HN title, post, and reply bank | EN |
-| `alternativeto.md` | AlternativeTo listing fields | EN |
-| `winget.md` | WinGet metadata and submission checklist | EN |
-| `seo-landing-en.md` | English landing page copy and metadata | EN |
-| `seo-landing-ru.md` | Russian landing page copy and metadata | RU |
-| `press-kit.md` | Reusable short descriptions and FAQ | EN + RU |
-| `platform-rules.md` | Current official requirements and links | EN |
+| `positioning.md` | Product facts, audience and reusable descriptions | EN + RU |
+| `press-kit.md` | Short copy, platform matrix and processing/signing answers | EN + RU |
+| `launch-plan.md` | Existing-listing refresh and next-update sequence | RU |
+| `alternativeto.md` | Fields for updating the existing entry or pending submission | EN |
+| `winget.md` | Candidate metadata; no package submission is implied | EN |
+| `habr-draft.md` | Reference scaffold; unsuitable for publication under current Habr rules | RU |
+| `reddit-posts.md` | Distinct drafts for communities that permit them | EN |
+| `product-hunt.md` | Product listing and maker-comment draft | EN |
+| `show-hn.md` | Technical launch draft and replies | EN |
+| `social-posts.md` | Current-release captions and a clearly marked update preview | EN + RU |
+| `seo-landing-en.md`, `seo-landing-ru.md` | Copy banks for the current website | EN + RU |
+| `gifs/` | Real desktop recordings and their captions | EN + RU |
+| `readme-video-brief.md` | Superseded September concept; retained as history | EN |
+| `platform-rules.md` | Submission requirements and official reference links | EN |
+| `next-channels-2026-10-25.md` | Priorities, preparation and timing for additional channels | RU |
 
-## Source of truth
+## Sources of truth
 
-- Product: https://github.com/jabrailkhalil/clickntranslate
-- Latest release: https://github.com/jabrailkhalil/clickntranslate/releases/latest
-- Issues: https://github.com/jabrailkhalil/clickntranslate/issues
-- Telegram: https://t.me/jabrail_digital
+- Product: https://translate.clickn.dev/
+- Source: https://github.com/jabrailkhalil/clickntranslate
+- Published release: https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2
+- Latest downloads: https://github.com/jabrailkhalil/clickntranslate/releases/latest
+- Android workflows: [Android guide](../ANDROID.md)
+- Desktop localization: [localization notes](../LOCALIZATION.md)
+- Processing: [desktop privacy policy](../../PRIVACY.md) and Android guide
+- Support: https://github.com/jabrailkhalil/clickntranslate/issues
+- News: https://t.me/jabrail_digital
 - License: GPL-3.0-only
-- Promoted version: always the latest public GitHub release
 
-Before publishing, verify download filenames, supported platforms, GIFs, and
-community rules again. Do not publish assets from `gallery/` or `video/`; they
-are draft/generated material and are excluded from the release pack. Do not
-claim that online translation is local or that an unsigned executable can
-never trigger an antivirus heuristic.
+Use only public release assets. Recheck versions, links, screenshots and available
+platform labels before updating an external entry. Use the owner’s account;
+GitHub activity must use **jabrailkhalil**, never another connected identity.

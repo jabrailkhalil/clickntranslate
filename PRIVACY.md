@@ -1,8 +1,14 @@
 # Click'n'Translate Privacy Policy
 
-Effective date: October 22, 2026
+Effective date: October 24, 2026
 
 Click'n'Translate is a screen OCR and translation application published by Jabrail Digital. This policy describes the Windows, macOS and Linux desktop edition. The application does not require a Click'n'Translate account and does not include advertising, analytics, or developer-operated telemetry.
+
+The project also provides a separate Android edition. Its screen capture,
+online/offline processing and local history are described in the
+[Android data and permissions guide](docs/ANDROID.md#data-and-permissions).
+The product website is [translate.clickn.dev](https://translate.clickn.dev/);
+website privacy information is available from [clickn.dev](https://clickn.dev/en/privacy/).
 
 ## Data processed by the application
 
