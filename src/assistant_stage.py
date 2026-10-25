@@ -2,7 +2,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from assistant_art import MASCOTS, DEFAULT_MASCOT, companion_art
-from assistant_text import assistant_text
+from assistant_text import assistant_text, companion_display_name
 from button_styles import button_qss
 from ui_scaling import ScaleArrowButton
 from assistant_motion import PetMotion, paint_pet
@@ -76,7 +76,7 @@ class MascotStage(QtWidgets.QWidget):
         self.mascot, self.appearance, self.custom_image = mascot, appearance, custom_image
         self.motion.mascot = mascot
         self.motion.reactions = self.owner.config.get('desktop_assistant_reactions', True) is True
-        self.setAccessibleName(assistant_text(self.owner.current_interface_language, mascot))
+        self.setAccessibleName(companion_display_name(self.owner.current_interface_language, mascot, appearance))
         self._style_buttons()
         if changed:
             self.motion.greet()
@@ -228,7 +228,7 @@ class MascotStage(QtWidgets.QWidget):
         painter.setFont(font)
         painter.setPen(QtGui.QColor('#eee7f5' if dark else '#554264'))
         painter.drawText(QtCore.QRectF(cx-96, 3, 192, 22), QtCore.Qt.AlignCenter,
-                         assistant_text(self.owner.current_interface_language, self.mascot))
+                         companion_display_name(self.owner.current_interface_language, self.mascot, self.appearance))
         painter.setPen(QtCore.Qt.NoPen)
         painter.setBrush(QtGui.QColor(0, 0, 0, 25 if dark else 13))
         painter.drawEllipse(QtCore.QRectF(cx-85, ground+3, 170, 15))

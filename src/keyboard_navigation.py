@@ -125,12 +125,22 @@ def tab_stops(root):
 
 
 def focus_control(widget, backwards=False):
+    navigation = getattr(QtWidgets.QApplication.instance(), '_keyboard_navigation', None)
+    if navigation is not None:
+        # This helper deliberately requests keyboard navigation. Qt also uses
+        # TabFocusReason for automatic focus transfers after a mouse action,
+        # so the reason on a later FocusIn event cannot establish the mode.
+        navigation.keyboard = True
     parent = widget.parentWidget()
     while parent is not None:
         if isinstance(parent, QtWidgets.QScrollArea):
             parent.ensureWidgetVisible(widget, 8, 8)
         parent = parent.parentWidget()
     widget.setFocus(QtCore.Qt.BacktabFocusReason if backwards else QtCore.Qt.TabFocusReason)
+    if navigation is not None:
+        # A one-control dialog can wrap Tab back to the already focused
+        # widget, producing no FocusIn event to paint the keyboard cue.
+        navigation._show_ring(widget)
 
 
 def _scroll_area(widget):
@@ -240,6 +250,15 @@ class KeyboardNavigation(QtCore.QObject):
         if ring is not None and not sip.isdeleted(ring):
             ring.hide()
 
+    @staticmethod
+    def _focus_style(widget, enabled):
+        if (isinstance(widget, (QtWidgets.QPushButton, QtWidgets.QToolButton, QtWidgets.QComboBox))
+                and not sip.isdeleted(widget) and bool(widget.property('keyboardFocus')) != enabled):
+            widget.setProperty('keyboardFocus', enabled)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
+
     def _show_ring(self, widget):
         self._hide_ring()
         if not isinstance(widget, _CONTROLS) or not widget.isVisible():
@@ -247,6 +266,7 @@ class KeyboardNavigation(QtCore.QObject):
         root = _root(widget)
         if widget.window() is not root or isinstance(root, QtWidgets.QMenu):
             return
+        self._focus_style(widget, True)
         ring = getattr(root, '_keyboard_focus_ring', None)
         if ring is None or sip.isdeleted(ring):
             ring = root._keyboard_focus_ring = _FocusRing(root)
@@ -257,6 +277,31 @@ class KeyboardNavigation(QtCore.QObject):
         ring.show()
         ring.raise_()
         self._focused, self._ring = weakref.ref(widget), weakref.ref(ring)
+
+    def note_key_input(self, widget, event):
+        """Only focus-navigation keys enable the keyboard focus decoration."""
+        key, modifiers = event.key(), event.modifiers()
+        if key in (QtCore.Qt.Key_Tab, QtCore.Qt.Key_Backtab, QtCore.Qt.Key_F1,
+                   QtCore.Qt.Key_F6) or matches_control_shortcut(event, QtCore.Qt.Key_Comma):
+            self.keyboard = True
+        elif modifiers & QtCore.Qt.AltModifier and key == QtCore.Qt.Key_Left:
+            self.keyboard = True
+        else:
+            target = widget
+            editing = False
+            while target is not None:
+                if isinstance(target, (QtWidgets.QLineEdit, QtWidgets.QTextEdit,
+                        QtWidgets.QPlainTextEdit, QtWidgets.QAbstractSpinBox,
+                        QtWidgets.QKeySequenceEdit)):
+                    editing = True
+                    break
+                target = target.parentWidget()
+            if not editing and key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right,
+                    QtCore.Qt.Key_Up, QtCore.Qt.Key_Down, QtCore.Qt.Key_Home,
+                    QtCore.Qt.Key_End, QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown,
+                    QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Space):
+                self.keyboard = True
+        return self.keyboard
 
     def _back(self, owner):
         settings = getattr(owner, 'settings_window', None)
@@ -335,7 +380,10 @@ class KeyboardNavigation(QtCore.QObject):
                 self._help_dialog = None
             previous = focus_ref()
             if previous is not None and not sip.isdeleted(previous) and previous.isVisible() and previous.isEnabled():
-                focus_control(previous)
+                if self.keyboard:
+                    focus_control(previous)
+                else:
+                    previous.setFocus(QtCore.Qt.OtherFocusReason)
         box.finished.connect(finished)
         box.open()
 
@@ -357,17 +405,22 @@ class KeyboardNavigation(QtCore.QObject):
         if kind in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.Wheel):
             self.keyboard = False
             self._hide_ring()
+            self._focus_style(self._focused(), False)
             return False
         if kind in (QtCore.QEvent.WindowDeactivate, QtCore.QEvent.ApplicationDeactivate):
             self._hide_ring()
             return False
         if kind == QtCore.QEvent.FocusOut:
+            self._focus_style(widget, False)
             if self._focused() is widget:
                 self._hide_ring()
             return False
         if kind == QtCore.QEvent.FocusIn:
-            if event.reason() in (QtCore.Qt.TabFocusReason, QtCore.Qt.BacktabFocusReason, QtCore.Qt.ShortcutFocusReason):
-                self.keyboard = True
+            if event.reason() == QtCore.Qt.MouseFocusReason:
+                self.keyboard = False
+                self._hide_ring()
+                self._focus_style(self._focused(), False)
+                self._focus_style(widget, False)
             if self.keyboard:
                 self._show_ring(widget)
             return False
@@ -406,7 +459,7 @@ class KeyboardNavigation(QtCore.QObject):
         key, modifiers = event.key(), event.modifiers()
         ctrl, shift, alt = bool(modifiers & QtCore.Qt.ControlModifier), bool(modifiers & QtCore.Qt.ShiftModifier), bool(modifiers & QtCore.Qt.AltModifier)
         owner = _owner(root)
-        self.keyboard = True
+        self.note_key_input(focus, event)
         if key == QtCore.Qt.Key_F1 and not modifiers:
             if not event.isAutoRepeat():
                 self._help(root)
@@ -490,7 +543,8 @@ class KeyboardNavigation(QtCore.QObject):
                     if checkbox is not None and checkbox.isEnabled():
                         checkbox.click()
                         return True
-        self._show_ring(focus)
+        if self.keyboard:
+            self._show_ring(focus)
         return False
 
 

@@ -369,6 +369,7 @@ def test_text_editing_and_value_arrows_keep_their_native_meaning(app):
     from number_controls import ChoiceStepper
     keyboard.install_keyboard_navigation(app)
     dialog = QtWidgets.QDialog()
+    dialog.setLayoutDirection(QtCore.Qt.LeftToRight)
     layout = QtWidgets.QVBoxLayout(dialog)
     editor = QtWidgets.QLineEdit('abcd')
     slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)

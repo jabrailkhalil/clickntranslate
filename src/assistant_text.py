@@ -309,7 +309,36 @@ for _language, _values in _PREFERENCES.items():
     ASSISTANT_TEXT[_language].update(zip(('page', 'enable_switch', 'page_hint', 'behavior', 'idle', 'walk', 'look', 'sleep', 'size', 'speed', 'opacity', 'topmost', 'hop', 'home', 'companion_settings', 'hide_hint'), _values))
 
 
+# Keep the six identities stable in configuration and artwork. Display names
+# use native spelling: proper names stay intact in Latin-script interfaces,
+# while Chinese, Arabic and Hindi get complete transliterations, not a mixed
+# list of translated nicknames and untranslated English names.
+COMPANION_NAMES = {
+    'pancake': ('Pancake', 'Блинчик', 'Panqueque', 'Pfannkuchen', 'Crêpe', '煎饼', 'Panqueca', 'Pancake', 'بانكيك', 'Krep', 'पैनकेक', 'Panekuk'),
+    'mochi': ('Chester', 'Честер', 'Chester', 'Chester', 'Chester', '切斯特', 'Chester', 'Chester', 'تشيستر', 'Chester', 'चेस्टर', 'Chester'),
+    'bubu': ('Raf', 'Раф', 'Raf', 'Raf', 'Raf', '拉夫', 'Raf', 'Raf', 'راف', 'Raf', 'राफ़', 'Raf'),
+    'momo': ('Lola', 'Лола', 'Lola', 'Lola', 'Lola', '洛拉', 'Lola', 'Lola', 'لولا', 'Lola', 'लोला', 'Lola'),
+    'orbit': ('Doc', 'Док', 'Doc', 'Doc', 'Doc', '多克', 'Doc', 'Doc', 'دوك', 'Doc', 'डॉक', 'Doc'),
+    'click': ('Click', 'Клик', 'Click', 'Click', 'Clic', '克利克', 'Click', 'Clic', 'كليك', 'Klik', 'क्लिक', 'Klik'),
+}
+
+
 _SECTIONS = {
+    'custom_name': ('My image', 'Своя картинка', 'Mi imagen', 'Mein Bild', 'Mon image', '我的图片', 'Minha imagem', 'La mia immagine', 'صورتي', 'Kendi görselim', 'मेरी इमेज', 'Gambar saya'),
+    'hide_hint': (
+        'Enable it again in Settings → Companion.',
+        'Включить снова можно в настройках → «Компаньон».',
+        'Actívalo de nuevo en Ajustes → Compañero.',
+        'Unter Einstellungen → Begleiter wieder aktivieren.',
+        'Réactivez-le dans Réglages → Compagnon.',
+        '可在设置 → 伙伴中重新启用。',
+        'Ative-o novamente em Configurações → Companheiro.',
+        'Riattivalo in Impostazioni → Compagno.',
+        'يمكنك تفعيله مجددًا من الإعدادات ← الرفيق.',
+        'Ayarlar → Yardımcı bölümünden yeniden etkinleştirin.',
+        'सेटिंग्स → साथी में इसे फिर चालू करें।',
+        'Aktifkan lagi di Pengaturan → Pendamping.',
+    ),
     'open': (
         ('Open application', 'Return to the current Click’n’Translate window.'),
         ('Открыть приложение', 'Вернуться к текущему окну Click’n’Translate.'),
@@ -324,7 +353,7 @@ _SECTIONS = {
         ('ऐप खोलें', 'Click’n’Translate की मौजूदा विंडो पर लौटें।'),
         ('Buka aplikasi', 'Kembali ke jendela Click’n’Translate saat ini.'),
     ),
-    'menu_buttons': ('Menu buttons…', 'Кнопки меню…', 'Botones del menú…', 'Menütasten…', 'Boutons du menu…', '菜单按钮…', 'Botões do menu…', 'Pulsanti del menu…', 'أزرار القائمة…', 'Menü düğmeleri…', 'मेनू बटन…', 'Tombol menu…'),
+    'menu_buttons': ('Companion menu', 'Меню компаньона', 'Menú del compañero', 'Begleitermenü', 'Menu du compagnon', '伙伴菜单', 'Menu do companheiro', 'Menu del compagno', 'قائمة الرفيق', 'Yardımcı menüsü', 'साथी का मेनू', 'Menu pendamping'),
     'menu_buttons_hint': (
         'Choose the actions shown when you click the mascot. Changes apply immediately.',
         'Выберите действия при нажатии на маскота. Изменения применяются сразу.',
@@ -409,12 +438,7 @@ _SECTIONS = {
     'sleep_icon': ('Cozy sleep', 'Уютный сон', 'Sueño cómodo', 'Kuschelschlaf', 'Bien au chaud', '安睡', 'Sono aconchegante', 'Sonno accogliente', 'نوم هانئ', 'Rahat uyku', 'सुकून की नींद', 'Tidur nyenyak'),
     'sleep_alt': ('Sleepy', 'Сонный', 'Dormido', 'Schläfrig', 'Endormi', '睡觉', 'Com sono', 'Assonnato', 'نعسان', 'Uykulu', 'नींद में', 'Mengantuk'),
     'hero': ('Celebrating', 'Празднует', 'Celebrando', 'Feiernd', 'Célèbre', '庆祝', 'Comemorando', 'Celebrando', 'يحتفل', 'Kutluyor', 'जश्न मना रहा है', 'Merayakan'),
-    'pancake': ('Pancake', 'Блинчик', 'Panqueque', 'Pfannkuchen', 'Pancake', '松饼', 'Panqueca', 'Pancake', 'بانكيك', 'Krep', 'पैनकेक', 'Panekuk'),
-    'mochi': ('Chester', 'Честер', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester', 'Chester'),
-    'bubu': ('Raf', 'Раф', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf', 'Raf'),
-    'momo': ('Lola', 'Лола', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola', 'Lola'),
-    'orbit': ('Doc', 'Док', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc', 'Doc'),
-    'click': ('Click', 'Клик', 'Click', 'Click', 'Click', 'Click', 'Click', 'Click', 'Click', 'Click', 'Click', 'Click'),
+    **COMPANION_NAMES,
     'custom': ('My image…', 'Своя…', 'Mi imagen…', 'Eigenes…', 'Mon image…', '自选图片…', 'Minha imagem…', 'La mia immagine…', 'صورتي…', 'Kendi görüntüm…', 'मेरी इमेज…', 'Gambar saya…'),
     'choose_image': ('Choose an image', 'Выбрать картинку', 'Elegir imagen', 'Bild auswählen', 'Choisir une image', '选择图片', 'Escolha uma imagem', "Scegli un'immagine", 'اختر صورة', 'Görüntü seçin', 'इमेज चुनें', 'Pilih gambar'),
     'image_files': ('Images', 'Изображения', 'Imágenes', 'Bilder', 'Images', '图片', 'Imagens', 'Immagini', 'الصور', 'Görüntüler', 'इमेज', 'Gambar'),
@@ -467,6 +491,11 @@ for _key, _values in _SECTIONS.items():
 
 def assistant_text(language, key):
     return ASSISTANT_TEXT.get(language, ASSISTANT_TEXT['en']).get(key, ASSISTANT_TEXT['en'].get(key, key))
+
+
+def companion_display_name(language, mascot, appearance='animated'):
+    """Name the visible artwork without changing its stored character identity."""
+    return assistant_text(language, 'custom_name' if appearance == 'custom' else mascot)
 
 
 def assistant_action_text(language, action):

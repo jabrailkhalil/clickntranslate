@@ -95,6 +95,15 @@ _TEXT = {
 }
 
 
+_KEYS += ('dim_strength',)
+for _locale, _caption in {
+        'en': 'Strength:', 'ru': 'Интенсивность:', 'es': 'Intensidad:',
+        'de': 'Stärke:', 'fr': 'Intensité :', 'zh': '强度：',
+        'pt': 'Intensidade:', 'it': 'Intensità:', 'ar': 'الشدة:',
+        'tr': 'Yoğunluk:', 'hi': 'तीव्रता:', 'id': 'Intensitas:'}.items():
+    _TEXT[_locale] += (_caption,)
+
+
 def page_caption(locale, page_id):
     return PAGE_CAPTIONS.get(locale, PAGE_CAPTIONS['en'])[page_id]
 

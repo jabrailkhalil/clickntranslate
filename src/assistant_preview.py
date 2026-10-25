@@ -2,8 +2,8 @@
 from functools import lru_cache
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from assistant_art import art_path, mascot_id
-from assistant_text import assistant_text
+from assistant_art import art_path, mascot_id, load_custom_art
+from assistant_text import assistant_text, companion_display_name
 from assistant_motion import PetMotion
 
 
@@ -35,6 +35,7 @@ class AssistantPreview(QtWidgets.QWidget):
         self._owner, self.language = activity_owner, language
         self._choice_dialog = None
         self.art = None
+        self._custom_art = False
         self.button = activity_owner._create_main_hotkey_pair(
             assistant_text(language, 'companion_section'), '', compact=True)
         self.button.setMinimumWidth(0)
@@ -58,12 +59,26 @@ class AssistantPreview(QtWidgets.QWidget):
         self.buttons = {self.mascot: self.button}
         self.set_reactions(getattr(self._owner, 'config', {}).get('desktop_assistant_reactions', True) is True)
         self.set_activity(getattr(self._owner, '_companion_activity', 'idle'))
-        hint = assistant_text(self.language, self.mascot) + ' — ' + assistant_text(self.language, 'companion_settings')
+        appearance = getattr(self._owner, 'config', {}).get('desktop_assistant_appearance', 'animated')
+        hint = companion_display_name(self.language, self.mascot, appearance) + ' — ' + assistant_text(self.language, 'companion_settings')
         self.button.caption_label.setText(assistant_text(self.language, 'companion_section'))
         self.button.setAccessibleName(hint)
         self.button.setToolTip(hint)
-        self.art = preview_art(self.mascot) if self.isVisible() else None
+        self.art = self._load_art() if self.isVisible() else None
         self._update_thumbnail()
+
+    def _load_art(self):
+        self._custom_art = False
+        config = getattr(self._owner, 'config', {})
+        if config.get('desktop_assistant_appearance') == 'custom':
+            try:
+                picture = load_custom_art(config.get('desktop_assistant_image', ''))
+            except (OSError, ValueError):
+                pass
+            else:
+                self._custom_art = True
+                return picture
+        return preview_art(self.mascot)
 
     def _update_thumbnail(self):
         if self.art is not None:
@@ -71,7 +86,8 @@ class AssistantPreview(QtWidgets.QWidget):
             # user's UI scale. Keep extra pixels instead of enlarging a 20px
             # bitmap. DPR preserves exactly the same logical row height.
             density = 4
-            pixmap = preview_portrait(self.mascot).scaled(
+            portrait = self.art if self._custom_art else preview_portrait(self.mascot)
+            pixmap = portrait.scaled(
                 32*density, max(1, self.button.value_label.height())*density,
                 QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
             pixmap.setDevicePixelRatio(density)
@@ -93,7 +109,7 @@ class AssistantPreview(QtWidgets.QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.art = preview_art(self.mascot)
+        self.art = self._load_art()
         self._update_thumbnail()
 
     def hideEvent(self, event):

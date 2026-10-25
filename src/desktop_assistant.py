@@ -10,7 +10,7 @@ import weakref
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
-from assistant_text import assistant_text, assistant_action_text
+from assistant_text import assistant_text, assistant_action_text, companion_display_name
 from button_styles import button_qss
 from assistant_settings import BEHAVIORS, assistant_preferences, normalized_assistant_actions
 from assistant_art import DEFAULT_MASCOT, companion_art, mascot_id
@@ -265,7 +265,7 @@ class AssistantMenu(QtWidgets.QFrame):
         outer.setContentsMargins(12, 10, 12, 10)
         outer.setSpacing(8)
         header = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel(assistant_text(language, mascot))
+        title = QtWidgets.QLabel(companion_display_name(language, mascot, appearance))
         title.setStyleSheet(f'color:{"#eee7f5" if dark else "#302639"}; background:transparent; font-size:16px; font-weight:600;')
         header.addWidget(title, 1)
         close = QtWidgets.QPushButton('×')

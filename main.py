@@ -14361,6 +14361,10 @@ class DarkThemeApp(QMainWindow):
             pane_layout.setContentsMargins(3, 2, 3, 2)
             pane_layout.setSpacing(0)
             pane_layout.setColumnStretch(0, 1)
+            pane_layout.setRowStretch(0, 1)
+            # Both editors reserve the same footer height. The live progress
+            # line belongs below the result, but must not shorten only it.
+            pane_layout.setRowMinimumHeight(1, 14)
         divider_space = QWidget(self.main_composer)
         divider_space.setFixedWidth(8)
         divider_layout = QHBoxLayout(divider_space)
@@ -14379,7 +14383,7 @@ class DarkThemeApp(QMainWindow):
         self.text_input.setPlaceholderText(ui_text(self.current_interface_language, 'input_placeholder'))
         self.text_input.setToolTip(tooltip_text(
             doc_text(self.current_interface_language, "main_file_tooltip").splitlines()[0]))
-        self.text_input.setMinimumHeight(66)
+        self.text_input.setMinimumHeight(50)
         self.text_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
         self.text_input.setViewportMargins(0, 0, 0, 0)
         self.text_input.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -14433,7 +14437,7 @@ class DarkThemeApp(QMainWindow):
         composer_actions_layout.addWidget(
             self.translate_button, 0, Qt.AlignHCenter | Qt.AlignBottom
         )
-        input_layout.addWidget(composer_actions, 0, 1)
+        input_layout.addWidget(composer_actions, 0, 1, 2, 1)
         self.main_translation_status = QLabel()
         self.main_translation_status.setObjectName('mainTranslationStatus')
         self.main_translation_status.setFixedHeight(14)

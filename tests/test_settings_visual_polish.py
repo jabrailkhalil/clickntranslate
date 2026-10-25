@@ -129,13 +129,20 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
 
                 template = settings.game_template_combo
                 remember = settings.game_remember_template_checkbox
-                template_rect, remember_rect = rect_in(template, settings.settings_game_page), rect_in(remember, settings.settings_game_page)
+                create = settings.game_create_template_button
+                create_rect, remember_rect = rect_in(create, settings.settings_game_page), rect_in(remember, settings.settings_game_page)
                 assert not settings.game_template_label.isVisible(), context
-                assert template_rect.center().y() == remember_rect.center().y(), context
+                assert create_rect.top() > remember_rect.bottom(), context
                 assert remember.sizeHint().width() <= remember.width(), context
                 assert template.width() == settings.game_interval_controls.width(), context
-                assert rect_in(row, settings.settings_game_page).bottom() < template_rect.top(), context
-                assert template_rect.bottom() < rect_in(settings.game_interval_controls, settings.settings_game_page).top(), context
+                assert template.isVisible() == bool(remember.isChecked() and template.property('templateCatalogAvailable')), context
+                assert rect_in(row, settings.settings_game_page).bottom() < remember_rect.top(), context
+                for label, value in ((settings.game_scan_interval_label, settings.game_interval_controls),
+                                     (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
+                    caption = rect_in(label, settings.settings_game_page)
+                    field = rect_in(value, settings.settings_game_page)
+                    assert 0 <= field.top()-caption.bottom()-1 <= 4, (context, caption, field)
+                    assert abs(field.center().x()-caption.center().x()) <= 40, (context, caption, field)
 
 
 @pytest.mark.parametrize('dark', [True, False])
@@ -188,7 +195,7 @@ def test_field_outlines_share_the_full_row_bounds(window, app, locale, dark):
             (1, (settings.translator_combo, settings.result_window_control)),
             (4, (settings.ocr_engine_combo,)),
             (2, (settings.game_source_combo, settings.game_target_combo,
-                 settings.game_template_combo)),
+                 settings.game_interval_controls, settings.game_opacity_controls)),
             (3, (companion.mode_combo, *companion.values.values()))):
         settings._set_settings_page(page)
         settings.settings_page_tabs[page].setFocus()

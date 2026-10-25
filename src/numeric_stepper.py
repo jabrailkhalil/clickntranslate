@@ -146,7 +146,7 @@ class NumericStepper(StepperFrame):
         return self.editor.lineEdit()
 
     def stepBy(self, steps):
-        self.editor.stepBy(steps)
+        self._step_editor_from_arrow(steps)
         self._sync_steps()
 
     def stepUp(self):

@@ -99,7 +99,7 @@ def test_actions_dialog_translations_layout_theme_and_keyboard(app, companion, l
         assert len(dialog.checkboxes) == 8
         assert all(isinstance(assistant_action_text(language, action), tuple) for action in ASSISTANT_ACTIONS)
         assert dialog.layoutDirection() == (QtCore.Qt.RightToLeft if language == 'ar' else QtCore.Qt.LeftToRight)
-        assert '#121212' in dialog.styleSheet() if dark else '#f0edf3' in dialog.styleSheet()
+        assert '#111111' in dialog.styleSheet() if dark else '#f0ecf3' in dialog.styleSheet()
         for action, checkbox in dialog.checkboxes.items():
             title, hint = assistant_action_text(language, action)
             assert checkbox.text() == title and checkbox.accessibleDescription() == hint
@@ -151,7 +151,11 @@ def test_menu_buttons_action_uses_the_footer_and_changes_apply_live(window, app)
     settings._set_settings_page(3)
     page = settings.settings_assistant_page
     panel = settings.assistant_action_panel
-    assert panel.layout().itemAtPosition(0, 0).widget() is page.menu_buttons
+    assert panel.layout().itemAt(1).widget() is page.menu_buttons
+    assert page.menu_buttons.parentWidget() is panel
+    assert abs(page.menu_buttons.geometry().center().x() - panel.rect().center().x()) <= 1
+    assert page.menu_buttons.width() < panel.width()
+    assert 'background:transparent; border:0;' in panel.styleSheet()
     assert not settings.assistant_settings_scroll.isAncestorOf(page.menu_buttons)
     assert not hasattr(page, 'dismiss_button')
     assert not hasattr(page, 'action_buttons')

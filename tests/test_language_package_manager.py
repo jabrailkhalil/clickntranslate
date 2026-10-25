@@ -341,7 +341,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertEqual(self.dialog.title_bar.height(), 38)
         self.assertEqual(self.dialog.title_close_btn.objectName(), "languageManagerTitleClose")
         self.assertEqual(self.dialog.title_label.text(), "Language packages")
-        self.assertIn("background-color: #090a0d", self.dialog.styleSheet())
+        self.assertIn("QFrame#languageManagerTitleBar { background:#1e1e1e", self.dialog.styleSheet())
         self.assertEqual(self.dialog.size().width(), 640)
         self.assertEqual(self.dialog.size().height(), 558)
 
@@ -367,9 +367,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.dialog._apply_style()
 
         style = self.dialog.styleSheet()
-        self.assertIn("background-color: #f2edf7", style)
-        self.assertIn("color: #2b2333", style)
-        self.assertNotIn("background-color: #090a0d", style)
+        self.assertIn("QDialog#languageManagerDialog { background:#f0ecf3", style)
+        self.assertIn("QFrame#languageManagerTitleBar { background:#ddd7e2", style)
+        self.assertIn("color:#202124", style)
+        self.assertNotIn("background:#111111", style)
 
     def test_every_ocr_language_is_present_in_each_per_language_table(self):
         expected = {language.code for language in LANGUAGES}
@@ -514,7 +515,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
         table.clearFocus()
         self.app.processEvents()
         inactive = table.viewport().grab().toImage().pixelColor(point)
-        self.assertEqual(active.name(), '#5f4a88')
+        from classic_style import classic_palette
+        self.assertEqual(active.name(), classic_palette(True)['selected'])
         self.assertEqual(inactive, active)
         from PyQt5.QtWidgets import QStyle, QStyleOptionViewItem
         option = QStyleOptionViewItem()

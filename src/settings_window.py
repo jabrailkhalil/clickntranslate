@@ -59,6 +59,7 @@ import portable_paths
 from languages import (
     LANGUAGES as APP_LANGUAGES,
     easyocr_language_codes,
+    language_display_name,
     language_icon_path,
     tesseract_language_code,
     windows_ocr_tag,
@@ -4975,7 +4976,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Удалить установленный движок {engine} с этого компьютера.",
         "hymt_note": "Hy-MT — одна локальная модель перевода, а не пакеты по языкам. Установите её здесь, и она появится в списке переводчиков.",
         "translation_engine": "Движок перевода", "local_model": "Локальная модель",
-        "rapidocr_note": "Для RapidOCR не нужны отдельные языковые пакеты. Локальный нейросетевой движок включает одну модель Chinese + English. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
+        "rapidocr_note": "Для RapidOCR не нужны отдельные языковые пакеты. Локальный нейросетевой движок включает одну модель для китайского и английского языков. Для русского используйте Windows OCR, Tesseract или EasyOCR.",
         "component": "Компонент", "package": "Пакет", "status": "Статус", "argos_note": "Показаны все пакеты Argos. Неанглийские пары используют два пакета через английский.",
         "remove_highlighted": "Удалить выделенные", "direction": "Направление", "search": "Поиск: русский, ru, en→ru…", "language": "Язык",
         "installed": "Установлен", "missing": "Не установлен", "can_download": "Можно скачать", "engine_missing": "{engine} не установлен", "checking": "Проверка…",
@@ -5012,7 +5013,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Eliminar el motor {engine} instalado en este equipo.",
         "hymt_note": "Hy-MT es un único modelo local de traducción, no paquetes por idioma. Instálalo aquí y aparecerá en la lista de traductores.",
         "translation_engine": "Motor de traducción", "local_model": "Modelo local",
-        "rapidocr_note": "RapidOCR no usa paquetes de idioma separados. Su motor neuronal local incluye un modelo Chinese + English. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
+        "rapidocr_note": "RapidOCR no usa paquetes de idioma separados. Su motor neuronal local incluye un modelo para chino e inglés. Para ruso usa Windows OCR, Tesseract o EasyOCR.",
         "component": "Componente", "package": "Paquete", "status": "Estado", "argos_note": "Se muestran todos los paquetes Argos. Los pares sin inglés usan dos paquetes a través del inglés.",
         "remove_highlighted": "Eliminar resaltados", "direction": "Dirección", "search": "Buscar: ruso, ru, en→ru…", "language": "Idioma",
         "installed": "Instalado", "missing": "No instalado", "can_download": "Disponible", "engine_missing": "Falta {engine}", "checking": "Comprobando…",
@@ -5049,7 +5050,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Die installierte {engine}-Engine von diesem Rechner löschen.",
         "hymt_note": "Hy-MT ist ein einzelnes lokales Übersetzungsmodell, keine Sprachpakete. Hier installieren, dann erscheint es in der Übersetzerliste.",
         "translation_engine": "Übersetzungs-Engine", "local_model": "Lokales Modell",
-        "rapidocr_note": "RapidOCR benötigt keine separaten Sprachpakete. Die lokale neuronale Engine enthält ein Chinese + English-Modell. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
+        "rapidocr_note": "RapidOCR benötigt keine separaten Sprachpakete. Die lokale neuronale Engine enthält ein Modell für Chinesisch und Englisch. Für Russisch nutze Windows OCR, Tesseract oder EasyOCR.",
         "component": "Komponente", "package": "Paket", "status": "Status", "argos_note": "Alle Argos-Pakete werden angezeigt. Nicht englische Paare verwenden zwei Pakete über Englisch.",
         "remove_highlighted": "Markierte entfernen", "direction": "Richtung", "search": "Suchen: Russisch, ru, en→ru…", "language": "Sprache",
         "installed": "Installiert", "missing": "Nicht installiert", "can_download": "Verfügbar", "engine_missing": "{engine} fehlt", "checking": "Prüfung…",
@@ -5086,7 +5087,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "Supprimer le moteur {engine} installé sur cet ordinateur.",
         "hymt_note": "Hy-MT est un seul modèle de traduction local, pas des modules par langue. Installez-le ici et il apparaît dans la liste des traducteurs.",
         "translation_engine": "Moteur de traduction", "local_model": "Modèle local",
-        "rapidocr_note": "RapidOCR n’utilise pas de modules de langue séparés. Son moteur neuronal local inclut un modèle Chinese + English. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
+        "rapidocr_note": "RapidOCR n’utilise pas de modules de langue séparés. Son moteur neuronal local inclut un modèle pour le chinois et l’anglais. Pour le russe, utilisez Windows OCR, Tesseract ou EasyOCR.",
         "component": "Composant", "package": "Module", "status": "État", "argos_note": "Tous les modules Argos sont affichés. Les paires sans anglais utilisent deux modules via l’anglais.",
         "remove_highlighted": "Supprimer la sélection", "direction": "Direction", "search": "Rechercher : russe, ru, en→ru…", "language": "Langue",
         "installed": "Installé", "missing": "Non installé", "can_download": "Disponible", "engine_missing": "{engine} manquant", "checking": "Vérification…",
@@ -5123,7 +5124,7 @@ LANGUAGE_MANAGER_TEXT = {
         "remove_engine_tooltip": "从这台电脑上删除已安装的 {engine} 引擎。",
         "hymt_note": "Hy-MT 是一个本地翻译模型，而不是按语言划分的语言包。在这里安装后，它会出现在翻译器列表中。",
         "translation_engine": "翻译引擎", "local_model": "本地模型",
-        "rapidocr_note": "RapidOCR 不需要单独的语言包。本地神经引擎内置 Chinese + English 模型；俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
+        "rapidocr_note": "RapidOCR 不需要单独的语言包。本地神经引擎内置中文和英文模型；俄语请使用 Windows OCR、Tesseract 或 EasyOCR。",
         "component": "组件", "package": "语言包", "status": "状态", "argos_note": "显示所有 Argos 语言包。两个非英语语言之间需要通过英语使用两个语言包。",
         "remove_highlighted": "删除高亮项", "direction": "方向", "search": "搜索：俄语、ru、en→ru…", "language": "语言",
         "installed": "已安装", "missing": "未安装", "can_download": "可下载", "engine_missing": "未安装 {engine}", "checking": "正在检查…",
@@ -7289,7 +7290,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "code": "rapidocr-recognition",
                 "icon": "",
                 "name": language_manager_text(self.lang, "recognition"),
-                "package": "Chinese + English",
+                "package": " + ".join(language_display_name(code, self.lang) for code in ('zh', 'en')),
                 "status": self._status_checking() if checking else installed if engine_ready else needs_engine,
                 "checked": bool(engine_ready),
                 "selectable": False,
@@ -9796,6 +9797,9 @@ class SettingsWindow(QWidget):
         control = getattr(self, "ocr_dim_strength_control", None)
         if control is not None:
             control.setEnabled(enabled)
+        options = getattr(self, 'ocr_dimming_options', None)
+        if options is not None:
+            options.setEnabled(enabled)
         self.auto_save_setting("dim_screen_during_ocr", enabled)
 
     def _create_bug_report_from_settings(self):
@@ -10945,26 +10949,34 @@ class SettingsWindow(QWidget):
         self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
         self.game_template_combo = DropDownCombo(self.settings_game_page)
         self.game_template_combo.setMinimumWidth(0)
-        self.game_template_combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.game_template_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.game_template_combo.setFixedHeight(28)
         self.game_template_combo.setFixedWidth(180)
         self.game_template_combo.setMaxVisibleItems(7)
-        self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
         remembered_name = self.parent.config.get('game_last_template', '')
         if isinstance(remembered_name, str) and remembered_name:
             self.game_template_combo.addItem(remembered_name, remembered_name)
-            self.game_template_combo.setCurrentIndex(1)
+            self.game_template_combo.setCurrentIndex(0)
         self.game_template_combo.setEnabled(self.game_remember_template_checkbox.isChecked())
         self.game_template_combo.setToolTip(tooltip_text(region_text(lang, 'dynamic_hint')))
         self.game_template_combo.setAccessibleName(region_text(lang, 'template_label'))
+        self.game_template_combo.setPlaceholderText(dynamic_text(lang, 'choose_template'))
         self.game_template_label = QLabel(region_text(lang, 'template_label'), self.settings_game_page)
         self.game_template_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.game_template_label.setToolTip(self.game_template_combo.toolTip())
         self.game_template_label.setBuddy(self.game_template_combo)
         self.game_template_label.hide()
+        self.game_create_template_button = OpticallyCenteredPushButton(
+            dynamic_text(lang, 'create_template'), self.settings_game_page)
+        self.game_create_template_button.setFixedHeight(28)
+        self.game_create_template_button.setObjectName('gameCreateTemplateButton')
+        self.game_create_template_button.setProperty('buttonRole', 'secondary')
+        self.game_create_template_button.setToolTip(tooltip_text(dynamic_text(lang, 'create_template_hint')))
+        self.game_create_template_button.setAccessibleName(dynamic_text(lang, 'create_template'))
+        self.game_create_template_button.setAccessibleDescription(dynamic_text(lang, 'create_template_hint'))
+        self.game_create_template_button.clicked.connect(self._create_dynamic_template)
         self.game_remember_template_checkbox.toggled.connect(self._game_template_memory_changed)
-        self.game_template_combo.activated.connect(lambda _index: self.auto_save_setting(
-            'game_last_template', self.game_template_combo.currentData() or ''))
+        self.game_template_combo.activated.connect(self._game_template_selected)
         game_layout.addWidget(self.game_remember_template_checkbox, 2, 0, Qt.AlignLeft | Qt.AlignVCenter)
         game_layout.addWidget(self.game_template_combo, 2, 1)
 
@@ -11116,8 +11128,55 @@ class SettingsWindow(QWidget):
             launch()
 
     def _game_template_memory_changed(self, enabled):
-        self.game_template_combo.setEnabled(bool(enabled))
         self.auto_save_setting('game_remember_template', bool(enabled))
+        self._refresh_game_templates()
+
+    def _create_dynamic_template(self):
+        from dynamic_workspace import open_template_builder
+        def saved(value):
+            if sip.isdeleted(self):
+                return
+            self._remember_game_template(value)
+        return open_template_builder(self.parent, on_saved=saved)
+
+    def _remember_game_template(self, value):
+        """An explicit choice applies its languages; merely viewing does not."""
+        from dynamic_templates import text as dynamic_text
+        from ocr import installed_ocr_language_codes, _translation_targets_for_source, ocr_ui_text
+        source, target = value.get('source_language'), value.get('target_language')
+        try:
+            available = set(installed_ocr_language_codes(config=self.parent.config))
+            usable = (source in available and target in _translation_targets_for_source(source, self.parent.config))
+        except Exception:
+            logging.exception('Could not verify selected template languages')
+            usable = False
+        if not usable:
+            self._refresh_game_templates()
+            lang = self.parent.current_interface_language
+            hint = dynamic_text(lang, 'unavailable') + '\n' + ocr_ui_text(lang, 'install_languages_first')
+            self.game_template_combo.setToolTip(tooltip_text(hint))
+            self.game_template_combo.setAccessibleDescription(hint)
+            return False
+        self.parent.config.update(game_last_template=value['name'], game_remember_template=True,
+            game_translate_source_language=source, game_translate_target_language=target)
+        self.parent.save_config()
+        _invalidate_main_config_cache()
+        self._populate_game_language_controls()
+        self._refresh_game_templates()
+        return True
+
+    def _game_template_selected(self, index):
+        from dynamic_templates import TemplateStore
+        name = self.game_template_combo.itemData(index)
+        try:
+            value = next((item for item in TemplateStore().load() if item['name'] == name), None)
+        except Exception:
+            logging.exception('Could not load selected dynamic template')
+            value = None
+        if value is not None:
+            self._remember_game_template(value)
+        else:
+            self._refresh_game_templates()
 
     def _refresh_game_templates(self):
         from dynamic_templates import TemplateStore, text as dynamic_text
@@ -11130,20 +11189,28 @@ class SettingsWindow(QWidget):
             templates = []
         with QtCore.QSignalBlocker(self.game_template_combo):
             self.game_template_combo.clear()
-            self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
             for item in templates:
                 self.game_template_combo.addItem(item['name'], item['name'])
             index = self.game_template_combo.findData(name)
             missing = bool(name) and index < 0
-            if missing:
+            if missing and templates:
                 self.game_template_combo.addItem(str(name), str(name))
                 index = self.game_template_combo.count()-1
                 self.game_template_combo.model().item(index).setEnabled(False)
-            self.game_template_combo.setCurrentIndex(max(0, index))
-        self.game_template_combo.setToolTip(tooltip_text(region_text(lang, 'dynamic_missing' if missing else 'dynamic_hint')))
+            self.game_template_combo.setCurrentIndex(index if index >= 0 else -1)
+        self.game_template_combo.setProperty('templateCatalogAvailable', bool(templates))
+        combo_hint = region_text(lang, 'dynamic_missing' if missing else 'dynamic_hint')
+        self.game_template_combo.setToolTip(tooltip_text(combo_hint))
+        self.game_template_combo.setAccessibleDescription(combo_hint)
         with QtCore.QSignalBlocker(self.game_remember_template_checkbox):
             self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
-        self.game_template_combo.setEnabled(self.game_remember_template_checkbox.isChecked())
+        remembered = self.game_remember_template_checkbox.isChecked()
+        self.game_template_combo.setEnabled(remembered and bool(templates))
+        self.game_template_combo.setVisible(remembered and bool(templates))
+        hint = (region_text(lang, 'dynamic_missing') if missing
+                else region_text(lang, 'dynamic_hint') if templates
+                else dynamic_text(lang, 'templates_empty'))
+        self.game_remember_template_checkbox.setToolTip(tooltip_text(hint))
 
     def _set_settings_page(self, index):
         progress = getattr(self, '_update_progress', None)
@@ -13957,7 +14024,7 @@ finally {
         dark = self.parent.current_theme != "Светлая"
         colors = button_palette(dark)
         panel_names = ('settings_action_panel', 'translation_action_panel',
-                       'ocr_action_panel', 'game_action_panel', 'assistant_action_panel')
+                       'ocr_action_panel', 'game_action_panel')
         for name, object_name in tuple((name, 'settingsActionPanel') for name in panel_names) + (
                                   ("settings_transfer_panel", "settingsTransferPanel"),):
             panel = getattr(self, name, None)

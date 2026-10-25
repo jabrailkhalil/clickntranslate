@@ -192,11 +192,63 @@ def _wrap_mode_pages(settings):
                     settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
                     settings.game_remember_template_checkbox):
         _flag(control)
-    grid.removeWidget(settings.game_help_button)
-    grid.removeWidget(settings.game_launch_button)
-    grid.setRowStretch(9, 1)
     content = QWidget()
     content.setLayout(grid)
+    _empty(grid)
+    for column in range(3):
+        grid.setColumnStretch(column, 0)
+        grid.setColumnMinimumWidth(column, 0)
+    for row in range(12):
+        grid.setRowStretch(row, 0)
+        grid.setRowMinimumHeight(row, 0)
+    grid.setColumnStretch(0, 1)
+    grid.setVerticalSpacing(5)
+    # The language caption stays with its pair instead of stretching across
+    # the page. All other labels sit over the value they describe.
+    header = settings.game_language_row.layout()
+    header.setStretch(0, 0)
+    header.setStretch(1, 0)
+    header.setSpacing(10)
+    header.addStretch(1)
+    grid.addWidget(settings.game_language_row, 0, 0)
+
+    grid.addWidget(settings.game_remember_template_checkbox, 1, 0, Qt.AlignLeft)
+    settings.game_template_actions = QWidget(content)
+    template_row = QHBoxLayout(settings.game_template_actions)
+    rtl = settings.layoutDirection() == Qt.RightToLeft
+    template_row.setContentsMargins(0 if rtl else 30, 0, 30 if rtl else 0, 0)
+    template_row.setSpacing(8)
+    template_row.addWidget(settings.game_template_combo)
+    template_row.addWidget(settings.game_create_template_button)
+    template_row.addStretch(1)
+    grid.addWidget(settings.game_template_actions, 2, 0)
+
+    settings.game_numeric_options = QWidget(content)
+    numbers = QHBoxLayout(settings.game_numeric_options)
+    numbers.setContentsMargins(0, 0, 0, 0)
+    numbers.setSpacing(20)
+    for attribute, label, control in (
+            ('game_timing_group', settings.game_scan_interval_label, settings.game_interval_controls),
+            ('game_background_group', settings.game_overlay_opacity_label, settings.game_opacity_controls)):
+        group = QWidget(settings.game_numeric_options)
+        setattr(settings, attribute, group)
+        stack = QVBoxLayout(group)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(2)
+        label.setFixedHeight(20)
+        label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        label.setBuddy(control)
+        group.setFixedWidth(max(180, label.fontMetrics().horizontalAdvance(label.text()) + 4))
+        stack.addWidget(label)
+        stack.addWidget(control, 0, Qt.AlignLeft)
+        numbers.addWidget(group)
+    numbers.addStretch(1)
+    grid.addWidget(settings.game_numeric_options, 3, 0)
+    for row, checkbox in enumerate((settings.game_pause_inactive_checkbox,
+            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox), 4):
+        grid.addWidget(checkbox, row, 0, Qt.AlignLeft)
+    grid.setRowStretch(7, 1)
     settings.game_settings_content = content
     settings.game_settings_scroll = _scroll(page, content, 'dynamicSettingsScroll')
     root = QVBoxLayout(page)
@@ -218,7 +270,16 @@ def _wrap_mode_pages(settings):
     root.setContentsMargins(0, 0, 0, 0)
     root.setSpacing(4)
     root.addWidget(settings.assistant_settings_scroll, 1)
-    settings.assistant_action_panel = _panel(settings, page, ((page.menu_buttons,),))
+    settings.assistant_action_panel = QWidget(page)
+    settings.assistant_action_panel.setObjectName('assistantMenuFooter')
+    settings.assistant_action_panel.setFixedHeight(34)
+    settings.assistant_action_panel.setStyleSheet('QWidget#assistantMenuFooter { background:transparent; border:0; }')
+    footer = QHBoxLayout(settings.assistant_action_panel)
+    footer.setContentsMargins(0, 1, 0, 1)
+    footer.addStretch(1)
+    page.menu_buttons.setFixedWidth(max(230, page.menu_buttons.fontMetrics().horizontalAdvance(page.menu_buttons.text())+32))
+    footer.addWidget(page.menu_buttons)
+    footer.addStretch(1)
     root.addWidget(settings.assistant_action_panel)
 
 
@@ -358,18 +419,26 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         control.setParent(content)
         grid.addWidget(_flag(control), row, 0, 1, 1 if row == 0 else 3, Qt.AlignLeft)
     settings.dim_screen_during_ocr_checkbox.setParent(content)
-    grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 3, 0, Qt.AlignLeft)
+    grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 3, 0, 1, 3, Qt.AlignLeft)
     dim_controls = QWidget(content)
+    settings.ocr_dimming_options = dim_controls
     dim_controls.setFixedHeight(28)
     dim_layout = QHBoxLayout(dim_controls)
-    dim_layout.setContentsMargins(0, 0, 0, 0)
-    dim_layout.setSpacing(0)
-    dim_layout.addStretch(1)
+    rtl = settings.layoutDirection() == Qt.RightToLeft
+    dim_layout.setContentsMargins(0 if rtl else 30, 0, 30 if rtl else 0, 0)
+    dim_layout.setSpacing(8)
+    settings.ocr_dim_strength_label = QLabel(section_text(lang, 'dim_strength'), dim_controls)
+    settings.ocr_dim_strength_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+    settings.ocr_dim_strength_label.setBuddy(settings.ocr_dim_strength_control)
+    settings.ocr_dim_strength_label.setToolTip(settings.ocr_dim_strength_control.toolTip())
+    dim_layout.addWidget(settings.ocr_dim_strength_label)
     dim_layout.addWidget(settings.ocr_dim_strength_control)
-    grid.addWidget(dim_controls, 3, 1, 1, 2)
+    dim_layout.addStretch(1)
+    dim_controls.setEnabled(settings.dim_screen_during_ocr_checkbox.isChecked())
+    grid.addWidget(dim_controls, 4, 0, 1, 3)
     settings.copy_notification_checkbox.setParent(content)
-    grid.addWidget(_flag(settings.copy_notification_checkbox), 4, 0, 1, 3, Qt.AlignLeft)
-    grid.setRowStretch(5, 1)
+    grid.addWidget(_flag(settings.copy_notification_checkbox), 5, 0, 1, 3, Qt.AlignLeft)
+    grid.setRowStretch(6, 1)
     settings.ocr_settings_content = content
     settings.ocr_settings_scroll = _scroll(settings.settings_ocr_page, content, 'ocrSettingsScroll')
     root.addWidget(settings.ocr_settings_scroll, 1)

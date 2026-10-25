@@ -78,6 +78,7 @@ class AssistantActionsDialog(CenteredFramelessDialog):
         from ui_scaling import interface_scale_factor
         from window_appearance import scale_native_controls
         from keyboard_navigation import install_keyboard_navigation
+        from classic_style import classic_palette
         self.language = owner.current_interface_language
         tr = lambda key: assistant_text(self.language, key)
         dark = owner.current_theme != 'Светлая'
@@ -146,8 +147,8 @@ class AssistantActionsDialog(CenteredFramelessDialog):
         self.done_button.clicked.connect(self.accept)
         footer.addWidget(self.done_button)
         panel.addLayout(footer)
-        background, ink, border, muted = (('#121212', '#f1edf5', '#584963', '#bdb2ca') if dark
-                                         else ('#f0edf3', '#302837', '#bcaacb', '#70647e'))
+        palette = classic_palette(dark)
+        background, ink, border, muted = (palette[key] for key in ('background', 'text', 'border', 'muted'))
         self.setStyleSheet(f'''
             QFrame#assistantActionsSurface {{ background:{background}; border:1px solid {border}; border-radius:8px; }}
             QScrollArea, QScrollArea > QWidget > QWidget {{ background:transparent; border:0; }}
@@ -172,7 +173,17 @@ class AssistantActionsDialog(CenteredFramelessDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        QtCore.QTimer.singleShot(0, lambda: self.checkboxes['open'].setFocus(QtCore.Qt.TabFocusReason))
+        QtCore.QTimer.singleShot(0, self._focus_first_action)
+
+    def _focus_first_action(self):
+        if sip.isdeleted(self) or not self.isVisible():
+            return
+        navigation = getattr(QtWidgets.QApplication.instance(), '_keyboard_navigation', None)
+        if navigation is not None and navigation.keyboard:
+            from keyboard_navigation import focus_control
+            focus_control(self.checkboxes['open'])
+        else:
+            self.checkboxes['open'].setFocus(QtCore.Qt.OtherFocusReason)
 
 
 class AssistantSettingsPage(QtWidgets.QWidget):
@@ -246,11 +257,14 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             form.addWidget(field, row, 2, QtCore.Qt.AlignVCenter)
             self.field_labels[name] = label
         self.menu_buttons = QtWidgets.QPushButton(tr('menu_buttons'))
-        self.menu_buttons.setFixedHeight(28)
+        self.menu_buttons.setObjectName('assistantMenuButton')
+        self.menu_buttons.setProperty('buttonRole', 'secondary')
+        self.menu_buttons.setFixedHeight(32)
         self.menu_buttons.setMinimumWidth(0)
-        self.menu_buttons.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        self.menu_buttons.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         self.menu_buttons.setToolTip(tr('menu_buttons_hint'))
         self.menu_buttons.setAccessibleName(tr('menu_buttons'))
+        self.menu_buttons.setAccessibleDescription(tr('menu_buttons_hint'))
         self.menu_buttons.clicked.connect(self.configure_menu)
         root.addWidget(self.options)
         self.mascot_preview = MascotStage(self.owner, self)
@@ -381,9 +395,18 @@ class AssistantSettingsPage(QtWidgets.QWidget):
     def refresh_custom_icon(self):
         from settings_window import compact_combo_style
         from styled_dialogs import set_widget_stylesheet
+        from button_styles import button_qss
+        dark = self.owner.current_theme != 'Светлая'
         self.appearance_buttons['custom'].setIcon(header_icon('image_add', self.owner.current_theme))
         for combo in (self.mode_combo,):
-            set_widget_stylesheet(combo, compact_combo_style(self.owner.current_theme != 'Светлая'))
+            set_widget_stylesheet(combo, compact_combo_style(dark))
+        surface = '#302938' if dark else '#e2d8ec'
+        border = '#8c739f' if dark else '#927aa8'
+        set_widget_stylesheet(self.menu_buttons,
+            button_qss(dark, selector='QPushButton#assistantMenuButton', compact=True)
+            + f'''QPushButton#assistantMenuButton {{ background:{surface}; border-color:{border};
+                min-height:28px; min-width:142px; }}
+                QPushButton#assistantMenuButton[pointerHover="false"]:hover {{ background:{surface}; }}''')
 
     def refresh(self):
         values = assistant_preferences(self.owner.config)

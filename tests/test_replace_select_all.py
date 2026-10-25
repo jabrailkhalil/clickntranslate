@@ -82,7 +82,7 @@ def test_checkbox_saves_and_fits_translation_page(window, app, language):
     assert window.config['replace_selection_select_all'] is True
     assert box.width() >= box.sizeHint().width()
     origin = box.mapTo(settings, QtCore.QPoint())
-    panel = settings.ocr_languages_btn.mapTo(settings, QtCore.QPoint())
+    panel = settings.translation_action_panel.mapTo(settings, QtCore.QPoint())
     assert origin.y() + box.height() < panel.y()
 
 

@@ -305,18 +305,34 @@ LAYOUT_COPY = {
 }
 
 APPLICATION_SUMMARY = {
- 'ru': 'Приложение: запуск, истории, подсказки, проверка обновлений, язык интерфейса, масштаб и размер текста результата. Кэш, сброс, обновление, экспорт, импорт, отчёт и горячие клавиши доступны кнопками внизу этой вкладки.',
- 'en': 'Application: startup, histories, tooltips, update checks, interface language, scale and result text size. Cache, reset, update, export, import, bug report and hotkeys are buttons at the bottom of this page.',
- 'es': 'Aplicación: inicio, historiales, ayudas, actualizaciones, idioma, escala y tamaño del resultado. Caché, restablecer, actualizar, exportar, importar, informes y atajos están en los botones inferiores de esta página.',
- 'de': 'Anwendung: Start, Verläufe, Hinweise, Updateprüfung, Sprache, Skalierung und Ergebnistextgröße. Cache, Zurücksetzen, Update, Export, Import, Fehlerbericht und Tastenkürzel sind direkt unten auf dieser Seite verfügbar.',
- 'fr': 'Application : démarrage, historiques, aides, mises à jour, langue, échelle et taille du résultat. Cache, réinitialisation, mise à jour, export, import, rapport et raccourcis sont accessibles en bas de cette page.',
- 'zh': '程序：启动、历史记录、提示、更新检查、界面语言、缩放和译文大小。缓存、重置、更新、导出、导入、问题报告及快捷键按钮均位于此页面底部。',
- 'pt': 'Aplicativo: inicialização, históricos, dicas, atualizações, idioma, escala e tamanho do resultado. Cache, redefinição, atualização, exportação, importação, relatório e atalhos ficam nos botões inferiores desta página.',
- 'it': 'Applicazione: avvio, cronologie, suggerimenti, aggiornamenti, lingua, scala e dimensione del risultato. Cache, ripristino, aggiornamento, esportazione, importazione, rapporto e scorciatoie sono nei pulsanti in fondo alla pagina.',
- 'ar': 'التطبيق: بدء التشغيل والسجلات والتلميحات والتحديثات ولغة الواجهة ومقياسها وحجم نص النتيجة. أزرار التخزين المؤقت وإعادة الضبط والتحديث والتصدير والاستيراد والتقرير والاختصارات أسفل الصفحة نفسها.',
- 'tr': 'Uygulama: başlangıç, geçmişler, ipuçları, güncellemeler, arayüz dili, ölçek ve sonuç yazısı boyutu. Önbellek, sıfırlama, güncelleme, dışa ve içe aktarma, rapor ve kısayollar bu sayfanın altındaki düğmelerdedir.',
- 'hi': 'ऐप: शुरुआत, इतिहास, संकेत, अपडेट जाँच, भाषा, स्केल और परिणाम टेक्स्ट आकार। कैश, रीसेट, अपडेट, निर्यात, आयात, रिपोर्ट और शॉर्टकट के बटन इसी पेज के नीचे हैं।',
- 'id': 'Aplikasi: mulai, riwayat, petunjuk, pembaruan, bahasa, skala dan ukuran teks hasil. Tombol cache, reset, pembaruan, ekspor, impor, laporan dan pintasan ada langsung di bawah halaman ini.',
+ 'ru': 'Приложение: запуск, истории, подсказки, проверка обновлений, масштаб и размер текста результата. Кэш, сброс, обновление, экспорт, импорт, отчёт и горячие клавиши доступны кнопками внизу этой вкладки. Язык интерфейса меняется через флаг вверху слева.',
+ 'en': 'Application: startup, histories, tooltips, update checks, scale and result text size. Cache, reset, update, export, import, bug report and hotkeys are buttons at the bottom of this page. Change UI language with the flag at the top left.',
+ 'es': 'Aplicación: inicio, historiales, ayudas, actualizaciones, escala y tamaño del resultado. Caché, restablecer, actualizar, exportar, importar, informes y atajos están en los botones inferiores. Cambia el idioma de interfaz con la bandera de arriba a la izquierda.',
+ 'de': 'Anwendung: Start, Verläufe, Hinweise, Updateprüfung, Skalierung und Ergebnistextgröße. Cache, Zurücksetzen, Update, Export, Import, Fehlerbericht und Tastenkürzel sind direkt unten verfügbar. Die Oberflächensprache wird über die Flagge oben links geändert.',
+ 'fr': 'Application : démarrage, historiques, aides, mises à jour, échelle et taille du résultat. Cache, réinitialisation, mise à jour, export, import, rapport et raccourcis sont accessibles en bas. Le drapeau en haut à gauche change la langue de l’interface.',
+ 'zh': '程序：启动、历史记录、提示、更新检查、缩放和译文大小。缓存、重置、更新、导出、导入、问题报告及快捷键按钮均位于此页面底部。通过左上角的国旗更改界面语言。',
+ 'pt': 'Aplicativo: inicialização, históricos, dicas, atualizações, escala e tamanho do resultado. Cache, redefinição, atualização, exportação, importação, relatório e atalhos ficam nos botões inferiores. Altere o idioma da interface pela bandeira no canto superior esquerdo.',
+ 'it': 'Applicazione: avvio, cronologie, suggerimenti, aggiornamenti, scala e dimensione del risultato. Cache, ripristino, aggiornamento, esportazione, importazione, rapporto e scorciatoie sono nei pulsanti in fondo. Cambia la lingua dalla bandiera in alto a sinistra.',
+ 'ar': 'التطبيق: بدء التشغيل والسجلات والتلميحات والتحديثات ومقياس الواجهة وحجم نص النتيجة. أزرار التخزين المؤقت وإعادة الضبط والتحديث والتصدير والاستيراد والتقرير والاختصارات أسفل الصفحة. غيّر لغة الواجهة من العلم أعلى اليسار.',
+ 'tr': 'Uygulama: başlangıç, geçmişler, ipuçları, güncellemeler, ölçek ve sonuç yazısı boyutu. Önbellek, sıfırlama, güncelleme, dışa ve içe aktarma, rapor ve kısayollar alttaki düğmelerdedir. Arayüz dilini sol üstteki bayraktan değiştirin.',
+ 'hi': 'ऐप: शुरुआत, इतिहास, संकेत, अपडेट जाँच, स्केल और परिणाम टेक्स्ट आकार। कैश, रीसेट, अपडेट, निर्यात, आयात, रिपोर्ट और शॉर्टकट के बटन नीचे हैं। इंटरफ़ेस की भाषा ऊपर बाईं ओर के झंडे से बदलें।',
+ 'id': 'Aplikasi: mulai, riwayat, petunjuk, pembaruan, skala dan ukuran teks hasil. Tombol cache, reset, pembaruan, ekspor, impor, laporan dan pintasan ada di bawah. Ubah bahasa antarmuka melalui bendera di kiri atas.',
+}
+
+
+DYNAMIC_PAGE_HINTS = {
+ 'en': 'In {tab}, choose languages, the scan interval, background opacity and saved area templates.',
+ 'ru': 'Во вкладке «{tab}» выберите языки, интервал проверки, непрозрачность фона и сохранённые шаблоны областей.',
+ 'es': 'En {tab}, elige idiomas, intervalo de lectura, opacidad del fondo y plantillas de zonas guardadas.',
+ 'de': 'Unter {tab} Sprachen, Scanintervall, Hintergrunddeckkraft und gespeicherte Bereichsvorlagen wählen.',
+ 'fr': 'Dans {tab}, choisissez les langues, l’intervalle de lecture, l’opacité du fond et les modèles de zones enregistrés.',
+ 'zh': '在“{tab}”中选择语言、扫描间隔、背景不透明度和已保存的区域模板。',
+ 'pt': 'Em {tab}, escolha os idiomas, o intervalo de leitura, a opacidade do fundo e os modelos de áreas salvos.',
+ 'it': 'In {tab}, scegli lingue, intervallo di scansione, opacità dello sfondo e modelli di aree salvati.',
+ 'ar': 'في {tab}، اختر اللغتين والفاصل بين عمليات الفحص وعتامة الخلفية وقوالب المناطق المحفوظة.',
+ 'tr': '{tab} bölümünde dilleri, tarama aralığını, arka plan opaklığını ve kayıtlı alan şablonlarını seçin.',
+ 'hi': '{tab} में भाषाएँ, जाँच अंतराल, पृष्ठभूमि की अपारदर्शिता और सहेजे क्षेत्र टेम्पलेट चुनें।',
+ 'id': 'Di {tab}, pilih bahasa, interval pemindaian, opasitas latar, dan templat area tersimpan.',
 }
 
 
@@ -330,7 +346,7 @@ for _locale, _layout_copy in LAYOUT_COPY.items():
 
 
 def guide_updates(language):
-    from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, page_caption, section_text
+    from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, page_caption, section_text
     c = COPY.get(language, COPY['en'])
     entries = {key: (c[i], c[i+1]) for key, i in (
         ('result_text', 5), ('result_behavior', 7), ('selection_behavior', 9))}
@@ -338,6 +354,8 @@ def guide_updates(language):
         'api_connections': (page_caption(language, PAGE_TRANSLATION) + ' → ' + section_text(language, 'api'), c[4]),
         'settings_page_main': (page_caption(language, PAGE_APPLICATION), c[1]),
         'settings_page_updates': (page_caption(language, PAGE_TRANSLATION), c[2]),
+        'settings_page_game': (page_caption(language, PAGE_DYNAMIC), DYNAMIC_PAGE_HINTS.get(
+            language, DYNAMIC_PAGE_HINTS['en']).format(tab=page_caption(language, PAGE_DYNAMIC))),
         'actions_panel': (page_caption(language, PAGE_APPLICATION), c[12]),
     })
     return entries

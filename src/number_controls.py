@@ -95,6 +95,14 @@ class StepperFrame(QtWidgets.QFrame):
         self.setFocusProxy(editor)
         self.set_theme(dark)
 
+    def _step_editor_from_arrow(self, steps):
+        self.editor.stepBy(steps)
+        # QSpinBox.stepBy selects its numeric text even while our separate
+        # arrow owns focus. That orphaned selection receives no FocusOut and
+        # survives a later blank click. An arrow changes a value, not its text
+        # selection; direct editor typing/native Up/Down keep their behavior.
+        self.editor.lineEdit().deselect()
+
     def set_theme(self, dark, *, inset=True):
         from button_styles import button_qss
         background, border, ink = (('#17181d', '#3d3948', '#f4f6fb') if dark
@@ -170,8 +178,8 @@ class NumberStepper(StepperFrame):
 
     def __init__(self, parent=None, *, dark=True, font_size=15):
         super().__init__(_NumberBox(), parent, dark=dark, font_size=font_size)
-        self.decrease.clicked.connect(lambda: self.editor.stepBy(-1))
-        self.increase.clicked.connect(lambda: self.editor.stepBy(1))
+        self.decrease.clicked.connect(lambda: self._step_editor_from_arrow(-1))
+        self.increase.clicked.connect(lambda: self._step_editor_from_arrow(1))
         self.editor.valueChanged.connect(self._value_changed)
         self._sync_steps()
 

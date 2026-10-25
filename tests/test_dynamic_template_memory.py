@@ -130,7 +130,7 @@ def test_dynamic_settings_offer_template_memory_and_explicit_choice(window, isol
     assert window.config['game_last_template'] == 'Dialogue'
 
 
-def test_restoring_different_template_languages_and_cancelling_keeps_config(isolated, monkeypatch):
+def test_restoring_template_geometry_keeps_the_current_pair_and_cancelling_keeps_config(isolated, monkeypatch):
     config, store = isolated
     value = saved(store)
     value.update(source_language='ru', target_language='en')
@@ -140,8 +140,8 @@ def test_restoring_different_template_languages_and_cancelling_keeps_config(isol
     before = copy.deepcopy(config)
     selector = workspace.PairedRegionSelector()
     try:
-        assert selector.source_combo.currentData() == 'ru'
-        assert selector.target_combo.currentData() == 'en'
+        assert selector.source_combo.currentData() == 'en'
+        assert selector.target_combo.currentData() == 'ru'
         assert config == before
         selector.close()
         assert config == before
@@ -244,7 +244,7 @@ def test_dynamic_memory_settings_fit_the_fixed_page_in_all_languages(window, app
     page = settings.settings_game_page
     controls = [settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                 settings.game_toolbar_checkbox, settings.game_remember_template_checkbox,
-                settings.game_template_combo, settings.game_help_button, settings.game_launch_button]
+                settings.game_create_template_button, settings.game_help_button, settings.game_launch_button]
     for widget in controls:
         rect = QtCore.QRect(widget.mapTo(page, QtCore.QPoint()), widget.size())
         assert page.rect().contains(rect), (locale, theme, widget.objectName(), rect, page.rect())

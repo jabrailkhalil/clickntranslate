@@ -248,7 +248,8 @@ def test_clicking_empty_scaled_canvas_clears_number_selection_and_tab_arrow_focu
     assert field.value() == 77
     assert window.config['desktop_assistant_opacity'] == 77
     assert not editor.hasSelectedText() and not editor.hasFocus()
-    field.decrease.setFocus(QtCore.Qt.TabFocusReason)
+    from keyboard_navigation import focus_control
+    focus_control(field.decrease)
     assert field.decrease.property('keyboardFocus')
     QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=blank)
     app.processEvents()

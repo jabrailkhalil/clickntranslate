@@ -111,8 +111,20 @@ def _install_keyboard_focus_tracking():
         return
 
     class ButtonFocusFilter(QObject):
+        _styled_focus = lambda self: None
+
+        def _set_keyboard_style(self, widget, keyboard):
+            import weakref
+            if bool(widget.property('keyboardFocus')) != keyboard:
+                widget.setProperty('keyboardFocus', keyboard)
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+                widget.update()
+            if keyboard:
+                self._styled_focus = weakref.ref(widget)
+
         _events = frozenset((
-            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress,
+            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.Wheel,
             QEvent.Leave, QEvent.WindowDeactivate, QEvent.Hide, QEvent.EnabledChange,
             QEvent.Enter, QEvent.DynamicPropertyChange, QEvent.ToolTip,
             QEvent.GraphicsSceneHelp, QEvent.FocusIn, QEvent.FocusOut, QEvent.KeyPress,
@@ -122,6 +134,17 @@ def _install_keyboard_focus_tracking():
             kind = event.type()
             if kind not in self._events:
                 return False
+            if (kind in (QEvent.MouseButtonPress, QEvent.Wheel)
+                    or kind == QEvent.FocusIn and event.reason() == Qt.MouseFocusReason):
+                navigation = app._keyboard_navigation
+                navigation.keyboard = False
+                navigation._hide_ring()
+                previous = self._styled_focus()
+                if previous is not None:
+                    from PyQt5 import sip
+                    if not sip.isdeleted(previous):
+                        self._set_keyboard_style(previous, False)
+                self._styled_focus = lambda: None
             hovered = getattr(app, '_hovered_app_button', lambda: None)()
             if hovered is not None:
                 from PyQt5 import sip
@@ -163,14 +186,10 @@ def _install_keyboard_focus_tracking():
                 return False
             if not isinstance(widget, (QPushButton, QToolButton, QComboBox)):
                 return False
-            keyboard = kind == QEvent.KeyPress or (kind == QEvent.FocusIn and event.reason() in (
-                Qt.TabFocusReason, Qt.BacktabFocusReason, Qt.ShortcutFocusReason,
-            ))
-            if bool(widget.property("keyboardFocus")) != keyboard:
-                widget.setProperty("keyboardFocus", keyboard)
-                widget.style().unpolish(widget)
-                widget.style().polish(widget)
-                widget.update()
+            navigation = app._keyboard_navigation
+            keyboard = (navigation.note_key_input(widget, event) if kind == QEvent.KeyPress
+                        else kind == QEvent.FocusIn and navigation.keyboard)
+            self._set_keyboard_style(widget, keyboard)
             return False
 
     app._button_focus_filter = ButtonFocusFilter(app)
