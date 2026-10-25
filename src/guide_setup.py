@@ -357,7 +357,7 @@ GUIDE_SETTING_BODIES = {
         "Сохраняйте распознанный и скопированный текст локально. История поможет найти его, даже если буфер обмена уже изменился.",
         "Лучше скрывать окно программы на время захвата: оно не закроет текст, который вы хотите распознать.",
         "При выделении области изображение остановится. Так удобнее захватить текст из видео или меняющегося окна.",
-        "Затемнение выделит выбранную область. Силу эффекта можно отрегулировать ползунком рядом.",
+        'Затемнение выделит выбранную область. Введите силу эффекта в процентах или измените её стрелками рядом.',
         "После перевода выделения возвращайте прежнее содержимое буфера. Если результат нужен именно в буфере, он сохранится там.",
         "Короткое уведомление подтвердит, что текст скопирован. Не придётся гадать, сработало ли сочетание.",
         "Программа проверит наличие новой версии при запуске и предложит обновиться, когда появятся исправления.",
@@ -372,7 +372,7 @@ GUIDE_SETTING_BODIES = {
         "Keep recognized and copied text in local history, even after your clipboard changes.",
         "Hide the app while capturing the screen so its window does not cover the text you want to recognize.",
         "Freeze the image while selecting an area. This makes text in videos or changing windows easier to capture.",
-        "Dim the surroundings to make the selected area clear. Adjust the strength with the slider beside it.",
+        'Dim the surroundings to make the selected area clear. Enter the strength as a percentage or adjust it with the arrows beside it.',
         "Restore your previous clipboard after translating a selection. Results explicitly requested in the clipboard remain there.",
         "A short notification confirms that text was copied, so you know the hotkey worked.",
         "Check for a new version at startup and offer an update when fixes become available.",
@@ -387,7 +387,7 @@ GUIDE_SETTING_BODIES = {
         "Conserva el texto reconocido y copiado en el historial local, aunque cambie el portapapeles.",
         "Oculta la aplicación durante la captura para que su ventana no tape el texto que quieres reconocer.",
         "Congela la imagen al seleccionar un área. Facilita capturar texto de vídeos o ventanas que cambian.",
-        "Oscurece el entorno para distinguir el área seleccionada. Ajusta la intensidad con el control de al lado.",
+        'Oscurece el entorno para distinguir el área seleccionada. Escribe la intensidad en porcentaje o ajústala con las flechas de al lado.',
         "Restaura el portapapeles anterior tras traducir una selección. Los resultados solicitados en el portapapeles se conservan.",
         "Una notificación breve confirma que se copió el texto y que el atajo funcionó.",
         "Busca nuevas versiones al iniciar y ofrece actualizar cuando haya correcciones.",
@@ -402,7 +402,7 @@ GUIDE_SETTING_BODIES = {
         "Bewahren Sie erkannte und kopierte Texte im lokalen Verlauf auf, auch wenn sich die Zwischenablage ändert.",
         "Blenden Sie das App-Fenster bei der Aufnahme aus, damit es den zu erkennenden Text nicht verdeckt.",
         "Halten Sie das Bild beim Auswählen eines Bereichs an. So lassen sich Texte aus Videos leichter erfassen.",
-        "Dunkeln Sie die Umgebung ab, um die Auswahl hervorzuheben. Die Stärke regelt der Schieber daneben.",
+        'Dunkeln Sie die Umgebung ab, um die Auswahl hervorzuheben. Geben Sie die Stärke in Prozent ein oder ändern Sie sie mit den Pfeilschaltflächen daneben.',
         "Stellen Sie die Zwischenablage nach einer Auswahlübersetzung wieder her. Ausdrücklich kopierte Ergebnisse bleiben erhalten.",
         "Eine kurze Meldung bestätigt, dass Text kopiert wurde und das Tastenkürzel funktioniert hat.",
         "Prüfen Sie beim Start auf neue Versionen und erhalten Sie ein Update-Angebot, sobald Verbesserungen verfügbar sind.",
@@ -417,7 +417,7 @@ GUIDE_SETTING_BODIES = {
         "Gardez les textes reconnus et copiés dans l’historique local, même si le presse-papiers change.",
         "Masquez l’application pendant la capture pour que sa fenêtre ne couvre pas le texte à reconnaître.",
         "Figez l’image pendant la sélection d’une zone. Cela facilite la capture de textes dans les vidéos.",
-        "Assombrissez le reste de l’écran pour distinguer la sélection. Réglez l’intensité avec le curseur voisin.",
+        'Assombrissez le reste de l’écran pour distinguer la sélection. Saisissez l’intensité en pourcentage ou réglez-la avec les boutons fléchés voisins.',
         "Restaurez le presse-papiers après la traduction d’une sélection. Les résultats demandés dans le presse-papiers y restent.",
         "Une brève notification confirme la copie du texte et le bon fonctionnement du raccourci.",
         "Vérifiez les nouvelles versions au démarrage et recevez une proposition de mise à jour lorsqu’il y a des corrections.",
@@ -432,7 +432,7 @@ GUIDE_SETTING_BODIES = {
         "在本地历史中保留识别并复制的文字，即使剪贴板已改变也能找回。",
         "捕获屏幕时隐藏应用窗口，避免遮挡需要识别的文字。",
         "选择区域时冻结画面，更容易捕获视频或变化窗口中的文字。",
-        "调暗周围画面以突出选区，可用旁边的滑块调整强度。",
+        '调暗周围画面以突出选区。输入强度百分比，或用旁边的箭头按钮调整。',
         "翻译选中文字后恢复原来的剪贴板内容。明确要求复制的结果仍会保留在剪贴板中。",
         "用简短通知确认文字已复制，方便判断快捷键是否生效。",
         "启动时检查新版本，并在有修复更新时提示升级。",
@@ -453,8 +453,7 @@ GUIDE_SETTING_BODIES = {
      'deseja reconhecer.',
      'Congele a imagem durante a seleção da área. Isso facilita capturar texto em vídeos e janelas que '
      'mudam.',
-     'Escureça o ambiente para tornar a área selecionada clara. Ajuste a força com o controle '
-     'deslizante ao lado.',
+     'Escureça o entorno para destacar a área selecionada. Digite a intensidade em porcentagem ou ajuste-a com os botões de seta ao lado.',
      'Restaure sua área de transferência anterior após traduzir uma seleção. Os resultados solicitados '
      'explicitamente na área de transferência permanecem lá.',
      'Uma breve notificação confirma que o texto foi copiado, para que você saiba que o atalho '
@@ -478,8 +477,7 @@ GUIDE_SETTING_BODIES = {
      'testo che desideri riconoscere.',
      'Congela l’immagine durante la selezione dell’area. Così è più facile acquisire testo da video e '
      'finestre che cambiano.',
-     "Oscura l'ambiente circostante per rendere chiara l'area selezionata. Regola la forza con il "
-     'cursore accanto ad esso.',
+     'Oscura l’ambiente circostante per evidenziare l’area selezionata. Inserisci l’intensità in percentuale o regolala con i pulsanti freccia accanto.',
      'Ripristina gli appunti precedenti dopo aver tradotto una selezione. I risultati esplicitamente '
      'richiesti negli appunti rimangono lì.',
      'Una breve notifica conferma che il testo è stato copiato, quindi sai che la scorciatoia ha '
@@ -499,7 +497,7 @@ GUIDE_SETTING_BODIES = {
      'احتفظ بالنصوص التي جرى التعرف عليها ونسخها في سجل محلي، حتى بعد تغير محتوى الحافظة.',
      'أخفِ التطبيق أثناء التقاط الشاشة حتى لا تحجب نافذته النص المطلوب التعرف عليه.',
      'جمّد الصورة أثناء تحديد المنطقة. يسهل ذلك التقاط النص في الفيديو والنوافذ المتغيرة.',
-     'عتّم ما يحيط بالمنطقة المحددة لتوضيحها. اضبط شدة التعتيم باستخدام شريط التمرير بجانب الإعداد.',
+     'عتّم ما يحيط بالمنطقة المحددة لتوضيحها. أدخل شدة التعتيم كنسبة مئوية أو اضبطها بأزرار الأسهم المجاورة.',
      'استعد محتوى الحافظة السابق بعد ترجمة النص المحدد. تبقى النتائج التي طلبت نسخها إلى الحافظة '
      'صراحةً فيها.',
      'يؤكد إشعار قصير نسخ النص لتعرف أن الاختصار قد عمل.',
@@ -516,7 +514,7 @@ GUIDE_SETTING_BODIES = {
      'Penceresi tanınacak metni kapatmasın diye ekran yakalarken uygulamayı gizleyin.',
      'Alan seçerken görüntüyü dondurun. Video veya değişen pencerelerdeki metni yakalamayı '
      'kolaylaştırır.',
-     'Seçili alanı belirginleştirmek için çevresini karartın. Yanındaki kaydırıcıyla gücünü ayarlayın.',
+     'Seçili alanı belirginleştirmek için çevresini karartın. Gücü yüzde olarak girin veya yanındaki ok düğmeleriyle ayarlayın.',
      'Seçim çevirisinden sonra önceki panoyu geri yükleyin. Özellikle panoya istenen sonuçlar orada '
      'kalır.',
      'Kısa bildirim kopyalamayı onaylar; kısayolun çalıştığını anlarsınız.',
@@ -532,7 +530,7 @@ GUIDE_SETTING_BODIES = {
      'क्लिपबोर्ड बदलने के बाद भी पहचाना और कॉपी किया टेक्स्ट स्थानीय इतिहास में रखें।',
      'कैप्चर करते समय ऐप छिपाएँ ताकि उसकी विंडो पढ़ने वाला टेक्स्ट न ढके।',
      'क्षेत्र चुनते समय दृश्य स्थिर करें। वीडियो या बदलती विंडो का टेक्स्ट कैप्चर करना आसान होगा।',
-     'चुना क्षेत्र स्पष्ट करने के लिए आसपास मंद करें। पास के स्लाइडर से स्तर बदलें।',
+     'चुना क्षेत्र स्पष्ट करने के लिए आसपास मंद करें। स्तर प्रतिशत में लिखें या पास के तीर बटनों से बदलें।',
      'चयन अनुवाद के बाद पिछला क्लिपबोर्ड लौटाएँ। जिन्हें स्पष्ट रूप से कॉपी करने को कहा हो वे परिणाम '
      'रहते हैं।',
      'छोटी सूचना कॉपी की पुष्टि करती है, ताकि शॉर्टकट चलने का पता हो।',
@@ -549,7 +547,7 @@ GUIDE_SETTING_BODIES = {
      'dikenali.',
      'Bekukan gambar saat memilih area agar teks dalam video atau jendela berubah lebih mudah '
      'ditangkap.',
-     'Redupkan sekeliling agar area pilihan jelas. Sesuaikan kekuatan dengan penggeser di sampingnya.',
+     'Redupkan sekeliling agar area pilihan jelas. Masukkan tingkat keredupan dalam persen atau atur dengan tombol panah di sampingnya.',
      'Pulihkan papan klip sebelumnya setelah menerjemahkan pilihan. Hasil yang diminta secara khusus '
      'untuk disalin tetap ada.',
      'Notifikasi singkat mengonfirmasi teks disalin agar Anda tahu pintasan bekerja.',

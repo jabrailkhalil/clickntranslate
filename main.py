@@ -11332,9 +11332,14 @@ class DarkThemeApp(QMainWindow):
         pairs = set(self._available_main_translation_pairs())
         if mode not in {"ocr", "fullscreen", "game"}:
             return pairs
-        pairs = {(source, target) for source, target in pairs if source != 'auto'}
         try:
-            from ocr import installed_ocr_language_codes
+            from ocr import installed_ocr_language_codes, direct_vision_provider
+
+            if direct_vision_provider(self.config):
+                pairs = {(source.code, target.code) for source in APP_LANGUAGES
+                         for target in APP_LANGUAGES if source.code != target.code}
+            else:
+                pairs = {(source, target) for source, target in pairs if source != 'auto'}
 
             engine = self.config.get(
                 "ocr_engine", platform_support.default_ocr_engine()
@@ -11347,15 +11352,13 @@ class DarkThemeApp(QMainWindow):
                 for source, target in pairs
                 if source in installed_sources
             }
-            # EasyOCR has no language model before its first recognition.  An
-            # empty installed-model probe must not erase both language pickers
-            # in the main window: the selected source is what tells EasyOCR
-            # which model it needs to fetch/use.  Keep the installed-only list
-            # when it has entries, otherwise retain the translator's pairs.
-            return filtered_pairs or pairs
+            # Local OCR never downloads language models from this selector.
+            # An empty inventory must stay empty instead of advertising the
+            # entire translator catalog as usable recognition languages.
+            return filtered_pairs
         except Exception:
             logging.exception("Could not inspect hotkey language availability")
-            return pairs
+            return set()
 
     def _configured_hotkey_translation_pair(self, mode):
         source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS.get(
@@ -11457,6 +11460,12 @@ class DarkThemeApp(QMainWindow):
             ready = source_combo.count() > 0 and target_combo.count() > 0
             source_combo.setEnabled(ready)
             target_combo.setEnabled(ready)
+            from ocr import ocr_ui_text
+            for combo, hint_key in ((source_combo, 'source_language'), (target_combo, 'target_language')):
+                hint = ocr_ui_text(self.current_interface_language,
+                                  hint_key if ready else 'install_languages_first')
+                combo.setToolTip(tooltip_text(hint))
+                combo.setAccessibleDescription(hint)
             swap_button = getattr(self, "hotkey_language_swap", None)
             if isinstance(swap_button, QToolButton):
                 swap_button.setEnabled(

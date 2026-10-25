@@ -216,3 +216,91 @@ def test_legacy_localized_names_get_flags_without_assigning_a_flag_to_unknown_ch
     show_picker(combo)
     assert not combo.itemDelegate().icon(combo.model().index(0, 0)).isNull()
     assert combo.itemDelegate().icon(combo.model().index(combo.count()-1, 0)).isNull()
+
+
+def test_short_nonlanguage_menu_does_not_keep_a_previous_language_icon_gutter(app, show_picker):
+    combo = DropDownCombo()
+    for language in LANGUAGES:
+        combo.addItem(language.display_name('en'), language.code)
+    show_picker(combo)
+    combo.hidePopup()
+    combo.clear()
+    combo.addItem('New layout')
+    combo.showPopup()
+    app.processEvents()
+    fresh = DropDownCombo()
+    fresh.setFont(combo.font())
+    fresh.addItem('New layout')
+    try:
+        option = QtWidgets.QStyleOptionViewItem()
+        option.initFrom(combo.view())
+        actual = combo.itemDelegate().sizeHint(option, combo.model().index(0, 0))
+        expected = fresh.itemDelegate().sizeHint(option, fresh.model().index(0, 0))
+        assert not combo._language_search.isVisible()
+        assert actual == expected
+    finally:
+        fresh.deleteLater()
+
+
+@pytest.mark.parametrize('dark', [True, False])
+def test_capture_and_ordinary_popups_use_the_same_row_palette(app, dark):
+    from settings_window import compact_combo_style
+    ordinary = DropDownCombo()
+    capture = CaptureLanguageCombo()
+    try:
+        ordinary.setStyleSheet(compact_combo_style(dark))
+        ordinary.ensurePolished()
+        capture.set_capture_theme(dark)
+        assert capture.popup_colors() == ordinary.popup_colors()
+        assert capture.POPUP_GAP == ordinary.POPUP_GAP
+    finally:
+        ordinary.deleteLater()
+        capture.deleteLater()
+
+
+def test_show_window_switches_keep_shared_ticks_and_stay_open_for_multiple_choices(app, show_picker):
+    from settings_window import ResultWindowModeCombo
+    modes = ('selection', 'area', 'main')
+    combo = ResultWindowModeCombo(modes, dict(zip(modes, ('Selected text', 'Screen area', 'Translate button'))),
+        dict(all='All', none='None', count='{count} of {total}', on='On', off='Off'))
+    combo.setFixedSize(240, 28)
+    view, popup = show_picker(combo)
+    delegate = combo.itemDelegate()
+    for mode in ('area', 'main'):
+        item = combo._item(mode)
+        assert item.icon().isNull()
+        assert delegate.marked(item.index())
+        QTest.mouseClick(view.viewport(), QtCore.Qt.LeftButton,
+                         pos=view.visualRect(item.index()).center())
+        app.processEvents()
+        assert popup.isVisible()
+        assert not delegate.marked(item.index())
+    assert combo.checked_modes() == ('selection',)
+
+
+def test_elided_template_exposes_complete_escaped_name_and_keeps_hover_opt_out(app):
+    from unittest import mock
+    from settings_window import compact_combo_style
+    combo = DropDownCombo()
+    combo.setStyleSheet(compact_combo_style(True))
+    combo.setFixedSize(180, 28)
+    name = 'Subtitles <boss battle> & additional dialog area'
+    combo.addItem(name)
+    combo.setToolTip('Choose a saved layout')
+    combo.ensurePolished()
+    hint = combo.elided_value_tooltip()
+    document = QtGui.QTextDocument()
+    document.setHtml(hint)
+    assert name in document.toPlainText()
+    assert 'Choose a saved layout' in document.toPlainText()
+    assert '&lt;boss battle&gt;' in hint and '&amp;' in hint
+    original = app.property('buttonTooltipsEnabled')
+    try:
+        app.setProperty('buttonTooltipsEnabled', False)
+        event = QtGui.QHelpEvent(QtCore.QEvent.ToolTip, QtCore.QPoint(20, 10), QtCore.QPoint(120, 70))
+        with mock.patch.object(QtWidgets.QToolTip, 'showText') as show:
+            combo.event(event)
+            show.assert_not_called()
+    finally:
+        app.setProperty('buttonTooltipsEnabled', original)
+        combo.deleteLater()

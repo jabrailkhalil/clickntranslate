@@ -39,7 +39,7 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
     settings = window.settings_window
     owners = (
         (PAGE_APPLICATION, settings.settings_general_page,
-         ('interface_language_button', 'ui_scale_control', 'translation_font_control',
+         ('ui_scale_control', 'translation_font_control',
           'translation_font_preview', 'autostart_checkbox', 'start_minimized_checkbox',
           'button_tooltips_checkbox', 'update_check_on_launch_checkbox')),
         (PAGE_TRANSLATION, settings.settings_updates_page,

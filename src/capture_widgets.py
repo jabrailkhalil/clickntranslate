@@ -6,7 +6,7 @@ from button_styles import paint_down_arrow
 from languages import language_display_name, language_short_label
 from settings_window import DropDownCombo
 from styled_dialogs import install_tooltip_style
-from combo_popup import PopupRowDelegate
+from combo_popup import PopupRowDelegate, popup_palette
 
 
 class _LanguageRow(PopupRowDelegate):
@@ -22,8 +22,6 @@ class _LanguageRow(PopupRowDelegate):
 
 
 class CaptureLanguageCombo(DropDownCombo):
-    POPUP_GAP = 5
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.interface_language = 'en'
@@ -60,10 +58,7 @@ class CaptureLanguageCombo(DropDownCombo):
     def set_capture_theme(self, dark, language='en', factor=1.0):
         self.ui_factor = factor
         self.interface_language = language
-        self.colors = (dict(surface='#211d29', text='#f5f0fc', muted='#a49bad', border='#544760',
-                            hover='#2e2638', selected='#3e3050', accent='#c3a5eb') if dark else
-                       dict(surface='#faf7fd', text='#302638', muted='#8b8095', border='#c8b9d7',
-                            hover='#f0e9f7', selected='#e9ddf4', accent='#765099'))
+        self.colors = popup_palette(dark)
         c = self.colors
         font = QtWidgets.QApplication.font()
         font.setPixelSize(max(12, round(14 * factor)))
@@ -77,7 +72,7 @@ class CaptureLanguageCombo(DropDownCombo):
         from window_appearance import scaled_stylesheet
         self.setStyleSheet(scaled_stylesheet(f"""
             QComboBox {{ background:{c['surface']}; color:{c['text']}; border:1px solid {c['border']};
-                border-radius:8px; padding:3px 20px 3px 8px; font-size:14px; font-weight:600; }}
+                border-radius:7px; padding:3px 20px 3px 8px; font-size:14px; font-weight:400; }}
             QComboBox:hover, QComboBox:on {{ border-color:{c['accent']}; background:{c['hover']}; }}
             QComboBox:disabled {{ color:{c['muted']}; }}
             QComboBox::drop-down {{ width:18px; border:0; background:transparent; }}
@@ -99,7 +94,7 @@ class CaptureLanguageCombo(DropDownCombo):
         self.itemIcon(self.currentIndex()).paint(painter, QtCore.QRect(
             round(10*s), round((self.height()-20*s)/2), round(20*s), round(20*s)))
         font = self.font()
-        font.setWeight(QtGui.QFont.Medium)
+        font.setWeight(QtGui.QFont.Normal)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(c['text']))
         label = language_short_label(self.currentData()) if self.currentData() else self.currentText()

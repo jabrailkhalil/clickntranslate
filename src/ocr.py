@@ -2189,10 +2189,23 @@ def _installed_argos_translation_pairs():
         return set()
 
 
+def direct_vision_provider(config=None):
+    """The image route can translate without the separate text translator."""
+    config = config if config is not None else get_cached_ocr_config()
+    from api_providers import VISION_ENGINES, profile
+    provider = {name.lower(): key for name, key in VISION_ENGINES.items()}.get(
+        str(config.get("ocr_engine", "")).strip().lower())
+    if provider:
+        item = profile(provider, config)
+        if item['vision'] and item['direct']:
+            return provider
+    return None
+
+
 def _translation_targets_for_source(source_code, config=None):
     config = config or get_cached_ocr_config()
     engine_name = str(config.get("translator_engine", "Google")).strip().lower()
-    if engine_name == "argos":
+    if engine_name == "argos" and not direct_vision_provider(config):
         pairs = _installed_argos_translation_pairs()
         return [language.code for language in APP_LANGUAGES if (source_code, language.code) in pairs]
     return [language.code for language in APP_LANGUAGES if language.code != source_code]
@@ -2202,7 +2215,7 @@ def _ocr_translate_options_from_config(config=None):
     config = config or get_cached_ocr_config()
     installed_sources = set(installed_ocr_language_codes(config=config))
     engine_name = str(config.get("translator_engine", "Google")).strip().lower()
-    if engine_name == "argos":
+    if engine_name == "argos" and not direct_vision_provider(config):
         pairs = _installed_argos_translation_pairs()
         return [
             (source, target)
@@ -6618,9 +6631,10 @@ class FullScreenTranslateOverlay(QWidget):
                 self._fail_translation(run_id, "screen_no_text")
                 return
             import threading
+            import copy
             threading.Thread(
                 target=self._translate_all,
-                args=(run_id, list(self._lines_data), source_code, target_code),
+                args=(run_id, copy.copy(self._lines_data), source_code, target_code),
                 daemon=True,
             ).start()
         except Exception:

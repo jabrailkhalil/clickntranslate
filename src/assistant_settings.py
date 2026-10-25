@@ -246,11 +246,12 @@ class AssistantSettingsPage(QtWidgets.QWidget):
             form.addWidget(field, row, 2, QtCore.Qt.AlignVCenter)
             self.field_labels[name] = label
         self.menu_buttons = QtWidgets.QPushButton(tr('menu_buttons'))
-        self.menu_buttons.setFixedSize(180, 28)
+        self.menu_buttons.setFixedHeight(28)
+        self.menu_buttons.setMinimumWidth(0)
+        self.menu_buttons.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
         self.menu_buttons.setToolTip(tr('menu_buttons_hint'))
         self.menu_buttons.setAccessibleName(tr('menu_buttons'))
         self.menu_buttons.clicked.connect(self.configure_menu)
-        form.addWidget(self.menu_buttons, 3, 1, 1, 2, QtCore.Qt.AlignRight)
         root.addWidget(self.options)
         self.mascot_preview = MascotStage(self.owner, self)
         self.mascot_preview.step_requested.connect(self.cycle_mascot)
@@ -282,23 +283,7 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         image_row.addWidget(self.replace_image)
         root.addWidget(self.custom_image_row)
 
-        footer = QtWidgets.QHBoxLayout()
-        footer.setSpacing(8)
-        self.action_buttons = {}
-        home = QtWidgets.QPushButton(tr('home'))
-        home.setFixedHeight(30)
-        home.setToolTip(control_hint(self.language, 'desktop_home'))
-        home.clicked.connect(lambda: self.perform('home'))
-        self.action_buttons['home'] = home
-        footer.addWidget(home)
-        footer.addStretch(1)
-        self.dismiss_button = QtWidgets.QPushButton(tr('dismiss'))
-        self.dismiss_button.setObjectName('desktopAssistantDismiss')
-        self.dismiss_button.setFixedHeight(30)
-        self.dismiss_button.setToolTip(tr('dismiss_hint'))
-        self.dismiss_button.clicked.connect(settings._dismiss_desktop_assistant_until_restart)
-        footer.addWidget(self.dismiss_button)
-        root.addLayout(footer)
+        root.addWidget(self.menu_buttons)
         self.toggle.toggled.connect(settings._set_desktop_assistant_enabled)
         self.main_visible.toggled.connect(self.owner.set_main_assistant_visible)
         self.topmost.toggled.connect(lambda checked: self.save('topmost', checked))
@@ -404,8 +389,6 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         values = assistant_preferences(self.owner.config)
         enabled = (self.owner.config.get('desktop_assistant_enabled') is True
                    and not getattr(self.owner, '_desktop_assistant_suppressed_until_restart', False))
-        self.dismiss_button.setEnabled(enabled)
-        self.action_buttons['home'].setEnabled(enabled)
         for widget, value in ((self.toggle, enabled), (self.topmost, values['desktop_assistant_topmost']),
                               (self.main_visible, self.owner.config.get('main_assistant_visible', True) is True)):
             with QtCore.QSignalBlocker(widget):

@@ -546,8 +546,7 @@ class MainWindowGeometryTest(unittest.TestCase):
                     for info in panel.overlay._detached_buttons.values()
                 }
                 self.assertTrue({
-                    "ocr_engine_combo", "translator_combo",
-                    "copy_notification_checkbox",
+                    "translator_combo", "restore_clipboard_checkbox",
                     "close_result_on_outside_click_checkbox",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
@@ -568,8 +567,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 self.assertTrue({
                     "game_source_combo",
                     "game_target_combo",
-                    "game_scan_interval_slider",
-                    "game_overlay_opacity_slider",
+                    "game_interval_controls",
+                    "game_opacity_controls",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
                 self.assertNotIn("export_settings_btn", detached_keys)

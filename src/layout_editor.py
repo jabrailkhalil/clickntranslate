@@ -224,12 +224,17 @@ class LayoutEditorOverlay(QtWidgets.QWidget):
         if widget is None or sip.isdeleted(widget):
             return False
         try:
+            ancestor = widget.parentWidget()
+            while ancestor is not None:
+                if ancestor.property('numberStepper'):
+                    return False
+                ancestor = ancestor.parentWidget()
             # Shortcut rows have their own drag/swap targets. Their labels
             # remain independently editable, but the button container must
             # stay in its grid instead of being detached a second time.
             if widget.objectName() == "mainHotkeyPair":
                 return False
-            return (
+            return (bool(widget.property('numberStepper')) or
                 isinstance(
                     widget,
                     (

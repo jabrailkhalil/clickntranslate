@@ -367,7 +367,7 @@ def test_output_controls_scale_inherited_fonts_too(isolated, app, factor):
         overlay.controls.gear.click()
         app.processEvents()
         assert overlay.controls.font_size.editor.font().pixelSize() == round(15 * factor)
-        assert overlay.controls.template_name.font().pixelSize() == round(13 * factor)
+        assert overlay.controls.template_name.font().pixelSize() == round(14 * factor)
         assert overlay.controls.locked.font().pixelSize() == round(13 * factor)
         assert overlay.controls.gear.font().pixelSize() == round(13 * factor)
     finally:

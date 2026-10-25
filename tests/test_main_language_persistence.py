@@ -209,7 +209,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
             harness._replace_selected_text_translation_pair(), ("zh", "en")
         )
 
-    def test_ocr_mode_does_not_blank_both_pickers_before_its_first_model(self):
+    def test_ocr_mode_requires_installed_models_and_restores_pair_after_install(self):
         harness = _LanguageHarness({
             "translator_engine": "lingva",
             "ocr_engine": "EasyOCR",
@@ -223,13 +223,23 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         harness.hotkey_target_combo = main.DropDownCombo()
         harness.hotkey_language_swap = main.LanguageSwapButton()
         try:
-            # EasyOCR downloads/selects a language model on first use, so a
-            # new installation legitimately reports no installed models yet.
+            # Recognition does not download models. Keep unavailable controls
+            # disabled until installation without overwriting the saved pair.
             with mock.patch("ocr.installed_ocr_language_codes", return_value=[]):
                 self.assertTrue(harness._refresh_hotkey_language_controls())
 
-            self.assertGreater(harness.hotkey_source_combo.count(), 0)
-            self.assertGreater(harness.hotkey_target_combo.count(), 0)
+            self.assertEqual(harness.hotkey_source_combo.count(), 0)
+            self.assertEqual(harness.hotkey_target_combo.count(), 0)
+            self.assertFalse(harness.hotkey_source_combo.isEnabled())
+            self.assertFalse(harness.hotkey_target_combo.isEnabled())
+            self.assertFalse(harness.hotkey_language_swap.isEnabled())
+            self.assertEqual(harness.config['ocr_translate_source_language'], 'ru')
+            self.assertEqual(harness.config['ocr_translate_target_language'], 'en')
+            self.assertEqual(harness.save_count, 0)
+            with mock.patch('ocr.installed_ocr_language_codes', return_value=['en', 'ru']):
+                self.assertTrue(harness._refresh_hotkey_language_controls())
+            self.assertTrue(harness.hotkey_source_combo.isEnabled())
+            self.assertTrue(harness.hotkey_target_combo.isEnabled())
             self.assertEqual(harness.hotkey_source_combo.currentData(), "ru")
             self.assertEqual(harness.hotkey_target_combo.currentData(), "en")
         finally:

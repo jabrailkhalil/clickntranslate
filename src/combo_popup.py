@@ -8,6 +8,7 @@ from classic_style import classic_palette
 
 
 GROUP_HEADER_ROLE = QtCore.Qt.UserRole + 100
+CHECKED_ROLE = QtCore.Qt.UserRole + 101
 
 
 @lru_cache(maxsize=128)
@@ -43,6 +44,17 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
     def label(self, index):
         return str(index.data(QtCore.Qt.DisplayRole) or '')
 
+    def marked(self, index):
+        """Both single choices and independent switches use the same tick."""
+        checked = index.data(CHECKED_ROLE)
+        if checked is not None:
+            return bool(checked)
+        return self.mark_current and index.row() == self.combo.currentIndex()
+
+    def _language_gutter(self):
+        search = getattr(self.combo, '_language_search', None)
+        return search is not None and not search.isHidden()
+
     def icon(self, index):
         decoration = index.data(QtCore.Qt.DecorationRole)
         if isinstance(decoration, QtGui.QIcon) and not decoration.isNull():
@@ -54,7 +66,7 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         # Older language fields contain names rather than ISO item data.
         # Search already verifies those catalogs; template/provider names do
         # not get interpreted as languages here.
-        if code is None and getattr(self.combo, '_language_search', None) is not None:
+        if code is None and self._language_gutter():
             from language_search import language_code_for_option_text
             return _language_flag(language_code_for_option_text(self.label(index)))
         return QtGui.QIcon()
@@ -72,7 +84,7 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         font = self._font(index)
         metrics = QtGui.QFontMetrics(font)
         icon = self.icon(index)
-        gutter = not header and (not icon.isNull() or getattr(self.combo, '_language_search', None) is not None)
+        gutter = not header and (not icon.isNull() or self._language_gutter())
         decoration = 24*scale if gutter else 0
         width = metrics.horizontalAdvance(self.label(index)) + round((18 if header else 38)*scale+decoration)
         height = max(round((26 if header else 30)*scale), metrics.height()+round(8*scale))
@@ -85,7 +97,7 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         scale, colors = popup_scale(self.combo), self.combo.popup_colors()
         header = bool(index.data(GROUP_HEADER_ROLE))
         enabled = bool(index.flags() & QtCore.Qt.ItemIsEnabled)
-        chosen = self.mark_current and enabled and index.row() == self.combo.currentIndex()
+        chosen = enabled and not header and self.marked(index)
         hover = enabled and bool(option.state & (QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected))
         rect = QtCore.QRectF(option.rect)
         painter.save()
@@ -111,7 +123,7 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
                 target = QtCore.QRectF(x+(size-fitted.width())/2,
                     content.center().y()-fitted.height()/2, fitted.width(), fitted.height())
                 painter.drawPixmap(target, pixels, QtCore.QRectF(pixels.rect()))
-        if not header and (not icon.isNull() or getattr(self.combo, '_language_search', None) is not None):
+        if not header and (not icon.isNull() or self._language_gutter()):
             content.adjust(0 if rtl else 24*scale, 0, -24*scale if rtl else 0, 0)
         if not header:
             content.adjust(20*scale if rtl else 0, 0, 0 if rtl else -20*scale, 0)

@@ -27,11 +27,29 @@ def assert_language_text_fits(combo, context):
                                         QtWidgets.QStyle.SC_ComboBoxEditField, combo)
     assert combo.rect().contains(field), (context, field, combo.rect())
     icon_width = 0 if option.currentIcon.isNull() else option.iconSize.width() + 6
-    widest = max(combo.fontMetrics().horizontalAdvance(combo.itemText(index))
-                 for index in range(combo.count()))
-    assert widest + icon_width <= field.width() - 2, (context, widest, icon_width, field)
+    # A long catalog entry must not widen one half of the fixed language pair.
+    # The closed field can elide it; hover and the open list retain its full name.
+    value = combo._closed_display_text()
+    if combo.fontMetrics().horizontalAdvance(value) + icon_width > field.width():
+        document = QtGui.QTextDocument()
+        document.setHtml(combo.elided_value_tooltip())
+        assert value in document.toPlainText(), (context, value)
     assert combo.fontMetrics().height() <= field.height(), (context, combo.fontMetrics().height(), field)
     assert combo.font().pixelSize() == 14
+    before = combo.geometry()
+    try:
+        combo.showPopup()
+        for _ in range(4):
+            QtWidgets.QApplication.processEvents()
+        view = combo.view()
+        row_option = QtWidgets.QStyleOptionViewItem()
+        row_option.initFrom(view)
+        widest = max(combo.itemDelegate().sizeHint(row_option, combo.model().index(index, 0)).width()
+                     for index in range(combo.count()))
+        assert view.viewport().width() >= widest, (context, widest, view.viewport().width())
+    finally:
+        combo.hidePopup()
+    assert combo.geometry() == before
 
 
 @pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
@@ -47,7 +65,7 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
         for theme in ('Темная', 'Светлая'):
             if window.current_theme != theme:
                 window.toggle_theme()
-            for scale in (80, 110, 125, 150, 200):
+            for scale in (80, 100, 125, 150, 200):
                 window.set_ui_scale_percent(scale)
                 settings._set_settings_page(PAGE_DYNAMIC)
                 settings._populate_game_language_controls(fast=False)
@@ -165,7 +183,7 @@ def test_field_outlines_share_the_full_row_bounds(window, app, locale, dark):
              {'#d7cde7', '#ad97cb', '#8063a8', '#9b78c8'})
     companion = settings.settings_assistant_page
     for page, fields in (
-            (0, (settings.interface_language_button, settings.ui_scale_field,
+            (0, (settings.ui_scale_field,
                  settings.translation_font_control)),
             (1, (settings.translator_combo, settings.result_window_control)),
             (4, (settings.ocr_engine_combo,)),

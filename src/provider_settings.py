@@ -417,7 +417,7 @@ class ProviderSettingsPage(QWidget):
 
     def apply_theme(self):
         from PyQt5.QtGui import QColor, QPalette
-        from settings_window import modern_combo_style
+        from settings_window import compact_combo_style
         from styled_dialogs import install_accent_controls, set_widget_stylesheet
         from button_styles import standard_buttons
         from classic_style import classic_palette
@@ -433,10 +433,7 @@ class ProviderSettingsPage(QWidget):
             QLineEdit:focus {{ border-color:{colors['accent_text']}; }}
         """ + standard_buttons(dark, compact=True))
         for combo in (self.service, self.usage):
-            set_widget_stylesheet(combo, modern_combo_style(dark, font_size=14) + f"""
-                QComboBox {{ background:{field}; color:{text}; border-color:{border};
-                    margin:0; padding:1px 26px 1px 8px; min-height:0; }}
-            """)
+            set_widget_stylesheet(combo, compact_combo_style(dark))
             combo.set_popup_background(field)
             # QSS min-height resets QComboBox's native minimum; keep the form
             # row identical to its line edits after the style has been polished.

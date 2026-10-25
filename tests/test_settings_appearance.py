@@ -558,7 +558,7 @@ class PopupFrameTest(unittest.TestCase):
         return parent, settings
 
     def test_every_picker_knows_its_popup_colour(self):
-        for theme, expected in (("Темная", "#20212a"), ("Светлая", "#f1edf4")):
+        for theme, expected in (("Темная", "#17181d"), ("Светлая", "#e9e4ed")):
             parent, settings = self._settings(theme)
             try:
                 for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
@@ -578,7 +578,7 @@ class PopupFrameTest(unittest.TestCase):
             popup = combo.view().window()
 
             image = popup.grab().toImage()
-            self.assertEqual(image.pixelColor(image.width()//2, 2).name(), '#20212a')
+            self.assertEqual(image.pixelColor(image.width()//2, 2).name(), '#17181d')
             self.assertEqual(image.pixelColor(image.width()//2, 2).alpha(), 255)
             self.assertEqual(image.pixelColor(0, 0).alpha(), 0)
             combo.hidePopup()
@@ -592,13 +592,13 @@ class PopupFrameTest(unittest.TestCase):
         parent, settings = self._settings()
         try:
             combo = settings.ocr_engine_combo
-            self.assertEqual(combo._popup_background, "#20212a")
+            self.assertEqual(combo._popup_background, "#17181d")
 
             parent.current_theme = "Светлая"
             settings.apply_theme()
             self.app.processEvents()
 
-            self.assertEqual(combo._popup_background, "#f1edf4")
+            self.assertEqual(combo._popup_background, "#e9e4ed")
         finally:
             settings.close()
             parent.close()

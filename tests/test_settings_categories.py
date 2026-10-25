@@ -80,7 +80,8 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
         settings._set_settings_page(0)
         QApplication.processEvents()
         page = settings.settings_general_page
-        for control in (settings.interface_language_button, settings.translation_font_control,
+        assert not hasattr(settings, 'interface_language_button')
+        for control in (settings.translation_font_control,
                         settings.translation_font_preview, settings.ui_scale_control,
                         settings.copy_history_checkbox, settings.history_checkbox):
             rect = QRect(control.mapTo(page, QPoint()), control.size())

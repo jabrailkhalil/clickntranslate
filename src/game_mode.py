@@ -1357,10 +1357,23 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             usable_ocr_engine,
         )
 
-        variants = _prepare_game_ocr_variants(qimage)
         engine = usable_ocr_engine(self.config.get("ocr_engine", platform_support.default_ocr_engine()))
         session = _new_ocr_session_id("game")
+        from api_providers import VISION_ENGINES, profile
+        api_provider = {name.lower(): provider for name, provider in VISION_ENGINES.items()}.get(engine.lower())
         worker = None
+        if api_provider:
+            from api_ocr import ApiOCRWorker
+            # Keep colour and the original image dimensions for vision models.
+            # Separate OCR keeps the existing text-change deduplication and
+            # translation pipeline; direct mode returns both in one request.
+            direct_target = self.target_language if profile(api_provider, self.config)['direct'] else None
+            worker = ApiOCRWorker(api_provider, _qimage_to_pil_rgb(qimage),
+                                  self.source_language, direct_target, self.config)
+            worker.result_ready.connect(self._on_api_ocr_result)
+            worker.failed.connect(self._on_api_ocr_error)
+        else:
+            variants = _prepare_game_ocr_variants(qimage)
         if engine.lower() == "windows":
             bitmap = load_image_from_pil(variants[0][1])
             if bitmap is not None:
@@ -1398,13 +1411,28 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._ocr_busy = True
         self._workers.add(worker)
         worker.join_paragraphs = self.config.get('ocr_join_paragraphs') is True
-        worker.result_ready.connect(self._on_ocr_result)
+        if not api_provider:
+            worker.result_ready.connect(self._on_ocr_result)
         worker.finished.connect(self._ocr_finished)
         worker.finished.connect(worker.deleteLater)
         worker.start()
 
     @QtCore.pyqtSlot(str)
     def _on_ocr_result(self, text):
+        self._consume_ocr_result(text)
+
+    @QtCore.pyqtSlot(object)
+    def _on_api_ocr_result(self, result):
+        self._consume_ocr_result(result.source, result.translation)
+
+    @QtCore.pyqtSlot(str)
+    def _on_api_ocr_error(self, error):
+        if self._closed or self.paused:
+            return
+        self._set_status("ocr_error", active=False)
+        self.status_label.setToolTip(str(error))
+
+    def _consume_ocr_result(self, text, translated=None):
         if self._closed or self.paused or not self._target_is_active():
             return
         self._has_ocr_source = True
@@ -1427,7 +1455,11 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             return
         self._last_source_text = normalized
         self.card.hide()
-        self._start_translation(normalized)
+        if translated is None:
+            self._start_translation(normalized)
+        else:
+            self._revision += 1
+            self._apply_translation(self._revision, normalized, str(translated), "")
 
     @QtCore.pyqtSlot()
     def _ocr_finished(self):
@@ -2024,6 +2056,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             return
         self._ocr_busy = True
         self._workers.add(worker)
+        worker.translation_target_code = self.target_language
         worker.result_ready.connect(self._on_position_ocr_result)
         worker.finished.connect(self._position_ocr_finished)
         worker.finished.connect(worker.deleteLater)
@@ -2035,13 +2068,23 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
         if self._closed or self.paused or not self._target_is_active():
             return
-        grouped = _group_screen_ocr_lines(lines, join_paragraphs=self.config.get('ocr_join_paragraphs') is True)
+        direct_values = getattr(lines, 'translations', None)
+        direct_pairs = [] if direct_values is None else [
+            (normalize_game_ocr_text(item[4]), str(value or '').strip())
+            for item, value in zip(lines, direct_values)
+        ]
+        # Vision providers already return paragraph bounds and matching
+        # translations; regrouping would invalidate that correspondence.
+        grouped = (lines if direct_values is not None else _group_screen_ocr_lines(
+            lines, join_paragraphs=self.config.get('ocr_join_paragraphs') is True))
         viewport = QtCore.QRectF(0, 0, self.width() * self._ocr_scale_x, self.height() * self._ocr_scale_y)
         grouped = [(*item[:4], normalize_game_ocr_text(item[4])) for item in grouped
                    if len(normalize_game_ocr_text(item[4])) >= 2
                    and viewport.intersects(QtCore.QRectF(*item[:4]))]
         now = time.monotonic()
         self._live.observe(grouped, now)
+        if direct_pairs:
+            self._live.remember(direct_pairs)
         if not grouped:
             self._empty_ocr_frames += 1
             self._last_layout_signature = ()
@@ -2061,7 +2104,16 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         # translation. Render only text that belongs to the newest OCR frame.
         blocks = self._live.blocks()
         if blocks != self._blocks:
+            previous_text = [(item[4], item[5]) for item in self._blocks]
             self._blocks = blocks
+            if direct_pairs and blocks:
+                self._has_shown_translation = True
+                self._status_is_error = False
+                if (self.config.get('history') is True
+                        and [(item[4], item[5]) for item in blocks] != previous_text):
+                    from ocr import save_translation_history
+                    save_translation_history("\n".join(item[4] for item in blocks),
+                                             "\n".join(item[5] for item in blocks), self.target_language)
             self.update()
         pending = set(self._live.pending(now))
         self._last_layout_signature = tuple(sorted(pending))

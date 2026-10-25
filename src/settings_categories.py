@@ -1,5 +1,5 @@
 """Arrange program and translation preferences in the fixed settings viewport."""
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout,
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
@@ -194,7 +194,7 @@ def _wrap_mode_pages(settings):
         _flag(control)
     grid.removeWidget(settings.game_help_button)
     grid.removeWidget(settings.game_launch_button)
-    grid.setRowStretch(9, 0)
+    grid.setRowStretch(9, 1)
     content = QWidget()
     content.setLayout(grid)
     settings.game_settings_content = content
@@ -209,9 +209,7 @@ def _wrap_mode_pages(settings):
 
     page = settings.settings_assistant_page
     old_root = page.layout()
-    old_footer = old_root.takeAt(old_root.count()-1).layout()
-    _empty(old_footer)
-    old_footer.deleteLater()
+    old_root.removeWidget(page.menu_buttons)
     content = QWidget()
     content.setLayout(old_root)
     settings.assistant_settings_content = content
@@ -220,15 +218,13 @@ def _wrap_mode_pages(settings):
     root.setContentsMargins(0, 0, 0, 0)
     root.setSpacing(4)
     root.addWidget(settings.assistant_settings_scroll, 1)
-    settings.assistant_action_panel = _panel(settings, page,
-        ((page.action_buttons['home'], page.dismiss_button),))
+    settings.assistant_action_panel = _panel(settings, page, ((page.menu_buttons,),))
     root.addWidget(settings.assistant_action_panel)
 
 
 def organize(settings, general_layout, form, updates_layout, dim_row):
-    from settings_window import InterfaceLanguageButton, settings_text
+    from settings_window import settings_text
     from styled_dialogs import tooltip_text
-    from PyQt5.QtGui import QIcon
 
     lang = settings.parent.current_interface_language
     compact = COMPACT.get(lang, COMPACT['en'])
@@ -248,26 +244,9 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             settings.update_check_on_launch_checkbox)):
         control.setParent(content)
         form.addWidget(_flag(control), row, 0, Qt.AlignLeft)
-    settings.interface_language_label = QLabel(section_text(lang, 'language'), content)
-    settings.interface_language_button = InterfaceLanguageButton('', content)
-    settings.interface_language_button.setObjectName('settingsInterfaceLanguage')
-    settings.interface_language_button.setFixedSize(180, 28)
-    settings.interface_language_button.setIconSize(QSize(18, 18))
-    settings.interface_language_button.setToolTip(tooltip_text(section_text(lang, 'language_hint')))
-    settings.interface_language_label.setToolTip(settings.interface_language_button.toolTip())
-    settings.interface_language_label.setBuddy(settings.interface_language_button)
-    from main import INTERFACE_LANGUAGE_OPTIONS, resource_path
-    option = next((item for item in INTERFACE_LANGUAGE_OPTIONS if item['code'] == lang),
-                  INTERFACE_LANGUAGE_OPTIONS[0])
-    settings.interface_language_button.setText(option['name'])
-    settings.interface_language_button.setIcon(QIcon(resource_path(option['icon'])))
-    settings.interface_language_button.setAccessibleName(section_text(lang, 'language').rstrip(':： '))
-    settings.interface_language_button.clicked.connect(
-        lambda _checked=False: settings.parent.show_interface_language_menu(restore_to='settings'))
     for row, label, control in (
-            (0, settings.interface_language_label, settings.interface_language_button),
-            (1, settings.ui_scale_label, settings.ui_scale_control),
-            (2, settings.translation_font_label, settings.translation_font_control)):
+            (0, settings.ui_scale_label, settings.ui_scale_control),
+            (1, settings.translation_font_label, settings.translation_font_control)):
         label.setParent(content)
         control.setParent(content)
         label.setStyleSheet('margin:0; padding:0; font-size:14px;')
@@ -275,7 +254,7 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         form.addWidget(label, row, 1)
         form.addWidget(control, row, 2)
     settings.translation_font_preview.setParent(content)
-    form.addWidget(settings.translation_font_preview, 3, 2, 2, 1, Qt.AlignVCenter)
+    form.addWidget(settings.translation_font_preview, 2, 2, 2, 1, Qt.AlignVCenter)
     form.setRowStretch(6, 1)
     settings.application_settings_content = content
     settings.application_settings_scroll = _scroll(general, content, 'applicationSettingsScroll')
@@ -382,12 +361,11 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 3, 0, Qt.AlignLeft)
     dim_controls = QWidget(content)
     dim_controls.setFixedHeight(28)
-    slider_row = QHBoxLayout(dim_controls)
-    slider_row.setContentsMargins(0, 0, 0, 0)
-    slider_row.setSpacing(8)
-    slider_row.addStretch(1)
-    slider_row.addWidget(settings.ocr_dim_strength_value)
-    slider_row.addWidget(settings.ocr_dim_strength_slider)
+    dim_layout = QHBoxLayout(dim_controls)
+    dim_layout.setContentsMargins(0, 0, 0, 0)
+    dim_layout.setSpacing(0)
+    dim_layout.addStretch(1)
+    dim_layout.addWidget(settings.ocr_dim_strength_control)
     grid.addWidget(dim_controls, 3, 1, 1, 2)
     settings.copy_notification_checkbox.setParent(content)
     grid.addWidget(_flag(settings.copy_notification_checkbox), 4, 0, 1, 3, Qt.AlignLeft)

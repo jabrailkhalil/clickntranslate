@@ -34,6 +34,13 @@ class _NumberBox(QtWidgets.QSpinBox):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.setAlignment(QtCore.Qt.AlignCenter)
 
+    def wheelEvent(self, event):
+        # Scrolling a settings page must not silently resize/fade a companion.
+        if not self.hasFocus() and not self.lineEdit().hasFocus():
+            event.ignore()
+            return
+        super().wheelEvent(event)
+
     def _digits(self, value):
         value = value.strip()
         if self.suffix() and value.endswith(self.suffix()):

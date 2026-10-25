@@ -9,7 +9,7 @@ import game_mode
 import platform_support
 from button_styles import button_qss
 from number_controls import NumberStepper
-from settings_window import DropDownCombo
+from settings_window import DropDownCombo, compact_combo_style
 from dynamic_templates import TemplateStore, decode_rect, encode_rect, output_style, text
 from windows_overlay import configure_surface, rounded_region, set_surface_region
 
@@ -81,6 +81,7 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         layout.addLayout(self.selection_controls)
         self._manual_output = bool(self._config.get('game_manual_output', False))
         self.template_combo = DropDownCombo()
+        self.template_combo.setStyleSheet(compact_combo_style(dark))
         self.template_combo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
         self.template_combo.setAccessibleName(text(self._language, 'choose_template'))
         self.template_combo.setToolTip(text(self._language, 'choose_template'))
@@ -653,6 +654,7 @@ class OutputControls(QtWidgets.QFrame):
         form.setContentsMargins(0, 2, 0, 0)
         form.setSpacing(8)
         self.output_combo = DropDownCombo()
+        self.output_combo.setStyleSheet(compact_combo_style(dark))
         self.output_combo.setMinimumHeight(28)
         self.output_combo.setAccessibleName(text(self.language, 'output_choice'))
         form.addWidget(self.output_combo)
@@ -695,6 +697,7 @@ class OutputControls(QtWidgets.QFrame):
         templates = QtWidgets.QHBoxLayout()
         templates.setSpacing(6)
         self.template_name = DropDownCombo()
+        self.template_name.setStyleSheet(compact_combo_style(dark))
         self.template_name.setEditable(True)
         self.template_name.setToolTip(text(self.language, 'templates'))
         self.template_name.setAccessibleName(text(self.language, 'templates'))

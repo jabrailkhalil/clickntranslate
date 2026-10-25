@@ -1,5 +1,6 @@
 from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
 from number_controls import ChoiceStepper, StepperFrame
+from numeric_stepper import NumericStepper
 from control_hints import control_hint
 from settings_sections import (
     PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR,
@@ -37,7 +38,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QKeySequenceEdit,
     QMessageBox, QTextEdit, QHBoxLayout, QComboBox, QSpacerItem, QSizePolicy, QApplication, QToolButton,
     QDialog, QProgressBar, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QLineEdit, QFrame, QGridLayout, QScrollArea, QSlider, QStackedWidget, QRadioButton
+    QLineEdit, QFrame, QGridLayout, QScrollArea, QStackedWidget, QRadioButton
 )
 from PyQt5.QtCore import Qt, QMetaObject, QUrl, pyqtSlot
 from PyQt5.QtGui import QDesktopServices, QKeySequence, QIcon, QColor, QBrush
@@ -415,6 +416,44 @@ class DropDownCombo(QComboBox):
     def set_group_header(self, index):
         _configure_engine_group_header(self, index)
 
+    def _closed_display_text(self):
+        option = QtWidgets.QStyleOptionComboBox()
+        self.initStyleOption(option)
+        return option.currentText
+
+    def elided_value_tooltip(self):
+        """Keep a long chosen value readable without widening the form."""
+        option = QtWidgets.QStyleOptionComboBox()
+        self.initStyleOption(option)
+        value = self._closed_display_text()
+        field = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                            QtWidgets.QStyle.SC_ComboBoxEditField, self)
+        icon_width = option.iconSize.width() + 6 if not option.currentIcon.isNull() else 0
+        if not value or self.fontMetrics().horizontalAdvance(value) <= field.width() - icon_width:
+            return ''
+        hint = self.toolTip()
+        if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', hint, re.I):
+            document = QtGui.QTextDocument()
+            document.setHtml(hint)
+            hint = document.toPlainText()
+        full = hint if value in hint else '\n'.join(part for part in (hint, value) if part)
+        import html
+        return '<qt><div style="width:240px">' + html.escape(full).replace('\n', '<br>') + '</div></qt>'
+
+    def event(self, event):
+        if event.type() == QtCore.QEvent.ToolTip:
+            app = QtWidgets.QApplication.instance()
+            if app is not None and app.property('buttonTooltipsEnabled') is False:
+                QtWidgets.QToolTip.hideText()
+                event.accept()
+                return True
+            text = self.elided_value_tooltip()
+            if text:
+                QtWidgets.QToolTip.showText(event.globalPos(), text, self)
+                event.accept()
+                return True
+        return super().event(event)
+
     def paintEvent(self, event):
         option = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(option)
@@ -698,6 +737,7 @@ def modern_combo_style(dark, font_size=15):
             border: 1px solid {border};
             border-radius: 7px;
             font-size: {int(font_size)}px;
+            font-weight: 400;
         }}
         QComboBox:hover {{
             background-color: {bg_lit};
@@ -884,15 +924,16 @@ class ResultWindowModeCombo(DropDownCombo):
             self.toggle_mode(value)
 
     def _refresh_icons(self):
-        # The tick is an icon rather than Qt's own check indicator: a stylesheet
-        # on the combo makes Qt paint the popup itself, and its indicator would
-        # be the platform's white square regardless of the window's style.
+        # Independent switches keep their state while sharing the ordinary
+        # language selector's trailing tick, row padding and selection colour.
+        from combo_popup import CHECKED_ROLE
         for mode in self._modes:
             item = self._item(mode)
             if item is None:
                 continue
             checked = self._checked.get(mode, False)
-            item.setIcon(QIcon(accent_check_pixmap(checked, self._dark)))
+            item.setIcon(QIcon())
+            item.setData(bool(checked), CHECKED_ROLE)
             state = self._summaries.get("on" if checked else "off", "")
             item.setData(f"{item.text()} — {state}" if state else item.text(),
                          Qt.AccessibleDescriptionRole)
@@ -902,6 +943,9 @@ class ResultWindowModeCombo(DropDownCombo):
     def available_text_width(self):
         """Room for the summary once padding and the chevron are taken out."""
         return max(40, self.width() - 42)
+
+    def _closed_display_text(self):
+        return self.summary_text()
 
     def summary_text(self):
         checked = self.checked_modes()
@@ -932,11 +976,11 @@ class ResultWindowModeCombo(DropDownCombo):
         self._refresh_text()
 
     def set_dark(self, dark):
-        """Follow a theme switch: the row indicators are painted pixmaps."""
+        """Repaint the shared row indicators after a theme switch."""
         dark = bool(dark)
         if dark != self._dark:
             self._dark = dark
-            self._refresh_icons()
+            self.view().viewport().update()
 
     def _refresh_text(self):
         # The closed control may only have room for "2 of 3", so the tooltip and
@@ -3654,6 +3698,15 @@ SETTINGS_TEXT = {
      'clear_histories_question': 'Hapus riwayat terjemahan dan salinan?',
      'settings_reset_done': 'Pengaturan direset'},
 }
+
+for _locale, _opacity_caption in zip(
+        ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id'),
+        ('Background opacity:', 'Непрозрачность фона:', 'Opacidad del fondo:',
+         'Hintergrunddeckkraft:', 'Opacité du fond :', '背景不透明度：',
+         'Opacidade do fundo:', 'Opacità dello sfondo:', 'عتامة الخلفية:',
+         'Arka plan opaklığı:', 'पृष्ठभूमि की अपारदर्शिता:', 'Opasitas latar:')):
+    SETTINGS_TEXT[_locale]['game_overlay_opacity'] = _opacity_caption
+SETTINGS_TEXT['ru']['game_scan_interval'] = 'Интервал проверки:'
 
 def settings_text(lang, key):
     texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
@@ -9527,23 +9580,14 @@ class SettingsWindow(QWidget):
 
     def _save_ocr_dim_strength(self, value):
         strength = max(0, min(80, int(value)))
-        label = getattr(self, "ocr_dim_strength_value", None)
-        if label is not None:
-            label.setText(f"{strength}%")
         self.auto_save_setting("ocr_dim_strength", strength)
 
     def _save_game_scan_interval(self, value):
-        interval = max(450, min(10000, int(value)))
-        label = getattr(self, "game_scan_interval_value", None)
-        if label is not None:
-            label.setText(f"{interval / 1000:.1f} s")
+        interval = max(450, min(10000, round(float(value) * 1000)))
         self.auto_save_setting("game_capture_interval_ms", interval)
 
     def _save_game_overlay_opacity(self, value):
         opacity = max(45, min(100, int(value)))
-        label = getattr(self, "game_overlay_opacity_value", None)
-        if label is not None:
-            label.setText(f"{opacity}%")
         self.auto_save_setting("game_overlay_opacity", opacity)
 
     def _game_source_changed(self, _index=None):
@@ -9560,13 +9604,16 @@ class SettingsWindow(QWidget):
         target_combo = getattr(self, "game_target_combo", None)
         if source_combo is None or target_combo is None:
             return
-        source = str(source_combo.currentData() or "en")
+        source = source_combo.currentData()
+        source = str(source) if source else None
         preferred = str(
             selected_target
             or self.parent.config.get("game_translate_target_language")
             or "ru"
         )
-        if fast:
+        if source is None:
+            available = set()
+        elif fast:
             available = {preferred} if preferred != source else {
                 "ru" if source != "ru" else "en"
             }
@@ -9575,7 +9622,8 @@ class SettingsWindow(QWidget):
                 from ocr import _translation_targets_for_source
                 available = set(_translation_targets_for_source(source, self.parent.config))
             except Exception:
-                available = {language.code for language in APP_LANGUAGES if language.code != source}
+                logging.exception("Could not inspect dynamic translation directions")
+                available = set()
         target_combo.blockSignals(True)
         try:
             target_combo.clear()
@@ -9583,10 +9631,31 @@ class SettingsWindow(QWidget):
                 if language.code not in available or language.code == source:
                     continue
                 target_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
+            if target_combo.count() == 0:
+                from ocr import ocr_ui_text
+                target_combo.addItem(ocr_ui_text(
+                    self.parent.current_interface_language, "no_installed_translation_pairs"), None)
             index = target_combo.findData(preferred)
             target_combo.setCurrentIndex(index if index >= 0 else 0)
+            target_combo.setEnabled(target_combo.currentData() is not None)
+            from ocr import ocr_ui_text
+            hint = ocr_ui_text(self.parent.current_interface_language, "target_language")
+            if target_combo.currentData() is None:
+                hint += "\n" + ocr_ui_text(self.parent.current_interface_language, "install_languages_first")
+            target_combo.setToolTip(tooltip_text(hint))
         finally:
             target_combo.blockSignals(False)
+        launch = getattr(self, "game_launch_button", None)
+        if launch is not None:
+            enabled = bool(source and target_combo.currentData())
+            launch.setEnabled(enabled)
+            if not enabled:
+                from ocr import ocr_ui_text
+                launch.setToolTip(tooltip_text(ocr_ui_text(
+                    self.parent.current_interface_language, "install_languages_first")))
+            else:
+                launch.setToolTip(tooltip_text(settings_text(
+                    self.parent.current_interface_language, "game_workflow_note")))
         self._update_game_swap_enabled()
 
     def _populate_game_language_controls(self, fast=False):
@@ -9599,6 +9668,7 @@ class SettingsWindow(QWidget):
             or "en"
         )
         config = dict(self.parent.config)
+        empty_key = "no_installed_languages"
         if fast:
             available = {current_source}
         else:
@@ -9606,13 +9676,16 @@ class SettingsWindow(QWidget):
                 from ocr import installed_ocr_language_codes
                 available = set(installed_ocr_language_codes(config=config))
                 if str(config.get("translator_engine", "google")).lower() == "argos":
+                    if available:
+                        empty_key = "no_installed_translation_pairs"
                     from ocr import _translation_targets_for_source
                     available = {
                         source for source in available
                         if _translation_targets_for_source(source, config)
                     }
             except Exception:
-                available = {language.code for language in APP_LANGUAGES}
+                logging.exception("Could not inspect dynamic OCR languages")
+                available = set()
         source_combo.blockSignals(True)
         try:
             source_combo.clear()
@@ -9620,8 +9693,18 @@ class SettingsWindow(QWidget):
                 if language.code not in available:
                     continue
                 source_combo.addItem(language.display_name(self.parent.current_interface_language), language.code)
+            if source_combo.count() == 0:
+                from ocr import ocr_ui_text
+                source_combo.addItem(ocr_ui_text(
+                    self.parent.current_interface_language, empty_key), None)
             index = source_combo.findData(current_source)
             source_combo.setCurrentIndex(index if index >= 0 else 0)
+            source_combo.setEnabled(source_combo.currentData() is not None)
+            from ocr import ocr_ui_text
+            hint = ocr_ui_text(self.parent.current_interface_language, "source_language")
+            if source_combo.currentData() is None:
+                hint += "\n" + ocr_ui_text(self.parent.current_interface_language, "install_languages_first")
+            source_combo.setToolTip(tooltip_text(hint))
         finally:
             source_combo.blockSignals(False)
         self._populate_game_targets(
@@ -9683,7 +9766,8 @@ class SettingsWindow(QWidget):
                     str(target), self.parent.config
                 )
             except Exception:
-                reverse_available = True
+                logging.exception("Could not inspect reverse dynamic translation direction")
+                reverse_available = False
         button.setEnabled(bool(reverse_available))
 
     def _swap_game_languages(self):
@@ -9709,12 +9793,9 @@ class SettingsWindow(QWidget):
 
     def _set_ocr_dimming_enabled(self, enabled):
         enabled = bool(enabled)
-        slider = getattr(self, "ocr_dim_strength_slider", None)
-        value_label = getattr(self, "ocr_dim_strength_value", None)
-        if slider is not None:
-            slider.setEnabled(enabled)
-        if value_label is not None:
-            value_label.setEnabled(enabled)
+        control = getattr(self, "ocr_dim_strength_control", None)
+        if control is not None:
+            control.setEnabled(enabled)
         self.auto_save_setting("dim_screen_during_ocr", enabled)
 
     def _create_bug_report_from_settings(self):
@@ -10562,32 +10643,22 @@ class SettingsWindow(QWidget):
         except (TypeError, ValueError):
             dim_strength = 60
         dim_strength = max(0, min(80, dim_strength))
-        self.ocr_dim_strength_value = QLabel(f"{dim_strength}%")
-        self.ocr_dim_strength_value.setObjectName("ocrDimStrengthValue")
-        self.ocr_dim_strength_value.setFixedWidth(42)
-        self.ocr_dim_strength_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.ocr_dim_strength_value.setToolTip(tooltip_text(dim_tooltip))
-        dim_row.addWidget(self.ocr_dim_strength_value)
-        self.ocr_dim_strength_slider = QSlider(Qt.Horizontal)
-        self.ocr_dim_strength_slider.setObjectName("ocrDimStrengthSlider")
-        self.ocr_dim_strength_slider.setRange(0, 80)
-        self.ocr_dim_strength_slider.setSingleStep(5)
-        self.ocr_dim_strength_slider.setPageStep(10)
-        self.ocr_dim_strength_slider.setValue(dim_strength)
-        self.ocr_dim_strength_slider.setFixedWidth(140)
-        self.ocr_dim_strength_slider.setFixedHeight(24)
-        self.ocr_dim_strength_slider.setToolTip(tooltip_text(dim_tooltip))
-        self.ocr_dim_strength_slider.setAccessibleName(dim_tooltip)
-        self.ocr_dim_strength_slider.valueChanged.connect(self._save_ocr_dim_strength)
-        dim_row.addWidget(self.ocr_dim_strength_slider, alignment=Qt.AlignVCenter)
+        self.ocr_dim_strength_control = NumericStepper(dark=self.parent.current_theme != 'Светлая')
+        self.ocr_dim_strength_control.setObjectName('ocrDimStrengthControl')
+        self.ocr_dim_strength_control.setRange(0, 80)
+        self.ocr_dim_strength_control.setSingleStep(5)
+        self.ocr_dim_strength_control.setSuffix('%')
+        self.ocr_dim_strength_control.setValue(dim_strength)
+        self.ocr_dim_strength_control.setFixedSize(180, 28)
+        self.ocr_dim_strength_control.setToolTip(tooltip_text(dim_tooltip))
+        self.ocr_dim_strength_control.setAccessibleName(settings_text(lang, 'dim_screen_during_ocr'))
+        self.ocr_dim_strength_control.valueChanged.connect(self._save_ocr_dim_strength)
+        dim_row.addWidget(self.ocr_dim_strength_control, alignment=Qt.AlignVCenter)
         updates_layout.addLayout(dim_row)
         self.dim_screen_during_ocr_checkbox.toggled.connect(
             self._set_ocr_dimming_enabled
         )
-        self.ocr_dim_strength_slider.setEnabled(
-            self.dim_screen_during_ocr_checkbox.isChecked()
-        )
-        self.ocr_dim_strength_value.setEnabled(
+        self.ocr_dim_strength_control.setEnabled(
             self.dim_screen_during_ocr_checkbox.isChecked()
         )
 
@@ -10719,7 +10790,7 @@ class SettingsWindow(QWidget):
         game_layout.setHorizontalSpacing(12)
         game_layout.setVerticalSpacing(4)
         game_layout.setColumnStretch(0, 1)
-        game_layout.setColumnMinimumWidth(1, 340)
+        game_layout.setColumnMinimumWidth(1, 180)
         game_layout.setAlignment(Qt.AlignTop)
 
         self.game_settings_heading = QLabel(
@@ -10746,13 +10817,12 @@ class SettingsWindow(QWidget):
         language_header = QHBoxLayout(self.game_language_row)
         language_header.setContentsMargins(0, 0, 0, 0)
         language_header.setSpacing(12)
-        language_header.addWidget(self.game_languages_label)
+        language_header.addWidget(self.game_languages_label, 1)
         self.game_language_controls = QWidget(self.game_language_row)
         self.game_language_controls.setObjectName("gameLanguageControls")
         self.game_language_controls.setFixedHeight(32)
-        self.game_language_controls.setMinimumWidth(0)
-        self.game_language_controls.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        language_header.addWidget(self.game_language_controls, 1)
+        self.game_language_controls.setFixedWidth(406)
+        language_header.addWidget(self.game_language_controls)
         language_row = QHBoxLayout(self.game_language_controls)
         language_row.setContentsMargins(0, 0, 0, 0)
         language_row.setSpacing(6)
@@ -10764,7 +10834,7 @@ class SettingsWindow(QWidget):
             # a one-row popup underneath the user's pointer.
             combo.aboutToShowPopup.connect(self._verify_game_language_controls)
             combo.setFixedHeight(32)
-            combo.setMinimumWidth(0)
+            combo.setFixedWidth(180)
             combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
             self._apply_game_language_combo_style(combo)
         self.game_swap_button = LanguageSwapButton(self.settings_game_page)
@@ -10786,26 +10856,16 @@ class SettingsWindow(QWidget):
         except (TypeError, ValueError):
             game_interval = 850
         game_interval = max(450, min(10000, game_interval))
-        self.game_interval_controls = QWidget(self.settings_game_page)
-        self.game_interval_controls.setObjectName("gameIntervalControls")
-        self.game_interval_controls.setFixedSize(340, 32)
-        interval_row = QHBoxLayout(self.game_interval_controls)
-        interval_row.setContentsMargins(0, 0, 0, 0)
-        interval_row.setSpacing(8)
-        self.game_scan_interval_slider = QSlider(Qt.Horizontal, self.settings_game_page)
-        self.game_scan_interval_slider.setObjectName("gameScanIntervalSlider")
-        self.game_scan_interval_slider.setRange(450, 10000)
-        self.game_scan_interval_slider.setSingleStep(50)
-        self.game_scan_interval_slider.setPageStep(500)
-        self.game_scan_interval_slider.setValue(game_interval)
-        self.game_scan_interval_slider.setFixedWidth(270)
-        self.game_scan_interval_slider.setFixedHeight(24)
-        self.game_scan_interval_value = QLabel(f"{game_interval / 1000:.1f} s")
-        self.game_scan_interval_value.setObjectName("gameSettingValue")
-        self.game_scan_interval_value.setFixedWidth(62)
-        self.game_scan_interval_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        interval_row.addWidget(self.game_scan_interval_slider)
-        interval_row.addWidget(self.game_scan_interval_value)
+        self.game_interval_controls = NumericStepper(self.settings_game_page,
+            dark=self.parent.current_theme != 'Светлая', decimals=2)
+        self.game_scan_interval_control = self.game_interval_controls
+        self.game_interval_controls.setObjectName('gameIntervalControls')
+        self.game_interval_controls.setRange(.45, 10)
+        self.game_interval_controls.setSingleStep(.05)
+        self.game_interval_controls.setSuffix(' s')
+        self.game_interval_controls.setValue(game_interval / 1000)
+        self.game_interval_controls.setFixedSize(180, 28)
+        self.game_interval_controls.setAccessibleName(settings_text(lang, 'game_scan_interval'))
         game_layout.addWidget(self.game_scan_interval_label, 3, 0)
         game_layout.addWidget(self.game_interval_controls, 3, 1)
 
@@ -10817,26 +10877,16 @@ class SettingsWindow(QWidget):
         except (TypeError, ValueError):
             game_opacity = 88
         game_opacity = max(45, min(100, game_opacity))
-        self.game_opacity_controls = QWidget(self.settings_game_page)
-        self.game_opacity_controls.setObjectName("gameOpacityControls")
-        self.game_opacity_controls.setFixedSize(340, 32)
-        opacity_row = QHBoxLayout(self.game_opacity_controls)
-        opacity_row.setContentsMargins(0, 0, 0, 0)
-        opacity_row.setSpacing(8)
-        self.game_overlay_opacity_slider = QSlider(Qt.Horizontal, self.settings_game_page)
-        self.game_overlay_opacity_slider.setObjectName("gameOverlayOpacitySlider")
-        self.game_overlay_opacity_slider.setRange(45, 100)
-        self.game_overlay_opacity_slider.setSingleStep(1)
-        self.game_overlay_opacity_slider.setPageStep(5)
-        self.game_overlay_opacity_slider.setValue(game_opacity)
-        self.game_overlay_opacity_slider.setFixedWidth(270)
-        self.game_overlay_opacity_slider.setFixedHeight(24)
-        self.game_overlay_opacity_value = QLabel(f"{game_opacity}%")
-        self.game_overlay_opacity_value.setObjectName("gameSettingValue")
-        self.game_overlay_opacity_value.setFixedWidth(62)
-        self.game_overlay_opacity_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        opacity_row.addWidget(self.game_overlay_opacity_slider)
-        opacity_row.addWidget(self.game_overlay_opacity_value)
+        self.game_opacity_controls = NumericStepper(self.settings_game_page,
+            dark=self.parent.current_theme != 'Светлая')
+        self.game_overlay_opacity_control = self.game_opacity_controls
+        self.game_opacity_controls.setObjectName('gameOpacityControls')
+        self.game_opacity_controls.setRange(45, 100)
+        self.game_opacity_controls.setSingleStep(1)
+        self.game_opacity_controls.setSuffix('%')
+        self.game_opacity_controls.setValue(game_opacity)
+        self.game_opacity_controls.setFixedSize(180, 28)
+        self.game_opacity_controls.setAccessibleName(settings_text(lang, 'game_overlay_opacity'))
         game_layout.addWidget(self.game_overlay_opacity_label, 4, 0)
         game_layout.addWidget(self.game_opacity_controls, 4, 1)
 
@@ -10897,7 +10947,7 @@ class SettingsWindow(QWidget):
         self.game_template_combo.setMinimumWidth(0)
         self.game_template_combo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.game_template_combo.setFixedHeight(28)
-        self.game_template_combo.setFixedWidth(340)
+        self.game_template_combo.setFixedWidth(180)
         self.game_template_combo.setMaxVisibleItems(7)
         self.game_template_combo.addItem(dynamic_text(lang, 'new_layout'), '')
         remembered_name = self.parent.config.get('game_last_template', '')
@@ -10951,10 +11001,10 @@ class SettingsWindow(QWidget):
         self.game_source_combo.currentIndexChanged.connect(self._game_source_changed)
         self.game_target_combo.currentIndexChanged.connect(self._save_game_language_pair)
         self.game_swap_button.clicked.connect(self._swap_game_languages)
-        self.game_scan_interval_slider.valueChanged.connect(
+        self.game_scan_interval_control.valueChanged.connect(
             self._save_game_scan_interval
         )
-        self.game_overlay_opacity_slider.valueChanged.connect(
+        self.game_overlay_opacity_control.valueChanged.connect(
             self._save_game_overlay_opacity
         )
         self.game_pause_inactive_checkbox.toggled.connect(
@@ -10968,7 +11018,6 @@ class SettingsWindow(QWidget):
         self.settings_assistant_page = AssistantSettingsPage(self)
         # Keep the public alias used by toggle synchronization and QA.
         self.desktop_assistant_checkbox = self.settings_assistant_page.toggle
-        self.desktop_assistant_dismiss_button = self.settings_assistant_page.dismiss_button
         self.settings_assistant_page.hide()
 
         # --- Переключатель страниц ---
@@ -11049,9 +11098,9 @@ class SettingsWindow(QWidget):
             ('reset_btn', 'reset'), ('update_btn', 'update'),
             ('copy_history_btn', 'copy_history'), ('translation_history_btn', 'translation_history'),
             ('hotkeys_button', 'hotkeys'), ('keep_visible_checkbox', 'keep_visible'),
-            ('game_scan_interval_slider', 'scan_interval'),
+            ('game_scan_interval_control', 'scan_interval'),
             ('game_scan_interval_label', 'scan_interval'),
-            ('game_overlay_opacity_slider', 'overlay_background'),
+            ('game_overlay_opacity_control', 'overlay_background'),
             ('game_overlay_opacity_label', 'overlay_background'),
             ('game_manual_output_checkbox', 'no_overlay_on_text'),
             ('game_source_combo', 'source_language'), ('game_target_combo', 'target_language'),
@@ -13963,8 +14012,6 @@ finally {
         theme = THEMES_LOCAL.get(self.parent.current_theme) or next(iter(THEMES_LOCAL.values()))
         self._ui_theme = self.parent.current_theme
         dark = self.parent.current_theme != "Светлая"
-        slider_track = "#3a3344" if dark else "#d4cadc"
-        slider_disabled = "#29262d" if dark else "#e3dde7"
         disabled_text = "#756B80" if dark else "#7c7087"
         report_hover = "#211b29" if dark else "#ded6e5"
         style = f"""
@@ -14010,45 +14057,6 @@ finally {
                 border:1px solid {'#584963' if dark else '#bcaacb'};
                 border-radius:6px; padding:2px 6px; font-size:13px;
             }}
-            QSlider#assistantSlider::groove:horizontal,
-            QSlider#ocrDimStrengthSlider::groove:horizontal {{
-                height: 5px;
-                background: {slider_track};
-                border-radius: 2px;
-            }}
-            QSlider#assistantSlider::sub-page:horizontal,
-            QSlider#ocrDimStrengthSlider::sub-page:horizontal {{
-                background: #9B78C8;
-                border-radius: 2px;
-            }}
-            QSlider#assistantSlider::handle:horizontal,
-            QSlider#ocrDimStrengthSlider::handle:horizontal {{
-                width: 16px;
-                height: 16px;
-                margin: -6px 0;
-                background: #C5B3E9;
-                border: 1px solid #7A5FA1;
-                border-radius: 8px;
-            }}
-            QSlider#assistantSlider::groove:horizontal:disabled,
-            QSlider#assistantSlider::sub-page:horizontal:disabled,
-            QSlider#ocrDimStrengthSlider::groove:horizontal:disabled,
-            QSlider#ocrDimStrengthSlider::sub-page:horizontal:disabled {{
-                background: {slider_disabled};
-            }}
-            QSlider#assistantSlider::handle:horizontal:disabled,
-            QSlider#ocrDimStrengthSlider::handle:horizontal:disabled {{
-                background: #756B80;
-                border-color: #5f5668;
-            }}
-            QLabel#ocrDimStrengthValue {{
-                color: {theme['text_color']};
-                font-size: 14px;
-                font-weight: 700;
-            }}
-            QLabel#ocrDimStrengthValue:disabled {{
-                color: {disabled_text};
-            }}
             QLabel#gameSettingsHeading {{
                 color: #A97BDD;
                 font-size: 16px;
@@ -14059,37 +14067,12 @@ finally {
                 font-size: 14px;
                 font-weight: 400;
             }}
-            QLabel#gameSettingValue {{
-                color: {theme['text_color']};
-                font-size: 14px;
-                font-weight: 700;
-            }}
             QLabel#gameWorkflowNote {{
                 color: {theme['text_color']};
                 font-size: 13px;
                 font-weight: 400;
             }}
 
-            QSlider#gameScanIntervalSlider::groove:horizontal,
-            QSlider#gameOverlayOpacitySlider::groove:horizontal {{
-                height: 5px;
-                background: {slider_track};
-                border-radius: 2px;
-            }}
-            QSlider#gameScanIntervalSlider::sub-page:horizontal,
-            QSlider#gameOverlayOpacitySlider::sub-page:horizontal {{
-                background: #9B78C8;
-                border-radius: 2px;
-            }}
-            QSlider#gameScanIntervalSlider::handle:horizontal,
-            QSlider#gameOverlayOpacitySlider::handle:horizontal {{
-                width: 16px;
-                height: 16px;
-                margin: -6px 0;
-                background: #C5B3E9;
-                border: 1px solid #7A5FA1;
-                border-radius: 8px;
-            }}
 
         """ + standard_buttons(dark, compact=True)
         style += button_qss(dark, 'secondary', 'QToolButton#assistantAppearance', compact=True)
@@ -14116,16 +14099,6 @@ finally {
                 navigation.set_dark(self.parent.current_theme != "Светлая")
             except RuntimeError:
                 pass
-        language_button = getattr(self, 'interface_language_button', None)
-        if language_button is not None and not sip.isdeleted(language_button):
-            field, ink, edge = (('#17181d', '#f4f6fb', '#3d3948') if dark
-                                else ('#e9e4ed', '#202124', '#d7cde7'))
-            set_widget_stylesheet(language_button, f'''
-                QPushButton {{ background:{field}; color:{ink}; border:1px solid {edge};
-                    border-radius:7px; padding:0 6px; font-size:14px; font-weight:400; }}
-                QPushButton:hover, QPushButton:pressed {{ border-color:#9B78C8; }}
-                QPushButton[keyboardFocus="true"]:focus {{ border-color:#9B78C8; }}
-            ''')
         for dot in getattr(self, "settings_page_dots", ()):
             try:
                 dot.set_dark(self.parent.current_theme != "Светлая")

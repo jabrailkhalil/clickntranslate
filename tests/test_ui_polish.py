@@ -572,10 +572,11 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         assert window.settings_window.settings_assistant_page.isVisible()
         assert window.settings_window.desktop_assistant_checkbox is window.settings_window.settings_assistant_page.toggle
         assert window.settings_window.desktop_assistant_checkbox.isVisible()
-        assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
+        assert window.settings_window.settings_assistant_page.menu_buttons.isVisible()
+        assert not hasattr(window.settings_window.settings_assistant_page, 'dismiss_button')
+        assert not hasattr(window.settings_window.settings_assistant_page, 'action_buttons')
         assert window.settings_window.settings_assistant_page.mascot_preview.next_button.hasFocus()
         assert window.config.get('desktop_assistant_enabled') is not True
-        assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
         with mock.patch.object(window, 'save_config') as save:
             window.settings_window.settings_assistant_page.main_visible.click()
             assert window.config['main_assistant_visible'] is False
@@ -585,7 +586,6 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
             assert window.assistant_preview.isHidden()
             window.show_desktop_assistant_settings()
             app.processEvents()
-            assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
             window.settings_window.settings_assistant_page.main_visible.click()
             window.show_main_screen()
             app.processEvents()

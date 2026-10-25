@@ -145,12 +145,16 @@ def test_actions_dialog_large_scale_keeps_footer_visible_and_uses_only_vertical_
         dialog.deleteLater()
 
 
-def test_settings_button_is_in_the_free_fourth_row_and_changes_apply_live(window, app):
+def test_menu_buttons_action_uses_the_footer_and_changes_apply_live(window, app):
     window.show_settings()
     settings = window.settings_window
     settings._set_settings_page(3)
     page = settings.settings_assistant_page
-    assert page.form_grid.itemAtPosition(3, 1).widget() is page.menu_buttons
+    panel = settings.assistant_action_panel
+    assert panel.layout().itemAtPosition(0, 0).widget() is page.menu_buttons
+    assert not settings.assistant_settings_scroll.isAncestorOf(page.menu_buttons)
+    assert not hasattr(page, 'dismiss_button')
+    assert not hasattr(page, 'action_buttons')
     with mock.patch.object(page, 'save', wraps=page.save) as save:
         page.configure_menu()
         dialog = page._actions_dialog

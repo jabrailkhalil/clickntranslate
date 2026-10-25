@@ -466,7 +466,8 @@ def scale_native_controls(root, factor):
 def style_capture_controls(overlay, config, controls):
     """Scale only the controls; capture geometry always stays in screen units."""
     from button_styles import button_qss
-    from settings_window import DropDownCombo, modern_combo_style
+    from settings_window import DropDownCombo, compact_combo_style
+    from classic_style import classic_palette
     from capture_widgets import CaptureLanguageCombo
     from ui_scaling import desktop_control_scale
     controls = [widget for widget in controls if widget is not None]
@@ -497,13 +498,13 @@ def style_capture_controls(overlay, config, controls):
             widget.set_capture_theme(dark, config.get('interface_language', 'en'), factor)
             continue
         if isinstance(widget, QtWidgets.QComboBox):
-            style = modern_combo_style(dark, 14) + """
+            style = compact_combo_style(dark) + """
                 QComboBox { margin:0; padding:3px 20px 3px 7px; }
                 QComboBox::drop-down { width:18px; }
             """
             if isinstance(widget, DropDownCombo):
                 widget.setMaxVisibleItems(9)
-                widget.set_popup_background('#20212a' if dark else '#f1edf4')
+                widget.set_popup_background(classic_palette(dark)['field'])
             # Reserve the icon, the language code and the chevron separately.
             # The settings-field padding hid the code in these compact fields.
             widget.setFixedSize(round(max(112, widget.property('capture_base_size').width()) * factor), round(44 * factor))

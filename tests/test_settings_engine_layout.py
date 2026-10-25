@@ -369,8 +369,10 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertEqual(
                 item.toolTip(), settings_text("en", f"result_window_mode_{mode}_tooltip")
             )
-            # Every row carries its own indicator, so several can be on at once.
-            self.assertFalse(item.icon().isNull(), mode)
+            # Independent states use the shared trailing tick, so several can
+            # be on without a second checkbox/icon style at the row's left.
+            self.assertTrue(control.itemDelegate().marked(item.index()), mode)
+            self.assertTrue(item.icon().isNull(), mode)
         settings.close()
         parent.close()
         self.app.processEvents()
@@ -471,20 +473,23 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.app.processEvents()
 
     def test_the_rows_are_repainted_for_the_light_theme(self):
-        """The ticks are pixmaps, so a theme switch has to redraw them rather
-        than restyle them."""
+        """The same delegate paints ticks and rows in the active palette."""
         parent, settings = self._result_window_settings(hidden=("area",))
         control = settings.result_window_control
-        # An unticked box is the one that carries the theme: a ticked one is
-        # accent-filled in both palettes.
-        before = control._item("area").icon().pixmap(18, 18).toImage()
+        control.showPopup()
+        self.app.processEvents()
+        before = control.view().window().grab().toImage()
+        control.hidePopup()
 
         parent.current_theme = "Светлая"
         settings.apply_theme()
         self.app.processEvents()
 
         self.assertFalse(control._dark)
-        after = control._item("area").icon().pixmap(18, 18).toImage()
+        control.showPopup()
+        self.app.processEvents()
+        after = control.view().window().grab().toImage()
+        control.hidePopup()
         self.assertNotEqual(before, after)
         settings.close()
         parent.close()
@@ -611,18 +616,18 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                 self.assertIsInstance(settings.game_swap_button, main.LanguageSwapButton)
                 self.assertEqual(settings.game_swap_button.text(), "")
                 self.assertIn("foreground", settings.game_pause_inactive_checkbox.toolTip())
-                settings.game_scan_interval_slider.setValue(1200)
-                settings.game_overlay_opacity_slider.setValue(76)
+                settings.game_scan_interval_control.setValue(1.20)
+                settings.game_overlay_opacity_control.setValue(76)
                 settings.game_pause_inactive_checkbox.click()
                 settings.game_show_original_checkbox.click()
                 self.assertEqual(parent.config["game_capture_interval_ms"], 1200)
                 self.assertEqual(parent.config["game_overlay_opacity"], 76)
                 self.assertFalse(parent.config["game_pause_when_inactive"])
                 self.assertTrue(parent.config["game_show_original_text"])
-                self.assertEqual(settings.game_scan_interval_slider.maximum(), 10000)
-                settings.game_scan_interval_slider.setValue(10000)
+                self.assertEqual(settings.game_scan_interval_control.maximum(), 10)
+                settings.game_scan_interval_control.setValue(10)
                 self.assertEqual(parent.config["game_capture_interval_ms"], 10000)
-                self.assertEqual(settings.game_scan_interval_value.text(), "10.0 s")
+                self.assertEqual(settings.game_scan_interval_control.lineEdit().text().replace(',', '.'), "10.00 s")
                 self.assertEqual(
                     settings.game_interval_controls.x(),
                     settings.game_opacity_controls.x(),
@@ -653,18 +658,18 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         settings._set_settings_page(4)
         self.app.processEvents()
         try:
-            self.assertFalse(settings.ocr_dim_strength_slider.isEnabled())
-            self.assertEqual(settings.ocr_dim_strength_slider.value(), 55)
-            self.assertEqual(settings.ocr_dim_strength_value.text(), "55%")
+            self.assertFalse(settings.ocr_dim_strength_control.isEnabled())
+            self.assertEqual(settings.ocr_dim_strength_control.value(), 55)
+            self.assertEqual(settings.ocr_dim_strength_control.lineEdit().text(), "55%")
             self.assertTrue(settings.restore_clipboard_checkbox.isChecked())
             self.assertFalse(settings.copy_notification_checkbox.isChecked())
 
             settings.dim_screen_during_ocr_checkbox.click()
-            self.assertTrue(settings.ocr_dim_strength_slider.isEnabled())
+            self.assertTrue(settings.ocr_dim_strength_control.isEnabled())
             self.assertTrue(parent.config["dim_screen_during_ocr"])
-            settings.ocr_dim_strength_slider.setValue(75)
+            settings.ocr_dim_strength_control.setValue(75)
             self.assertEqual(parent.config["ocr_dim_strength"], 75)
-            self.assertEqual(settings.ocr_dim_strength_value.text(), "75%")
+            self.assertEqual(settings.ocr_dim_strength_control.lineEdit().text(), "75%")
 
             settings._set_settings_page(1)
             self.app.processEvents()
@@ -793,7 +798,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             settings._set_settings_page(0)
             self.app.processEvents()
             control = settings.translation_font_control
-            history = self._rect_in_settings(settings, settings.copy_history_checkbox)
+            history = self._rect_in_settings(settings, settings.start_minimized_checkbox)
             label = self._rect_in_settings(settings, settings.translation_font_label)
             font = self._rect_in_settings(settings, control)
             scale = self._rect_in_settings(settings, settings.ui_scale_control)

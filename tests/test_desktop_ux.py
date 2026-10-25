@@ -234,6 +234,7 @@ def test_dynamic_help_runs_only_the_explicit_action(window, choice):
 
 def test_clicking_empty_scaled_canvas_clears_number_selection_and_tab_arrow_focus(window, app):
     window.show_assistant_settings()
+    app.processEvents()
     page = window.settings_window.settings_assistant_page
     field = page.values['opacity']
     editor = field.lineEdit()

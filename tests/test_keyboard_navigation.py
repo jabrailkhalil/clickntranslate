@@ -192,12 +192,13 @@ def test_enter_opens_combo_and_escape_only_closes_its_popup(window, app):
     assert window.settings_window is settings
 
 
-def test_application_language_button_restores_focus_after_live_language_change(window, app):
+def test_header_language_button_restores_focus_after_live_language_change_from_settings(window, app):
     window.show_settings()
     settings = window.settings_window
     app.processEvents()
-    keyboard.focus_control(settings.interface_language_button)
-    QTest.keyClick(settings.interface_language_button, QtCore.Qt.Key_Return)
+    assert not hasattr(settings, 'interface_language_button')
+    keyboard.focus_control(window.flag_button)
+    QTest.keyClick(window.flag_button, QtCore.Qt.Key_Return)
     app.processEvents()
     picker = window._interface_language_picker
     assert picker is not None and window.flag_button.isChecked()
@@ -212,7 +213,7 @@ def test_application_language_button_restores_focus_after_live_language_change(w
     app.processEvents()
     assert window._interface_language_picker is None
     assert settings._settings_page_index == 0
-    assert settings.interface_language_button.hasFocus()
+    assert window.flag_button.hasFocus()
 
 
 def test_result_window_modes_support_arrow_selection_and_space_toggle(window, app):
@@ -298,6 +299,7 @@ def test_real_f1_help_can_be_opened_closed_and_reopened_without_nested_dialogs(w
 def test_arrow_keys_follow_the_grid_without_activating_buttons(app):
     keyboard.install_keyboard_navigation(app)
     dialog = QtWidgets.QDialog()
+    dialog.setLayoutDirection(QtCore.Qt.LeftToRight)
     layout = QtWidgets.QGridLayout(dialog)
     buttons = [QtWidgets.QPushButton(name) for name in ('Top left', 'Top right', 'Bottom left', 'Bottom right')]
     clicks = []
@@ -323,7 +325,7 @@ def test_arrow_keys_follow_the_grid_without_activating_buttons(app):
 def test_arrows_from_closed_combos_navigate_without_changing_the_selected_engine(window, app):
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
+    settings._set_settings_page(PAGE_OCR)
     app.processEvents()
     combo = settings.ocr_engine_combo
     before = combo.currentData()
